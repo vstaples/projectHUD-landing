@@ -508,9 +508,18 @@
   <div class="footer-copy">© 2026 Test Company · Powered by ProjectHUD · All Rights Reserved</div>
 </footer>
 
+<!-- Supabase client library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+  // ── Supabase configuration ──────────────────────────────────────
+  const SUPABASE_URL  = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+  const SUPABASE_KEY  = 'sb_publishable_1EOfIYerLiE3syHLc9zfKw__72o8fmx';
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // ── Password show/hide ──────────────────────────────────────────
   function togglePassword() {
-    const pw = document.getElementById('password');
+    const pw  = document.getElementById('password');
     const btn = document.getElementById('toggle-btn');
     if (pw.type === 'password') {
       pw.type = 'text';
@@ -521,11 +530,12 @@
     }
   }
 
-  function handleLogin() {
-    const email = document.getElementById('email').value.trim();
+  // ── Login handler ───────────────────────────────────────────────
+  async function handleLogin() {
+    const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value.trim();
-    const errorEl = document.getElementById('login-error');
-    const btn = document.getElementById('submit-btn');
+    const errorEl  = document.getElementById('login-error');
+    const btn      = document.getElementById('submit-btn');
 
     errorEl.style.display = 'none';
 
@@ -538,23 +548,36 @@
     btn.textContent = 'Authenticating...';
     btn.disabled = true;
 
-    // NOTE: Replace this timeout with your real Supabase auth call.
-    // Example Supabase integration:
-    //   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    //   if (error) { show error } else { redirect to dashboard }
-    setTimeout(() => {
-      // Placeholder — wire up to Supabase here
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      // Login failed — show error message
+      errorEl.textContent = 'Invalid email or password. Please try again.';
+      errorEl.style.display = 'block';
       btn.textContent = 'Sign In to Platform →';
       btn.disabled = false;
-      errorEl.textContent = 'Authentication not yet configured. Contact vstaples@projecthud.com.';
-      errorEl.style.display = 'block';
+      return;
+    }
+
+    // Login succeeded — show success state then redirect
+    document.getElementById('login-fields').style.display = 'none';
+    document.getElementById('login-success').style.display = 'block';
+
+    setTimeout(() => {
+      window.location.href = '/dashboard.html';
     }, 1500);
   }
 
-  // Allow Enter key to submit
+  // ── Enter key support ───────────────────────────────────────────
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') handleLogin();
   });
+
+  // ── If already logged in, go straight to dashboard ─────────────
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) window.location.href = '/dashboard.html';
+  })();
 </script>
 </body>
 </html>
