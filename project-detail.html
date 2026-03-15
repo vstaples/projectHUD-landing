@@ -337,6 +337,84 @@
 .journal-panel-close:hover { color: var(--red); }
 
 @media (max-width: 1100px) { .detail-grid { grid-template-columns: 1fr; } }
+
+/* ── Journal Reply Threads ─────────────────────────────────── */
+.jr-thread-root { margin-top: 4px; }
+.jr-reply-wrap { position: relative; margin-top: 6px; padding-top: 4px; }
+.jr-reply-row { display: flex; align-items: flex-start; gap: 8px; }
+.jr-avatar {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.30);
+  color: #00d2ff; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.jr-reply-body-wrap { flex: 1; min-width: 0; }
+.jr-reply-meta {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+}
+.jr-author {
+  font-family: 'Barlow Condensed', sans-serif; font-size: 11px;
+  font-weight: 600; color: #00d2ff; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.jr-ts {
+  font-family: 'Share Tech Mono', monospace; font-size: 10px;
+  color: rgba(180,200,220,0.45);
+}
+/* Reply icon button — inline in journal-header and in reply meta */
+.jr-reply-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none;
+  color: rgba(0,210,255,0.40); cursor: pointer;
+  padding: 2px 3px; transition: color 0.15s;
+  line-height: 1;
+}
+.jr-reply-icon-btn:hover { color: #00d2ff; }
+.jr-del-btn {
+  background: none; border: none; color: rgba(255,71,87,0.40);
+  font-size: 10px; cursor: pointer; padding: 0 2px; line-height: 1;
+  transition: color 0.15s; font-family: 'Barlow Condensed', sans-serif;
+}
+.jr-del-btn:hover { color: #ff4757; }
+.jr-reply-text {
+  font-family: 'Barlow', sans-serif; font-size: 12px;
+  color: rgba(200,220,240,0.82); line-height: 1.5;
+  word-break: break-word; white-space: pre-wrap;
+}
+/* Composer — full width of the journal entry */
+.jr-composer { margin-top: 8px; margin-bottom: 6px; }
+.jr-textarea {
+  display: block; width: 100%; box-sizing: border-box;
+  min-height: 68px;
+  background: rgba(0,30,60,0.55);
+  border: 1px solid rgba(0,210,255,0.28);
+  border-radius: 3px;
+  color: rgba(210,230,245,0.92);
+  font-family: 'Barlow', sans-serif; font-size: 12px; line-height: 1.5;
+  padding: 8px 10px; resize: vertical; outline: none;
+  transition: border-color 0.15s;
+}
+.jr-textarea:focus { border-color: rgba(0,210,255,0.55); }
+.jr-textarea::placeholder { color: rgba(150,175,200,0.32); }
+.jr-composer-actions { display: flex; gap: 8px; margin-top: 6px; }
+.jr-submit-btn {
+  background: rgba(0,210,255,0.10); border: 1px solid rgba(0,210,255,0.38);
+  color: #00d2ff; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  padding: 4px 14px; cursor: pointer; border-radius: 2px;
+  transition: background 0.15s;
+}
+.jr-submit-btn:hover { background: rgba(0,210,255,0.20); }
+.jr-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.jr-cancel-btn {
+  background: none; border: 1px solid rgba(150,170,190,0.18);
+  color: rgba(150,170,190,0.50); font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  padding: 4px 12px; cursor: pointer; border-radius: 2px;
+  transition: color 0.15s;
+}
+.jr-cancel-btn:hover { color: rgba(200,215,230,0.80); }
+
 </style>
 </head>
 <body>
@@ -427,12 +505,7 @@
               <div id="overview-tasks"></div>
             </div>
 
-            <div class="panel" style="margin-top:16px;">
-              <div class="panel-header"><div class="panel-title">PROJECT DESCRIPTION</div></div>
-              <div style="padding:14px 16px;">
-                <p id="proj-description" style="font-family:var(--font-body,Barlow,sans-serif);font-size:13px;color:var(--text1);line-height:1.75;letter-spacing:0.01em;">—</p>
-              </div>
-            </div>
+
           </div>
 
           <!-- RIGHT -->
@@ -441,15 +514,6 @@
               <div class="bracket-bl"></div><div class="bracket-br"></div>
               <div class="panel-header"><div class="panel-title">PHASE PROGRESS</div></div>
               <div id="phase-progress"></div>
-            </div>
-
-            <div class="panel" style="margin-bottom:14px;">
-              <div class="panel-header">
-                <div class="panel-title">EVM SNAPSHOT</div>
-                <button class="panel-action" onclick="switchTab('evm')">FULL →</button>
-              </div>
-              <div style="padding:10px 14px;display:flex;justify-content:space-around;" id="overview-gauges"></div>
-              <div id="overview-evm-vals" style="padding:8px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border);"></div>
             </div>
 
             <div class="panel">
@@ -1138,8 +1202,9 @@ function taskRowHTML(t) {
     <td style="padding:7px 12px 7px 14px;width:16px;">${UI.taskDot(t.status)}</td>
     <td style="padding:7px 8px;min-width:0;">
       <div style="font-family:var(--font-ui);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;" title="${t.name}">${t.name}</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;">${t.phase||'—'}${asgn?' · '+asgn.name:''}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;">${t.phase||'—'}</div>
     </td>
+    <td style="padding:7px 8px;font-family:var(--font-ui);font-size:12px;color:var(--text2);white-space:nowrap;">${asgn ? asgn.name : '—'}</td>
     <td style="padding:7px 8px;text-align:center;">${UI.badge(t.status)}</td>
     <td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;">${startStr}</td>
     <td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:${isOverdue?'var(--red)':due.color};white-space:nowrap;text-align:center;font-weight:${isOverdue?'700':'400'};">${endStr}</td>
@@ -1160,7 +1225,7 @@ function renderOverviewTasks() {
   const hidden  = all.slice(INITIAL);
   const extraOverdue = overdue.length > INITIAL ? overdue.length - INITIAL : 0;
   const TH = (label, align='center') => `<th style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.14em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:${align};white-space:nowrap;">${label}</th>`;
-  let html = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${TH('','left')}${TH('TASK','left')}${TH('STATUS')}${TH('START')}${TH('END')}${TH('DUR','right')}</tr></thead><tbody id="overview-tasks-body">${visible.map(taskRowHTML).join('')}</tbody></table>`;
+  let html = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${TH('','left')}${TH('TASK','left')}${TH('RESOURCE','left')}${TH('STATUS')}${TH('START')}${TH('END')}${TH('DUR','right')}</tr></thead><tbody id="overview-tasks-body">${visible.map(taskRowHTML).join('')}</tbody></table>`;
   if (hidden.length > 0) {
     const label = extraOverdue > 0
       ? `▼ &nbsp;+${hidden.length} more &nbsp;<span style="color:var(--red);">(${extraOverdue} overdue)</span>`
@@ -1514,9 +1579,7 @@ async function loadProjectDetail() {
     renderOverviewMilestones();
     renderOverviewTasks();
     renderPhaseProgress();
-    renderOverviewEVM();
     renderRecentJournal();
-    renderDescription();
     renderTasksTable();
     renderedTabs.add('overview');
     renderedTabs.add('tasks');
