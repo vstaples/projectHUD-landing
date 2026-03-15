@@ -175,7 +175,7 @@ async function loadDashboard() {
         const fill    = pctDone === 100 ? 'var(--green)' : overdue > 0 ? 'var(--amber)' : 'var(--cyan)';
         const cpi     = parseFloat((0.90 + Math.random()*0.18).toFixed(2));
         const spi     = parseFloat((0.87 + Math.random()*0.18).toFixed(2));
-        return `<div class="project-card ${health} fade-in">
+        return `<div class="project-card ${health} fade-in" onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
             <div><div class="proj-name">${proj.name}</div><div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div></div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
