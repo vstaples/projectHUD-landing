@@ -371,6 +371,10 @@
         <div class="health-sep"></div>
         <div class="health-chip"><span class="hc-label">TARGET DATE</span><span class="hc-val" id="hc-target" style="font-size:13.0px;font-family:var(--font-mono);">—</span><span class="hc-sub" id="hc-days-left">—</span></div>
         <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">WORK COMPLETE</span><span class="hc-val" id="hc-work-pct" style="color:var(--cyan)">—</span><span class="hc-sub" id="hc-work-sub">—</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">HRS CONSUMED</span><span class="hc-val" id="hc-hrs-pct" style="color:var(--purple)">—</span><span class="hc-sub" id="hc-hrs-sub">—</span></div>
+        <div class="health-sep"></div>
         <div class="health-chip"><span class="hc-label">PM / OWNER</span><span class="hc-val" id="hc-pm" style="font-size:13.0px;font-family:var(--font-ui);">—</span></div>
       </div>
 
@@ -379,10 +383,12 @@
         <button class="proj-tab active" data-tab="overview">◈ OVERVIEW</button>
         <button class="proj-tab" data-tab="tasks">▦ TASKS <span class="tab-badge" id="tab-tasks-count" style="display:none"></span></button>
         <button class="proj-tab" data-tab="milestones">◆ MILESTONES</button>
-        <button class="proj-tab" data-tab="evm">◉ EVM / BUDGET</button>
+        <button class="proj-tab" data-tab="evm">◉ EVM</button>
+        <button class="proj-tab" data-tab="expenditures">$ EXPENDITURES</button>
         <button class="proj-tab" data-tab="risks">⚑ RISKS</button>
         <button class="proj-tab" data-tab="documents">▣ DOCUMENTS</button>
         <button class="proj-tab" data-tab="journal">▤ JOURNAL</button>
+        <button class="proj-tab" data-tab="labor">◉ LABOR</button>
       </div>
     </div>
 
@@ -500,48 +506,24 @@
         </div>
       </div>
 
-      <!-- ── EVM / BUDGET TAB ──────────────────────────────── -->
+      <!-- ── EVM TAB ──────────────────────────────────────────── -->
       <div id="tab-evm" class="tab-pane" style="display:none;">
-        <div class="detail-grid">
-          <div>
-            <!-- EVM indices -->
-            <div class="panel bracketed" style="margin-bottom:16px;">
-              <div class="bracket-bl"></div><div class="bracket-br"></div>
-              <div class="panel-header"><div class="panel-title">EARNED VALUE METRICS</div></div>
-              <div style="padding:14px;display:flex;justify-content:space-around;" id="evm-gauges-full"></div>
-              <table class="evm-table" id="evm-table-detail" style="border-top:1px solid var(--border);"></table>
-            </div>
+        <div class="panel bracketed">
+          <div class="bracket-bl"></div><div class="bracket-br"></div>
+          <div class="panel-header"><div class="panel-title">EARNED VALUE METRICS</div></div>
+          <div style="padding:14px;display:flex;justify-content:space-around;" id="evm-gauges-full"></div>
+          <table class="evm-table" id="evm-table-detail" style="border-top:1px solid var(--border);"></table>
+        </div>
+      </div>
 
-            <!-- Expenditures -->
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-title">EXPENDITURES</div>
-                <button class="hud-btn" onclick="openExpForm()">+ ADD</button>
-              </div>
-              <div id="expenditures-list"></div>
-            </div>
+      <!-- ── EXPENDITURES TAB ──────────────────────────────────── -->
+      <div id="tab-expenditures" class="tab-pane" style="display:none;">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">EXPENDITURES</div>
+            <button class="hud-btn" onclick="openExpForm()">+ ADD</button>
           </div>
-
-          <div>
-            <!-- Budget summary -->
-            <div class="panel bracketed" style="margin-bottom:14px;">
-              <div class="bracket-bl"></div><div class="bracket-br"></div>
-              <div class="panel-header"><div class="panel-title">BUDGET SUMMARY</div></div>
-              <div id="budget-bars"></div>
-            </div>
-
-            <!-- Labor costs by phase -->
-            <div class="panel" style="margin-bottom:14px;">
-              <div class="panel-header"><div class="panel-title">LABOR BY PHASE</div></div>
-              <div id="labor-by-phase"></div>
-            </div>
-
-            <!-- Resource cost breakdown -->
-            <div class="panel">
-              <div class="panel-header"><div class="panel-title">HOURS BY RESOURCE</div></div>
-              <div id="resource-breakdown"></div>
-            </div>
-          </div>
+          <div id="expenditures-list"></div>
         </div>
       </div>
 
@@ -581,6 +563,25 @@
             <span class="panel-count" id="journal-count">0</span>
           </div>
           <div id="journal-list"></div>
+        </div>
+      </div>
+
+      <!-- ── LABOR TAB ─────────────────────────────────────── -->
+      <div id="tab-labor" class="tab-pane" style="display:none;">
+        <div class="detail-grid">
+          <div>
+            <div class="panel bracketed">
+              <div class="bracket-bl"></div><div class="bracket-br"></div>
+              <div class="panel-header"><div class="panel-title">LABOR BY PHASE</div></div>
+              <div id="labor-by-phase"></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel">
+              <div class="panel-header"><div class="panel-title">HOURS BY RESOURCE</div></div>
+              <div id="resource-breakdown"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -796,12 +797,14 @@ function switchTab(tab) {
   // Lazy-render tab content on first visit
   if (!renderedTabs.has(tab) && STATE.project) {
     renderedTabs.add(tab);
-    if (tab === 'milestones') renderMilestones();
-    if (tab === 'evm')        renderEVM();
-    if (tab === 'risks')      renderRisks();
-    if (tab === 'documents')  renderDocuments();
-    if (tab === 'journal')    renderJournalTab();
-    if (tab === 'tasks')      renderTasksTable();
+    if (tab === 'milestones')    renderMilestones();
+    if (tab === 'evm')           renderEVM();
+    if (tab === 'expenditures')  renderExpenditures();
+    if (tab === 'risks')         renderRisks();
+    if (tab === 'documents')     renderDocuments();
+    if (tab === 'journal')       renderJournalTab();
+    if (tab === 'tasks')         renderTasksTable();
+    if (tab === 'labor')         renderLabor();
   }
 }
 
@@ -951,11 +954,10 @@ async function saveExpenditure() {
     }
     // Reload expenditures and re-render
     STATE.expenditures = await API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`);
-    // Force re-render of EVM tab
-    renderedTabs.delete('evm');
-    if (STATE.activeTab === 'evm') {
-      renderedTabs.add('evm');
-      renderEVM();
+    renderedTabs.delete('expenditures');
+    if (STATE.activeTab === 'expenditures') {
+      renderedTabs.add('expenditures');
+      renderExpenditures();
     }
     closeExpForm();
   } catch(err) {
@@ -1352,6 +1354,17 @@ function renderHeader() {
   const pm = users.find(u => u.id === pmId);
   document.getElementById('hc-pm').textContent = pm?.name || '—';
 
+  // Work complete & hours consumed chips
+  const actualHrs = tasks.reduce((s,t) => s + parseFloat(t.actual_hours||0), 0);
+  const budgetHrs = parseFloat(p.budget_baseline_hours || 0);
+  const hrsPct    = budgetHrs > 0 ? UI.pct(actualHrs, budgetHrs) : 0;
+  const hrsColor  = hrsPct > 100 ? 'var(--red)' : hrsPct > 85 ? 'var(--amber)' : 'var(--purple)';
+  document.getElementById('hc-work-pct').textContent = pctDone + '%';
+  document.getElementById('hc-work-sub').textContent = `${done} OF ${total} TASKS`;
+  document.getElementById('hc-hrs-pct').textContent  = hrsPct + '%';
+  document.getElementById('hc-hrs-pct').style.color  = hrsColor;
+  document.getElementById('hc-hrs-sub').textContent  = `${actualHrs.toFixed(0)}h OF ${budgetHrs}h`;
+
   // Tab badge
   if (overdue > 0) {
     const badge = document.getElementById('tab-tasks-count');
@@ -1715,74 +1728,12 @@ function renderEVM() {
     </tr>`;
   }).join('');
 
-  // Budget bars
-  const laborPct = budgetHrs > 0 ? UI.pct(actualHrs, budgetHrs) : 0;
-  document.getElementById('budget-bars').innerHTML = [
-    { label: 'WORK COMPLETE',  used: pct,      color: 'var(--cyan)',   total: pct+'%' },
-    { label: 'HOURS CONSUMED', used: laborPct, color: laborPct > 100 ? 'var(--red)' : laborPct > 80 ? 'var(--amber)' : 'var(--purple)', total: UI.fmtHours(actualHrs) + ' of ' + UI.fmtHours(budgetHrs) },
-  ].map(b => `<div class="budget-row">
-    <div class="budget-label-row">
-      <span class="budget-label">${b.label}</span>
-      <span class="budget-nums">${b.total}</span>
-    </div>
-    ${UI.progressBar(Math.min(b.used, 100), b.color)}
-  </div>`).join('');
+}  // closes renderEVM()
 
-  // Labor by phase — with budget vs actual comparison
-  const phases = [...new Set(tasks.map(t=>t.phase).filter(Boolean))];
-  const maxPhaseHrs = Math.max(...phases.map(ph =>
-    tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0)
-  ), 1);
-  document.getElementById('labor-by-phase').innerHTML = phases.map(ph => {
-    const phaseTasks = tasks.filter(t=>t.phase===ph);
-    const actHrs = phaseTasks.reduce((s,t)=>s+parseFloat(t.actual_hours||0),0);
-    const bgtHrs = phaseTasks.reduce((s,t)=>s+parseFloat(t.budget_hours||0),0);
-    const pctOfMax = UI.pct(actHrs, maxPhaseHrs);
-    const overBudget = bgtHrs > 0 && actHrs > bgtHrs;
-    const barColor = overBudget ? 'var(--red)' : actHrs/bgtHrs > 0.8 ? 'var(--amber)' : 'var(--purple)';
-    return `<div class="phase-progress-row">
-      <div class="pp-header">
-        <div class="pp-name" style="font-size:11.5px;">${ph}</div>
-        <div class="pp-stats" style="color:${overBudget?'var(--red)':'var(--text3)'}">
-          ${actHrs.toFixed(1)}h${bgtHrs>0?' / '+bgtHrs.toFixed(1)+'h bgd':''}
-          ${overBudget?'<span style="color:var(--red);margin-left:4px;">↑ OVER</span>':''}
-        </div>
-      </div>
-      ${UI.progressBar(pctOfMax, barColor)}
-    </div>`;
-  }).join('');
-
-  // Resource hours breakdown
-  const resourceEl = document.getElementById('resource-breakdown');
-  if (resourceEl) {
-    const userHrs = {};
-    STATE.journal.forEach(j => {
-      userHrs[j.user_id] = (userHrs[j.user_id] || 0) + parseFloat(j.hours_spent || 0);
-    });
-    const sorted = Object.entries(userHrs).sort((a,b) => b[1]-a[1]);
-    const maxHrs = sorted[0]?.[1] || 1;
-    resourceEl.innerHTML = sorted.length === 0 ? UI.allClear('NO DATA') :
-      sorted.map(([uid, hrs]) => {
-        const user = STATE.users.find(u => u.id === uid);
-        const pctOfMax = UI.pct(hrs, maxHrs);
-        const cost = hrs * 175;
-        return `<div class="wl-row" style="padding:10px 14px;">
-          ${UI.avatar(user, 26)}
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:var(--font-ui);font-size:12.5px;color:var(--text1);margin-bottom:4px;">${user?.name||'—'}</div>
-            ${UI.progressBar(pctOfMax, 'var(--purple)')}
-          </div>
-          <div style="text-align:right;min-width:80px;flex-shrink:0;">
-            <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div>
-            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div>
-          </div>
-        </div>`;
-      }).join('');
-  }
-
-  // Expenditures table
+function renderExpenditures() {
   const exps = STATE.expenditures || [];
   const expEl = document.getElementById('expenditures-list');
+  if (!expEl) return;
   if (!exps.length && !STATE.project.current_expense_budget) {
     expEl.innerHTML = UI.allClear('NO EXPENDITURES', 'No expenditures recorded for this project');
   } else {
@@ -1903,7 +1854,69 @@ function renderEVM() {
       </table>`}
     `;
   }  // closes } else {
-}  // closes renderEVM()
+}  // closes renderExpenditures()
+
+function renderLabor() {
+  const tasks = STATE.tasks;
+  const RATE  = 175;
+
+  // Labor by phase
+  const phases = [...new Set(tasks.map(t=>t.phase).filter(Boolean))];
+  const maxPhaseHrs = Math.max(...phases.map(ph =>
+    tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0)
+  ), 1);
+  const laborEl = document.getElementById('labor-by-phase');
+  if (laborEl) {
+    laborEl.innerHTML = phases.length === 0 ? UI.allClear('NO PHASE DATA') :
+      phases.map(ph => {
+        const phaseTasks = tasks.filter(t=>t.phase===ph);
+        const actHrs = phaseTasks.reduce((s,t)=>s+parseFloat(t.actual_hours||0),0);
+        const bgtHrs = phaseTasks.reduce((s,t)=>s+parseFloat(t.budget_hours||0),0);
+        const pctOfMax = UI.pct(actHrs, maxPhaseHrs);
+        const overBudget = bgtHrs > 0 && actHrs > bgtHrs;
+        const barColor = overBudget ? 'var(--red)' : actHrs > bgtHrs * 0.8 ? 'var(--amber)' : 'var(--purple)';
+        return `<div class="phase-progress-row">
+          <div class="pp-header">
+            <div class="pp-name" style="font-size:12px;">${ph}</div>
+            <div class="pp-stats" style="color:${overBudget?'var(--red)':'var(--text3)'}">
+              ${actHrs.toFixed(1)}h${bgtHrs>0?' / '+bgtHrs.toFixed(1)+'h budget':''}
+              ${overBudget?'<span style="color:var(--red);margin-left:4px;">↑ OVER</span>':''}
+              <span style="margin-left:8px;color:var(--text3);">${UI.fmtCurrency(actHrs*RATE)}</span>
+            </div>
+          </div>
+          ${UI.progressBar(pctOfMax, barColor)}
+        </div>`;
+      }).join('');
+  }
+
+  // Hours by resource
+  const resourceEl = document.getElementById('resource-breakdown');
+  if (resourceEl) {
+    const userHrs = {};
+    STATE.journal.forEach(j => {
+      userHrs[j.user_id] = (userHrs[j.user_id] || 0) + parseFloat(j.hours_spent || 0);
+    });
+    const sorted = Object.entries(userHrs).sort((a,b) => b[1]-a[1]);
+    const maxHrs = sorted[0]?.[1] || 1;
+    resourceEl.innerHTML = sorted.length === 0 ? UI.allClear('NO DATA') :
+      sorted.map(([uid, hrs]) => {
+        const user = STATE.users.find(u => u.id === uid);
+        const pctOfMax = UI.pct(hrs, maxHrs);
+        const cost = hrs * RATE;
+        return `<div class="wl-row" style="padding:10px 14px;">
+          ${UI.avatar(user, 28)}
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:var(--font-ui);font-size:13px;color:var(--text1);margin-bottom:5px;">${user?.name||'—'}</div>
+            ${UI.progressBar(pctOfMax, 'var(--purple)')}
+          </div>
+          <div style="text-align:right;min-width:90px;flex-shrink:0;">
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+}
 
 function renderRisks() {
   const el = document.getElementById('risks-list');
