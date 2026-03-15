@@ -350,11 +350,11 @@
                 <tr>
                   <th style="width:18px;"></th>
                   <th>TASK</th>
-                  <th>PHASE</th>
                   <th>ASSIGNED</th>
                   <th>START</th>
                   <th>DUE</th>
                   <th>DURATION</th>
+                  <th>EFFORT</th>
                   <th>% DONE</th>
                   <th>STATUS</th>
                   <th>ACT HRS</th>
@@ -759,7 +759,6 @@ function renderTasksTable() {
             ${hasJournal ? `<span style="font-family:var(--font-mono);font-size:8px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}
           </div>
         </td>
-        <td><span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${t.phase || '—'}</span></td>
         <td>
           <div style="display:flex;align-items:center;gap:6px;">
             ${asgn ? UI.avatar(asgn, 20) : ''}
@@ -769,6 +768,7 @@ function renderTasksTable() {
         <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
         <td style="font-family:var(--font-mono);font-size:10px;color:${due.color};">${due.text}</td>
         <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
         <td>
           <div style="display:flex;align-items:center;gap:6px;min-width:70px;">
             <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);">
