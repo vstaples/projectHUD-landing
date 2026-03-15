@@ -1,395 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sign In — Test Company</title>
-  <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#00d2ff" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@600;700;800&family=Rajdhani:wght@700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg:         #060a10;
-      --bg2:        #0a1018;
-      --bg3:        #0e1520;
-      --bg4:        #121c28;
-      --border:     rgba(0,210,255,0.10);
-      --border2:    rgba(0,210,255,0.22);
-      --border3:    rgba(0,210,255,0.40);
-      --cyan:       #00d2ff;
-      --cyan-dim:   rgba(0,210,255,0.55);
-      --cyan-glow:  rgba(0,210,255,0.07);
-      --green:      #00e5a0;
-      --red:        #ff4757;
-      --red-dim:    rgba(255,71,87,0.10);
-      --text:       #c8d8ea;
-      --text-dim:   #5a7a8a;
-      --text-muted: #2e4455;
-      --mono:       'Share Tech Mono', monospace;
-      --body:       'Barlow', sans-serif;
-      --cond:       'Barlow Condensed', sans-serif;
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--body);
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Grid background */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image:
-        linear-gradient(rgba(0,210,255,0.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,210,255,0.018) 1px, transparent 1px);
-      background-size: 44px 44px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Ambient glow */
-    body::after {
-      content: '';
-      position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
-      width: 900px; height: 600px;
-      background: radial-gradient(ellipse at center top, rgba(0,210,255,0.06) 0%, transparent 65%);
-      pointer-events: none; z-index: 0;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes scanline {
-      0% { top: 0; opacity: 0; }
-      5% { opacity: 0.4; }
-      95% { opacity: 0.2; }
-      100% { top: 100%; opacity: 0; }
-    }
-
-    /* ── NAV ─────────────────────────────────── */
-    nav {
-      position: relative; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 40px; height: 58px;
-      background: rgba(6,10,16,0.95);
-      backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .nav-logo {
-      display: flex; align-items: center; gap: 12px;
-      text-decoration: none;
-    }
-    .nav-logo-wordmark { display: flex; flex-direction: column; gap: 2px; }
-    .nav-logo-main {
-      font-family: 'Rajdhani', sans-serif; font-weight: 700;
-      font-size: 18px; letter-spacing: 0.1em; line-height: 1;
-      color: #eeeef8; text-transform: uppercase;
-    }
-    .nav-logo-main em { font-style: normal; color: var(--cyan); }
-    .nav-logo-sub {
-      font-family: 'JetBrains Mono', monospace; font-weight: 300;
-      font-size: 8px; letter-spacing: 0.22em; color: var(--text-muted);
-      text-transform: uppercase;
-    }
-    .nav-divider {
-      width: 1px; height: 28px;
-      background: linear-gradient(to bottom, transparent, rgba(0,200,255,0.25), transparent);
-    }
-    .nav-back {
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--text-muted); text-decoration: none;
-      transition: color 0.2s; display: flex; align-items: center; gap: 6px;
-    }
-    .nav-back:hover { color: var(--cyan); }
-
-    /* ── MAIN LAYOUT ─────────────────────────── */
-    main {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 48px 24px;
-      position: relative; z-index: 1;
-    }
-
-    /* ── LOGIN CARD ──────────────────────────── */
-    .login-wrap {
-      width: 100%; max-width: 460px;
-      animation: fadeInUp 0.5s ease 0.1s both;
-    }
-
-    .login-header { text-align: center; margin-bottom: 40px; }
-    .login-eyebrow {
-      font-family: var(--mono); font-size: 12px;
-      letter-spacing: 0.28em; color: var(--cyan);
-      text-transform: uppercase; margin-bottom: 14px;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-    }
-    .live-dot {
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--green); box-shadow: 0 0 5px var(--green);
-      animation: pulse 1.5s ease-in-out infinite; flex-shrink: 0;
-    }
-    .login-title {
-      font-family: var(--cond); font-weight: 800;
-      font-size: 42px; letter-spacing: 0.02em;
-      text-transform: uppercase; color: #eef4ff;
-      line-height: 1; margin-bottom: 8px;
-    }
-    .login-title span { color: var(--cyan); }
-    .login-subtitle {
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.2em; color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    /* Card */
-    .login-card {
-      background: var(--bg2);
-      border: 1px solid var(--border2);
-      position: relative; overflow: hidden;
-    }
-    .login-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-      opacity: 0.5;
-    }
-    /* Scanline effect */
-    .card-scan {
-      position: absolute; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(0,210,255,0.3), transparent);
-      animation: scanline 4s ease-in-out infinite;
-      pointer-events: none; z-index: 2;
-    }
-
-    .card-header {
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      background: rgba(0,210,255,0.03);
-    }
-    .card-header-label {
-      font-family: var(--mono); font-size: 10px;
-      letter-spacing: 0.2em; color: var(--cyan);
-      text-transform: uppercase; display: flex; align-items: center; gap: 8px;
-    }
-    .card-header-status {
-      font-family: var(--mono); font-size: 10px;
-      letter-spacing: 0.12em; color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    .card-body { padding: 32px 28px; }
-
-    /* Fields */
-    .field-group { margin-bottom: 20px; }
-    .field-label {
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.2em; color: var(--text-dim);
-      text-transform: uppercase; margin-bottom: 8px; display: block;
-    }
-    .field-input {
-      width: 100%; background: var(--bg3);
-      border: 1px solid var(--border2);
-      color: var(--text); font-family: var(--mono);
-      font-size: 14px; letter-spacing: 0.04em;
-      padding: 13px 16px; outline: none;
-      transition: border-color 0.2s, background 0.2s;
-      appearance: none; -webkit-appearance: none;
-    }
-    .field-input::placeholder { color: var(--text-muted); }
-    .field-input:focus {
-      border-color: var(--border3);
-      background: var(--bg4);
-    }
-    .field-input:focus + .field-bar { transform: scaleX(1); }
-    .field-bar-wrap { position: relative; }
-    .field-bar {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
-      background: var(--cyan);
-      transform: scaleX(0); transition: transform 0.3s;
-      transform-origin: left;
-    }
-
-    /* Password row */
-    .password-wrap { position: relative; }
-    .password-wrap .field-input { padding-right: 48px; }
-    .toggle-pw {
-      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; cursor: pointer;
-      color: var(--text-dim); font-family: var(--mono); font-size: 10px;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      transition: color 0.2s; padding: 4px;
-    }
-    .toggle-pw:hover { color: var(--cyan); }
-
-    /* Remember row */
-    .field-extras {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 28px; margin-top: -4px;
-    }
-    .remember-label {
-      display: flex; align-items: center; gap: 10px;
-      cursor: pointer;
-    }
-    .remember-check {
-      width: 14px; height: 14px;
-      background: var(--bg3); border: 1px solid var(--border2);
-      flex-shrink: 0; cursor: pointer; appearance: none;
-      -webkit-appearance: none; position: relative;
-      transition: border-color 0.2s;
-    }
-    .remember-check:checked { background: var(--cyan); border-color: var(--cyan); }
-    .remember-check:checked::after {
-      content: '✓'; position: absolute;
-      font-size: 10px; color: var(--bg);
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      line-height: 1;
-    }
-    .remember-text {
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.12em; color: var(--text-dim);
-      text-transform: uppercase; user-select: none;
-    }
-    .forgot-link {
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.12em; color: var(--text-dim);
-      text-transform: uppercase; text-decoration: none;
-      transition: color 0.2s;
-    }
-    .forgot-link:hover { color: var(--cyan); }
-
-    /* Error */
-    .field-error {
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.12em; color: var(--red);
-      text-transform: uppercase; margin-bottom: 16px;
-      padding: 10px 14px;
-      background: var(--red-dim);
-      border: 1px solid rgba(255,71,87,0.25);
-      display: none;
-    }
-
-    /* Submit */
-    .btn-submit {
-      width: 100%;
-      font-family: var(--mono); font-size: 12px;
-      letter-spacing: 0.22em; text-transform: uppercase;
-      color: var(--bg); background: var(--cyan);
-      border: none; padding: 17px;
-      cursor: pointer; position: relative; overflow: hidden;
-      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-      transition: all 0.2s;
-    }
-    .btn-submit:hover { background: #fff; }
-    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    /* Card footer */
-    .card-footer {
-      padding: 14px 20px;
-      border-top: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      background: rgba(0,0,0,0.2);
-    }
-    .card-footer-note {
-      font-family: var(--mono); font-size: 10px;
-      letter-spacing: 0.14em; color: var(--text-muted);
-      text-transform: uppercase; display: flex; align-items: center; gap: 6px;
-    }
-    .shield-icon { color: var(--green); font-size: 11px; }
-    .card-footer-contact {
-      font-family: var(--mono); font-size: 10px;
-      letter-spacing: 0.1em; color: var(--text-muted);
-      text-transform: uppercase; text-decoration: none;
-      transition: color 0.2s;
-    }
-    .card-footer-contact:hover { color: var(--cyan); }
-
-    /* ── SUCCESS STATE ────────────────────────── */
-    .login-success {
-      display: none;
-      padding: 40px 28px;
-      text-align: center;
-    }
-    .success-icon {
-      font-family: var(--mono); font-size: 36px;
-      color: var(--green); margin-bottom: 16px;
-    }
-    .success-title {
-      font-family: var(--cond); font-weight: 700;
-      font-size: 26px; letter-spacing: 0.06em;
-      text-transform: uppercase; color: #eef4ff;
-      margin-bottom: 10px;
-    }
-    .success-msg {
-      font-size: 14px; color: var(--text-dim);
-      font-weight: 300; line-height: 1.6;
-    }
-
-    /* ── BOTTOM NOTE ─────────────────────────── */
-    .login-bottom {
-      text-align: center; margin-top: 28px;
-      font-family: var(--mono); font-size: 11px;
-      letter-spacing: 0.14em; color: var(--text-muted);
-      text-transform: uppercase; line-height: 1.8;
-      animation: fadeInUp 0.5s ease 0.3s both;
-    }
-    .login-bottom a {
-      color: var(--text-dim); text-decoration: none;
-      transition: color 0.2s;
-    }
-    .login-bottom a:hover { color: var(--cyan); }
-
-    /* ── FOOTER ──────────────────────────────── */
-    footer {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border);
-      padding: 20px 40px;
-      display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 12px;
-      position: relative; z-index: 1;
-    }
-    .footer-logo {
-      font-family: 'Rajdhani', sans-serif; font-weight: 700;
-      font-size: 16px; letter-spacing: 0.12em;
-      color: var(--text-muted); text-transform: uppercase;
-    }
-    .footer-copy {
-      font-family: var(--mono); font-size: 10px;
-      letter-spacing: 0.1em; color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    @media (max-width: 500px) {
-      nav { padding: 0 20px; }
-      .card-body { padding: 24px 20px; }
-      footer { padding: 16px 20px; }
-      main { padding: 32px 16px; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In — ProjectHUD</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#00d2ff" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@600;700;800&family=Rajdhani:wght@700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg: #060a10; --bg2: #0a1018; --bg3: #0e1520; --bg4: #121c28;
+  --border: rgba(0,210,255,0.10); --border2: rgba(0,210,255,0.22); --border3: rgba(0,210,255,0.40);
+  --cyan: #00d2ff; --cyan-dim: rgba(0,210,255,0.55); --cyan-glow: rgba(0,210,255,0.07);
+  --green: #00e5a0; --red: #ff4757; --red-dim: rgba(255,71,87,0.10);
+  --text: #c8d8ea; --text-dim: #5a7a8a; --text-muted: #2e4455;
+  --mono: 'Share Tech Mono', monospace; --body: 'Barlow', sans-serif; --cond: 'Barlow Condensed', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--body); display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(0,210,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(0,210,255,0.018) 1px, transparent 1px); background-size: 44px 44px; pointer-events: none; z-index: 0; }
+body::after { content: ''; position: fixed; top: -100px; left: 50%; transform: translateX(-50%); width: 900px; height: 600px; background: radial-gradient(ellipse at center top, rgba(0,210,255,0.06) 0%, transparent 65%); pointer-events: none; z-index: 0; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scanline { 0% { top: 0; opacity: 0; } 5% { opacity: 0.4; } 95% { opacity: 0.2; } 100% { top: 100%; opacity: 0; } }
+nav { position: relative; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 58px; background: rgba(6,10,16,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.nav-logo-wordmark { display: flex; flex-direction: column; gap: 2px; }
+.nav-logo-main { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.1em; line-height: 1; color: #eeeef8; text-transform: uppercase; }
+.nav-logo-main em { font-style: normal; color: var(--cyan); }
+.nav-logo-sub { font-family: 'JetBrains Mono', monospace; font-weight: 300; font-size: 8px; letter-spacing: 0.22em; color: var(--text-muted); text-transform: uppercase; }
+.nav-divider { width: 1px; height: 28px; background: linear-gradient(to bottom, transparent, rgba(0,200,255,0.25), transparent); }
+.nav-back { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); text-decoration: none; transition: color 0.2s; display: flex; align-items: center; gap: 6px; }
+.nav-back:hover { color: var(--cyan); }
+main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; position: relative; z-index: 1; }
+.login-wrap { width: 100%; max-width: 460px; animation: fadeInUp 0.5s ease 0.1s both; }
+.login-header { text-align: center; margin-bottom: 40px; }
+.login-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.28em; color: var(--cyan); text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); animation: pulse 1.5s ease-in-out infinite; flex-shrink: 0; }
+.login-title { font-family: var(--cond); font-weight: 800; font-size: 42px; letter-spacing: 0.02em; text-transform: uppercase; color: #eef4ff; line-height: 1; margin-bottom: 8px; }
+.login-title span { color: var(--cyan); }
+.login-subtitle { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; }
+.login-card { background: var(--bg2); border: 1px solid var(--border2); position: relative; overflow: hidden; }
+.login-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); opacity: 0.5; }
+.card-scan { position: absolute; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(0,210,255,0.3), transparent); animation: scanline 4s ease-in-out infinite; pointer-events: none; z-index: 2; }
+.card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(0,210,255,0.03); }
+.card-header-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--cyan); text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.card-header-status { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-muted); text-transform: uppercase; }
+.card-body { padding: 32px 28px; }
+.field-group { margin-bottom: 20px; }
+.field-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; display: block; }
+.field-input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); font-family: var(--mono); font-size: 14px; letter-spacing: 0.04em; padding: 13px 16px; outline: none; transition: border-color 0.2s, background 0.2s; appearance: none; -webkit-appearance: none; }
+.field-input::placeholder { color: var(--text-muted); }
+.field-input:focus { border-color: var(--border3); background: var(--bg4); }
+.field-input:focus + .field-bar { transform: scaleX(1); }
+.field-bar-wrap { position: relative; }
+.field-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: var(--cyan); transform: scaleX(0); transition: transform 0.3s; transform-origin: left; }
+.password-wrap { position: relative; }
+.password-wrap .field-input { padding-right: 48px; }
+.toggle-pw { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; transition: color 0.2s; padding: 4px; }
+.toggle-pw:hover { color: var(--cyan); }
+.field-extras { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; margin-top: -4px; }
+.remember-label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.remember-check { width: 14px; height: 14px; background: var(--bg3); border: 1px solid var(--border2); flex-shrink: 0; cursor: pointer; appearance: none; -webkit-appearance: none; position: relative; transition: border-color 0.2s; }
+.remember-check:checked { background: var(--cyan); border-color: var(--cyan); }
+.remember-check:checked::after { content: '✓'; position: absolute; font-size: 10px; color: var(--bg); top: 50%; left: 50%; transform: translate(-50%, -50%); line-height: 1; }
+.remember-text { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; user-select: none; }
+.forgot-link { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; text-decoration: none; transition: color 0.2s; }
+.forgot-link:hover { color: var(--cyan); }
+.field-error { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--red); text-transform: uppercase; margin-bottom: 16px; padding: 10px 14px; background: var(--red-dim); border: 1px solid rgba(255,71,87,0.25); display: none; }
+.btn-submit { width: 100%; font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--bg); background: var(--cyan); border: none; padding: 17px; cursor: pointer; position: relative; overflow: hidden; clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%); transition: all 0.2s; }
+.btn-submit:hover { background: #fff; }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.card-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); }
+.card-footer-note { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+.shield-icon { color: var(--green); font-size: 11px; }
+.card-footer-contact { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase; text-decoration: none; transition: color 0.2s; }
+.card-footer-contact:hover { color: var(--cyan); }
+.login-success { display: none; padding: 40px 28px; text-align: center; }
+.success-icon { font-family: var(--mono); font-size: 36px; color: var(--green); margin-bottom: 16px; }
+.success-title { font-family: var(--cond); font-weight: 700; font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; color: #eef4ff; margin-bottom: 10px; }
+.success-msg { font-size: 14px; color: var(--text-dim); font-weight: 300; line-height: 1.6; }
+.login-bottom { text-align: center; margin-top: 28px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; line-height: 1.8; animation: fadeInUp 0.5s ease 0.3s both; }
+.login-bottom a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+.login-bottom a:hover { color: var(--cyan); }
+footer { flex-shrink: 0; border-top: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: relative; z-index: 1; }
+.footer-logo { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.12em; color: var(--text-muted); text-transform: uppercase; }
+.footer-copy { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase; }
+@media (max-width: 500px) { nav { padding: 0 20px; } .card-body { padding: 24px 20px; } footer { padding: 16px 20px; } main { padding: 32px 16px; } }
+</style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
   <a href="/index.html" class="nav-logo">
-    <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
       <rect x="1" y="1" width="26" height="26" stroke="rgba(0,210,255,0.35)" stroke-width="1"/>
       <rect x="5" y="5" width="18" height="18" stroke="rgba(0,210,255,0.2)" stroke-width="1"/>
       <circle cx="14" cy="14" r="4" fill="none" stroke="#00d2ff" stroke-width="1.5"/>
@@ -400,69 +106,53 @@
     </svg>
     <div class="nav-divider"></div>
     <div class="nav-logo-wordmark">
-      <div class="nav-logo-main">Test <em>Company</em></div>
-      <div class="nav-logo-sub">Operations Command Platform</div>
+      <div class="nav-logo-main">Project<em>HUD</em></div>
+      <div class="nav-logo-sub">Project Management Platform</div>
     </div>
   </a>
   <a href="/index.html" class="nav-back">← Back to Home</a>
 </nav>
 
-<!-- MAIN -->
 <main>
   <div class="login-wrap">
-
     <div class="login-header">
       <div class="login-eyebrow">
         <span class="live-dot"></span>
         Secure Access Portal
       </div>
       <h1 class="login-title">Sign In to<br><span>Platform</span></h1>
-      <p class="login-subtitle">Test Company · Operations Command</p>
+      <p class="login-subtitle">ProjectHUD · Project Management Command</p>
     </div>
 
     <div class="login-card">
       <div class="card-scan"></div>
-
       <div class="card-header">
         <div class="card-header-label">
-          <span style="color:var(--green);">◆</span>
-          Authentication Required
+          <span style="color:var(--green);">◆</span> Authentication Required
         </div>
         <div class="card-header-status">TLS 1.3 · Encrypted</div>
       </div>
-
       <div class="card-body">
         <div id="login-fields">
           <div class="field-group">
             <label class="field-label" for="email">Email Address</label>
             <div class="field-bar-wrap">
-              <input
-                id="email"
-                type="email"
-                class="field-input"
-                placeholder="vstaples@projecthud.com"
-                value="vstaples@projecthud.com"
-                autocomplete="email"
-              />
+              <input id="email" type="email" class="field-input"
+                placeholder="Enter your email address"
+                autocomplete="email" />
               <div class="field-bar"></div>
             </div>
           </div>
-
           <div class="field-group">
             <label class="field-label" for="password">Password</label>
             <div class="field-bar-wrap password-wrap">
-              <input
-                id="password"
-                type="password"
-                class="field-input"
+              <input id="password" type="password" class="field-input"
                 placeholder="Enter your password"
-                autocomplete="current-password"
-              />
+                autocomplete="current-password" />
               <button class="toggle-pw" type="button" onclick="togglePassword()" id="toggle-btn">Show</button>
               <div class="field-bar"></div>
             </div>
           </div>
-
           <div class="field-extras">
             <label class="remember-label">
               <input type="checkbox" class="remember-check" id="remember" />
@@ -470,114 +160,83 @@
             </label>
             <a href="mailto:vstaples@projecthud.com?subject=Password Reset Request" class="forgot-link">Forgot Password?</a>
           </div>
-
           <div class="field-error" id="login-error">Invalid email or password. Please try again.</div>
-
           <button class="btn-submit" id="submit-btn" onclick="handleLogin()">
             Sign In to Platform →
           </button>
         </div>
-
         <div class="login-success" id="login-success">
           <div class="success-icon">✓</div>
           <div class="success-title">Access Granted</div>
           <p class="success-msg">Redirecting you to your operations dashboard...</p>
         </div>
       </div>
-
       <div class="card-footer">
         <div class="card-footer-note">
-          <span class="shield-icon">⬡</span>
-          Secured by ProjectHUD
+          <span class="shield-icon">⬡</span> Secured by ProjectHUD
         </div>
         <a href="mailto:vstaples@projecthud.com" class="card-footer-contact">Need Access? Contact Admin</a>
       </div>
     </div>
 
     <div class="login-bottom">
-      Not a member? <a href="mailto:vstaples@projecthud.com">Contact vstaples@projecthud.com</a><br>
-      <a href="/index.html">← Return to Test Company Home</a>
+      Need access? <a href="mailto:vstaples@projecthud.com">Contact vstaples@projecthud.com</a><br>
+      <a href="/index.html">← Return to ProjectHUD Home</a>
     </div>
-
   </div>
 </main>
 
-<!-- FOOTER -->
 <footer>
-  <div class="footer-logo">Test Company</div>
-  <div class="footer-copy">© 2026 Test Company · Powered by ProjectHUD · All Rights Reserved</div>
+  <div class="footer-logo">ProjectHUD</div>
+  <div class="footer-copy">© 2026 ProjectHUD · All Rights Reserved</div>
 </footer>
 
-<!-- Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // ── Supabase configuration ──────────────────────────────────────
-  const SUPABASE_URL  = 'https://dvbetgdzksatcgdfftbs.supabase.co';
-  const SUPABASE_KEY  = 'sb_publishable_1EOfIYerLiE3syHLc9zfKw__72o8fmx';
-  const { createClient } = supabase;
-  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // ── Password show/hide ──────────────────────────────────────────
-  function togglePassword() {
-    const pw  = document.getElementById('password');
-    const btn = document.getElementById('toggle-btn');
-    if (pw.type === 'password') {
-      pw.type = 'text';
-      btn.textContent = 'Hide';
-    } else {
-      pw.type = 'password';
-      btn.textContent = 'Show';
-    }
+function togglePassword() {
+  const pw = document.getElementById('password');
+  const btn = document.getElementById('toggle-btn');
+  if (pw.type === 'password') { pw.type = 'text'; btn.textContent = 'Hide'; }
+  else { pw.type = 'password'; btn.textContent = 'Show'; }
+}
+
+async function handleLogin() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('submit-btn');
+  errorEl.style.display = 'none';
+  if (!email || !password) {
+    errorEl.textContent = 'Please enter your email and password.';
+    errorEl.style.display = 'block';
+    return;
   }
-
-  // ── Login handler ───────────────────────────────────────────────
-  async function handleLogin() {
-    const email    = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const errorEl  = document.getElementById('login-error');
-    const btn      = document.getElementById('submit-btn');
-
-    errorEl.style.display = 'none';
-
-    if (!email || !password) {
-      errorEl.textContent = 'Please enter your email and password.';
-      errorEl.style.display = 'block';
-      return;
-    }
-
-    btn.textContent = 'Authenticating...';
-    btn.disabled = true;
-
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      // Login failed — show error message
-      errorEl.textContent = 'Invalid email or password. Please try again.';
-      errorEl.style.display = 'block';
-      btn.textContent = 'Sign In to Platform →';
-      btn.disabled = false;
-      return;
-    }
-
-    // Login succeeded — show success state then redirect
-    document.getElementById('login-fields').style.display = 'none';
-    document.getElementById('login-success').style.display = 'block';
-
-    setTimeout(() => {
-      window.location.href = '/dashboard.html';
-    }, 1500);
+  btn.textContent = 'Authenticating...';
+  btn.disabled = true;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    errorEl.textContent = 'Invalid email or password. Please try again.';
+    errorEl.style.display = 'block';
+    btn.textContent = 'Sign In to Platform →';
+    btn.disabled = false;
+    return;
   }
+  document.getElementById('login-fields').style.display = 'none';
+  document.getElementById('login-success').style.display = 'block';
+  setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
+}
 
-  // ── Enter key support ───────────────────────────────────────────
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') handleLogin();
-  });
+document.addEventListener('keydown', function(e) { if (e.key === 'Enter') handleLogin(); });
 
-  // ── If already logged in, go straight to dashboard ─────────────
-  (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) window.location.href = '/dashboard.html';
-  })();
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) window.location.href = '/dashboard.html';
+})();
 </script>
 </body>
 </html>
