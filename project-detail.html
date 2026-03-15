@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectHUD — Project Detail</title>
+<link rel="stylesheet" href="/css/hud.css">
+<style>
+/* ── PROJECT DETAIL SPECIFIC ────────────────────────────────── */
+
+/* Header band */
+.proj-header-band {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 28px 0;
+  flex-shrink: 0;
+}
+.proj-header-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 20px;
+  margin-bottom: 14px;
+}
+.proj-title-block { min-width: 0; }
+.proj-title {
+  font-family: var(--font-hud);
+  font-size: 22px; font-weight: 700;
+  color: var(--text0); letter-spacing: 0.06em;
+  line-height: 1.2; margin-bottom: 4px;
+}
+.proj-client-tag {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--text2);
+  letter-spacing: 0.14em;
+}
+.proj-header-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: flex-start; }
+
+/* Health bar — 4 stat chips in a row */
+.proj-health-row {
+  display: flex; gap: 20px; align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.health-chip { display: flex; flex-direction: column; gap: 2px; }
+.health-chip .hc-label { font-family: var(--font-mono); font-size: 8.5px; color: var(--text3); letter-spacing: 0.12em; }
+.health-chip .hc-val   { font-family: var(--font-hud); font-size: 18px; font-weight: 700; line-height: 1; }
+.health-chip .hc-sub   { font-family: var(--font-mono); font-size: 8px; color: var(--text3); letter-spacing: 0.08em; }
+.health-sep { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+
+/* Tab bar */
+.proj-tab-bar {
+  display: flex; gap: 0;
+  border-bottom: none;
+  margin-top: 2px;
+}
+.proj-tab {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  padding: 10px 16px; background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text3); cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.proj-tab:hover { color: var(--text1); }
+.proj-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.proj-tab .tab-badge {
+  background: rgba(255,71,87,0.15); border: 1px solid rgba(255,71,87,0.3);
+  color: var(--red); font-size: 8px; font-weight: 700;
+  padding: 1px 5px; border-radius: 2px; min-width: 16px; text-align: center;
+}
+
+/* Main layout */
+.detail-grid { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
+
+/* Milestone rows */
+.milestone-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s;
+}
+.milestone-row:last-child { border-bottom: none; }
+.milestone-row:hover { background: var(--bg4); }
+.ms-diamond {
+  width: 10px; height: 10px; flex-shrink: 0;
+  transform: rotate(45deg); border: 1.5px solid;
+}
+.ms-info { flex: 1; min-width: 0; }
+.ms-name  { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--text0); }
+.ms-phase { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
+.ms-date  { font-family: var(--font-mono); font-size: 10px; color: var(--text2); flex-shrink: 0; text-align: right; }
+.ms-slip  { font-family: var(--font-mono); font-size: 9px; color: var(--amber); flex-shrink: 0; }
+
+/* Task table */
+.task-table-wrap { overflow-x: auto; }
+.task-tbl { width: 100%; border-collapse: collapse; }
+.task-tbl th {
+  font-family: var(--font-mono); font-size: 8.5px; color: var(--text3);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  text-align: left; white-space: nowrap; background: var(--bg2);
+  position: sticky; top: 0;
+}
+.task-tbl td {
+  font-family: var(--font-ui); font-size: 12.5px; color: var(--text1);
+  padding: 8px 10px; border-bottom: 1px solid rgba(100,160,220,0.06);
+  vertical-align: middle;
+}
+.task-tbl tr:last-child td { border-bottom: none; }
+.task-tbl tr:hover td { background: rgba(0,210,255,0.03); }
+.task-tbl .phase-header td {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  color: var(--cyan); letter-spacing: 0.16em;
+  background: rgba(0,210,255,0.04); padding: 7px 10px;
+  border-bottom: 1px solid rgba(0,210,255,0.1);
+}
+.task-name-cell { display: flex; align-items: center; gap: 8px; }
+.cp-flag {
+  width: 8px; height: 8px; flex-shrink: 0;
+  background: var(--red); opacity: 0;
+}
+.cp-flag.on { opacity: 1; }
+.task-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+
+/* Journal entries */
+.journal-entry {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+}
+.journal-entry:last-child { border-bottom: none; }
+.journal-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
+}
+.journal-date { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.08em; }
+.journal-hours { font-family: var(--font-mono); font-size: 9px; color: var(--cyan); font-weight: 700; }
+.journal-pct { font-family: var(--font-mono); font-size: 9px; color: var(--green); }
+.journal-blocker { font-family: var(--font-mono); font-size: 9px; color: var(--amber); }
+.journal-body { font-family: var(--font-ui); font-size: 12.5px; color: var(--text1); line-height: 1.5; }
+
+/* Risk rows */
+.risk-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s;
+}
+.risk-row:last-child { border-bottom: none; }
+.risk-row:hover { background: var(--bg4); }
+.risk-score {
+  font-family: var(--font-hud); font-size: 15px; font-weight: 700;
+  min-width: 42px; text-align: center; flex-shrink: 0;
+  padding-top: 2px;
+}
+.risk-info { flex: 1; min-width: 0; }
+.risk-title { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--text0); }
+.risk-meta  { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 2px; }
+
+/* Document rows */
+.doc-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s;
+}
+.doc-row:last-child { border-bottom: none; }
+.doc-row:hover { background: var(--bg4); }
+.doc-icon { font-size: 16px; flex-shrink: 0; color: var(--text2); }
+.doc-info { flex: 1; min-width: 0; }
+.doc-name { font-family: var(--font-ui); font-size: 13px; color: var(--text0); }
+.doc-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 2px; }
+
+/* EVM detail table */
+.evm-table { width: 100%; }
+.evm-table tr { border-bottom: 1px solid var(--border); }
+.evm-table tr:last-child { border-bottom: none; }
+.evm-table td { padding: 8px 14px; font-family: var(--font-mono); font-size: 10px; }
+.evm-table .evm-key { color: var(--text3); letter-spacing: 0.12em; width: 50%; }
+.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; }
+
+/* Budget bars */
+.budget-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.budget-row:last-child { border-bottom: none; }
+.budget-label-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+.budget-label { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.1em; }
+.budget-nums  { font-family: var(--font-mono); font-size: 9px; color: var(--text3); }
+
+/* Phase progress */
+.phase-progress-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.phase-progress-row:last-child { border-bottom: none; }
+.pp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.pp-name { font-family: var(--font-ui); font-size: 12.5px; color: var(--text1); }
+.pp-stats { font-family: var(--font-mono); font-size: 9px; color: var(--text3); }
+
+/* Slide-in journal panel */
+.journal-panel {
+  position: fixed; right: -420px; top: 0; bottom: 0; width: 400px;
+  background: var(--bg1); border-left: 1px solid var(--border);
+  z-index: 200; transition: right 0.25s ease;
+  display: flex; flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.4);
+}
+.journal-panel.open { right: 0; }
+.journal-panel-header {
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.journal-panel-title { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); letter-spacing: 0.16em; }
+.journal-panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+.journal-panel-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 16px; transition: color 0.12s; }
+.journal-panel-close:hover { color: var(--red); }
+
+@media (max-width: 1100px) { .detail-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="ticker">
+  <div id="ticker-live"><div class="dot"></div><span>LIVE</span></div>
+  <div id="ticker-scroll-wrap"><div id="ticker-scroll"></div></div>
+</div>
+
+<div id="app">
+  <nav id="sidebar"></nav>
+
+  <div id="main">
+
+    <!-- PROJECT HEADER BAND -->
+    <div class="proj-header-band" id="proj-header-band">
+      <div class="proj-header-top">
+        <div class="proj-title-block">
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.16em;margin-bottom:6px;" id="proj-breadcrumb">PROJECTS → LOADING...</div>
+          <div class="proj-title" id="proj-title">Loading...</div>
+          <div class="proj-client-tag" id="proj-client-tag">—</div>
+        </div>
+        <div class="proj-header-actions">
+          <button class="hud-btn" id="btn-edit-project">✎ EDIT</button>
+          <button class="hud-btn primary" id="btn-new-task">+ TASK</button>
+        </div>
+      </div>
+
+      <!-- HEALTH CHIPS -->
+      <div class="proj-health-row" id="proj-health-row">
+        <div class="health-chip"><span class="hc-label">STATUS</span><span class="hc-val" id="hc-status" style="font-size:13px;font-family:var(--font-mono);">—</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">% COMPLETE</span><span class="hc-val" id="hc-pct" style="color:var(--cyan)">—</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">CPI</span><span class="hc-val" id="hc-cpi">—</span><span class="hc-sub">COST PERF.</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">SPI</span><span class="hc-val" id="hc-spi">—</span><span class="hc-sub">SCHED. PERF.</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">TASKS</span><span class="hc-val" id="hc-tasks" style="color:var(--text0)">—</span><span class="hc-sub" id="hc-tasks-sub">—</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">TARGET DATE</span><span class="hc-val" id="hc-target" style="font-size:13px;font-family:var(--font-mono);">—</span><span class="hc-sub" id="hc-days-left">—</span></div>
+        <div class="health-sep"></div>
+        <div class="health-chip"><span class="hc-label">PM / OWNER</span><span class="hc-val" id="hc-pm" style="font-size:13px;font-family:var(--font-ui);">—</span></div>
+      </div>
+
+      <!-- TAB BAR -->
+      <div class="proj-tab-bar">
+        <button class="proj-tab active" data-tab="overview">◈ OVERVIEW</button>
+        <button class="proj-tab" data-tab="tasks">▦ TASKS <span class="tab-badge" id="tab-tasks-count" style="display:none"></span></button>
+        <button class="proj-tab" data-tab="milestones">◆ MILESTONES</button>
+        <button class="proj-tab" data-tab="evm">◉ EVM / BUDGET</button>
+        <button class="proj-tab" data-tab="risks">⚑ RISKS</button>
+        <button class="proj-tab" data-tab="documents">▣ DOCUMENTS</button>
+        <button class="proj-tab" data-tab="journal">▤ JOURNAL</button>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="content">
+
+      <!-- ── OVERVIEW TAB ─────────────────────────────────── -->
+      <div id="tab-overview" class="tab-pane">
+        <div class="detail-grid">
+          <!-- LEFT -->
+          <div>
+            <!-- Milestones summary -->
+            <div class="panel bracketed" style="margin-bottom:16px;">
+              <div class="bracket-bl"></div><div class="bracket-br"></div>
+              <div class="panel-header">
+                <div class="panel-title">MILESTONES</div>
+                <button class="panel-action" onclick="switchTab('milestones')">VIEW ALL →</button>
+              </div>
+              <div id="overview-milestones"></div>
+            </div>
+
+            <!-- Tasks up next -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">TASKS UP NEXT</div>
+                <button class="panel-action" onclick="switchTab('tasks')">VIEW ALL →</button>
+              </div>
+              <div id="overview-tasks"></div>
+            </div>
+
+            <!-- Description / Notes -->
+            <div class="panel" style="margin-top:16px;">
+              <div class="panel-header"><div class="panel-title">PROJECT DESCRIPTION</div></div>
+              <div style="padding:14px 16px;">
+                <p id="proj-description" style="font-family:var(--font-ui);font-size:13px;color:var(--text1);line-height:1.7;">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT -->
+          <div>
+            <!-- Phase progress -->
+            <div class="panel bracketed" style="margin-bottom:14px;">
+              <div class="bracket-bl"></div><div class="bracket-br"></div>
+              <div class="panel-header"><div class="panel-title">PHASE PROGRESS</div></div>
+              <div id="phase-progress"></div>
+            </div>
+
+            <!-- EVM mini -->
+            <div class="panel" style="margin-bottom:14px;">
+              <div class="panel-header">
+                <div class="panel-title">EVM SNAPSHOT</div>
+                <button class="panel-action" onclick="switchTab('evm')">FULL →</button>
+              </div>
+              <div style="padding:10px 14px;display:flex;justify-content:space-around;" id="overview-gauges"></div>
+              <div id="overview-evm-vals" style="padding:8px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border);"></div>
+            </div>
+
+            <!-- Recent journal activity -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">RECENT ACTIVITY</div>
+                <button class="panel-action" onclick="switchTab('journal')">VIEW ALL →</button>
+              </div>
+              <div id="recent-journal"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TASKS TAB ─────────────────────────────────────── -->
+      <div id="tab-tasks" class="tab-pane" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="display:flex;gap:6px;" id="task-filter-btns">
+            <button class="hud-btn task-filter active-filter" data-filter="all">ALL</button>
+            <button class="hud-btn task-filter" data-filter="in_progress">IN PROGRESS</button>
+            <button class="hud-btn task-filter" data-filter="not_started">NOT STARTED</button>
+            <button class="hud-btn task-filter" data-filter="complete">COMPLETE</button>
+            <button class="hud-btn task-filter" data-filter="overdue" style="color:var(--red);">OVERDUE</button>
+          </div>
+          <button class="hud-btn primary" onclick="alert('Project Plan page coming soon')">OPEN PROJECT PLAN →</button>
+        </div>
+        <div class="panel">
+          <div class="task-table-wrap">
+            <table class="task-tbl" id="tasks-table">
+              <thead>
+                <tr>
+                  <th style="width:18px;"></th>
+                  <th>TASK</th>
+                  <th>PHASE</th>
+                  <th>ASSIGNED</th>
+                  <th>START</th>
+                  <th>DUE</th>
+                  <th>DURATION</th>
+                  <th>% DONE</th>
+                  <th>STATUS</th>
+                  <th>ACT HRS</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tasks-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MILESTONES TAB ────────────────────────────────── -->
+      <div id="tab-milestones" class="tab-pane" style="display:none;">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">PROJECT MILESTONES</div>
+            <button class="hud-btn" onclick="alert('Add milestone coming soon')">+ ADD MILESTONE</button>
+          </div>
+          <div id="milestones-list"></div>
+        </div>
+      </div>
+
+      <!-- ── EVM / BUDGET TAB ──────────────────────────────── -->
+      <div id="tab-evm" class="tab-pane" style="display:none;">
+        <div class="detail-grid">
+          <div>
+            <!-- EVM indices -->
+            <div class="panel bracketed" style="margin-bottom:16px;">
+              <div class="bracket-bl"></div><div class="bracket-br"></div>
+              <div class="panel-header"><div class="panel-title">EARNED VALUE METRICS</div></div>
+              <div style="padding:14px;display:flex;justify-content:space-around;" id="evm-gauges-full"></div>
+              <table class="evm-table" id="evm-table-detail" style="border-top:1px solid var(--border);"></table>
+            </div>
+
+            <!-- Expenditures -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">EXPENDITURES</div>
+                <button class="hud-btn" onclick="alert('Add expenditure coming soon')">+ ADD</button>
+              </div>
+              <div id="expenditures-list"></div>
+            </div>
+          </div>
+
+          <div>
+            <!-- Budget summary -->
+            <div class="panel bracketed" style="margin-bottom:14px;">
+              <div class="bracket-bl"></div><div class="bracket-br"></div>
+              <div class="panel-header"><div class="panel-title">BUDGET SUMMARY</div></div>
+              <div id="budget-bars"></div>
+            </div>
+
+            <!-- Labor costs by phase -->
+            <div class="panel">
+              <div class="panel-header"><div class="panel-title">LABOR BY PHASE</div></div>
+              <div id="labor-by-phase"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RISKS TAB ─────────────────────────────────────── -->
+      <div id="tab-risks" class="tab-pane" style="display:none;">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button class="hud-btn primary" onclick="alert('Add risk coming soon')">+ ADD RISK</button>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">RISK REGISTER</div>
+            <span class="panel-count" id="risks-count">0</span>
+          </div>
+          <div id="risks-list"></div>
+        </div>
+      </div>
+
+      <!-- ── DOCUMENTS TAB ─────────────────────────────────── -->
+      <div id="tab-documents" class="tab-pane" style="display:none;">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button class="hud-btn primary" onclick="alert('Upload document coming soon')">↑ UPLOAD</button>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">PROJECT DOCUMENTS</div>
+            <span class="panel-count" id="docs-count">0</span>
+          </div>
+          <div id="documents-list"></div>
+        </div>
+      </div>
+
+      <!-- ── JOURNAL TAB ───────────────────────────────────── -->
+      <div id="tab-journal" class="tab-pane" style="display:none;">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">TASK JOURNAL — ALL ENTRIES</div>
+            <span class="panel-count" id="journal-count">0</span>
+          </div>
+          <div id="journal-list"></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Journal slide-in panel (task drill-down) -->
+<div class="journal-panel" id="journal-panel">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="jp-title">TASK JOURNAL</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeJournalPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" id="jp-body"></div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/ticker.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+// ── INIT ──────────────────────────────────────────────────────
+Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
+Sidebar.init('project-detail.html');
+
+// ── GET PROJECT ID FROM URL ───────────────────────────────────
+const params    = new URLSearchParams(window.location.search);
+const PROJECT_ID = params.get('id');
+
+if (!PROJECT_ID) {
+  window.location.href = '/projects.html';
+}
+
+// ── STATE ─────────────────────────────────────────────────────
+let STATE = {
+  project: null, tasks: [], milestones: [], users: [],
+  firms: [], journal: [], risks: [], documents: [],
+  activeTab: 'overview', taskFilter: 'all',
+};
+
+// ── TAB SWITCHING ─────────────────────────────────────────────
+function switchTab(tab) {
+  STATE.activeTab = tab;
+  document.querySelectorAll('.proj-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  document.querySelectorAll('.tab-pane').forEach(p => {
+    p.style.display = p.id === `tab-${tab}` ? '' : 'none';
+  });
+}
+
+document.querySelectorAll('.proj-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ── TASK FILTER ───────────────────────────────────────────────
+document.querySelectorAll('.task-filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    STATE.taskFilter = btn.dataset.filter;
+    document.querySelectorAll('.task-filter').forEach(b => b.classList.remove('active-filter'));
+    btn.classList.add('active-filter');
+    renderTasksTable();
+  });
+});
+
+// ── JOURNAL PANEL ─────────────────────────────────────────────
+async function openJournalPanel(taskId, taskName) {
+  document.getElementById('jp-task-name').textContent = taskName;
+  document.getElementById('jp-title').textContent = 'TASK JOURNAL';
+  document.getElementById('jp-body').innerHTML = UI.loading('LOADING JOURNAL...');
+  document.getElementById('journal-panel').classList.add('open');
+  try {
+    const entries = await API.getJournalByTask(taskId);
+    const users = STATE.users;
+    if (!entries?.length) {
+      document.getElementById('jp-body').innerHTML = UI.allClear('NO ENTRIES', 'No journal entries for this task yet');
+      return;
+    }
+    document.getElementById('jp-body').innerHTML = entries.map(e => {
+      const author = users.find(u => u.id === e.user_id);
+      return `<div class="journal-entry">
+        <div class="journal-header">
+          ${UI.avatar(author, 22)}
+          <span class="journal-date">${UI.fmtDate(e.entry_date)}</span>
+          <span class="journal-hours">${e.hours_spent}h</span>
+          ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
+          ${e.blockers ? `<span class="journal-blocker">⚑ BLOCKER</span>` : ''}
+        </div>
+        <div class="journal-body">${e.accomplishment}</div>
+        ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:9px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(err) {
+    document.getElementById('jp-body').innerHTML = UI.allClear('ERROR', 'Could not load journal entries');
+  }
+}
+
+function closeJournalPanel() {
+  document.getElementById('journal-panel').classList.remove('open');
+}
+
+// ── RENDER HELPERS ────────────────────────────────────────────
+function renderHeader() {
+  const p = STATE.project;
+  const tasks = STATE.tasks;
+  const firms = STATE.firms;
+  const users = STATE.users;
+
+  document.title = `ProjectHUD — ${p.name}`;
+  document.getElementById('proj-breadcrumb').textContent = `PROJECTS → ${(p.name || '').toUpperCase()}`;
+  document.getElementById('proj-title').textContent = p.name;
+
+  const clientFirm = firms.find(f => f.id === p.client_id);
+  const isInternal = clientFirm?.is_internal;
+  document.getElementById('proj-client-tag').textContent = isInternal
+    ? 'INTERNAL PROJECT · ' + (clientFirm?.name || '')
+    : 'CLIENT: ' + (clientFirm?.name || '—');
+
+  const done    = tasks.filter(t => t.status === 'complete').length;
+  const total   = tasks.length;
+  const pctDone = UI.pct(done, total);
+  const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete').length;
+
+  // Compute mock EVM from actual_hours data
+  const budgetHours = parseFloat(p.budget_baseline_hours || 0);
+  const actualHours = tasks.reduce((s, t) => s + parseFloat(t.actual_hours || 0), 0);
+  const budgetHoursUsed = tasks.reduce((s, t) => s + parseFloat(t.budget_hours || 0), 0);
+  const ev = budgetHoursUsed * (pctDone / 100);
+  const cpi = ev > 0 ? (ev / actualHours).toFixed(2) : '—';
+  const spi = pctDone > 0 ? (ev / (budgetHoursUsed * 0.55)).toFixed(2) : '—';
+  const cpiNum = parseFloat(cpi) || 0;
+  const spiNum = parseFloat(spi) || 0;
+
+  document.getElementById('hc-status').innerHTML = UI.badge(p.status);
+  document.getElementById('hc-pct').textContent  = pctDone + '%';
+  document.getElementById('hc-cpi').textContent  = cpi;
+  document.getElementById('hc-cpi').style.color  = UI.indexColor(cpiNum);
+  document.getElementById('hc-spi').textContent  = spi;
+  document.getElementById('hc-spi').style.color  = UI.indexColor(spiNum);
+  document.getElementById('hc-tasks').textContent   = `${done}/${total}`;
+  document.getElementById('hc-tasks-sub').textContent = overdue > 0 ? `${overdue} OVERDUE` : 'ON TRACK';
+  document.getElementById('hc-tasks-sub').style.color = overdue > 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('hc-target').textContent  = UI.fmtDateShort(p.target_date);
+  const dLeft = p.target_date ? UI.daysUntil(p.target_date) : null;
+  if (dLeft !== null) {
+    document.getElementById('hc-days-left').textContent = dLeft > 0 ? `${dLeft}d REMAINING` : `${Math.abs(dLeft)}d OVERDUE`;
+    document.getElementById('hc-days-left').style.color = dLeft < 30 ? 'var(--amber)' : 'var(--text3)';
+  }
+
+  // PM - find user assigned to most tasks
+  const pmCounts = {};
+  tasks.forEach(t => { if (t.assigned_to) pmCounts[t.assigned_to] = (pmCounts[t.assigned_to]||0)+1; });
+  const pmId = Object.entries(pmCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const pm = users.find(u => u.id === pmId);
+  document.getElementById('hc-pm').textContent = pm?.name || '—';
+
+  // Tab badge
+  if (overdue > 0) {
+    const badge = document.getElementById('tab-tasks-count');
+    badge.textContent = overdue;
+    badge.style.display = '';
+  }
+}
+
+function renderOverviewMilestones() {
+  const ms = STATE.milestones.slice(0, 5);
+  const el = document.getElementById('overview-milestones');
+  if (!ms.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined for this project'); return; }
+  el.innerHTML = ms.map(m => {
+    const cfg = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
+    const dLeft = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
+    const slipped = m.current_target_date && m.initial_target_date &&
+      m.current_target_date !== m.initial_target_date;
+    return `<div class="milestone-row">
+      <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
+      <div class="ms-info">
+        <div class="ms-name">${m.description}</div>
+        <div class="ms-phase">${m.phase || '—'}</div>
+      </div>
+      ${slipped ? `<span class="ms-slip">↑ SLIPPED</span>` : ''}
+      <div style="text-align:right;flex-shrink:0;">
+        ${UI.badge(m.status)}
+        <div class="ms-date" style="margin-top:3px;">${UI.fmtDateShort(m.current_target_date)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderOverviewTasks() {
+  const upNext = STATE.tasks
+    .filter(t => t.status !== 'complete' && t.due_date)
+    .sort((a,b) => new Date(a.due_date) - new Date(b.due_date))
+    .slice(0, 5);
+  const el = document.getElementById('overview-tasks');
+  if (!upNext.length) { el.innerHTML = UI.allClear('ALL CLEAR', 'No upcoming tasks'); return; }
+  el.innerHTML = upNext.map(t => {
+    const due = UI.dueDateLabel(t.due_date);
+    const asgn = STATE.users.find(u => u.id === t.assigned_to);
+    return `<div class="task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
+      ${UI.taskDot(t.status)}
+      <div class="task-info">
+        <div class="task-name">${t.name}</div>
+        <div class="task-meta">${t.phase || '—'}${asgn?' · '+asgn.name:''}</div>
+      </div>
+      ${UI.badge(t.status)}
+      <span style="font-family:var(--font-mono);font-size:10px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderPhaseProgress() {
+  const tasks = STATE.tasks;
+  const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+  const el = document.getElementById('phase-progress');
+  if (!phases.length) { el.innerHTML = UI.allClear('NO PHASES'); return; }
+  el.innerHTML = phases.map(phase => {
+    const pt = tasks.filter(t => t.phase === phase);
+    const done = pt.filter(t => t.status === 'complete').length;
+    const pct = UI.pct(done, pt.length);
+    const hasOverdue = pt.some(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete');
+    const color = pct === 100 ? 'var(--green)' : hasOverdue ? 'var(--amber)' : 'var(--cyan)';
+    return `<div class="phase-progress-row">
+      <div class="pp-header">
+        <div class="pp-name">${phase}</div>
+        <div class="pp-stats">${done}/${pt.length} · ${pct}%</div>
+      </div>
+      ${UI.progressBar(pct, color)}
+    </div>`;
+  }).join('');
+}
+
+function renderOverviewEVM() {
+  const tasks = STATE.tasks;
+  const done = tasks.filter(t => t.status === 'complete').length;
+  const total = tasks.length;
+  const pctDone = UI.pct(done, total);
+  const cpi = 0.97, spi = 0.94;
+  document.getElementById('overview-gauges').innerHTML =
+    UI.gauge(pctDone, 100, 'var(--cyan)', 'WORK %', pctDone+'%', 52) +
+    UI.gauge(cpi, 2, UI.indexColor(cpi), 'CPI', cpi.toFixed(2), 52) +
+    UI.gauge(spi, 2, UI.indexColor(spi), 'SPI', spi.toFixed(2), 52);
+  document.getElementById('overview-evm-vals').innerHTML = `
+    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:8px;color:var(--text3);">TASKS DONE</span><span style="font-family:var(--font-hud);font-size:14px;font-weight:700;color:var(--green);">${done}</span></div>
+    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:8px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14px;font-weight:700;color:var(--red);">${tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
+}
+
+function renderRecentJournal() {
+  const recent = STATE.journal.slice(0, 4);
+  const el = document.getElementById('recent-journal');
+  if (!recent.length) { el.innerHTML = UI.allClear('NO ACTIVITY', 'No journal entries yet'); return; }
+  el.innerHTML = recent.map(e => {
+    const author = STATE.users.find(u => u.id === e.user_id);
+    const task = STATE.tasks.find(t => t.id === e.task_id);
+    return `<div class="journal-entry" style="cursor:pointer;" onclick="openJournalPanel('${e.task_id}','${(task?.name||'').replace(/'/g,"\\'")}')">
+      <div class="journal-header">
+        ${UI.avatar(author, 20)}
+        <span class="journal-date">${UI.fmtDateShort(e.entry_date)}</span>
+        <span class="journal-hours">${e.hours_spent}h</span>
+        ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
+      </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:3px;">${task?.name || '—'}</div>
+      <div class="journal-body" style="font-size:12px;">${e.accomplishment}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDescription() {
+  document.getElementById('proj-description').textContent =
+    STATE.project?.description || 'No description provided.';
+}
+
+function renderTasksTable() {
+  const filter = STATE.taskFilter;
+  let tasks = STATE.tasks;
+  const now = new Date();
+  if (filter === 'in_progress') tasks = tasks.filter(t => t.status === 'in_progress');
+  else if (filter === 'not_started') tasks = tasks.filter(t => t.status === 'not_started' || t.status === 'ready');
+  else if (filter === 'complete') tasks = tasks.filter(t => t.status === 'complete');
+  else if (filter === 'overdue') tasks = tasks.filter(t => t.due_date && new Date(t.due_date) < now && t.status !== 'complete');
+
+  // Group by phase
+  const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+  const nophase = tasks.filter(t => !t.phase);
+  const tbody = document.getElementById('tasks-tbody');
+  let html = '';
+
+  const renderPhase = (phaseLabel, phaseTasks) => {
+    html += `<tr class="phase-header"><td colspan="11">${phaseLabel}</td></tr>`;
+    phaseTasks.forEach(t => {
+      const asgn = STATE.users.find(u => u.id === t.assigned_to);
+      const due  = t.due_date ? UI.dueDateLabel(t.due_date) : { text: '—', color: 'var(--text3)' };
+      const hasJournal = STATE.journal.some(j => j.task_id === t.id);
+      html += `<tr>
+        <td><div class="cp-flag"></div></td>
+        <td>
+          <div class="task-name-cell">
+            ${UI.taskDot(t.status)}
+            <span class="task-name-text" title="${t.name}">${t.name}</span>
+            ${hasJournal ? `<span style="font-family:var(--font-mono);font-size:8px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}
+          </div>
+        </td>
+        <td><span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${t.phase || '—'}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;">
+            ${asgn ? UI.avatar(asgn, 20) : ''}
+            <span style="font-family:var(--font-ui);font-size:12px;">${asgn?.name || '—'}</span>
+          </div>
+        </td>
+        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
+        <td style="font-family:var(--font-mono);font-size:10px;color:${due.color};">${due.text}</td>
+        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;min-width:70px;">
+            <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);">
+              <div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div>
+            </div>
+            <span style="font-family:var(--font-mono);font-size:9px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span>
+          </div>
+        </td>
+        <td>${UI.badge(t.status)}</td>
+        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
+        <td>
+          <button class="panel-action" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">▤</button>
+        </td>
+      </tr>`;
+    });
+  };
+
+  phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
+  if (nophase.length) renderPhase('NO PHASE', nophase);
+
+  tbody.innerHTML = html || `<tr><td colspan="11">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
+}
+
+function renderMilestones() {
+  const el = document.getElementById('milestones-list');
+  if (!STATE.milestones.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined'); return; }
+  el.innerHTML = STATE.milestones.map((m, i) => {
+    const cfg = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
+    const slipped = m.current_target_date && m.initial_target_date &&
+      m.current_target_date !== m.initial_target_date;
+    const dLeft = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
+    return `<div class="milestone-row">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);min-width:20px;">${i+1}</div>
+      <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
+      <div class="ms-info">
+        <div class="ms-name">${m.description}</div>
+        <div class="ms-phase">${m.phase || '—'}${m.responsible ? ' · Responsible: ' + (STATE.users.find(u=>u.id===m.responsible)?.name||'—') : ''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
+        ${UI.badge(m.status)}
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">
+          Initial: ${UI.fmtDateShort(m.initial_target_date)}
+        </div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:${slipped?'var(--amber)':'var(--text2)'};">
+          ${slipped?'↑ ':''} Current: ${UI.fmtDateShort(m.current_target_date)}
+        </div>
+        ${dLeft !== null && m.status !== 'complete' ? `<div style="font-family:var(--font-mono);font-size:9px;color:${dLeft<0?'var(--red)':dLeft<14?'var(--amber)':'var(--text3)'};">${dLeft<0?Math.abs(dLeft)+'d LATE':dLeft+'d LEFT'}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderEVM() {
+  const tasks = STATE.tasks;
+  const p = STATE.project;
+  const done = tasks.filter(t => t.status === 'complete').length;
+  const pct = UI.pct(done, tasks.length);
+  const actualHrs = tasks.reduce((s,t) => s + parseFloat(t.actual_hours||0), 0);
+  const budgetHrs = parseFloat(p.budget_baseline_hours || 0);
+  const cpi = 0.97, spi = 0.94;
+
+  document.getElementById('evm-gauges-full').innerHTML =
+    UI.gauge(pct, 100, 'var(--cyan)', 'WORK %', pct+'%', 60) +
+    UI.gauge(cpi, 2, UI.indexColor(cpi), 'CPI', cpi.toFixed(2), 60) +
+    UI.gauge(spi, 2, UI.indexColor(spi), 'SPI', spi.toFixed(2), 60);
+
+  const evmRows = [
+    ['BAC (Budget at Completion)', UI.fmtCurrency(budgetHrs * 175)],
+    ['EV (Earned Value)',          UI.fmtCurrency(budgetHrs * 175 * pct / 100)],
+    ['AC (Actual Cost)',           UI.fmtCurrency(actualHrs * 185)],
+    ['PV (Planned Value)',         UI.fmtCurrency(budgetHrs * 175 * 0.55)],
+    ['CV (Cost Variance)',         '—'],
+    ['SV (Schedule Variance)',     '—'],
+    ['CPI',                        `<span style="color:${UI.indexColor(cpi)}">${cpi}</span>`],
+    ['SPI',                        `<span style="color:${UI.indexColor(spi)}">${spi}</span>`],
+    ['EAC (Est. at Completion)',    UI.fmtCurrency(budgetHrs * 175 / cpi)],
+    ['ETC (Est. to Complete)',      '—'],
+    ['VAC (Variance at Completion)','—'],
+    ['Actual Hours Logged',        UI.fmtHours(actualHrs)],
+    ['Budget Hours',               UI.fmtHours(budgetHrs)],
+  ];
+  document.getElementById('evm-table-detail').innerHTML = evmRows.map(([k,v]) =>
+    `<tr><td class="evm-key">${k}</td><td class="evm-val">${v}</td></tr>`
+  ).join('');
+
+  // Budget bars
+  document.getElementById('budget-bars').innerHTML = [
+    { label: 'TOTAL BUDGET', used: pct, color: 'var(--cyan)',  total: UI.fmtCurrency(budgetHrs*175) },
+    { label: 'LABOR',        used: UI.pct(actualHrs, budgetHrs), color: 'var(--purple)', total: UI.fmtHours(budgetHrs) },
+  ].map(b => `<div class="budget-row">
+    <div class="budget-label-row">
+      <span class="budget-label">${b.label}</span>
+      <span class="budget-nums">${b.used}% OF ${b.total}</span>
+    </div>
+    ${UI.progressBar(b.used, b.color)}
+  </div>`).join('');
+
+  // Labor by phase
+  const phases = [...new Set(tasks.map(t=>t.phase).filter(Boolean))];
+  const maxPhaseHrs = Math.max(...phases.map(ph => tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0)), 1);
+  document.getElementById('labor-by-phase').innerHTML = phases.map(ph => {
+    const hrs = tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0);
+    const pctOfMax = UI.pct(hrs, maxPhaseHrs);
+    return `<div class="phase-progress-row">
+      <div class="pp-header">
+        <div class="pp-name" style="font-size:11.5px;">${ph}</div>
+        <div class="pp-stats">${hrs.toFixed(1)}h</div>
+      </div>
+      ${UI.progressBar(pctOfMax, 'var(--purple)')}
+    </div>`;
+  }).join('');
+
+  // Expenditures - placeholder until we add expenditures query
+  document.getElementById('expenditures-list').innerHTML = UI.allClear('NO EXPENDITURES', 'No expenditures recorded yet');
+}
+
+function renderRisks() {
+  const el = document.getElementById('risks-list');
+  document.getElementById('risks-count').textContent = STATE.risks.length;
+  if (!STATE.risks.length) { el.innerHTML = UI.allClear('NO RISKS', 'No risks in register'); return; }
+  el.innerHTML = STATE.risks.map(r => {
+    const score = r.weighted_score ? parseFloat(r.weighted_score).toFixed(0) : '—';
+    const scoreColor = parseFloat(r.weighted_score) > 50000 ? 'var(--red)' : parseFloat(r.weighted_score) > 20000 ? 'var(--amber)' : 'var(--green)';
+    return `<div class="risk-row">
+      <div class="risk-score" style="color:${scoreColor};">${score}</div>
+      <div class="risk-info">
+        <div class="risk-title">${r.title}</div>
+        <div class="risk-meta">${r.category||'—'} · P: ${r.probability||0} · Impact: ${UI.fmtCurrency(r.cost_impact)}</div>
+      </div>
+      ${UI.badge(r.status)}
+    </div>`;
+  }).join('');
+}
+
+function renderDocuments() {
+  const el = document.getElementById('documents-list');
+  document.getElementById('docs-count').textContent = STATE.documents.length;
+  if (!STATE.documents.length) { el.innerHTML = UI.allClear('NO DOCUMENTS', 'No documents uploaded'); return; }
+  el.innerHTML = STATE.documents.map(d => `<div class="doc-row">
+    <div class="doc-icon">▣</div>
+    <div class="doc-info">
+      <div class="doc-name">${d.file_name}</div>
+      <div class="doc-meta">${d.description||'—'} · ${UI.fmtDate(d.created_at)} · ${d.file_size_kb ? d.file_size_kb+'KB' : '—'}</div>
+    </div>
+    ${d.client_visible ? `<span style="font-family:var(--font-mono);font-size:8.5px;color:var(--green);border:1px solid rgba(0,229,160,0.3);padding:2px 6px;">CLIENT</span>` : ''}
+    <button class="panel-action">↓ DOWNLOAD</button>
+  </div>`).join('');
+}
+
+function renderJournalTab() {
+  const el = document.getElementById('journal-list');
+  document.getElementById('journal-count').textContent = STATE.journal.length;
+  if (!STATE.journal.length) { el.innerHTML = UI.allClear('NO JOURNAL ENTRIES', 'No work has been logged yet'); return; }
+  el.innerHTML = STATE.journal.slice(0, 50).map(e => {
+    const author = STATE.users.find(u => u.id === e.user_id);
+    const task   = STATE.tasks.find(t => t.id === e.task_id);
+    return `<div class="journal-entry">
+      <div class="journal-header">
+        ${UI.avatar(author, 24)}
+        <span style="font-family:var(--font-ui);font-size:12.5px;color:var(--text0);">${author?.name||'—'}</span>
+        <span class="journal-date">${UI.fmtDate(e.entry_date)}</span>
+        <span class="journal-hours">${e.hours_spent}h</span>
+        ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
+        ${e.blockers ? `<span class="journal-blocker">⚑ BLOCKER</span>` : ''}
+      </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:4px;letter-spacing:0.08em;">${task?.name||'—'} · ${task?.phase||'—'}</div>
+      <div class="journal-body">${e.accomplishment}</div>
+      ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:9px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── MAIN LOAD ─────────────────────────────────────────────────
+async function loadProjectDetail() {
+  try {
+    const [project, tasks, milestones, users, firms, risks, documents, journal] = await Promise.all([
+      API.getProjectById(PROJECT_ID),
+      API.getTasksByProject(PROJECT_ID),
+      API.getMilestonesByProject(PROJECT_ID),
+      API.getUsers(),
+      API.getFirms(),
+      API.getRisksByProject(PROJECT_ID),
+      API.getDocumentsByProject(PROJECT_ID),
+      API.get(`task_journal?select=*&project_id=eq.${PROJECT_ID}&order=entry_date.desc`),
+    ]);
+
+    if (!project) { window.location.href = '/projects.html'; return; }
+
+    STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal };
+
+    // Render everything
+    renderHeader();
+    renderOverviewMilestones();
+    renderOverviewTasks();
+    renderPhaseProgress();
+    renderOverviewEVM();
+    renderRecentJournal();
+    renderDescription();
+    renderTasksTable();
+    renderMilestones();
+    renderEVM();
+    renderRisks();
+    renderDocuments();
+    renderJournalTab();
+
+  } catch(err) {
+    console.error('Project detail load error:', err);
+  }
+}
+
+loadProjectDetail();
+</script>
+</body>
+</html>
