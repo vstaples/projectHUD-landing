@@ -122,6 +122,15 @@
   border-bottom: 1px solid rgba(0,210,255,0.1);
 }
 .task-name-cell { display: flex; align-items: center; gap: 8px; }
+
+/* Overview Tasks Up Next table rows */
+.overview-task-row {
+  border-bottom: 1px solid rgba(100,160,220,0.06);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.overview-task-row:hover { background: rgba(0,210,255,0.04); }
+.overview-task-row:last-child { border-bottom: none; }
 .cp-flag {
   width: 8px; height: 8px; flex-shrink: 0;
   background: var(--red); opacity: 0;
@@ -1451,17 +1460,26 @@ function expandOverviewMilestones() {
 }
 
 function taskRowHTML(t) {
-  const due  = UI.dueDateLabel(t.due_date);
-  const asgn = STATE.users.find(u => u.id === t.assigned_to);
-  return `<div class="task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
-    ${UI.taskDot(t.status)}
-    <div class="task-info">
-      <div class="task-name">${t.name}</div>
-      <div class="task-meta">${t.phase || '—'}${asgn?' · '+asgn.name:''}</div>
-    </div>
-    ${UI.badge(t.status)}
-    <span style="font-family:var(--font-mono);font-size:11px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
-  </div>`;
+  const now     = new Date();
+  const isOverdue = t.due_date && new Date(t.due_date) < now && t.status !== 'complete';
+  const asgn    = STATE.users.find(u => u.id === t.assigned_to);
+  const due     = UI.dueDateLabel(t.due_date);
+
+  const startStr = t.start_date  ? UI.fmtDateShort(t.start_date) : '—';
+  const endStr   = t.due_date    ? UI.fmtDateShort(t.due_date)   : '—';
+  const dur      = t.duration_days ? t.duration_days + 'd' : (t.effort_days ? t.effort_days + 'd' : '—');
+
+  return `<tr class="overview-task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
+    <td style="padding:7px 12px 7px 14px;width:16px;">${UI.taskDot(t.status)}</td>
+    <td style="padding:7px 8px;min-width:0;">
+      <div style="font-family:var(--font-ui);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;" title="${t.name}">${t.name}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;">${t.phase||'—'}${asgn?' · '+asgn.name:''}</div>
+    </td>
+    <td style="padding:7px 8px;text-align:center;">${UI.badge(t.status)}</td>
+    <td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;">${startStr}</td>
+    <td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:${isOverdue?'var(--red)':due.color};white-space:nowrap;text-align:center;font-weight:${isOverdue?'700':'400'};">${endStr}</td>
+    <td style="padding:7px 12px 7px 8px;font-family:var(--font-mono);font-size:11px;color:var(--text2);white-space:nowrap;text-align:right;">${dur}</td>
+  </tr>`;
 }
 
 function renderOverviewTasks() {
@@ -1476,31 +1494,45 @@ function renderOverviewTasks() {
   if (!active.length) { el.innerHTML = UI.allClear('ALL CLEAR', 'No upcoming tasks'); return; }
 
   const INITIAL = 5;
-  const visible  = [...overdue, ...upcoming].slice(0, INITIAL);
-  const hidden   = [...overdue, ...upcoming].slice(INITIAL);
+  const all     = [...overdue, ...upcoming];
+  const visible = all.slice(0, INITIAL);
+  const hidden  = all.slice(INITIAL);
   const extraOverdue = overdue.length > INITIAL ? overdue.length - INITIAL : 0;
-  const extraTotal   = hidden.length;
 
-  let html = visible.map(taskRowHTML).join('');
+  // Table header
+  const TH = (label, align='center') =>
+    `<th style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.14em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:${align};white-space:nowrap;">${label}</th>`;
+
+  let html = `<table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr>
+        ${TH('','left')}
+        ${TH('TASK','left')}
+        ${TH('STATUS')}
+        ${TH('START')}
+        ${TH('END')}
+        ${TH('DUR','right')}
+      </tr>
+    </thead>
+    <tbody id="overview-tasks-body">
+      ${visible.map(taskRowHTML).join('')}
+    </tbody>
+  </table>`;
 
   if (hidden.length > 0) {
     const label = extraOverdue > 0
-      ? `▼ &nbsp;+${extraTotal} more &nbsp;<span style="color:var(--red);">(${extraOverdue} overdue)</span>`
-      : `▼ &nbsp;+${extraTotal} more tasks`;
+      ? `▼ &nbsp;+${hidden.length} more &nbsp;<span style="color:var(--red);">(${extraOverdue} overdue)</span>`
+      : `▼ &nbsp;+${hidden.length} more tasks`;
 
     html += `<div id="tasks-expand-row" onclick="expandOverviewTasks()" style="
-      padding:9px 14px;
-      font-family:var(--font-mono);font-size:11px;
-      color:var(--cyan);letter-spacing:0.12em;
-      cursor:pointer;border-top:1px solid var(--border);
-      display:flex;align-items:center;gap:8px;
-      transition:background 0.12s;
-    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
-       onmouseout="this.style.background='transparent'">
+      padding:9px 14px;font-family:var(--font-mono);font-size:11px;
+      color:var(--cyan);letter-spacing:0.12em;cursor:pointer;
+      border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;
+      transition:background 0.12s;"
+      onmouseover="this.style.background='rgba(0,210,255,0.04)'"
+      onmouseout="this.style.background='transparent'">
       ${label}
     </div>`;
-
-    // Store hidden rows for expansion
     window._hiddenOverviewTasks = hidden;
   }
 
@@ -1509,25 +1541,21 @@ function renderOverviewTasks() {
 
 function expandOverviewTasks() {
   const expandRow = document.getElementById('tasks-expand-row');
-  const el = document.getElementById('overview-tasks');
-  if (!expandRow || !window._hiddenOverviewTasks) return;
-  // Remove the expand row
+  const tbody = document.getElementById('overview-tasks-body');
+  if (!expandRow || !tbody || !window._hiddenOverviewTasks) return;
   expandRow.remove();
-  // Append all hidden rows
   window._hiddenOverviewTasks.forEach(t => {
-    el.insertAdjacentHTML('beforeend', taskRowHTML(t));
+    tbody.insertAdjacentHTML('beforeend', taskRowHTML(t));
   });
-  // Add collapse row
-  el.insertAdjacentHTML('beforeend', `
+  // Add collapse row below the table
+  document.getElementById('overview-tasks').insertAdjacentHTML('beforeend', `
     <div onclick="renderOverviewTasks()" style="
-      padding:9px 14px;
-      font-family:var(--font-mono);font-size:11px;
-      color:var(--text3);letter-spacing:0.12em;
-      cursor:pointer;border-top:1px solid var(--border);
-      display:flex;align-items:center;gap:8px;
-      transition:background 0.12s;
-    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
-       onmouseout="this.style.background='transparent'">
+      padding:9px 14px;font-family:var(--font-mono);font-size:11px;
+      color:var(--text3);letter-spacing:0.12em;cursor:pointer;
+      border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;
+      transition:background 0.12s;"
+      onmouseover="this.style.background='rgba(0,210,255,0.04)'"
+      onmouseout="this.style.background='transparent'">
       ▲ &nbsp;SHOW LESS
     </div>`);
 }
