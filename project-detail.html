@@ -6,6 +6,14 @@
 <title>ProjectHUD — Project Detail</title>
 <link rel="stylesheet" href="/css/hud.css">
 <style>
+/* Expenditure form label */
+.exp-label {
+  display: block;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text3); letter-spacing: 0.14em;
+  margin-bottom: 5px;
+}
+
 /* ── PROJECT DETAIL SPECIFIC ────────────────────────────────── */
 
 /* Header band */
@@ -508,7 +516,7 @@
             <div class="panel">
               <div class="panel-header">
                 <div class="panel-title">EXPENDITURES</div>
-                <button class="hud-btn" onclick="alert('Add expenditure coming soon')">+ ADD</button>
+                <button class="hud-btn" onclick="openExpForm()">+ ADD</button>
               </div>
               <div id="expenditures-list"></div>
             </div>
@@ -606,9 +614,145 @@
       <div class="evm-popup-result" id="evm-popup-result"></div>
       <div class="evm-popup-grid" id="evm-popup-grid"></div>
     </div>
-    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);">
+    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
       <span style="font-size:14px;color:var(--text3);cursor:se-resize;user-select:none;line-height:1;" title="Drag to resize">⠿</span>
     </div>
+  </div>
+</div>
+
+<!-- Expenditure Add/Edit Form Panel -->
+<div class="journal-panel" id="exp-form-panel" style="width:480px;right:-500px;">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="exp-form-title">ADD EXPENDITURE</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="exp-form-subtitle">Fill in procurement details</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeExpForm()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:16px;">
+
+    <!-- Row 1: Phase + Type -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">PHASE</label>
+        <input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" />
+      </div>
+      <div>
+        <label class="exp-label">TYPE</label>
+        <select id="ef-type" class="hud-select" style="width:100%;">
+          <option value="">— Select —</option>
+          <option>Materials</option>
+          <option>Rental</option>
+          <option>Capital</option>
+          <option>Shipping</option>
+          <option>Travel</option>
+          <option>Service</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Row 2: Part Number + Vendor PN -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">PART NUMBER</label>
+        <input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" />
+      </div>
+      <div>
+        <label class="exp-label">VENDOR PN</label>
+        <input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" />
+      </div>
+    </div>
+
+    <!-- Row 3: Description (full width) -->
+    <div style="margin-bottom:12px;">
+      <label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label>
+      <input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" />
+    </div>
+
+    <!-- Row 4: Qty + Vendor -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">QTY</label>
+        <input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" />
+      </div>
+      <div>
+        <label class="exp-label">VENDOR</label>
+        <input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" />
+      </div>
+    </div>
+
+    <!-- Row 5: Unit Price + Total (computed) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">UNIT PRICE ($)</label>
+        <input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" />
+      </div>
+      <div>
+        <label class="exp-label">TOTAL PRICE</label>
+        <div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div>
+      </div>
+    </div>
+
+    <!-- Row 6: PO Number + Category -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div>
+        <label class="exp-label">PO NUMBER</label>
+        <input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" />
+      </div>
+      <div>
+        <label class="exp-label">CATEGORY</label>
+        <input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" />
+      </div>
+    </div>
+
+    <!-- Procurement dates section -->
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+      PROCUREMENT DATES
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">FORECAST DATE</label>
+        <input id="ef-forecast-date" class="hud-input" type="date" />
+      </div>
+      <div>
+        <label class="exp-label">REQUESTED DATE</label>
+        <input id="ef-requested-date" class="hud-input" type="date" />
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">APPROVED DATE</label>
+        <input id="ef-approved-date" class="hud-input" type="date" />
+      </div>
+      <div>
+        <label class="exp-label">ORDERED DATE</label>
+        <input id="ef-ordered-date" class="hud-input" type="date" />
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label class="exp-label">RECEIVED DATE</label>
+      <input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" />
+    </div>
+
+    <!-- Comments -->
+    <div style="margin-bottom:20px;">
+      <label class="exp-label">COMMENTS</label>
+      <textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea>
+    </div>
+
+    <!-- Error message -->
+    <div id="ef-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" onclick="saveExpenditure()" id="ef-save-btn" style="flex:1;">SAVE EXPENDITURE</button>
+      <button class="hud-btn" onclick="closeExpForm()">CANCEL</button>
+    </div>
+
   </div>
 </div>
 
@@ -711,8 +855,123 @@ function closeJournalPanel() {
   document.getElementById('journal-panel').classList.remove('open');
 }
 
-// ── EVM EXPLAINER POPUP ───────────────────────────────────────
+// ── EXPENDITURE FORM ──────────────────────────────────────────
+let _expEditId = null; // null = new, uuid = editing
+
+function openExpForm(exp = null) {
+  _expEditId = exp?.id || null;
+  const panel = document.getElementById('exp-form-panel');
+  document.getElementById('exp-form-title').textContent = exp ? 'EDIT EXPENDITURE' : 'ADD EXPENDITURE';
+  document.getElementById('exp-form-subtitle').textContent = exp ? exp.description : 'Fill in procurement details';
+
+  // Clear / populate fields
+  const fields = {
+    'ef-phase':         exp?.phase         || '',
+    'ef-type':          exp?.type          || '',
+    'ef-part-number':   exp?.part_number   || '',
+    'ef-vendor-pn':     exp?.vendor_pn     || '',
+    'ef-description':   exp?.description   || '',
+    'ef-qty':           exp?.qty           || 1,
+    'ef-vendor':        exp?.vendor        || '',
+    'ef-unit-price':    exp?.unit_price    || '',
+    'ef-po-number':     exp?.po_number     || '',
+    'ef-category':      exp?.category      || '',
+    'ef-forecast-date':  exp?.forecast_date  || '',
+    'ef-requested-date': exp?.requested_date || '',
+    'ef-approved-date':  exp?.approved_date  || '',
+    'ef-ordered-date':   exp?.ordered_date   || '',
+    'ef-received-date':  exp?.received_date  || '',
+    'ef-notes':          exp?.notes          || '',
+  };
+  Object.entries(fields).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  });
+  updateExpTotal();
+  document.getElementById('ef-error').style.display = 'none';
+  panel.classList.add('open');
+}
+
+function closeExpForm() {
+  document.getElementById('exp-form-panel').classList.remove('open');
+  _expEditId = null;
+}
+
+function updateExpTotal() {
+  const qty  = parseFloat(document.getElementById('ef-qty')?.value || 1);
+  const unit = parseFloat(document.getElementById('ef-unit-price')?.value || 0);
+  const total = qty * unit;
+  document.getElementById('ef-total-display').textContent =
+    total > 0 ? UI.fmtCurrency(total) : '$0.00';
+}
+
+async function saveExpenditure() {
+  const desc = document.getElementById('ef-description').value.trim();
+  if (!desc) {
+    const errEl = document.getElementById('ef-error');
+    errEl.textContent = 'Description is required.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('ef-save-btn');
+  btn.textContent = 'SAVING...';
+  btn.disabled = true;
+
+  const qty       = parseFloat(document.getElementById('ef-qty').value || 1);
+  const unitPrice = parseFloat(document.getElementById('ef-unit-price').value || 0);
+
+  const payload = {
+    project_id:     PROJECT_ID,
+    firm_id:        STATE.project.firm_id,
+    description:    desc,
+    phase:          document.getElementById('ef-phase').value.trim()         || null,
+    type:           document.getElementById('ef-type').value                 || null,
+    part_number:    document.getElementById('ef-part-number').value.trim()   || null,
+    vendor_pn:      document.getElementById('ef-vendor-pn').value.trim()     || null,
+    qty:            qty,
+    vendor:         document.getElementById('ef-vendor').value.trim()        || null,
+    unit_price:     unitPrice || null,
+    amount:         qty * unitPrice || null,
+    po_number:      document.getElementById('ef-po-number').value.trim()     || null,
+    category:       document.getElementById('ef-category').value.trim()      || null,
+    forecast_date:  document.getElementById('ef-forecast-date').value        || null,
+    requested_date: document.getElementById('ef-requested-date').value       || null,
+    approved_date:  document.getElementById('ef-approved-date').value        || null,
+    ordered_date:   document.getElementById('ef-ordered-date').value         || null,
+    received_date:  document.getElementById('ef-received-date').value        || null,
+    notes:          document.getElementById('ef-notes').value.trim()         || null,
+  };
+
+  try {
+    if (_expEditId) {
+      await API.patch(`expenditures?id=eq.${_expEditId}`, payload);
+    } else {
+      await API.post('expenditures', payload);
+    }
+    // Reload expenditures and re-render
+    STATE.expenditures = await API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`);
+    // Force re-render of EVM tab
+    renderedTabs.delete('evm');
+    if (STATE.activeTab === 'evm') {
+      renderedTabs.add('evm');
+      renderEVM();
+    }
+    closeExpForm();
+  } catch(err) {
+    const errEl = document.getElementById('ef-error');
+    errEl.textContent = 'Save failed: ' + err.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE EXPENDITURE';
+    btn.disabled = false;
+  }
+}
+
+// ── EXPENDITURE ROW COLOR CODING ──────────────────────────────
 function closeEVMPopup(e) {
+  // Don't close if the user was just resizing (mousedown started on the popup)
+  if (window._evmPopupDragging) return;
   if (!e || e.target === document.getElementById('evm-popup-overlay')) {
     document.getElementById('evm-popup-overlay').style.display = 'none';
   }
@@ -993,6 +1252,31 @@ function showEVMPopup(key) {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEVMPopup({}); });
+
+// Track resize drag state — prevents overlay mouseup from closing popup
+// when user releases the resize handle over the overlay area
+document.addEventListener('mousedown', e => {
+  if (e.target.closest?.('.evm-popup')) {
+    window._evmPopupDragging = false;
+    window._evmPopupMousedownX = e.clientX;
+    window._evmPopupMousedownY = e.clientY;
+  }
+});
+document.addEventListener('mousemove', e => {
+  if (window._evmPopupMousedownX !== undefined) {
+    const dx = Math.abs(e.clientX - window._evmPopupMousedownX);
+    const dy = Math.abs(e.clientY - window._evmPopupMousedownY);
+    if (dx > 4 || dy > 4) window._evmPopupDragging = true;
+  }
+});
+document.addEventListener('mouseup', () => {
+  // Reset dragging flag after a short delay so the click handler sees it
+  setTimeout(() => {
+    window._evmPopupDragging = false;
+    window._evmPopupMousedownX = undefined;
+    window._evmPopupMousedownY = undefined;
+  }, 50);
+});
 function computeEVM() {
   const p     = STATE.project;
   const tasks = STATE.tasks;
@@ -1563,10 +1847,17 @@ function renderEVM() {
         <thead>
           <tr>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PHASE</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">TYPE</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PART #</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">QTY</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">CATEGORY</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">AMOUNT</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR PN</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">TOTAL</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PO #</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);"></th>
           </tr>
         </thead>
         <tbody>
@@ -1577,17 +1868,27 @@ function renderEVM() {
               : e.requested_date ? 'REQUESTED'
               : 'FORECAST';
             const stateColor = state === 'RECEIVED' ? 'var(--green)'
-              : state === 'ORDERED'   ? 'var(--cyan)'
+              : state === 'ORDERED'   ? 'var(--amber)'
               : state === 'APPROVED'  ? 'var(--cyan)'
-              : state === 'REQUESTED' ? 'var(--amber)'
+              : state === 'REQUESTED' ? 'var(--text2)'
               : 'var(--text3)';
-            return `<tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
-              <td style="font-family:var(--font-ui);font-size:12.5px;color:var(--text0);padding:8px 10px;">${e.description}</td>
-              <td style="font-family:var(--font-ui);font-size:12.0px;color:var(--text2);padding:8px 10px;">${e.vendor||'—'}</td>
-              <td style="font-family:var(--font-mono);font-size:11px;color:var(--text3);padding:8px 10px;">${e.category||'—'}</td>
-              <td style="font-family:var(--font-mono);font-size:11.0px;color:var(--text0);padding:8px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
-              <td style="padding:8px 10px;text-align:center;">
-                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 6px;opacity:0.85;">${state}</span>
+            const rowOpacity = state === 'RECEIVED' ? '1' : state === 'FORECAST' ? '0.55' : '0.85';
+            const expJson = encodeURIComponent(JSON.stringify(e));
+            return `<tr style="border-bottom:1px solid rgba(100,160,220,0.06);opacity:${rowOpacity};cursor:pointer;" onmouseenter="this.style.background='rgba(0,210,255,0.03)'" onmouseleave="this.style.background=''">
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.phase||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.type||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.part_number||'—'}</td>
+              <td style="font-family:var(--font-ui);font-size:12px;color:${stateColor};padding:7px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.description}">${e.description}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;text-align:right;">${e.qty||1}</td>
+              <td style="font-family:var(--font-ui);font-size:12px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.vendor||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.vendor_pn||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.po_number||'—'}</td>
+              <td style="padding:7px 10px;text-align:center;">
+                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 7px;">${state}</span>
+              </td>
+              <td style="padding:7px 8px;text-align:right;">
+                <button class="panel-action" onclick="openExpForm(STATE.expenditures.find(x=>x.id==='${e.id}'))" title="Edit">✎</button>
               </td>
             </tr>`;
           }).join('')}
