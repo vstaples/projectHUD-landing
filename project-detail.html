@@ -186,9 +186,10 @@
 .evm-popup {
   background: var(--bg1);
   border: 1px solid var(--border-act);
-  width: 480px; max-width: 90vw;
+  width: 680px; max-width: 92vw;
   box-shadow: 0 24px 60px rgba(0,0,0,0.6);
   position: relative;
+  max-height: 90vh; overflow-y: auto;
 }
 .evm-popup-header {
   padding: 14px 18px;
@@ -237,6 +238,41 @@
 .evm-popup-result-label {
   font-family: var(--font-mono); font-size: 10px; color: var(--text2);
   letter-spacing: 0.1em;
+}
+
+/* EVM task data grid */
+.evm-popup-grid { margin-top: 14px; }
+.evm-popup-grid-title {
+  font-family: var(--font-mono); font-size: 9px; color: var(--text3);
+  letter-spacing: 0.18em; padding: 6px 0 4px;
+  border-bottom: 1px solid var(--border); margin-bottom: 0;
+}
+.evm-grid-table { width: 100%; border-collapse: collapse; }
+.evm-grid-table th {
+  font-family: var(--font-mono); font-size: 8.5px; color: var(--text3);
+  letter-spacing: 0.12em; padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left; background: var(--bg2);
+  position: sticky; top: 0;
+  white-space: nowrap;
+}
+.evm-grid-table th.num { text-align: right; }
+.evm-grid-table td {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text1);
+  padding: 5px 8px; border-bottom: 1px solid rgba(100,160,220,0.05);
+  white-space: nowrap;
+}
+.evm-grid-table td.num { text-align: right; }
+.evm-grid-table tr:last-child td { border-bottom: none; }
+.evm-grid-table tr:hover td { background: rgba(0,210,255,0.03); }
+.evm-grid-table .subtotal td {
+  border-top: 1px solid var(--border);
+  font-weight: 700; color: var(--text0);
+  background: rgba(0,210,255,0.03);
+}
+.evm-popup-grid-wrap {
+  max-height: 220px; overflow-y: auto;
+  border: 1px solid var(--border);
 }
 
 /* Budget bars */
@@ -557,6 +593,7 @@
       <div class="evm-popup-calc" id="evm-popup-calc"></div>
       <div class="evm-popup-interp" id="evm-popup-interp"></div>
       <div class="evm-popup-result" id="evm-popup-result"></div>
+      <div class="evm-popup-grid" id="evm-popup-grid"></div>
     </div>
   </div>
 </div>
@@ -843,6 +880,96 @@ function showEVMPopup(key) {
     <div class="evm-popup-result-val" style="color:${def.color};">${def.result}</div>
     <div class="evm-popup-result-label">${match || key}<br><span style="color:var(--text3);font-size:8.5px;">CLICK ANYWHERE OUTSIDE TO CLOSE</span></div>`;
   document.getElementById('evm-popup-overlay').style.display = 'flex';
+
+  // ── TASK DATA GRID ────────────────────────────────────────
+  // Show task-level data relevant to the clicked metric
+  // RATE is already declared above (175)
+  const gridEl = document.getElementById('evm-popup-grid');
+  const tasks  = STATE.tasks.filter(t => t.actual_hours > 0 || t.budget_hours > 0 || t.status === 'complete');
+
+  function gridRow(t) {
+    const user  = STATE.users.find(u => u.id === t.assigned_to);
+    const bh    = parseFloat(t.budget_hours  || 0);
+    const ah    = parseFloat(t.actual_hours  || 0);
+    const bc    = bh * RATE;
+    const ac    = ah * RATE;
+    const cv    = (bh * RATE) - (ah * RATE);
+    const pct   = parseFloat(t.pct_complete  || 0);
+    const ev    = bc * (pct / 100);
+    return { t, user, bh, ah, bc, ac, cv, ev, pct };
+  }
+
+  // Define which columns to show per metric
+  const gridConfigs = {
+    'BAC':  { title: 'TASK BUDGET HOURS — SOURCE DATA FOR BAC',
+      cols: ['TASK','PHASE','BUDGET HRS','RATE','BUDGET COST'],
+      row: r => [r.t.name, r.t.phase||'—', r.bh.toFixed(1)+'h', '$'+RATE, fmtC(r.bc)],
+      totals: rows => ['TOTAL', '', rows.reduce((s,r)=>s+r.bh,0).toFixed(1)+'h', '', fmtC(rows.reduce((s,r)=>s+r.bc,0))] },
+    'AC':   { title: 'ACTUAL HOURS LOGGED — SOURCE DATA FOR AC',
+      cols: ['TASK','PHASE','RESOURCE','ACT HRS','RATE','ACTUAL COST'],
+      row: r => [r.t.name, r.t.phase||'—', r.user?.name||'—', r.ah.toFixed(1)+'h', '$'+RATE, fmtC(r.ac)],
+      totals: rows => ['TOTAL', '', '', rows.reduce((s,r)=>s+r.ah,0).toFixed(1)+'h', '', fmtC(rows.reduce((s,r)=>s+r.ac,0))] },
+    'EV':   { title: 'EARNED VALUE — SOURCE DATA (BAC × % COMPLETE PER TASK)',
+      cols: ['TASK','PHASE','BGT COST','% DONE','EV'],
+      row: r => [r.t.name, r.t.phase||'—', fmtC(r.bc), r.pct+'%', fmtC(r.ev)],
+      totals: rows => ['TOTAL', '', fmtC(rows.reduce((s,r)=>s+r.bc,0)), '', fmtC(rows.reduce((s,r)=>s+r.ev,0))] },
+    'CV':   { title: 'COST VARIANCE BY TASK — EV MINUS AC',
+      cols: ['TASK','PHASE','EV','AC','CV'],
+      row: r => [r.t.name, r.t.phase||'—', fmtC(r.ev), fmtC(r.ac), r.cv >= 0 ? `<span style="color:var(--green)">${fmtC(r.ev-r.ac)}</span>` : `<span style="color:var(--red)">${fmtC(r.ev-r.ac)}</span>`],
+      totals: rows => { const tev=rows.reduce((s,r)=>s+r.ev,0); const tac=rows.reduce((s,r)=>s+r.ac,0); return ['TOTAL','',fmtC(tev),fmtC(tac), tev-tac>=0?`<span style="color:var(--green)">${fmtC(tev-tac)}</span>`:`<span style="color:var(--red)">${fmtC(tev-tac)}</span>`]; } },
+    'CPI':  { title: 'COST PERFORMANCE — EV ÷ AC PER TASK',
+      cols: ['TASK','PHASE','% DONE','EV','AC','CPI'],
+      row: r => { const cpi = r.ah>0 ? (r.ev/r.ac).toFixed(2) : '—'; return [r.t.name, r.t.phase||'—', r.pct+'%', fmtC(r.ev), fmtC(r.ac), `<span style="color:${r.ah>0?(r.ev/r.ac>=1?'var(--green)':r.ev/r.ac>=0.9?'var(--amber)':'var(--red)'):'var(--text3)'}">${cpi}</span>`]; },
+      totals: rows => { const tev=rows.reduce((s,r)=>s+r.ev,0); const tac=rows.reduce((s,r)=>s+r.ac,0); const cpi=(tev/tac).toFixed(2); return ['TOTAL','','',fmtC(tev),fmtC(tac),`<span style="color:${tev/tac>=1?'var(--green)':tev/tac>=0.9?'var(--amber)':'var(--red)'}">${cpi}</span>`]; } },
+    'Budget Hours': { title: 'BUDGET HOURS BY TASK',
+      cols: ['TASK','PHASE','DURATION','EFFORT','BGT HRS','BGT COST'],
+      row: r => [r.t.name, r.t.phase||'—', r.t.duration_days||'—', r.t.effort_days||'—', r.bh.toFixed(1)+'h', fmtC(r.bc)],
+      totals: rows => ['TOTAL','','','', rows.reduce((s,r)=>s+r.bh,0).toFixed(1)+'h', fmtC(rows.reduce((s,r)=>s+r.bc,0))] },
+    'Actual Hours': { title: 'ACTUAL HOURS BY TASK (FROM TASK JOURNAL)',
+      cols: ['TASK','PHASE','RESOURCE','BGT HRS','ACT HRS','VARIANCE'],
+      row: r => { const v=r.bh-r.ah; return [r.t.name, r.t.phase||'—', r.user?.name||'—', r.bh.toFixed(1)+'h', r.ah.toFixed(1)+'h', `<span style="color:${v>=0?'var(--green)':'var(--red)'}">${v>=0?'+':''}${v.toFixed(1)}h</span>`]; },
+      totals: rows => { const tbh=rows.reduce((s,r)=>s+r.bh,0); const tah=rows.reduce((s,r)=>s+r.ah,0); const v=tbh-tah; return ['TOTAL','','',tbh.toFixed(1)+'h',tah.toFixed(1)+'h',`<span style="color:${v>=0?'var(--green)':'var(--red)'}">${v>=0?'+':''}${v.toFixed(1)}h</span>`]; } },
+  };
+
+  // SV, EAC, ETC, VAC, PV reuse EV/AC data
+  gridConfigs['SV'] = gridConfigs['EV'];
+  gridConfigs['SPI'] = gridConfigs['EV'];
+  gridConfigs['EAC'] = gridConfigs['CPI'];
+  gridConfigs['ETC'] = gridConfigs['AC'];
+  gridConfigs['VAC'] = gridConfigs['CPI'];
+  gridConfigs['PV']  = gridConfigs['BAC'];
+
+  function fmtC(n) { return UI.fmtCurrency(n); }
+
+  const cfg = gridConfigs[match] || gridConfigs[key];
+  if (cfg && tasks.length > 0) {
+    const rows = tasks.map(gridRow).filter(r => r.bh > 0 || r.ah > 0);
+    const totals = cfg.totals(rows);
+    const numCols = cfg.cols.length;
+    const numericCols = new Set([2,3,4,5]); // right-align last 3-4 cols typically
+
+    gridEl.innerHTML = `
+      <div class="evm-popup-grid-title">◆ ${cfg.title}</div>
+      <div class="evm-popup-grid-wrap">
+        <table class="evm-grid-table">
+          <thead><tr>${cfg.cols.map((c,i) =>
+            `<th class="${i>=2?'num':''}">${c}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${rows.map(r => {
+              const cells = cfg.row(r);
+              return `<tr>${cells.map((c,i) =>
+                `<td class="${i>=2?'num':''}">${c}</td>`).join('')}</tr>`;
+            }).join('')}
+            <tr class="subtotal">${totals.map((c,i) =>
+              `<td class="${i>=2?'num':''}">${c}</td>`).join('')}
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  } else {
+    gridEl.innerHTML = '';
+  }
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEVMPopup({}); });
