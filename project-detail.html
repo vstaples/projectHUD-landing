@@ -414,6 +414,23 @@
   transition: color 0.15s;
 }
 .jr-cancel-btn:hover { color: rgba(200,215,230,0.80); }
+/* Expand/collapse reply thread toggle */
+.jr-expand-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none;
+  color: rgba(0,210,255,0.50);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; letter-spacing: 0.06em;
+  cursor: pointer; padding: 1px 4px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.jr-expand-btn:hover { color: #00d2ff; }
+
+
+
+/* Fix: prevent #app overflow:hidden from clipping fixed-position panels */
+#app { overflow: visible !important; }
 
 </style>
 </head>
@@ -424,7 +441,7 @@
   <div id="ticker-scroll-wrap"><div id="ticker-scroll"></div></div>
 </div>
 
-<div id="app">
+<div id="app" style="overflow:visible;">
   <nav id="sidebar"></nav>
 
   <div id="main">

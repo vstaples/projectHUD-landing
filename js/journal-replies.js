@@ -1,6 +1,6 @@
 // ============================================================
-// ProjectHUD — journal-replies.js  v2
-// Uses API + Auth globals. No supabase direct calls.
+// ProjectHUD — journal-replies.js  v3
+// Uses API + Auth globals. Expand/collapse nested replies.
 // ============================================================
 
 const REPLY_INDENT_PX  = 24;
@@ -65,7 +65,6 @@ async function saveReply(parentId, parentType, taskId, projectId, body) {
   };
   try {
     await API.post('journal_replies', payload);
-    // Fetch the newly saved reply back
     const rows = await API.get(
       `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(full_name,email)&parent_id=eq.${parentId}&order=created_at.desc&limit=1`
     );
@@ -98,66 +97,87 @@ async function deleteReply(replyId, parentId) {
   }
 }
 
-// ── Reply icon SVG (arrow only, no text) ────────────────────
+// ── Reply arrow icon ────────────────────────────────────────
 function _replyIcon() {
-  return `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;">
+  return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="display:block;">
     <path d="M2 8L7 3v3c5.5 0 8 2 8 7-1.5-3-4-4.5-8-4.5V12L2 8z" fill="currentColor"/>
   </svg>`;
 }
 
-// ── Build nested reply thread ────────────────────────────────
-function buildReplyThread(parentId, taskId, projectId, depth) {
-  depth = depth || 0;
-  const replies = _replyCache[parentId] || [];
-  if (!replies.length) return null;
+// ── Expand/collapse triangle ────────────────────────────────
+function _expandIcon(expanded) {
+  // ▶ collapsed, ▼ expanded
+  return expanded ? '▼' : '▶';
+}
 
+// ── Toggle expand/collapse of ONE level of replies ──────────
+function toggleReplies(parentId, taskId, projectId, btn) {
+  const childrenSlot = btn.closest('[data-reply-id], [data-journal-id]')
+                          ?.querySelector(':scope > .jr-children-slot');
+  if (!childrenSlot) return;
+
+  const isExpanded = childrenSlot.dataset.expanded === '1';
+
+  if (isExpanded) {
+    // Collapse: clear children
+    childrenSlot.innerHTML = '';
+    childrenSlot.dataset.expanded = '0';
+    btn.textContent = _expandIcon(false);
+    btn.title = 'Show replies';
+  } else {
+    // Expand: render ONE level only (direct children)
+    childrenSlot.innerHTML = '';
+    const directReplies = _replyCache[parentId] || [];
+    directReplies.forEach(reply => {
+      const wrap = _buildSingleReply(reply, taskId, projectId, 1);
+      childrenSlot.appendChild(wrap);
+    });
+    childrenSlot.dataset.expanded = '1';
+    btn.textContent = _expandIcon(true);
+    btn.title = 'Hide replies';
+  }
+}
+
+// ── Build a single reply element (one level, no children rendered) ──
+function _buildSingleReply(reply, taskId, projectId, depth) {
+  const wrap = document.createElement('div');
+  wrap.className = 'jr-reply-wrap';
+  wrap.dataset.replyId = reply.id;
   const indentPx = Math.min(depth, REPLY_MAX_INDENT) * REPLY_INDENT_PX;
-  const frag = document.createDocumentFragment();
+  wrap.style.marginLeft = indentPx + 'px';
+  wrap.style.borderLeft = '1px solid rgba(0,210,255,0.18)';
+  wrap.style.paddingLeft = '10px';
 
-  replies.forEach(reply => {
-    const wrap = document.createElement('div');
-    wrap.className = 'jr-reply-wrap';
-    wrap.dataset.replyId = reply.id;
-    wrap.dataset.parentId = parentId;
-    wrap.style.marginLeft = indentPx + 'px';
-    if (depth > 0) {
-      wrap.style.borderLeft = '1px solid rgba(0,210,255,0.18)';
-      wrap.style.paddingLeft = '10px';
-    }
+  const authorName = reply.users?.full_name || reply.users?.email?.split('@')[0] || 'Unknown';
+  const initials   = authorName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
+  const ts         = _replyRelTime(reply.created_at);
+  const isMine     = _currentUser && reply.author_id === _currentUser.id;
+  const hasChildren = (_replyCache[reply.id] || []).length > 0;
+  const childCount  = hasChildren ? (_replyCache[reply.id] || []).length : 0;
 
-    const authorName = reply.users?.full_name || reply.users?.email?.split('@')[0] || 'Unknown';
-    const initials   = authorName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
-    const ts         = _replyRelTime(reply.created_at);
-    const isMine     = _currentUser && reply.author_id === _currentUser.id;
-
-    wrap.innerHTML = `
-      <div class="jr-reply-row">
-        <div class="jr-avatar">${initials}</div>
-        <div class="jr-reply-body-wrap">
-          <div class="jr-reply-meta">
-            <span class="jr-author">${_esc(authorName)}</span>
-            <span class="jr-ts">${ts}</span>
-            <button class="jr-reply-icon-btn" title="Reply"
-              onclick="handleReplyClick('${reply.id}','reply','${taskId}','${projectId}',this)">
-              ${_replyIcon()}
-            </button>
-            ${isMine ? `<button class="jr-del-btn" title="Delete" onclick="handleDeleteReply('${reply.id}','${parentId}',this)">✕</button>` : ''}
-          </div>
-          <div class="jr-reply-text">${_esc(reply.body)}</div>
+  wrap.innerHTML = `
+    <div class="jr-reply-row">
+      <div class="jr-avatar">${initials}</div>
+      <div class="jr-reply-body-wrap">
+        <div class="jr-reply-meta">
+          <span class="jr-author">${_esc(authorName)}</span>
+          <span class="jr-ts">${ts}</span>
+          <button class="jr-reply-icon-btn" title="Reply"
+            onclick="handleReplyClick('${reply.id}','reply','${taskId}','${projectId}',this)">
+            ${_replyIcon()}
+          </button>
+          ${isMine ? `<button class="jr-del-btn" title="Delete" onclick="handleDeleteReply('${reply.id}','${reply.parent_id || ''}',this)">✕</button>` : ''}
+          ${hasChildren ? `<button class="jr-expand-btn" title="Show replies"
+            onclick="toggleReplies('${reply.id}','${taskId}','${projectId}',this)">▶ ${childCount}</button>` : ''}
         </div>
+        <div class="jr-reply-text">${_esc(reply.body)}</div>
       </div>
-      <div class="jr-composer-slot"></div>
-      <div class="jr-children-slot"></div>
-    `;
+    </div>
+    <div class="jr-composer-slot"></div>
+    <div class="jr-children-slot" data-expanded="0"></div>
+  `;
 
-    const childrenSlot = wrap.querySelector('.jr-children-slot');
-    const childTree = buildReplyThread(reply.id, taskId, projectId, depth + 1);
-    if (childTree) childrenSlot.appendChild(childTree);
-
-    frag.appendChild(wrap);
-  });
-
-  return frag;
+  return wrap;
 }
 
 // ── Inject reply thread into a journal entry element ────────
@@ -171,49 +191,57 @@ function injectReplyThread(journalEntryEl, journalId, taskId, projectId) {
   root.className = 'jr-thread-root';
   root.dataset.journalId = journalId;
 
-  // No separate "REPLY" button — the reply icon is injected into the
-  // journal-header row by injectReplyIcon() called from the renderer.
+  const directReplies = _replyCache[journalId] || [];
+  const replyCount = directReplies.length;
+
+  // Build: expand toggle (only if replies exist) + composer slot + children slot
   root.innerHTML = `
     <div class="jr-composer-slot"></div>
-    <div class="jr-children-slot"></div>
+    <div class="jr-children-slot" data-expanded="0"></div>
   `;
-
-  const childrenSlot = root.querySelector('.jr-children-slot');
-  const childTree = buildReplyThread(journalId, taskId, projectId, 1);
-  if (childTree) childrenSlot.appendChild(childTree);
 
   journalEntryEl.appendChild(root);
 
-  // Inject the reply icon into the journal-header of this entry
-  _injectHeaderReplyBtn(journalEntryEl, journalId, taskId, projectId);
+  // Inject reply icon + optional expand toggle into the journal-header
+  _injectHeaderControls(journalEntryEl, journalId, taskId, projectId, replyCount);
 }
 
-// Inject arrow icon into the .journal-header row (right side)
-function _injectHeaderReplyBtn(entryEl, journalId, taskId, projectId) {
+// ── Inject controls into .journal-header ────────────────────
+function _injectHeaderControls(entryEl, journalId, taskId, projectId, replyCount) {
   const header = entryEl.querySelector('.journal-header');
-  if (!header || header.querySelector('.jr-reply-icon-btn')) return;
+  if (!header) return;
 
-  const btn = document.createElement('button');
-  btn.className = 'jr-reply-icon-btn';
-  btn.title = 'Reply';
-  btn.innerHTML = _replyIcon();
-  btn.style.marginLeft = 'auto'; // push to right of header
-  btn.onclick = function() {
-    handleReplyClick(journalId, 'journal', taskId, projectId, btn);
-  };
-  header.appendChild(btn);
+  // Remove any previously injected controls
+  header.querySelectorAll('.jr-reply-icon-btn, .jr-expand-btn').forEach(e => e.remove());
+
+  // Reply arrow — right-aligned via margin-left:auto
+  const replyBtn = document.createElement('button');
+  replyBtn.className = 'jr-reply-icon-btn';
+  replyBtn.title = 'Reply';
+  replyBtn.style.marginLeft = 'auto';
+  replyBtn.innerHTML = _replyIcon();
+  replyBtn.onclick = () => handleReplyClick(journalId, 'journal', taskId, projectId, replyBtn);
+  header.appendChild(replyBtn);
+
+  // Expand toggle — only shown when replies exist
+  if (replyCount > 0) {
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'jr-expand-btn';
+    expandBtn.title = 'Show replies';
+    expandBtn.textContent = `▶ ${replyCount}`;
+    expandBtn.onclick = () => toggleReplies(journalId, taskId, projectId, expandBtn);
+    header.appendChild(expandBtn);
+  }
 }
 
 // ── Composer open/close ──────────────────────────────────────
 function handleReplyClick(parentId, parentType, taskId, projectId, triggerBtn) {
-  // Close any other open composers
   document.querySelectorAll('.jr-composer').forEach(c => c.remove());
 
-  // Find the composer slot: walk up to the thread-root or reply-wrap
+  // Find the nearest jr-thread-root or jr-reply-wrap ancestor
   const container = triggerBtn.closest('.jr-reply-wrap, .jr-thread-root, .journal-entry');
   if (!container) return;
 
-  // For journal-entry the slot is inside .jr-thread-root child
   let slot;
   if (container.classList.contains('journal-entry')) {
     slot = container.querySelector('.jr-thread-root > .jr-composer-slot');
@@ -254,16 +282,39 @@ async function handleReplySubmit(btn, parentId, parentType, taskId, projectId) {
 
   composer.remove();
 
-  // Re-render children of the parent
-  const parentWrap = document.querySelector(
-    `.jr-thread-root[data-journal-id="${parentId}"], [data-reply-id="${parentId}"]`
-  );
-  if (parentWrap) {
-    const childrenSlot = parentWrap.querySelector(':scope > .jr-children-slot');
-    if (childrenSlot) {
-      childrenSlot.innerHTML = '';
-      const childTree = buildReplyThread(parentId, taskId, projectId, 1);
-      if (childTree) childrenSlot.appendChild(childTree);
+  // Re-render the parent entry's controls (update reply count on expand btn)
+  const journalEntry = document.querySelector(`.jr-thread-root[data-journal-id="${parentId}"]`)?.closest('.journal-entry');
+  const replyWrap    = document.querySelector(`[data-reply-id="${parentId}"]`);
+
+  if (journalEntry) {
+    // Top-level reply to a journal entry — refresh header controls
+    const directCount = (_replyCache[parentId] || []).length;
+    _injectHeaderControls(journalEntry, parentId, taskId, projectId, directCount);
+    // If children slot is expanded, refresh it
+    const slot = journalEntry.querySelector('.jr-thread-root > .jr-children-slot');
+    if (slot?.dataset.expanded === '1') {
+      slot.innerHTML = '';
+      (_replyCache[parentId] || []).forEach(r => {
+        slot.appendChild(_buildSingleReply(r, taskId, projectId, 1));
+      });
+    }
+  } else if (replyWrap) {
+    // Reply to a reply — refresh the expand button on that reply
+    const existingExpand = replyWrap.querySelector(':scope > .jr-reply-row .jr-expand-btn');
+    const childCount = (_replyCache[parentId] || []).length;
+    if (existingExpand) {
+      existingExpand.textContent = `${existingExpand.textContent.startsWith('▼') ? '▼' : '▶'} ${childCount}`;
+    } else {
+      // Add expand button
+      const meta = replyWrap.querySelector('.jr-reply-meta');
+      if (meta) {
+        const eb = document.createElement('button');
+        eb.className = 'jr-expand-btn';
+        eb.title = 'Show replies';
+        eb.textContent = `▶ ${childCount}`;
+        eb.onclick = () => toggleReplies(parentId, taskId, projectId, eb);
+        meta.appendChild(eb);
+      }
     }
   }
 }
