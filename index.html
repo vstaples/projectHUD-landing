@@ -3,26 +3,580 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Project Hud</title>
+  <title>Test Company — Operational Command Platform</title>
+  <meta name="description" content="Test Company is the operations command platform built for your firm." />
+  <meta name="theme-color" content="#00d2ff" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700&family=Barlow+Condensed:wght@400;500;600;700;800&family=Rajdhani:wght@700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet" />
   <style>
-    body {
-      margin: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      background: #0a0a0a;
-      font-family: sans-serif;
-      color: #ffffff;
+    :root {
+      --bg:         #060a10;
+      --bg2:        #0a1018;
+      --bg3:        #0e1520;
+      --bg4:        #121c28;
+      --border:     rgba(0,210,255,0.10);
+      --border2:    rgba(0,210,255,0.22);
+      --border3:    rgba(0,210,255,0.40);
+      --cyan:       #00d2ff;
+      --cyan-dim:   rgba(0,210,255,0.55);
+      --cyan-glow:  rgba(0,210,255,0.07);
+      --cyan-glow2: rgba(0,210,255,0.12);
+      --green:      #00e5a0;
+      --green-dim:  rgba(0,229,160,0.08);
+      --amber:      #ffaa00;
+      --red:        #ff4757;
+      --text:       #c8d8ea;
+      --text-dim:   #5a7a8a;
+      --text-muted: #2e4455;
+      --mono:       'Share Tech Mono', monospace;
+      --body:       'Barlow', sans-serif;
+      --cond:       'Barlow Condensed', sans-serif;
     }
-    h1 { font-size: 2.5rem; }
-    p { color: #888; }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,210,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,210,255,0.018) 1px, transparent 1px);
+      background-size: 44px 44px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── NAV ─────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 200;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 52px; height: 62px;
+      background: rgba(6,10,16,0.94);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 14px;
+      text-decoration: none;
+    }
+    .nav-logo-icon {
+      position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .nav-logo-glow {
+      position: absolute; inset: -12px;
+      background: radial-gradient(ellipse at center, rgba(0,200,255,0.13) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .nav-logo-divider {
+      width: 1px; height: 32px; flex-shrink: 0;
+      background: linear-gradient(to bottom, transparent, rgba(0,200,255,0.28), transparent);
+    }
+    .nav-logo-wordmark { display: flex; flex-direction: column; gap: 3px; }
+    .nav-logo-main {
+      font-family: 'Rajdhani', sans-serif; font-weight: 700;
+      font-size: 20px; letter-spacing: 0.1em; line-height: 1;
+      color: #eeeef8; text-transform: uppercase;
+    }
+    .nav-logo-main em { font-style: normal; color: var(--cyan); }
+    .nav-logo-sub {
+      font-family: 'JetBrains Mono', monospace; font-weight: 300;
+      font-size: 9px; letter-spacing: 0.22em; color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-login {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-dim); text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-login:hover { color: var(--cyan); }
+    .nav-cta {
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--bg); background: var(--cyan);
+      border: none; padding: 10px 22px; cursor: pointer;
+      text-decoration: none;
+      clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+      transition: opacity 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.85; }
+
+    /* ── HERO ────────────────────────────────── */
+    #hero {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 60px;
+      align-items: center;
+      padding: calc(62px + 80px) 52px 100px;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+    .hero-scan {
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--cyan) 50%, transparent 100%);
+      animation: hscan 5s ease-in-out infinite; opacity: 0;
+    }
+    @keyframes hscan {
+      0% { top: 62px; opacity: 0; }
+      5% { opacity: 0.5; }
+      95% { opacity: 0.3; }
+      100% { top: 100vh; opacity: 0; }
+    }
+    .hero-glow-left {
+      position: fixed; top: 0; left: -200px;
+      width: 800px; height: 800px;
+      background: radial-gradient(circle, rgba(0,210,255,0.04) 0%, transparent 65%);
+      pointer-events: none; z-index: 0;
+    }
+    .hero-content { position: relative; z-index: 1; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .hero-eyebrow {
+      font-family: var(--mono); font-size: 13px;
+      letter-spacing: 0.3em; color: var(--cyan);
+      text-transform: uppercase; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 12px;
+      animation: fadeInUp 0.6s ease 0.05s both;
+    }
+    .hero-eyebrow::after {
+      content: ''; display: block; width: 40px; height: 1px;
+      background: var(--border2);
+    }
+    .hero-title {
+      font-family: var(--cond); font-weight: 800;
+      font-size: clamp(52px, 6.5vw, 88px);
+      line-height: 0.93; letter-spacing: -0.01em;
+      text-transform: uppercase; color: #eef4ff;
+      margin-bottom: 12px;
+      animation: fadeInUp 0.6s ease 0.1s both;
+    }
+    .hero-title .accent { color: var(--cyan); display: block; }
+    .hero-title .dim { color: rgba(238,244,255,0.35); }
+    .hero-sub {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.22em; color: var(--text-dim);
+      text-transform: uppercase; margin-bottom: 36px;
+      animation: fadeInUp 0.6s ease 0.2s both;
+    }
+    .hero-desc {
+      font-size: 18px; font-weight: 300; line-height: 1.75;
+      color: var(--text); max-width: 560px; margin-bottom: 52px;
+      animation: fadeInUp 0.6s ease 0.3s both;
+    }
+    .hero-desc strong { color: #eef4ff; font-weight: 500; }
+    .hero-actions {
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+      animation: fadeInUp 0.6s ease 0.4s both;
+    }
+    .btn-primary {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--bg); background: var(--cyan);
+      border: none; padding: 16px 36px; cursor: pointer;
+      text-decoration: none; display: inline-block;
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+      transition: all 0.2s; position: relative;
+    }
+    .btn-primary:hover { background: #fff; transform: translateX(3px); }
+    .btn-ghost {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--cyan-dim); background: transparent;
+      border: 1px solid var(--border2); padding: 15px 28px;
+      cursor: pointer; text-decoration: none; display: inline-block;
+      transition: all 0.2s;
+    }
+    .btn-ghost:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-glow); }
+
+    .hero-proof {
+      margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px 24px;
+      animation: fadeInUp 0.6s ease 0.5s both;
+      max-width: 520px;
+    }
+    .hero-proof-item {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.1em; color: var(--text-dim);
+      text-transform: uppercase; display: flex; align-items: center; gap: 8px;
+    }
+    .hero-proof-item::before {
+      content: '✓'; color: var(--green); font-size: 12px; flex-shrink: 0;
+    }
+
+    /* Hero right panel */
+    .hero-panel {
+      position: relative; width: 100%; z-index: 1;
+      animation: fadeInRight 0.8s ease 0.4s both;
+      align-self: center;
+    }
+    .panel-header {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-bottom: none; padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-header-left {
+      font-family: var(--mono); font-size: 9px;
+      letter-spacing: 0.16em; color: var(--cyan); text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .live-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 5px var(--green);
+      animation: pulse 1.5s ease-in-out infinite; flex-shrink: 0;
+    }
+    .panel-header-right {
+      font-family: var(--mono); font-size: 9px;
+      letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .panel-stats {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1px; background: var(--border);
+    }
+    .panel-stat { background: var(--bg2); padding: 14px 16px; }
+    .panel-stat-label {
+      font-family: var(--mono); font-size: 9px;
+      letter-spacing: 0.12em; color: var(--text-muted);
+      text-transform: uppercase; margin-bottom: 4px;
+    }
+    .panel-stat-value {
+      font-family: var(--mono); font-size: 24px; line-height: 1; margin-bottom: 3px;
+    }
+    .panel-stat-sub {
+      font-family: var(--mono); font-size: 8px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .c-cyan { color: var(--cyan); }
+    .c-green { color: var(--green); }
+    .c-amber { color: var(--amber); }
+    .c-red  { color: var(--red); }
+    .panel-rows { border: 1px solid var(--border); border-top: none; }
+    .panel-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 14px; border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .panel-row:last-child { border-bottom: none; }
+    .panel-row-name {
+      font-family: var(--mono); font-size: 10px;
+      letter-spacing: 0.03em; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      flex: 1; margin-right: 8px;
+    }
+    .panel-tag {
+      font-family: var(--mono); font-size: 9px;
+      letter-spacing: 0.1em; padding: 2px 5px; border: 1px solid;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .tag-urgent { color: var(--red); border-color: rgba(255,71,87,0.4); }
+    .tag-high   { color: var(--amber); border-color: rgba(255,170,0,0.4); }
+    .tag-normal { color: var(--text-dim); border-color: var(--border); }
+    .tag-done   { color: var(--green); border-color: rgba(0,229,160,0.4); }
+    .panel-intel {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-top: none; padding: 10px 14px;
+    }
+    .panel-intel-label {
+      font-family: var(--mono); font-size: 9px;
+      letter-spacing: 0.16em; color: var(--cyan); text-transform: uppercase; margin-bottom: 5px;
+    }
+    .panel-intel-text {
+      font-size: 11px; color: var(--text-dim); line-height: 1.55; font-weight: 300;
+    }
+
+    /* ── TICKER ──────────────────────────────── */
+    .ticker {
+      position: relative; z-index: 1;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 11px 0; overflow: hidden;
+    }
+    .ticker-inner {
+      display: flex; gap: 56px;
+      animation: ticker 35s linear infinite; white-space: nowrap;
+    }
+    @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .ticker-item {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.18em; color: var(--text-dim);
+      text-transform: uppercase; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .ticker-dot {
+      width: 3px; height: 3px; border-radius: 50%;
+      background: var(--cyan); opacity: 0.6;
+    }
+
+    /* ── CTA SECTION ─────────────────────────── */
+    #cta {
+      text-align: center; padding: 120px 52px;
+      position: relative; overflow: hidden; z-index: 1;
+    }
+    #cta::before {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(0,210,255,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-eyebrow {
+      font-family: var(--mono); font-size: 13px;
+      letter-spacing: 0.3em; color: var(--cyan);
+      text-transform: uppercase; margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .cta-title {
+      font-family: var(--cond); font-weight: 800;
+      font-size: clamp(40px, 5vw, 68px);
+      text-transform: uppercase; color: #eef4ff;
+      line-height: 0.95; letter-spacing: 0.01em; margin-bottom: 24px;
+    }
+    .cta-sub {
+      font-size: 17px; font-weight: 300;
+      color: var(--text-dim); margin-bottom: 52px;
+      max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.7;
+    }
+    .cta-actions {
+      display: flex; align-items: center; justify-content: center;
+      gap: 20px; flex-wrap: wrap; margin-bottom: 28px;
+    }
+    .cta-note {
+      font-family: var(--mono); font-size: 12px;
+      letter-spacing: 0.15em; color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ── FOOTER ──────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 52px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 20px;
+      position: relative; z-index: 1;
+    }
+    .footer-logo {
+      font-family: 'Rajdhani', sans-serif; font-weight: 700;
+      font-size: 18px; letter-spacing: 0.12em;
+      color: var(--text-dim); text-transform: uppercase;
+    }
+    .footer-links {
+      display: flex; gap: 32px; list-style: none;
+    }
+    .footer-links a {
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.12em; color: var(--text-muted);
+      text-decoration: none; text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--cyan); }
+    .footer-copy {
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.1em; color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ── RESPONSIVE ──────────────────────────── */
+    @media (max-width: 900px) {
+      #hero { grid-template-columns: 1fr; gap: 48px; padding: calc(62px + 48px) 24px 72px; }
+      nav { padding: 0 24px; }
+      #cta { padding: 80px 24px; }
+      footer { padding: 24px; flex-direction: column; align-items: flex-start; gap: 16px; }
+      .footer-links { flex-wrap: wrap; gap: 16px; }
+    }
   </style>
 </head>
 <body>
-  <div style="text-align:center">
-    <h1>Project Huddle 🚀</h1>
-    <p>Deployment successful. We're live.</p>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-icon">
+      <div class="nav-logo-glow"></div>
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="26" height="26" stroke="rgba(0,210,255,0.35)" stroke-width="1"/>
+        <rect x="5" y="5" width="18" height="18" stroke="rgba(0,210,255,0.2)" stroke-width="1"/>
+        <circle cx="14" cy="14" r="4" fill="none" stroke="#00d2ff" stroke-width="1.5"/>
+        <line x1="14" y1="1" x2="14" y2="5" stroke="rgba(0,210,255,0.5)" stroke-width="1"/>
+        <line x1="14" y1="23" x2="14" y2="27" stroke="rgba(0,210,255,0.5)" stroke-width="1"/>
+        <line x1="1" y1="14" x2="5" y2="14" stroke="rgba(0,210,255,0.5)" stroke-width="1"/>
+        <line x1="23" y1="14" x2="27" y2="14" stroke="rgba(0,210,255,0.5)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="nav-logo-divider"></div>
+    <div class="nav-logo-wordmark">
+      <div class="nav-logo-main">Test <em>Company</em></div>
+      <div class="nav-logo-sub">Operations Command Platform</div>
+    </div>
+  </a>
+  <div class="nav-right">
+    <a href="/login.html" class="nav-login">Sign In</a>
+    <a href="/login.html" class="nav-cta">Access Platform</a>
   </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-scan"></div>
+  <div class="hero-glow-left"></div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s ease-in-out infinite;"></span>
+      Platform Online · Accepting New Users
+    </div>
+    <h1 class="hero-title">
+      Operations
+      <span class="accent">Command</span>
+      <span class="dim">Center</span>
+    </h1>
+    <p class="hero-sub">Test Company · Powered by ProjectHUD</p>
+    <p class="hero-desc">
+      <strong>Real-time visibility. Intelligent workflows.</strong> Test Company gives your team a single command view across all operations — replacing scattered spreadsheets and email threads with a live, intelligent platform.
+    </p>
+    <div class="hero-actions">
+      <a href="/login.html" class="btn-primary">Sign In to Platform →</a>
+      <a href="mailto:vstaples@projecthud.com" class="btn-ghost">Contact Admin</a>
+    </div>
+    <div class="hero-proof">
+      <div class="hero-proof-item">Real-Time Dashboards</div>
+      <div class="hero-proof-item">AI-Powered Briefings</div>
+      <div class="hero-proof-item">Request Management</div>
+      <div class="hero-proof-item">Team Workload Intel</div>
+    </div>
+  </div>
+
+  <!-- Right status panel -->
+  <div class="hero-panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <span class="live-dot"></span>
+        Test Company · Live
+      </div>
+      <div class="panel-header-right">OPS COMMAND</div>
+    </div>
+    <div class="panel-stats">
+      <div class="panel-stat">
+        <div class="panel-stat-label">Active Tasks</div>
+        <div class="panel-stat-value c-cyan">14</div>
+        <div class="panel-stat-sub c-green">↑ 3 today</div>
+      </div>
+      <div class="panel-stat">
+        <div class="panel-stat-label">Completed</div>
+        <div class="panel-stat-value c-green">97%</div>
+        <div class="panel-stat-sub" style="color:var(--text-dim)">SLA Rate</div>
+      </div>
+      <div class="panel-stat">
+        <div class="panel-stat-label">Open Requests</div>
+        <div class="panel-stat-value c-amber">6</div>
+        <div class="panel-stat-sub" style="color:var(--text-dim)">Pending</div>
+      </div>
+      <div class="panel-stat">
+        <div class="panel-stat-label">Team Online</div>
+        <div class="panel-stat-value c-green">4</div>
+        <div class="panel-stat-sub" style="color:var(--text-dim)">of 6 members</div>
+      </div>
+    </div>
+    <div class="panel-rows">
+      <div class="panel-row">
+        <div class="panel-row-name">Client Onboarding — Johnson</div>
+        <div class="panel-tag tag-urgent">Urgent</div>
+      </div>
+      <div class="panel-row">
+        <div class="panel-row-name">Document Review — Q2 Filing</div>
+        <div class="panel-tag tag-high">High</div>
+      </div>
+      <div class="panel-row">
+        <div class="panel-row-name">Account Setup — Williams</div>
+        <div class="panel-tag tag-normal">Normal</div>
+      </div>
+      <div class="panel-row">
+        <div class="panel-row-name">Compliance Check — March</div>
+        <div class="panel-tag tag-done">Done</div>
+      </div>
+    </div>
+    <div class="panel-intel">
+      <div class="panel-intel-label">◆ AI Briefing</div>
+      <div class="panel-intel-text">6 open requests need attention today. Johnson onboarding is flagged urgent — action required before EOD.</div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker" style="position:relative;z-index:1;">
+  <div class="ticker-inner">
+    <div class="ticker-item"><span class="ticker-dot"></span>Real-Time Operations</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>AI-Powered Briefings</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Request Management</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Team Workload Intelligence</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>SLA Tracking</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Phase-Gated Workflows</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Live Command View</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Test Company Platform</div>
+    <!-- duplicate for seamless loop -->
+    <div class="ticker-item"><span class="ticker-dot"></span>Real-Time Operations</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>AI-Powered Briefings</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Request Management</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Team Workload Intelligence</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>SLA Tracking</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Phase-Gated Workflows</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Live Command View</div>
+    <div class="ticker-item"><span class="ticker-dot"></span>Test Company Platform</div>
+  </div>
+</div>
+
+<!-- CTA -->
+<section id="cta">
+  <div style="position:relative; z-index:1;">
+    <div class="cta-eyebrow">
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s ease-in-out infinite;"></span>
+      Platform Active · Ready for Your Team
+    </div>
+    <h2 class="cta-title">
+      Your Team.<br>
+      <span style="color:var(--cyan);">Running Like a Command Center.</span>
+    </h2>
+    <p class="cta-sub">Sign in to access your live operations dashboard, review open requests, and see your team's AI morning briefing.</p>
+    <div class="cta-actions">
+      <a href="/login.html" class="btn-primary">Sign In to Platform →</a>
+      <a href="mailto:vstaples@projecthud.com" class="btn-ghost">Contact vstaples@projecthud.com</a>
+    </div>
+    <p class="cta-note">Secure Login · Powered by ProjectHUD</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Test Company</div>
+  <ul class="footer-links">
+    <li><a href="/login.html">Sign In</a></li>
+    <li><a href="mailto:vstaples@projecthud.com">Admin Contact</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 Test Company · Powered by ProjectHUD · All Rights Reserved</div>
+</footer>
+
 </body>
 </html>
