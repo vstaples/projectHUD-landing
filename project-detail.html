@@ -1846,7 +1846,6 @@ function renderEVM() {
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PHASE</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">TYPE</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PART #</th>
@@ -1857,6 +1856,10 @@ function renderEVM() {
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">TOTAL</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PO #</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">REQUESTED</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">APPROVED</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">ORDERED</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">RECEIVED</th>
             <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);"></th>
           </tr>
         </thead>
@@ -1887,6 +1890,10 @@ function renderEVM() {
               <td style="padding:7px 10px;text-align:center;">
                 <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 7px;">${state}</span>
               </td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.requested_date ? 'var(--text2)' : 'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.requested_date ? UI.fmtDateShort(e.requested_date) : '—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.approved_date  ? 'var(--cyan)'  : 'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.approved_date  ? UI.fmtDateShort(e.approved_date)  : '—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.ordered_date   ? 'var(--amber)' : 'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.ordered_date   ? UI.fmtDateShort(e.ordered_date)   : '—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.received_date  ? 'var(--green)' : 'var(--text3)'};padding:7px 10px;white-space:nowrap;font-weight:${e.received_date?'700':'400'};">${e.received_date  ? UI.fmtDateShort(e.received_date)  : '—'}</td>
               <td style="padding:7px 8px;text-align:right;">
                 <button class="panel-action" onclick="openExpForm(STATE.expenditures.find(x=>x.id==='${e.id}'))" title="Edit">✎</button>
               </td>
