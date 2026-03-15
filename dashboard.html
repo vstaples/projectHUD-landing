@@ -991,8 +991,12 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // ── API ───────────────────────────────────────────────────────
 function getToken() {
   try {
-    const s = localStorage.getItem('phud_session');
+    // Supabase stores session under sb-{projectref}-auth-token
+    const s = localStorage.getItem('sb-dvbetgdzksatcgdfftbs-auth-token');
     if (s) { const p = JSON.parse(s); if (p?.access_token) return p.access_token; }
+    // Fallback: legacy key
+    const s2 = localStorage.getItem('phud_session');
+    if (s2) { const p2 = JSON.parse(s2); if (p2?.access_token) return p2.access_token; }
   } catch(e) {}
   return SUPABASE_KEY;
 }
@@ -1376,6 +1380,7 @@ loadDashboard();
 
 // ── LOGOUT ────────────────────────────────────────────────────
 document.getElementById('btn-logout').addEventListener('click', () => {
+  localStorage.removeItem('sb-dvbetgdzksatcgdfftbs-auth-token');
   localStorage.removeItem('phud_session');
   window.location.href = 'login.html';
 });
