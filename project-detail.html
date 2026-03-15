@@ -838,6 +838,14 @@ async function openJournalPanel(taskId, taskName) {
   document.getElementById('jp-title').textContent = 'TASK JOURNAL';
   document.getElementById('jp-body').innerHTML = UI.loading('LOADING JOURNAL...');
   document.getElementById('journal-panel').classList.add('open');
+  await loadRepliesForTask(taskId);
+  document.querySelectorAll('#jp-body .journal-entry').forEach(el => {
+    injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
+  });
+    await loadRepliesForTask(taskId);
+    document.querySelectorAll('#journal-panel .journal-entry').forEach(el => {
+      injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
+    });
   try {
     const entries = await API.getJournalByTask(taskId);
     const users = STATE.users;
@@ -847,7 +855,7 @@ async function openJournalPanel(taskId, taskName) {
     }
     document.getElementById('jp-body').innerHTML = entries.map(e => {
       const author = users.find(u => u.id === e.user_id);
-      return `<div class="journal-entry">
+      return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}">
         <div class="journal-header">
           ${UI.avatar(author, 22)}
           <span class="journal-date">${UI.fmtDate(e.entry_date)}</span>
@@ -1600,7 +1608,7 @@ function renderRecentJournal() {
   el.innerHTML = recent.map(e => {
     const author = STATE.users.find(u => u.id === e.user_id);
     const task = STATE.tasks.find(t => t.id === e.task_id);
-    return `<div class="journal-entry" style="cursor:pointer;" onclick="openJournalPanel('${e.task_id}','${(task?.name||'').replace(/'/g,"\\'")}')">
+    return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}" style="cursor:pointer;" onclick="openJournalPanel('${e.task_id}','${(task?.name||'').replace(/'/g,"\\'")}')">
       <div class="journal-header">
         ${UI.avatar(author, 20)}
         <span class="journal-date">${UI.fmtDateShort(e.entry_date)}</span>
@@ -1980,14 +1988,14 @@ function renderDocuments() {
   </div>`).join('');
 }
 
-function renderJournalTab() {
+async function renderJournalTab() {
   const el = document.getElementById('journal-list');
   document.getElementById('journal-count').textContent = STATE.journal.length;
   if (!STATE.journal.length) { el.innerHTML = UI.allClear('NO JOURNAL ENTRIES', 'No work has been logged yet'); return; }
   el.innerHTML = STATE.journal.slice(0, 50).map(e => {
     const author = STATE.users.find(u => u.id === e.user_id);
     const task   = STATE.tasks.find(t => t.id === e.task_id);
-    return `<div class="journal-entry">
+    return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}">
       <div class="journal-header">
         ${UI.avatar(author, 24)}
         <span style="font-family:var(--font-body,'Barlow',sans-serif);font-size:13px;color:var(--text0);letter-spacing:0.01em;">${author?.name||'—'}</span>
@@ -2001,10 +2009,15 @@ function renderJournalTab() {
       ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
     </div>`;
   }).join('');
+  await loadRepliesForProject(PROJECT_ID);
+  document.querySelectorAll('#journal-list .journal-entry').forEach(el => {
+    injectReplyThread(el, el.dataset.journalId, el.dataset.taskId, PROJECT_ID);
+  });
 }
 
 // ── MAIN LOAD ─────────────────────────────────────────────────
 async function loadProjectDetail() {
+  await initReplies();
   try {
     const [project, tasks, milestones, users, firms, risks, documents, journal, expenditures] = await Promise.all([
       API.getProjectById(PROJECT_ID),
@@ -2052,5 +2065,6 @@ async function loadProjectDetail() {
 
 loadProjectDetail();
 </script>
+<script src="/js/journal-replies.js"></script>
 </body>
 </html>
