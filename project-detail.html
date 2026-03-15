@@ -42,9 +42,9 @@
   flex-wrap: wrap;
 }
 .health-chip { display: flex; flex-direction: column; gap: 2px; }
-.health-chip .hc-label { font-family: var(--font-mono); font-size: 8.5px; color: var(--text3); letter-spacing: 0.12em; }
+.health-chip .hc-label { font-family: var(--font-mono); font-size: 10px; color: var(--text2); letter-spacing: 0.1em; }
 .health-chip .hc-val   { font-family: var(--font-hud); font-size: 18px; font-weight: 700; line-height: 1; }
-.health-chip .hc-sub   { font-family: var(--font-mono); font-size: 8px; color: var(--text3); letter-spacing: 0.08em; }
+.health-chip .hc-sub   { font-family: var(--font-mono); font-size: 10px; color: var(--text2); letter-spacing: 0.08em; }
 .health-sep { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
 
 /* Tab bar */
@@ -169,9 +169,10 @@
 .evm-table { width: 100%; }
 .evm-table tr { border-bottom: 1px solid var(--border); }
 .evm-table tr:last-child { border-bottom: none; }
-.evm-table td { padding: 8px 14px; font-family: var(--font-mono); font-size: 10px; }
-.evm-table .evm-key { color: var(--text3); letter-spacing: 0.12em; width: 50%; }
-.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; }
+.evm-table tr:hover td { background: rgba(0,210,255,0.03); }
+.evm-table td { padding: 9px 16px; font-family: var(--font-mono); font-size: 12px; }
+.evm-table .evm-key { color: var(--text2); letter-spacing: 0.08em; width: 60%; }
+.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; font-size: 13px; }
 
 /* Budget bars */
 .budget-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
@@ -1080,22 +1081,66 @@ function renderEVM() {
   // Expenditures table
   const exps = STATE.expenditures || [];
   const expEl = document.getElementById('expenditures-list');
-  if (!exps.length) {
+  if (!exps.length && !STATE.project.current_expense_budget) {
     expEl.innerHTML = UI.allClear('NO EXPENDITURES', 'No expenditures recorded for this project');
   } else {
+    const budget         = parseFloat(STATE.project.current_expense_budget || 0);
     const totalCommitted = exps.reduce((s,e) => s + parseFloat(e.amount||0), 0);
     const totalReceived  = exps.filter(e => e.received_date).reduce((s,e) => s + parseFloat(e.amount||0), 0);
+    const totalPending   = totalCommitted - totalReceived;
+    const remainingBudget = budget - totalCommitted;
+    const committedPct   = budget > 0 ? UI.pct(totalCommitted, budget) : 0;
+    const receivedPct    = budget > 0 ? UI.pct(totalReceived, budget) : 0;
+    const budgetBarColor = committedPct > 100 ? 'var(--red)' : committedPct > 85 ? 'var(--amber)' : 'var(--cyan)';
 
-    // Summary bar
     expEl.innerHTML = `
-      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:20px;">
-        <div><span style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);display:block;margin-bottom:2px;">TOTAL COMMITTED</span>
-          <span style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</span></div>
-        <div><span style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);display:block;margin-bottom:2px;">RECEIVED / POSTED</span>
-          <span style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</span></div>
-        <div><span style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);display:block;margin-bottom:2px;">PENDING</span>
-          <span style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalCommitted - totalReceived)}</span></div>
+      <!-- Budget summary chips -->
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">BUDGET</div>
+          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--text0);">${UI.fmtCurrency(budget)}</div>
+        </div>
+        <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">TOTAL COMMITTED</div>
+          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</div>
+        </div>
+        <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">RECEIVED / POSTED</div>
+          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</div>
+        </div>
+        <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">PENDING</div>
+          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalPending)}</div>
+        </div>
+        <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">REMAINING BUDGET</div>
+          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:${remainingBudget < 0 ? 'var(--red)' : 'var(--text1)'};">${UI.fmtCurrency(remainingBudget)}</div>
+        </div>
       </div>
+
+      <!-- Budget consumption bar -->
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;">BUDGET CONSUMED</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:${budgetBarColor};font-weight:700;">${committedPct}%</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,0.06);position:relative;">
+          <div style="height:100%;width:${Math.min(committedPct,100)}%;background:${budgetBarColor};transition:width 0.6s ease;"></div>
+          ${receivedPct > 0 ? `<div style="position:absolute;top:0;left:0;height:100%;width:${Math.min(receivedPct,100)}%;background:var(--green);opacity:0.6;"></div>` : ''}
+        </div>
+        <div style="display:flex;gap:16px;margin-top:5px;">
+          <span style="font-family:var(--font-mono);font-size:8.5px;color:var(--green);">■ Received ${receivedPct}%</span>
+          <span style="font-family:var(--font-mono);font-size:8.5px;color:var(--amber);">■ Pending ${committedPct - receivedPct}%</span>
+          ${remainingBudget < 0 ? `<span style="font-family:var(--font-mono);font-size:8.5px;color:var(--red);">⚑ OVER BUDGET ${UI.fmtCurrency(Math.abs(remainingBudget))}</span>` : ''}
+        </div>
+      </div>
+
+      <!-- Line items table -->
+      ${exps.length === 0 ? UI.allClear('NO LINE ITEMS', 'No expenditure line items yet') : `
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
@@ -1108,7 +1153,6 @@ function renderEVM() {
         </thead>
         <tbody>
           ${exps.map(e => {
-            // Determine procurement state
             const state = e.received_date ? 'RECEIVED'
               : e.ordered_date   ? 'ORDERED'
               : e.approved_date  ? 'APPROVED'
@@ -1130,9 +1174,8 @@ function renderEVM() {
             </tr>`;
           }).join('')}
         </tbody>
-      </table>`;
-  }
-}
+      </table>`}
+    `;
 
 function renderRisks() {
   const el = document.getElementById('risks-list');

@@ -176,7 +176,7 @@ const UI = (() => {
           font-family:'Rajdhani',sans-serif;font-size:${Math.round(size*0.23)}px;font-weight:700;color:${color};"
         >${displayVal}</div>
       </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:8.5px;color:var(--text3);letter-spacing:0.12em;text-align:center;">${label}</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);letter-spacing:0.12em;text-align:center;">${label}</div>
     </div>`;
   }
 
