@@ -865,9 +865,13 @@ function showEVMPopup(key) {
     },
   };
 
-  // Match the key to a definition
-  const match = Object.keys(defs).find(k => key.toUpperCase().includes(k.toUpperCase()) || key.includes(k));
-  const def = defs[match] || defs[key];
+  // Exact match first, then fallback to includes
+  const match = defs[key] ? key
+    : Object.keys(defs).find(k => k === key)
+    || Object.keys(defs).find(k => key === k.split(' ')[0])
+    || Object.keys(defs).find(k => k.startsWith(key))
+    || Object.keys(defs).find(k => k.startsWith(key + ' '));
+  const def = defs[match];
   if (!def) return;
 
   document.getElementById('evm-popup-title').textContent = def.title;
@@ -924,6 +928,9 @@ function showEVMPopup(key) {
 
     gridEl.innerHTML = `
       <div class="evm-popup-grid-title">◆ ${gridTitle(cfg)}</div>
+      <div style="padding:6px 0 8px;font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.06em;line-height:1.5;">
+        SUMMARY FOR COMPLETED &amp; IN-PROGRESS TASKS ONLY · BGT COST = Budget Hours × $${RATE}/hr · ACT COST = Actual Hours Logged × $${RATE}/hr · TOTAL = BGT − ACT (positive = under budget)
+      </div>
       <div class="evm-popup-grid-wrap">
         <table class="evm-grid-table">
           <thead>
@@ -1394,12 +1401,14 @@ function renderEVM() {
     ['Budget Hours (BAC hrs)',       UI.fmtHours(budgetHrs)],
     ['Actual Hours (AC hrs)',        UI.fmtHours(actualHrs)],
   ];
-  document.getElementById('evm-table-detail').innerHTML = evmRows.map(([k,v]) =>
-    `<tr onclick="showEVMPopup('${k.split(' ')[0]}')">
+  document.getElementById('evm-table-detail').innerHTML = evmRows.map(([k,v]) => {
+    // Extract the exact 2-3 letter code before the space/paren
+    const code = k.match(/^([A-Z]+)\s/)?.[1] || k.split(' ')[0];
+    return `<tr onclick="showEVMPopup('${code}')">
       <td class="evm-key">${k} <span class="evm-hint">ⓘ</span></td>
       <td class="evm-val">${v}</td>
-    </tr>`
-  ).join('');
+    </tr>`;
+  }).join('');
 
   // Budget bars
   const laborPct = budgetHrs > 0 ? UI.pct(actualHrs, budgetHrs) : 0;
