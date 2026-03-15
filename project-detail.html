@@ -85,7 +85,7 @@
   transform: rotate(45deg); border: 1.5px solid;
 }
 .ms-info { flex: 1; min-width: 0; }
-.ms-name  { font-family: var(--font-ui); font-size:13.0px; font-weight: 500; color: var(--text0); }
+.ms-name  { font-family: var(--font-ui); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
 .ms-phase { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
 .ms-date  { font-family: var(--font-mono); font-size:11px; color: var(--text2); flex-shrink: 0; text-align: right; }
 .ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
@@ -130,10 +130,10 @@
   display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
 }
 .journal-date { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; }
-.journal-hours { font-family: var(--font-mono); font-size:11px; color: var(--cyan); font-weight: 700; }
-.journal-pct { font-family: var(--font-mono); font-size:11px; color: var(--green); }
-.journal-blocker { font-family: var(--font-mono); font-size:11px; color: var(--amber); }
-.journal-body { font-family: var(--font-ui); font-size:12.5px; color: var(--text1); line-height: 1.5; }
+.journal-hours { font-family: var(--font-mono); font-size:11px; color: var(--cyan); font-weight: 700; letter-spacing: 0.06em; }
+.journal-pct { font-family: var(--font-mono); font-size:11px; color: var(--green); letter-spacing: 0.06em; }
+.journal-blocker { font-family: var(--font-mono); font-size:11px; color: var(--amber); letter-spacing: 0.06em; }
+.journal-body { font-family: var(--font-body, 'Barlow', sans-serif); font-size:13px; color: var(--text1); line-height: 1.7; letter-spacing: 0.01em; }
 
 /* Risk rows */
 .risk-row {
@@ -149,7 +149,7 @@
   padding-top: 2px;
 }
 .risk-info { flex: 1; min-width: 0; }
-.risk-title { font-family: var(--font-ui); font-size:13.0px; font-weight: 500; color: var(--text0); }
+.risk-title { font-family: var(--font-ui); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
 .risk-meta  { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
 
 /* Document rows */
@@ -162,7 +162,7 @@
 .doc-row:hover { background: var(--bg4); }
 .doc-icon { font-size:16.0px; flex-shrink: 0; color: var(--text2); }
 .doc-info { flex: 1; min-width: 0; }
-.doc-name { font-family: var(--font-ui); font-size:13.0px; color: var(--text0); }
+.doc-name { font-family: var(--font-ui); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
 .doc-meta { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
 
 /* EVM detail table */
@@ -186,10 +186,14 @@
 .evm-popup {
   background: var(--bg1);
   border: 1px solid var(--border-act);
-  width: 680px; max-width: 92vw;
+  width: 820px; max-width: 94vw;
   box-shadow: 0 24px 60px rgba(0,0,0,0.6);
   position: relative;
   max-height: 90vh; overflow-y: auto;
+  resize: both;
+  overflow: auto;
+  min-width: 520px;
+  min-height: 300px;
 }
 .evm-popup-header {
   padding: 14px 18px;
@@ -214,16 +218,18 @@
   padding: 10px 14px; margin-bottom: 14px; letter-spacing: 0.04em;
 }
 .evm-popup-calc {
-  font-family: var(--font-data); font-size:12.0px;
+  font-family: var(--font-mono); font-size:12px;
   color: var(--text2); background: var(--bg3);
   border: 1px solid var(--border);
   padding: 10px 14px; margin-bottom: 14px;
+  line-height: 1.8; letter-spacing: 0.04em;
 }
 .evm-popup-calc .calc-line { margin-bottom: 4px; }
 .evm-popup-calc .calc-line:last-child { margin-bottom: 0; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; font-weight: 700; color: var(--text0); }
 .evm-popup-interp {
-  font-family: var(--font-ui); font-size:13.0px; color: var(--text1);
-  line-height: 1.6; padding: 10px 14px;
+  font-family: var(--font-body, 'Barlow', sans-serif); font-size:13px; color: var(--text1);
+  line-height: 1.75; letter-spacing: 0.02em;
+  padding: 12px 16px;
   border-left: 2px solid var(--cyan);
   background: rgba(0,210,255,0.03);
 }
@@ -238,6 +244,11 @@
 .evm-popup-result-label {
   font-family: var(--font-mono); font-size:11px; color: var(--text2);
   letter-spacing: 0.1em;
+}
+.evm-popup::-webkit-resizer {
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
 
 /* EVM task data grid */
@@ -330,7 +341,7 @@
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.16em;margin-bottom:6px;" id="proj-breadcrumb">PROJECTS → LOADING...</div>
           <div class="proj-title" id="proj-title">Loading...</div>
           <div class="proj-client-tag" id="proj-client-tag">—</div>
-          <div id="proj-description-header" style="font-family:var(--font-ui);font-size:12.5px;color:var(--text2);margin-top:5px;line-height:1.5;max-width:700px;"></div>
+          <div id="proj-description-header" style="font-family:var(--font-body,Barlow,sans-serif);font-size:13px;color:var(--text2);margin-top:5px;line-height:1.7;letter-spacing:0.01em;max-width:700px;"></div>
         </div>
         <div class="proj-header-actions">
           <button class="hud-btn" id="btn-edit-project">✎ EDIT</button>
@@ -398,7 +409,7 @@
             <div class="panel" style="margin-top:16px;">
               <div class="panel-header"><div class="panel-title">PROJECT DESCRIPTION</div></div>
               <div style="padding:14px 16px;">
-                <p id="proj-description" style="font-family:var(--font-ui);font-size:13.0px;color:var(--text1);line-height:1.7;">—</p>
+                <p id="proj-description" style="font-family:var(--font-body,Barlow,sans-serif);font-size:13px;color:var(--text1);line-height:1.75;letter-spacing:0.01em;">—</p>
               </div>
             </div>
           </div>
@@ -594,6 +605,9 @@
       <div class="evm-popup-interp" id="evm-popup-interp"></div>
       <div class="evm-popup-result" id="evm-popup-result"></div>
       <div class="evm-popup-grid" id="evm-popup-grid"></div>
+    </div>
+    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);">
+      <span style="font-size:14px;color:var(--text3);cursor:se-resize;user-select:none;line-height:1;" title="Drag to resize">⠿</span>
     </div>
   </div>
 </div>
@@ -1626,7 +1640,7 @@ function renderJournalTab() {
     return `<div class="journal-entry">
       <div class="journal-header">
         ${UI.avatar(author, 24)}
-        <span style="font-family:var(--font-ui);font-size:12.5px;color:var(--text0);">${author?.name||'—'}</span>
+        <span style="font-family:var(--font-body,'Barlow',sans-serif);font-size:13px;color:var(--text0);letter-spacing:0.01em;">${author?.name||'—'}</span>
         <span class="journal-date">${UI.fmtDate(e.entry_date)}</span>
         <span class="journal-hours">${e.hours_spent}h</span>
         ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
