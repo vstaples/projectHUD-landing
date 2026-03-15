@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectHUD — CPM / PERT</title>
+<link rel="stylesheet" href="/css/hud.css">
+<style>
+/* ── CPM / PERT PAGE STYLES ─────────────────────────────────── */
+
+/* Tab bar within page */
+.cpm-tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:16px; flex-shrink:0; }
+.cpm-tab  {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em;
+  padding:8px 16px; background:none; border:none;
+  border-bottom:2px solid transparent;
+  color:var(--text3); cursor:pointer; transition:all 0.15s;
+}
+.cpm-tab:hover { color:var(--text1); }
+.cpm-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+
+/* Network diagram canvas */
+#cpm-canvas-wrap {
+  flex:1; overflow:auto; position:relative;
+  background:var(--bg0);
+  border:1px solid var(--border);
+  min-height:400px;
+  cursor:grab;
+}
+#cpm-canvas-wrap:active { cursor:grabbing; }
+#cpm-canvas { display:block; }
+
+/* Node styles (rendered on canvas — used for tooltip reference) */
+.node-tooltip {
+  position:fixed; z-index:200;
+  background:var(--bg2); border:1px solid var(--border-act);
+  padding:12px 14px; pointer-events:none;
+  font-family:var(--font-mono); font-size:11px;
+  max-width:280px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);
+}
+.node-tooltip-title { font-family:var(--font-ui); font-size:13px; color:var(--text0); margin-bottom:8px; font-weight:600; }
+.node-tooltip-row   { display:flex; justify-content:space-between; gap:16px; margin-bottom:3px; }
+.node-tooltip-key   { color:var(--text3); letter-spacing:0.08em; }
+.node-tooltip-val   { color:var(--text0); font-weight:700; }
+.node-tooltip-cp    { color:var(--red); font-weight:700; margin-top:6px; letter-spacing:0.1em; }
+
+/* Legend */
+.cpm-legend {
+  display:flex; gap:16px; align-items:center;
+  padding:8px 14px; border-bottom:1px solid var(--border);
+  flex-wrap:wrap; flex-shrink:0;
+}
+.legend-item { display:flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10px; color:var(--text2); }
+.legend-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.legend-line { width:24px; height:2px; flex-shrink:0; }
+
+/* PERT stats grid */
+.pert-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+.pert-stat {
+  background:var(--bg2); border:1px solid var(--border); border-top:2px solid;
+  padding:12px 14px;
+}
+.pert-stat-label { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:0.14em; margin-bottom:5px; }
+.pert-stat-val   { font-family:var(--font-hud); font-size:26px; font-weight:700; line-height:1; margin-bottom:3px; }
+.pert-stat-sub   { font-family:var(--font-mono); font-size:9px; color:var(--text2); letter-spacing:0.06em; }
+
+/* PERT task table */
+.pert-tbl { width:100%; border-collapse:collapse; }
+.pert-tbl th { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:0.14em; padding:7px 10px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap; background:var(--bg2); position:sticky; top:0; }
+.pert-tbl th.num { text-align:right; }
+.pert-tbl td { font-family:var(--font-mono); font-size:11px; color:var(--text1); padding:7px 10px; border-bottom:1px solid rgba(100,160,220,0.05); vertical-align:middle; white-space:nowrap; }
+.pert-tbl td.num { text-align:right; }
+.pert-tbl tr:hover td { background:rgba(0,210,255,0.03); }
+.pert-tbl tr.critical td { color:var(--red); }
+.pert-tbl tr.critical td.task-name { color:var(--text0); }
+.pert-tbl tr.near-critical td { color:var(--amber); opacity:0.9; }
+
+/* Float bar */
+.float-bar { display:inline-block; height:8px; background:var(--green); vertical-align:middle; margin-left:4px; }
+.float-zero { display:inline-block; width:8px; height:8px; background:var(--red); border-radius:50%; vertical-align:middle; }
+
+/* Distribution chart */
+#pert-chart-wrap { height:160px; position:relative; margin-top:4px; }
+
+/* Controls */
+.cpm-controls {
+  display:flex; gap:8px; padding:8px 14px;
+  border-bottom:1px solid var(--border); flex-shrink:0; align-items:center; flex-wrap:wrap;
+}
+.filter-btn {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;
+  padding:5px 12px; border:1px solid var(--border);
+  background:transparent; color:var(--text3); cursor:pointer; transition:all 0.12s;
+}
+.filter-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+.filter-btn.active { border-color:var(--cyan); background:rgba(0,210,255,0.08); color:var(--cyan); }
+
+/* Content area */
+#cpm-content { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+</style>
+</head>
+<body>
+
+<div id="ticker">
+  <div id="ticker-live"><div class="dot"></div><span>LIVE</span></div>
+  <div id="ticker-scroll-wrap"><div id="ticker-scroll"></div></div>
+</div>
+
+<div id="app">
+  <nav id="sidebar"></nav>
+  <div id="main">
+    <div id="page-header">
+      <div>
+        <div class="page-title" id="page-proj-title">CPM / PERT</div>
+        <div class="page-subtitle" id="page-proj-sub">CRITICAL PATH METHOD + PROGRAM EVALUATION AND REVIEW TECHNIQUE</div>
+      </div>
+      <div class="page-meta" id="page-date"></div>
+    </div>
+
+    <div id="content" style="padding:0;display:flex;flex-direction:column;overflow:hidden;">
+
+      <!-- CPM / PERT sub-tabs -->
+      <div class="cpm-tabs" style="padding:0 28px;margin-bottom:0;background:var(--bg1);border-bottom:1px solid var(--border);">
+        <button class="cpm-tab active" data-view="network">◈ NETWORK DIAGRAM</button>
+        <button class="cpm-tab" data-view="pert">◉ PERT ANALYSIS</button>
+        <button class="cpm-tab" data-view="schedule">▦ CPM SCHEDULE TABLE</button>
+      </div>
+
+      <!-- ── NETWORK DIAGRAM VIEW ─────────────────────── -->
+      <div id="view-network" class="view-pane" style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:14px 28px 0;">
+        <div class="cpm-controls">
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.12em;margin-right:4px;">SHOW:</span>
+          <button class="filter-btn active" data-phase="ALL">ALL PHASES</button>
+          <div id="phase-filter-btns" style="display:contents;"></div>
+          <div style="flex:1;"></div>
+          <button class="filter-btn" onclick="resetZoom()">⟲ RESET VIEW</button>
+          <button class="filter-btn" onclick="toggleCriticalOnly()">⚑ CRITICAL PATH ONLY</button>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.08em;" id="cp-duration-label"></span>
+        </div>
+        <div class="cpm-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Critical Path Task</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Near-Critical (Float ≤ 5d)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Normal Task</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Complete</div>
+          <div class="legend-item"><div class="legend-line" style="background:var(--red)"></div>Critical Edge</div>
+          <div class="legend-item"><div class="legend-line" style="background:var(--border);"></div>Normal Edge</div>
+          <div class="legend-item" style="margin-left:8px;font-style:italic;">ES = Early Start &nbsp; EF = Early Finish &nbsp; LS = Late Start &nbsp; LF = Late Finish &nbsp; TF = Total Float</div>
+        </div>
+        <div id="cpm-canvas-wrap">
+          <canvas id="cpm-canvas"></canvas>
+        </div>
+        <div class="node-tooltip" id="node-tooltip" style="display:none;"></div>
+      </div>
+
+      <!-- ── PERT ANALYSIS VIEW ───────────────────────── -->
+      <div id="view-pert" class="view-pane" style="display:none;flex:1;overflow-y:auto;padding:20px 28px;">
+        <div class="pert-grid" id="pert-stats"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="panel bracketed">
+            <div class="bracket-bl"></div><div class="bracket-br"></div>
+            <div class="panel-header"><div class="panel-title">PERT COMPLETION DISTRIBUTION</div></div>
+            <div style="padding:14px;" id="pert-chart-wrap">
+              <canvas id="pert-chart" style="width:100%;height:140px;"></canvas>
+            </div>
+            <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:16px;" id="pert-prob-row"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">CRITICAL PATH SUMMARY</div></div>
+            <div id="cp-summary" style="padding:12px;"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">PERT THREE-POINT ESTIMATES — ALL TASKS</div>
+            <span class="panel-count" id="pert-count">0</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="pert-tbl" id="pert-table">
+              <thead>
+                <tr>
+                  <th style="min-width:200px;">TASK</th>
+                  <th>PHASE</th>
+                  <th class="num">OPT (O)</th>
+                  <th class="num">LIKELY (M)</th>
+                  <th class="num">PESS (P)</th>
+                  <th class="num">EXPECTED</th>
+                  <th class="num">STD DEV</th>
+                  <th class="num">VARIANCE</th>
+                  <th class="num">FLOAT</th>
+                  <th>CRITICAL</th>
+                </tr>
+              </thead>
+              <tbody id="pert-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CPM SCHEDULE TABLE VIEW ──────────────────── -->
+      <div id="view-schedule" class="view-pane" style="display:none;flex:1;overflow-y:auto;padding:20px 28px;">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">CPM SCHEDULE — FORWARD &amp; BACKWARD PASS</div>
+            <span class="panel-count" id="sched-count">0</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="pert-tbl" id="sched-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th style="min-width:200px;">TASK</th>
+                  <th>PHASE</th>
+                  <th>ASSIGNED</th>
+                  <th class="num">DURATION</th>
+                  <th class="num">ES</th>
+                  <th class="num">EF</th>
+                  <th class="num">LS</th>
+                  <th class="num">LF</th>
+                  <th class="num">TOTAL FLOAT</th>
+                  <th class="num">FREE FLOAT</th>
+                  <th>STATUS</th>
+                  <th>CRITICAL</th>
+                </tr>
+              </thead>
+              <tbody id="sched-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/ticker.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+// ── INIT ──────────────────────────────────────────────────────
+document.getElementById('page-date').textContent =
+  new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'}).toUpperCase();
+Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
+Sidebar.init('cpm-pert.html');
+
+const params    = new URLSearchParams(window.location.search);
+const PROJECT_ID = params.get('id');
+if (!PROJECT_ID) window.location.href = '/projects.html';
+
+let STATE_CPM = { tasks:[], deps:[], users:[], project:null, nodes:{}, criticalPath:[], phases:[], showCriticalOnly:false, activePhase:'ALL' };
+
+// ── SUB-TAB SWITCHING ─────────────────────────────────────────
+document.querySelectorAll('.cpm-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cpm-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-pane').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    const view = btn.dataset.view;
+    const el = document.getElementById(`view-${view}`);
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    if (view === 'network')  { setTimeout(drawNetwork, 50); }
+    if (view === 'pert')     { renderPERT(); }
+    if (view === 'schedule') { renderScheduleTable(); }
+  });
+});
+
+// ── CPM ALGORITHM ─────────────────────────────────────────────
+function computeCPM(tasks, deps) {
+  const nodes = {};
+  tasks.forEach(t => {
+    nodes[t.id] = {
+      id: t.id, name: t.name, phase: t.phase,
+      duration: parseFloat(t.duration_days || 1),
+      opt:      parseFloat(t.duration_optimistic  || t.duration_days * 0.7),
+      pess:     parseFloat(t.duration_pessimistic || t.duration_days * 1.6),
+      status:   t.status, pct: t.pct_complete || 0,
+      assigned: t.assigned_to, seq: t.sequence_order || 0,
+      ES:0, EF:0, LS:0, LF:0, TF:0, FF:0,
+      preds: [], succs: [],
+    };
+  });
+
+  // Build adjacency
+  deps.forEach(d => {
+    if (nodes[d.predecessor_task_id] && nodes[d.successor_task_id]) {
+      nodes[d.predecessor_task_id].succs.push(d.successor_task_id);
+      nodes[d.successor_task_id].preds.push(d.predecessor_task_id);
+    }
+  });
+
+  // Topological sort (Kahn's algorithm)
+  const inDeg = {};
+  const ids = Object.keys(nodes);
+  ids.forEach(id => { inDeg[id] = nodes[id].preds.length; });
+  const queue = ids.filter(id => inDeg[id] === 0);
+  const topo = [];
+  while (queue.length) {
+    const cur = queue.shift();
+    topo.push(cur);
+    nodes[cur].succs.forEach(s => {
+      inDeg[s]--;
+      if (inDeg[s] === 0) queue.push(s);
+    });
+  }
+
+  // Forward pass — ES/EF
+  topo.forEach(id => {
+    const n = nodes[id];
+    n.ES = n.preds.length ? Math.max(...n.preds.map(p => nodes[p].EF)) : 0;
+    n.EF = n.ES + n.duration;
+  });
+
+  // Project duration
+  const projectDuration = Math.max(...ids.map(id => nodes[id].EF));
+
+  // Backward pass — LS/LF
+  [...topo].reverse().forEach(id => {
+    const n = nodes[id];
+    n.LF = n.succs.length ? Math.min(...n.succs.map(s => nodes[s].LS)) : projectDuration;
+    n.LS = n.LF - n.duration;
+  });
+
+  // Float
+  ids.forEach(id => {
+    const n = nodes[id];
+    n.TF = Math.round((n.LS - n.ES) * 10) / 10;
+    // Free float = min(ES of successors) - EF
+    n.FF = n.succs.length
+      ? Math.round((Math.min(...n.succs.map(s => nodes[s].ES)) - n.EF) * 10) / 10
+      : 0;
+  });
+
+  // Critical path = nodes with TF == 0
+  const criticalPath = ids.filter(id => nodes[id].TF <= 0);
+
+  return { nodes, topo, projectDuration, criticalPath };
+}
+
+// ── PERT COMPUTATION ──────────────────────────────────────────
+function computePERT(nodes, criticalPath) {
+  const cpNodes = criticalPath.map(id => nodes[id]);
+  // Expected duration on critical path
+  const expectedTotal = cpNodes.reduce((s, n) => {
+    const E = (n.opt + 4*n.duration + n.pess) / 6;
+    return s + E;
+  }, 0);
+  // Variance on critical path
+  const varianceTotal = cpNodes.reduce((s, n) => {
+    const sd = (n.pess - n.opt) / 6;
+    return s + sd * sd;
+  }, 0);
+  const stddevTotal = Math.sqrt(varianceTotal);
+  return { expectedTotal, varianceTotal, stddevTotal };
+}
+
+// ── NORMAL CDF (approximation) ─────────────────────────────────
+function normCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return z > 0 ? 1 - p : p;
+}
+
+// ── DRAW NETWORK DIAGRAM ──────────────────────────────────────
+let panX = 0, panY = 0, scale = 1;
+let criticalOnlyMode = false;
+
+function resetZoom() {
+  panX = 0; panY = 0; scale = 1;
+  drawNetwork();
+}
+
+function toggleCriticalOnly() {
+  criticalOnlyMode = !criticalOnlyMode;
+  const btn = document.querySelector('[onclick="toggleCriticalOnly()"]');
+  if (btn) {
+    btn.classList.toggle('active', criticalOnlyMode);
+    btn.textContent = criticalOnlyMode ? '◈ SHOW ALL' : '⚑ CRITICAL PATH ONLY';
+  }
+  drawNetwork();
+}
+
+function drawNetwork() {
+  const wrap = document.getElementById('cpm-canvas-wrap');
+  const canvas = document.getElementById('cpm-canvas');
+  const { nodes, topo, criticalPath } = STATE_CPM;
+  if (!topo.length) return;
+
+  const cpSet = new Set(criticalPath);
+  const cpEdges = new Set();
+  criticalPath.forEach(id => {
+    nodes[id].succs.forEach(s => {
+      if (cpSet.has(s)) cpEdges.add(`${id}->${s}`);
+    });
+  });
+
+  // Filter by phase if active
+  const activePhase = STATE_CPM.activePhase;
+  let displayIds = criticalOnlyMode ? criticalPath : topo;
+  if (activePhase !== 'ALL') {
+    displayIds = displayIds.filter(id => nodes[id].phase === activePhase);
+  }
+  const displaySet = new Set(displayIds);
+
+  // Layout: group by topological level
+  const level = {};
+  topo.forEach(id => {
+    const n = nodes[id];
+    level[id] = n.preds.filter(p => displaySet.has(p)).length
+      ? Math.max(...n.preds.filter(p => displaySet.has(p)).map(p => (level[p]||0))) + 1
+      : 0;
+  });
+
+  const cols = {};
+  displayIds.forEach(id => {
+    const lv = level[id] || 0;
+    if (!cols[lv]) cols[lv] = [];
+    cols[lv].push(id);
+  });
+
+  const NW = 160, NH = 72, HGAP = 60, VGAP = 18;
+  const numCols = Object.keys(cols).length;
+
+  // Compute positions
+  const positions = {};
+  Object.entries(cols).forEach(([col, ids]) => {
+    const x = parseInt(col) * (NW + HGAP) + 40;
+    const totalH = ids.length * (NH + VGAP) - VGAP;
+    ids.forEach((id, i) => {
+      positions[id] = { x, y: i * (NH + VGAP) + 40 };
+    });
+  });
+
+  const totalW = numCols * (NW + HGAP) + 80;
+  const totalH = Math.max(...Object.values(cols).map(a => a.length)) * (NH + VGAP) + 80;
+
+  canvas.width  = Math.max(totalW, wrap.clientWidth);
+  canvas.height = Math.max(totalH, wrap.clientHeight - 100);
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(scale, scale);
+
+  // Draw edges first
+  displayIds.forEach(id => {
+    const n = nodes[id];
+    const from = positions[id];
+    if (!from) return;
+    n.succs.filter(s => displaySet.has(s)).forEach(s => {
+      const to = positions[s];
+      if (!to) return;
+      const isCPEdge = cpEdges.has(`${id}->${s}`);
+      ctx.beginPath();
+      ctx.strokeStyle = isCPEdge ? 'rgba(255,71,87,0.8)' : 'rgba(100,160,220,0.2)';
+      ctx.lineWidth   = isCPEdge ? 2 : 1;
+      if (isCPEdge) ctx.setLineDash([]);
+      else ctx.setLineDash([4, 3]);
+
+      // Bezier curve from right edge to left edge
+      const x1 = from.x + NW, y1 = from.y + NH/2;
+      const x2 = to.x,        y2 = to.y + NH/2;
+      const cp1x = x1 + (x2-x1)*0.5, cp1y = y1;
+      const cp2x = x1 + (x2-x1)*0.5, cp2y = y2;
+      ctx.moveTo(x1, y1);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Arrow head
+      const angle = Math.atan2(y2 - cp2y, x2 - cp2x);
+      ctx.beginPath();
+      ctx.fillStyle = isCPEdge ? 'rgba(255,71,87,0.8)' : 'rgba(100,160,220,0.25)';
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - 8*Math.cos(angle-0.4), y2 - 8*Math.sin(angle-0.4));
+      ctx.lineTo(x2 - 8*Math.cos(angle+0.4), y2 - 8*Math.sin(angle+0.4));
+      ctx.closePath();
+      ctx.fill();
+    });
+  });
+
+  // Draw nodes
+  displayIds.forEach(id => {
+    const n = nodes[id];
+    const pos = positions[id];
+    if (!pos) return;
+    const { x, y } = pos;
+    const isCritical   = cpSet.has(id);
+    const isNearCrit   = !isCritical && n.TF <= 5;
+    const isComplete   = n.status === 'complete';
+    const nodeColor    = isComplete ? '#00e5a0' : isCritical ? '#ff4757' : isNearCrit ? '#ffaa00' : '#00d2ff';
+    const nodeBg       = isComplete ? 'rgba(0,229,160,0.06)' : isCritical ? 'rgba(255,71,87,0.06)' : isNearCrit ? 'rgba(255,170,0,0.06)' : 'rgba(0,210,255,0.04)';
+    const borderColor  = isComplete ? 'rgba(0,229,160,0.5)' : isCritical ? 'rgba(255,71,87,0.6)' : isNearCrit ? 'rgba(255,170,0,0.5)' : 'rgba(0,210,255,0.3)';
+
+    // Node background
+    ctx.fillStyle = nodeBg;
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = isCritical ? 2 : 1;
+    ctx.beginPath();
+    ctx.rect(x, y, NW, NH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top bar (accent line)
+    ctx.fillStyle = nodeColor;
+    ctx.fillRect(x, y, NW, 2);
+
+    // Divider line at y+22 (header row)
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y+22); ctx.lineTo(x+NW, y+22);
+    ctx.moveTo(x+NW/2, y+22); ctx.lineTo(x+NW/2, y+NH);
+    ctx.stroke();
+
+    // Header: ES | EF
+    ctx.fillStyle = nodeColor; ctx.font = 'bold 10px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(`ES: ${n.ES.toFixed(0)}`, x + NW/4, y + 14);
+    ctx.fillText(`EF: ${n.EF.toFixed(0)}`, x + 3*NW/4, y + 14);
+
+    // Task name (truncated)
+    ctx.fillStyle = '#c8dff0'; ctx.font = '600 10px Barlow Condensed, sans-serif';
+    ctx.textAlign = 'center';
+    const maxLen = 22;
+    const label = n.name.length > maxLen ? n.name.slice(0, maxLen-1)+'…' : n.name;
+    ctx.fillText(label, x + NW/2, y + 34);
+
+    // Duration
+    ctx.fillStyle = '#7a9bbf'; ctx.font = '9px Share Tech Mono';
+    ctx.fillText(`DUR: ${n.duration}d`, x + NW/2, y + 46);
+
+    // Footer: LS | LF
+    ctx.fillStyle = n.TF === 0 ? '#ff4757' : '#5a7a8a'; ctx.font = '9px Share Tech Mono';
+    ctx.fillText(`LS: ${n.LS.toFixed(0)}`, x + NW/4, y + NH - 7);
+    ctx.fillText(`LF: ${n.LF.toFixed(0)}`, x + 3*NW/4, y + NH - 7);
+
+    // Float badge (top-right corner)
+    if (n.TF <= 0) {
+      ctx.fillStyle = 'rgba(255,71,87,0.15)';
+      ctx.fillRect(x + NW - 30, y + 4, 26, 14);
+      ctx.fillStyle = '#ff4757'; ctx.font = 'bold 8px Share Tech Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText('CP', x + NW - 17, y + 14);
+    } else {
+      ctx.fillStyle = 'rgba(100,160,220,0.1)';
+      ctx.fillRect(x + NW - 36, y + 4, 32, 14);
+      ctx.fillStyle = '#5a7a8a'; ctx.font = '8px Share Tech Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText(`F:${n.TF.toFixed(0)}`, x + NW - 20, y + 14);
+    }
+  });
+
+  ctx.restore();
+
+  // Store positions for tooltip
+  STATE_CPM.positions = positions;
+  STATE_CPM.displaySet = displaySet;
+}
+
+// ── CANVAS PAN & TOOLTIP ─────────────────────────────────────
+let isPanning = false, lastPan = {x:0,y:0};
+
+document.getElementById('cpm-canvas-wrap').addEventListener('mousedown', e => {
+  isPanning = true;
+  lastPan = {x: e.clientX - panX, y: e.clientY - panY};
+});
+document.addEventListener('mousemove', e => {
+  if (!isPanning) {
+    checkTooltip(e);
+    return;
+  }
+  panX = e.clientX - lastPan.x;
+  panY = e.clientY - lastPan.y;
+  drawNetwork();
+});
+document.addEventListener('mouseup', () => { isPanning = false; });
+
+document.getElementById('cpm-canvas-wrap').addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  scale = Math.max(0.3, Math.min(3, scale * delta));
+  drawNetwork();
+}, { passive: false });
+
+function checkTooltip(e) {
+  const { nodes, positions, displaySet } = STATE_CPM;
+  if (!positions || !displaySet) return;
+  const wrap = document.getElementById('cpm-canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const mx = (e.clientX - rect.left - panX) / scale;
+  const my = (e.clientY - rect.top  - panY) / scale;
+  const NW = 160, NH = 72;
+  const tooltip = document.getElementById('node-tooltip');
+  let found = false;
+  for (const id of displaySet) {
+    const pos = positions[id];
+    if (!pos) continue;
+    if (mx >= pos.x && mx <= pos.x+NW && my >= pos.y && my <= pos.y+NH) {
+      const n = nodes[id];
+      const user = STATE_CPM.users.find(u => u.id === n.assigned);
+      const isCritical = STATE_CPM.criticalPath.includes(id);
+      const expected = ((n.opt + 4*n.duration + n.pess) / 6).toFixed(1);
+      const sd = ((n.pess - n.opt) / 6).toFixed(2);
+      tooltip.innerHTML = `
+        <div class="node-tooltip-title">${n.name}</div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">PHASE</span><span class="node-tooltip-val">${n.phase||'—'}</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">ASSIGNED</span><span class="node-tooltip-val">${user?.name||'—'}</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">DURATION (M)</span><span class="node-tooltip-val">${n.duration}d</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">PERT EXPECTED</span><span class="node-tooltip-val">${expected}d ±${sd}d</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">ES / EF</span><span class="node-tooltip-val">Day ${n.ES.toFixed(0)} → ${n.EF.toFixed(0)}</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">LS / LF</span><span class="node-tooltip-val">Day ${n.LS.toFixed(0)} → ${n.LF.toFixed(0)}</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">TOTAL FLOAT</span><span class="node-tooltip-val" style="color:${n.TF<=0?'var(--red)':n.TF<=5?'var(--amber)':'var(--green)'}">${n.TF.toFixed(0)}d</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">FREE FLOAT</span><span class="node-tooltip-val">${n.FF.toFixed(0)}d</span></div>
+        <div class="node-tooltip-row"><span class="node-tooltip-key">STATUS</span><span class="node-tooltip-val">${n.status?.replace('_',' ').toUpperCase()||'—'}</span></div>
+        ${isCritical ? '<div class="node-tooltip-cp">⚑ ON CRITICAL PATH — ZERO FLOAT</div>' : ''}`;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top  = (e.clientY - 10) + 'px';
+      found = true;
+      break;
+    }
+  }
+  if (!found) tooltip.style.display = 'none';
+}
+
+// ── RENDER PERT TABLE ─────────────────────────────────────────
+function renderPERT() {
+  const { nodes, topo, criticalPath, projectDuration } = STATE_CPM;
+  const cpSet = new Set(criticalPath);
+  const { expectedTotal, stddevTotal } = computePERT(nodes, criticalPath);
+
+  // Stats
+  document.getElementById('pert-stats').innerHTML = `
+    <div class="pert-stat" style="border-top-color:var(--cyan);">
+      <div class="pert-stat-label">PROJECT DURATION (CPM)</div>
+      <div class="pert-stat-val" style="color:var(--cyan)">${projectDuration.toFixed(0)}<span style="font-size:14px;color:var(--text2)">d</span></div>
+      <div class="pert-stat-sub">MOST LIKELY (M)</div>
+    </div>
+    <div class="pert-stat" style="border-top-color:var(--green);">
+      <div class="pert-stat-label">PERT EXPECTED</div>
+      <div class="pert-stat-val" style="color:var(--green)">${expectedTotal.toFixed(1)}<span style="font-size:14px;color:var(--text2)">d</span></div>
+      <div class="pert-stat-sub">CRITICAL PATH WEIGHTED AVG</div>
+    </div>
+    <div class="pert-stat" style="border-top-color:var(--amber);">
+      <div class="pert-stat-label">STD DEVIATION</div>
+      <div class="pert-stat-val" style="color:var(--amber)">±${stddevTotal.toFixed(1)}<span style="font-size:14px;color:var(--text2)">d</span></div>
+      <div class="pert-stat-sub">CRITICAL PATH TOTAL</div>
+    </div>
+    <div class="pert-stat" style="border-top-color:var(--purple);">
+      <div class="pert-stat-label">CRITICAL TASKS</div>
+      <div class="pert-stat-val" style="color:var(--purple)">${criticalPath.length}<span style="font-size:14px;color:var(--text2)">/${topo.length}</span></div>
+      <div class="pert-stat-sub">ON CRITICAL PATH</div>
+    </div>`;
+
+  // Probability row
+  const targets = [
+    { label:'P50 (50%)', z:0,   desc:'Expected' },
+    { label:'P75 (75%)', z:0.674, desc:'+0.67σ' },
+    { label:'P85 (85%)', z:1.036, desc:'+1.04σ' },
+    { label:'P90 (90%)', z:1.282, desc:'+1.28σ' },
+  ];
+  document.getElementById('pert-prob-row').innerHTML = targets.map(t => `
+    <div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;margin-bottom:3px;">${t.label}</div>
+      <div style="font-family:var(--font-hud);font-size:18px;font-weight:700;color:var(--cyan);">${(expectedTotal + t.z*stddevTotal).toFixed(0)}d</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${t.desc}</div>
+    </div>`).join('');
+
+  // PERT distribution curve (canvas)
+  drawPERTCurve(expectedTotal, stddevTotal, projectDuration);
+
+  // Critical path summary
+  const cpNames = criticalPath.map(id => nodes[id].name.slice(0,30));
+  document.getElementById('cp-summary').innerHTML = criticalPath.map((id, i) => {
+    const n = nodes[id];
+    const E = ((n.opt + 4*n.duration + n.pess)/6).toFixed(1);
+    const sd = ((n.pess - n.opt)/6).toFixed(2);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(100,160,220,0.06);">
+      <div style="width:6px;height:6px;background:var(--red);transform:rotate(45deg);flex-shrink:0;"></div>
+      <div style="flex:1;font-family:var(--font-ui);font-size:12px;color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${n.name}">${n.name}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);flex-shrink:0;">${E}d ±${sd}</div>
+    </div>`;
+  }).join('');
+
+  // PERT table
+  const maxFloat = Math.max(...topo.map(id => nodes[id].TF), 1);
+  document.getElementById('pert-count').textContent = topo.length;
+  document.getElementById('pert-tbody').innerHTML = topo.map(id => {
+    const n = nodes[id];
+    const E = (n.opt + 4*n.duration + n.pess) / 6;
+    const sd = (n.pess - n.opt) / 6;
+    const V  = sd * sd;
+    const isCrit = cpSet.has(id);
+    const isNear = !isCrit && n.TF <= 5;
+    const floatPct = Math.min(n.TF / Math.max(maxFloat, 1) * 100, 100);
+    return `<tr class="${isCrit?'critical':isNear?'near-critical':''}">
+      <td class="task-name" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${n.name}">${n.name}</td>
+      <td style="color:var(--text3);font-size:10px;">${n.phase||'—'}</td>
+      <td class="num" style="color:var(--green);">${n.opt.toFixed(1)}d</td>
+      <td class="num">${n.duration.toFixed(1)}d</td>
+      <td class="num" style="color:var(--amber);">${n.pess.toFixed(1)}d</td>
+      <td class="num" style="color:var(--cyan);font-weight:700;">${E.toFixed(1)}d</td>
+      <td class="num">±${sd.toFixed(2)}</td>
+      <td class="num" style="color:var(--text3);">${V.toFixed(2)}</td>
+      <td class="num">
+        ${isCrit
+          ? `<span class="float-zero" title="Zero float"></span>`
+          : `${n.TF.toFixed(0)}d <span class="float-bar" style="width:${Math.min(floatPct,60)}px;background:${isNear?'var(--amber)':'var(--green)'}"></span>`}
+      </td>
+      <td>${isCrit ? `<span style="color:var(--red);font-weight:700;letter-spacing:0.1em;">⚑ CP</span>` : isNear ? `<span style="color:var(--amber);">≈ NEAR</span>` : `<span style="color:var(--text3);">—</span>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+function drawPERTCurve(mean, sd, mlDur) {
+  const canvas = document.getElementById('pert-chart');
+  if (!canvas) return;
+  const wrap = document.getElementById('pert-chart-wrap');
+  canvas.width  = wrap.clientWidth || 400;
+  canvas.height = 140;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const W = canvas.width, H = canvas.height;
+  const minX = mean - 4*sd, maxX = mean + 4*sd;
+  const pts = 200;
+
+  function xToCanvas(x) { return (x - minX) / (maxX - minX) * W; }
+  function norm(x) { return Math.exp(-0.5*((x-mean)/sd)**2) / (sd * Math.sqrt(2*Math.PI)); }
+
+  const maxY = norm(mean);
+  function yToCanvas(y) { return H - 10 - (y / maxY) * (H - 20); }
+
+  // Fill under curve with gradient
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0,   'rgba(0,210,255,0.05)');
+  grad.addColorStop(0.5, 'rgba(0,210,255,0.2)');
+  grad.addColorStop(1,   'rgba(0,210,255,0.05)');
+  ctx.beginPath();
+  for (let i = 0; i <= pts; i++) {
+    const x = minX + (i/pts) * (maxX - minX);
+    const cx = xToCanvas(x), cy = yToCanvas(norm(x));
+    i === 0 ? ctx.moveTo(cx, H-10) : ctx.lineTo(cx, cy);
+  }
+  ctx.lineTo(W, H-10); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Curve line
+  ctx.beginPath();
+  ctx.strokeStyle = 'var(--cyan,#00d2ff)'; ctx.lineWidth = 2;
+  for (let i = 0; i <= pts; i++) {
+    const x = minX + (i/pts) * (maxX - minX);
+    const cx = xToCanvas(x), cy = yToCanvas(norm(x));
+    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+
+  // Vertical lines: ML (red), Mean (cyan), ±1σ (dashed)
+  const lines = [
+    { x: mlDur,      color: 'rgba(255,71,87,0.8)',  label: `ML: ${mlDur}d`, dash: false },
+    { x: mean,       color: 'rgba(0,210,255,0.9)',  label: `μ: ${mean.toFixed(0)}d`, dash: false },
+    { x: mean+sd,    color: 'rgba(255,170,0,0.5)',  label: `+1σ`, dash: true },
+    { x: mean-sd,    color: 'rgba(255,170,0,0.5)',  label: `-1σ`, dash: true },
+  ];
+  lines.forEach(l => {
+    const cx = xToCanvas(l.x);
+    ctx.beginPath();
+    ctx.strokeStyle = l.color; ctx.lineWidth = 1.5;
+    l.dash ? ctx.setLineDash([4,3]) : ctx.setLineDash([]);
+    ctx.moveTo(cx, 10); ctx.lineTo(cx, H-10);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = l.color; ctx.font = '9px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(l.label, cx, 9);
+  });
+}
+
+// ── RENDER SCHEDULE TABLE ─────────────────────────────────────
+function renderScheduleTable() {
+  const { nodes, topo, criticalPath } = STATE_CPM;
+  const cpSet = new Set(criticalPath);
+  document.getElementById('sched-count').textContent = topo.length;
+  document.getElementById('sched-tbody').innerHTML = topo.map((id, i) => {
+    const n = nodes[id];
+    const user = STATE_CPM.users.find(u => u.id === n.assigned);
+    const isCrit = cpSet.has(id);
+    const isNear = !isCrit && n.TF <= 5;
+    const statusColors = { complete:'var(--green)', in_progress:'var(--cyan)', blocked:'var(--red)', not_started:'var(--text3)' };
+    const sc = statusColors[n.status] || 'var(--text3)';
+    return `<tr class="${isCrit?'critical':isNear?'near-critical':''}">
+      <td style="color:var(--text3);">${i+1}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-ui);font-size:12px;color:var(--text0);" title="${n.name}">${n.name}</td>
+      <td style="color:var(--text3);font-size:10px;">${n.phase||'—'}</td>
+      <td style="font-family:var(--font-ui);font-size:11px;">${user?.name||'—'}</td>
+      <td class="num">${n.duration}d</td>
+      <td class="num" style="color:var(--cyan);">${n.ES.toFixed(0)}</td>
+      <td class="num" style="color:var(--cyan);">${n.EF.toFixed(0)}</td>
+      <td class="num" style="color:${isCrit?'var(--red)':'var(--text2)'};">${n.LS.toFixed(0)}</td>
+      <td class="num" style="color:${isCrit?'var(--red)':'var(--text2)'};">${n.LF.toFixed(0)}</td>
+      <td class="num" style="color:${n.TF<=0?'var(--red)':n.TF<=5?'var(--amber)':'var(--green)'}; font-weight:700;">${n.TF.toFixed(0)}</td>
+      <td class="num" style="color:var(--text3);">${n.FF.toFixed(0)}</td>
+      <td><span style="font-family:var(--font-mono);font-size:9px;color:${sc};">${(n.status||'').replace('_',' ').toUpperCase()}</span></td>
+      <td>${isCrit ? `<span style="color:var(--red);font-weight:700;">⚑ CP</span>` : `<span style="color:var(--text3);">—</span>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── PHASE FILTER BUTTONS ──────────────────────────────────────
+function buildPhaseFilters() {
+  const phases = STATE_CPM.phases;
+  const wrap = document.getElementById('phase-filter-btns');
+  wrap.innerHTML = phases.slice(0, 8).map(ph =>
+    `<button class="filter-btn" data-phase="${ph}" onclick="setPhase('${ph.replace(/'/g,"\\'")}')">${ph.slice(0,18)}</button>`
+  ).join('');
+}
+
+function setPhase(ph) {
+  STATE_CPM.activePhase = ph;
+  document.querySelectorAll('.filter-btn[data-phase]').forEach(b => {
+    b.classList.toggle('active', b.dataset.phase === ph);
+  });
+  drawNetwork();
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadCPMData() {
+  try {
+    const [project, tasks, deps, users] = await Promise.all([
+      API.getProjectById(PROJECT_ID),
+      API.getTasksByProject(PROJECT_ID),
+      API.get(`task_dependencies?select=*&project_id=eq.${PROJECT_ID}`),
+      API.getUsers(),
+    ]);
+
+    if (!project) { window.location.href='/projects.html'; return; }
+
+    document.getElementById('page-proj-title').textContent = `CPM / PERT — ${project.name}`;
+    document.getElementById('page-proj-sub').textContent   = `CRITICAL PATH METHOD · PROGRAM EVALUATION & REVIEW TECHNIQUE`;
+
+    // Filter tasks with duration
+    const validTasks = tasks.filter(t => t.duration_days && t.duration_days > 0);
+
+    const { nodes, topo, projectDuration, criticalPath } = computeCPM(validTasks, deps || []);
+
+    // PERT: seed optimistic/pessimistic if not in DB
+    Object.values(nodes).forEach(n => {
+      if (!n.opt  || n.opt <= 0)  n.opt  = n.duration * 0.7;
+      if (!n.pess || n.pess <= 0) n.pess = n.duration * 1.6;
+    });
+
+    const phases = [...new Set(validTasks.map(t => t.phase).filter(Boolean))];
+
+    STATE_CPM = { ...STATE_CPM, tasks: validTasks, deps: deps||[], users, project, nodes, topo, criticalPath, projectDuration, phases };
+
+    // Update CP duration label
+    document.getElementById('cp-duration-label').textContent =
+      `CRITICAL PATH: ${projectDuration}d · ${criticalPath.length} TASKS`;
+
+    buildPhaseFilters();
+    drawNetwork();
+
+  } catch(err) {
+    console.error('CPM load error:', err);
+  }
+}
+
+// Handle resize
+window.addEventListener('resize', () => {
+  const view = document.querySelector('.cpm-tab.active')?.dataset.view;
+  if (view === 'network') drawNetwork();
+  if (view === 'pert')    drawPERTCurve(...[STATE_CPM.projectDuration]);
+});
+
+loadCPMData();
+</script>
+</body>
+</html>
