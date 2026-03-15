@@ -410,9 +410,15 @@
             </div>
 
             <!-- Labor costs by phase -->
-            <div class="panel">
+            <div class="panel" style="margin-bottom:14px;">
               <div class="panel-header"><div class="panel-title">LABOR BY PHASE</div></div>
               <div id="labor-by-phase"></div>
+            </div>
+
+            <!-- Resource cost breakdown -->
+            <div class="panel">
+              <div class="panel-header"><div class="panel-title">HOURS BY RESOURCE</div></div>
+              <div id="resource-breakdown"></div>
             </div>
           </div>
         </div>
@@ -500,6 +506,8 @@ let STATE = {
 };
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
+const renderedTabs = new Set();
+
 function switchTab(tab) {
   STATE.activeTab = tab;
   document.querySelectorAll('.proj-tab').forEach(b => {
@@ -508,6 +516,16 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-pane').forEach(p => {
     p.style.display = p.id === `tab-${tab}` ? '' : 'none';
   });
+  // Lazy-render tab content on first visit
+  if (!renderedTabs.has(tab) && STATE.project) {
+    renderedTabs.add(tab);
+    if (tab === 'milestones') renderMilestones();
+    if (tab === 'evm')        renderEVM();
+    if (tab === 'risks')      renderRisks();
+    if (tab === 'documents')  renderDocuments();
+    if (tab === 'journal')    renderJournalTab();
+    if (tab === 'tasks')      renderTasksTable();
+  }
 }
 
 document.querySelectorAll('.proj-tab').forEach(btn => {
@@ -1007,23 +1025,113 @@ function renderEVM() {
     ${UI.progressBar(Math.min(b.used, 100), b.color)}
   </div>`).join('');
 
-  // Labor by phase
+  // Labor by phase — with budget vs actual comparison
   const phases = [...new Set(tasks.map(t=>t.phase).filter(Boolean))];
-  const maxPhaseHrs = Math.max(...phases.map(ph => tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0)), 1);
+  const maxPhaseHrs = Math.max(...phases.map(ph =>
+    tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0)
+  ), 1);
   document.getElementById('labor-by-phase').innerHTML = phases.map(ph => {
-    const hrs = tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0);
-    const pctOfMax = UI.pct(hrs, maxPhaseHrs);
+    const phaseTasks = tasks.filter(t=>t.phase===ph);
+    const actHrs = phaseTasks.reduce((s,t)=>s+parseFloat(t.actual_hours||0),0);
+    const bgtHrs = phaseTasks.reduce((s,t)=>s+parseFloat(t.budget_hours||0),0);
+    const pctOfMax = UI.pct(actHrs, maxPhaseHrs);
+    const overBudget = bgtHrs > 0 && actHrs > bgtHrs;
+    const barColor = overBudget ? 'var(--red)' : actHrs/bgtHrs > 0.8 ? 'var(--amber)' : 'var(--purple)';
     return `<div class="phase-progress-row">
       <div class="pp-header">
         <div class="pp-name" style="font-size:11.5px;">${ph}</div>
-        <div class="pp-stats">${hrs.toFixed(1)}h</div>
+        <div class="pp-stats" style="color:${overBudget?'var(--red)':'var(--text3)'}">
+          ${actHrs.toFixed(1)}h${bgtHrs>0?' / '+bgtHrs.toFixed(1)+'h bgd':''}
+          ${overBudget?'<span style="color:var(--red);margin-left:4px;">↑ OVER</span>':''}
+        </div>
       </div>
-      ${UI.progressBar(pctOfMax, 'var(--purple)')}
+      ${UI.progressBar(pctOfMax, barColor)}
     </div>`;
   }).join('');
 
-  // Expenditures - placeholder until we add expenditures query
-  document.getElementById('expenditures-list').innerHTML = UI.allClear('NO EXPENDITURES', 'No expenditures recorded yet');
+  // Resource hours breakdown
+  const resourceEl = document.getElementById('resource-breakdown');
+  if (resourceEl) {
+    const userHrs = {};
+    STATE.journal.forEach(j => {
+      userHrs[j.user_id] = (userHrs[j.user_id] || 0) + parseFloat(j.hours_spent || 0);
+    });
+    const sorted = Object.entries(userHrs).sort((a,b) => b[1]-a[1]);
+    const maxHrs = sorted[0]?.[1] || 1;
+    resourceEl.innerHTML = sorted.length === 0 ? UI.allClear('NO DATA') :
+      sorted.map(([uid, hrs]) => {
+        const user = STATE.users.find(u => u.id === uid);
+        const pctOfMax = UI.pct(hrs, maxHrs);
+        const cost = hrs * 175;
+        return `<div class="wl-row" style="padding:10px 14px;">
+          ${UI.avatar(user, 26)}
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:var(--font-ui);font-size:12.5px;color:var(--text1);margin-bottom:4px;">${user?.name||'—'}</div>
+            ${UI.progressBar(pctOfMax, 'var(--purple)')}
+          </div>
+          <div style="text-align:right;min-width:80px;flex-shrink:0;">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div>
+            <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${UI.fmtCurrency(cost)}</div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  // Expenditures table
+  const exps = STATE.expenditures || [];
+  const expEl = document.getElementById('expenditures-list');
+  if (!exps.length) {
+    expEl.innerHTML = UI.allClear('NO EXPENDITURES', 'No expenditures recorded for this project');
+  } else {
+    const totalCommitted = exps.reduce((s,e) => s + parseFloat(e.amount||0), 0);
+    const totalReceived  = exps.filter(e => e.received_date).reduce((s,e) => s + parseFloat(e.amount||0), 0);
+
+    // Summary bar
+    expEl.innerHTML = `
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:20px;">
+        <div><span style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);display:block;margin-bottom:2px;">TOTAL COMMITTED</span>
+          <span style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</span></div>
+        <div><span style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);display:block;margin-bottom:2px;">RECEIVED / POSTED</span>
+          <span style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</span></div>
+        <div><span style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);display:block;margin-bottom:2px;">PENDING</span>
+          <span style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalCommitted - totalReceived)}</span></div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
+            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR</th>
+            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">CATEGORY</th>
+            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">AMOUNT</th>
+            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${exps.map(e => {
+            // Determine procurement state
+            const state = e.received_date ? 'RECEIVED'
+              : e.ordered_date   ? 'ORDERED'
+              : e.approved_date  ? 'APPROVED'
+              : e.requested_date ? 'REQUESTED'
+              : 'FORECAST';
+            const stateColor = state === 'RECEIVED' ? 'var(--green)'
+              : state === 'ORDERED'   ? 'var(--cyan)'
+              : state === 'APPROVED'  ? 'var(--cyan)'
+              : state === 'REQUESTED' ? 'var(--amber)'
+              : 'var(--text3)';
+            return `<tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
+              <td style="font-family:var(--font-ui);font-size:12.5px;color:var(--text0);padding:8px 10px;">${e.description}</td>
+              <td style="font-family:var(--font-ui);font-size:12px;color:var(--text2);padding:8px 10px;">${e.vendor||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:8px 10px;">${e.category||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:var(--text0);padding:8px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
+              <td style="padding:8px 10px;text-align:center;">
+                <span style="font-family:var(--font-mono);font-size:8.5px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 6px;opacity:0.85;">${state}</span>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
 }
 
 function renderRisks() {
@@ -1085,7 +1193,7 @@ function renderJournalTab() {
 // ── MAIN LOAD ─────────────────────────────────────────────────
 async function loadProjectDetail() {
   try {
-    const [project, tasks, milestones, users, firms, risks, documents, journal] = await Promise.all([
+    const [project, tasks, milestones, users, firms, risks, documents, journal, expenditures] = await Promise.all([
       API.getProjectById(PROJECT_ID),
       API.getTasksByProject(PROJECT_ID),
       API.getMilestonesByProject(PROJECT_ID),
@@ -1094,13 +1202,14 @@ async function loadProjectDetail() {
       API.getRisksByProject(PROJECT_ID),
       API.getDocumentsByProject(PROJECT_ID),
       API.get(`task_journal?select=*&project_id=eq.${PROJECT_ID}&order=entry_date.desc`),
+      API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`),
     ]);
 
     if (!project) { window.location.href = '/projects.html'; return; }
 
-    STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal };
+    STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures };
 
-    // Render everything
+    // Always render header and overview tab content
     renderHeader();
     renderOverviewMilestones();
     renderOverviewTasks();
@@ -1108,12 +1217,20 @@ async function loadProjectDetail() {
     renderOverviewEVM();
     renderRecentJournal();
     renderDescription();
+
+    // Mark overview sub-panels as rendered
+    // Other tabs render lazily on first click via switchTab()
+    // Pre-render tasks table since it's the most visited tab
     renderTasksTable();
-    renderMilestones();
-    renderEVM();
-    renderRisks();
-    renderDocuments();
-    renderJournalTab();
+    renderedTabs.add('overview');
+    renderedTabs.add('tasks');
+
+    // If page loaded with a non-overview tab active (e.g. direct link),
+    // trigger its render now
+    if (STATE.activeTab !== 'overview') {
+      renderedTabs.delete(STATE.activeTab);
+      switchTab(STATE.activeTab);
+    }
 
   } catch(err) {
     console.error('Project detail load error:', err);
