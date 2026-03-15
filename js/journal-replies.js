@@ -21,7 +21,7 @@ async function initReplies() {
 async function loadRepliesForProject(projectId) {
   try {
     const data = await API.get(
-      `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(full_name,email)&project_id=eq.${projectId}&order=created_at.asc`
+      `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(name,email)&project_id=eq.${projectId}&order=created_at.asc`
     );
     _replyCache = {};
     (data || []).forEach(r => {
@@ -36,7 +36,7 @@ async function loadRepliesForProject(projectId) {
 async function loadRepliesForTask(taskId) {
   try {
     const data = await API.get(
-      `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(full_name,email)&task_id=eq.${taskId}&order=created_at.asc`
+      `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(name,email)&task_id=eq.${taskId}&order=created_at.asc`
     );
     (data || []).forEach(r => {
       if (!_replyCache[r.parent_id]) _replyCache[r.parent_id] = [];
@@ -66,7 +66,7 @@ async function saveReply(parentId, parentType, taskId, projectId, body) {
   try {
     await API.post('journal_replies', payload);
     const rows = await API.get(
-      `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(full_name,email)&parent_id=eq.${parentId}&order=created_at.desc&limit=1`
+      `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(name,email)&parent_id=eq.${parentId}&order=created_at.desc&limit=1`
     );
     const reply = rows?.[0];
     if (!reply) return null;
@@ -148,7 +148,7 @@ function _buildSingleReply(reply, taskId, projectId, depth) {
   wrap.style.borderLeft = '1px solid rgba(0,210,255,0.18)';
   wrap.style.paddingLeft = '10px';
 
-  const authorName = reply.users?.full_name || reply.users?.email?.split('@')[0] || 'Unknown';
+  const authorName = reply.users?.name || reply.users?.email?.split('@')[0] || 'Unknown';
   const initials   = authorName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
   const ts         = _replyRelTime(reply.created_at);
   const isMine     = _currentUser && reply.author_id === _currentUser.id;

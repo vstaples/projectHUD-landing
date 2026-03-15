@@ -429,9 +429,6 @@
 
 
 
-/* Fix: prevent #app overflow:hidden from clipping fixed-position panels */
-#app { overflow: visible !important; }
-
 </style>
 </head>
 <body>
@@ -441,7 +438,7 @@
   <div id="ticker-scroll-wrap"><div id="ticker-scroll"></div></div>
 </div>
 
-<div id="app" style="overflow:visible;">
+<div id="app">
   <nav id="sidebar"></nav>
 
   <div id="main">
@@ -675,88 +672,13 @@
 </div><!-- /app -->
 
 <!-- Journal slide-in panel -->
-<div class="journal-panel" id="journal-panel">
-  <div class="journal-panel-header">
-    <div>
-      <div class="journal-panel-title" id="jp-title">TASK JOURNAL</div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
-    </div>
-    <button class="journal-panel-close" onclick="closeJournalPanel()">✕</button>
-  </div>
-  <div class="journal-panel-body" id="jp-body"></div>
-</div>
+
 
 <!-- EVM Explainer Popup -->
-<div id="evm-popup-overlay" class="evm-popup-overlay" style="display:none;" onclick="closeEVMPopup(event)">
-  <div class="evm-popup" onclick="event.stopPropagation()">
-    <div class="evm-popup-header">
-      <div class="evm-popup-title" id="evm-popup-title">—</div>
-      <button class="evm-popup-close" onclick="closeEVMPopup()">✕</button>
-    </div>
-    <div class="evm-popup-body">
-      <div class="evm-popup-formula" id="evm-popup-formula"></div>
-      <div class="evm-popup-calc" id="evm-popup-calc"></div>
-      <div class="evm-popup-interp" id="evm-popup-interp"></div>
-      <div class="evm-popup-result" id="evm-popup-result"></div>
-      <div class="evm-popup-grid" id="evm-popup-grid"></div>
-    </div>
-    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
-      <span style="font-size:14px;color:var(--text3);cursor:se-resize;user-select:none;line-height:1;" title="Drag to resize">⠿</span>
-    </div>
-  </div>
-</div>
+
 
 <!-- Expenditure Add/Edit Form Panel -->
-<div class="journal-panel" id="exp-form-panel" style="width:480px;right:-500px;">
-  <div class="journal-panel-header">
-    <div>
-      <div class="journal-panel-title" id="exp-form-title">ADD EXPENDITURE</div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="exp-form-subtitle">Fill in procurement details</div>
-    </div>
-    <button class="journal-panel-close" onclick="closeExpForm()">✕</button>
-  </div>
-  <div class="journal-panel-body" style="padding:16px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">PHASE</label><input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" /></div>
-      <div><label class="exp-label">TYPE</label>
-        <select id="ef-type" class="hud-select" style="width:100%;"><option value="">— Select —</option><option>Materials</option><option>Rental</option><option>Capital</option><option>Shipping</option><option>Travel</option><option>Service</option><option>Other</option></select>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">PART NUMBER</label><input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" /></div>
-      <div><label class="exp-label">VENDOR PN</label><input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" /></div>
-    </div>
-    <div style="margin-bottom:12px;"><label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label><input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" /></div>
-    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">QTY</label><input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" /></div>
-      <div><label class="exp-label">VENDOR</label><input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" /></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">UNIT PRICE ($)</label><input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" /></div>
-      <div><label class="exp-label">TOTAL PRICE</label><div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-      <div><label class="exp-label">PO NUMBER</label><input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" /></div>
-      <div><label class="exp-label">CATEGORY</label><input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" /></div>
-    </div>
-    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">PROCUREMENT DATES</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">FORECAST DATE</label><input id="ef-forecast-date" class="hud-input" type="date" /></div>
-      <div><label class="exp-label">REQUESTED DATE</label><input id="ef-requested-date" class="hud-input" type="date" /></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">APPROVED DATE</label><input id="ef-approved-date" class="hud-input" type="date" /></div>
-      <div><label class="exp-label">ORDERED DATE</label><input id="ef-ordered-date" class="hud-input" type="date" /></div>
-    </div>
-    <div style="margin-bottom:16px;"><label class="exp-label">RECEIVED DATE</label><input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" /></div>
-    <div style="margin-bottom:20px;"><label class="exp-label">COMMENTS</label><textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea></div>
-    <div id="ef-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
-    <div style="display:flex;gap:10px;">
-      <button class="hud-btn primary" onclick="saveExpenditure()" id="ef-save-btn" style="flex:1;">SAVE EXPENDITURE</button>
-      <button class="hud-btn" onclick="closeExpForm()">CANCEL</button>
-    </div>
-  </div>
-</div>
+
 
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
@@ -1611,5 +1533,84 @@ async function loadProjectDetail() {
 
 loadProjectDetail();
 </script>
+
+<div class="journal-panel" id="journal-panel">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="jp-title">TASK JOURNAL</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeJournalPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" id="jp-body"></div>
+</div>
+<div id="evm-popup-overlay" class="evm-popup-overlay" style="display:none;" onclick="closeEVMPopup(event)">
+  <div class="evm-popup" onclick="event.stopPropagation()">
+    <div class="evm-popup-header">
+      <div class="evm-popup-title" id="evm-popup-title">—</div>
+      <button class="evm-popup-close" onclick="closeEVMPopup()">✕</button>
+    </div>
+    <div class="evm-popup-body">
+      <div class="evm-popup-formula" id="evm-popup-formula"></div>
+      <div class="evm-popup-calc" id="evm-popup-calc"></div>
+      <div class="evm-popup-interp" id="evm-popup-interp"></div>
+      <div class="evm-popup-result" id="evm-popup-result"></div>
+      <div class="evm-popup-grid" id="evm-popup-grid"></div>
+    </div>
+    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+      <span style="font-size:14px;color:var(--text3);cursor:se-resize;user-select:none;line-height:1;" title="Drag to resize">⠿</span>
+    </div>
+  </div>
+</div>
+<div class="journal-panel" id="exp-form-panel" style="width:480px;right:-500px;">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="exp-form-title">ADD EXPENDITURE</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="exp-form-subtitle">Fill in procurement details</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeExpForm()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">PHASE</label><input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" /></div>
+      <div><label class="exp-label">TYPE</label>
+        <select id="ef-type" class="hud-select" style="width:100%;"><option value="">— Select —</option><option>Materials</option><option>Rental</option><option>Capital</option><option>Shipping</option><option>Travel</option><option>Service</option><option>Other</option></select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">PART NUMBER</label><input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" /></div>
+      <div><label class="exp-label">VENDOR PN</label><input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" /></div>
+    </div>
+    <div style="margin-bottom:12px;"><label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label><input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" /></div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">QTY</label><input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" /></div>
+      <div><label class="exp-label">VENDOR</label><input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">UNIT PRICE ($)</label><input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" /></div>
+      <div><label class="exp-label">TOTAL PRICE</label><div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div><label class="exp-label">PO NUMBER</label><input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" /></div>
+      <div><label class="exp-label">CATEGORY</label><input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" /></div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">PROCUREMENT DATES</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">FORECAST DATE</label><input id="ef-forecast-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">REQUESTED DATE</label><input id="ef-requested-date" class="hud-input" type="date" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">APPROVED DATE</label><input id="ef-approved-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">ORDERED DATE</label><input id="ef-ordered-date" class="hud-input" type="date" /></div>
+    </div>
+    <div style="margin-bottom:16px;"><label class="exp-label">RECEIVED DATE</label><input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" /></div>
+    <div style="margin-bottom:20px;"><label class="exp-label">COMMENTS</label><textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea></div>
+    <div id="ef-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" onclick="saveExpenditure()" id="ef-save-btn" style="flex:1;">SAVE EXPENDITURE</button>
+      <button class="hud-btn" onclick="closeExpForm()">CANCEL</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
