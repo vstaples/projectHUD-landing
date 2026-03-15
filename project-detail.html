@@ -228,6 +228,7 @@
           <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.16em;margin-bottom:6px;" id="proj-breadcrumb">PROJECTS → LOADING...</div>
           <div class="proj-title" id="proj-title">Loading...</div>
           <div class="proj-client-tag" id="proj-client-tag">—</div>
+          <div id="proj-description-header" style="font-family:var(--font-ui);font-size:12.5px;color:var(--text2);margin-top:5px;line-height:1.5;max-width:700px;"></div>
         </div>
         <div class="proj-header-actions">
           <button class="hud-btn" id="btn-edit-project">✎ EDIT</button>
@@ -576,6 +577,8 @@ function renderHeader() {
     ? 'INTERNAL PROJECT · ' + (clientFirm?.name || '')
     : 'CLIENT: ' + (clientFirm?.name || '—');
 
+  document.getElementById('proj-description-header').textContent = p.description || '';
+
   const done    = tasks.filter(t => t.status === 'complete').length;
   const total   = tasks.length;
   const pctDone = UI.pct(done, total);
@@ -622,50 +625,162 @@ function renderHeader() {
   }
 }
 
+function milestoneRowHTML(m) {
+  const cfg    = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
+  const dLeft  = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
+  const slipped = m.current_target_date && m.initial_target_date &&
+    m.current_target_date !== m.initial_target_date;
+  return `<div class="milestone-row">
+    <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
+    <div class="ms-info">
+      <div class="ms-name">${m.description}</div>
+      <div class="ms-phase">${m.phase || '—'}</div>
+    </div>
+    ${slipped ? `<span class="ms-slip">↑ SLIPPED</span>` : ''}
+    <div style="text-align:right;flex-shrink:0;">
+      ${UI.badge(m.status)}
+      <div class="ms-date" style="margin-top:3px;">${UI.fmtDateShort(m.current_target_date)}</div>
+    </div>
+  </div>`;
+}
+
 function renderOverviewMilestones() {
-  const ms = STATE.milestones.slice(0, 5);
-  const el = document.getElementById('overview-milestones');
-  if (!ms.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined for this project'); return; }
-  el.innerHTML = ms.map(m => {
-    const cfg = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
-    const dLeft = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
-    const slipped = m.current_target_date && m.initial_target_date &&
-      m.current_target_date !== m.initial_target_date;
-    return `<div class="milestone-row">
-      <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
-      <div class="ms-info">
-        <div class="ms-name">${m.description}</div>
-        <div class="ms-phase">${m.phase || '—'}</div>
-      </div>
-      ${slipped ? `<span class="ms-slip">↑ SLIPPED</span>` : ''}
-      <div style="text-align:right;flex-shrink:0;">
-        ${UI.badge(m.status)}
-        <div class="ms-date" style="margin-top:3px;">${UI.fmtDateShort(m.current_target_date)}</div>
-      </div>
+  const el  = document.getElementById('overview-milestones');
+  const all = STATE.milestones;
+  if (!all.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined for this project'); return; }
+
+  const INITIAL = 5;
+  const visible = all.slice(0, INITIAL);
+  const hidden  = all.slice(INITIAL);
+  const overdueCount = hidden.filter(m =>
+    m.status !== 'complete' && m.current_target_date && UI.daysUntil(m.current_target_date) < 0
+  ).length;
+
+  let html = visible.map(milestoneRowHTML).join('');
+
+  if (hidden.length > 0) {
+    const label = overdueCount > 0
+      ? `▼ &nbsp;+${hidden.length} more &nbsp;<span style="color:var(--red);">(${overdueCount} overdue)</span>`
+      : `▼ &nbsp;+${hidden.length} more milestones`;
+
+    html += `<div id="ms-expand-row" onclick="expandOverviewMilestones()" style="
+      padding:9px 14px;
+      font-family:var(--font-mono);font-size:10px;
+      color:var(--cyan);letter-spacing:0.12em;
+      cursor:pointer;border-top:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;
+      transition:background 0.12s;
+    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
+       onmouseout="this.style.background='transparent'">
+      ${label}
     </div>`;
-  }).join('');
+    window._hiddenOverviewMilestones = hidden;
+  }
+
+  el.innerHTML = html;
+}
+
+function expandOverviewMilestones() {
+  const expandRow = document.getElementById('ms-expand-row');
+  const el = document.getElementById('overview-milestones');
+  if (!expandRow || !window._hiddenOverviewMilestones) return;
+  expandRow.remove();
+  window._hiddenOverviewMilestones.forEach(m => {
+    el.insertAdjacentHTML('beforeend', milestoneRowHTML(m));
+  });
+  el.insertAdjacentHTML('beforeend', `
+    <div onclick="renderOverviewMilestones()" style="
+      padding:9px 14px;
+      font-family:var(--font-mono);font-size:10px;
+      color:var(--text3);letter-spacing:0.12em;
+      cursor:pointer;border-top:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;
+    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
+       onmouseout="this.style.background='transparent'">
+      ▲ &nbsp;SHOW LESS
+    </div>`);
+}
+
+function taskRowHTML(t) {
+  const due  = UI.dueDateLabel(t.due_date);
+  const asgn = STATE.users.find(u => u.id === t.assigned_to);
+  return `<div class="task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
+    ${UI.taskDot(t.status)}
+    <div class="task-info">
+      <div class="task-name">${t.name}</div>
+      <div class="task-meta">${t.phase || '—'}${asgn?' · '+asgn.name:''}</div>
+    </div>
+    ${UI.badge(t.status)}
+    <span style="font-family:var(--font-mono);font-size:10px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
+  </div>`;
 }
 
 function renderOverviewTasks() {
-  const upNext = STATE.tasks
-    .filter(t => t.status !== 'complete' && t.due_date)
-    .sort((a,b) => new Date(a.due_date) - new Date(b.due_date))
-    .slice(0, 5);
+  const now     = new Date();
+  const active  = STATE.tasks.filter(t => t.status !== 'complete' && t.due_date);
+  const overdue = active.filter(t => new Date(t.due_date) < now)
+                        .sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+  const upcoming= active.filter(t => new Date(t.due_date) >= now)
+                        .sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+
   const el = document.getElementById('overview-tasks');
-  if (!upNext.length) { el.innerHTML = UI.allClear('ALL CLEAR', 'No upcoming tasks'); return; }
-  el.innerHTML = upNext.map(t => {
-    const due = UI.dueDateLabel(t.due_date);
-    const asgn = STATE.users.find(u => u.id === t.assigned_to);
-    return `<div class="task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
-      ${UI.taskDot(t.status)}
-      <div class="task-info">
-        <div class="task-name">${t.name}</div>
-        <div class="task-meta">${t.phase || '—'}${asgn?' · '+asgn.name:''}</div>
-      </div>
-      ${UI.badge(t.status)}
-      <span style="font-family:var(--font-mono);font-size:10px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
+  if (!active.length) { el.innerHTML = UI.allClear('ALL CLEAR', 'No upcoming tasks'); return; }
+
+  const INITIAL = 5;
+  const visible  = [...overdue, ...upcoming].slice(0, INITIAL);
+  const hidden   = [...overdue, ...upcoming].slice(INITIAL);
+  const extraOverdue = overdue.length > INITIAL ? overdue.length - INITIAL : 0;
+  const extraTotal   = hidden.length;
+
+  let html = visible.map(taskRowHTML).join('');
+
+  if (hidden.length > 0) {
+    const label = extraOverdue > 0
+      ? `▼ &nbsp;+${extraTotal} more &nbsp;<span style="color:var(--red);">(${extraOverdue} overdue)</span>`
+      : `▼ &nbsp;+${extraTotal} more tasks`;
+
+    html += `<div id="tasks-expand-row" onclick="expandOverviewTasks()" style="
+      padding:9px 14px;
+      font-family:var(--font-mono);font-size:10px;
+      color:var(--cyan);letter-spacing:0.12em;
+      cursor:pointer;border-top:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;
+      transition:background 0.12s;
+    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
+       onmouseout="this.style.background='transparent'">
+      ${label}
     </div>`;
-  }).join('');
+
+    // Store hidden rows for expansion
+    window._hiddenOverviewTasks = hidden;
+  }
+
+  el.innerHTML = html;
+}
+
+function expandOverviewTasks() {
+  const expandRow = document.getElementById('tasks-expand-row');
+  const el = document.getElementById('overview-tasks');
+  if (!expandRow || !window._hiddenOverviewTasks) return;
+  // Remove the expand row
+  expandRow.remove();
+  // Append all hidden rows
+  window._hiddenOverviewTasks.forEach(t => {
+    el.insertAdjacentHTML('beforeend', taskRowHTML(t));
+  });
+  // Add collapse row
+  el.insertAdjacentHTML('beforeend', `
+    <div onclick="renderOverviewTasks()" style="
+      padding:9px 14px;
+      font-family:var(--font-mono);font-size:10px;
+      color:var(--text3);letter-spacing:0.12em;
+      cursor:pointer;border-top:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;
+      transition:background 0.12s;
+    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
+       onmouseout="this.style.background='transparent'">
+      ▲ &nbsp;SHOW LESS
+    </div>`);
 }
 
 function renderPhaseProgress() {
