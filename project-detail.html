@@ -928,8 +928,15 @@ function showEVMPopup(key) {
 
     gridEl.innerHTML = `
       <div class="evm-popup-grid-title">◆ ${gridTitle(cfg)}</div>
-      <div style="padding:6px 0 8px;font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.06em;line-height:1.5;">
-        SUMMARY FOR COMPLETED &amp; IN-PROGRESS TASKS ONLY · BGT COST = Budget Hours × $${RATE}/hr · ACT COST = Actual Hours Logged × $${RATE}/hr · TOTAL = BGT − ACT (positive = under budget)
+      <div style="padding:10px 0 10px;text-align:center;">
+        <div style="font-family:var(--font-mono);font-size:14px;color:var(--text1);letter-spacing:0.1em;font-weight:600;margin-bottom:8px;">
+          SUMMARY FOR COMPLETED &amp; IN-PROGRESS TASKS ONLY
+        </div>
+        <div style="text-align:left;display:inline-block;font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.06em;line-height:1.8;">
+          <div>BGT COST &nbsp;= Budget Hours × $${RATE}/hr</div>
+          <div>ACT COST &nbsp;= Actual Hours Logged × $${RATE}/hr</div>
+          <div>TOTAL &nbsp;&nbsp;&nbsp;&nbsp;= BGT − ACT &nbsp;(positive = under budget)</div>
+        </div>
       </div>
       <div class="evm-popup-grid-wrap">
         <table class="evm-grid-table">
