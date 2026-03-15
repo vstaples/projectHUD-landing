@@ -418,44 +418,74 @@ function drawNetwork() {
   }
   const displaySet = new Set(displayIds);
 
-  // Layout: group by topological level
-  const level = {};
-  topo.forEach(id => {
-    const n = nodes[id];
-    level[id] = n.preds.filter(p => displaySet.has(p)).length
-      ? Math.max(...n.preds.filter(p => displaySet.has(p)).map(p => (level[p]||0))) + 1
-      : 0;
-  });
+  // Layout: group by PHASE, then sequence within phase
+  // Each phase gets its own horizontal band with a header label above it
+  const PHASE_HEADER_H = 28; // height of the phase label band
+  const NW = 160, NH = 72, HGAP = 52, VGAP = 16;
+  const PHASE_GAP = 40; // vertical gap between phases
 
-  const cols = {};
+  // Collect phases in order they appear
+  const phaseOrder = [];
   displayIds.forEach(id => {
-    const lv = level[id] || 0;
-    if (!cols[lv]) cols[lv] = [];
-    cols[lv].push(id);
+    const ph = nodes[id].phase || '(No Phase)';
+    if (!phaseOrder.includes(ph)) phaseOrder.push(ph);
   });
 
-  const NW = 160, NH = 72, HGAP = 60, VGAP = 18;
-  const numCols = Object.keys(cols).length;
+  // Group nodes by phase, preserving topo order within each
+  const byPhase = {};
+  phaseOrder.forEach(ph => { byPhase[ph] = []; });
+  displayIds.forEach(id => {
+    const ph = nodes[id].phase || '(No Phase)';
+    if (byPhase[ph]) byPhase[ph].push(id);
+  });
 
-  // Compute positions
+  // Within each phase, sub-group by topological level (columns)
+  const phaseLayout = {}; // phase → { cols: {lv: [ids]}, startY }
+  let curY = 40;
+  phaseOrder.forEach(ph => {
+    const ids = byPhase[ph];
+    const localLevel = {};
+    ids.forEach(id => {
+      const n = nodes[id];
+      const predLevels = n.preds.filter(p => displaySet.has(p) && nodes[p].phase === ph)
+        .map(p => localLevel[p] || 0);
+      localLevel[id] = predLevels.length ? Math.max(...predLevels) + 1 : 0;
+    });
+    const cols = {};
+    ids.forEach(id => {
+      const lv = localLevel[id] || 0;
+      if (!cols[lv]) cols[lv] = [];
+      cols[lv].push(id);
+    });
+    const maxRows  = Math.max(...Object.values(cols).map(a => a.length), 1);
+    const phaseH   = PHASE_HEADER_H + maxRows * (NH + VGAP) - VGAP + 16;
+    phaseLayout[ph] = { cols, startY: curY, phaseH, localLevel };
+    curY += phaseH + PHASE_GAP;
+  });
+
+  // Compute positions for every node
   const positions = {};
-  Object.entries(cols).forEach(([col, ids]) => {
-    const x = parseInt(col) * (NW + HGAP) + 40;
-    const totalH = ids.length * (NH + VGAP) - VGAP;
-    ids.forEach((id, i) => {
-      positions[id] = { x, y: i * (NH + VGAP) + 40 };
+  phaseOrder.forEach(ph => {
+    const { cols, startY } = phaseLayout[ph];
+    Object.entries(cols).forEach(([lv, ids]) => {
+      const x = parseInt(lv) * (NW + HGAP) + 40;
+      ids.forEach((id, i) => {
+        positions[id] = { x, y: startY + PHASE_HEADER_H + i * (NH + VGAP) };
+      });
     });
   });
 
-  const totalW = numCols * (NW + HGAP) + 80;
-  const totalH = Math.max(...Object.values(cols).map(a => a.length)) * (NH + VGAP) + 80;
+  // Canvas size
+  const maxCols   = Math.max(...phaseOrder.map(ph => Object.keys(phaseLayout[ph].cols).length));
+  const totalW    = maxCols * (NW + HGAP) + 80;
+  const totalH    = curY + 40;
 
   canvas.width  = Math.max(totalW, wrap.clientWidth);
   canvas.height = Math.max(totalH, wrap.clientHeight - 100);
 
-  // Auto-fit: on first draw (scale===1, panX===0) shrink to fit
+  // Auto-fit: on first draw shrink to fit width
   if (scale === 1 && panX === 0 && panY === 0 && totalW > wrap.clientWidth) {
-    scale = Math.max(0.2, Math.min(1, (wrap.clientWidth - 40) / totalW));
+    scale = Math.max(0.15, Math.min(1, (wrap.clientWidth - 40) / totalW));
   }
 
   const ctx = canvas.getContext('2d');
@@ -499,6 +529,41 @@ function drawNetwork() {
       ctx.closePath();
       ctx.fill();
     });
+  });
+
+  // Draw phase header banners
+  phaseOrder.forEach(ph => {
+    const { startY, phaseH, cols } = phaseLayout[ph];
+    const numPhaseCols = Object.keys(cols).length;
+    const bandW = numPhaseCols * (NW + HGAP) - HGAP + NW/2 + 20;
+
+    // Background band for whole phase
+    ctx.fillStyle = 'rgba(0,210,255,0.03)';
+    ctx.strokeStyle = 'rgba(0,210,255,0.10)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.rect(24, startY, Math.max(bandW, totalW - 32), phaseH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Phase header bar
+    ctx.fillStyle = 'rgba(0,210,255,0.08)';
+    ctx.beginPath();
+    ctx.rect(24, startY, Math.max(bandW, totalW - 32), PHASE_HEADER_H - 4);
+    ctx.fill();
+
+    // Left accent bar
+    ctx.fillStyle = 'rgba(0,210,255,0.7)';
+    ctx.fillRect(24, startY, 3, PHASE_HEADER_H - 4);
+
+    // Phase label text
+    ctx.fillStyle = '#00d2ff';
+    ctx.font = 'bold 11px Barlow Condensed, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.letterSpacing = '0.14em';
+    ctx.fillText(ph.toUpperCase(), 36, startY + 17);
+    ctx.letterSpacing = '';
   });
 
   // Draw nodes
@@ -576,8 +641,9 @@ function drawNetwork() {
   ctx.restore();
 
   // Store positions for tooltip
-  STATE_CPM.positions = positions;
+  STATE_CPM.positions  = positions;
   STATE_CPM.displaySet = displaySet;
+  STATE_CPM.phaseLayout = phaseLayout;
 }
 
 // ── CANVAS PAN & TOOLTIP ─────────────────────────────────────
