@@ -180,8 +180,8 @@
 .evm-table tr:hover td { background: rgba(0,210,255,0.05); }
 .evm-table tr:hover .evm-key { color: var(--cyan); }
 .evm-table td { padding: 9px 16px; font-family: var(--font-mono); font-size:12.0px; }
-.evm-table .evm-key { color: var(--text2); letter-spacing: 0.08em; width: 60%; transition: color 0.12s; }
-.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; font-size:13.0px; }
+.evm-table .evm-key { color: var(--text2); letter-spacing: 0.08em; width: auto; white-space: nowrap; transition: color 0.12s; }
+.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; font-size:13.0px; padding-left: 40px; white-space: nowrap; }
 .evm-table .evm-hint { color: var(--text3); font-size:11px; margin-left: 6px; }
 
 /* EVM explainer popup */
@@ -508,7 +508,7 @@
 
       <!-- ── EVM TAB ──────────────────────────────────────────── -->
       <div id="tab-evm" class="tab-pane" style="display:none;">
-        <div class="panel bracketed">
+        <div class="panel bracketed" style="max-width:640px;">
           <div class="bracket-bl"></div><div class="bracket-br"></div>
           <div class="panel-header"><div class="panel-title">EARNED VALUE METRICS</div></div>
           <div style="padding:14px;display:flex;justify-content:space-around;" id="evm-gauges-full"></div>
