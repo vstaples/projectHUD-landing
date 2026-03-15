@@ -753,6 +753,7 @@ async function openJournalPanel(taskId, taskName) {
   document.getElementById('jp-title').textContent = 'TASK JOURNAL';
   document.getElementById('jp-body').innerHTML = UI.loading('LOADING JOURNAL...');
   document.getElementById('journal-panel').classList.add('open');
+  document.getElementById('main').style.paddingRight = '408px';
   try {
     const entries = await API.getJournalByTask(taskId);
     const users = STATE.users;
@@ -786,6 +787,7 @@ async function openJournalPanel(taskId, taskName) {
 
 function closeJournalPanel() {
   document.getElementById('journal-panel').classList.remove('open');
+  document.getElementById('main').style.paddingRight = '';
 }
 
 // ── EXPENDITURE FORM ──────────────────────────────────────────
@@ -821,10 +823,12 @@ function openExpForm(exp = null) {
   updateExpTotal();
   document.getElementById('ef-error').style.display = 'none';
   panel.classList.add('open');
+  document.getElementById('main').style.paddingRight = '488px';
 }
 
 function closeExpForm() {
   document.getElementById('exp-form-panel').classList.remove('open');
+  document.getElementById('main').style.paddingRight = '';
   _expEditId = null;
 }
 
