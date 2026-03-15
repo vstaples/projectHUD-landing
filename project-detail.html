@@ -1555,7 +1555,7 @@ function renderPhaseProgress() {
 
 function renderOverviewEVM() {
   const tasks = STATE.tasks;
-  const { cpi, spi, cpiNum, spiNum, pctDone } = computeEVM();
+  const { cpi, spi, cpiNum, spiNum, pctDone, done, total } = computeEVM();
   document.getElementById('overview-gauges').innerHTML =
     UI.gauge(pctDone, 100, 'var(--cyan)',         'WORK %', pctDone+'%',  52) +
     UI.gauge(cpiNum,  2,   UI.indexColor(cpiNum), 'CPI',    cpi,          52) +
