@@ -42,7 +42,7 @@
 }
 .proj-header-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: flex-start; }
 
-/* Health bar — 4 stat chips in a row */
+/* Health bar */
 .proj-health-row {
   display: flex; gap: 20px; align-items: center;
   padding: 10px 0;
@@ -410,7 +410,6 @@
         <div class="detail-grid">
           <!-- LEFT -->
           <div>
-            <!-- Milestones summary -->
             <div class="panel bracketed" style="margin-bottom:16px;">
               <div class="bracket-bl"></div><div class="bracket-br"></div>
               <div class="panel-header">
@@ -420,7 +419,6 @@
               <div id="overview-milestones"></div>
             </div>
 
-            <!-- Tasks up next -->
             <div class="panel">
               <div class="panel-header">
                 <div class="panel-title">TASKS UP NEXT</div>
@@ -429,7 +427,6 @@
               <div id="overview-tasks"></div>
             </div>
 
-            <!-- Description / Notes -->
             <div class="panel" style="margin-top:16px;">
               <div class="panel-header"><div class="panel-title">PROJECT DESCRIPTION</div></div>
               <div style="padding:14px 16px;">
@@ -440,14 +437,12 @@
 
           <!-- RIGHT -->
           <div>
-            <!-- Phase progress -->
             <div class="panel bracketed" style="margin-bottom:14px;">
               <div class="bracket-bl"></div><div class="bracket-br"></div>
               <div class="panel-header"><div class="panel-title">PHASE PROGRESS</div></div>
               <div id="phase-progress"></div>
             </div>
 
-            <!-- EVM mini -->
             <div class="panel" style="margin-bottom:14px;">
               <div class="panel-header">
                 <div class="panel-title">EVM SNAPSHOT</div>
@@ -457,7 +452,6 @@
               <div id="overview-evm-vals" style="padding:8px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border);"></div>
             </div>
 
-            <!-- Recent journal activity -->
             <div class="panel">
               <div class="panel-header">
                 <div class="panel-title">RECENT ACTIVITY</div>
@@ -599,7 +593,7 @@
   </div><!-- /main -->
 </div><!-- /app -->
 
-<!-- Journal slide-in panel (task drill-down) -->
+<!-- Journal slide-in panel -->
 <div class="journal-panel" id="journal-panel">
   <div class="journal-panel-header">
     <div>
@@ -641,129 +635,45 @@
     <button class="journal-panel-close" onclick="closeExpForm()">✕</button>
   </div>
   <div class="journal-panel-body" style="padding:16px;">
-
-    <!-- Row 1: Phase + Type -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <label class="exp-label">PHASE</label>
-        <input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" />
-      </div>
-      <div>
-        <label class="exp-label">TYPE</label>
-        <select id="ef-type" class="hud-select" style="width:100%;">
-          <option value="">— Select —</option>
-          <option>Materials</option>
-          <option>Rental</option>
-          <option>Capital</option>
-          <option>Shipping</option>
-          <option>Travel</option>
-          <option>Service</option>
-          <option>Other</option>
-        </select>
+      <div><label class="exp-label">PHASE</label><input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" /></div>
+      <div><label class="exp-label">TYPE</label>
+        <select id="ef-type" class="hud-select" style="width:100%;"><option value="">— Select —</option><option>Materials</option><option>Rental</option><option>Capital</option><option>Shipping</option><option>Travel</option><option>Service</option><option>Other</option></select>
       </div>
     </div>
-
-    <!-- Row 2: Part Number + Vendor PN -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <label class="exp-label">PART NUMBER</label>
-        <input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" />
-      </div>
-      <div>
-        <label class="exp-label">VENDOR PN</label>
-        <input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" />
-      </div>
+      <div><label class="exp-label">PART NUMBER</label><input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" /></div>
+      <div><label class="exp-label">VENDOR PN</label><input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" /></div>
     </div>
-
-    <!-- Row 3: Description (full width) -->
-    <div style="margin-bottom:12px;">
-      <label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label>
-      <input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" />
-    </div>
-
-    <!-- Row 4: Qty + Vendor -->
+    <div style="margin-bottom:12px;"><label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label><input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" /></div>
     <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <label class="exp-label">QTY</label>
-        <input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" />
-      </div>
-      <div>
-        <label class="exp-label">VENDOR</label>
-        <input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" />
-      </div>
+      <div><label class="exp-label">QTY</label><input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" /></div>
+      <div><label class="exp-label">VENDOR</label><input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" /></div>
     </div>
-
-    <!-- Row 5: Unit Price + Total (computed) -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <label class="exp-label">UNIT PRICE ($)</label>
-        <input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" />
-      </div>
-      <div>
-        <label class="exp-label">TOTAL PRICE</label>
-        <div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div>
-      </div>
+      <div><label class="exp-label">UNIT PRICE ($)</label><input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" /></div>
+      <div><label class="exp-label">TOTAL PRICE</label><div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div></div>
     </div>
-
-    <!-- Row 6: PO Number + Category -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-      <div>
-        <label class="exp-label">PO NUMBER</label>
-        <input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" />
-      </div>
-      <div>
-        <label class="exp-label">CATEGORY</label>
-        <input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" />
-      </div>
+      <div><label class="exp-label">PO NUMBER</label><input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" /></div>
+      <div><label class="exp-label">CATEGORY</label><input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" /></div>
     </div>
-
-    <!-- Procurement dates section -->
-    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">
-      PROCUREMENT DATES
-    </div>
-
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">PROCUREMENT DATES</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <label class="exp-label">FORECAST DATE</label>
-        <input id="ef-forecast-date" class="hud-input" type="date" />
-      </div>
-      <div>
-        <label class="exp-label">REQUESTED DATE</label>
-        <input id="ef-requested-date" class="hud-input" type="date" />
-      </div>
+      <div><label class="exp-label">FORECAST DATE</label><input id="ef-forecast-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">REQUESTED DATE</label><input id="ef-requested-date" class="hud-input" type="date" /></div>
     </div>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <label class="exp-label">APPROVED DATE</label>
-        <input id="ef-approved-date" class="hud-input" type="date" />
-      </div>
-      <div>
-        <label class="exp-label">ORDERED DATE</label>
-        <input id="ef-ordered-date" class="hud-input" type="date" />
-      </div>
+      <div><label class="exp-label">APPROVED DATE</label><input id="ef-approved-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">ORDERED DATE</label><input id="ef-ordered-date" class="hud-input" type="date" /></div>
     </div>
-
-    <div style="margin-bottom:16px;">
-      <label class="exp-label">RECEIVED DATE</label>
-      <input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" />
-    </div>
-
-    <!-- Comments -->
-    <div style="margin-bottom:20px;">
-      <label class="exp-label">COMMENTS</label>
-      <textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea>
-    </div>
-
-    <!-- Error message -->
+    <div style="margin-bottom:16px;"><label class="exp-label">RECEIVED DATE</label><input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" /></div>
+    <div style="margin-bottom:20px;"><label class="exp-label">COMMENTS</label><textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea></div>
     <div id="ef-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
-
-    <!-- Actions -->
     <div style="display:flex;gap:10px;">
       <button class="hud-btn primary" onclick="saveExpenditure()" id="ef-save-btn" style="flex:1;">SAVE EXPENDITURE</button>
       <button class="hud-btn" onclick="closeExpForm()">CANCEL</button>
     </div>
-
   </div>
 </div>
 
@@ -773,18 +683,15 @@
 <script src="/js/ui.js"></script>
 <script src="/js/ticker.js"></script>
 <script src="/js/sidebar.js"></script>
+<script src="/js/journal-replies.js"></script>
 <script>
 // ── INIT ──────────────────────────────────────────────────────
 Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
 Sidebar.init('project-detail.html');
 
-// ── GET PROJECT ID FROM URL ───────────────────────────────────
-const params    = new URLSearchParams(window.location.search);
+const params     = new URLSearchParams(window.location.search);
 const PROJECT_ID = params.get('id');
-
-if (!PROJECT_ID) {
-  window.location.href = '/projects.html';
-}
+if (!PROJECT_ID) { window.location.href = '/projects.html'; }
 
 // ── STATE ─────────────────────────────────────────────────────
 let STATE = {
@@ -804,7 +711,6 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-pane').forEach(p => {
     p.style.display = p.id === `tab-${tab}` ? '' : 'none';
   });
-  // Lazy-render tab content on first visit
   if (!renderedTabs.has(tab) && STATE.project) {
     renderedTabs.add(tab);
     if (tab === 'milestones')    renderMilestones();
@@ -838,14 +744,6 @@ async function openJournalPanel(taskId, taskName) {
   document.getElementById('jp-title').textContent = 'TASK JOURNAL';
   document.getElementById('jp-body').innerHTML = UI.loading('LOADING JOURNAL...');
   document.getElementById('journal-panel').classList.add('open');
-  await loadRepliesForTask(taskId);
-  document.querySelectorAll('#jp-body .journal-entry').forEach(el => {
-    injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
-  });
-    await loadRepliesForTask(taskId);
-    document.querySelectorAll('#journal-panel .journal-entry').forEach(el => {
-      injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
-    });
   try {
     const entries = await API.getJournalByTask(taskId);
     const users = STATE.users;
@@ -867,6 +765,11 @@ async function openJournalPanel(taskId, taskName) {
         ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
       </div>`;
     }).join('');
+    // ── Inject reply threads after entries are rendered ────
+    await loadRepliesForTask(taskId);
+    document.querySelectorAll('#jp-body .journal-entry').forEach(el => {
+      injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
+    });
   } catch(err) {
     document.getElementById('jp-body').innerHTML = UI.allClear('ERROR', 'Could not load journal entries');
   }
@@ -877,15 +780,13 @@ function closeJournalPanel() {
 }
 
 // ── EXPENDITURE FORM ──────────────────────────────────────────
-let _expEditId = null; // null = new, uuid = editing
+let _expEditId = null;
 
 function openExpForm(exp = null) {
   _expEditId = exp?.id || null;
   const panel = document.getElementById('exp-form-panel');
   document.getElementById('exp-form-title').textContent = exp ? 'EDIT EXPENDITURE' : 'ADD EXPENDITURE';
   document.getElementById('exp-form-subtitle').textContent = exp ? exp.description : 'Fill in procurement details';
-
-  // Clear / populate fields
   const fields = {
     'ef-phase':         exp?.phase         || '',
     'ef-type':          exp?.type          || '',
@@ -934,14 +835,11 @@ async function saveExpenditure() {
     errEl.style.display = 'block';
     return;
   }
-
   const btn = document.getElementById('ef-save-btn');
   btn.textContent = 'SAVING...';
   btn.disabled = true;
-
   const qty       = parseFloat(document.getElementById('ef-qty').value || 1);
   const unitPrice = parseFloat(document.getElementById('ef-unit-price').value || 0);
-
   const payload = {
     project_id:     PROJECT_ID,
     firm_id:        STATE.project.firm_id,
@@ -963,14 +861,12 @@ async function saveExpenditure() {
     received_date:  document.getElementById('ef-received-date').value        || null,
     notes:          document.getElementById('ef-notes').value.trim()         || null,
   };
-
   try {
     if (_expEditId) {
       await API.patch(`expenditures?id=eq.${_expEditId}`, payload);
     } else {
       await API.post('expenditures', payload);
     }
-    // Reload expenditures and re-render
     STATE.expenditures = await API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`);
     renderedTabs.delete('expenditures');
     if (STATE.activeTab === 'expenditures') {
@@ -988,9 +884,8 @@ async function saveExpenditure() {
   }
 }
 
-// ── EXPENDITURE ROW COLOR CODING ──────────────────────────────
+// ── EVM POPUP ─────────────────────────────────────────────────
 function closeEVMPopup(e) {
-  // Don't close if the user was just resizing (mousedown started on the popup)
   if (window._evmPopupDragging) return;
   if (!e || e.target === document.getElementById('evm-popup-overlay')) {
     document.getElementById('evm-popup-overlay').style.display = 'none';
@@ -1012,153 +907,21 @@ function showEVMPopup(key) {
   const tcpi    = (eac != null && (bacCost - evCost) > 0) ? (bacCost - evCost) / (eac - acCost) : null;
 
   const defs = {
-    'BAC': {
-      title: 'BAC — Budget at Completion',
-      formula: 'BAC = Budget Baseline Hours × Blended Labor Rate',
-      calc: [
-        `Budget Hours: ${bac.toFixed(1)} hrs`,
-        `Blended Rate: $${RATE}/hr`,
-        `BAC = ${bac.toFixed(1)} × $${RATE} = ${UI.fmtCurrency(bacCost)}`,
-      ],
-      result: UI.fmtCurrency(bacCost), color: 'var(--text0)',
-      interp: `The total approved budget for this project is ${UI.fmtCurrency(bacCost)}. This is the baseline locked at project approval and is used as the denominator for all EVM calculations. It should not change unless a formal change order is approved.`
-    },
-    'PV': {
-      title: 'PV — Planned Value',
-      formula: 'PV = BAC × (Schedule % Elapsed)',
-      calc: [
-        `BAC: ${UI.fmtCurrency(bacCost)}`,
-        `Schedule elapsed: ${(pv/bac*100).toFixed(1)}% of project duration`,
-        `PV = ${UI.fmtCurrency(bacCost)} × ${(pv/bac*100).toFixed(1)}% = ${UI.fmtCurrency(pvCost)}`,
-      ],
-      result: UI.fmtCurrency(pvCost), color: 'var(--text0)',
-      interp: `By this point in the schedule, ${UI.fmtCurrency(pvCost)} worth of work was planned to be complete. This is the "budget for work scheduled" — what was supposed to have been accomplished based on the project timeline.`
-    },
-    'EV': {
-      title: 'EV — Earned Value',
-      formula: 'EV = BAC × (% Work Complete)',
-      calc: [
-        `BAC: ${UI.fmtCurrency(bacCost)}`,
-        `Tasks complete: ${done} of ${total} (${pctDone}%)`,
-        `EV = ${UI.fmtCurrency(bacCost)} × ${pctDone}% = ${UI.fmtCurrency(evCost)}`,
-      ],
-      result: UI.fmtCurrency(evCost), color: 'var(--cyan)',
-      interp: `${UI.fmtCurrency(evCost)} worth of work has actually been completed. This is the "budget for work performed" — the true measure of progress independent of what was spent.`
-    },
-    'AC': {
-      title: 'AC — Actual Cost',
-      formula: 'AC = Σ (Hours Logged × Labor Rate)',
-      calc: [
-        `Total hours logged (task journal): ${ac.toFixed(1)} hrs`,
-        `Blended rate: $${RATE}/hr`,
-        `AC = ${ac.toFixed(1)} × $${RATE} = ${UI.fmtCurrency(acCost)}`,
-      ],
-      result: UI.fmtCurrency(acCost), color: 'var(--text0)',
-      interp: `${UI.fmtCurrency(acCost)} has actually been spent to date, based on ${ac.toFixed(1)} hours logged across all task journal entries. This is the real cost incurred — compared to EV to determine cost performance.`
-    },
-    'CV': {
-      title: 'CV — Cost Variance',
-      formula: 'CV = EV − AC',
-      calc: [
-        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
-        `AC (Actual Cost): ${UI.fmtCurrency(acCost)}`,
-        `CV = ${UI.fmtCurrency(evCost)} − ${UI.fmtCurrency(acCost)} = ${UI.fmtCurrency(cv)}`,
-      ],
-      result: UI.fmtCurrency(cv), color: cv >= 0 ? 'var(--green)' : 'var(--red)',
-      interp: cv >= 0
-        ? `CV is positive — the project is ${UI.fmtCurrency(cv)} under budget. The team has earned more value than it has spent.`
-        : `CV is negative — the project is ${UI.fmtCurrency(Math.abs(cv))} over budget. More has been spent than the value of work completed. Root cause: labor hours are running ${((ac/ev)-1*100).toFixed(0)}% over the plan.`
-    },
-    'SV': {
-      title: 'SV — Schedule Variance',
-      formula: 'SV = EV − PV',
-      calc: [
-        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
-        `PV (Planned Value): ${UI.fmtCurrency(pvCost)}`,
-        `SV = ${UI.fmtCurrency(evCost)} − ${UI.fmtCurrency(pvCost)} = ${UI.fmtCurrency(sv)}`,
-      ],
-      result: UI.fmtCurrency(sv), color: sv >= 0 ? 'var(--green)' : 'var(--red)',
-      interp: sv >= 0
-        ? `SV is positive — the project is ${UI.fmtCurrency(sv)} ahead of schedule in value terms. More work has been accomplished than was planned for this point in time.`
-        : `SV is negative — the project is ${UI.fmtCurrency(Math.abs(sv))} behind schedule in value terms. Less work has been completed than was planned for this point in time.`
-    },
-    'CPI': {
-      title: 'CPI — Cost Performance Index',
-      formula: 'CPI = EV ÷ AC',
-      calc: [
-        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
-        `AC (Actual Cost): ${UI.fmtCurrency(acCost)}`,
-        `CPI = ${UI.fmtCurrency(evCost)} ÷ ${UI.fmtCurrency(acCost)} = ${cpi}`,
-      ],
-      result: cpi, color: UI.indexColor(cpiNum),
-      interp: `CPI of ${cpi} means the project is earning ${UI.fmtCurrency(cpiNum * 100)} of value for every $100 spent. ${cpiNum < 1 ? `The project is spending $${(1/cpiNum).toFixed(2)} to produce $1.00 of work — significantly over budget. To finish on budget, either scope must be reduced or the remaining work must be completed at a CPI of ${tcpi ? tcpi.toFixed(2) : '—'} (TCPI).` : 'The project is efficiently delivering value within budget.'}`
-    },
-    'SPI': {
-      title: 'SPI — Schedule Performance Index',
-      formula: 'SPI = EV ÷ PV',
-      calc: [
-        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
-        `PV (Planned Value): ${UI.fmtCurrency(pvCost)}`,
-        `SPI = ${UI.fmtCurrency(evCost)} ÷ ${UI.fmtCurrency(pvCost)} = ${spi}`,
-      ],
-      result: spi, color: UI.indexColor(spiNum),
-      interp: `SPI of ${spi} means the team is completing ${UI.fmtCurrency(spiNum * 100)} of planned work for every $100 planned. ${spiNum >= 1 ? 'The project is progressing faster than scheduled.' : 'The project is progressing slower than scheduled.'} Note: SPI naturally trends toward 1.0 near project end as all remaining work gets done.`
-    },
-    'EAC': {
-      title: 'EAC — Estimate at Completion',
-      formula: 'EAC = BAC ÷ CPI',
-      calc: [
-        `BAC: ${UI.fmtCurrency(bacCost)}`,
-        `CPI: ${cpi}`,
-        `EAC = ${UI.fmtCurrency(bacCost)} ÷ ${cpi} = ${eac != null ? UI.fmtCurrency(eac) : '—'}`,
-      ],
-      result: eac != null ? UI.fmtCurrency(eac) : '—', color: eac != null && eac > bacCost ? 'var(--red)' : 'var(--green)',
-      interp: eac != null ? `If the project continues at the current CPI of ${cpi}, it will cost ${UI.fmtCurrency(eac)} to complete — ${eac > bacCost ? UI.fmtCurrency(eac - bacCost) + ' over' : UI.fmtCurrency(bacCost - eac) + ' under'} the original budget of ${UI.fmtCurrency(bacCost)}.` : 'Cannot compute — insufficient data.'
-    },
-    'ETC': {
-      title: 'ETC — Estimate to Complete',
-      formula: 'ETC = EAC − AC',
-      calc: [
-        `EAC (Est. at Completion): ${eac != null ? UI.fmtCurrency(eac) : '—'}`,
-        `AC (Actual Cost to date): ${UI.fmtCurrency(acCost)}`,
-        `ETC = ${eac != null ? UI.fmtCurrency(eac) : '—'} − ${UI.fmtCurrency(acCost)} = ${etc != null ? UI.fmtCurrency(etc) : '—'}`,
-      ],
-      result: etc != null ? UI.fmtCurrency(etc) : '—', color: 'var(--amber)',
-      interp: etc != null ? `${UI.fmtCurrency(etc)} is still needed to finish the project, based on current cost performance. This is what remains after accounting for the ${UI.fmtCurrency(acCost)} already spent.` : 'Cannot compute — insufficient data.'
-    },
-    'VAC': {
-      title: 'VAC — Variance at Completion',
-      formula: 'VAC = BAC − EAC',
-      calc: [
-        `BAC (Budget at Completion): ${UI.fmtCurrency(bacCost)}`,
-        `EAC (Estimate at Completion): ${eac != null ? UI.fmtCurrency(eac) : '—'}`,
-        `VAC = ${UI.fmtCurrency(bacCost)} − ${eac != null ? UI.fmtCurrency(eac) : '—'} = ${vac != null ? UI.fmtCurrency(vac) : '—'}`,
-      ],
-      result: vac != null ? UI.fmtCurrency(vac) : '—', color: vac != null ? (vac >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text2)',
-      interp: vac != null ? `At project completion, the ${vac >= 0 ? 'budget surplus' : 'cost overrun'} is forecast to be ${UI.fmtCurrency(Math.abs(vac))}. ${vac < 0 ? 'Corrective action is needed to bring costs back in line, or a change order must be processed.' : 'The project is tracking to finish under budget.'}` : 'Cannot compute — insufficient data.'
-    },
-    'Budget Hours': {
-      title: 'Budget Hours (BAC hrs)',
-      formula: 'BAC hrs = Baseline budget locked at project approval',
-      calc: [`Budget Baseline Hours: ${bac.toFixed(1)} hrs`, `At $${RATE}/hr blended rate = ${UI.fmtCurrency(bacCost)}`],
-      result: bac.toFixed(1) + ' hrs', color: 'var(--text0)',
-      interp: `${bac.toFixed(1)} hours were budgeted for this project at baseline. These hours are locked — changes require formal change control. To date, ${ac.toFixed(1)} hours have been logged (${UI.pct(ac, bac)}% of budget hours consumed).`
-    },
-    'Actual Hours': {
-      title: 'Actual Hours (AC hrs)',
-      formula: 'AC hrs = Σ hours_spent from task journal entries',
-      calc: [
-        `Journal entries: ${STATE.journal.length} entries`,
-        `Total hours logged: ${ac.toFixed(1)} hrs`,
-        `Budget hours: ${bac.toFixed(1)} hrs`,
-        `Hours consumed: ${UI.pct(ac, bac)}% of budget`,
-      ],
-      result: ac.toFixed(1) + ' hrs', color: UI.indexColor(bac > 0 ? bac/ac : 1),
-      interp: `${ac.toFixed(1)} actual hours have been logged across ${STATE.journal.length} task journal entries. With ${pctDone}% of work complete and ${UI.pct(ac, bac)}% of budget hours consumed, the project is burning hours ${ac/ev > 1 ? `${((ac/ev-1)*100).toFixed(0)}% faster` : 'slower'} than the work is being earned.`
-    },
+    'BAC': { title: 'BAC — Budget at Completion', formula: 'BAC = Budget Baseline Hours × Blended Labor Rate', calc: [`Budget Hours: ${bac.toFixed(1)} hrs`,`Blended Rate: $${RATE}/hr`,`BAC = ${bac.toFixed(1)} × $${RATE} = ${UI.fmtCurrency(bacCost)}`], result: UI.fmtCurrency(bacCost), color: 'var(--text0)', interp: `The total approved budget for this project is ${UI.fmtCurrency(bacCost)}.` },
+    'PV':  { title: 'PV — Planned Value', formula: 'PV = BAC × (Schedule % Elapsed)', calc: [`BAC: ${UI.fmtCurrency(bacCost)}`,`Schedule elapsed: ${(pv/bac*100).toFixed(1)}%`,`PV = ${UI.fmtCurrency(bacCost)} × ${(pv/bac*100).toFixed(1)}% = ${UI.fmtCurrency(pvCost)}`], result: UI.fmtCurrency(pvCost), color: 'var(--text0)', interp: `By this point in the schedule, ${UI.fmtCurrency(pvCost)} worth of work was planned to be complete.` },
+    'EV':  { title: 'EV — Earned Value', formula: 'EV = BAC × (% Work Complete)', calc: [`BAC: ${UI.fmtCurrency(bacCost)}`,`Tasks complete: ${done} of ${total} (${pctDone}%)`,`EV = ${UI.fmtCurrency(bacCost)} × ${pctDone}% = ${UI.fmtCurrency(evCost)}`], result: UI.fmtCurrency(evCost), color: 'var(--cyan)', interp: `${UI.fmtCurrency(evCost)} worth of work has actually been completed.` },
+    'AC':  { title: 'AC — Actual Cost', formula: 'AC = Σ (Hours Logged × Labor Rate)', calc: [`Total hours logged: ${ac.toFixed(1)} hrs`,`Blended rate: $${RATE}/hr`,`AC = ${ac.toFixed(1)} × $${RATE} = ${UI.fmtCurrency(acCost)}`], result: UI.fmtCurrency(acCost), color: 'var(--text0)', interp: `${UI.fmtCurrency(acCost)} has actually been spent to date.` },
+    'CV':  { title: 'CV — Cost Variance', formula: 'CV = EV − AC', calc: [`EV: ${UI.fmtCurrency(evCost)}`,`AC: ${UI.fmtCurrency(acCost)}`,`CV = ${UI.fmtCurrency(evCost)} − ${UI.fmtCurrency(acCost)} = ${UI.fmtCurrency(cv)}`], result: UI.fmtCurrency(cv), color: cv >= 0 ? 'var(--green)' : 'var(--red)', interp: cv >= 0 ? `CV is positive — ${UI.fmtCurrency(cv)} under budget.` : `CV is negative — ${UI.fmtCurrency(Math.abs(cv))} over budget.` },
+    'SV':  { title: 'SV — Schedule Variance', formula: 'SV = EV − PV', calc: [`EV: ${UI.fmtCurrency(evCost)}`,`PV: ${UI.fmtCurrency(pvCost)}`,`SV = ${UI.fmtCurrency(evCost)} − ${UI.fmtCurrency(pvCost)} = ${UI.fmtCurrency(sv)}`], result: UI.fmtCurrency(sv), color: sv >= 0 ? 'var(--green)' : 'var(--red)', interp: sv >= 0 ? `SV positive — ${UI.fmtCurrency(sv)} ahead of schedule.` : `SV negative — ${UI.fmtCurrency(Math.abs(sv))} behind schedule.` },
+    'CPI': { title: 'CPI — Cost Performance Index', formula: 'CPI = EV ÷ AC', calc: [`EV: ${UI.fmtCurrency(evCost)}`,`AC: ${UI.fmtCurrency(acCost)}`,`CPI = ${cpi}`], result: cpi, color: UI.indexColor(cpiNum), interp: `CPI of ${cpi} — earning ${UI.fmtCurrency(cpiNum * 100)} per $100 spent.` },
+    'SPI': { title: 'SPI — Schedule Performance Index', formula: 'SPI = EV ÷ PV', calc: [`EV: ${UI.fmtCurrency(evCost)}`,`PV: ${UI.fmtCurrency(pvCost)}`,`SPI = ${spi}`], result: spi, color: UI.indexColor(spiNum), interp: `SPI of ${spi} — completing ${UI.fmtCurrency(spiNum * 100)} of planned work per $100 planned.` },
+    'EAC': { title: 'EAC — Estimate at Completion', formula: 'EAC = BAC ÷ CPI', calc: [`BAC: ${UI.fmtCurrency(bacCost)}`,`CPI: ${cpi}`,`EAC = ${eac != null ? UI.fmtCurrency(eac) : '—'}`], result: eac != null ? UI.fmtCurrency(eac) : '—', color: eac != null && eac > bacCost ? 'var(--red)' : 'var(--green)', interp: eac != null ? `Forecast final cost: ${UI.fmtCurrency(eac)}.` : 'Cannot compute.' },
+    'ETC': { title: 'ETC — Estimate to Complete', formula: 'ETC = EAC − AC', calc: [`EAC: ${eac != null ? UI.fmtCurrency(eac) : '—'}`,`AC: ${UI.fmtCurrency(acCost)}`,`ETC = ${etc != null ? UI.fmtCurrency(etc) : '—'}`], result: etc != null ? UI.fmtCurrency(etc) : '—', color: 'var(--amber)', interp: etc != null ? `${UI.fmtCurrency(etc)} still needed to finish.` : 'Cannot compute.' },
+    'VAC': { title: 'VAC — Variance at Completion', formula: 'VAC = BAC − EAC', calc: [`BAC: ${UI.fmtCurrency(bacCost)}`,`EAC: ${eac != null ? UI.fmtCurrency(eac) : '—'}`,`VAC = ${vac != null ? UI.fmtCurrency(vac) : '—'}`], result: vac != null ? UI.fmtCurrency(vac) : '—', color: vac != null ? (vac >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text2)', interp: vac != null ? `Forecast ${vac >= 0 ? 'surplus' : 'overrun'}: ${UI.fmtCurrency(Math.abs(vac))}.` : 'Cannot compute.' },
+    'Budget Hours': { title: 'Budget Hours (BAC hrs)', formula: 'BAC hrs = Baseline budget', calc: [`Budget Baseline Hours: ${bac.toFixed(1)} hrs`,`At $${RATE}/hr = ${UI.fmtCurrency(bacCost)}`], result: bac.toFixed(1) + ' hrs', color: 'var(--text0)', interp: `${bac.toFixed(1)} hours budgeted. ${ac.toFixed(1)} hours logged (${UI.pct(ac, bac)}% consumed).` },
+    'Actual Hours': { title: 'Actual Hours (AC hrs)', formula: 'AC hrs = Σ hours_spent from task journal', calc: [`Journal entries: ${STATE.journal.length}`,`Total hours: ${ac.toFixed(1)} hrs`,`Budget: ${bac.toFixed(1)} hrs`,`Consumed: ${UI.pct(ac, bac)}%`], result: ac.toFixed(1) + ' hrs', color: UI.indexColor(bac > 0 ? bac/ac : 1), interp: `${ac.toFixed(1)} actual hours logged across ${STATE.journal.length} entries.` },
   };
 
-  // Exact match first, then fallback to includes
   const match = defs[key] ? key
     : Object.keys(defs).find(k => k === key)
     || Object.keys(defs).find(k => key === k.split(' ')[0])
@@ -1169,100 +932,39 @@ function showEVMPopup(key) {
 
   document.getElementById('evm-popup-title').textContent = def.title;
   document.getElementById('evm-popup-formula').textContent = def.formula;
-  document.getElementById('evm-popup-calc').innerHTML = def.calc.map((l, i) =>
-    `<div class="calc-line">${l}</div>`
-  ).join('');
+  document.getElementById('evm-popup-calc').innerHTML = def.calc.map(l => `<div class="calc-line">${l}</div>`).join('');
   document.getElementById('evm-popup-interp').textContent = def.interp;
   document.getElementById('evm-popup-result').innerHTML = `
     <div class="evm-popup-result-val" style="color:${def.color};">${def.result}</div>
     <div class="evm-popup-result-label">${match || key}<br><span style="color:var(--text3);font-size:11px;">CLICK ANYWHERE OUTSIDE TO CLOSE</span></div>`;
   document.getElementById('evm-popup-overlay').style.display = 'flex';
 
-  // ── TASK DATA GRID ────────────────────────────────────────
-  // Show task-level data relevant to the clicked metric
-  // RATE is already declared above (175)
   const gridEl = document.getElementById('evm-popup-grid');
+  const RATE2  = 175;
   const tasks  = STATE.tasks.filter(t => parseFloat(t.pct_complete || 0) > 0);
-
   function gridRow(t) {
-    const bh  = parseFloat(t.budget_hours || 0);
-    const ah  = parseFloat(t.actual_hours || 0);
-    const bc  = bh * RATE;
-    const ac  = ah * RATE;
-    const tot = bc - ac;  // BGT COST - ACT COST = TOTAL (variance)
+    const bh = parseFloat(t.budget_hours || 0);
+    const ah = parseFloat(t.actual_hours || 0);
+    const bc = bh * RATE2; const ac2 = ah * RATE2; const tot = bc - ac2;
     const pct = parseFloat(t.pct_complete || 0);
-    return { t, bh, ah, bc, ac, tot, pct };
+    return { t, bh, ah, bc, ac: ac2, tot, pct };
   }
-
-  // Single unified column layout for all metrics
-  // TASK | PHASE | % DONE | BGT COST | ACT COST | TOTAL
-  function gridTitle(key) {
-    const titles = {
-      'BAC':'BUDGET COST BY TASK', 'PV':'PLANNED VALUE — TASK BREAKDOWN',
-      'EV':'EARNED VALUE — TASK BREAKDOWN', 'AC':'ACTUAL COST BY TASK',
-      'CV':'COST VARIANCE BY TASK', 'SV':'SCHEDULE VARIANCE — TASK BREAKDOWN',
-      'CPI':'COST PERFORMANCE — TASK BREAKDOWN', 'SPI':'SCHEDULE PERFORMANCE — TASK BREAKDOWN',
-      'EAC':'ESTIMATE AT COMPLETION — TASK BREAKDOWN', 'ETC':'ESTIMATE TO COMPLETE — TASK BREAKDOWN',
-      'VAC':'VARIANCE AT COMPLETION — TASK BREAKDOWN',
-      'Budget Hours':'BUDGET HOURS & COST BY TASK', 'Actual Hours':'ACTUAL COST BY TASK',
-    };
-    return titles[key] || 'TASK DATA';
-  }
-
-  function fmtC(n) { return UI.fmtCurrency(n); }
-
-  const cfg = match || key;
   const rows = tasks.map(gridRow).filter(r => r.pct > 0);
-
   if (rows.length > 0) {
     const tbgd = rows.reduce((s,r) => s + r.bc, 0);
     const tact = rows.reduce((s,r) => s + r.ac, 0);
     const ttot = tbgd - tact;
-
     gridEl.innerHTML = `
-      <div class="evm-popup-grid-title">◆ ${gridTitle(cfg)}</div>
-      <div style="padding:10px 0 10px;text-align:center;">
-        <div style="font-family:var(--font-mono);font-size:14.0px;color:var(--text1);letter-spacing:0.1em;font-weight:600;margin-bottom:8px;">
-          SUMMARY FOR COMPLETED &amp; IN-PROGRESS TASKS ONLY
-        </div>
-        <div style="text-align:left;display:inline-block;font-family:var(--font-mono);font-size:12.0px;color:var(--text3);letter-spacing:0.06em;line-height:1.8;">
-          <div>BGT COST &nbsp;= Budget Hours × $${RATE}/hr</div>
-          <div>ACT COST &nbsp;= Actual Hours Logged × $${RATE}/hr</div>
-          <div>TOTAL &nbsp;&nbsp;&nbsp;&nbsp;= BGT − ACT &nbsp;(positive = under budget)</div>
-        </div>
-      </div>
+      <div class="evm-popup-grid-title">◆ TASK DATA</div>
       <div class="evm-popup-grid-wrap">
         <table class="evm-grid-table">
-          <thead>
-            <tr>
-              <th>TASK</th>
-              <th>PHASE</th>
-              <th class="num">% DONE</th>
-              <th class="num">BGT COST</th>
-              <th class="num">ACT COST</th>
-              <th class="num">TOTAL</th>
-            </tr>
-          </thead>
+          <thead><tr><th>TASK</th><th>PHASE</th><th class="num">% DONE</th><th class="num">BGT COST</th><th class="num">ACT COST</th><th class="num">TOTAL</th></tr></thead>
           <tbody>
             ${rows.map(r => {
-              const totColor = r.tot >= 0 ? 'var(--green)' : 'var(--red)';
-              return `<tr>
-                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.t.name}">${r.t.name}</td>
-                <td style="color:var(--text3);font-size:11px;">${r.t.phase||'—'}</td>
-                <td class="num">${r.pct}%</td>
-                <td class="num">${fmtC(r.bc)}</td>
-                <td class="num">${fmtC(r.ac)}</td>
-                <td class="num" style="color:${totColor};font-weight:700;">${r.tot >= 0 ? '+' : ''}${fmtC(r.tot)}</td>
-              </tr>`;
+              const tc = r.tot >= 0 ? 'var(--green)' : 'var(--red)';
+              return `<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.t.name}">${r.t.name}</td><td style="color:var(--text3);font-size:11px;">${r.t.phase||'—'}</td><td class="num">${r.pct}%</td><td class="num">${UI.fmtCurrency(r.bc)}</td><td class="num">${UI.fmtCurrency(r.ac)}</td><td class="num" style="color:${tc};font-weight:700;">${r.tot >= 0 ? '+' : ''}${UI.fmtCurrency(r.tot)}</td></tr>`;
             }).join('')}
-            <tr class="subtotal">
-              <td>TOTAL</td>
-              <td></td>
-              <td class="num">—</td>
-              <td class="num">${fmtC(tbgd)}</td>
-              <td class="num">${fmtC(tact)}</td>
-              <td class="num" style="color:${ttot >= 0 ? 'var(--green)' : 'var(--red)'};">${ttot >= 0 ? '+' : ''}${fmtC(ttot)}</td>
-            </tr>
+            <tr class="subtotal"><td>TOTAL</td><td></td><td class="num">—</td><td class="num">${UI.fmtCurrency(tbgd)}</td><td class="num">${UI.fmtCurrency(tact)}</td><td class="num" style="color:${ttot >= 0 ? 'var(--green)' : 'var(--red)'};">${ttot >= 0 ? '+' : ''}${UI.fmtCurrency(ttot)}</td></tr>
           </tbody>
         </table>
       </div>`;
@@ -1272,9 +974,6 @@ function showEVMPopup(key) {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEVMPopup({}); });
-
-// Track resize drag state — prevents overlay mouseup from closing popup
-// when user releases the resize handle over the overlay area
 document.addEventListener('mousedown', e => {
   if (e.target.closest?.('.evm-popup')) {
     window._evmPopupDragging = false;
@@ -1290,13 +989,13 @@ document.addEventListener('mousemove', e => {
   }
 });
 document.addEventListener('mouseup', () => {
-  // Reset dragging flag after a short delay so the click handler sees it
   setTimeout(() => {
     window._evmPopupDragging = false;
     window._evmPopupMousedownX = undefined;
     window._evmPopupMousedownY = undefined;
   }, 50);
 });
+
 function computeEVM() {
   const p     = STATE.project;
   const tasks = STATE.tasks;
@@ -1329,26 +1028,20 @@ function renderHeader() {
   const tasks = STATE.tasks;
   const firms = STATE.firms;
   const users = STATE.users;
-
   document.title = `ProjectHUD — ${p.name}`;
   document.getElementById('proj-breadcrumb').textContent = `PROJECTS → ${(p.name || '').toUpperCase()}`;
   document.getElementById('proj-title').textContent = p.name;
-
   const clientFirm = firms.find(f => f.id === p.client_id);
   const isInternal = clientFirm?.is_internal;
   document.getElementById('proj-client-tag').textContent = isInternal
     ? 'INTERNAL PROJECT · ' + (clientFirm?.name || '')
     : 'CLIENT: ' + (clientFirm?.name || '—');
-
   document.getElementById('proj-description-header').textContent = p.description || '';
-
   const done    = tasks.filter(t => t.status === 'complete').length;
   const total   = tasks.length;
   const pctDone = UI.pct(done, total);
   const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete').length;
-
   const { cpi, spi, cpiNum, spiNum } = computeEVM();
-
   document.getElementById('hc-status').innerHTML = UI.badge(p.status);
   document.getElementById('hc-pct').textContent  = pctDone + '%';
   document.getElementById('hc-cpi').textContent  = cpi;
@@ -1364,15 +1057,11 @@ function renderHeader() {
     document.getElementById('hc-days-left').textContent = dLeft > 0 ? `${dLeft}d REMAINING` : `${Math.abs(dLeft)}d OVERDUE`;
     document.getElementById('hc-days-left').style.color = dLeft < 30 ? 'var(--amber)' : 'var(--text3)';
   }
-
-  // PM - find user assigned to most tasks
   const pmCounts = {};
   tasks.forEach(t => { if (t.assigned_to) pmCounts[t.assigned_to] = (pmCounts[t.assigned_to]||0)+1; });
   const pmId = Object.entries(pmCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
   const pm = users.find(u => u.id === pmId);
   document.getElementById('hc-pm').textContent = pm?.name || '—';
-
-  // Work complete & hours consumed chips
   const actualHrs = tasks.reduce((s,t) => s + parseFloat(t.actual_hours||0), 0);
   const budgetHrs = parseFloat(p.budget_baseline_hours || 0);
   const hrsPct    = budgetHrs > 0 ? UI.pct(actualHrs, budgetHrs) : 0;
@@ -1382,8 +1071,6 @@ function renderHeader() {
   document.getElementById('hc-hrs-pct').textContent  = hrsPct + '%';
   document.getElementById('hc-hrs-pct').style.color  = hrsColor;
   document.getElementById('hc-hrs-sub').textContent  = `${actualHrs.toFixed(0)}h OF ${budgetHrs}h`;
-
-  // Tab badge
   if (overdue > 0) {
     const badge = document.getElementById('tab-tasks-count');
     badge.textContent = overdue;
@@ -1393,7 +1080,6 @@ function renderHeader() {
 
 function milestoneRowHTML(m) {
   const cfg    = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
-  const dLeft  = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
   const slipped = m.current_target_date && m.initial_target_date &&
     m.current_target_date !== m.initial_target_date;
   return `<div class="milestone-row">
@@ -1413,36 +1099,21 @@ function milestoneRowHTML(m) {
 function renderOverviewMilestones() {
   const el  = document.getElementById('overview-milestones');
   const all = STATE.milestones;
-  if (!all.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined for this project'); return; }
-
+  if (!all.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined'); return; }
   const INITIAL = 5;
   const visible = all.slice(0, INITIAL);
   const hidden  = all.slice(INITIAL);
   const overdueCount = hidden.filter(m =>
     m.status !== 'complete' && m.current_target_date && UI.daysUntil(m.current_target_date) < 0
   ).length;
-
   let html = visible.map(milestoneRowHTML).join('');
-
   if (hidden.length > 0) {
     const label = overdueCount > 0
       ? `▼ &nbsp;+${hidden.length} more &nbsp;<span style="color:var(--red);">(${overdueCount} overdue)</span>`
       : `▼ &nbsp;+${hidden.length} more milestones`;
-
-    html += `<div id="ms-expand-row" onclick="expandOverviewMilestones()" style="
-      padding:9px 14px;
-      font-family:var(--font-mono);font-size:11px;
-      color:var(--cyan);letter-spacing:0.12em;
-      cursor:pointer;border-top:1px solid var(--border);
-      display:flex;align-items:center;gap:8px;
-      transition:background 0.12s;
-    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
-       onmouseout="this.style.background='transparent'">
-      ${label}
-    </div>`;
+    html += `<div id="ms-expand-row" onclick="expandOverviewMilestones()" style="padding:9px 14px;font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.12em;cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;transition:background 0.12s;" onmouseover="this.style.background='rgba(0,210,255,0.04)'" onmouseout="this.style.background='transparent'">${label}</div>`;
     window._hiddenOverviewMilestones = hidden;
   }
-
   el.innerHTML = html;
 }
 
@@ -1451,32 +1122,18 @@ function expandOverviewMilestones() {
   const el = document.getElementById('overview-milestones');
   if (!expandRow || !window._hiddenOverviewMilestones) return;
   expandRow.remove();
-  window._hiddenOverviewMilestones.forEach(m => {
-    el.insertAdjacentHTML('beforeend', milestoneRowHTML(m));
-  });
-  el.insertAdjacentHTML('beforeend', `
-    <div onclick="renderOverviewMilestones()" style="
-      padding:9px 14px;
-      font-family:var(--font-mono);font-size:11px;
-      color:var(--text3);letter-spacing:0.12em;
-      cursor:pointer;border-top:1px solid var(--border);
-      display:flex;align-items:center;gap:8px;
-    " onmouseover="this.style.background='rgba(0,210,255,0.04)'"
-       onmouseout="this.style.background='transparent'">
-      ▲ &nbsp;SHOW LESS
-    </div>`);
+  window._hiddenOverviewMilestones.forEach(m => { el.insertAdjacentHTML('beforeend', milestoneRowHTML(m)); });
+  el.insertAdjacentHTML('beforeend', `<div onclick="renderOverviewMilestones()" style="padding:9px 14px;font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(0,210,255,0.04)'" onmouseout="this.style.background='transparent'">▲ &nbsp;SHOW LESS</div>`);
 }
 
 function taskRowHTML(t) {
-  const now     = new Date();
+  const now       = new Date();
   const isOverdue = t.due_date && new Date(t.due_date) < now && t.status !== 'complete';
-  const asgn    = STATE.users.find(u => u.id === t.assigned_to);
-  const due     = UI.dueDateLabel(t.due_date);
-
-  const startStr = t.start_date  ? UI.fmtDateShort(t.start_date) : '—';
-  const endStr   = t.due_date    ? UI.fmtDateShort(t.due_date)   : '—';
-  const dur      = t.duration_days ? t.duration_days + 'd' : (t.effort_days ? t.effort_days + 'd' : '—');
-
+  const asgn      = STATE.users.find(u => u.id === t.assigned_to);
+  const due       = UI.dueDateLabel(t.due_date);
+  const startStr  = t.start_date ? UI.fmtDateShort(t.start_date) : '—';
+  const endStr    = t.due_date   ? UI.fmtDateShort(t.due_date)   : '—';
+  const dur       = t.duration_days ? t.duration_days + 'd' : (t.effort_days ? t.effort_days + 'd' : '—');
   return `<tr class="overview-task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
     <td style="padding:7px 12px 7px 14px;width:16px;">${UI.taskDot(t.status)}</td>
     <td style="padding:7px 8px;min-width:0;">
@@ -1493,57 +1150,24 @@ function taskRowHTML(t) {
 function renderOverviewTasks() {
   const now     = new Date();
   const active  = STATE.tasks.filter(t => t.status !== 'complete' && t.due_date);
-  const overdue = active.filter(t => new Date(t.due_date) < now)
-                        .sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
-  const upcoming= active.filter(t => new Date(t.due_date) >= now)
-                        .sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
-
+  const overdue = active.filter(t => new Date(t.due_date) < now).sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+  const upcoming= active.filter(t => new Date(t.due_date) >= now).sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
   const el = document.getElementById('overview-tasks');
   if (!active.length) { el.innerHTML = UI.allClear('ALL CLEAR', 'No upcoming tasks'); return; }
-
   const INITIAL = 5;
   const all     = [...overdue, ...upcoming];
   const visible = all.slice(0, INITIAL);
   const hidden  = all.slice(INITIAL);
   const extraOverdue = overdue.length > INITIAL ? overdue.length - INITIAL : 0;
-
-  // Table header
-  const TH = (label, align='center') =>
-    `<th style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.14em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:${align};white-space:nowrap;">${label}</th>`;
-
-  let html = `<table style="width:100%;border-collapse:collapse;">
-    <thead>
-      <tr>
-        ${TH('','left')}
-        ${TH('TASK','left')}
-        ${TH('STATUS')}
-        ${TH('START')}
-        ${TH('END')}
-        ${TH('DUR','right')}
-      </tr>
-    </thead>
-    <tbody id="overview-tasks-body">
-      ${visible.map(taskRowHTML).join('')}
-    </tbody>
-  </table>`;
-
+  const TH = (label, align='center') => `<th style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.14em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:${align};white-space:nowrap;">${label}</th>`;
+  let html = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${TH('','left')}${TH('TASK','left')}${TH('STATUS')}${TH('START')}${TH('END')}${TH('DUR','right')}</tr></thead><tbody id="overview-tasks-body">${visible.map(taskRowHTML).join('')}</tbody></table>`;
   if (hidden.length > 0) {
     const label = extraOverdue > 0
       ? `▼ &nbsp;+${hidden.length} more &nbsp;<span style="color:var(--red);">(${extraOverdue} overdue)</span>`
       : `▼ &nbsp;+${hidden.length} more tasks`;
-
-    html += `<div id="tasks-expand-row" onclick="expandOverviewTasks()" style="
-      padding:9px 14px;font-family:var(--font-mono);font-size:11px;
-      color:var(--cyan);letter-spacing:0.12em;cursor:pointer;
-      border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;
-      transition:background 0.12s;"
-      onmouseover="this.style.background='rgba(0,210,255,0.04)'"
-      onmouseout="this.style.background='transparent'">
-      ${label}
-    </div>`;
+    html += `<div id="tasks-expand-row" onclick="expandOverviewTasks()" style="padding:9px 14px;font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.12em;cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;transition:background 0.12s;" onmouseover="this.style.background='rgba(0,210,255,0.04)'" onmouseout="this.style.background='transparent'">${label}</div>`;
     window._hiddenOverviewTasks = hidden;
   }
-
   el.innerHTML = html;
 }
 
@@ -1552,20 +1176,8 @@ function expandOverviewTasks() {
   const tbody = document.getElementById('overview-tasks-body');
   if (!expandRow || !tbody || !window._hiddenOverviewTasks) return;
   expandRow.remove();
-  window._hiddenOverviewTasks.forEach(t => {
-    tbody.insertAdjacentHTML('beforeend', taskRowHTML(t));
-  });
-  // Add collapse row below the table
-  document.getElementById('overview-tasks').insertAdjacentHTML('beforeend', `
-    <div onclick="renderOverviewTasks()" style="
-      padding:9px 14px;font-family:var(--font-mono);font-size:11px;
-      color:var(--text3);letter-spacing:0.12em;cursor:pointer;
-      border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;
-      transition:background 0.12s;"
-      onmouseover="this.style.background='rgba(0,210,255,0.04)'"
-      onmouseout="this.style.background='transparent'">
-      ▲ &nbsp;SHOW LESS
-    </div>`);
+  window._hiddenOverviewTasks.forEach(t => { tbody.insertAdjacentHTML('beforeend', taskRowHTML(t)); });
+  document.getElementById('overview-tasks').insertAdjacentHTML('beforeend', `<div onclick="renderOverviewTasks()" style="padding:9px 14px;font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;transition:background 0.12s;" onmouseover="this.style.background='rgba(0,210,255,0.04)'" onmouseout="this.style.background='transparent'">▲ &nbsp;SHOW LESS</div>`);
 }
 
 function renderPhaseProgress() {
@@ -1579,18 +1191,11 @@ function renderPhaseProgress() {
     const pct = UI.pct(done, pt.length);
     const hasOverdue = pt.some(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete');
     const color = pct === 100 ? 'var(--green)' : hasOverdue ? 'var(--amber)' : 'var(--cyan)';
-    return `<div class="phase-progress-row">
-      <div class="pp-header">
-        <div class="pp-name">${phase}</div>
-        <div class="pp-stats">${done}/${pt.length} · ${pct}%</div>
-      </div>
-      ${UI.progressBar(pct, color)}
-    </div>`;
+    return `<div class="phase-progress-row"><div class="pp-header"><div class="pp-name">${phase}</div><div class="pp-stats">${done}/${pt.length} · ${pct}%</div></div>${UI.progressBar(pct, color)}</div>`;
   }).join('');
 }
 
 function renderOverviewEVM() {
-  const tasks = STATE.tasks;
   const { cpi, spi, cpiNum, spiNum, pctDone, done, total } = computeEVM();
   document.getElementById('overview-gauges').innerHTML =
     UI.gauge(pctDone, 100, 'var(--cyan)',         'WORK %', pctDone+'%',  52) +
@@ -1598,7 +1203,7 @@ function renderOverviewEVM() {
     UI.gauge(spiNum,  2,   UI.indexColor(spiNum), 'SPI',    spi,          52);
   document.getElementById('overview-evm-vals').innerHTML = `
     <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">TASKS DONE</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--green);">${done}</span></div>
-    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--red);">${tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
+    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--red);">${STATE.tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
 }
 
 function renderRecentJournal() {
@@ -1634,13 +1239,10 @@ function renderTasksTable() {
   else if (filter === 'not_started') tasks = tasks.filter(t => t.status === 'not_started' || t.status === 'ready');
   else if (filter === 'complete') tasks = tasks.filter(t => t.status === 'complete');
   else if (filter === 'overdue') tasks = tasks.filter(t => t.due_date && new Date(t.due_date) < now && t.status !== 'complete');
-
-  // Group by phase
-  const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+  const phases  = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
   const nophase = tasks.filter(t => !t.phase);
   const tbody = document.getElementById('tasks-tbody');
   let html = '';
-
   const renderPhase = (phaseLabel, phaseTasks) => {
     html += `<tr class="phase-header"><td colspan="11">${phaseLabel}</td></tr>`;
     phaseTasks.forEach(t => {
@@ -1649,43 +1251,21 @@ function renderTasksTable() {
       const hasJournal = STATE.journal.some(j => j.task_id === t.id);
       html += `<tr>
         <td><div class="cp-flag"></div></td>
-        <td>
-          <div class="task-name-cell">
-            ${UI.taskDot(t.status)}
-            <span class="task-name-text" title="${t.name}">${t.name}</span>
-            ${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}
-          </div>
-        </td>
-        <td>
-          <div style="display:flex;align-items:center;gap:6px;">
-            ${asgn ? UI.avatar(asgn, 20) : ''}
-            <span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span>
-          </div>
-        </td>
+        <td><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
+        <td><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${due.text}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:6px;min-width:70px;">
-            <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);">
-              <div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div>
-            </div>
-            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span>
-          </div>
-        </td>
+        <td><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
         <td>${UI.badge(t.status)}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
-        <td>
-          <button class="panel-action" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">▤</button>
-        </td>
+        <td><button class="panel-action" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" >▤</button></td>
       </tr>`;
     });
   };
-
   phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
   if (nophase.length) renderPhase('NO PHASE', nophase);
-
   tbody.innerHTML = html || `<tr><td colspan="11">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
 }
 
@@ -1694,24 +1274,16 @@ function renderMilestones() {
   if (!STATE.milestones.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined'); return; }
   el.innerHTML = STATE.milestones.map((m, i) => {
     const cfg = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
-    const slipped = m.current_target_date && m.initial_target_date &&
-      m.current_target_date !== m.initial_target_date;
+    const slipped = m.current_target_date && m.initial_target_date && m.current_target_date !== m.initial_target_date;
     const dLeft = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
     return `<div class="milestone-row">
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);min-width:20px;">${i+1}</div>
       <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
-      <div class="ms-info">
-        <div class="ms-name">${m.description}</div>
-        <div class="ms-phase">${m.phase || '—'}${m.responsible ? ' · Responsible: ' + (STATE.users.find(u=>u.id===m.responsible)?.name||'—') : ''}</div>
-      </div>
+      <div class="ms-info"><div class="ms-name">${m.description}</div><div class="ms-phase">${m.phase || '—'}${m.responsible ? ' · Responsible: ' + (STATE.users.find(u=>u.id===m.responsible)?.name||'—') : ''}</div></div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
         ${UI.badge(m.status)}
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">
-          Initial: ${UI.fmtDateShort(m.initial_target_date)}
-        </div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:${slipped?'var(--amber)':'var(--text2)'};">
-          ${slipped?'↑ ':''} Current: ${UI.fmtDateShort(m.current_target_date)}
-        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">Initial: ${UI.fmtDateShort(m.initial_target_date)}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:${slipped?'var(--amber)':'var(--text2)'};">${slipped?'↑ ':''} Current: ${UI.fmtDateShort(m.current_target_date)}</div>
         ${dLeft !== null && m.status !== 'complete' ? `<div style="font-family:var(--font-mono);font-size:11px;color:${dLeft<0?'var(--red)':dLeft<14?'var(--amber)':'var(--text3)'};">${dLeft<0?Math.abs(dLeft)+'d LATE':dLeft+'d LEFT'}</div>` : ''}
       </div>
     </div>`;
@@ -1724,8 +1296,7 @@ function renderEVM() {
   const { cpi, spi, cpiNum, spiNum, pctDone: pct, bac, ac, ev, pv } = computeEVM();
   const actualHrs = tasks.reduce((s,t) => s + parseFloat(t.actual_hours||0), 0);
   const budgetHrs = parseFloat(p.budget_baseline_hours || 0);
-  const RATE = 175; // default blended rate — will be replaced with real rate data
-
+  const RATE = 175;
   const bacCost = budgetHrs * RATE;
   const evCost  = ev  * RATE;
   const acCost  = actualHrs * RATE;
@@ -1735,12 +1306,10 @@ function renderEVM() {
   const eac     = cpiNum > 0 ? bacCost / cpiNum : null;
   const etc     = eac != null ? eac - acCost : null;
   const vac     = eac != null ? bacCost - eac : null;
-
   document.getElementById('evm-gauges-full').innerHTML =
     UI.gauge(pct,    100, 'var(--cyan)',         'WORK %', pct+'%', 60) +
     UI.gauge(cpiNum, 2,   UI.indexColor(cpiNum), 'CPI',    cpi,     60) +
     UI.gauge(spiNum, 2,   UI.indexColor(spiNum), 'SPI',    spi,     60);
-
   const evmRows = [
     ['BAC (Budget at Completion)',   UI.fmtCurrency(bacCost)],
     ['PV  (Planned Value)',          UI.fmtCurrency(pvCost)],
@@ -1757,15 +1326,10 @@ function renderEVM() {
     ['Actual Hours (AC hrs)',        UI.fmtHours(actualHrs)],
   ];
   document.getElementById('evm-table-detail').innerHTML = evmRows.map(([k,v]) => {
-    // Extract the exact 2-3 letter code before the space/paren
     const code = k.match(/^([A-Z]+)\s/)?.[1] || k.split(' ')[0];
-    return `<tr onclick="showEVMPopup('${code}')">
-      <td class="evm-key">${k} <span class="evm-hint">ⓘ</span></td>
-      <td class="evm-val">${v}</td>
-    </tr>`;
+    return `<tr onclick="showEVMPopup('${code}')"><td class="evm-key">${k} <span class="evm-hint">ⓘ</span></td><td class="evm-val">${v}</td></tr>`;
   }).join('');
-
-}  // closes renderEVM()
+}
 
 function renderExpenditures() {
   const exps = STATE.expenditures || [];
@@ -1782,89 +1346,47 @@ function renderExpenditures() {
     const committedPct   = budget > 0 ? UI.pct(totalCommitted, budget) : 0;
     const receivedPct    = budget > 0 ? UI.pct(totalReceived, budget) : 0;
     const budgetBarColor = committedPct > 100 ? 'var(--red)' : committedPct > 85 ? 'var(--amber)' : 'var(--cyan)';
-
     expEl.innerHTML = `
-      <!-- Budget summary chips -->
       <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;">
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">BUDGET</div>
-          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--text0);">${UI.fmtCurrency(budget)}</div>
-        </div>
+        <div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">BUDGET</div><div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--text0);">${UI.fmtCurrency(budget)}</div></div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">TOTAL COMMITTED</div>
-          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</div>
-        </div>
+        <div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">TOTAL COMMITTED</div><div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</div></div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">RECEIVED / POSTED</div>
-          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</div>
-        </div>
+        <div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">RECEIVED / POSTED</div><div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</div></div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">PENDING</div>
-          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalPending)}</div>
-        </div>
+        <div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">PENDING</div><div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalPending)}</div></div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">REMAINING BUDGET</div>
-          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:${remainingBudget < 0 ? 'var(--red)' : 'var(--text1)'};">${UI.fmtCurrency(remainingBudget)}</div>
-        </div>
+        <div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">REMAINING BUDGET</div><div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:${remainingBudget < 0 ? 'var(--red)' : 'var(--text1)'};">${UI.fmtCurrency(remainingBudget)}</div></div>
       </div>
-
-      <!-- Budget consumption bar -->
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.1em;">BUDGET CONSUMED</span>
-          <span style="font-family:var(--font-mono);font-size:11px;color:${budgetBarColor};font-weight:700;">${committedPct}%</span>
-        </div>
-        <div style="height:6px;background:rgba(255,255,255,0.06);position:relative;">
-          <div style="height:100%;width:${Math.min(committedPct,100)}%;background:${budgetBarColor};transition:width 0.6s ease;"></div>
-          ${receivedPct > 0 ? `<div style="position:absolute;top:0;left:0;height:100%;width:${Math.min(receivedPct,100)}%;background:var(--green);opacity:0.6;"></div>` : ''}
-        </div>
-        <div style="display:flex;gap:16px;margin-top:5px;">
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--green);">■ Received ${receivedPct}%</span>
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--amber);">■ Pending ${committedPct - receivedPct}%</span>
-          ${remainingBudget < 0 ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);">⚑ OVER BUDGET ${UI.fmtCurrency(Math.abs(remainingBudget))}</span>` : ''}
-        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.1em;">BUDGET CONSUMED</span><span style="font-family:var(--font-mono);font-size:11px;color:${budgetBarColor};font-weight:700;">${committedPct}%</span></div>
+        <div style="height:6px;background:rgba(255,255,255,0.06);position:relative;"><div style="height:100%;width:${Math.min(committedPct,100)}%;background:${budgetBarColor};transition:width 0.6s ease;"></div>${receivedPct > 0 ? `<div style="position:absolute;top:0;left:0;height:100%;width:${Math.min(receivedPct,100)}%;background:var(--green);opacity:0.6;"></div>` : ''}</div>
+        <div style="display:flex;gap:16px;margin-top:5px;"><span style="font-family:var(--font-mono);font-size:11px;color:var(--green);">■ Received ${receivedPct}%</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--amber);">■ Pending ${committedPct - receivedPct}%</span>${remainingBudget < 0 ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);">⚑ OVER BUDGET ${UI.fmtCurrency(Math.abs(remainingBudget))}</span>` : ''}</div>
       </div>
-
-      <!-- Line items table -->
       ${exps.length === 0 ? UI.allClear('NO LINE ITEMS', 'No expenditure line items yet') : `
       <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PHASE</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">TYPE</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PART #</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">QTY</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR PN</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">TOTAL</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PO #</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">REQUESTED</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">APPROVED</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">ORDERED</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">RECEIVED</th>
-            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);"></th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PHASE</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">TYPE</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PART #</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">QTY</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR PN</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">TOTAL</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">PO #</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">REQUESTED</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">APPROVED</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">ORDERED</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;">RECEIVED</th>
+          <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);"></th>
+        </tr></thead>
         <tbody>
           ${exps.map(e => {
-            const state = e.received_date ? 'RECEIVED'
-              : e.ordered_date   ? 'ORDERED'
-              : e.approved_date  ? 'APPROVED'
-              : e.requested_date ? 'REQUESTED'
-              : 'FORECAST';
-            const stateColor = state === 'RECEIVED' ? 'var(--green)'
-              : state === 'ORDERED'   ? 'var(--amber)'
-              : state === 'APPROVED'  ? 'var(--cyan)'
-              : state === 'REQUESTED' ? 'var(--text2)'
-              : 'var(--text3)';
+            const state = e.received_date ? 'RECEIVED' : e.ordered_date ? 'ORDERED' : e.approved_date ? 'APPROVED' : e.requested_date ? 'REQUESTED' : 'FORECAST';
+            const stateColor = state === 'RECEIVED' ? 'var(--green)' : state === 'ORDERED' ? 'var(--amber)' : state === 'APPROVED' ? 'var(--cyan)' : state === 'REQUESTED' ? 'var(--text2)' : 'var(--text3)';
             const rowOpacity = state === 'RECEIVED' ? '1' : state === 'FORECAST' ? '0.55' : '0.85';
-            const expJson = encodeURIComponent(JSON.stringify(e));
             return `<tr style="border-bottom:1px solid rgba(100,160,220,0.06);opacity:${rowOpacity};cursor:pointer;" onmouseenter="this.style.background='rgba(0,210,255,0.03)'" onmouseleave="this.style.background=''">
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.phase||'—'}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.type||'—'}</td>
@@ -1875,29 +1397,23 @@ function renderExpenditures() {
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.vendor_pn||'—'}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.po_number||'—'}</td>
-              <td style="padding:7px 10px;text-align:center;">
-                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 7px;">${state}</span>
-              </td>
-              <td style="font-family:var(--font-mono);font-size:11px;color:${e.requested_date ? 'var(--text2)' : 'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.requested_date ? UI.fmtDateShort(e.requested_date) : '—'}</td>
-              <td style="font-family:var(--font-mono);font-size:11px;color:${e.approved_date  ? 'var(--cyan)'  : 'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.approved_date  ? UI.fmtDateShort(e.approved_date)  : '—'}</td>
-              <td style="font-family:var(--font-mono);font-size:11px;color:${e.ordered_date   ? 'var(--amber)' : 'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.ordered_date   ? UI.fmtDateShort(e.ordered_date)   : '—'}</td>
-              <td style="font-family:var(--font-mono);font-size:11px;color:${e.received_date  ? 'var(--green)' : 'var(--text3)'};padding:7px 10px;white-space:nowrap;font-weight:${e.received_date?'700':'400'};">${e.received_date  ? UI.fmtDateShort(e.received_date)  : '—'}</td>
-              <td style="padding:7px 8px;text-align:right;">
-                <button class="panel-action" onclick="openExpForm(STATE.expenditures.find(x=>x.id==='${e.id}'))" title="Edit">✎</button>
-              </td>
+              <td style="padding:7px 10px;text-align:center;"><span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 7px;">${state}</span></td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.requested_date?'var(--text2)':'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.requested_date?UI.fmtDateShort(e.requested_date):'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.approved_date?'var(--cyan)':'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.approved_date?UI.fmtDateShort(e.approved_date):'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.ordered_date?'var(--amber)':'var(--text3)'};padding:7px 10px;white-space:nowrap;">${e.ordered_date?UI.fmtDateShort(e.ordered_date):'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:${e.received_date?'var(--green)':'var(--text3)'};padding:7px 10px;white-space:nowrap;font-weight:${e.received_date?'700':'400'};">${e.received_date?UI.fmtDateShort(e.received_date):'—'}</td>
+              <td style="padding:7px 8px;text-align:right;"><button class="panel-action" onclick="openExpForm(STATE.expenditures.find(x=>x.id==='${e.id}'))" title="Edit">✎</button></td>
             </tr>`;
           }).join('')}
         </tbody>
       </table>`}
     `;
-  }  // closes } else {
-}  // closes renderExpenditures()
+  }
+}
 
 function renderLabor() {
   const tasks = STATE.tasks;
   const RATE  = 175;
-
-  // Labor by phase
   const phases = [...new Set(tasks.map(t=>t.phase).filter(Boolean))];
   const maxPhaseHrs = Math.max(...phases.map(ph =>
     tasks.filter(t=>t.phase===ph).reduce((s,t)=>s+parseFloat(t.actual_hours||0),0)
@@ -1912,27 +1428,13 @@ function renderLabor() {
         const pctOfMax = UI.pct(actHrs, maxPhaseHrs);
         const overBudget = bgtHrs > 0 && actHrs > bgtHrs;
         const barColor = overBudget ? 'var(--red)' : actHrs > bgtHrs * 0.8 ? 'var(--amber)' : 'var(--purple)';
-        return `<div class="phase-progress-row">
-          <div class="pp-header">
-            <div class="pp-name" style="font-size:12px;">${ph}</div>
-            <div class="pp-stats" style="color:${overBudget?'var(--red)':'var(--text3)'}">
-              ${actHrs.toFixed(1)}h${bgtHrs>0?' / '+bgtHrs.toFixed(1)+'h budget':''}
-              ${overBudget?'<span style="color:var(--red);margin-left:4px;">↑ OVER</span>':''}
-              <span style="margin-left:8px;color:var(--text3);">${UI.fmtCurrency(actHrs*RATE)}</span>
-            </div>
-          </div>
-          ${UI.progressBar(pctOfMax, barColor)}
-        </div>`;
+        return `<div class="phase-progress-row"><div class="pp-header"><div class="pp-name" style="font-size:12px;">${ph}</div><div class="pp-stats" style="color:${overBudget?'var(--red)':'var(--text3)'}">${actHrs.toFixed(1)}h${bgtHrs>0?' / '+bgtHrs.toFixed(1)+'h budget':''}${overBudget?'<span style="color:var(--red);margin-left:4px;">↑ OVER</span>':''}<span style="margin-left:8px;color:var(--text3);">${UI.fmtCurrency(actHrs*RATE)}</span></div></div>${UI.progressBar(pctOfMax, barColor)}</div>`;
       }).join('');
   }
-
-  // Hours by resource
   const resourceEl = document.getElementById('resource-breakdown');
   if (resourceEl) {
     const userHrs = {};
-    STATE.journal.forEach(j => {
-      userHrs[j.user_id] = (userHrs[j.user_id] || 0) + parseFloat(j.hours_spent || 0);
-    });
+    STATE.journal.forEach(j => { userHrs[j.user_id] = (userHrs[j.user_id] || 0) + parseFloat(j.hours_spent || 0); });
     const sorted = Object.entries(userHrs).sort((a,b) => b[1]-a[1]);
     const maxHrs = sorted[0]?.[1] || 1;
     resourceEl.innerHTML = sorted.length === 0 ? UI.allClear('NO DATA') :
@@ -1940,17 +1442,7 @@ function renderLabor() {
         const user = STATE.users.find(u => u.id === uid);
         const pctOfMax = UI.pct(hrs, maxHrs);
         const cost = hrs * RATE;
-        return `<div class="wl-row" style="padding:10px 14px;">
-          ${UI.avatar(user, 28)}
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:var(--font-ui);font-size:13px;color:var(--text1);margin-bottom:5px;">${user?.name||'—'}</div>
-            ${UI.progressBar(pctOfMax, 'var(--purple)')}
-          </div>
-          <div style="text-align:right;min-width:90px;flex-shrink:0;">
-            <div style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div>
-            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div>
-          </div>
-        </div>`;
+        return `<div class="wl-row" style="padding:10px 14px;">${UI.avatar(user, 28)}<div style="flex:1;min-width:0;"><div style="font-family:var(--font-ui);font-size:13px;color:var(--text1);margin-bottom:5px;">${user?.name||'—'}</div>${UI.progressBar(pctOfMax, 'var(--purple)')}</div><div style="text-align:right;min-width:90px;flex-shrink:0;"><div style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div></div></div>`;
       }).join('');
   }
 }
@@ -1962,14 +1454,7 @@ function renderRisks() {
   el.innerHTML = STATE.risks.map(r => {
     const score = r.weighted_score ? parseFloat(r.weighted_score).toFixed(0) : '—';
     const scoreColor = parseFloat(r.weighted_score) > 50000 ? 'var(--red)' : parseFloat(r.weighted_score) > 20000 ? 'var(--amber)' : 'var(--green)';
-    return `<div class="risk-row">
-      <div class="risk-score" style="color:${scoreColor};">${score}</div>
-      <div class="risk-info">
-        <div class="risk-title">${r.title}</div>
-        <div class="risk-meta">${r.category||'—'} · P: ${r.probability||0} · Impact: ${UI.fmtCurrency(r.cost_impact)}</div>
-      </div>
-      ${UI.badge(r.status)}
-    </div>`;
+    return `<div class="risk-row"><div class="risk-score" style="color:${scoreColor};">${score}</div><div class="risk-info"><div class="risk-title">${r.title}</div><div class="risk-meta">${r.category||'—'} · P: ${r.probability||0} · Impact: ${UI.fmtCurrency(r.cost_impact)}</div></div>${UI.badge(r.status)}</div>`;
   }).join('');
 }
 
@@ -1977,15 +1462,7 @@ function renderDocuments() {
   const el = document.getElementById('documents-list');
   document.getElementById('docs-count').textContent = STATE.documents.length;
   if (!STATE.documents.length) { el.innerHTML = UI.allClear('NO DOCUMENTS', 'No documents uploaded'); return; }
-  el.innerHTML = STATE.documents.map(d => `<div class="doc-row">
-    <div class="doc-icon">▣</div>
-    <div class="doc-info">
-      <div class="doc-name">${d.file_name}</div>
-      <div class="doc-meta">${d.description||'—'} · ${UI.fmtDate(d.created_at)} · ${d.file_size_kb ? d.file_size_kb+'KB' : '—'}</div>
-    </div>
-    ${d.client_visible ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--green);border:1px solid rgba(0,229,160,0.3);padding:2px 6px;">CLIENT</span>` : ''}
-    <button class="panel-action">↓ DOWNLOAD</button>
-  </div>`).join('');
+  el.innerHTML = STATE.documents.map(d => `<div class="doc-row"><div class="doc-icon">▣</div><div class="doc-info"><div class="doc-name">${d.file_name}</div><div class="doc-meta">${d.description||'—'} · ${UI.fmtDate(d.created_at)} · ${d.file_size_kb ? d.file_size_kb+'KB' : '—'}</div></div>${d.client_visible ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--green);border:1px solid rgba(0,229,160,0.3);padding:2px 6px;">CLIENT</span>` : ''}<button class="panel-action">↓ DOWNLOAD</button></div>`).join('');
 }
 
 async function renderJournalTab() {
@@ -2009,6 +1486,7 @@ async function renderJournalTab() {
       ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
     </div>`;
   }).join('');
+  // ── Inject reply threads after entries are rendered ────
   await loadRepliesForProject(PROJECT_ID);
   document.querySelectorAll('#journal-list .journal-entry').forEach(el => {
     injectReplyThread(el, el.dataset.journalId, el.dataset.taskId, PROJECT_ID);
@@ -2030,12 +1508,8 @@ async function loadProjectDetail() {
       API.get(`task_journal?select=*&project_id=eq.${PROJECT_ID}&order=entry_date.desc`),
       API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`),
     ]);
-
     if (!project) { window.location.href = '/projects.html'; return; }
-
     STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures };
-
-    // Always render header and overview tab content
     renderHeader();
     renderOverviewMilestones();
     renderOverviewTasks();
@@ -2043,21 +1517,13 @@ async function loadProjectDetail() {
     renderOverviewEVM();
     renderRecentJournal();
     renderDescription();
-
-    // Mark overview sub-panels as rendered
-    // Other tabs render lazily on first click via switchTab()
-    // Pre-render tasks table since it's the most visited tab
     renderTasksTable();
     renderedTabs.add('overview');
     renderedTabs.add('tasks');
-
-    // If page loaded with a non-overview tab active (e.g. direct link),
-    // trigger its render now
     if (STATE.activeTab !== 'overview') {
       renderedTabs.delete(STATE.activeTab);
       switchTab(STATE.activeTab);
     }
-
   } catch(err) {
     console.error('Project detail load error:', err);
   }
@@ -2065,6 +1531,5 @@ async function loadProjectDetail() {
 
 loadProjectDetail();
 </script>
-<script src="/js/journal-replies.js"></script>
 </body>
 </html>
