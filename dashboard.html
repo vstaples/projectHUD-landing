@@ -4,1386 +4,265 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProjectHUD — Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/hud.css">
 <style>
-/* ── RESET & TOKENS ─────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg0:       #060a10;
-  --bg1:       #080d18;
-  --bg2:       #0c1628;
-  --bg3:       #0a1525;
-  --bg4:       #0e1e30;
-  --cyan:      #00d2ff;
-  --cyan-dim:  rgba(0,210,255,0.08);
-  --cyan-glow: rgba(0,210,255,0.15);
-  --green:     #00e5a0;
-  --amber:     #ffaa00;
-  --red:       #ff4757;
-  --purple:    #9b59b6;
-  --border:    rgba(100,160,220,0.12);
-  --border-act:rgba(0,210,255,0.25);
-  --text0:     #e8f4ff;
-  --text1:     #c8dff0;
-  --text2:     #7a9bbf;
-  --text3:     #3a5a7a;
-  --font-hud:  'Rajdhani', sans-serif;
-  --font-ui:   'Barlow Condensed', sans-serif;
-  --font-mono: 'Share Tech Mono', monospace;
-  --font-data: 'JetBrains Mono', monospace;
-  --sidebar-w: 220px;
-  --ticker-h:  32px;
-}
-
-html, body { height: 100%; overflow: hidden; }
-body {
-  background: var(--bg0);
-  color: var(--text1);
-  font-family: var(--font-ui);
-  font-size: 14px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── SCROLLBAR ──────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: var(--bg1); }
-::-webkit-scrollbar-thumb { background: rgba(0,210,255,0.2); border-radius: 2px; }
-
-/* ── GRID BACKGROUND ────────────────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(0,210,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,210,255,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-/* ── TICKER ─────────────────────────────────────────────────── */
-#ticker {
-  height: var(--ticker-h);
-  background: rgba(0,210,255,0.04);
-  border-bottom: 1px solid rgba(0,210,255,0.1);
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 10;
-}
-#ticker-live {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 14px;
-  border-right: 1px solid rgba(0,210,255,0.15);
-  height: 100%;
-  flex-shrink: 0;
-}
-#ticker-live .dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 6px var(--green);
-  animation: pulse 2s infinite;
-}
-#ticker-live span {
-  font-family: var(--font-mono); font-size: 10px;
-  color: var(--green); letter-spacing: 0.15em;
-}
-#ticker-scroll-wrap { flex: 1; overflow: hidden; position: relative; }
-#ticker-scroll {
-  display: flex; align-items: center;
-  white-space: nowrap;
-  will-change: transform;
-}
-.ticker-item {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 0 18px;
-  font-family: var(--font-mono); font-size: 10px;
-  color: var(--text2);
-}
-.ticker-item .t-sep { color: var(--text3); margin: 0 4px; }
-.ticker-item .t-user { color: var(--text0); font-weight: 600; }
-.ticker-item .t-action { color: var(--cyan); }
-.ticker-item .t-time { color: var(--text3); font-size: 9px; }
-/* fade edges */
-#ticker::after {
-  content: '';
-  position: absolute; right: 0; top: 0; bottom: 0; width: 60px;
-  background: linear-gradient(to right, transparent, var(--bg0));
-  pointer-events: none;
-}
-
-/* ── APP SHELL ──────────────────────────────────────────────── */
-#app {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  position: relative; z-index: 1;
-}
-
-/* ── SIDEBAR ────────────────────────────────────────────────── */
-#sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  background: var(--bg1);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* Logo */
-.sidebar-logo {
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 10px;
-  flex-shrink: 0;
-}
-.logo-mark {
-  width: 28px; height: 28px; flex-shrink: 0;
-  position: relative;
-}
-.logo-mark svg { width: 100%; height: 100%; }
-.logo-text { min-width: 0; }
-.logo-text .wordmark {
-  font-family: var(--font-hud);
-  font-size: 18px; font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text0);
-  line-height: 1;
-}
-.logo-text .wordmark span { color: var(--cyan); }
-.logo-text .firm {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text3);
-  letter-spacing: 0.18em;
-  margin-top: 3px;
-}
-
-/* Nav */
-#sidebar-nav {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 10px;
-}
-.nav-section-label {
-  font-family: var(--font-mono);
-  font-size: 8.5px;
-  color: var(--text3);
-  letter-spacing: 0.2em;
-  padding: 10px 8px 4px;
-  text-transform: uppercase;
-}
-.nav-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 10px;
-  border-left: 2px solid transparent;
-  border-radius: 0 2px 2px 0;
-  cursor: pointer;
-  font-family: var(--font-ui);
-  font-size: 13px; font-weight: 500;
-  color: var(--text2);
-  letter-spacing: 0.04em;
-  transition: all 0.12s;
-  margin-bottom: 1px;
-  text-decoration: none;
-}
-.nav-item:hover { color: var(--text0); background: rgba(0,210,255,0.04); }
-.nav-item.active {
-  border-left-color: var(--cyan);
-  background: var(--cyan-dim);
-  color: var(--cyan);
-}
-.nav-item .nav-icon {
-  font-size: 13px; width: 16px; text-align: center; flex-shrink: 0;
-}
-.nav-badge {
-  margin-left: auto;
-  background: rgba(255,71,87,0.15);
-  border: 1px solid rgba(255,71,87,0.3);
-  color: var(--red);
-  font-family: var(--font-mono);
-  font-size: 9px; font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 2px;
-  min-width: 18px; text-align: center;
-}
-.nav-badge.amber {
-  background: rgba(255,170,0,0.12);
-  border-color: rgba(255,170,0,0.3);
-  color: var(--amber);
-}
-
-/* Operator block */
-#operator {
-  border-top: 1px solid var(--border);
-  padding: 12px 14px;
-  flex-shrink: 0;
-}
-.op-label {
-  font-family: var(--font-mono);
-  font-size: 8.5px; color: var(--text3);
-  letter-spacing: 0.2em; margin-bottom: 8px;
-}
-.op-user {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 10px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  margin-bottom: 8px;
-}
-.op-avatar {
-  width: 32px; height: 32px; flex-shrink: 0;
-  background: #1a3a5a;
-  border: 1px solid rgba(0,210,255,0.3);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-hud);
-  font-size: 13px; font-weight: 700;
-  color: var(--cyan);
-}
-.op-name {
-  font-family: var(--font-ui);
-  font-size: 13px; font-weight: 600;
-  color: var(--text0); line-height: 1.2;
-}
-.op-role {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--amber);
-  letter-spacing: 0.12em; margin-top: 1px;
-}
-.op-tools {
-  display: flex; gap: 6px; margin-bottom: 8px;
-}
-.op-btn {
-  flex: 1; padding: 6px 0;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text3);
-  cursor: pointer;
-  font-size: 13px;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.12s;
-}
-.op-btn:hover { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
-.op-version {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 8px;
-}
-.op-version span {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text3);
-  letter-spacing: 0.08em;
-}
-.op-version a {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text3);
-  letter-spacing: 0.06em;
-  text-decoration: none;
-  transition: color 0.12s;
-}
-.op-version a:hover { color: var(--cyan); }
-.op-bottom {
-  display: flex; align-items: center; gap: 6px;
-}
-.nominal {
-  display: flex; align-items: center; gap: 5px;
-  flex: 1;
-}
-.nominal-dot {
-  width: 5px; height: 5px;
-  background: var(--green);
-  transform: rotate(45deg);
-  flex-shrink: 0;
-}
-.nominal-text {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text2);
-  letter-spacing: 0.1em;
-}
-.op-notif {
-  position: relative;
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text2);
-  cursor: pointer;
-  padding: 3px 7px;
-  font-size: 12px;
-  transition: all 0.12s;
-}
-.op-notif:hover { border-color: var(--cyan); color: var(--cyan); }
-.notif-badge {
-  position: absolute; top: -5px; right: -5px;
-  background: var(--red);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 8px; font-weight: 700;
-  width: 15px; height: 15px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-}
-.op-logout {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text3);
-  cursor: pointer;
-  padding: 3px 8px;
-  font-family: var(--font-mono);
-  font-size: 9px; letter-spacing: 0.1em;
-  transition: all 0.12s;
-}
-.op-logout:hover { border-color: var(--red); color: var(--red); }
-
-/* ── MAIN CONTENT ───────────────────────────────────────────── */
-#main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-}
-
-/* Page header */
-#page-header {
-  padding: 18px 28px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: flex-end; justify-content: space-between;
-  flex-shrink: 0;
-}
-.page-title {
-  font-family: var(--font-hud);
-  font-size: 26px; font-weight: 700;
-  color: var(--text0);
-  letter-spacing: 0.08em;
-  line-height: 1;
-}
-.page-subtitle {
-  font-family: var(--font-mono);
-  font-size: 10px; color: var(--text2);
-  letter-spacing: 0.16em;
-  margin-top: 4px;
-}
-.page-meta {
-  font-family: var(--font-mono);
-  font-size: 10px; color: var(--text3);
-  letter-spacing: 0.1em;
-  text-align: right;
-}
-
-/* Content area */
-#content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 28px 28px;
-}
-
-/* ── KPI CARDS ──────────────────────────────────────────────── */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.kpi-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-top: 2px solid;
-  padding: 14px 16px;
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.kpi-card:hover { background: var(--bg4); }
-.kpi-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(ellipse at top left, var(--kpi-glow, rgba(0,210,255,0.04)) 0%, transparent 60%);
-  pointer-events: none;
-}
-.kpi-card .kpi-icon {
-  position: absolute; top: 10px; right: 14px;
-  font-size: 32px; opacity: 0.07;
-}
-.kpi-value {
-  font-family: var(--font-hud);
-  font-size: 36px; font-weight: 700;
-  line-height: 1;
-  margin-bottom: 6px;
-}
-.kpi-label {
-  font-family: var(--font-ui);
-  font-size: 11px; font-weight: 700;
-  color: var(--text1);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.kpi-sub {
-  font-family: var(--font-mono);
-  font-size: 9.5px; color: var(--text2);
-  letter-spacing: 0.06em;
-}
-.kpi-sub a { color: inherit; text-decoration: none; }
-.kpi-sub a:hover { color: var(--cyan); }
-
-/* ── TWO COLUMN LAYOUT ──────────────────────────────────────── */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 260px;
-  gap: 16px;
-  align-items: start;
-}
-
-/* ── PANEL ──────────────────────────────────────────────────── */
-.panel {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  margin-bottom: 14px;
-}
-.panel-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.panel-title {
-  font-family: var(--font-mono);
-  font-size: 10px; font-weight: 600;
-  color: var(--text2);
-  letter-spacing: 0.18em;
-  display: flex; align-items: center; gap: 8px;
-}
-.panel-title::before {
-  content: '';
-  display: inline-block;
-  width: 2px; height: 12px;
-  background: var(--cyan);
-  flex-shrink: 0;
-}
-.panel-action {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text3);
-  letter-spacing: 0.1em;
-  background: none; border: none; cursor: pointer;
-  transition: color 0.12s;
-  text-decoration: none;
-}
-.panel-action:hover { color: var(--cyan); }
-.panel-count {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  background: rgba(0,210,255,0.1);
-  color: var(--cyan);
-  padding: 2px 7px;
-  border: 1px solid rgba(0,210,255,0.2);
-}
-
-/* ── PROJECT CARDS ──────────────────────────────────────────── */
-.project-card {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  border-left: 3px solid transparent;
-  cursor: pointer;
-  transition: background 0.12s, border-left-color 0.12s;
-}
+.dashboard-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.project-card { padding: 14px 16px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; cursor: pointer; transition: background 0.12s, border-left-color 0.12s; }
 .project-card:last-child { border-bottom: none; }
 .project-card:hover { background: var(--bg4); border-left-color: var(--cyan); }
 .project-card.at-risk { border-left-color: rgba(255,170,0,0.5); }
 .project-card.blocked { border-left-color: rgba(255,71,87,0.5); }
 .project-card.active  { border-left-color: rgba(0,229,160,0.4); }
-
-.proj-top {
-  display: flex; align-items: flex-start;
-  justify-content: space-between; gap: 12px;
-  margin-bottom: 6px;
-}
-.proj-name {
-  font-family: var(--font-ui);
-  font-size: 15px; font-weight: 600;
-  color: var(--text0); line-height: 1.2;
-}
-.proj-client {
-  font-family: var(--font-mono);
-  font-size: 9.5px; color: var(--text2);
-  letter-spacing: 0.08em; margin-top: 2px;
-}
-.status-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 8px;
-  font-family: var(--font-mono);
-  font-size: 9px; font-weight: 700;
-  letter-spacing: 0.1em;
-  border: 1px solid;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.status-badge.active  { color: var(--green); border-color: rgba(0,229,160,0.35); background: rgba(0,229,160,0.07); }
-.status-badge.at-risk { color: var(--amber); border-color: rgba(255,170,0,0.35); background: rgba(255,170,0,0.07); }
-.status-badge.blocked { color: var(--red);   border-color: rgba(255,71,87,0.35);  background: rgba(255,71,87,0.07); }
-.status-badge.planning{ color: var(--text2); border-color: var(--border);         background: transparent; }
-.status-badge .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-
-.proj-phase {
-  font-family: var(--font-mono);
-  font-size: 9.5px; color: var(--text2);
-  letter-spacing: 0.08em;
-  margin-bottom: 8px;
-}
-
-.progress-bar-wrap { margin-bottom: 10px; }
-.progress-bar {
-  height: 3px;
-  background: rgba(255,255,255,0.06);
-  position: relative; overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: var(--cyan);
-  transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
-}
-.progress-fill.at-risk { background: var(--amber); }
-.progress-fill.complete { background: var(--green); }
-
-.proj-stats {
-  display: flex; gap: 16px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-.proj-stat { display: flex; flex-direction: column; gap: 2px; }
+.proj-name   { font-family: var(--font-ui); font-size: 15px; font-weight: 600; color: var(--text0); line-height: 1.2; }
+.proj-client { font-family: var(--font-mono); font-size: 9.5px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
+.proj-stats  { display: flex; gap: 16px; font-family: var(--font-mono); font-size: 10px; margin-top: 10px; }
+.proj-stat   { display: flex; flex-direction: column; gap: 2px; }
 .proj-stat .stat-label { color: var(--text3); font-size: 8.5px; letter-spacing: 0.1em; }
 .proj-stat .stat-value { color: var(--text1); font-weight: 600; }
-.proj-stat .stat-value.green  { color: var(--green); }
-.proj-stat .stat-value.amber  { color: var(--amber); }
-.proj-stat .stat-value.red    { color: var(--red);   }
-.proj-stat .stat-value.cyan   { color: var(--cyan);  }
-
-/* ── TASKS PANEL ────────────────────────────────────────────── */
-.task-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background 0.1s;
-}
+.task-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--bg4); }
-.task-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 .task-info { flex: 1; min-width: 0; }
-.task-name {
-  font-family: var(--font-ui);
-  font-size: 13px; font-weight: 500;
-  color: var(--text0);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.task-meta {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text2);
-  letter-spacing: 0.06em; margin-top: 2px;
-}
-.task-badge {
-  font-family: var(--font-mono);
-  font-size: 8.5px; font-weight: 700;
-  padding: 2px 6px;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* ── EVM PANEL ──────────────────────────────────────────────── */
-.evm-gauge-row {
-  display: flex; gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-}
-.evm-gauge {
-  flex: 1;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-}
-.gauge-ring {
-  width: 56px; height: 56px;
-  position: relative;
-}
-.gauge-ring svg { transform: rotate(-90deg); }
-.gauge-ring .gauge-bg { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 4; }
-.gauge-ring .gauge-fill { fill: none; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
-.gauge-center {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-hud);
-  font-size: 13px; font-weight: 700;
-}
-.gauge-label {
-  font-family: var(--font-mono);
-  font-size: 8.5px; color: var(--text3);
-  letter-spacing: 0.12em; text-align: center;
-}
-.evm-values {
-  padding: 10px 14px;
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.evm-val { display: flex; flex-direction: column; gap: 2px; }
+.task-name { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--text0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.06em; margin-top: 2px; }
+.evm-gauge-row { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); justify-content: space-around; }
+.evm-values { padding: 10px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .evm-val .ev-label { font-family: var(--font-mono); font-size: 8.5px; color: var(--text3); letter-spacing: 0.1em; }
-.evm-val .ev-num   { font-family: var(--font-hud);  font-size: 16px; font-weight: 700; color: var(--text0); }
-
-/* ── ALERTS PANEL ───────────────────────────────────────────── */
-.alert-row {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-}
+.evm-val .ev-num   { font-family: var(--font-hud); font-size: 16px; font-weight: 700; color: var(--text0); }
+.alert-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .alert-row:last-child { border-bottom: none; }
-.alert-icon { font-size: 12px; margin-top: 1px; flex-shrink: 0; }
 .alert-info { flex: 1; min-width: 0; }
 .alert-title { font-family: var(--font-ui); font-size: 12.5px; color: var(--text0); }
 .alert-meta  { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 2px; }
 .alert-age   { font-family: var(--font-mono); font-size: 9px; color: var(--red); font-weight: 700; flex-shrink: 0; }
-
-/* ── ACTION ITEMS ───────────────────────────────────────────── */
-.ai-row {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; gap: 10px; align-items: flex-start;
-}
-.ai-row:last-child { border-bottom: none; }
-.ai-priority {
-  font-family: var(--font-mono);
-  font-size: 8px; font-weight: 700; letter-spacing: 0.1em;
-  padding: 2px 5px; border: 1px solid;
-  flex-shrink: 0; margin-top: 1px;
-}
-.ai-priority.crit { color: var(--red);   border-color: rgba(255,71,87,0.4);  background: rgba(255,71,87,0.08); }
-.ai-priority.high { color: var(--amber); border-color: rgba(255,170,0,0.4);  background: rgba(255,170,0,0.08); }
-.ai-priority.med  { color: var(--cyan);  border-color: rgba(0,210,255,0.3);  background: rgba(0,210,255,0.06); }
-.ai-body { flex: 1; min-width: 0; }
-.ai-desc { font-family: var(--font-ui); font-size: 12.5px; color: var(--text0); line-height: 1.4; }
-.ai-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 3px; }
-.ai-due  { font-family: var(--font-mono); font-size: 9px; color: var(--amber); font-weight: 700; flex-shrink: 0; }
-
-/* ── WORKLOAD ───────────────────────────────────────────────── */
-.wl-row {
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 10px;
-}
+.wl-row { padding: 9px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
 .wl-row:last-child { border-bottom: none; }
-.wl-avatar {
-  width: 26px; height: 26px; flex-shrink: 0;
-  background: #1a3a5a;
-  border: 1px solid rgba(0,210,255,0.25);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-hud); font-size: 11px; font-weight: 700;
-  color: var(--cyan);
-}
+.wl-avatar { width: 26px; height: 26px; flex-shrink: 0; background: #1a3a5a; border: 1px solid rgba(0,210,255,0.25); display: flex; align-items: center; justify-content: center; font-family: var(--font-hud); font-size: 11px; font-weight: 700; color: var(--cyan); }
 .wl-name { font-family: var(--font-ui); font-size: 12.5px; color: var(--text1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wl-bar-wrap { width: 70px; }
 .wl-bar { height: 3px; background: rgba(255,255,255,0.06); }
 .wl-fill { height: 100%; transition: width 0.6s ease; }
-.wl-pct { font-family: var(--font-mono); font-size: 9px; color: var(--text2); min-width: 28px; text-align: right; }
-
-/* ── ALL CLEAR STATE ────────────────────────────────────────── */
-.all-clear {
-  padding: 28px 16px;
-  text-align: center;
-}
-.all-clear .ac-icon { font-size: 24px; color: var(--cyan); opacity: 0.3; margin-bottom: 6px; }
-.all-clear .ac-text {
-  font-family: var(--font-mono);
-  font-size: 10px; color: var(--cyan);
-  letter-spacing: 0.2em;
-  margin-bottom: 4px;
-}
-.all-clear .ac-sub {
-  font-family: var(--font-mono);
-  font-size: 9px; color: var(--text3);
-  letter-spacing: 0.08em;
-}
-
-/* ── LOADING STATE ──────────────────────────────────────────── */
-.loading {
-  padding: 24px 16px;
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 10px; color: var(--text3);
-  letter-spacing: 0.14em;
-}
-
-/* ── CORNER BRACKETS ────────────────────────────────────────── */
-.bracketed {
-  position: relative;
-}
-.bracketed::before, .bracketed::after,
-.bracketed > .bracket-bl, .bracketed > .bracket-br {
-  content: '';
-  position: absolute;
-  width: 10px; height: 10px;
-  pointer-events: none;
-}
-.bracketed::before { top: -1px; left: -1px; border-top: 1px solid var(--cyan); border-left: 1px solid var(--cyan); }
-.bracketed::after  { top: -1px; right: -1px; border-top: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
-.bracketed > .bracket-bl { bottom: -1px; left: -1px; border-bottom: 1px solid var(--cyan); border-left: 1px solid var(--cyan); }
-.bracketed > .bracket-br { bottom: -1px; right: -1px; border-bottom: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
-
-/* ── ANIMATIONS ─────────────────────────────────────────────── */
-@keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--green); }
-  50% { opacity: 0.6; box-shadow: 0 0 12px var(--green); }
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.fade-in { animation: fadeInUp 0.3s ease forwards; }
-
-/* ── RESPONSIVE ─────────────────────────────────────────────── */
-@media (max-width: 1200px) {
-  .kpi-row { grid-template-columns: repeat(3, 1fr); }
-  .dashboard-grid { grid-template-columns: 1fr; }
-}
+.wl-pct { font-family: var(--font-mono); font-size: 9px; min-width: 28px; text-align: right; }
+@media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 
-<!-- TICKER -->
 <div id="ticker">
-  <div id="ticker-live">
-    <div class="dot"></div>
-    <span>LIVE</span>
-  </div>
-  <div id="ticker-scroll-wrap">
-    <div id="ticker-scroll">
-      <!-- populated by JS -->
-    </div>
-  </div>
+  <div id="ticker-live"><div class="dot"></div><span>LIVE</span></div>
+  <div id="ticker-scroll-wrap"><div id="ticker-scroll"></div></div>
 </div>
 
-<!-- APP -->
 <div id="app">
+  <nav id="sidebar"></nav>
 
-  <!-- SIDEBAR -->
-  <nav id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 28 28" fill="none">
-          <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="#00d2ff" stroke-width="1.2"/>
-          <polygon points="14,7 21,11 21,19 14,23 7,19 7,11" fill="rgba(0,210,255,0.08)" stroke="#00d2ff" stroke-width="0.7"/>
-          <circle cx="14" cy="15" r="2.5" fill="#00d2ff"/>
-          <line x1="14" y1="7" x2="14" y2="12.5" stroke="#00d2ff" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="logo-text">
-        <div class="wordmark">Project<span>HUD</span></div>
-        <div class="firm" id="firm-name">LOADING...</div>
-      </div>
-    </div>
-
-    <div id="sidebar-nav">
-      <a class="nav-item active" href="dashboard.html">
-        <span class="nav-icon">◈</span> Dashboard
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◧</span> Projects
-        <span class="nav-badge amber" id="nav-projects-count">—</span>
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◉</span> EVM / KPIs
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">▦</span> Project Plan
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">▤</span> Gantt
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◎</span> Meetings
-        <span class="nav-badge" id="nav-meetings-count">—</span>
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">▣</span> Documents
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">⚑</span> Risk Register
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◑</span> Stakeholders
-      </a>
-
-      <div class="nav-section-label">Admin</div>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">▶</span> Action Items
-        <span class="nav-badge" id="nav-actions-count">—</span>
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◌</span> Snapshots
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">▦</span> Audit Log
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◑</span> User Mgmt
-      </a>
-    </div>
-
-    <div id="operator">
-      <div class="op-label">OPERATOR</div>
-      <div class="op-user">
-        <div class="op-avatar" id="op-avatar">VS</div>
-        <div>
-          <div class="op-name" id="op-name">Loading...</div>
-          <div class="op-role" id="op-role">ADMIN</div>
-        </div>
-      </div>
-      <div class="op-tools">
-        <button class="op-btn" title="HUD Intelligence">◈</button>
-        <button class="op-btn" title="Report Issue">⚑</button>
-        <button class="op-btn" title="Chat">◉</button>
-      </div>
-      <div class="op-version">
-        <span>v1.0.0</span>
-        <a href="#">RELEASE NOTES</a>
-      </div>
-      <div class="op-bottom">
-        <div class="nominal">
-          <div class="nominal-dot"></div>
-          <span class="nominal-text">NOMINAL</span>
-        </div>
-        <button class="op-notif" title="Notifications">
-          ◉
-          <span class="notif-badge" id="notif-badge" style="display:none">0</span>
-        </button>
-        <button class="op-logout" id="btn-logout">LOGOUT</button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- MAIN -->
   <div id="main">
     <div id="page-header">
       <div>
         <div class="page-title">DASHBOARD</div>
         <div class="page-subtitle">FIRM-WIDE OPERATIONAL OVERVIEW</div>
       </div>
-      <div class="page-meta" id="page-date">—</div>
+      <div class="page-meta" id="page-date"></div>
     </div>
 
     <div id="content">
-
-      <!-- KPI ROW -->
       <div class="kpi-row">
-        <div class="kpi-card" style="border-top-color:var(--cyan); --kpi-glow:rgba(0,210,255,0.05);">
-          <div class="kpi-icon">◧</div>
-          <div class="kpi-value" id="kpi-active" style="color:var(--cyan)">—</div>
-          <div class="kpi-label">Active Projects</div>
-          <div class="kpi-sub" id="kpi-active-sub">Loading...</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:var(--purple); --kpi-glow:rgba(155,89,182,0.05);">
-          <div class="kpi-icon">▶</div>
-          <div class="kpi-value" id="kpi-actions" style="color:var(--purple)">—</div>
-          <div class="kpi-label">Open Action Items</div>
-          <div class="kpi-sub" id="kpi-actions-sub">Loading...</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:var(--red); --kpi-glow:rgba(255,71,87,0.05);">
-          <div class="kpi-icon">⚑</div>
-          <div class="kpi-value" id="kpi-alerts" style="color:var(--red)">—</div>
-          <div class="kpi-label">At-Risk Tasks</div>
-          <div class="kpi-sub" id="kpi-alerts-sub">Loading...</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:var(--green); --kpi-glow:rgba(0,229,160,0.05);">
-          <div class="kpi-icon">✓</div>
-          <div class="kpi-value" id="kpi-complete" style="color:var(--green)">—</div>
-          <div class="kpi-label">Tasks Complete</div>
-          <div class="kpi-sub" id="kpi-complete-sub">Loading...</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:var(--amber); --kpi-glow:rgba(255,170,0,0.05);">
-          <div class="kpi-icon">◎</div>
-          <div class="kpi-value" id="kpi-risks" style="color:var(--amber)">—</div>
-          <div class="kpi-label">Open Risks</div>
-          <div class="kpi-sub" id="kpi-risks-sub">Loading...</div>
-        </div>
+        <div class="kpi-card" style="border-top-color:var(--cyan);--kpi-glow:rgba(0,210,255,0.05);"><div class="kpi-icon">◧</div><div class="kpi-value" id="kpi-active" style="color:var(--cyan)">—</div><div class="kpi-label">Active Projects</div><div class="kpi-sub" id="kpi-active-sub">Loading...</div></div>
+        <div class="kpi-card" style="border-top-color:var(--purple);--kpi-glow:rgba(155,89,182,0.05);"><div class="kpi-icon">▶</div><div class="kpi-value" id="kpi-actions" style="color:var(--purple)">—</div><div class="kpi-label">Open Action Items</div><div class="kpi-sub" id="kpi-actions-sub">Loading...</div></div>
+        <div class="kpi-card" style="border-top-color:var(--red);--kpi-glow:rgba(255,71,87,0.05);"><div class="kpi-icon">⚑</div><div class="kpi-value" id="kpi-alerts" style="color:var(--red)">—</div><div class="kpi-label">At-Risk Tasks</div><div class="kpi-sub" id="kpi-alerts-sub">Loading...</div></div>
+        <div class="kpi-card" style="border-top-color:var(--green);--kpi-glow:rgba(0,229,160,0.05);"><div class="kpi-icon">✓</div><div class="kpi-value" id="kpi-complete" style="color:var(--green)">—</div><div class="kpi-label">Tasks Complete</div><div class="kpi-sub" id="kpi-complete-sub">Loading...</div></div>
+        <div class="kpi-card" style="border-top-color:var(--amber);--kpi-glow:rgba(255,170,0,0.05);"><div class="kpi-icon">◎</div><div class="kpi-value" id="kpi-risks" style="color:var(--amber)">—</div><div class="kpi-label">Open Risks</div><div class="kpi-sub" id="kpi-risks-sub">Loading...</div></div>
       </div>
 
-      <!-- MAIN GRID -->
       <div class="dashboard-grid">
-
-        <!-- LEFT COLUMN -->
         <div>
-          <!-- Active Projects -->
           <div class="panel bracketed">
             <div class="bracket-bl"></div><div class="bracket-br"></div>
             <div class="panel-header">
               <div class="panel-title">ACTIVE PROJECTS</div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <span class="panel-count" id="proj-count">—</span>
-                <button class="panel-action">VIEW ALL →</button>
-              </div>
+              <div style="display:flex;gap:8px;align-items:center;"><span class="panel-count" id="proj-count">—</span><button class="panel-action">VIEW ALL →</button></div>
             </div>
-            <div id="projects-list"><div class="loading">LOADING PROJECT DATA...</div></div>
+            <div id="projects-list"></div>
           </div>
-
-          <!-- Tasks Up Next -->
           <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">TASKS UP NEXT</div>
-              <button class="panel-action">VIEW ALL →</button>
-            </div>
-            <div id="tasks-list"><div class="loading">LOADING TASKS...</div></div>
+            <div class="panel-header"><div class="panel-title">TASKS UP NEXT</div><button class="panel-action">VIEW ALL →</button></div>
+            <div id="tasks-list"></div>
           </div>
         </div>
-
-        <!-- RIGHT COLUMN -->
         <div>
-          <!-- EVM Summary -->
           <div class="panel bracketed">
             <div class="bracket-bl"></div><div class="bracket-br"></div>
-            <div class="panel-header">
-              <div class="panel-title">EVM SUMMARY</div>
-              <button class="panel-action">DETAILS →</button>
-            </div>
-            <div class="evm-gauge-row" id="evm-gauges">
-              <div class="loading" style="width:100%;padding:20px;">LOADING...</div>
-            </div>
+            <div class="panel-header"><div class="panel-title">EVM SUMMARY</div><button class="panel-action">DETAILS →</button></div>
+            <div class="evm-gauge-row" id="evm-gauges"></div>
             <div class="evm-values" id="evm-values"></div>
           </div>
-
-          <!-- Alerts -->
           <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title" style="--c:var(--red);">ALERTS — OVERDUE</div>
-              <span class="panel-count" id="alerts-count" style="background:rgba(255,71,87,0.1);color:var(--red);border-color:rgba(255,71,87,0.25);">—</span>
-            </div>
-            <div id="alerts-list"><div class="loading">LOADING...</div></div>
+            <div class="panel-header"><div class="panel-title">ALERTS — OVERDUE</div><span class="panel-count" id="alerts-count" style="background:rgba(255,71,87,0.1);color:var(--red);border-color:rgba(255,71,87,0.25);">—</span></div>
+            <div id="alerts-list"></div>
           </div>
-
-          <!-- Action Items -->
           <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">KEY ACTION ITEMS</div>
-              <button class="panel-action">VIEW ALL →</button>
-            </div>
-            <div id="actions-list"><div class="loading">LOADING...</div></div>
+            <div class="panel-header"><div class="panel-title">KEY ACTION ITEMS</div><button class="panel-action">VIEW ALL →</button></div>
+            <div id="actions-list"></div>
           </div>
-
-          <!-- Team Workload -->
           <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">TEAM WORKLOAD</div>
-            </div>
-            <div id="workload-list"><div class="loading">LOADING...</div></div>
+            <div class="panel-header"><div class="panel-title">TEAM WORKLOAD</div></div>
+            <div id="workload-list"></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-      </div><!-- /dashboard-grid -->
-    </div><!-- /content -->
-  </div><!-- /main -->
-</div><!-- /app -->
-
-<script type="module">
-// ── CONFIG ────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
-
-// ── API ───────────────────────────────────────────────────────
-function getToken() {
-  try {
-    // Supabase stores session under sb-{projectref}-auth-token
-    const s = localStorage.getItem('sb-dvbetgdzksatcgdfftbs-auth-token');
-    if (s) { const p = JSON.parse(s); if (p?.access_token) return p.access_token; }
-    // Fallback: legacy key
-    const s2 = localStorage.getItem('phud_session');
-    if (s2) { const p2 = JSON.parse(s2); if (p2?.access_token) return p2.access_token; }
-  } catch(e) {}
-  return SUPABASE_KEY;
-}
-async function query(path) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${getToken()}`,
-      'Content-Type': 'application/json'
-    }
-  });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
-}
-
-// ── HELPERS ───────────────────────────────────────────────────
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
-}
-function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-}
-function daysSince(d) {
-  return Math.floor((Date.now() - new Date(d)) / 86400000);
-}
-function daysUntil(d) {
-  return Math.ceil((new Date(d + 'T12:00:00') - Date.now()) / 86400000);
-}
-function pct(num, den) {
-  if (!den) return 0;
-  return Math.round((num / den) * 100);
-}
-function fmtCPI(val) {
-  if (!val) return '—';
-  return val.toFixed(2);
-}
-
-// ── SET DATE ──────────────────────────────────────────────────
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/ticker.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
 document.getElementById('page-date').textContent =
-  new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase();
+  new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'}).toUpperCase();
 
-// ── TICKER ────────────────────────────────────────────────────
-const TICKER_EVENTS = [
-  { user: 'V. Staples', action: 'updated task status', target: 'Build #1: Materials Readiness', time: '2m ago' },
-  { user: 'A. Smith',   action: 'completed task',      target: 'Isolation Cover: Issue PO for Materials', time: '18m ago' },
-  { user: 'R. White',   action: 'updated task',        target: 'Quote Custom Parts → IN PROGRESS', time: '1h ago' },
-  { user: 'V. Staples', action: 'reviewed milestone',  target: 'Design Review Complete & Approved', time: '2h ago' },
-  { user: 'A. Smith',   action: 'completed task',      target: 'Tungsten Cables: Purchase Materials', time: '3h ago' },
-  { user: 'R. White',   action: 'updated task',        target: 'Leak Seals: Purchase Materials', time: '4h ago' },
-];
+Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
+Sidebar.init('dashboard.html');
 
-function buildTicker() {
-  const scroll = document.getElementById('ticker-scroll');
-  const items = [...TICKER_EVENTS, ...TICKER_EVENTS];
-  scroll.innerHTML = items.map(e =>
-    `<span class="ticker-item">
-      <span class="t-sep">·</span>
-      <span class="t-user">${e.user}</span>
-      <span class="t-action">${e.action}</span>
-      <span>"${e.target}"</span>
-      <span class="t-time">${e.time}</span>
-    </span>`
-  ).join('');
-  let pos = 0;
-  let paused = false;
-  const wrap = document.getElementById('ticker-scroll-wrap');
-  wrap.addEventListener('mouseenter', () => paused = true);
-  wrap.addEventListener('mouseleave', () => paused = false);
-  function animate() {
-    if (!paused) {
-      pos -= 0.5;
-      const half = scroll.scrollWidth / 2;
-      if (Math.abs(pos) >= half) pos = 0;
-      scroll.style.transform = `translateX(${pos}px)`;
-    }
-    requestAnimationFrame(animate);
-  }
-  requestAnimationFrame(animate);
-}
-buildTicker();
-
-// ── LOAD DATA ─────────────────────────────────────────────────
 async function loadDashboard() {
   try {
     const [projects, tasks, users, firms] = await Promise.all([
-      query('projects?select=*&order=created_at.desc'),
-      query('tasks?select=*&order=due_date.asc'),
-      query('users?select=*'),
-      query('firms?select=*'),
+      API.getProjects(), API.getTasks(), API.getUsers(), API.getFirms()
     ]);
 
-    // Firm name
-    const internalFirm = firms.find(f => f.is_internal);
-    if (internalFirm) {
-      document.getElementById('firm-name').textContent = internalFirm.name.toUpperCase();
-    }
+    const activeProjects  = projects.filter(p => p.status === 'active');
+    const completeTasks   = tasks.filter(t => t.status === 'complete');
+    const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
+    const atRiskTasks     = tasks.filter(t =>
+      t.status === 'blocked' || t.status === 'overdue' ||
+      (t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete')
+    );
+    const clientFirms = Object.fromEntries(firms.map(f => [f.id, f.name]));
+    const projMap     = Object.fromEntries(projects.map(p => [p.id, p.name]));
 
-    // Current user (first admin for now)
-    const admin = users.find(u => u.is_admin);
-    if (admin) {
-      document.getElementById('op-avatar').textContent = initials(admin.name);
-      document.getElementById('op-name').textContent = admin.name;
-      document.getElementById('op-role').textContent = 'ADMIN';
-    }
-
-    // Active projects
-    const activeProjects = projects.filter(p => p.status === 'active');
-    document.getElementById('nav-projects-count').textContent = activeProjects.length;
-    document.getElementById('proj-count').textContent = activeProjects.length;
-
-    // Task stats
-    const allTasks = tasks;
-    const completeTasks = allTasks.filter(t => t.status === 'complete');
-    const atRiskTasks   = allTasks.filter(t => t.status === 'blocked' || t.status === 'overdue' ||
-      (t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete'));
-    const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
-
-    // ── KPI CARDS ──────────────────────────────────────────────
-    document.getElementById('kpi-active').textContent  = activeProjects.length;
+    // KPI cards
+    document.getElementById('kpi-active').textContent    = activeProjects.length;
     document.getElementById('kpi-active-sub').textContent = `${projects.length} total projects`;
-
-    document.getElementById('kpi-actions').textContent = 0;
+    document.getElementById('kpi-actions').textContent   = 0;
     document.getElementById('kpi-actions-sub').textContent = '0 overdue · view →';
-
-    document.getElementById('kpi-alerts').textContent  = atRiskTasks.length;
-    document.getElementById('kpi-alerts-sub').innerHTML =
-      `<span style="color:var(--red)">${allTasks.filter(t=>t.status==='blocked').length} blocked</span> · ${allTasks.filter(t=>t.status==='overdue').length} overdue`;
-
-    document.getElementById('kpi-complete').textContent = completeTasks.length;
-    document.getElementById('kpi-complete-sub').textContent = `of ${allTasks.length} total tasks`;
-
-    document.getElementById('kpi-risks').textContent = 0;
+    document.getElementById('kpi-alerts').textContent    = atRiskTasks.length;
+    document.getElementById('kpi-alerts-sub').innerHTML  =
+      `<span style="color:var(--red)">${tasks.filter(t=>t.status==='blocked').length} blocked</span> · ${tasks.filter(t=>t.status==='overdue').length} overdue`;
+    document.getElementById('kpi-complete').textContent  = completeTasks.length;
+    document.getElementById('kpi-complete-sub').textContent = `of ${tasks.length} total tasks`;
+    document.getElementById('kpi-risks').textContent     = 0;
     document.getElementById('kpi-risks-sub').textContent = 'no critical risks';
 
-    // ── PROJECTS LIST ──────────────────────────────────────────
+    // Active projects
+    document.getElementById('proj-count').textContent = activeProjects.length;
     const projList = document.getElementById('projects-list');
     if (activeProjects.length === 0) {
-      projList.innerHTML = `<div class="all-clear">
-        <div class="ac-icon">◈</div>
-        <div class="ac-text">◆ NO ACTIVE PROJECTS</div>
-        <div class="ac-sub">Create a project to begin tracking</div>
-      </div>`;
+      projList.innerHTML = UI.allClear('NO ACTIVE PROJECTS','Create a project to begin tracking');
     } else {
-      const clientFirms = Object.fromEntries(firms.map(f => [f.id, f.name]));
       projList.innerHTML = activeProjects.map(proj => {
-        const projTasks = allTasks.filter(t => t.project_id === proj.id);
-        const done = projTasks.filter(t => t.status === 'complete').length;
-        const total = projTasks.length;
-        const pctDone = pct(done, total);
-        const blocked = projTasks.filter(t => t.status === 'blocked').length;
-        const overdue = projTasks.filter(t =>
-          t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete'
-        ).length;
-
-        const health = blocked > 0 ? 'blocked' : overdue > 0 ? 'at-risk' : 'active';
-        const healthLabel = blocked > 0 ? 'BLOCKED' : overdue > 0 ? 'AT RISK' : 'ACTIVE';
-        const fillClass = pctDone === 100 ? 'complete' : overdue > 0 ? 'at-risk' : '';
-        const clientName = proj.client_id ? clientFirms[proj.client_id] || '—' : 'Internal';
-
-        // Mock EVM values (will be real once time_entries seeded)
-        const cpi = 0.97 + Math.random() * 0.1;
-        const spi = 0.93 + Math.random() * 0.12;
-        const cpiClass = cpi >= 1.0 ? 'green' : cpi >= 0.9 ? 'amber' : 'red';
-        const spiClass = spi >= 1.0 ? 'green' : spi >= 0.9 ? 'amber' : 'red';
-
-        const daysLeft = proj.target_date ? daysUntil(proj.target_date) : null;
-
+        const pt      = tasks.filter(t => t.project_id === proj.id);
+        const done    = pt.filter(t => t.status === 'complete').length;
+        const overdue = pt.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete').length;
+        const blocked = pt.filter(t => t.status === 'blocked').length;
+        const pctDone = UI.pct(done, pt.length);
+        const health  = blocked > 0 ? 'blocked' : overdue > 0 ? 'at-risk' : 'active';
+        const hLabel  = blocked > 0 ? 'BLOCKED' : overdue > 0 ? 'AT RISK' : 'ACTIVE';
+        const client  = proj.client_id ? clientFirms[proj.client_id] || '—' : 'Internal';
+        const dLeft   = proj.target_date ? UI.daysUntil(proj.target_date) : null;
+        const fill    = pctDone === 100 ? 'var(--green)' : overdue > 0 ? 'var(--amber)' : 'var(--cyan)';
+        const cpi     = parseFloat((0.90 + Math.random()*0.18).toFixed(2));
+        const spi     = parseFloat((0.87 + Math.random()*0.18).toFixed(2));
         return `<div class="project-card ${health} fade-in">
-          <div class="proj-top">
-            <div>
-              <div class="proj-name">${proj.name}</div>
-              <div class="proj-client">${clientName}${proj.phase ? ' · ' + proj.phase : ''}</div>
-            </div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
+            <div><div class="proj-name">${proj.name}</div><div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div></div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-              <span class="status-badge ${health}">
-                <span class="badge-dot"></span>
-                ${healthLabel}
-              </span>
-              ${daysLeft !== null ? `<span style="font-family:var(--font-mono);font-size:9px;color:${daysLeft < 30 ? 'var(--amber)' : 'var(--text3)'};">${daysLeft}d REMAINING</span>` : ''}
+              ${UI.badge(health,hLabel)}
+              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:9px;color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
             </div>
           </div>
-          <div class="progress-bar-wrap">
-            <div class="progress-bar">
-              <div class="progress-fill ${fillClass}" style="width:${pctDone}%"></div>
-            </div>
-          </div>
+          ${UI.progressBar(pctDone,fill)}
           <div class="proj-stats">
-            <div class="proj-stat">
-              <span class="stat-label">% COMPLETE</span>
-              <span class="stat-value ${pctDone > 50 ? 'cyan' : ''}">${pctDone}%</span>
-            </div>
-            <div class="proj-stat">
-              <span class="stat-label">CPI</span>
-              <span class="stat-value ${cpiClass}">${cpi.toFixed(2)}</span>
-            </div>
-            <div class="proj-stat">
-              <span class="stat-label">SPI</span>
-              <span class="stat-value ${spiClass}">${spi.toFixed(2)}</span>
-            </div>
-            <div class="proj-stat">
-              <span class="stat-label">TASKS</span>
-              <span class="stat-value">${done}/${total}</span>
-            </div>
-            ${overdue > 0 ? `<div class="proj-stat">
-              <span class="stat-label">OVERDUE</span>
-              <span class="stat-value red">${overdue}</span>
-            </div>` : ''}
-            ${blocked > 0 ? `<div class="proj-stat">
-              <span class="stat-label">BLOCKED</span>
-              <span class="stat-value red">${blocked}</span>
-            </div>` : ''}
+            <div class="proj-stat"><span class="stat-label">% COMPLETE</span><span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
+            <div class="proj-stat"><span class="stat-label">CPI</span><span class="stat-value" style="color:${UI.indexColor(cpi)}">${cpi}</span></div>
+            <div class="proj-stat"><span class="stat-label">SPI</span><span class="stat-value" style="color:${UI.indexColor(spi)}">${spi}</span></div>
+            <div class="proj-stat"><span class="stat-label">TASKS</span><span class="stat-value">${done}/${pt.length}</span></div>
+            ${overdue>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span><span class="stat-value" style="color:var(--red)">${overdue}</span></div>`:''}
           </div>
         </div>`;
       }).join('');
     }
 
-    // ── TASKS UP NEXT ──────────────────────────────────────────
-    const upNext = allTasks
-      .filter(t => t.status !== 'complete' && t.due_date)
-      .sort((a,b) => new Date(a.due_date) - new Date(b.due_date))
-      .slice(0, 6);
-
-    const STATUS_META = {
-      in_progress: { color: 'var(--cyan)',  label: 'IN PROGRESS' },
-      ready:       { color: 'var(--green)', label: 'READY' },
-      not_started: { color: 'var(--text3)', label: 'NOT STARTED' },
-      blocked:     { color: 'var(--red)',   label: 'BLOCKED' },
-      overdue:     { color: 'var(--amber)', label: 'OVERDUE' },
-    };
-
-    const tasksList = document.getElementById('tasks-list');
-    if (upNext.length === 0) {
-      tasksList.innerHTML = `<div class="all-clear">
-        <div class="ac-icon">◈</div>
-        <div class="ac-text">◆ ALL CLEAR</div>
-        <div class="ac-sub">No upcoming tasks</div>
-      </div>`;
-    } else {
-      const projMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
-      tasksList.innerHTML = upNext.map(t => {
-        const due = daysUntil(t.due_date);
-        const isOverdue = due < 0;
-        const sm = STATUS_META[t.status] || STATUS_META.not_started;
-        const dueColor = isOverdue ? 'var(--red)' : due <= 3 ? 'var(--amber)' : 'var(--text2)';
-        const assignee = users.find(u => u.id === t.assigned_to);
+    // Tasks up next
+    const upNext = tasks.filter(t=>t.status!=='complete'&&t.due_date)
+      .sort((a,b)=>new Date(a.due_date)-new Date(b.due_date)).slice(0,6);
+    const tList = document.getElementById('tasks-list');
+    tList.innerHTML = upNext.length === 0 ? UI.allClear('ALL CLEAR','No upcoming tasks') :
+      upNext.map(t => {
+        const due = UI.dueDateLabel(t.due_date);
+        const asgn = users.find(u=>u.id===t.assigned_to);
         return `<div class="task-row">
-          <div class="task-dot" style="background:${sm.color}"></div>
+          ${UI.taskDot(t.status)}
           <div class="task-info">
             <div class="task-name">${t.name}</div>
-            <div class="task-meta">${projMap[t.project_id] || '—'}${t.phase ? ' · ' + t.phase : ''}${assignee ? ' · ' + assignee.name : ''}</div>
+            <div class="task-meta">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}${asgn?' · '+asgn.name:''}</div>
           </div>
-          <span class="task-badge" style="color:${sm.color};background:${sm.color}18;border:1px solid ${sm.color}33">${sm.label}</span>
-          <span style="font-family:var(--font-mono);font-size:10px;color:${dueColor};min-width:54px;text-align:right;flex-shrink:0;">
-            ${isOverdue ? Math.abs(due)+'d LATE' : due === 0 ? 'TODAY' : fmtDate(t.due_date)}
-          </span>
+          ${UI.badge(t.status)}
+          <span style="font-family:var(--font-mono);font-size:10px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
         </div>`;
       }).join('');
-    }
 
-    // ── EVM GAUGES ─────────────────────────────────────────────
-    // Computed from real task pct_complete data
-    const totalTasks = allTasks.length;
-    const completedPct = pct(completeTasks.length, totalTasks);
-    const budgetPct = 42; // placeholder until time_entries seeded
-    const laborPct  = 38;
-    const cpiVal = 0.97;
-    const spiVal = 0.94;
-
-    function gaugeHTML(value, max, color, label, displayVal) {
-      const r = 22;
-      const circ = 2 * Math.PI * r;
-      const ratio = Math.min(value / max, 1);
-      const offset = circ * (1 - ratio);
-      return `<div class="evm-gauge">
-        <div class="gauge-ring">
-          <svg viewBox="0 0 56 56" width="56" height="56">
-            <circle class="gauge-bg" cx="28" cy="28" r="${r}"/>
-            <circle class="gauge-fill"
-              cx="28" cy="28" r="${r}"
-              stroke="${color}"
-              stroke-dasharray="${circ}"
-              stroke-dashoffset="${offset}"/>
-          </svg>
-          <div class="gauge-center" style="color:${color}">${displayVal}</div>
-        </div>
-        <div class="gauge-label">${label}</div>
-      </div>`;
-    }
-
+    // EVM gauges
+    const p = UI.pct(completeTasks.length, tasks.length);
+    const cpiV = 0.97, spiV = 0.94;
     document.getElementById('evm-gauges').innerHTML =
-      gaugeHTML(completedPct, 100, 'var(--cyan)',  'WORK %',   completedPct+'%') +
-      gaugeHTML(cpiVal, 2,       cpiVal >= 1 ? 'var(--green)' : 'var(--amber)', 'CPI', cpiVal.toFixed(2)) +
-      gaugeHTML(spiVal, 2,       spiVal >= 1 ? 'var(--green)' : 'var(--amber)', 'SPI', spiVal.toFixed(2));
-
+      UI.gauge(p,    100, 'var(--cyan)',           'WORK %', p+'%') +
+      UI.gauge(cpiV, 2,   UI.indexColor(cpiV),     'CPI',    cpiV.toFixed(2)) +
+      UI.gauge(spiV, 2,   UI.indexColor(spiV),     'SPI',    spiV.toFixed(2));
     document.getElementById('evm-values').innerHTML = `
-      <div class="evm-val"><span class="ev-label">TOTAL TASKS</span><span class="ev-num" style="color:var(--cyan)">${totalTasks}</span></div>
+      <div class="evm-val"><span class="ev-label">TOTAL TASKS</span><span class="ev-num" style="color:var(--cyan)">${tasks.length}</span></div>
       <div class="evm-val"><span class="ev-label">COMPLETE</span><span class="ev-num" style="color:var(--green)">${completeTasks.length}</span></div>
       <div class="evm-val"><span class="ev-label">IN PROGRESS</span><span class="ev-num" style="color:var(--cyan)">${inProgressTasks.length}</span></div>
-      <div class="evm-val"><span class="ev-label">AT RISK</span><span class="ev-num" style="color:var(--red)">${atRiskTasks.length}</span></div>
-    `;
+      <div class="evm-val"><span class="ev-label">AT RISK</span><span class="ev-num" style="color:var(--red)">${atRiskTasks.length}</span></div>`;
 
-    // ── ALERTS ─────────────────────────────────────────────────
-    const overdueTasks = allTasks.filter(t =>
-      t.status !== 'complete' && t.due_date &&
-      new Date(t.due_date) < new Date()
-    ).slice(0, 4);
+    // Alerts
+    const overdue = tasks.filter(t=>t.status!=='complete'&&t.due_date&&new Date(t.due_date)<new Date()).slice(0,4);
+    document.getElementById('alerts-count').textContent = overdue.length;
+    document.getElementById('alerts-list').innerHTML = overdue.length === 0
+      ? UI.allClear('ALL CLEAR','No overdue tasks')
+      : overdue.map(t=>`<div class="alert-row">
+          <span style="color:var(--red);margin-top:1px;flex-shrink:0;">⚑</span>
+          <div class="alert-info"><div class="alert-title">${t.name}</div><div class="alert-meta">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}</div></div>
+          <span class="alert-age">${Math.abs(UI.daysUntil(t.due_date))}d</span>
+        </div>`).join('');
 
-    document.getElementById('alerts-count').textContent = overdueTasks.length;
-    const alertsList = document.getElementById('alerts-list');
-    if (overdueTasks.length === 0) {
-      alertsList.innerHTML = `<div class="all-clear">
-        <div class="ac-icon">◈</div>
-        <div class="ac-text">◆ ALL CLEAR</div>
-        <div class="ac-sub">No overdue tasks</div>
-      </div>`;
-    } else {
-      const projMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
-      alertsList.innerHTML = overdueTasks.map(t => {
-        const days = Math.abs(daysUntil(t.due_date));
-        return `<div class="alert-row">
-          <span class="alert-icon" style="color:var(--red)">⚑</span>
-          <div class="alert-info">
-            <div class="alert-title">${t.name}</div>
-            <div class="alert-meta">${projMap[t.project_id] || '—'}${t.phase ? ' · ' + t.phase : ''}</div>
-          </div>
-          <span class="alert-age">${days}d</span>
-        </div>`;
-      }).join('');
-    }
+    // Action items
+    document.getElementById('actions-list').innerHTML = UI.allClear('ALL CLEAR','No open action items');
 
-    // ── ACTION ITEMS ────────────────────────────────────────────
-    document.getElementById('actions-list').innerHTML = `
-      <div class="all-clear">
-        <div class="ac-icon">◈</div>
-        <div class="ac-text">◆ ALL CLEAR</div>
-        <div class="ac-sub">No open action items</div>
-      </div>`;
-    document.getElementById('kpi-actions').textContent = 0;
+    // Team workload
+    const wl = users.filter(u=>!u.project_id).map(u=>({
+      user:u, count:tasks.filter(t=>t.assigned_to===u.id&&t.status!=='complete').length
+    })).filter(w=>w.count>0).sort((a,b)=>b.count-a.count);
+    const maxL = Math.max(...wl.map(w=>w.count),1);
+    document.getElementById('workload-list').innerHTML = wl.length === 0
+      ? UI.allClear('ALL CLEAR')
+      : wl.map(w=>{
+          const p = UI.pct(w.count, maxL*1.2);
+          const c = p>80?'var(--red)':p>55?'var(--amber)':'var(--cyan)';
+          return `<div class="wl-row">
+            <div class="wl-avatar">${UI.initials(w.user.name)}</div>
+            <div class="wl-name">${w.user.name}</div>
+            <div class="wl-bar-wrap"><div class="wl-bar"><div class="wl-fill" style="width:${p}%;background:${c}"></div></div></div>
+            <div class="wl-pct" style="color:${c}">${w.count}</div>
+          </div>`;
+        }).join('');
 
-    // ── TEAM WORKLOAD ───────────────────────────────────────────
-    const internalUsers = users.filter(u => !u.project_id);
-    const workloadData = internalUsers.map(u => ({
-      user: u,
-      assigned: allTasks.filter(t => t.assigned_to === u.id && t.status !== 'complete').length
-    })).filter(w => w.assigned > 0)
-      .sort((a,b) => b.assigned - a.assigned);
-
-    const maxLoad = Math.max(...workloadData.map(w => w.assigned), 1);
-    const wlList = document.getElementById('workload-list');
-    if (workloadData.length === 0) {
-      wlList.innerHTML = `<div class="all-clear"><div class="ac-text">◆ ALL CLEAR</div></div>`;
-    } else {
-      wlList.innerHTML = workloadData.map(w => {
-        const pctLoad = pct(w.assigned, maxLoad * 1.2);
-        const fillColor = pctLoad > 80 ? 'var(--red)' : pctLoad > 55 ? 'var(--amber)' : 'var(--cyan)';
-        return `<div class="wl-row">
-          <div class="wl-avatar">${initials(w.user.name)}</div>
-          <div class="wl-name">${w.user.name}</div>
-          <div class="wl-bar-wrap">
-            <div class="wl-bar">
-              <div class="wl-fill" style="width:${pctLoad}%;background:${fillColor}"></div>
-            </div>
-          </div>
-          <div class="wl-pct" style="color:${fillColor}">${w.assigned}</div>
-        </div>`;
-      }).join('');
-    }
-
-    // ── NAV BADGES ─────────────────────────────────────────────
-    document.getElementById('nav-actions-count').textContent = 0;
-    document.getElementById('nav-meetings-count').textContent = 0;
-
-  } catch(err) {
-    console.error('Dashboard load error:', err);
-  }
+  } catch(err) { console.error('Dashboard load error:', err); }
 }
 
 loadDashboard();
-
-// ── LOGOUT ────────────────────────────────────────────────────
-document.getElementById('btn-logout').addEventListener('click', () => {
-  localStorage.removeItem('sb-dvbetgdzksatcgdfftbs-auth-token');
-  localStorage.removeItem('phud_session');
-  window.location.href = 'login.html';
-});
 </script>
 </body>
 </html>
