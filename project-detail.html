@@ -23,13 +23,13 @@
 .proj-title-block { min-width: 0; }
 .proj-title {
   font-family: var(--font-hud);
-  font-size: 22px; font-weight: 700;
+  font-size:22.0px; font-weight: 700;
   color: var(--text0); letter-spacing: 0.06em;
   line-height: 1.2; margin-bottom: 4px;
 }
 .proj-client-tag {
   font-family: var(--font-mono);
-  font-size: 10px; color: var(--text2);
+  font-size:11px; color: var(--text2);
   letter-spacing: 0.14em;
 }
 .proj-header-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: flex-start; }
@@ -42,9 +42,9 @@
   flex-wrap: wrap;
 }
 .health-chip { display: flex; flex-direction: column; gap: 2px; }
-.health-chip .hc-label { font-family: var(--font-mono); font-size: 10px; color: var(--text2); letter-spacing: 0.1em; }
-.health-chip .hc-val   { font-family: var(--font-hud); font-size: 18px; font-weight: 700; line-height: 1; }
-.health-chip .hc-sub   { font-family: var(--font-mono); font-size: 10px; color: var(--text2); letter-spacing: 0.08em; }
+.health-chip .hc-label { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.1em; }
+.health-chip .hc-val   { font-family: var(--font-hud); font-size:18.0px; font-weight: 700; line-height: 1; }
+.health-chip .hc-sub   { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; }
 .health-sep { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
 
 /* Tab bar */
@@ -54,7 +54,7 @@
   margin-top: 2px;
 }
 .proj-tab {
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  font-family: var(--font-mono); font-size:11px; letter-spacing: 0.14em;
   padding: 10px 16px; background: none; border: none;
   border-bottom: 2px solid transparent;
   color: var(--text3); cursor: pointer;
@@ -65,7 +65,7 @@
 .proj-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
 .proj-tab .tab-badge {
   background: rgba(255,71,87,0.15); border: 1px solid rgba(255,71,87,0.3);
-  color: var(--red); font-size: 8px; font-weight: 700;
+  color: var(--red); font-size:11px; font-weight: 700;
   padding: 1px 5px; border-radius: 2px; min-width: 16px; text-align: center;
 }
 
@@ -85,30 +85,30 @@
   transform: rotate(45deg); border: 1.5px solid;
 }
 .ms-info { flex: 1; min-width: 0; }
-.ms-name  { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--text0); }
-.ms-phase { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
-.ms-date  { font-family: var(--font-mono); font-size: 10px; color: var(--text2); flex-shrink: 0; text-align: right; }
-.ms-slip  { font-family: var(--font-mono); font-size: 9px; color: var(--amber); flex-shrink: 0; }
+.ms-name  { font-family: var(--font-ui); font-size:13.0px; font-weight: 500; color: var(--text0); }
+.ms-phase { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
+.ms-date  { font-family: var(--font-mono); font-size:11px; color: var(--text2); flex-shrink: 0; text-align: right; }
+.ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
 
 /* Task table */
 .task-table-wrap { overflow-x: auto; }
 .task-tbl { width: 100%; border-collapse: collapse; }
 .task-tbl th {
-  font-family: var(--font-mono); font-size: 8.5px; color: var(--text3);
+  font-family: var(--font-mono); font-size:11px; color: var(--text3);
   letter-spacing: 0.14em; text-transform: uppercase;
   padding: 8px 10px; border-bottom: 1px solid var(--border);
   text-align: left; white-space: nowrap; background: var(--bg2);
   position: sticky; top: 0;
 }
 .task-tbl td {
-  font-family: var(--font-ui); font-size: 12.5px; color: var(--text1);
+  font-family: var(--font-ui); font-size:12.5px; color: var(--text1);
   padding: 8px 10px; border-bottom: 1px solid rgba(100,160,220,0.06);
   vertical-align: middle;
 }
 .task-tbl tr:last-child td { border-bottom: none; }
 .task-tbl tr:hover td { background: rgba(0,210,255,0.03); }
 .task-tbl .phase-header td {
-  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  font-family: var(--font-mono); font-size:11px; font-weight: 700;
   color: var(--cyan); letter-spacing: 0.16em;
   background: rgba(0,210,255,0.04); padding: 7px 10px;
   border-bottom: 1px solid rgba(0,210,255,0.1);
@@ -129,11 +129,11 @@
 .journal-header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
 }
-.journal-date { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.08em; }
-.journal-hours { font-family: var(--font-mono); font-size: 9px; color: var(--cyan); font-weight: 700; }
-.journal-pct { font-family: var(--font-mono); font-size: 9px; color: var(--green); }
-.journal-blocker { font-family: var(--font-mono); font-size: 9px; color: var(--amber); }
-.journal-body { font-family: var(--font-ui); font-size: 12.5px; color: var(--text1); line-height: 1.5; }
+.journal-date { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; }
+.journal-hours { font-family: var(--font-mono); font-size:11px; color: var(--cyan); font-weight: 700; }
+.journal-pct { font-family: var(--font-mono); font-size:11px; color: var(--green); }
+.journal-blocker { font-family: var(--font-mono); font-size:11px; color: var(--amber); }
+.journal-body { font-family: var(--font-ui); font-size:12.5px; color: var(--text1); line-height: 1.5; }
 
 /* Risk rows */
 .risk-row {
@@ -144,13 +144,13 @@
 .risk-row:last-child { border-bottom: none; }
 .risk-row:hover { background: var(--bg4); }
 .risk-score {
-  font-family: var(--font-hud); font-size: 15px; font-weight: 700;
+  font-family: var(--font-hud); font-size:15.0px; font-weight: 700;
   min-width: 42px; text-align: center; flex-shrink: 0;
   padding-top: 2px;
 }
 .risk-info { flex: 1; min-width: 0; }
-.risk-title { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--text0); }
-.risk-meta  { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 2px; }
+.risk-title { font-family: var(--font-ui); font-size:13.0px; font-weight: 500; color: var(--text0); }
+.risk-meta  { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
 
 /* Document rows */
 .doc-row {
@@ -160,10 +160,10 @@
 }
 .doc-row:last-child { border-bottom: none; }
 .doc-row:hover { background: var(--bg4); }
-.doc-icon { font-size: 16px; flex-shrink: 0; color: var(--text2); }
+.doc-icon { font-size:16.0px; flex-shrink: 0; color: var(--text2); }
 .doc-info { flex: 1; min-width: 0; }
-.doc-name { font-family: var(--font-ui); font-size: 13px; color: var(--text0); }
-.doc-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 2px; }
+.doc-name { font-family: var(--font-ui); font-size:13.0px; color: var(--text0); }
+.doc-meta { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
 
 /* EVM detail table */
 .evm-table { width: 100%; }
@@ -171,10 +171,10 @@
 .evm-table tr:last-child { border-bottom: none; }
 .evm-table tr:hover td { background: rgba(0,210,255,0.05); }
 .evm-table tr:hover .evm-key { color: var(--cyan); }
-.evm-table td { padding: 9px 16px; font-family: var(--font-mono); font-size: 12px; }
+.evm-table td { padding: 9px 16px; font-family: var(--font-mono); font-size:12.0px; }
 .evm-table .evm-key { color: var(--text2); letter-spacing: 0.08em; width: 60%; transition: color 0.12s; }
-.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; font-size: 13px; }
-.evm-table .evm-hint { color: var(--text3); font-size: 9px; margin-left: 6px; }
+.evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; font-size:13.0px; }
+.evm-table .evm-hint { color: var(--text3); font-size:11px; margin-left: 6px; }
 
 /* EVM explainer popup */
 .evm-popup-overlay {
@@ -198,23 +198,23 @@
   background: rgba(0,210,255,0.04);
 }
 .evm-popup-title {
-  font-family: var(--font-hud); font-size: 16px; font-weight: 700;
+  font-family: var(--font-hud); font-size:16.0px; font-weight: 700;
   color: var(--text0); letter-spacing: 0.06em;
 }
 .evm-popup-close {
   background: none; border: none; color: var(--text3);
-  cursor: pointer; font-size: 16px; transition: color 0.12s;
+  cursor: pointer; font-size:16.0px; transition: color 0.12s;
 }
 .evm-popup-close:hover { color: var(--red); }
 .evm-popup-body { padding: 18px; }
 .evm-popup-formula {
-  font-family: var(--font-data); font-size: 13px;
+  font-family: var(--font-data); font-size:13.0px;
   color: var(--cyan); background: rgba(0,210,255,0.06);
   border: 1px solid rgba(0,210,255,0.15);
   padding: 10px 14px; margin-bottom: 14px; letter-spacing: 0.04em;
 }
 .evm-popup-calc {
-  font-family: var(--font-data); font-size: 12px;
+  font-family: var(--font-data); font-size:12.0px;
   color: var(--text2); background: var(--bg3);
   border: 1px solid var(--border);
   padding: 10px 14px; margin-bottom: 14px;
@@ -222,7 +222,7 @@
 .evm-popup-calc .calc-line { margin-bottom: 4px; }
 .evm-popup-calc .calc-line:last-child { margin-bottom: 0; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; font-weight: 700; color: var(--text0); }
 .evm-popup-interp {
-  font-family: var(--font-ui); font-size: 13px; color: var(--text1);
+  font-family: var(--font-ui); font-size:13.0px; color: var(--text1);
   line-height: 1.6; padding: 10px 14px;
   border-left: 2px solid var(--cyan);
   background: rgba(0,210,255,0.03);
@@ -233,23 +233,23 @@
   border: 1px solid var(--border);
 }
 .evm-popup-result-val {
-  font-family: var(--font-hud); font-size: 28px; font-weight: 700;
+  font-family: var(--font-hud); font-size:28.0px; font-weight: 700;
 }
 .evm-popup-result-label {
-  font-family: var(--font-mono); font-size: 10px; color: var(--text2);
+  font-family: var(--font-mono); font-size:11px; color: var(--text2);
   letter-spacing: 0.1em;
 }
 
 /* EVM task data grid */
 .evm-popup-grid { margin-top: 14px; }
 .evm-popup-grid-title {
-  font-family: var(--font-mono); font-size: 9px; color: var(--text3);
+  font-family: var(--font-mono); font-size:11px; color: var(--text3);
   letter-spacing: 0.18em; padding: 6px 0 4px;
   border-bottom: 1px solid var(--border); margin-bottom: 0;
 }
 .evm-grid-table { width: 100%; border-collapse: collapse; }
 .evm-grid-table th {
-  font-family: var(--font-mono); font-size: 8.5px; color: var(--text3);
+  font-family: var(--font-mono); font-size:11px; color: var(--text3);
   letter-spacing: 0.12em; padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   text-align: left; background: var(--bg2);
@@ -258,7 +258,7 @@
 }
 .evm-grid-table th.num { text-align: right; }
 .evm-grid-table td {
-  font-family: var(--font-mono); font-size: 10px; color: var(--text1);
+  font-family: var(--font-mono); font-size:11px; color: var(--text1);
   padding: 5px 8px; border-bottom: 1px solid rgba(100,160,220,0.05);
   white-space: nowrap;
 }
@@ -279,15 +279,15 @@
 .budget-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .budget-row:last-child { border-bottom: none; }
 .budget-label-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-.budget-label { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.1em; }
-.budget-nums  { font-family: var(--font-mono); font-size: 9px; color: var(--text3); }
+.budget-label { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.1em; }
+.budget-nums  { font-family: var(--font-mono); font-size:11px; color: var(--text3); }
 
 /* Phase progress */
 .phase-progress-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .phase-progress-row:last-child { border-bottom: none; }
 .pp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.pp-name { font-family: var(--font-ui); font-size: 12.5px; color: var(--text1); }
-.pp-stats { font-family: var(--font-mono); font-size: 9px; color: var(--text3); }
+.pp-name { font-family: var(--font-ui); font-size:12.5px; color: var(--text1); }
+.pp-stats { font-family: var(--font-mono); font-size:11px; color: var(--text3); }
 
 /* Slide-in journal panel */
 .journal-panel {
@@ -303,9 +303,9 @@
   display: flex; align-items: center; justify-content: space-between;
   flex-shrink: 0;
 }
-.journal-panel-title { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); letter-spacing: 0.16em; }
+.journal-panel-title { font-family: var(--font-mono); font-size:11.0px; color: var(--cyan); letter-spacing: 0.16em; }
 .journal-panel-body { flex: 1; overflow-y: auto; padding: 12px; }
-.journal-panel-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 16px; transition: color 0.12s; }
+.journal-panel-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size:16.0px; transition: color 0.12s; }
 .journal-panel-close:hover { color: var(--red); }
 
 @media (max-width: 1100px) { .detail-grid { grid-template-columns: 1fr; } }
@@ -327,7 +327,7 @@
     <div class="proj-header-band" id="proj-header-band">
       <div class="proj-header-top">
         <div class="proj-title-block">
-          <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.16em;margin-bottom:6px;" id="proj-breadcrumb">PROJECTS → LOADING...</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.16em;margin-bottom:6px;" id="proj-breadcrumb">PROJECTS → LOADING...</div>
           <div class="proj-title" id="proj-title">Loading...</div>
           <div class="proj-client-tag" id="proj-client-tag">—</div>
           <div id="proj-description-header" style="font-family:var(--font-ui);font-size:12.5px;color:var(--text2);margin-top:5px;line-height:1.5;max-width:700px;"></div>
@@ -340,7 +340,7 @@
 
       <!-- HEALTH CHIPS -->
       <div class="proj-health-row" id="proj-health-row">
-        <div class="health-chip"><span class="hc-label">STATUS</span><span class="hc-val" id="hc-status" style="font-size:13px;font-family:var(--font-mono);">—</span></div>
+        <div class="health-chip"><span class="hc-label">STATUS</span><span class="hc-val" id="hc-status" style="font-size:13.0px;font-family:var(--font-mono);">—</span></div>
         <div class="health-sep"></div>
         <div class="health-chip"><span class="hc-label">% COMPLETE</span><span class="hc-val" id="hc-pct" style="color:var(--cyan)">—</span></div>
         <div class="health-sep"></div>
@@ -350,9 +350,9 @@
         <div class="health-sep"></div>
         <div class="health-chip"><span class="hc-label">TASKS</span><span class="hc-val" id="hc-tasks" style="color:var(--text0)">—</span><span class="hc-sub" id="hc-tasks-sub">—</span></div>
         <div class="health-sep"></div>
-        <div class="health-chip"><span class="hc-label">TARGET DATE</span><span class="hc-val" id="hc-target" style="font-size:13px;font-family:var(--font-mono);">—</span><span class="hc-sub" id="hc-days-left">—</span></div>
+        <div class="health-chip"><span class="hc-label">TARGET DATE</span><span class="hc-val" id="hc-target" style="font-size:13.0px;font-family:var(--font-mono);">—</span><span class="hc-sub" id="hc-days-left">—</span></div>
         <div class="health-sep"></div>
-        <div class="health-chip"><span class="hc-label">PM / OWNER</span><span class="hc-val" id="hc-pm" style="font-size:13px;font-family:var(--font-ui);">—</span></div>
+        <div class="health-chip"><span class="hc-label">PM / OWNER</span><span class="hc-val" id="hc-pm" style="font-size:13.0px;font-family:var(--font-ui);">—</span></div>
       </div>
 
       <!-- TAB BAR -->
@@ -398,7 +398,7 @@
             <div class="panel" style="margin-top:16px;">
               <div class="panel-header"><div class="panel-title">PROJECT DESCRIPTION</div></div>
               <div style="padding:14px 16px;">
-                <p id="proj-description" style="font-family:var(--font-ui);font-size:13px;color:var(--text1);line-height:1.7;">—</p>
+                <p id="proj-description" style="font-family:var(--font-ui);font-size:13.0px;color:var(--text1);line-height:1.7;">—</p>
               </div>
             </div>
           </div>
@@ -574,7 +574,7 @@
   <div class="journal-panel-header">
     <div>
       <div class="journal-panel-title" id="jp-title">TASK JOURNAL</div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
     </div>
     <button class="journal-panel-close" onclick="closeJournalPanel()">✕</button>
   </div>
@@ -685,7 +685,7 @@ async function openJournalPanel(taskId, taskName) {
           ${e.blockers ? `<span class="journal-blocker">⚑ BLOCKER</span>` : ''}
         </div>
         <div class="journal-body">${e.accomplishment}</div>
-        ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:9px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
+        ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
       </div>`;
     }).join('');
   } catch(err) {
@@ -882,7 +882,7 @@ function showEVMPopup(key) {
   document.getElementById('evm-popup-interp').textContent = def.interp;
   document.getElementById('evm-popup-result').innerHTML = `
     <div class="evm-popup-result-val" style="color:${def.color};">${def.result}</div>
-    <div class="evm-popup-result-label">${match || key}<br><span style="color:var(--text3);font-size:8.5px;">CLICK ANYWHERE OUTSIDE TO CLOSE</span></div>`;
+    <div class="evm-popup-result-label">${match || key}<br><span style="color:var(--text3);font-size:11px;">CLICK ANYWHERE OUTSIDE TO CLOSE</span></div>`;
   document.getElementById('evm-popup-overlay').style.display = 'flex';
 
   // ── TASK DATA GRID ────────────────────────────────────────
@@ -929,10 +929,10 @@ function showEVMPopup(key) {
     gridEl.innerHTML = `
       <div class="evm-popup-grid-title">◆ ${gridTitle(cfg)}</div>
       <div style="padding:10px 0 10px;text-align:center;">
-        <div style="font-family:var(--font-mono);font-size:14px;color:var(--text1);letter-spacing:0.1em;font-weight:600;margin-bottom:8px;">
+        <div style="font-family:var(--font-mono);font-size:14.0px;color:var(--text1);letter-spacing:0.1em;font-weight:600;margin-bottom:8px;">
           SUMMARY FOR COMPLETED &amp; IN-PROGRESS TASKS ONLY
         </div>
-        <div style="text-align:left;display:inline-block;font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.06em;line-height:1.8;">
+        <div style="text-align:left;display:inline-block;font-family:var(--font-mono);font-size:12.0px;color:var(--text3);letter-spacing:0.06em;line-height:1.8;">
           <div>BGT COST &nbsp;= Budget Hours × $${RATE}/hr</div>
           <div>ACT COST &nbsp;= Actual Hours Logged × $${RATE}/hr</div>
           <div>TOTAL &nbsp;&nbsp;&nbsp;&nbsp;= BGT − ACT &nbsp;(positive = under budget)</div>
@@ -955,7 +955,7 @@ function showEVMPopup(key) {
               const totColor = r.tot >= 0 ? 'var(--green)' : 'var(--red)';
               return `<tr>
                 <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.t.name}">${r.t.name}</td>
-                <td style="color:var(--text3);font-size:9.5px;">${r.t.phase||'—'}</td>
+                <td style="color:var(--text3);font-size:11px;">${r.t.phase||'—'}</td>
                 <td class="num">${r.pct}%</td>
                 <td class="num">${fmtC(r.bc)}</td>
                 <td class="num">${fmtC(r.ac)}</td>
@@ -974,7 +974,7 @@ function showEVMPopup(key) {
         </table>
       </div>`;
   } else {
-    gridEl.innerHTML = `<div style="padding:12px 14px;font-family:var(--font-mono);font-size:10px;color:var(--text3);">NO TASKS WITH PROGRESS DATA</div>`;
+    gridEl.innerHTML = `<div style="padding:12px 14px;font-family:var(--font-mono);font-size:11px;color:var(--text3);">NO TASKS WITH PROGRESS DATA</div>`;
   }
 }
 
@@ -1102,7 +1102,7 @@ function renderOverviewMilestones() {
 
     html += `<div id="ms-expand-row" onclick="expandOverviewMilestones()" style="
       padding:9px 14px;
-      font-family:var(--font-mono);font-size:10px;
+      font-family:var(--font-mono);font-size:11px;
       color:var(--cyan);letter-spacing:0.12em;
       cursor:pointer;border-top:1px solid var(--border);
       display:flex;align-items:center;gap:8px;
@@ -1128,7 +1128,7 @@ function expandOverviewMilestones() {
   el.insertAdjacentHTML('beforeend', `
     <div onclick="renderOverviewMilestones()" style="
       padding:9px 14px;
-      font-family:var(--font-mono);font-size:10px;
+      font-family:var(--font-mono);font-size:11px;
       color:var(--text3);letter-spacing:0.12em;
       cursor:pointer;border-top:1px solid var(--border);
       display:flex;align-items:center;gap:8px;
@@ -1148,7 +1148,7 @@ function taskRowHTML(t) {
       <div class="task-meta">${t.phase || '—'}${asgn?' · '+asgn.name:''}</div>
     </div>
     ${UI.badge(t.status)}
-    <span style="font-family:var(--font-mono);font-size:10px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
+    <span style="font-family:var(--font-mono);font-size:11px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
   </div>`;
 }
 
@@ -1178,7 +1178,7 @@ function renderOverviewTasks() {
 
     html += `<div id="tasks-expand-row" onclick="expandOverviewTasks()" style="
       padding:9px 14px;
-      font-family:var(--font-mono);font-size:10px;
+      font-family:var(--font-mono);font-size:11px;
       color:var(--cyan);letter-spacing:0.12em;
       cursor:pointer;border-top:1px solid var(--border);
       display:flex;align-items:center;gap:8px;
@@ -1209,7 +1209,7 @@ function expandOverviewTasks() {
   el.insertAdjacentHTML('beforeend', `
     <div onclick="renderOverviewTasks()" style="
       padding:9px 14px;
-      font-family:var(--font-mono);font-size:10px;
+      font-family:var(--font-mono);font-size:11px;
       color:var(--text3);letter-spacing:0.12em;
       cursor:pointer;border-top:1px solid var(--border);
       display:flex;align-items:center;gap:8px;
@@ -1249,8 +1249,8 @@ function renderOverviewEVM() {
     UI.gauge(cpiNum,  2,   UI.indexColor(cpiNum), 'CPI',    cpi,          52) +
     UI.gauge(spiNum,  2,   UI.indexColor(spiNum), 'SPI',    spi,          52);
   document.getElementById('overview-evm-vals').innerHTML = `
-    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:8px;color:var(--text3);">TASKS DONE</span><span style="font-family:var(--font-hud);font-size:14px;font-weight:700;color:var(--green);">${done}</span></div>
-    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:8px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14px;font-weight:700;color:var(--red);">${tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
+    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">TASKS DONE</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--green);">${done}</span></div>
+    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--red);">${tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
 }
 
 function renderRecentJournal() {
@@ -1267,8 +1267,8 @@ function renderRecentJournal() {
         <span class="journal-hours">${e.hours_spent}h</span>
         ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
       </div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:3px;">${task?.name || '—'}</div>
-      <div class="journal-body" style="font-size:12px;">${e.accomplishment}</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:3px;">${task?.name || '—'}</div>
+      <div class="journal-body" style="font-size:12.0px;">${e.accomplishment}</div>
     </div>`;
   }).join('');
 }
@@ -1305,29 +1305,29 @@ function renderTasksTable() {
           <div class="task-name-cell">
             ${UI.taskDot(t.status)}
             <span class="task-name-text" title="${t.name}">${t.name}</span>
-            ${hasJournal ? `<span style="font-family:var(--font-mono);font-size:8px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}
+            ${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}
           </div>
         </td>
         <td>
           <div style="display:flex;align-items:center;gap:6px;">
             ${asgn ? UI.avatar(asgn, 20) : ''}
-            <span style="font-family:var(--font-ui);font-size:12px;">${asgn?.name || '—'}</span>
+            <span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span>
           </div>
         </td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:${due.color};">${due.text}</td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${due.text}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
         <td>
           <div style="display:flex;align-items:center;gap:6px;min-width:70px;">
             <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);">
               <div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div>
             </div>
-            <span style="font-family:var(--font-mono);font-size:9px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span>
           </div>
         </td>
         <td>${UI.badge(t.status)}</td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
         <td>
           <button class="panel-action" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">▤</button>
         </td>
@@ -1350,7 +1350,7 @@ function renderMilestones() {
       m.current_target_date !== m.initial_target_date;
     const dLeft = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
     return `<div class="milestone-row">
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);min-width:20px;">${i+1}</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);min-width:20px;">${i+1}</div>
       <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
       <div class="ms-info">
         <div class="ms-name">${m.description}</div>
@@ -1358,13 +1358,13 @@ function renderMilestones() {
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
         ${UI.badge(m.status)}
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">
           Initial: ${UI.fmtDateShort(m.initial_target_date)}
         </div>
-        <div style="font-family:var(--font-mono);font-size:9px;color:${slipped?'var(--amber)':'var(--text2)'};">
+        <div style="font-family:var(--font-mono);font-size:11px;color:${slipped?'var(--amber)':'var(--text2)'};">
           ${slipped?'↑ ':''} Current: ${UI.fmtDateShort(m.current_target_date)}
         </div>
-        ${dLeft !== null && m.status !== 'complete' ? `<div style="font-family:var(--font-mono);font-size:9px;color:${dLeft<0?'var(--red)':dLeft<14?'var(--amber)':'var(--text3)'};">${dLeft<0?Math.abs(dLeft)+'d LATE':dLeft+'d LEFT'}</div>` : ''}
+        ${dLeft !== null && m.status !== 'complete' ? `<div style="font-family:var(--font-mono);font-size:11px;color:${dLeft<0?'var(--red)':dLeft<14?'var(--amber)':'var(--text3)'};">${dLeft<0?Math.abs(dLeft)+'d LATE':dLeft+'d LEFT'}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1475,8 +1475,8 @@ function renderEVM() {
             ${UI.progressBar(pctOfMax, 'var(--purple)')}
           </div>
           <div style="text-align:right;min-width:80px;flex-shrink:0;">
-            <div style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div>
-            <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${UI.fmtCurrency(cost)}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div>
           </div>
         </div>`;
       }).join('');
@@ -1501,45 +1501,45 @@ function renderEVM() {
       <!-- Budget summary chips -->
       <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;">
         <div>
-          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">BUDGET</div>
-          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--text0);">${UI.fmtCurrency(budget)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">BUDGET</div>
+          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--text0);">${UI.fmtCurrency(budget)}</div>
         </div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
         <div>
-          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">TOTAL COMMITTED</div>
-          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">TOTAL COMMITTED</div>
+          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--cyan);">${UI.fmtCurrency(totalCommitted)}</div>
         </div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
         <div>
-          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">RECEIVED / POSTED</div>
-          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">RECEIVED / POSTED</div>
+          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--green);">${UI.fmtCurrency(totalReceived)}</div>
         </div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
         <div>
-          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">PENDING</div>
-          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalPending)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">PENDING</div>
+          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:var(--amber);">${UI.fmtCurrency(totalPending)}</div>
         </div>
         <div style="width:1px;height:36px;background:var(--border);flex-shrink:0;"></div>
         <div>
-          <div style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">REMAINING BUDGET</div>
-          <div style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:${remainingBudget < 0 ? 'var(--red)' : 'var(--text1)'};">${UI.fmtCurrency(remainingBudget)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;margin-bottom:3px;">REMAINING BUDGET</div>
+          <div style="font-family:var(--font-hud);font-size:20.0px;font-weight:700;color:${remainingBudget < 0 ? 'var(--red)' : 'var(--text1)'};">${UI.fmtCurrency(remainingBudget)}</div>
         </div>
       </div>
 
       <!-- Budget consumption bar -->
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;">BUDGET CONSUMED</span>
-          <span style="font-family:var(--font-mono);font-size:9px;color:${budgetBarColor};font-weight:700;">${committedPct}%</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.1em;">BUDGET CONSUMED</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:${budgetBarColor};font-weight:700;">${committedPct}%</span>
         </div>
         <div style="height:6px;background:rgba(255,255,255,0.06);position:relative;">
           <div style="height:100%;width:${Math.min(committedPct,100)}%;background:${budgetBarColor};transition:width 0.6s ease;"></div>
           ${receivedPct > 0 ? `<div style="position:absolute;top:0;left:0;height:100%;width:${Math.min(receivedPct,100)}%;background:var(--green);opacity:0.6;"></div>` : ''}
         </div>
         <div style="display:flex;gap:16px;margin-top:5px;">
-          <span style="font-family:var(--font-mono);font-size:8.5px;color:var(--green);">■ Received ${receivedPct}%</span>
-          <span style="font-family:var(--font-mono);font-size:8.5px;color:var(--amber);">■ Pending ${committedPct - receivedPct}%</span>
-          ${remainingBudget < 0 ? `<span style="font-family:var(--font-mono);font-size:8.5px;color:var(--red);">⚑ OVER BUDGET ${UI.fmtCurrency(Math.abs(remainingBudget))}</span>` : ''}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--green);">■ Received ${receivedPct}%</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--amber);">■ Pending ${committedPct - receivedPct}%</span>
+          ${remainingBudget < 0 ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--red);">⚑ OVER BUDGET ${UI.fmtCurrency(Math.abs(remainingBudget))}</span>` : ''}
         </div>
       </div>
 
@@ -1548,11 +1548,11 @@ function renderEVM() {
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
-            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
-            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR</th>
-            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">CATEGORY</th>
-            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">AMOUNT</th>
-            <th style="font-family:var(--font-mono);font-size:8.5px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">DESCRIPTION</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">VENDOR</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;">CATEGORY</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;">AMOUNT</th>
+            <th style="font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:0.12em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;">STATUS</th>
           </tr>
         </thead>
         <tbody>
@@ -1569,11 +1569,11 @@ function renderEVM() {
               : 'var(--text3)';
             return `<tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
               <td style="font-family:var(--font-ui);font-size:12.5px;color:var(--text0);padding:8px 10px;">${e.description}</td>
-              <td style="font-family:var(--font-ui);font-size:12px;color:var(--text2);padding:8px 10px;">${e.vendor||'—'}</td>
-              <td style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:8px 10px;">${e.category||'—'}</td>
-              <td style="font-family:var(--font-mono);font-size:11px;color:var(--text0);padding:8px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
+              <td style="font-family:var(--font-ui);font-size:12.0px;color:var(--text2);padding:8px 10px;">${e.vendor||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:var(--text3);padding:8px 10px;">${e.category||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:11.0px;color:var(--text0);padding:8px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
               <td style="padding:8px 10px;text-align:center;">
-                <span style="font-family:var(--font-mono);font-size:8.5px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 6px;opacity:0.85;">${state}</span>
+                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${stateColor};border:1px solid ${stateColor};padding:2px 6px;opacity:0.85;">${state}</span>
               </td>
             </tr>`;
           }).join('')}
@@ -1611,7 +1611,7 @@ function renderDocuments() {
       <div class="doc-name">${d.file_name}</div>
       <div class="doc-meta">${d.description||'—'} · ${UI.fmtDate(d.created_at)} · ${d.file_size_kb ? d.file_size_kb+'KB' : '—'}</div>
     </div>
-    ${d.client_visible ? `<span style="font-family:var(--font-mono);font-size:8.5px;color:var(--green);border:1px solid rgba(0,229,160,0.3);padding:2px 6px;">CLIENT</span>` : ''}
+    ${d.client_visible ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--green);border:1px solid rgba(0,229,160,0.3);padding:2px 6px;">CLIENT</span>` : ''}
     <button class="panel-action">↓ DOWNLOAD</button>
   </div>`).join('');
 }
@@ -1632,9 +1632,9 @@ function renderJournalTab() {
         ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
         ${e.blockers ? `<span class="journal-blocker">⚑ BLOCKER</span>` : ''}
       </div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:4px;letter-spacing:0.08em;">${task?.name||'—'} · ${task?.phase||'—'}</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:4px;letter-spacing:0.08em;">${task?.name||'—'} · ${task?.phase||'—'}</div>
       <div class="journal-body">${e.accomplishment}</div>
-      ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:9px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
+      ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
     </div>`;
   }).join('');
 }

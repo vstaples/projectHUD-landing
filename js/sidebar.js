@@ -32,7 +32,7 @@ const Sidebar = (() => {
       const isActive = currentPath === item.href.replace('/', '');
       const badgeVal = item.badgeId && badges[item.badgeId];
       const badgeHTML = badgeVal
-        ? `<span id="${item.badgeId}" style="margin-left:auto;background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.3);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;min-width:18px;text-align:center;">${badgeVal}</span>`
+        ? `<span id="${item.badgeId}" style="margin-left:auto;background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.3);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:700;padding:1px 5px;border-radius:2px;min-width:18px;text-align:center;">${badgeVal}</span>`
         : item.badgeId ? `<span id="${item.badgeId}" style="display:none;"></span>` : '';
 
       return `<a class="nav-item${isActive ? ' active' : ''}" href="${item.href}">

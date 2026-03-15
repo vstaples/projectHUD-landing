@@ -117,7 +117,7 @@ const UI = (() => {
       display:inline-flex;align-items:center;gap:4px;
       padding:2px 8px;
       font-family:'Share Tech Mono',monospace;
-      font-size:9px;font-weight:700;letter-spacing:0.1em;
+      font-size:11px;font-weight:700;letter-spacing:0.1em;
       color:${cfg.color};
       background:${cfg.bg};
       border:1px solid ${cfg.border};
@@ -176,28 +176,28 @@ const UI = (() => {
           font-family:'Rajdhani',sans-serif;font-size:${Math.round(size*0.23)}px;font-weight:700;color:${color};"
         >${displayVal}</div>
       </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);letter-spacing:0.12em;text-align:center;">${label}</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:0.12em;text-align:center;">${label}</div>
     </div>`;
   }
 
   // ── ALL CLEAR STATE ────────────────────────────────────────
   function allClear(message = 'ALL CLEAR', sub = '') {
     return `<div style="padding:28px 16px;text-align:center;">
-      <div style="font-size:22px;color:var(--cyan);opacity:0.25;margin-bottom:6px;">◈</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:0.2em;margin-bottom:4px;">◆ ${message}</div>
-      ${sub ? `<div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:0.08em;">${sub}</div>` : ''}
+      <div style="font-size:22.0px;color:var(--cyan);opacity:0.25;margin-bottom:6px;">◈</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:0.2em;margin-bottom:4px;">◆ ${message}</div>
+      ${sub ? `<div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:0.08em;">${sub}</div>` : ''}
     </div>`;
   }
 
   // ── LOADING STATE ──────────────────────────────────────────
   function loading(msg = 'LOADING...') {
-    return `<div style="padding:24px 16px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:0.14em;">${msg}</div>`;
+    return `<div style="padding:24px 16px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:0.14em;">${msg}</div>`;
   }
 
   // ── PANEL HEADER HTML ──────────────────────────────────────
   function panelHeader(title, rightHTML = '') {
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:600;color:var(--text2);letter-spacing:0.18em;display:flex;align-items:center;gap:8px;">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.18em;display:flex;align-items:center;gap:8px;">
         <span style="display:inline-block;width:2px;height:12px;background:var(--cyan);flex-shrink:0;"></span>
         ${title}
       </div>

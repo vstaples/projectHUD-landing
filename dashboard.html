@@ -13,36 +13,36 @@
 .project-card.at-risk { border-left-color: rgba(255,170,0,0.5); }
 .project-card.blocked { border-left-color: rgba(255,71,87,0.5); }
 .project-card.active  { border-left-color: rgba(0,229,160,0.4); }
-.proj-name   { font-family: var(--font-ui); font-size: 15px; font-weight: 600; color: var(--text0); line-height: 1.2; }
-.proj-client { font-family: var(--font-mono); font-size: 9.5px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
-.proj-stats  { display: flex; gap: 16px; font-family: var(--font-mono); font-size: 10px; margin-top: 10px; }
+.proj-name   { font-family: var(--font-ui); font-size:15.0px; font-weight: 600; color: var(--text0); line-height: 1.2; }
+.proj-client { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
+.proj-stats  { display: flex; gap: 16px; font-family: var(--font-mono); font-size:11px; margin-top: 10px; }
 .proj-stat   { display: flex; flex-direction: column; gap: 2px; }
-.proj-stat .stat-label { color: var(--text3); font-size: 8.5px; letter-spacing: 0.1em; }
+.proj-stat .stat-label { color: var(--text3); font-size:11px; letter-spacing: 0.1em; }
 .proj-stat .stat-value { color: var(--text1); font-weight: 600; }
 .task-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--bg4); }
 .task-info { flex: 1; min-width: 0; }
-.task-name { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--text0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.task-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text2); letter-spacing: 0.06em; margin-top: 2px; }
+.task-name { font-family: var(--font-ui); font-size:13.0px; font-weight: 500; color: var(--text0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-meta { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.06em; margin-top: 2px; }
 .evm-gauge-row { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); justify-content: space-around; }
 .evm-values { padding: 10px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.evm-val .ev-label { font-family: var(--font-mono); font-size: 8.5px; color: var(--text3); letter-spacing: 0.1em; }
-.evm-val .ev-num   { font-family: var(--font-hud); font-size: 16px; font-weight: 700; color: var(--text0); }
+.evm-val .ev-label { font-family: var(--font-mono); font-size:11px; color: var(--text3); letter-spacing: 0.1em; }
+.evm-val .ev-num   { font-family: var(--font-hud); font-size:16.0px; font-weight: 700; color: var(--text0); }
 .alert-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .alert-row:last-child { border-bottom: none; }
 .alert-info { flex: 1; min-width: 0; }
-.alert-title { font-family: var(--font-ui); font-size: 12.5px; color: var(--text0); }
-.alert-meta  { font-family: var(--font-mono); font-size: 9px; color: var(--text2); margin-top: 2px; }
-.alert-age   { font-family: var(--font-mono); font-size: 9px; color: var(--red); font-weight: 700; flex-shrink: 0; }
+.alert-title { font-family: var(--font-ui); font-size:12.5px; color: var(--text0); }
+.alert-meta  { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
+.alert-age   { font-family: var(--font-mono); font-size:11px; color: var(--red); font-weight: 700; flex-shrink: 0; }
 .wl-row { padding: 9px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
 .wl-row:last-child { border-bottom: none; }
-.wl-avatar { width: 26px; height: 26px; flex-shrink: 0; background: #1a3a5a; border: 1px solid rgba(0,210,255,0.25); display: flex; align-items: center; justify-content: center; font-family: var(--font-hud); font-size: 11px; font-weight: 700; color: var(--cyan); }
-.wl-name { font-family: var(--font-ui); font-size: 12.5px; color: var(--text1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-avatar { width: 26px; height: 26px; flex-shrink: 0; background: #1a3a5a; border: 1px solid rgba(0,210,255,0.25); display: flex; align-items: center; justify-content: center; font-family: var(--font-hud); font-size:11.0px; font-weight: 700; color: var(--cyan); }
+.wl-name { font-family: var(--font-ui); font-size:12.5px; color: var(--text1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wl-bar-wrap { width: 70px; }
 .wl-bar { height: 3px; background: rgba(255,255,255,0.06); }
 .wl-fill { height: 100%; transition: width 0.6s ease; }
-.wl-pct { font-family: var(--font-mono); font-size: 9px; min-width: 28px; text-align: right; }
+.wl-pct { font-family: var(--font-mono); font-size:11px; min-width: 28px; text-align: right; }
 @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -180,7 +180,7 @@ async function loadDashboard() {
             <div><div class="proj-name">${proj.name}</div><div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div></div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
               ${UI.badge(health,hLabel)}
-              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:9px;color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
+              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:11px;color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
             </div>
           </div>
           ${UI.progressBar(pctDone,fill)}
@@ -210,7 +210,7 @@ async function loadDashboard() {
             <div class="task-meta">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}${asgn?' · '+asgn.name:''}</div>
           </div>
           ${UI.badge(t.status)}
-          <span style="font-family:var(--font-mono);font-size:10px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
         </div>`;
       }).join('');
 
