@@ -344,7 +344,7 @@ async function _submitReply(btn, parentId, parentType, taskId, projectId, contai
   }
 }
 
-// ── Delete ────────────────────────────────────────────────────
+// ── Delete Function ────────────────────────────────────────────────────
 async function _handleDelete(replyId, parentId, wrapEl) {
   if (!confirm('Delete this reply?')) return;
   const ok = await deleteReply(replyId, parentId);
