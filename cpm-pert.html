@@ -134,6 +134,8 @@
           <button class="filter-btn active" data-phase="ALL">ALL PHASES</button>
           <div id="phase-filter-btns" style="display:contents;"></div>
           <div style="flex:1;"></div>
+          <button class="filter-btn" onclick="zoomIn()">+ ZOOM IN</button>
+          <button class="filter-btn" onclick="zoomOut()">− ZOOM OUT</button>
           <button class="filter-btn" onclick="resetZoom()">⟲ RESET VIEW</button>
           <button class="filter-btn" onclick="toggleCriticalOnly()">⚑ CRITICAL PATH ONLY</button>
           <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.08em;" id="cp-duration-label"></span>
@@ -250,7 +252,7 @@ const params    = new URLSearchParams(window.location.search);
 const PROJECT_ID = params.get('id');
 if (!PROJECT_ID) window.location.href = '/projects.html';
 
-let STATE_CPM = { tasks:[], deps:[], users:[], project:null, nodes:{}, criticalPath:[], phases:[], showCriticalOnly:false, activePhase:'ALL' };
+let STATE_CPM = { tasks:[], deps:[], users:[], project:null, nodes:{}, topo:[], criticalPath:[], projectDuration:0, phases:[], showCriticalOnly:false, activePhase:'ALL' };
 
 // ── SUB-TAB SWITCHING ─────────────────────────────────────────
 document.querySelectorAll('.cpm-tab').forEach(btn => {
@@ -262,9 +264,9 @@ document.querySelectorAll('.cpm-tab').forEach(btn => {
     const el = document.getElementById(`view-${view}`);
     el.style.display = 'flex';
     el.style.flexDirection = 'column';
-    if (view === 'network')  { setTimeout(drawNetwork, 50); }
-    if (view === 'pert')     { renderPERT(); }
-    if (view === 'schedule') { renderScheduleTable(); }
+    if (view === 'network')  { if (STATE_CPM.topo.length) setTimeout(drawNetwork, 50); }
+    if (view === 'pert')     { if (STATE_CPM.topo.length) renderPERT(); }
+    if (view === 'schedule') { if (STATE_CPM.topo.length) renderScheduleTable(); }
   });
 });
 
@@ -374,6 +376,16 @@ function resetZoom() {
   drawNetwork();
 }
 
+function zoomIn() {
+  scale = Math.min(3, scale * 1.25);
+  drawNetwork();
+}
+
+function zoomOut() {
+  scale = Math.max(0.2, scale * 0.8);
+  drawNetwork();
+}
+
 function toggleCriticalOnly() {
   criticalOnlyMode = !criticalOnlyMode;
   const btn = document.querySelector('[onclick="toggleCriticalOnly()"]');
@@ -440,6 +452,11 @@ function drawNetwork() {
 
   canvas.width  = Math.max(totalW, wrap.clientWidth);
   canvas.height = Math.max(totalH, wrap.clientHeight - 100);
+
+  // Auto-fit: on first draw (scale===1, panX===0) shrink to fit
+  if (scale === 1 && panX === 0 && panY === 0 && totalW > wrap.clientWidth) {
+    scale = Math.max(0.2, Math.min(1, (wrap.clientWidth - 40) / totalW));
+  }
 
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -830,14 +847,44 @@ function setPhase(ph) {
 // ── LOAD DATA ─────────────────────────────────────────────────
 async function loadCPMData() {
   try {
-    const [project, tasks, deps, users] = await Promise.all([
+    const [project, tasks, users] = await Promise.all([
       API.getProjectById(PROJECT_ID),
       API.getTasksByProject(PROJECT_ID),
-      API.get(`task_dependencies?select=*&project_id=eq.${PROJECT_ID}`),
       API.getUsers(),
     ]);
 
     if (!project) { window.location.href='/projects.html'; return; }
+
+    // Fetch deps via task_id (task_dependencies has no project_id column)
+    const taskIds = tasks.map(t => t.id);
+    let deps = [];
+    if (taskIds.length > 0) {
+      try {
+        deps = await API.get(`task_dependencies?select=*&task_id=in.(${taskIds.join(',')})`);
+      } catch(e) { deps = []; }
+    }
+
+    // If no explicit dependencies exist, auto-generate sequential deps
+    // within each phase from sequence_order — this gives the CPM
+    // something meaningful to compute even without formal WBS dependencies
+    if (!deps || deps.length === 0) {
+      const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+      phases.forEach(phase => {
+        const phaseTasks = tasks
+          .filter(t => t.phase === phase && t.duration_days > 0)
+          .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0));
+        for (let i = 1; i < phaseTasks.length; i++) {
+          deps.push({
+            id: `auto-${phaseTasks[i-1].id}-${phaseTasks[i].id}`,
+            task_id:              phaseTasks[i].id,
+            predecessor_task_id:  phaseTasks[i-1].id,
+            successor_task_id:    phaseTasks[i].id,
+            dependency_type:      'FS',
+            lag_days:             0,
+          });
+        }
+      });
+    }
 
     document.getElementById('page-proj-title').textContent = `CPM / PERT — ${project.name}`;
     document.getElementById('page-proj-sub').textContent   = `CRITICAL PATH METHOD · PROGRAM EVALUATION & REVIEW TECHNIQUE`;
@@ -871,6 +918,7 @@ async function loadCPMData() {
 
 // Handle resize
 window.addEventListener('resize', () => {
+  if (!STATE_CPM.topo.length) return;
   const view = document.querySelector('.cpm-tab.active')?.dataset.view;
   if (view === 'network') drawNetwork();
   if (view === 'pert')    drawPERTCurve(...[STATE_CPM.projectDuration]);
