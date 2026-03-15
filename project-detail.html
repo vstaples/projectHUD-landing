@@ -560,6 +560,33 @@ function closeJournalPanel() {
   document.getElementById('journal-panel').classList.remove('open');
 }
 
+// ── SHARED EVM COMPUTATION ────────────────────────────────────
+function computeEVM() {
+  const p     = STATE.project;
+  const tasks = STATE.tasks;
+  const done  = tasks.filter(t => t.status === 'complete').length;
+  const total = tasks.length;
+  const pctDone = UI.pct(done, total);
+  const bac   = parseFloat(p.budget_baseline_hours || 0);
+  const ac    = tasks.reduce((s,t) => s + parseFloat(t.actual_hours||0), 0);
+  const ev    = bac * (pctDone / 100);
+  const startDate  = p.start_date  ? new Date(p.start_date)  : null;
+  const targetDate = p.target_date ? new Date(p.target_date) : null;
+  const today      = new Date();
+  let schedPct = 0;
+  if (startDate && targetDate && targetDate > startDate) {
+    const totalDays   = (targetDate - startDate) / 86400000;
+    const elapsedDays = Math.min((today - startDate) / 86400000, totalDays);
+    schedPct = Math.max(elapsedDays / totalDays, 0.01);
+  }
+  const pv     = bac * schedPct;
+  const cpiRaw = (ev > 0 && ac > 0) ? ev / ac : null;
+  const spiRaw = (ev > 0 && pv > 0) ? ev / pv : null;
+  const cpi    = cpiRaw != null ? cpiRaw.toFixed(2) : '—';
+  const spi    = spiRaw != null ? spiRaw.toFixed(2) : '—';
+  return { bac, ac, ev, pv, cpi, spi, cpiNum: cpiRaw||0, spiNum: spiRaw||0, pctDone, done, total };
+}
+
 // ── RENDER HELPERS ────────────────────────────────────────────
 function renderHeader() {
   const p = STATE.project;
@@ -584,15 +611,7 @@ function renderHeader() {
   const pctDone = UI.pct(done, total);
   const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete').length;
 
-  // Compute mock EVM from actual_hours data
-  const budgetHours = parseFloat(p.budget_baseline_hours || 0);
-  const actualHours = tasks.reduce((s, t) => s + parseFloat(t.actual_hours || 0), 0);
-  const budgetHoursUsed = tasks.reduce((s, t) => s + parseFloat(t.budget_hours || 0), 0);
-  const ev = budgetHoursUsed * (pctDone / 100);
-  const cpi = ev > 0 ? (ev / actualHours).toFixed(2) : '—';
-  const spi = pctDone > 0 ? (ev / (budgetHoursUsed * 0.55)).toFixed(2) : '—';
-  const cpiNum = parseFloat(cpi) || 0;
-  const spiNum = parseFloat(spi) || 0;
+  const { cpi, spi, cpiNum, spiNum } = computeEVM();
 
   document.getElementById('hc-status').innerHTML = UI.badge(p.status);
   document.getElementById('hc-pct').textContent  = pctDone + '%';
@@ -806,10 +825,7 @@ function renderPhaseProgress() {
 
 function renderOverviewEVM() {
   const tasks = STATE.tasks;
-  const done = tasks.filter(t => t.status === 'complete').length;
-  const total = tasks.length;
-  const pctDone = UI.pct(done, total);
-  const cpi = 0.97, spi = 0.94;
+  const { cpi, spi, cpiNum, spiNum, pctDone } = computeEVM();
   document.getElementById('overview-gauges').innerHTML =
     UI.gauge(pctDone, 100, 'var(--cyan)', 'WORK %', pctDone+'%', 52) +
     UI.gauge(cpi, 2, UI.indexColor(cpi), 'CPI', cpi.toFixed(2), 52) +
@@ -939,46 +955,56 @@ function renderMilestones() {
 function renderEVM() {
   const tasks = STATE.tasks;
   const p = STATE.project;
-  const done = tasks.filter(t => t.status === 'complete').length;
-  const pct = UI.pct(done, tasks.length);
+  const { cpi, spi, cpiNum, spiNum, pctDone: pct, bac, ac, ev, pv } = computeEVM();
   const actualHrs = tasks.reduce((s,t) => s + parseFloat(t.actual_hours||0), 0);
   const budgetHrs = parseFloat(p.budget_baseline_hours || 0);
-  const cpi = 0.97, spi = 0.94;
+  const RATE = 175; // default blended rate — will be replaced with real rate data
+
+  const bacCost = budgetHrs * RATE;
+  const evCost  = ev  * RATE;
+  const acCost  = actualHrs * RATE;
+  const pvCost  = pv  * RATE;
+  const cv      = evCost - acCost;
+  const sv      = evCost - pvCost;
+  const eac     = cpiNum > 0 ? bacCost / cpiNum : null;
+  const etc     = eac != null ? eac - acCost : null;
+  const vac     = eac != null ? bacCost - eac : null;
 
   document.getElementById('evm-gauges-full').innerHTML =
-    UI.gauge(pct, 100, 'var(--cyan)', 'WORK %', pct+'%', 60) +
-    UI.gauge(cpi, 2, UI.indexColor(cpi), 'CPI', cpi.toFixed(2), 60) +
-    UI.gauge(spi, 2, UI.indexColor(spi), 'SPI', spi.toFixed(2), 60);
+    UI.gauge(pct,    100, 'var(--cyan)',         'WORK %', pct+'%', 60) +
+    UI.gauge(cpiNum, 2,   UI.indexColor(cpiNum), 'CPI',    cpi,     60) +
+    UI.gauge(spiNum, 2,   UI.indexColor(spiNum), 'SPI',    spi,     60);
 
   const evmRows = [
-    ['BAC (Budget at Completion)', UI.fmtCurrency(budgetHrs * 175)],
-    ['EV (Earned Value)',          UI.fmtCurrency(budgetHrs * 175 * pct / 100)],
-    ['AC (Actual Cost)',           UI.fmtCurrency(actualHrs * 185)],
-    ['PV (Planned Value)',         UI.fmtCurrency(budgetHrs * 175 * 0.55)],
-    ['CV (Cost Variance)',         '—'],
-    ['SV (Schedule Variance)',     '—'],
-    ['CPI',                        `<span style="color:${UI.indexColor(cpi)}">${cpi}</span>`],
-    ['SPI',                        `<span style="color:${UI.indexColor(spi)}">${spi}</span>`],
-    ['EAC (Est. at Completion)',    UI.fmtCurrency(budgetHrs * 175 / cpi)],
-    ['ETC (Est. to Complete)',      '—'],
-    ['VAC (Variance at Completion)','—'],
-    ['Actual Hours Logged',        UI.fmtHours(actualHrs)],
-    ['Budget Hours',               UI.fmtHours(budgetHrs)],
+    ['BAC (Budget at Completion)',   UI.fmtCurrency(bacCost)],
+    ['PV  (Planned Value)',          UI.fmtCurrency(pvCost)],
+    ['EV  (Earned Value)',           UI.fmtCurrency(evCost)],
+    ['AC  (Actual Cost)',            UI.fmtCurrency(acCost)],
+    ['CV  (Cost Variance)',          `<span style="color:${cv>=0?'var(--green)':'var(--red)'};">${UI.fmtCurrency(cv)}</span>`],
+    ['SV  (Schedule Variance)',      `<span style="color:${sv>=0?'var(--green)':'var(--red)'};">${UI.fmtCurrency(sv)}</span>`],
+    ['CPI (Cost Perf. Index)',       `<span style="color:${UI.indexColor(cpiNum)}">${cpi}</span>`],
+    ['SPI (Schedule Perf. Index)',   `<span style="color:${UI.indexColor(spiNum)}">${spi}</span>`],
+    ['EAC (Est. at Completion)',     eac != null ? UI.fmtCurrency(eac) : '—'],
+    ['ETC (Est. to Complete)',       etc != null ? UI.fmtCurrency(etc) : '—'],
+    ['VAC (Variance at Completion)', vac != null ? `<span style="color:${vac>=0?'var(--green)':'var(--red)'};">${UI.fmtCurrency(vac)}</span>` : '—'],
+    ['Budget Hours (BAC hrs)',       UI.fmtHours(budgetHrs)],
+    ['Actual Hours (AC hrs)',        UI.fmtHours(actualHrs)],
   ];
   document.getElementById('evm-table-detail').innerHTML = evmRows.map(([k,v]) =>
     `<tr><td class="evm-key">${k}</td><td class="evm-val">${v}</td></tr>`
   ).join('');
 
   // Budget bars
+  const laborPct = budgetHrs > 0 ? UI.pct(actualHrs, budgetHrs) : 0;
   document.getElementById('budget-bars').innerHTML = [
-    { label: 'TOTAL BUDGET', used: pct, color: 'var(--cyan)',  total: UI.fmtCurrency(budgetHrs*175) },
-    { label: 'LABOR',        used: UI.pct(actualHrs, budgetHrs), color: 'var(--purple)', total: UI.fmtHours(budgetHrs) },
+    { label: 'WORK COMPLETE',  used: pct,      color: 'var(--cyan)',   total: pct+'%' },
+    { label: 'HOURS CONSUMED', used: laborPct, color: laborPct > 100 ? 'var(--red)' : laborPct > 80 ? 'var(--amber)' : 'var(--purple)', total: UI.fmtHours(actualHrs) + ' of ' + UI.fmtHours(budgetHrs) },
   ].map(b => `<div class="budget-row">
     <div class="budget-label-row">
       <span class="budget-label">${b.label}</span>
-      <span class="budget-nums">${b.used}% OF ${b.total}</span>
+      <span class="budget-nums">${b.total}</span>
     </div>
-    ${UI.progressBar(b.used, b.color)}
+    ${UI.progressBar(Math.min(b.used, 100), b.color)}
   </div>`).join('');
 
   // Labor by phase
