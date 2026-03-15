@@ -167,12 +167,77 @@
 
 /* EVM detail table */
 .evm-table { width: 100%; }
-.evm-table tr { border-bottom: 1px solid var(--border); }
+.evm-table tr { border-bottom: 1px solid var(--border); cursor: pointer; }
 .evm-table tr:last-child { border-bottom: none; }
-.evm-table tr:hover td { background: rgba(0,210,255,0.03); }
+.evm-table tr:hover td { background: rgba(0,210,255,0.05); }
+.evm-table tr:hover .evm-key { color: var(--cyan); }
 .evm-table td { padding: 9px 16px; font-family: var(--font-mono); font-size: 12px; }
-.evm-table .evm-key { color: var(--text2); letter-spacing: 0.08em; width: 60%; }
+.evm-table .evm-key { color: var(--text2); letter-spacing: 0.08em; width: 60%; transition: color 0.12s; }
 .evm-table .evm-val { color: var(--text0); font-weight: 700; text-align: right; font-size: 13px; }
+.evm-table .evm-hint { color: var(--text3); font-size: 9px; margin-left: 6px; }
+
+/* EVM explainer popup */
+.evm-popup-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeInUp 0.15s ease;
+}
+.evm-popup {
+  background: var(--bg1);
+  border: 1px solid var(--border-act);
+  width: 480px; max-width: 90vw;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  position: relative;
+}
+.evm-popup-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,210,255,0.04);
+}
+.evm-popup-title {
+  font-family: var(--font-hud); font-size: 16px; font-weight: 700;
+  color: var(--text0); letter-spacing: 0.06em;
+}
+.evm-popup-close {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; font-size: 16px; transition: color 0.12s;
+}
+.evm-popup-close:hover { color: var(--red); }
+.evm-popup-body { padding: 18px; }
+.evm-popup-formula {
+  font-family: var(--font-data); font-size: 13px;
+  color: var(--cyan); background: rgba(0,210,255,0.06);
+  border: 1px solid rgba(0,210,255,0.15);
+  padding: 10px 14px; margin-bottom: 14px; letter-spacing: 0.04em;
+}
+.evm-popup-calc {
+  font-family: var(--font-data); font-size: 12px;
+  color: var(--text2); background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 10px 14px; margin-bottom: 14px;
+}
+.evm-popup-calc .calc-line { margin-bottom: 4px; }
+.evm-popup-calc .calc-line:last-child { margin-bottom: 0; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; font-weight: 700; color: var(--text0); }
+.evm-popup-interp {
+  font-family: var(--font-ui); font-size: 13px; color: var(--text1);
+  line-height: 1.6; padding: 10px 14px;
+  border-left: 2px solid var(--cyan);
+  background: rgba(0,210,255,0.03);
+}
+.evm-popup-result {
+  margin-top: 14px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border);
+}
+.evm-popup-result-val {
+  font-family: var(--font-hud); font-size: 28px; font-weight: 700;
+}
+.evm-popup-result-label {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text2);
+  letter-spacing: 0.1em;
+}
 
 /* Budget bars */
 .budget-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
@@ -480,6 +545,22 @@
   <div class="journal-panel-body" id="jp-body"></div>
 </div>
 
+<!-- EVM Explainer Popup -->
+<div id="evm-popup-overlay" class="evm-popup-overlay" style="display:none;" onclick="closeEVMPopup(event)">
+  <div class="evm-popup" onclick="event.stopPropagation()">
+    <div class="evm-popup-header">
+      <div class="evm-popup-title" id="evm-popup-title">—</div>
+      <button class="evm-popup-close" onclick="closeEVMPopup()">✕</button>
+    </div>
+    <div class="evm-popup-body">
+      <div class="evm-popup-formula" id="evm-popup-formula"></div>
+      <div class="evm-popup-calc" id="evm-popup-calc"></div>
+      <div class="evm-popup-interp" id="evm-popup-interp"></div>
+      <div class="evm-popup-result" id="evm-popup-result"></div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -579,7 +660,192 @@ function closeJournalPanel() {
   document.getElementById('journal-panel').classList.remove('open');
 }
 
-// ── SHARED EVM COMPUTATION ────────────────────────────────────
+// ── EVM EXPLAINER POPUP ───────────────────────────────────────
+function closeEVMPopup(e) {
+  if (!e || e.target === document.getElementById('evm-popup-overlay')) {
+    document.getElementById('evm-popup-overlay').style.display = 'none';
+  }
+}
+
+function showEVMPopup(key) {
+  const { bac, ac, ev, pv, cpi, spi, cpiNum, spiNum, pctDone, done, total } = computeEVM();
+  const RATE = 175;
+  const bacCost = bac * RATE;
+  const evCost  = ev  * RATE;
+  const acCost  = ac  * RATE;
+  const pvCost  = pv  * RATE;
+  const cv      = evCost - acCost;
+  const sv      = evCost - pvCost;
+  const eac     = cpiNum > 0 ? bacCost / cpiNum : null;
+  const etc     = eac != null ? eac - acCost : null;
+  const vac     = eac != null ? bacCost - eac : null;
+  const tcpi    = (eac != null && (bacCost - evCost) > 0) ? (bacCost - evCost) / (eac - acCost) : null;
+
+  const defs = {
+    'BAC': {
+      title: 'BAC — Budget at Completion',
+      formula: 'BAC = Budget Baseline Hours × Blended Labor Rate',
+      calc: [
+        `Budget Hours: ${bac.toFixed(1)} hrs`,
+        `Blended Rate: $${RATE}/hr`,
+        `BAC = ${bac.toFixed(1)} × $${RATE} = ${UI.fmtCurrency(bacCost)}`,
+      ],
+      result: UI.fmtCurrency(bacCost), color: 'var(--text0)',
+      interp: `The total approved budget for this project is ${UI.fmtCurrency(bacCost)}. This is the baseline locked at project approval and is used as the denominator for all EVM calculations. It should not change unless a formal change order is approved.`
+    },
+    'PV': {
+      title: 'PV — Planned Value',
+      formula: 'PV = BAC × (Schedule % Elapsed)',
+      calc: [
+        `BAC: ${UI.fmtCurrency(bacCost)}`,
+        `Schedule elapsed: ${(pv/bac*100).toFixed(1)}% of project duration`,
+        `PV = ${UI.fmtCurrency(bacCost)} × ${(pv/bac*100).toFixed(1)}% = ${UI.fmtCurrency(pvCost)}`,
+      ],
+      result: UI.fmtCurrency(pvCost), color: 'var(--text0)',
+      interp: `By this point in the schedule, ${UI.fmtCurrency(pvCost)} worth of work was planned to be complete. This is the "budget for work scheduled" — what was supposed to have been accomplished based on the project timeline.`
+    },
+    'EV': {
+      title: 'EV — Earned Value',
+      formula: 'EV = BAC × (% Work Complete)',
+      calc: [
+        `BAC: ${UI.fmtCurrency(bacCost)}`,
+        `Tasks complete: ${done} of ${total} (${pctDone}%)`,
+        `EV = ${UI.fmtCurrency(bacCost)} × ${pctDone}% = ${UI.fmtCurrency(evCost)}`,
+      ],
+      result: UI.fmtCurrency(evCost), color: 'var(--cyan)',
+      interp: `${UI.fmtCurrency(evCost)} worth of work has actually been completed. This is the "budget for work performed" — the true measure of progress independent of what was spent.`
+    },
+    'AC': {
+      title: 'AC — Actual Cost',
+      formula: 'AC = Σ (Hours Logged × Labor Rate)',
+      calc: [
+        `Total hours logged (task journal): ${ac.toFixed(1)} hrs`,
+        `Blended rate: $${RATE}/hr`,
+        `AC = ${ac.toFixed(1)} × $${RATE} = ${UI.fmtCurrency(acCost)}`,
+      ],
+      result: UI.fmtCurrency(acCost), color: 'var(--text0)',
+      interp: `${UI.fmtCurrency(acCost)} has actually been spent to date, based on ${ac.toFixed(1)} hours logged across all task journal entries. This is the real cost incurred — compared to EV to determine cost performance.`
+    },
+    'CV': {
+      title: 'CV — Cost Variance',
+      formula: 'CV = EV − AC',
+      calc: [
+        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
+        `AC (Actual Cost): ${UI.fmtCurrency(acCost)}`,
+        `CV = ${UI.fmtCurrency(evCost)} − ${UI.fmtCurrency(acCost)} = ${UI.fmtCurrency(cv)}`,
+      ],
+      result: UI.fmtCurrency(cv), color: cv >= 0 ? 'var(--green)' : 'var(--red)',
+      interp: cv >= 0
+        ? `CV is positive — the project is ${UI.fmtCurrency(cv)} under budget. The team has earned more value than it has spent.`
+        : `CV is negative — the project is ${UI.fmtCurrency(Math.abs(cv))} over budget. More has been spent than the value of work completed. Root cause: labor hours are running ${((ac/ev)-1*100).toFixed(0)}% over the plan.`
+    },
+    'SV': {
+      title: 'SV — Schedule Variance',
+      formula: 'SV = EV − PV',
+      calc: [
+        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
+        `PV (Planned Value): ${UI.fmtCurrency(pvCost)}`,
+        `SV = ${UI.fmtCurrency(evCost)} − ${UI.fmtCurrency(pvCost)} = ${UI.fmtCurrency(sv)}`,
+      ],
+      result: UI.fmtCurrency(sv), color: sv >= 0 ? 'var(--green)' : 'var(--red)',
+      interp: sv >= 0
+        ? `SV is positive — the project is ${UI.fmtCurrency(sv)} ahead of schedule in value terms. More work has been accomplished than was planned for this point in time.`
+        : `SV is negative — the project is ${UI.fmtCurrency(Math.abs(sv))} behind schedule in value terms. Less work has been completed than was planned for this point in time.`
+    },
+    'CPI': {
+      title: 'CPI — Cost Performance Index',
+      formula: 'CPI = EV ÷ AC',
+      calc: [
+        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
+        `AC (Actual Cost): ${UI.fmtCurrency(acCost)}`,
+        `CPI = ${UI.fmtCurrency(evCost)} ÷ ${UI.fmtCurrency(acCost)} = ${cpi}`,
+      ],
+      result: cpi, color: UI.indexColor(cpiNum),
+      interp: `CPI of ${cpi} means the project is earning ${UI.fmtCurrency(cpiNum * 100)} of value for every $100 spent. ${cpiNum < 1 ? `The project is spending $${(1/cpiNum).toFixed(2)} to produce $1.00 of work — significantly over budget. To finish on budget, either scope must be reduced or the remaining work must be completed at a CPI of ${tcpi ? tcpi.toFixed(2) : '—'} (TCPI).` : 'The project is efficiently delivering value within budget.'}`
+    },
+    'SPI': {
+      title: 'SPI — Schedule Performance Index',
+      formula: 'SPI = EV ÷ PV',
+      calc: [
+        `EV (Earned Value): ${UI.fmtCurrency(evCost)}`,
+        `PV (Planned Value): ${UI.fmtCurrency(pvCost)}`,
+        `SPI = ${UI.fmtCurrency(evCost)} ÷ ${UI.fmtCurrency(pvCost)} = ${spi}`,
+      ],
+      result: spi, color: UI.indexColor(spiNum),
+      interp: `SPI of ${spi} means the team is completing ${UI.fmtCurrency(spiNum * 100)} of planned work for every $100 planned. ${spiNum >= 1 ? 'The project is progressing faster than scheduled.' : 'The project is progressing slower than scheduled.'} Note: SPI naturally trends toward 1.0 near project end as all remaining work gets done.`
+    },
+    'EAC': {
+      title: 'EAC — Estimate at Completion',
+      formula: 'EAC = BAC ÷ CPI',
+      calc: [
+        `BAC: ${UI.fmtCurrency(bacCost)}`,
+        `CPI: ${cpi}`,
+        `EAC = ${UI.fmtCurrency(bacCost)} ÷ ${cpi} = ${eac != null ? UI.fmtCurrency(eac) : '—'}`,
+      ],
+      result: eac != null ? UI.fmtCurrency(eac) : '—', color: eac != null && eac > bacCost ? 'var(--red)' : 'var(--green)',
+      interp: eac != null ? `If the project continues at the current CPI of ${cpi}, it will cost ${UI.fmtCurrency(eac)} to complete — ${eac > bacCost ? UI.fmtCurrency(eac - bacCost) + ' over' : UI.fmtCurrency(bacCost - eac) + ' under'} the original budget of ${UI.fmtCurrency(bacCost)}.` : 'Cannot compute — insufficient data.'
+    },
+    'ETC': {
+      title: 'ETC — Estimate to Complete',
+      formula: 'ETC = EAC − AC',
+      calc: [
+        `EAC (Est. at Completion): ${eac != null ? UI.fmtCurrency(eac) : '—'}`,
+        `AC (Actual Cost to date): ${UI.fmtCurrency(acCost)}`,
+        `ETC = ${eac != null ? UI.fmtCurrency(eac) : '—'} − ${UI.fmtCurrency(acCost)} = ${etc != null ? UI.fmtCurrency(etc) : '—'}`,
+      ],
+      result: etc != null ? UI.fmtCurrency(etc) : '—', color: 'var(--amber)',
+      interp: etc != null ? `${UI.fmtCurrency(etc)} is still needed to finish the project, based on current cost performance. This is what remains after accounting for the ${UI.fmtCurrency(acCost)} already spent.` : 'Cannot compute — insufficient data.'
+    },
+    'VAC': {
+      title: 'VAC — Variance at Completion',
+      formula: 'VAC = BAC − EAC',
+      calc: [
+        `BAC (Budget at Completion): ${UI.fmtCurrency(bacCost)}`,
+        `EAC (Estimate at Completion): ${eac != null ? UI.fmtCurrency(eac) : '—'}`,
+        `VAC = ${UI.fmtCurrency(bacCost)} − ${eac != null ? UI.fmtCurrency(eac) : '—'} = ${vac != null ? UI.fmtCurrency(vac) : '—'}`,
+      ],
+      result: vac != null ? UI.fmtCurrency(vac) : '—', color: vac != null ? (vac >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text2)',
+      interp: vac != null ? `At project completion, the ${vac >= 0 ? 'budget surplus' : 'cost overrun'} is forecast to be ${UI.fmtCurrency(Math.abs(vac))}. ${vac < 0 ? 'Corrective action is needed to bring costs back in line, or a change order must be processed.' : 'The project is tracking to finish under budget.'}` : 'Cannot compute — insufficient data.'
+    },
+    'Budget Hours': {
+      title: 'Budget Hours (BAC hrs)',
+      formula: 'BAC hrs = Baseline budget locked at project approval',
+      calc: [`Budget Baseline Hours: ${bac.toFixed(1)} hrs`, `At $${RATE}/hr blended rate = ${UI.fmtCurrency(bacCost)}`],
+      result: bac.toFixed(1) + ' hrs', color: 'var(--text0)',
+      interp: `${bac.toFixed(1)} hours were budgeted for this project at baseline. These hours are locked — changes require formal change control. To date, ${ac.toFixed(1)} hours have been logged (${UI.pct(ac, bac)}% of budget hours consumed).`
+    },
+    'Actual Hours': {
+      title: 'Actual Hours (AC hrs)',
+      formula: 'AC hrs = Σ hours_spent from task journal entries',
+      calc: [
+        `Journal entries: ${STATE.journal.length} entries`,
+        `Total hours logged: ${ac.toFixed(1)} hrs`,
+        `Budget hours: ${bac.toFixed(1)} hrs`,
+        `Hours consumed: ${UI.pct(ac, bac)}% of budget`,
+      ],
+      result: ac.toFixed(1) + ' hrs', color: UI.indexColor(bac > 0 ? bac/ac : 1),
+      interp: `${ac.toFixed(1)} actual hours have been logged across ${STATE.journal.length} task journal entries. With ${pctDone}% of work complete and ${UI.pct(ac, bac)}% of budget hours consumed, the project is burning hours ${ac/ev > 1 ? `${((ac/ev-1)*100).toFixed(0)}% faster` : 'slower'} than the work is being earned.`
+    },
+  };
+
+  // Match the key to a definition
+  const match = Object.keys(defs).find(k => key.toUpperCase().includes(k.toUpperCase()) || key.includes(k));
+  const def = defs[match] || defs[key];
+  if (!def) return;
+
+  document.getElementById('evm-popup-title').textContent = def.title;
+  document.getElementById('evm-popup-formula').textContent = def.formula;
+  document.getElementById('evm-popup-calc').innerHTML = def.calc.map((l, i) =>
+    `<div class="calc-line">${l}</div>`
+  ).join('');
+  document.getElementById('evm-popup-interp').textContent = def.interp;
+  document.getElementById('evm-popup-result').innerHTML = `
+    <div class="evm-popup-result-val" style="color:${def.color};">${def.result}</div>
+    <div class="evm-popup-result-label">${match || key}<br><span style="color:var(--text3);font-size:8.5px;">CLICK ANYWHERE OUTSIDE TO CLOSE</span></div>`;
+  document.getElementById('evm-popup-overlay').style.display = 'flex';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEVMPopup({}); });
 function computeEVM() {
   const p     = STATE.project;
   const tasks = STATE.tasks;
@@ -1010,7 +1276,10 @@ function renderEVM() {
     ['Actual Hours (AC hrs)',        UI.fmtHours(actualHrs)],
   ];
   document.getElementById('evm-table-detail').innerHTML = evmRows.map(([k,v]) =>
-    `<tr><td class="evm-key">${k}</td><td class="evm-val">${v}</td></tr>`
+    `<tr onclick="showEVMPopup('${k.split(' ')[0]}')">
+      <td class="evm-key">${k} <span class="evm-hint">ⓘ</span></td>
+      <td class="evm-val">${v}</td>
+    </tr>`
   ).join('');
 
   // Budget bars
