@@ -1238,9 +1238,9 @@ function renderOverviewEVM() {
   const tasks = STATE.tasks;
   const { cpi, spi, cpiNum, spiNum, pctDone } = computeEVM();
   document.getElementById('overview-gauges').innerHTML =
-    UI.gauge(pctDone, 100, 'var(--cyan)', 'WORK %', pctDone+'%', 52) +
-    UI.gauge(cpi, 2, UI.indexColor(cpi), 'CPI', cpi.toFixed(2), 52) +
-    UI.gauge(spi, 2, UI.indexColor(spi), 'SPI', spi.toFixed(2), 52);
+    UI.gauge(pctDone, 100, 'var(--cyan)',         'WORK %', pctDone+'%',  52) +
+    UI.gauge(cpiNum,  2,   UI.indexColor(cpiNum), 'CPI',    cpi,          52) +
+    UI.gauge(spiNum,  2,   UI.indexColor(spiNum), 'SPI',    spi,          52);
   document.getElementById('overview-evm-vals').innerHTML = `
     <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:8px;color:var(--text3);">TASKS DONE</span><span style="font-family:var(--font-hud);font-size:14px;font-weight:700;color:var(--green);">${done}</span></div>
     <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:8px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14px;font-weight:700;color:var(--red);">${tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
