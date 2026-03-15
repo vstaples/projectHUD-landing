@@ -1,5 +1,5 @@
 // ============================================================
-// ProjectHUD — journal-replies.js  v3
+// ProjectHUD — journal-replies.js  v4
 // Uses API + Auth globals. Expand/collapse nested replies.
 // ============================================================
 
@@ -50,30 +50,24 @@ async function loadRepliesForTask(taskId) {
 }
 
 async function saveReply(parentId, parentType, taskId, projectId, body) {
-  if (!body || !body.trim()) return null;
+  if (!body?.trim()) return null;
   if (!_currentUser) {
     if (typeof showToast==='function') showToast('You must be logged in to reply.','error');
     return null;
   }
-  const payload = {
-    parent_id:   parentId,
-    parent_type: parentType,
-    task_id:     taskId,
-    project_id:  projectId,
-    author_id:   _currentUser.id,
-    body:        body.trim(),
-  };
   try {
-    await API.post('journal_replies', payload);
+    await API.post('journal_replies', {
+      parent_id: parentId, parent_type: parentType,
+      task_id: taskId, project_id: projectId,
+      author_id: _currentUser.id, body: body.trim(),
+    });
     const rows = await API.get(
       `journal_replies?select=id,parent_id,parent_type,task_id,author_id,body,created_at,users:author_id(name,email)&parent_id=eq.${parentId}&order=created_at.desc&limit=1`
     );
     const reply = rows?.[0];
     if (!reply) return null;
     if (!_replyCache[parentId]) _replyCache[parentId] = [];
-    if (!_replyCache[parentId].find(x => x.id === reply.id)) {
-      _replyCache[parentId].push(reply);
-    }
+    if (!_replyCache[parentId].find(x => x.id === reply.id)) _replyCache[parentId].push(reply);
     return reply;
   } catch(e) {
     console.error('[Replies] saveReply:', e.message);
@@ -85,61 +79,24 @@ async function saveReply(parentId, parentType, taskId, projectId, body) {
 async function deleteReply(replyId, parentId) {
   try {
     await API.del(`journal_replies?id=eq.${replyId}`);
-    if (_replyCache[parentId]) {
-      _replyCache[parentId] = _replyCache[parentId].filter(r => r.id !== replyId);
-    }
+    if (_replyCache[parentId]) _replyCache[parentId] = _replyCache[parentId].filter(r => r.id !== replyId);
     delete _replyCache[replyId];
     return true;
   } catch(e) {
     console.error('[Replies] deleteReply:', e.message);
-    if (typeof showToast==='function') showToast('Failed to delete reply.','error');
     return false;
   }
 }
 
-// ── Reply arrow icon ────────────────────────────────────────
-function _replyIcon() {
+// ── Icons ────────────────────────────────────────────────────
+function _replyArrow() {
   return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="display:block;">
     <path d="M2 8L7 3v3c5.5 0 8 2 8 7-1.5-3-4-4.5-8-4.5V12L2 8z" fill="currentColor"/>
   </svg>`;
 }
 
-// ── Expand/collapse triangle ────────────────────────────────
-function _expandIcon(expanded) {
-  // ▶ collapsed, ▼ expanded
-  return expanded ? '▼' : '▶';
-}
-
-// ── Toggle expand/collapse of ONE level of replies ──────────
-function toggleReplies(parentId, taskId, projectId, btn) {
-  const childrenSlot = btn.closest('[data-reply-id], [data-journal-id]')
-                          ?.querySelector(':scope > .jr-children-slot');
-  if (!childrenSlot) return;
-
-  const isExpanded = childrenSlot.dataset.expanded === '1';
-
-  if (isExpanded) {
-    // Collapse: clear children
-    childrenSlot.innerHTML = '';
-    childrenSlot.dataset.expanded = '0';
-    btn.textContent = _expandIcon(false);
-    btn.title = 'Show replies';
-  } else {
-    // Expand: render ONE level only (direct children)
-    childrenSlot.innerHTML = '';
-    const directReplies = _replyCache[parentId] || [];
-    directReplies.forEach(reply => {
-      const wrap = _buildSingleReply(reply, taskId, projectId, 1);
-      childrenSlot.appendChild(wrap);
-    });
-    childrenSlot.dataset.expanded = '1';
-    btn.textContent = _expandIcon(true);
-    btn.title = 'Hide replies';
-  }
-}
-
-// ── Build a single reply element (one level, no children rendered) ──
-function _buildSingleReply(reply, taskId, projectId, depth) {
+// ── Build one reply element (no children rendered yet) ───────
+function _buildReplyEl(reply, taskId, projectId, depth) {
   const wrap = document.createElement('div');
   wrap.className = 'jr-reply-wrap';
   wrap.dataset.replyId = reply.id;
@@ -152,8 +109,7 @@ function _buildSingleReply(reply, taskId, projectId, depth) {
   const initials   = authorName.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
   const ts         = _replyRelTime(reply.created_at);
   const isMine     = _currentUser && reply.author_id === _currentUser.id;
-  const hasChildren = (_replyCache[reply.id] || []).length > 0;
-  const childCount  = hasChildren ? (_replyCache[reply.id] || []).length : 0;
+  const childCount = (_replyCache[reply.id] || []).length;
 
   wrap.innerHTML = `
     <div class="jr-reply-row">
@@ -162,117 +118,177 @@ function _buildSingleReply(reply, taskId, projectId, depth) {
         <div class="jr-reply-meta">
           <span class="jr-author">${_esc(authorName)}</span>
           <span class="jr-ts">${ts}</span>
-          <button class="jr-reply-icon-btn" title="Reply"
-            onclick="handleReplyClick('${reply.id}','reply','${taskId}','${projectId}',this)">
-            ${_replyIcon()}
-          </button>
-          ${isMine ? `<button class="jr-del-btn" title="Delete" onclick="handleDeleteReply('${reply.id}','${reply.parent_id || ''}',this)">✕</button>` : ''}
-          ${hasChildren ? `<button class="jr-expand-btn" title="Show replies"
-            onclick="toggleReplies('${reply.id}','${taskId}','${projectId}',this)">▶ ${childCount}</button>` : ''}
+          <button class="jr-reply-icon-btn" title="Reply">${_replyArrow()}</button>
+          ${childCount > 0 ? `<button class="jr-expand-btn" title="Show replies">▼ ${childCount}</button>` : ''}
+          ${isMine ? `<button class="jr-del-btn" title="Delete">✕</button>` : ''}
         </div>
         <div class="jr-reply-text">${_esc(reply.body)}</div>
       </div>
     </div>
     <div class="jr-composer-slot"></div>
-    <div class="jr-children-slot" data-expanded="0"></div>
+    <div class="jr-children-slot"></div>
   `;
+
+  // Wire up buttons after innerHTML (avoids inline handler ID escaping issues)
+  const replyBtn  = wrap.querySelector('.jr-reply-icon-btn');
+  const expandBtn = wrap.querySelector('.jr-expand-btn');
+  const delBtn    = wrap.querySelector('.jr-del-btn');
+
+  replyBtn.addEventListener('click', () =>
+    _openComposer(reply.id, 'reply', taskId, projectId, wrap)
+  );
+  if (expandBtn) {
+    // Children start collapsed — icon shows ▼ = "click to expand"
+    // We use ▼ for collapsed (pointing down = "there are replies below") 
+    // and ▲ for expanded (pointing up = "click to collapse")
+    expandBtn.dataset.expanded = '0';
+    expandBtn.textContent = `▼ ${childCount}`;
+    expandBtn.addEventListener('click', () =>
+      _toggleChildren(reply.id, taskId, projectId, expandBtn, wrap, depth)
+    );
+  }
+  if (delBtn) {
+    delBtn.addEventListener('click', () => _handleDelete(reply.id, reply.parent_id, wrap));
+  }
 
   return wrap;
 }
 
-// ── Inject reply thread into a journal entry element ────────
+// ── Toggle children (one level at a time) ───────────────────
+function _toggleChildren(parentId, taskId, projectId, btn, containerEl, parentDepth) {
+  const slot = containerEl.querySelector(':scope > .jr-children-slot');
+  if (!slot) return;
+
+  const isExpanded = btn.dataset.expanded === '1';
+  const childCount = (_replyCache[parentId] || []).length;
+
+  if (isExpanded) {
+    slot.innerHTML = '';
+    btn.dataset.expanded = '0';
+    btn.textContent = `▼ ${childCount}`;
+    btn.title = 'Show replies';
+  } else {
+    slot.innerHTML = '';
+    (_replyCache[parentId] || []).forEach(r => {
+      slot.appendChild(_buildReplyEl(r, taskId, projectId, parentDepth + 1));
+    });
+    btn.dataset.expanded = '1';
+    btn.textContent = `▲ ${childCount}`;
+    btn.title = 'Hide replies';
+  }
+}
+
+// ── Inject reply thread into a journal entry ─────────────────
 function injectReplyThread(journalEntryEl, journalId, taskId, projectId) {
   if (!journalId || !taskId) return;
 
-  const existing = journalEntryEl.querySelector('.jr-thread-root');
-  if (existing) existing.remove();
+  journalEntryEl.querySelector('.jr-thread-root')?.remove();
 
   const root = document.createElement('div');
   root.className = 'jr-thread-root';
   root.dataset.journalId = journalId;
-
-  const directReplies = _replyCache[journalId] || [];
-  const replyCount = directReplies.length;
-
-  // Build: expand toggle (only if replies exist) + composer slot + children slot
-  root.innerHTML = `
-    <div class="jr-composer-slot"></div>
-    <div class="jr-children-slot" data-expanded="0"></div>
-  `;
-
+  root.innerHTML = `<div class="jr-composer-slot"></div><div class="jr-children-slot"></div>`;
   journalEntryEl.appendChild(root);
 
-  // Inject reply icon + optional expand toggle into the journal-header
-  _injectHeaderControls(journalEntryEl, journalId, taskId, projectId, replyCount);
+  // Inject controls into .journal-header
+  _injectHeaderControls(journalEntryEl, journalId, taskId, projectId);
 }
 
-// ── Inject controls into .journal-header ────────────────────
-function _injectHeaderControls(entryEl, journalId, taskId, projectId, replyCount) {
+function _injectHeaderControls(entryEl, journalId, taskId, projectId) {
   const header = entryEl.querySelector('.journal-header');
   if (!header) return;
-
-  // Remove any previously injected controls
   header.querySelectorAll('.jr-reply-icon-btn, .jr-expand-btn').forEach(e => e.remove());
 
-  // Reply arrow — right-aligned via margin-left:auto
+  // Reply arrow — margin-left:auto pushes it to the right
   const replyBtn = document.createElement('button');
   replyBtn.className = 'jr-reply-icon-btn';
   replyBtn.title = 'Reply';
   replyBtn.style.marginLeft = 'auto';
-  replyBtn.innerHTML = _replyIcon();
-  replyBtn.onclick = () => handleReplyClick(journalId, 'journal', taskId, projectId, replyBtn);
+  replyBtn.innerHTML = _replyArrow();
+  replyBtn.addEventListener('click', () =>
+    _openComposer(journalId, 'journal', taskId, projectId, entryEl)
+  );
   header.appendChild(replyBtn);
 
-  // Expand toggle — only shown when replies exist
-  if (replyCount > 0) {
+  // Expand toggle — only if replies exist, ▼ = collapsed
+  const childCount = (_replyCache[journalId] || []).length;
+  if (childCount > 0) {
     const expandBtn = document.createElement('button');
     expandBtn.className = 'jr-expand-btn';
+    expandBtn.dataset.expanded = '0';
+    expandBtn.textContent = `▼ ${childCount}`;
     expandBtn.title = 'Show replies';
-    expandBtn.textContent = `▶ ${replyCount}`;
-    expandBtn.onclick = () => toggleReplies(journalId, taskId, projectId, expandBtn);
+    expandBtn.addEventListener('click', () => {
+      const root = entryEl.querySelector('.jr-thread-root');
+      const slot = root?.querySelector(':scope > .jr-children-slot');
+      if (!slot) return;
+      const isExpanded = expandBtn.dataset.expanded === '1';
+      if (isExpanded) {
+        slot.innerHTML = '';
+        expandBtn.dataset.expanded = '0';
+        expandBtn.textContent = `▼ ${childCount}`;
+        expandBtn.title = 'Show replies';
+      } else {
+        slot.innerHTML = '';
+        (_replyCache[journalId] || []).forEach(r => {
+          slot.appendChild(_buildReplyEl(r, taskId, projectId, 1));
+        });
+        expandBtn.dataset.expanded = '1';
+        expandBtn.textContent = `▲ ${childCount}`;
+        expandBtn.title = 'Hide replies';
+      }
+    });
     header.appendChild(expandBtn);
   }
 }
 
-// ── Composer open/close ──────────────────────────────────────
-function handleReplyClick(parentId, parentType, taskId, projectId, triggerBtn) {
+// ── Open inline composer ─────────────────────────────────────
+function _openComposer(parentId, parentType, taskId, projectId, containerEl) {
   document.querySelectorAll('.jr-composer').forEach(c => c.remove());
 
-  // Find the nearest jr-thread-root or jr-reply-wrap ancestor
-  const container = triggerBtn.closest('.jr-reply-wrap, .jr-thread-root, .journal-entry');
-  if (!container) return;
-
+  // Find the correct composer slot:
+  // For journal-entry: inside .jr-thread-root > .jr-composer-slot
+  // For jr-reply-wrap: :scope > .jr-composer-slot
   let slot;
-  if (container.classList.contains('journal-entry')) {
-    slot = container.querySelector('.jr-thread-root > .jr-composer-slot');
+  if (containerEl.classList.contains('journal-entry')) {
+    slot = containerEl.querySelector('.jr-thread-root > .jr-composer-slot');
   } else {
-    slot = container.querySelector(':scope > .jr-composer-slot');
+    slot = containerEl.querySelector(':scope > .jr-composer-slot');
   }
   if (!slot) return;
-
-  if (slot.querySelector('.jr-composer')) { slot.innerHTML = ''; return; }
 
   const composer = document.createElement('div');
   composer.className = 'jr-composer';
   composer.innerHTML = `
     <textarea class="jr-textarea" placeholder="Write a reply…" rows="3"></textarea>
     <div class="jr-composer-actions">
-      <button class="jr-submit-btn"
-        onclick="handleReplySubmit(this,'${parentId}','${parentType}','${taskId}','${projectId}')">SUBMIT</button>
-      <button class="jr-cancel-btn" onclick="this.closest('.jr-composer').remove()">CANCEL</button>
+      <button class="jr-submit-btn">SUBMIT</button>
+      <button class="jr-cancel-btn">CANCEL</button>
     </div>
   `;
+
+  composer.querySelector('.jr-submit-btn').addEventListener('click', function() {
+    _submitReply(this, parentId, parentType, taskId, projectId, containerEl);
+  });
+  composer.querySelector('.jr-cancel-btn').addEventListener('click', () => composer.remove());
 
   slot.appendChild(composer);
   composer.querySelector('.jr-textarea').focus();
 }
 
-// ── Submit ───────────────────────────────────────────────────
-async function handleReplySubmit(btn, parentId, parentType, taskId, projectId) {
+// Public wrapper kept for any inline onclick still in HTML (none expected, but safe)
+function handleReplyClick(parentId, parentType, taskId, projectId, btn) {
+  const container = btn.closest('.jr-reply-wrap, .jr-thread-root, .journal-entry');
+  if (container) _openComposer(parentId, parentType, taskId, projectId,
+    container.classList.contains('jr-thread-root') ? container.closest('.journal-entry') : container
+  );
+}
+
+// ── Submit ────────────────────────────────────────────────────
+async function _submitReply(btn, parentId, parentType, taskId, projectId, containerEl) {
   const composer = btn.closest('.jr-composer');
-  const textarea = composer.querySelector('.jr-textarea');
-  const body = textarea.value.trim();
-  if (!body) { textarea.focus(); return; }
+  const body = composer.querySelector('.jr-textarea').value.trim();
+  if (!body) { composer.querySelector('.jr-textarea').focus(); return; }
 
   btn.disabled = true;
   btn.textContent = 'SAVING…';
@@ -282,70 +298,72 @@ async function handleReplySubmit(btn, parentId, parentType, taskId, projectId) {
 
   composer.remove();
 
-  // Re-render the parent entry's controls (update reply count on expand btn)
-  const journalEntry = document.querySelector(`.jr-thread-root[data-journal-id="${parentId}"]`)?.closest('.journal-entry');
-  const replyWrap    = document.querySelector(`[data-reply-id="${parentId}"]`);
+  // Refresh controls on the parent journal entry or reply
+  const journalEntry = containerEl.classList.contains('journal-entry')
+    ? containerEl
+    : containerEl.closest('.journal-entry');
 
   if (journalEntry) {
-    // Top-level reply to a journal entry — refresh header controls
-    const directCount = (_replyCache[parentId] || []).length;
-    _injectHeaderControls(journalEntry, parentId, taskId, projectId, directCount);
-    // If children slot is expanded, refresh it
-    const slot = journalEntry.querySelector('.jr-thread-root > .jr-children-slot');
-    if (slot?.dataset.expanded === '1') {
-      slot.innerHTML = '';
-      (_replyCache[parentId] || []).forEach(r => {
-        slot.appendChild(_buildSingleReply(r, taskId, projectId, 1));
-      });
-    }
-  } else if (replyWrap) {
-    // Reply to a reply — refresh the expand button on that reply
-    const existingExpand = replyWrap.querySelector(':scope > .jr-reply-row .jr-expand-btn');
-    const childCount = (_replyCache[parentId] || []).length;
-    if (existingExpand) {
-      existingExpand.textContent = `${existingExpand.textContent.startsWith('▼') ? '▼' : '▶'} ${childCount}`;
-    } else {
-      // Add expand button
-      const meta = replyWrap.querySelector('.jr-reply-meta');
-      if (meta) {
-        const eb = document.createElement('button');
-        eb.className = 'jr-expand-btn';
-        eb.title = 'Show replies';
-        eb.textContent = `▶ ${childCount}`;
-        eb.onclick = () => toggleReplies(parentId, taskId, projectId, eb);
-        meta.appendChild(eb);
+    const threadRoot = journalEntry.querySelector('.jr-thread-root');
+    if (threadRoot) {
+      const jId = threadRoot.dataset.journalId;
+      // If replying to the top-level entry, update header controls
+      if (parentId === jId) {
+        _injectHeaderControls(journalEntry, jId, taskId, projectId);
+        // If expanded, refresh children
+        const slot = threadRoot.querySelector(':scope > .jr-children-slot');
+        if (slot?.innerHTML) {
+          slot.innerHTML = '';
+          (_replyCache[jId] || []).forEach(r => {
+            slot.appendChild(_buildReplyEl(r, taskId, projectId, 1));
+          });
+        }
+      } else {
+        // Replying to a nested reply — update that reply's expand button
+        const replyWrap = journalEntry.querySelector(`[data-reply-id="${parentId}"]`);
+        if (replyWrap) {
+          const existExpand = replyWrap.querySelector('.jr-reply-meta > .jr-expand-btn');
+          const cnt = (_replyCache[parentId] || []).length;
+          if (existExpand) {
+            existExpand.textContent = existExpand.dataset.expanded === '1' ? `▲ ${cnt}` : `▼ ${cnt}`;
+          } else {
+            const eb = document.createElement('button');
+            eb.className = 'jr-expand-btn';
+            eb.dataset.expanded = '0';
+            eb.textContent = `▼ ${cnt}`;
+            eb.title = 'Show replies';
+            eb.addEventListener('click', () =>
+              _toggleChildren(parentId, taskId, projectId, eb, replyWrap,
+                parseInt(replyWrap.style.marginLeft || '0') / REPLY_INDENT_PX)
+            );
+            replyWrap.querySelector('.jr-reply-meta')?.appendChild(eb);
+          }
+        }
       }
     }
   }
 }
 
-// ── Delete ───────────────────────────────────────────────────
-async function handleDeleteReply(replyId, parentId, btn) {
+// ── Delete ────────────────────────────────────────────────────
+async function _handleDelete(replyId, parentId, wrapEl) {
   if (!confirm('Delete this reply?')) return;
   const ok = await deleteReply(replyId, parentId);
-  if (ok) {
-    const wrap = document.querySelector(`[data-reply-id="${replyId}"]`);
-    if (wrap) wrap.remove();
-  }
+  if (ok) wrapEl.remove();
 }
 
-// ── Utilities ────────────────────────────────────────────────
+// ── Utilities ─────────────────────────────────────────────────
 function _esc(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 function _replyRelTime(iso) {
   const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1)  return 'just now';
-  if (mins < 60) return mins + 'm ago';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return hrs + 'h ago';
-  const days = Math.floor(hrs / 24);
-  if (days < 7)  return days + 'd ago';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const m = Math.floor(diff/60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return m+'m ago';
+  const h = Math.floor(m/60);
+  if (h < 24) return h+'h ago';
+  const d = Math.floor(h/24);
+  if (d < 7)  return d+'d ago';
+  return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
 }
-
-if (typeof showToast === 'undefined') {
-  window.showToast = function(msg, type) { console.log('[Toast]', type, msg); };
-}
+if (typeof showToast==='undefined') window.showToast = (m,t) => console.log('[Toast]',t,m);

@@ -429,6 +429,12 @@
 
 
 
+
+/* Fix: allow fixed-position panels (journal, EVM popup, exp form) to overflow
+   the body without clipping. hud.css sets overflow:hidden on html/body which
+   clips position:fixed children in some browsers. */
+html, body { overflow: visible !important; }
+
 </style>
 </head>
 <body>
