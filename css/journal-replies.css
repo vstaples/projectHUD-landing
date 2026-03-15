@@ -1,0 +1,208 @@
+/* ============================================================
+   ProjectHUD — Journal Threaded Replies
+   Add to hud.css (or inline in project-detail.html <style>)
+   ============================================================ */
+
+/* ── Thread root container ───────────────────────────────── */
+.jr-thread-root {
+  margin-top: 6px;
+}
+
+/* ── Top-level reply button row ──────────────────────────── */
+.jr-top-reply-btn-wrap {
+  padding: 2px 0 4px 0;
+}
+
+/* ── Reply wrapper ───────────────────────────────────────── */
+.jr-reply-wrap {
+  position: relative;
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+/* ── Reply row: avatar + body ────────────────────────────── */
+.jr-reply-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* ── Avatar circle ───────────────────────────────────────── */
+.jr-avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 210, 255, 0.15);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  color: #00d2ff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+/* ── Body wrap (meta + text + reply btn) ─────────────────── */
+.jr-reply-body-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Meta row ────────────────────────────────────────────── */
+.jr-reply-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.jr-author {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #00d2ff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jr-ts {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: rgba(180, 200, 220, 0.5);
+}
+
+/* ── Delete button ───────────────────────────────────────── */
+.jr-del-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(255, 71, 87, 0.45);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.jr-del-btn:hover {
+  color: #ff4757;
+}
+
+/* ── Reply text ──────────────────────────────────────────── */
+.jr-reply-text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  color: rgba(200, 220, 240, 0.85);
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* ── Reply button (↩ REPLY) ──────────────────────────────── */
+.jr-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+  background: none;
+  border: none;
+  color: rgba(0, 210, 255, 0.45);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  padding: 2px 0;
+  transition: color 0.15s;
+  text-transform: uppercase;
+}
+.jr-reply-btn:hover {
+  color: #00d2ff;
+}
+.jr-reply-btn svg {
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.jr-reply-btn:hover svg {
+  opacity: 1;
+}
+
+/* ── Inline composer ─────────────────────────────────────── */
+.jr-composer {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.jr-textarea {
+  width: 100%;
+  min-height: 64px;
+  background: rgba(0, 30, 60, 0.60);
+  border: 1px solid rgba(0, 210, 255, 0.25);
+  border-radius: 3px;
+  color: rgba(210, 230, 245, 0.92);
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.jr-textarea:focus {
+  border-color: rgba(0, 210, 255, 0.55);
+}
+.jr-textarea::placeholder {
+  color: rgba(150, 175, 200, 0.35);
+}
+
+/* ── Composer action row ─────────────────────────────────── */
+.jr-composer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.jr-submit-btn {
+  background: rgba(0, 210, 255, 0.12);
+  border: 1px solid rgba(0, 210, 255, 0.40);
+  color: #00d2ff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 4px 14px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.jr-submit-btn:hover {
+  background: rgba(0, 210, 255, 0.22);
+  border-color: rgba(0, 210, 255, 0.65);
+}
+.jr-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.jr-cancel-btn {
+  background: none;
+  border: 1px solid rgba(150, 170, 190, 0.20);
+  color: rgba(150, 170, 190, 0.55);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.jr-cancel-btn:hover {
+  color: rgba(200, 215, 230, 0.8);
+  border-color: rgba(150, 170, 190, 0.40);
+}
