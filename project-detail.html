@@ -361,8 +361,7 @@
           <div id="proj-description-header" style="font-family:var(--font-body,Barlow,sans-serif);font-size:13px;color:var(--text2);margin-top:5px;line-height:1.7;letter-spacing:0.01em;max-width:700px;"></div>
         </div>
         <div class="proj-header-actions">
-          <button class="hud-btn" id="btn-edit-project">✎ EDIT</button>
-          <button class="hud-btn primary" id="btn-new-task">+ TASK</button>
+          <button class="hud-btn" id="btn-edit-project" onclick="openEditProjectPanel()">✎ EDIT</button>
         </div>
       </div>
 
@@ -474,7 +473,7 @@
             <button class="hud-btn task-filter" data-filter="complete">COMPLETE</button>
             <button class="hud-btn task-filter" data-filter="overdue" style="color:var(--red);">OVERDUE</button>
           </div>
-          <button class="hud-btn primary" onclick="alert('Project Plan page coming soon')">OPEN PROJECT PLAN →</button>
+          <button class="hud-btn" id="btn-edit-plan" onclick="togglePlanEditMode()">&#9998; EDIT PLAN</button>
         </div>
         <div class="panel">
           <div class="task-table-wrap">
@@ -1283,7 +1282,20 @@ function renderTasksTable() {
   const tbody = document.getElementById('tasks-tbody');
   let html = '';
   const renderPhase = (phaseLabel, phaseTasks) => {
-    html += `<tr class="phase-header"><td colspan="11">${phaseLabel}</td></tr>`;
+    const phaseKey    = phaseLabel.replace(/[^a-zA-Z0-9]/g,'_');
+    const isCollapsed = _collapsedPhases.has(phaseKey);
+    const planEdit    = document.getElementById('btn-edit-plan')?.dataset.active === '1';
+    html += `<tr class="phase-header" data-phase-key="${phaseKey}">
+      <td colspan="10">${phaseLabel}</td>
+      <td style="text-align:right;padding-right:8px;">
+        ${planEdit ? `
+          <button onclick="openEditPhasePanel('${phaseLabel.replace(/'/g,"\\'")}','${phaseKey}')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit phase">&#9998;</button>
+          <button onclick="confirmDeletePhase('${phaseLabel.replace(/'/g,"\\'")}','${phaseKey}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete phase">&#128465;</button>
+        ` : ''}
+        <span onclick="togglePhaseCollapse('${phaseKey}')" style="cursor:pointer;font-size:12px;color:var(--cyan);user-select:none;padding:2px 6px;" title="${isCollapsed?'Expand':'Collapse'}">${isCollapsed ? '&#9654;' : '&#9660;'}</span>
+      </td>
+    </tr>`;
+    if (isCollapsed) return;
     phaseTasks.forEach(t => {
       const asgn = STATE.users.find(u => u.id === t.assigned_to);
       const due  = t.due_date ? UI.dueDateLabel(t.due_date) : { text: '—', color: 'var(--text3)' };
@@ -1299,9 +1311,18 @@ function renderTasksTable() {
         <td><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
         <td>${UI.badge(t.status)}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
-        <td><button class="panel-action" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" >▤</button></td>
+        <td style="white-space:nowrap;">
+          <button class="panel-action" onclick="openJournalPanel(this.dataset.tid,this.dataset.tname)" data-tid="${t.id}" data-tname="${t.name.replace(/"/g,'&quot;')}">&#9636;</button>
+          ${planEdit ? `<button onclick="openEditTaskPanel('${t.id}')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit task">&#9998;</button><button onclick="confirmDeleteTask('${t.id}','${t.name.replace(/'/g,\"\\'\")}');" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete task">&#128465;</button>` : ''}
+        </td>
       </tr>`;
     });
+    if (planEdit) {
+      html += `<tr class="plan-edit-add-row"><td colspan="11" style="padding:0;"><div style="display:flex;gap:8px;padding:6px 14px;background:rgba(0,210,255,0.02);border-top:1px dashed rgba(0,210,255,0.12);">
+        <button onclick="openAddTaskPanel('${phaseLabel.replace(/'/g,\"\\'\")}');" style="background:none;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:4px 12px;cursor:pointer;">+ ADD TASK</button>
+        <button onclick="openAddPhasePanel('${phaseLabel.replace(/'/g,\"\\'\")}');" style="background:none;border:1px solid rgba(255,170,0,0.3);color:var(--amber);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:4px 12px;cursor:pointer;">+ ADD PHASE AFTER</button>
+      </div></td></tr>`;
+    }
   };
   phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
   if (nophase.length) renderPhase('NO PHASE', nophase);
@@ -1665,7 +1686,7 @@ async function computeCPMForGantt() {
   let deps = [];
   try {
     const taskIds = tasks.map(t => t.id);
-    deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${taskIds.join(',')})`);
+    deps = await API.get(`task_dependencies?select=*&task_id=in.(${taskIds.join(',')})`);
   } catch(e) { deps = []; }
 
   // Auto-generate sequential deps within each phase if none found
@@ -1681,7 +1702,7 @@ async function computeCPMForGantt() {
           task_id:              phaseTasks[i].id,
           predecessor_task_id:  phaseTasks[i-1].id,
           successor_task_id:    phaseTasks[i].id,
-          link_type:            'FS',
+          dependency_type:      'FS',
           lag_days:             0,
         });
       }
@@ -2077,6 +2098,382 @@ function _rr(ctx,x,y,w,h,r) {
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
 }
 
+// ── PLAN EDIT MODE & COLLAPSE STATE ──────────────────────────
+const _collapsedPhases = new Set();
+let   _planEditMode    = false;
+
+function togglePhaseCollapse(phaseKey) {
+  if (_collapsedPhases.has(phaseKey)) _collapsedPhases.delete(phaseKey);
+  else _collapsedPhases.add(phaseKey);
+  renderTasksTable();
+}
+
+function togglePlanEditMode() {
+  _planEditMode = !_planEditMode;
+  const btn = document.getElementById('btn-edit-plan');
+  if (btn) {
+    btn.dataset.active = _planEditMode ? '1' : '0';
+    btn.textContent    = _planEditMode ? '✕ EXIT EDIT' : '✎ EDIT PLAN';
+    btn.style.color    = _planEditMode ? 'var(--amber)' : '';
+    btn.style.borderColor = _planEditMode ? 'rgba(255,170,0,0.5)' : '';
+  }
+  renderTasksTable();
+}
+
+// ── SLIDE PANEL HELPER ────────────────────────────────────────
+function _openSlidePanel(id) {
+  const el = document.getElementById(id);
+  if (el) { el.style.right = '0'; el.classList.add('open'); }
+}
+function _closeSlidePanel(id) {
+  const el = document.getElementById(id);
+  if (el) { el.style.right = el.dataset.width || '-500px'; el.classList.remove('open'); }
+}
+function _clearErr(id) { const e=document.getElementById(id); if(e){e.style.display='none';e.textContent='';} }
+function _showErr(id,msg) { const e=document.getElementById(id); if(e){e.textContent=msg;e.style.display='block';} }
+
+// ── EDIT PROJECT (name / client / description) ─────────────────
+function openEditProjectPanel() {
+  const p = STATE.project;
+  const firms = STATE.firms || [];
+  document.getElementById('epf-name').value        = p.name || '';
+  document.getElementById('epf-description').value = p.description || '';
+  // Populate client select
+  const sel = document.getElementById('epf-client');
+  sel.innerHTML = '<option value="">— Select client —</option>' +
+    firms.map(f => `<option value="${f.id}" ${f.id===p.client_id?'selected':''}>${f.name}</option>`).join('');
+  _clearErr('epf-error');
+  _openSlidePanel('edit-project-panel');
+}
+function closeEditProjectPanel() { _closeSlidePanel('edit-project-panel'); }
+
+async function saveEditProject() {
+  const name = document.getElementById('epf-name').value.trim();
+  const desc = document.getElementById('epf-description').value.trim();
+  const clientId = document.getElementById('epf-client').value;
+  if (!name) { _showErr('epf-error','Project name is required'); return; }
+  const btn = document.getElementById('epf-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    const payload = { name, description: desc };
+    if (clientId) payload.client_id = clientId;
+    await API.patch(`projects?id=eq.${STATE.project.id}`, payload);
+    STATE.project.name        = name;
+    STATE.project.description = desc;
+    if (clientId) STATE.project.client_id = clientId;
+    renderHeader();
+    closeEditProjectPanel();
+  } catch(err) {
+    _showErr('epf-error', err.message || 'Save failed');
+  } finally {
+    btn.textContent = 'SAVE'; btn.disabled = false;
+  }
+}
+
+// ── ADD / EDIT TASK PANEL ─────────────────────────────────────
+let _editingTaskId = null;
+
+function openAddTaskPanel(phase) {
+  _editingTaskId = null;
+  document.getElementById('tf-panel-title').textContent = 'ADD TASK';
+  document.getElementById('tf-name').value        = '';
+  document.getElementById('tf-phase').value       = phase || '';
+  document.getElementById('tf-status').value      = 'not_started';
+  document.getElementById('tf-start').value       = '';
+  document.getElementById('tf-due').value         = '';
+  document.getElementById('tf-duration').value    = '';
+  document.getElementById('tf-effort').value      = '';
+  document.getElementById('tf-pct').value         = '0';
+  // Populate assigned select
+  const asel = document.getElementById('tf-assigned');
+  asel.innerHTML = '<option value="">— Unassigned —</option>' +
+    (STATE.users||[]).map(u => `<option value="${u.id}">` + u.name + '</option>').join('');
+  _clearErr('tf-error');
+  _openSlidePanel('task-form-panel');
+}
+
+function openEditTaskPanel(taskId) {
+  const t = STATE.tasks.find(t => t.id === taskId);
+  if (!t) return;
+  _editingTaskId = taskId;
+  document.getElementById('tf-panel-title').textContent = 'EDIT TASK';
+  document.getElementById('tf-name').value        = t.name || '';
+  document.getElementById('tf-phase').value       = t.phase || '';
+  document.getElementById('tf-status').value      = t.status || 'not_started';
+  document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
+  document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
+  document.getElementById('tf-duration').value    = t.duration_days || '';
+  document.getElementById('tf-effort').value      = t.effort_days   || '';
+  document.getElementById('tf-pct').value         = t.pct_complete  || '0';
+  document.getElementById('tf-assigned').value    = t.assigned_to   || '';
+  // Populate assigned select
+  const sel = document.getElementById('tf-assigned');
+  sel.innerHTML = '<option value="">— Unassigned —</option>' +
+    (STATE.users||[]).map(u => `<option value="${u.id}" ${u.id===t.assigned_to?'selected':''}>${u.name}</option>`).join('');
+  _clearErr('tf-error');
+  _openSlidePanel('task-form-panel');
+}
+function closeTaskFormPanel() { _closeSlidePanel('task-form-panel'); }
+
+async function saveTaskForm() {
+  const name = document.getElementById('tf-name').value.trim();
+  const phase = document.getElementById('tf-phase').value.trim();
+  if (!name)  { _showErr('tf-error','Task name is required'); return; }
+  if (!phase) { _showErr('tf-error','Phase is required'); return; }
+  const btn = document.getElementById('tf-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  const payload = {
+    name,
+    phase,
+    status:       document.getElementById('tf-status').value   || 'not_started',
+    start_date:   document.getElementById('tf-start').value    || null,
+    due_date:     document.getElementById('tf-due').value      || null,
+    duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
+    effort_days:  parseFloat(document.getElementById('tf-effort').value)   || null,
+    pct_complete: parseFloat(document.getElementById('tf-pct').value)      || 0,
+    assigned_to:  document.getElementById('tf-assigned').value             || null,
+  };
+  try {
+    if (_editingTaskId) {
+      await API.patch(`tasks?id=eq.${_editingTaskId}`, payload);
+      const idx = STATE.tasks.findIndex(t => t.id === _editingTaskId);
+      if (idx >= 0) Object.assign(STATE.tasks[idx], payload);
+    } else {
+      // Compute next sequence_order for this phase
+      const phaseTasks = STATE.tasks.filter(t => t.phase === phase);
+      const maxSeq = phaseTasks.length ? Math.max(...phaseTasks.map(t => t.sequence_order||0)) : 0;
+      payload.project_id     = PROJECT_ID;
+      payload.sequence_order = maxSeq + 10;
+      const [created] = await API.post('tasks', payload);
+      if (created) STATE.tasks.push(created);
+    }
+    closeTaskFormPanel();
+    renderTasksTable();
+    renderHeader();
+  } catch(err) {
+    _showErr('tf-error', err.message || 'Save failed');
+  } finally {
+    btn.textContent = 'SAVE'; btn.disabled = false;
+  }
+}
+
+// ── ADD / EDIT PHASE ─────────────────────────────────────────
+let _editingPhaseKey  = null;
+let _editingPhaseOrig = null;
+let _addPhaseAfter    = null;
+
+function openAddPhasePanel(afterPhase) {
+  _editingPhaseKey  = null;
+  _editingPhaseOrig = null;
+  _addPhaseAfter    = afterPhase;
+  document.getElementById('phf-panel-title').textContent = 'ADD PHASE';
+  document.getElementById('phf-name').value = '';
+  _clearErr('phf-error');
+  _openSlidePanel('phase-form-panel');
+}
+
+function openEditPhasePanel(phaseLabel, phaseKey) {
+  _editingPhaseKey  = phaseKey;
+  _editingPhaseOrig = phaseLabel;
+  _addPhaseAfter    = null;
+  document.getElementById('phf-panel-title').textContent = 'EDIT PHASE';
+  document.getElementById('phf-name').value = phaseLabel;
+  _clearErr('phf-error');
+  _openSlidePanel('phase-form-panel');
+}
+function closePhaseFormPanel() { _closeSlidePanel('phase-form-panel'); }
+
+async function savePhaseForm() {
+  const newName = document.getElementById('phf-name').value.trim();
+  if (!newName) { _showErr('phf-error','Phase name is required'); return; }
+  const btn = document.getElementById('phf-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    if (_editingPhaseOrig) {
+      // Rename: patch all tasks in the phase
+      const affected = STATE.tasks.filter(t => t.phase === _editingPhaseOrig);
+      await Promise.all(affected.map(t => API.patch(`tasks?id=eq.${t.id}`, { phase: newName })));
+      affected.forEach(t => { t.phase = newName; });
+    }
+    // For ADD PHASE: just opens with the new name ready — tasks will be added to it via ADD TASK
+    closePhaseFormPanel();
+    renderTasksTable();
+  } catch(err) {
+    _showErr('phf-error', err.message || 'Save failed');
+  } finally {
+    btn.textContent = 'SAVE'; btn.disabled = false;
+  }
+}
+
+// ── DELETE CONFIRM ────────────────────────────────────────────
+function confirmDeleteTask(taskId, taskName) {
+  document.getElementById('confirm-msg').textContent =
+    `Delete task "${taskName}"? This cannot be undone.`;
+  document.getElementById('confirm-ok-btn').onclick = () => deleteTask(taskId);
+  _openSlidePanel('confirm-panel');
+}
+
+async function deleteTask(taskId) {
+  _closeSlidePanel('confirm-panel');
+  try {
+    await API.del(`tasks?id=eq.${taskId}`);
+    STATE.tasks = STATE.tasks.filter(t => t.id !== taskId);
+    renderTasksTable();
+    renderHeader();
+  } catch(err) { alert('Delete failed: ' + (err.message||err)); }
+}
+
+function confirmDeletePhase(phaseLabel, phaseKey) {
+  const count = STATE.tasks.filter(t => t.phase === phaseLabel).length;
+  document.getElementById('confirm-msg').textContent =
+    `Delete phase "${phaseLabel}" and all ${count} task(s) within it? This cannot be undone.`;
+  document.getElementById('confirm-ok-btn').onclick = () => deletePhase(phaseLabel);
+  _openSlidePanel('confirm-panel');
+}
+
+async function deletePhase(phaseLabel) {
+  _closeSlidePanel('confirm-panel');
+  try {
+    const ids = STATE.tasks.filter(t => t.phase === phaseLabel).map(t => t.id);
+    if (ids.length) await API.del(`tasks?id=in.(${ids.join(',')})`);
+    STATE.tasks = STATE.tasks.filter(t => t.phase !== phaseLabel);
+    renderTasksTable();
+    renderHeader();
+  } catch(err) { alert('Delete failed: ' + (err.message||err)); }
+}
+
+// ── INIT BUTTON WIRING ────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Populate assigned select in task form on open
+  document.getElementById('task-form-panel')?.addEventListener('transitionend', () => {
+    const sel = document.getElementById('tf-assigned');
+    if (sel && !sel.options.length) {
+      sel.innerHTML = '<option value="">— Unassigned —</option>' +
+        (STATE.users||[]).map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+    }
+  });
+});
+
 </script>
+
+<!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
+<div class="journal-panel" id="edit-project-panel" style="width:440px;right:-460px;" data-width="-460px">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title">EDIT PROJECT</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;">Update project title, client &amp; description</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeEditProjectPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:18px;">
+    <div style="margin-bottom:14px;">
+      <label class="exp-label">PROJECT NAME <span style="color:var(--red);">*</span></label>
+      <input id="epf-name" class="hud-input" style="width:100%;" placeholder="Project name" />
+    </div>
+    <div style="margin-bottom:14px;">
+      <label class="exp-label">CLIENT</label>
+      <select id="epf-client" class="hud-select" style="width:100%;"></select>
+    </div>
+    <div style="margin-bottom:18px;">
+      <label class="exp-label">DESCRIPTION</label>
+      <textarea id="epf-description" class="hud-input" rows="4"
+        style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;width:100%;"
+        placeholder="Project description..."></textarea>
+    </div>
+    <div id="epf-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" id="epf-save-btn" onclick="saveEditProject()" style="flex:1;">SAVE</button>
+      <button class="hud-btn" onclick="closeEditProjectPanel()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TASK ADD / EDIT PANEL ───────────────────────────────── -->
+<div class="journal-panel" id="task-form-panel" style="width:460px;right:-480px;" data-width="-480px">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="tf-panel-title">ADD TASK</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;">Fill in task details</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeTaskFormPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:18px;">
+    <div style="margin-bottom:12px;">
+      <label class="exp-label">TASK NAME <span style="color:var(--red);">*</span></label>
+      <input id="tf-name" class="hud-input" style="width:100%;" placeholder="Task name" />
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label class="exp-label">PHASE <span style="color:var(--red);">*</span></label>
+        <input id="tf-phase" class="hud-input" style="width:100%;" placeholder="Phase name" />
+      </div>
+      <div>
+        <label class="exp-label">STATUS</label>
+        <select id="tf-status" class="hud-select" style="width:100%;">
+          <option value="not_started">Not Started</option>
+          <option value="in_progress">In Progress</option>
+          <option value="complete">Complete</option>
+          <option value="on_hold">On Hold</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" /></div>
+      <div><label class="exp-label">DUE DATE</label><input id="tf-due" class="hud-input" type="date" style="width:100%;" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">DURATION (d)</label><input id="tf-duration" class="hud-input" type="number" min="0" step="0.5" style="width:100%;" /></div>
+      <div><label class="exp-label">EFFORT (d)</label><input id="tf-effort" class="hud-input" type="number" min="0" step="0.5" style="width:100%;" /></div>
+      <div><label class="exp-label">% DONE</label><input id="tf-pct" class="hud-input" type="number" min="0" max="100" step="5" value="0" style="width:100%;" /></div>
+    </div>
+    <div style="margin-bottom:18px;">
+      <label class="exp-label">ASSIGNED TO</label>
+      <select id="tf-assigned" class="hud-select" style="width:100%;"><option value="">— Unassigned —</option></select>
+    </div>
+    <div id="tf-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" id="tf-save-btn" onclick="saveTaskForm()" style="flex:1;">SAVE</button>
+      <button class="hud-btn" onclick="closeTaskFormPanel()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PHASE ADD / EDIT PANEL ──────────────────────────────── -->
+<div class="journal-panel" id="phase-form-panel" style="width:400px;right:-420px;" data-width="-420px">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="phf-panel-title">ADD PHASE</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;">Enter phase name</div>
+    </div>
+    <button class="journal-panel-close" onclick="closePhaseFormPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:18px;">
+    <div style="margin-bottom:18px;">
+      <label class="exp-label">PHASE NAME <span style="color:var(--red);">*</span></label>
+      <input id="phf-name" class="hud-input" style="width:100%;" placeholder="e.g. Build #5 — Final Assembly" />
+    </div>
+    <div id="phf-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" id="phf-save-btn" onclick="savePhaseForm()" style="flex:1;">SAVE</button>
+      <button class="hud-btn" onclick="closePhaseFormPanel()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONFIRM DELETE PANEL ────────────────────────────────── -->
+<div class="journal-panel" id="confirm-panel" style="width:400px;right:-420px;" data-width="-420px">
+  <div class="journal-panel-header">
+    <div><div class="journal-panel-title" style="color:var(--red);">⚠ CONFIRM DELETE</div></div>
+    <button class="journal-panel-close" onclick="_closeSlidePanel('confirm-panel')">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:20px;">
+    <div id="confirm-msg" style="font-family:var(--font-mono);font-size:12px;color:var(--text1);line-height:1.7;margin-bottom:24px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button id="confirm-ok-btn" class="hud-btn" style="flex:1;background:rgba(255,71,87,0.1);border-color:rgba(255,71,87,0.5);color:var(--red);">DELETE</button>
+      <button class="hud-btn" onclick="_closeSlidePanel('confirm-panel')" style="flex:1;">CANCEL</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
