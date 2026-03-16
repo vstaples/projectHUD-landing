@@ -510,7 +510,7 @@ function drawNetwork() {
       if (isCPEdge) ctx.setLineDash([]);
       else ctx.setLineDash([4, 3]);
 
-      // Orthogonal routing: horizontal → vertical → horizontal
+      // Orthogonal routing
       const x1 = from.x + NW, y1 = from.y + NH/2;
       const x2 = to.x,        y2 = to.y + NH/2;
       const sameLine = Math.abs(y1 - y2) < 4;
@@ -519,17 +519,26 @@ function drawNetwork() {
         // Same row — straight horizontal line
         ctx.lineTo(x2, y2);
       } else {
-        // Different row — elbow: right → down/up → right
-        const midX = x1 + (x2 - x1) * 0.5;
-        ctx.lineTo(midX, y1);
-        ctx.lineTo(midX, y2);
-        ctx.lineTo(x2, y2);
+        // Cross-phase 5-segment connector:
+        // 1. Short jog right from last task right edge
+        // 2. Drop down to midpoint of the gap between phases
+        // 3. Long run left to left margin
+        // 4. Drop down to target row mid
+        // 5. Run right into target task left edge
+        const jogX   = x1 + 20;
+        const gapMid = from.y + NH + PHASE_GAP / 2;
+        const leftX  = 28;
+        ctx.lineTo(jogX,  y1);
+        ctx.lineTo(jogX,  gapMid);
+        ctx.lineTo(leftX, gapMid);
+        ctx.lineTo(leftX, y2);
+        ctx.lineTo(x2,    y2);
       }
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Arrow head always pointing right (angle = 0)
-      const angle = Math.atan2(y2 - y2, x2 - (x2 - 1));
+      // Arrow head pointing right
+      const angle = 0;
       ctx.beginPath();
       ctx.fillStyle = isCPEdge ? 'rgba(255,71,87,0.8)' : 'rgba(100,160,220,0.25)';
       ctx.moveTo(x2, y2);
@@ -872,7 +881,7 @@ function drawPERTCurve(mean, sd, mlDur) {
   });
 }
 
-// ── RENDER SCHEDULE TABLEs ─────────────────────────────────────
+// ── RENDER SCHEDULE TABLE ─────────────────────────────────────
 function renderScheduleTable() {
   const { nodes, topo, criticalPath } = STATE_CPM;
   const cpSet = new Set(criticalPath);
