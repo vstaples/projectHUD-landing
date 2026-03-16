@@ -482,6 +482,12 @@ async function doSave(blob, duration, dlg) {
     const token = await tokenPromise;
     if (!token) throw new Error('Auth token unavailable — is ProjectHUD open?');
 
+    // Extract user ID from JWT payload
+    let userId = null;
+    try {
+      userId = JSON.parse(atob(token.split('.')[1])).sub || null;
+    } catch(e) {}
+
     prog.textContent = 'UPLOADING…';
     const ts   = new Date().toISOString().replace(/[:.]/g, '-');
     const path = 'recordings/' + ts + '.webm';
@@ -499,12 +505,41 @@ async function doSave(blob, duration, dlg) {
     prog.textContent = 'SAVING METADATA…';
     const tags = dlg.querySelector('#sv-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
 
-    ch.postMessage({
-      evt: 'SAVE_CLIP',
-      payload: { title, duration_seconds: duration, file_path: path,
-        file_size_bytes: blob.size, category, tags, annotations,
-        is_public: category === 'marketing' },
+    prog.textContent = 'SAVING METADATA…';
+
+    // Extract user ID from JWT payload
+    let userId = null;
+    try { userId = JSON.parse(atob(token.split('.')[1])).sub || null; } catch(e) {}
+
+    // Save metadata directly via Supabase REST API using the same fresh token
+    // (avoids relying on main window which may have an expired session)
+    const metaRes = await fetch(SUPABASE_URL + '/rest/v1/video_clips', {
+      method:  'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'apikey':        SUPABASE_ANON_KEY,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal',
+      },
+      body: JSON.stringify({
+        title,
+        duration_seconds: duration,
+        file_path:        path,
+        file_size_bytes:  blob.size,
+        category,
+        tags,
+        annotations,
+        is_public:        category === 'marketing',
+        author_id:        userId,
+      }),
     });
+    if (!metaRes.ok) {
+      const metaErr = await metaRes.json().catch(() => ({}));
+      throw new Error(metaErr.message || metaErr.error || 'Metadata save failed (' + metaRes.status + ')');
+    }
+
+    // Notify main window recording was saved
+    ch.postMessage({ evt: 'SAVED' });
 
     prog.textContent = '✓ SAVED';
     prog.style.color = '#00e5a0';
