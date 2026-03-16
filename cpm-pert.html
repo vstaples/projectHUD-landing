@@ -511,15 +511,15 @@ function drawNetwork() {
       if (!to) return;
       const isCPEdge = cpEdges.has(`${id}->${s}`);
       ctx.beginPath();
-      ctx.strokeStyle = isCPEdge ? 'rgba(255,71,87,0.8)' : 'rgba(100,160,220,0.2)';
-      ctx.lineWidth   = isCPEdge ? 2 : 1;
+      ctx.strokeStyle = isCPEdge ? 'rgba(255,71,87,0.9)' : 'rgba(0,210,255,0.55)';
+      ctx.lineWidth   = isCPEdge ? 2 : 1.5;
       if (isCPEdge) ctx.setLineDash([]);
       else ctx.setLineDash([4, 3]);
 
       // Orthogonal routing
       const x1 = from.x + NW, y1 = from.y + NH/2;
       const x2 = to.x,        y2 = to.y + NH/2;
-      const sameLine = Math.abs(y1 - y2) < 4;
+      const sameLine = Math.abs(y1 - y2) < (NH / 2 + 4);
       ctx.moveTo(x1, y1);
       if (sameLine) {
         ctx.lineTo(x2, y2);
@@ -539,7 +539,7 @@ function drawNetwork() {
       // Arrow head pointing right
       const angle = 0;
       ctx.beginPath();
-      ctx.fillStyle = isCPEdge ? 'rgba(255,71,87,0.8)' : 'rgba(100,160,220,0.25)';
+      ctx.fillStyle = isCPEdge ? 'rgba(255,71,87,0.9)' : 'rgba(0,210,255,0.55)';
       ctx.moveTo(x2, y2);
       ctx.lineTo(x2 - 8*Math.cos(angle-0.4), y2 - 8*Math.sin(angle-0.4));
       ctx.lineTo(x2 - 8*Math.cos(angle+0.4), y2 - 8*Math.sin(angle+0.4));
