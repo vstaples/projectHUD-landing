@@ -1,160 +1,95 @@
 // ============================================================
-// ProjectHUD — hud-recorder.js  v2
-// Opens a detached recorder window (movable to any screen).
-// Communicates via BroadcastChannel('hud-recorder').
+// ProjectHUD — hud-recorder.js  v3
+// Detached recorder window via BroadcastChannel.
+// Uses API.post() for metadata, direct fetch() for storage.
+// initChannel() called at module load — survives navigation.
 // ============================================================
 
 const HUDRecorder = (() => {
 
-  // ── State ────────────────────────────────────────────────
-  let _state      = 'idle';
-  let _stream     = null;
-  let _recorder   = null;
-  let _chunks     = [];
-  let _startTime  = 0;
-  let _pausedMs   = 0;
-  let _pauseStart = 0;
-  let _annotations = [];
-  let _recWin     = null;   // the detached recorder window
-  let _channel    = null;   // BroadcastChannel
+  const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
 
-  // ── CSS (record border on main app only) ─────────────────
+  // ── State ─────────────────────────────────────────────────
+  let _state       = 'idle';
+  let _stream      = null;
+  let _recorder    = null;
+  let _chunks      = [];
+  let _startTime   = 0;
+  let _pausedMs    = 0;
+  let _pauseStart  = 0;
+  let _annotations = [];
+  let _recWin      = null;
+  let _channel     = null;
+  let _syncInterval= null;
+
+  // ── Styles ────────────────────────────────────────────────
   function injectStyles() {
     if (document.getElementById('hud-rec-styles')) return;
     const s = document.createElement('style');
     s.id = 'hud-rec-styles';
     s.textContent = `
-      body.hud-recording #app {
-        box-shadow: inset 0 0 0 3px #ff4757;
-        transition: box-shadow 0.2s;
-      }
-      body.hud-paused #app {
-        box-shadow: inset 0 0 0 3px #ffaa00;
-      }
-
-      /* ── Save dialog ───────────────────────────────────── */
+      body.hud-recording #app { box-shadow: inset 0 0 0 3px #ff4757; transition: box-shadow 0.2s; }
+      body.hud-paused    #app { box-shadow: inset 0 0 0 3px #ffaa00; }
       #hud-save-overlay {
-        position: fixed; inset: 0;
-        background: rgba(0,0,0,0.72);
-        z-index: 10000;
-        display: flex; align-items: center; justify-content: center;
+        position:fixed;inset:0;background:rgba(0,0,0,0.72);
+        z-index:10000;display:flex;align-items:center;justify-content:center;
       }
       .hud-save-panel {
-        background: #0a1628;
-        border: 1px solid rgba(0,210,255,0.25);
-        width: 520px; max-width: 94vw;
-        box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+        background:#0a1628;border:1px solid rgba(0,210,255,0.25);
+        width:520px;max-width:94vw;box-shadow:0 24px 64px rgba(0,0,0,0.8);
       }
       .hud-save-hdr {
-        padding: 13px 18px;
-        border-bottom: 1px solid rgba(0,210,255,0.12);
-        display: flex; align-items: center; justify-content: space-between;
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 11px; letter-spacing: 0.16em; color: #00d2ff;
+        padding:13px 18px;border-bottom:1px solid rgba(0,210,255,0.12);
+        display:flex;align-items:center;justify-content:space-between;
+        font-family:'Share Tech Mono',monospace;font-size:11px;
+        letter-spacing:0.16em;color:#00d2ff;
       }
-      .hud-save-body {
-        padding: 16px 18px;
-        display: flex; flex-direction: column; gap: 12px;
-      }
+      .hud-save-body { padding:16px 18px;display:flex;flex-direction:column;gap:12px; }
       .hud-save-label {
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 10px; color: rgba(160,190,220,0.45);
-        letter-spacing: 0.14em; display: block; margin-bottom: 4px;
+        font-family:'Share Tech Mono',monospace;font-size:10px;
+        color:rgba(160,190,220,0.45);letter-spacing:0.14em;
+        display:block;margin-bottom:4px;
       }
-      .hud-save-body input,
-      .hud-save-body textarea,
-      .hud-save-body select {
-        width: 100%; box-sizing: border-box;
-        background: rgba(0,0,0,0.35);
-        border: 1px solid rgba(0,210,255,0.18);
-        color: rgba(215,232,248,0.9);
-        font-family: 'Barlow', sans-serif; font-size: 13px;
-        padding: 7px 10px; outline: none;
-        transition: border-color 0.15s;
+      .hud-save-body input,.hud-save-body textarea,.hud-save-body select {
+        width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);
+        border:1px solid rgba(0,210,255,0.18);color:rgba(215,232,248,0.9);
+        font-family:'Barlow',sans-serif;font-size:13px;padding:7px 10px;outline:none;
+        transition:border-color 0.15s;
       }
-      .hud-save-body input:focus,
-      .hud-save-body textarea:focus,
-      .hud-save-body select:focus { border-color: rgba(0,210,255,0.45); }
-      .hud-save-body textarea { resize: vertical; min-height: 56px; }
-      .hud-save-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .hud-save-body input:focus,.hud-save-body textarea:focus,.hud-save-body select:focus {
+        border-color:rgba(0,210,255,0.45);
+      }
+      .hud-save-body textarea { resize:vertical;min-height:56px; }
+      .hud-save-2col { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
       .hud-save-footer {
-        display: flex; gap: 8px;
-        padding: 13px 18px;
-        border-top: 1px solid rgba(0,210,255,0.10);
+        display:flex;gap:8px;padding:13px 18px;
+        border-top:1px solid rgba(0,210,255,0.10);
       }
       .hud-save-submit {
-        flex: 1; padding: 9px;
-        background: rgba(0,210,255,0.10);
-        border: 1px solid rgba(0,210,255,0.38);
-        color: #00d2ff;
-        font-family: 'Barlow Condensed', sans-serif;
-        font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
-        cursor: pointer; transition: background 0.15s;
+        flex:1;padding:9px;background:rgba(0,210,255,0.10);
+        border:1px solid rgba(0,210,255,0.38);color:#00d2ff;
+        font-family:'Barlow Condensed',sans-serif;font-size:12px;
+        font-weight:600;letter-spacing:0.1em;cursor:pointer;transition:background 0.15s;
       }
-      .hud-save-submit:hover { background: rgba(0,210,255,0.20); }
-      .hud-save-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+      .hud-save-submit:hover { background:rgba(0,210,255,0.20); }
+      .hud-save-submit:disabled { opacity:0.45;cursor:not-allowed; }
       .hud-save-discard {
-        padding: 9px 18px;
-        background: none;
-        border: 1px solid rgba(255,71,87,0.22);
-        color: rgba(255,71,87,0.55);
-        font-family: 'Barlow Condensed', sans-serif;
-        font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
-        cursor: pointer; transition: color 0.15s, border-color 0.15s;
+        padding:9px 18px;background:none;
+        border:1px solid rgba(255,71,87,0.22);color:rgba(255,71,87,0.55);
+        font-family:'Barlow Condensed',sans-serif;font-size:12px;
+        font-weight:600;letter-spacing:0.1em;cursor:pointer;transition:color 0.15s;
       }
-      .hud-save-discard:hover { color: #ff4757; border-color: rgba(255,71,87,0.45); }
+      .hud-save-discard:hover { color:#ff4757; }
       .hud-save-progress {
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 11px; color: #00d2ff;
-        text-align: center; padding: 5px 0; letter-spacing: 0.1em;
+        font-family:'Share Tech Mono',monospace;font-size:11px;color:#00d2ff;
+        text-align:center;padding:5px 0;letter-spacing:0.1em;
       }
-      .hud-save-annots {
-        max-height: 88px; overflow-y: auto;
-        background: rgba(0,0,0,0.2);
-        border: 1px solid rgba(155,89,182,0.14);
-        padding: 5px 8px;
-      }
-      .hud-save-annot-row {
-        display: flex; gap: 8px; align-items: center;
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 10px; color: rgba(175,200,225,0.55);
-        padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
-      }
-      .hud-save-annot-row:last-child { border-bottom: none; }
-      .hsa-time  { color: #9b59b6; min-width: 38px; }
-      .hsa-type  { color: rgba(0,210,255,0.5); min-width: 52px; font-size: 9px; text-transform: uppercase; }
     `;
     document.head.appendChild(s);
   }
 
-  // ── Open recorder window ──────────────────────────────────
-  function openWindow() {
-    // If already open, focus it
-    if (_recWin && !_recWin.closed) {
-      _recWin.focus();
-      return;
-    }
-
-    // Position bottom-center of current screen
-    const w = 360, h = 310;
-    const left = window.screenLeft + Math.round((window.outerWidth - w) / 2);
-    const top  = window.screenTop  + window.outerHeight - h - 60;
-
-    _recWin = window.open(
-      '/recorder-window.html',
-      'HUDRecorder',
-      `width=${w},height=${h},left=${left},top=${top},` +
-      `resizable=yes,scrollbars=no,toolbar=no,menubar=no,` +
-      `location=no,status=no,titlebar=no`
-    );
-
-    if (!_recWin) {
-      alert('Popup blocked — please allow popups for this site to use the recorder.');
-      return;
-    }
-  }
-
-  // ── BroadcastChannel setup ────────────────────────────────
+  // ── Channel ───────────────────────────────────────────────
   function initChannel() {
     if (_channel) return;
     _channel = new BroadcastChannel('hud-recorder');
@@ -168,24 +103,18 @@ const HUDRecorder = (() => {
   // ── Handle commands from recorder window ──────────────────
   async function onMessage(e) {
     const { cmd } = e.data;
-
-    if (cmd === 'PANEL_READY') {
-      // Window loaded — nothing needed, user clicks START
+    if      (cmd === 'PANEL_READY') { /* window loaded */ }
+    else if (cmd === 'START')       { await startRecording(); }
+    else if (cmd === 'PAUSE')       { pauseRecording(); }
+    else if (cmd === 'RESUME')      { resumeRecording(); }
+    else if (cmd === 'STOP')        { stopRecording(); }
+    else if (cmd === 'ANNOTATION')  { _annotations.push(e.data.annotation); }
+    else if (cmd === 'REQUEST_SYNC') {
+      // New page loaded and is asking for current state
+      if (_state !== 'idle') {
+        broadcast({ cmd: 'SYNC_STATE', state: _state, startTime: _startTime, pausedMs: _pausedMs });
+      }
     }
-    else if (cmd === 'START')      { await startRecording(); }
-    else if (cmd === 'SYNC_STATE') {
-      // Restore state after page navigation
-      _state     = e.data.state;
-      _startTime = e.data.startTime;
-      _pausedMs  = e.data.pausedMs || 0;
-      document.body.classList.toggle('hud-recording', _state === 'recording');
-      document.body.classList.toggle('hud-paused',    _state === 'paused');
-      updateRecBtn();
-    }
-    else if (cmd === 'PAUSE')      { pauseRecording(); }
-    else if (cmd === 'RESUME')     { resumeRecording(); }
-    else if (cmd === 'STOP')       { stopRecording(); }
-    else if (cmd === 'ANNOTATION') { _annotations.push(e.data.annotation); }
   }
 
   // ── Helpers ───────────────────────────────────────────────
@@ -194,8 +123,9 @@ const HUDRecorder = (() => {
     const now = _state === 'paused' ? _pauseStart : Date.now();
     return Math.floor((now - _startTime - _pausedMs) / 1000);
   }
+
   function fmtTime(s) {
-    const m = Math.floor(s/60), sec = s%60;
+    const m = Math.floor(s / 60), sec = s % 60;
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   }
 
@@ -214,18 +144,33 @@ const HUDRecorder = (() => {
     }
   }
 
+  // ── Open recorder window ──────────────────────────────────
+  function openWindow() {
+    if (_recWin && !_recWin.closed) { _recWin.focus(); return; }
+    const w = 360, h = 320;
+    const left = window.screenLeft + Math.round((window.outerWidth - w) / 2);
+    const top  = window.screenTop  + window.outerHeight - h - 60;
+    _recWin = window.open(
+      '/recorder-window.html', 'HUDRecorder',
+      `width=${w},height=${h},left=${left},top=${top},` +
+      `resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`
+    );
+    if (!_recWin) {
+      alert('Popup blocked — please allow popups for this site to use the recorder.');
+    }
+  }
+
   // ── Start ─────────────────────────────────────────────────
   async function startRecording() {
     if (_state !== 'idle') return;
     injectStyles();
-
     try {
       _stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30, cursor: 'always' },
         audio: false,
       });
     } catch(e) {
-      console.warn('[HUDRecorder] getDisplayMedia cancelled:', e.message);
+      console.warn('[HUDRecorder] start failed:', e.message);
       broadcast({ evt: 'ERROR', message: 'Screen share cancelled' });
       return;
     }
@@ -244,7 +189,6 @@ const HUDRecorder = (() => {
     _recorder.onstop = _onRecorderStop;
     _recorder.start(1000);
 
-    // If user closes the share via browser UI
     _stream.getVideoTracks()[0].addEventListener('ended', () => {
       if (_state !== 'idle') stopRecording();
     });
@@ -252,17 +196,20 @@ const HUDRecorder = (() => {
     document.body.classList.add('hud-recording');
     updateRecBtn();
 
+    // Broadcast started + start periodic sync so newly-loaded pages can catch up
     broadcast({ evt: 'RECORDING_STARTED', startTime: _startTime });
-    // Broadcast sync every 5s for pages loaded mid-recording
+    clearInterval(_syncInterval);
     _syncInterval = setInterval(() => {
-      broadcast({ cmd: 'SYNC_STATE', state: _state, startTime: _startTime, pausedMs: _pausedMs });
-    }, 5000);
+      if (_state !== 'idle') {
+        broadcast({ cmd: 'SYNC_STATE', state: _state, startTime: _startTime, pausedMs: _pausedMs });
+      }
+    }, 3000);
   }
 
   // ── Pause ─────────────────────────────────────────────────
   function pauseRecording() {
     if (_state !== 'recording') return;
-    _recorder.pause();
+    _recorder?.pause();
     _pauseStart = Date.now();
     _state = 'paused';
     document.body.classList.remove('hud-recording');
@@ -275,7 +222,7 @@ const HUDRecorder = (() => {
   function resumeRecording() {
     if (_state !== 'paused') return;
     _pausedMs += Date.now() - _pauseStart;
-    _recorder.resume();
+    _recorder?.resume();
     _state = 'recording';
     document.body.classList.remove('hud-paused');
     document.body.classList.add('hud-recording');
@@ -286,50 +233,39 @@ const HUDRecorder = (() => {
   // ── Stop ──────────────────────────────────────────────────
   function stopRecording() {
     if (_state === 'idle') return;
+    clearInterval(_syncInterval);
     const duration = elapsed();
     _state = 'idle';
     document.body.classList.remove('hud-recording', 'hud-paused');
     updateRecBtn();
     _stream?.getTracks().forEach(t => t.stop());
-    if (_recorder) {
-      _recorder.stop(); // triggers _onRecorderStop which shows save dialog
+    if (_recorder && _recorder.state !== 'inactive') {
+      _pendingDuration = duration;
+      _recorder.stop(); // triggers _onRecorderStop
     } else {
-      // Navigated to new page — recorder lives on original page
-      // Just broadcast STOPPED; original page handles save dialog
+      // Navigated to new page — no local recorder, just notify
       broadcast({ evt: 'STOPPED', duration });
     }
   }
 
-  // ── After recorder finishes collecting chunks ─────────────
+  let _pendingDuration = 0;
+
   function _onRecorderStop() {
-    const blob     = new Blob(_chunks, { type: 'video/webm' });
-    const duration = elapsed();
-    showSaveDialog(blob, duration);
+    const blob = new Blob(_chunks, { type: 'video/webm' });
+    broadcast({ evt: 'STOPPED', duration: _pendingDuration });
+    showSaveDialog(blob, _pendingDuration);
   }
 
   // ── Save dialog ───────────────────────────────────────────
   function showSaveDialog(blob, duration) {
+    injectStyles();
     document.getElementById('hud-save-overlay')?.remove();
 
-    // Project options
     let projOpts = '<option value="">— No project —</option>';
     try {
       const proj = window.STATE?.project ? [window.STATE.project] : (window.STATE?.projects || []);
       proj.forEach(p => { projOpts += `<option value="${p.id}">${p.name}</option>`; });
     } catch(e) {}
-
-    const annotHTML = _annotations.length
-      ? `<div>
-          <label class="hud-save-label">ANNOTATIONS (${_annotations.length})</label>
-          <div class="hud-save-annots">
-            ${_annotations.map(a=>`
-              <div class="hud-save-annot-row">
-                <span class="hsa-time">${fmtTime(a.time_seconds)}</span>
-                <span class="hsa-type">${a.type}</span>
-                <span>${a.label}</span>
-              </div>`).join('')}
-          </div>
-        </div>` : '';
 
     const overlay = document.createElement('div');
     overlay.id = 'hud-save-overlay';
@@ -368,7 +304,6 @@ const HUDRecorder = (() => {
             <label class="hud-save-label">TAGS (comma separated)</label>
             <input id="hsr-tags" type="text" placeholder="e.g. evm, onboarding, demo" />
           </div>
-          ${annotHTML}
           <div id="hsr-progress" class="hud-save-progress" style="display:none;"></div>
         </div>
         <div class="hud-save-footer">
@@ -377,20 +312,19 @@ const HUDRecorder = (() => {
         </div>
       </div>
     `;
-
     overlay.querySelector('#hsr-save').addEventListener('click', () => _doSave(blob, duration, overlay));
     overlay.querySelector('#hsr-discard').addEventListener('click', () => {
       if (confirm('Discard this recording?')) {
         overlay.remove();
         broadcast({ evt: 'DISCARDED' });
+        _chunks = []; _annotations = [];
       }
     });
-
     document.body.appendChild(overlay);
     overlay.querySelector('#hsr-title').focus();
   }
 
-  // ── Upload ────────────────────────────────────────────────
+  // ── Upload via Supabase Storage REST API ─────────────────
   async function _doSave(blob, duration, overlay) {
     const title = overlay.querySelector('#hsr-title').value.trim();
     if (!title) { overlay.querySelector('#hsr-title').focus(); return; }
@@ -403,21 +337,34 @@ const HUDRecorder = (() => {
 
     try {
       const userId = await Auth.getCurrentUserId();
-      const ts     = new Date().toISOString().replace(/[:.]/g,'-');
+      const ts     = new Date().toISOString().replace(/[:.]/g, '-');
       const path   = `${userId}/${ts}.webm`;
 
+      // Upload directly to Supabase Storage REST API
       prog.textContent = 'UPLOADING TO STORAGE…';
-      const { data: up, error: upErr } = await supabase.storage
-        .from('video-library')
-        .upload(path, blob, { contentType: 'video/webm', upsert: false });
-      if (upErr) throw new Error(upErr.message);
+      const uploadRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/video-library/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'video/webm',
+            'x-upsert': 'false',
+          },
+          body: blob,
+        }
+      );
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({ message: uploadRes.statusText }));
+        throw new Error(err.message || err.error || uploadRes.statusText);
+      }
 
       prog.textContent = 'SAVING METADATA…';
 
-      const projectId = overlay.querySelector('#hsr-project').value || null;
       const category  = overlay.querySelector('#hsr-category').value;
+      const projectId = overlay.querySelector('#hsr-project').value || null;
       const tags      = overlay.querySelector('#hsr-tags').value
-        .split(',').map(t=>t.trim()).filter(Boolean);
+        .split(',').map(t => t.trim()).filter(Boolean);
 
       let firmId = null;
       try {
@@ -432,7 +379,7 @@ const HUDRecorder = (() => {
         author_id:        userId,
         firm_id:          firmId,
         duration_seconds: duration,
-        file_path:        up.path,
+        file_path:        path,
         file_size_bytes:  blob.size,
         category,
         tags,
@@ -440,10 +387,13 @@ const HUDRecorder = (() => {
         is_public:        category === 'marketing',
       });
 
-      prog.textContent = '✓ SAVED';
-      prog.style.color = '#00e5a0';
+      prog.textContent  = '✓ SAVED TO LIBRARY';
+      prog.style.color  = '#00e5a0';
       broadcast({ evt: 'SAVED' });
-      setTimeout(() => { overlay.remove(); _chunks = []; _annotations = []; }, 1200);
+      setTimeout(() => {
+        overlay.remove();
+        _chunks = []; _annotations = [];
+      }, 1400);
 
     } catch(err) {
       console.error('[HUDRecorder] save error:', err);
@@ -453,7 +403,7 @@ const HUDRecorder = (() => {
     }
   }
 
-  // ── Public APIs ────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────
   function toggle() {
     initChannel();
     if (_recWin && !_recWin.closed) {
@@ -463,8 +413,11 @@ const HUDRecorder = (() => {
     }
   }
 
-  // Auto-init channel on every page load so recording survives navigation
+  // ── Auto-init channel on every page load ──────────────────
+  // This ensures STOP/PAUSE commands received on any page after navigation
   initChannel();
+  // Request sync in case recording was already in progress on a previous page
+  setTimeout(() => broadcast({ cmd: 'REQUEST_SYNC' }), 300);
 
   return { toggle, getState: () => _state };
 

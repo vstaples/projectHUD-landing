@@ -446,7 +446,37 @@ ch.addEventListener('message', e => {
   }
 });
 
-// Notify main windows this panel is ready
+// Also handle SYNC_STATE command (sent every 3s by main window while recording)
+ch.addEventListener('message', e => {
+  const { cmd } = e.data;
+  if (cmd === 'SYNC_STATE' && state === 'idle') {
+    // Main window is recording but we missed RECORDING_STARTED — sync up
+    state     = e.data.state;
+    startTime = e.data.startTime;
+    pausedMs  = e.data.pausedMs || 0;
+    if (state === 'recording') {
+      setBodyState('recording');
+      clearInterval(timerInterval);
+      timerInterval = setInterval(tick, 500);
+      btnStart.disabled = true;
+      btnPause.disabled = false;
+      btnStop.disabled  = false;
+      btnMark.disabled  = false;
+      setStatus('● RECORDING', 'var(--red)');
+    } else if (state === 'paused') {
+      setBodyState('paused');
+      clearInterval(timerInterval);
+      timerInterval = setInterval(tick, 500);
+      btnStart.disabled = true;
+      btnPause.disabled = false;
+      btnStop.disabled  = false;
+      btnMark.disabled  = false;
+      setStatus('⏸ PAUSED', 'var(--amber)');
+    }
+  }
+});
+
+// Notify main window this panel is ready
 ch.postMessage({ cmd: 'PANEL_READY' });
 </script>
 </body>
