@@ -489,6 +489,7 @@ html, body { overflow: visible !important; }
       <div class="proj-tab-bar">
         <button class="proj-tab active" data-tab="overview">◈ OVERVIEW</button>
         <button class="proj-tab" data-tab="tasks">▦ TASKS <span class="tab-badge" id="tab-tasks-count" style="display:none"></span></button>
+        <button class="proj-tab" data-tab="gantt">▤ GANTT</button>
         <button class="proj-tab" data-tab="milestones">◆ MILESTONES</button>
         <button class="proj-tab" data-tab="evm">◉ EVM</button>
         <button class="proj-tab" data-tab="expenditures">$ EXPENDITURES</button>
@@ -583,7 +584,29 @@ html, body { overflow: visible !important; }
         </div>
       </div>
 
-      <!-- ── MILESTONES TAB ────────────────────────────────── -->
+      <!-- ── GANTT TAB ──────────────────────────────────────────────── -->
+      <div id="tab-gantt" class="tab-pane" style="display:none">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">PROJECT GANTT CHART</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="gantt-group-by" class="hud-select" style="font-size:11px;padding:4px 8px;">
+                <option value="phase">Group by Phase</option>
+                <option value="status">Group by Status</option>
+                <option value="none">All Tasks</option>
+              </select>
+              <select id="gantt-zoom" class="hud-select" style="font-size:11px;padding:4px 8px;">
+                <option value="week">Weeks</option>
+                <option value="month">Months</option>
+                <option value="quarter">Quarters</option>
+              </select>
+            </div>
+          </div>
+          <div id="gantt-container" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);"></div>
+        </div>
+      </div>
+
+            <!-- ── MILESTONES TAB ────────────────────────────────── -->
       <div id="tab-milestones" class="tab-pane" style="display:none;">
         <div class="panel">
           <div class="panel-header">
@@ -730,6 +753,7 @@ function switchTab(tab) {
     if (tab === 'documents')     renderDocuments();
     if (tab === 'journal')       renderJournalTab();
     if (tab === 'tasks')         renderTasksTable();
+    if (tab === 'gantt')         renderGanttTab();
     if (tab === 'labor')         renderLabor();
   }
 }
@@ -1543,6 +1567,249 @@ async function loadProjectDetail() {
 }
 
 loadProjectDetail();
+
+// ── ============================================================
+// ── renderGanttTab — SVG Gantt Chart
+// ── ============================================================
+function renderGanttTab() {
+  const container = document.getElementById('gantt-container');
+  if (!container) return;
+
+  const tasks      = (STATE.tasks || []).filter(t => t.start_date && t.due_date);
+  const milestones = STATE.milestones || [];
+
+  if (!tasks.length) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text3);">NO TASKS WITH START & DUE DATES</div>';
+    return;
+  }
+
+  // ── Date helpers ──────────────────────────────────────────
+  const parseDate  = s => new Date(s + 'T00:00:00');
+  const today      = new Date(); today.setHours(0,0,0,0);
+  const allDates   = tasks.flatMap(t => [parseDate(t.start_date), parseDate(t.due_date)]);
+  milestones.forEach(m => { if (m.due_date) allDates.push(parseDate(m.due_date)); });
+
+  let minDate = new Date(Math.min(...allDates));
+  let maxDate = new Date(Math.max(...allDates));
+
+  // Pad by 2 weeks on each side
+  minDate = new Date(minDate.getTime() - 14 * 86400000);
+  maxDate = new Date(maxDate.getTime() + 14 * 86400000);
+
+  // ── Layout constants ──────────────────────────────────────
+  const ROW_H      = 28;
+  const LABEL_W    = 220;
+  const HDR_H      = 48;
+  const BAR_PAD    = 5;
+  const BAR_H      = ROW_H - BAR_PAD * 2;
+  const totalDays  = Math.ceil((maxDate - minDate) / 86400000);
+  const zoom       = document.getElementById('gantt-zoom')?.value || 'month';
+  const CHART_W    = Math.max(totalDays * (zoom === 'week' ? 24 : zoom === 'month' ? 8 : 3), 800);
+  const pxPerDay   = CHART_W / totalDays;
+
+  function dayX(date) {
+    return LABEL_W + Math.round((date - minDate) / 86400000 * pxPerDay);
+  }
+
+  // ── Group tasks ───────────────────────────────────────────
+  const groupBy = document.getElementById('gantt-group-by')?.value || 'phase';
+  let groups = [];
+  if (groupBy === 'phase') {
+    const phases = [...new Set(tasks.map(t => t.phase || 'No Phase'))];
+    groups = phases.map(p => ({ label: p, tasks: tasks.filter(t => (t.phase || 'No Phase') === p) }));
+  } else if (groupBy === 'status') {
+    ['in_progress','not_started','complete','on_hold'].forEach(s => {
+      const t = tasks.filter(x => x.status === s);
+      if (t.length) groups.push({ label: s.replace(/_/g,' ').toUpperCase(), tasks: t });
+    });
+  } else {
+    groups = [{ label: 'ALL TASKS', tasks }];
+  }
+
+  // ── Status colors ─────────────────────────────────────────
+  function barColor(t) {
+    const due = parseDate(t.due_date);
+    if (t.status === 'complete')    return '#00e5a0';
+    if (t.status === 'on_hold')     return '#9b59b6';
+    if (due < today && t.status !== 'complete') return '#ff4757';
+    if (t.status === 'in_progress') return '#00d2ff';
+    return 'rgba(100,160,220,0.45)';
+  }
+
+  // ── Build header date labels ──────────────────────────────
+  function buildHeader() {
+    let labels = '';
+    const cur = new Date(minDate);
+    while (cur <= maxDate) {
+      const x   = dayX(cur) - LABEL_W;
+      let text  = '';
+      let tick  = false;
+      if (zoom === 'week') {
+        if (cur.getDay() === 1) { // Monday
+          text = cur.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+          tick = true;
+        }
+      } else if (zoom === 'month') {
+        if (cur.getDate() === 1) {
+          text = cur.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+          tick = true;
+        }
+      } else { // quarter
+        if (cur.getDate() === 1 && cur.getMonth() % 3 === 0) {
+          const q = Math.floor(cur.getMonth()/3)+1;
+          text = 'Q' + q + ' ' + cur.getFullYear();
+          tick = true;
+        }
+      }
+      if (tick) {
+        labels += `<line x1="${x}" y1="0" x2="${x}" y2="${HDR_H}" stroke="rgba(0,210,255,0.15)" stroke-width="1"/>
+<text x="${x+4}" y="${HDR_H-8}" fill="rgba(0,210,255,0.55)" font-size="10" font-family="Share Tech Mono,monospace" letter-spacing="0.08em">${text}</text>`;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return labels;
+  }
+
+  // ── Build rows ────────────────────────────────────────────
+  let rows = '';
+  let rowIdx = 0;
+  const rowMap = []; // for tooltip positioning
+
+  groups.forEach(group => {
+    // Group header row
+    const gy = HDR_H + rowIdx * ROW_H;
+    rows += `<rect x="0" y="${gy}" width="${LABEL_W + CHART_W}" height="${ROW_H}"
+      fill="rgba(0,210,255,0.04)"/>
+<text x="8" y="${gy + ROW_H/2 + 4}" fill="rgba(0,210,255,0.7)"
+  font-size="10" font-weight="bold" font-family="Share Tech Mono,monospace"
+  letter-spacing="0.12em">${group.label.toUpperCase()}</text>`;
+    rowIdx++;
+
+    group.tasks.forEach(t => {
+      const y   = HDR_H + rowIdx * ROW_H;
+      const sd  = parseDate(t.start_date);
+      const ed  = parseDate(t.due_date);
+      const x1  = dayX(sd);
+      const x2  = Math.max(dayX(ed), x1 + 4);
+      const w   = x2 - x1;
+      const col = barColor(t);
+      const pct = t.percent_complete || 0;
+      const user = STATE.users?.find(u => u.id === t.assigned_to);
+      const initials = user ? (user.name||'').split(' ').map(n=>n[0]).join('').toUpperCase().substring(0,2) : '';
+
+      // Zebra background
+      rows += `<rect x="0" y="${y}" width="${LABEL_W + CHART_W}" height="${ROW_H}"
+        fill="${rowIdx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}"/>`;
+
+      // Task label
+      const labelText = (t.name||'').length > 28 ? (t.name||'').substring(0,27)+'…' : (t.name||'');
+      rows += `<text x="12" y="${y + ROW_H/2 + 4}" fill="rgba(210,230,248,0.75)"
+        font-size="11" font-family="Barlow Condensed,sans-serif" letter-spacing="0.04em">${labelText}</text>`;
+
+      // Separator line
+      rows += `<line x1="0" y1="${y}" x2="${LABEL_W + CHART_W}" y2="${y}"
+        stroke="rgba(255,255,255,0.04)" stroke-width="1"/>`;
+
+      // Bar background
+      rows += `<rect x="${x1}" y="${y + BAR_PAD}" width="${w}" height="${BAR_H}"
+        rx="2" fill="rgba(0,0,0,0.3)"/>`;
+
+      // Bar fill (progress)
+      if (pct > 0) {
+        rows += `<rect x="${x1}" y="${y + BAR_PAD}" width="${Math.round(w * pct/100)}" height="${BAR_H}"
+          rx="2" fill="${col}" opacity="0.5"/>`;
+      }
+      // Bar outline
+      rows += `<rect x="${x1}" y="${y + BAR_PAD}" width="${w}" height="${BAR_H}"
+        rx="2" fill="none" stroke="${col}" stroke-width="1.5">`;
+      rows += `<title>${t.name} | ${t.start_date} → ${t.due_date} | ${(t.status||'').replace(/_/g,' ')} | ${pct}%${initials ? ' | ' + initials : ''}</title>`;
+      rows += `</rect>`;
+
+      // Assignee initials
+      if (initials && w > 24) {
+        rows += `<text x="${x1 + w - 4}" y="${y + ROW_H/2 + 3}" text-anchor="end"
+          fill="${col}" font-size="9" font-family="Share Tech Mono,monospace" opacity="0.8">${initials}</text>`;
+      }
+
+      rowIdx++;
+    });
+  });
+
+  // ── Milestone diamonds ────────────────────────────────────
+  let diamonds = '';
+  milestones.filter(m => m.due_date).forEach(m => {
+    const mx  = dayX(parseDate(m.due_date));
+    const col = m.status === 'complete' ? '#00e5a0' : parseDate(m.due_date) < today ? '#ff4757' : '#ffaa00';
+    const size = 7;
+    diamonds += `<polygon points="${mx},${HDR_H-size} ${mx+size},${HDR_H} ${mx},${HDR_H+size} ${mx-size},${HDR_H}"
+      fill="${col}" opacity="0.85">
+      <title>MILESTONE: ${m.title||m.name||''} | ${m.due_date}</title>
+    </polygon>`;
+  });
+
+  // ── Today line ────────────────────────────────────────────
+  const totalRows = rowIdx;
+  const svgH      = HDR_H + totalRows * ROW_H + 4;
+  const todayX    = dayX(today) - LABEL_W;
+  const todayLine = todayX >= 0 && todayX <= CHART_W
+    ? `<line x1="${todayX}" y1="0" x2="${todayX}" y2="${svgH}"
+        stroke="#ff4757" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+      <text x="${todayX+3}" y="14" fill="#ff4757" font-size="9"
+        font-family="Share Tech Mono,monospace">TODAY</text>`
+    : '';
+
+  // ── Label divider ─────────────────────────────────────────
+  const divider = `<line x1="${LABEL_W}" y1="0" x2="${LABEL_W}" y2="${svgH}"
+    stroke="rgba(0,210,255,0.20)" stroke-width="1"/>`;
+
+  // ── Assemble SVG ──────────────────────────────────────────
+  const chartSVG = `<svg xmlns="http://www.w3.org/2000/svg"
+    width="${LABEL_W + CHART_W}" height="${svgH}"
+    style="background:#060a10;display:block;min-width:${LABEL_W + CHART_W}px">
+    <defs>
+      <clipPath id="chart-clip">
+        <rect x="${LABEL_W}" y="0" width="${CHART_W}" height="${svgH}"/>
+      </clipPath>
+    </defs>
+
+    <!-- Header background -->
+    <rect x="0" y="0" width="${LABEL_W + CHART_W}" height="${HDR_H}"
+      fill="rgba(0,0,0,0.3)"/>
+    <rect x="${LABEL_W}" y="0" width="${CHART_W}" height="${HDR_H}"
+      fill="rgba(0,0,0,0.2)"/>
+
+    <!-- Header labels (clipped to chart area) -->
+    <g clip-path="url(#chart-clip)" transform="translate(${LABEL_W},0)">
+      ${buildHeader()}
+      ${todayLine}
+    </g>
+
+    <!-- Rows -->
+    ${rows}
+
+    <!-- Milestones (clipped) -->
+    <g clip-path="url(#chart-clip)">
+      ${diamonds}
+    </g>
+
+    <!-- Label/chart divider -->
+    ${divider}
+
+    <!-- Header bottom border -->
+    <line x1="0" y1="${HDR_H}" x2="${LABEL_W + CHART_W}" y2="${HDR_H}"
+      stroke="rgba(0,210,255,0.20)" stroke-width="1"/>
+  </svg>`;
+
+  container.innerHTML = chartSVG;
+}
+
+// Re-render Gantt when controls change
+document.addEventListener('change', e => {
+  if (e.target.id === 'gantt-zoom' || e.target.id === 'gantt-group-by') {
+    renderGanttTab();
+  }
+});
+
 </script>
 
 <div class="journal-panel" id="journal-panel">
