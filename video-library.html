@@ -63,11 +63,17 @@
   display: flex; align-items: center; justify-content: center;
   position: relative; overflow: hidden;
 }
-.vl-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.vl-thumb img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block;
+}
 .vl-thumb-placeholder {
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 100%;
-  font-size: 32px; color: rgba(0,210,255,0.20);
+  background: linear-gradient(135deg, #0c1628 0%, #060a10 100%);
+}
+.vl-thumb-placeholder svg {
+  opacity: 0.2;
 }
 .vl-duration {
   position: absolute; bottom: 6px; right: 8px;
@@ -82,12 +88,25 @@
 }
 .vl-card:hover .vl-play-overlay { background: rgba(0,0,0,0.35); }
 .vl-play-icon {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(0,210,255,0.20); border: 2px solid rgba(0,210,255,0.50);
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(0,210,255,0.20); border: 2px solid rgba(0,210,255,0.55);
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity 0.15s;
 }
 .vl-card:hover .vl-play-icon { opacity: 1; }
+
+/* Thumbnail upload overlay — shown on hover when no thumbnail exists */
+.vl-thumb-upload-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.65); border: 1px solid rgba(0,210,255,0.30);
+  color: rgba(0,210,255,0.7); font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.1em; padding: 3px 8px;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+  z-index: 10;
+}
+.vl-card:hover .vl-thumb-upload-btn { opacity: 1; }
+.vl-thumb-upload-btn:hover { background: rgba(0,210,255,0.15); color: #00d2ff; }
+
 .vl-card-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .vl-card-title {
   font-family: var(--font-ui); font-size: 13px; font-weight: 600;
@@ -100,12 +119,11 @@
 }
 .vl-cat-badge {
   font-family: var(--font-mono); font-size: 10px; font-weight: 700;
-  letter-spacing: 0.1em; padding: 2px 7px;
-  border: 1px solid;
+  letter-spacing: 0.1em; padding: 2px 7px; border: 1px solid;
 }
-.vl-cat-badge.marketing  { color: var(--cyan);   border-color: rgba(0,210,255,0.35); }
-.vl-cat-badge.training   { color: var(--green);  border-color: rgba(0,229,160,0.35); }
-.vl-cat-badge.internal   { color: var(--text2);  border-color: rgba(100,160,220,0.20); }
+.vl-cat-badge.marketing { color: var(--cyan);  border-color: rgba(0,210,255,0.35); }
+.vl-cat-badge.training  { color: var(--green); border-color: rgba(0,229,160,0.35); }
+.vl-cat-badge.internal  { color: var(--text2); border-color: rgba(100,160,220,0.20); }
 .vl-annot-count {
   font-family: var(--font-mono); font-size: 10px;
   color: rgba(155,89,182,0.7); letter-spacing: 0.06em;
@@ -145,17 +163,13 @@
 }
 #vl-player-close:hover { color: var(--red); }
 #vl-player-video {
-  width: 100%; max-height: 60vh; background: #000;
-  display: block;
+  width: 100%; max-height: 60vh; background: #000; display: block;
 }
 #vl-player-footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  padding: 12px 16px; border-top: 1px solid var(--border);
   display: flex; gap: 8px; align-items: flex-start;
 }
-#vl-player-annots {
-  flex: 1;
-}
+#vl-player-annots { flex: 1; }
 .vl-annot-list-title {
   font-family: var(--font-mono); font-size: 10px;
   color: rgba(155,89,182,0.7); letter-spacing: 0.14em; margin-bottom: 6px;
@@ -169,10 +183,10 @@
 }
 .vl-annot-row:hover { color: var(--text0); }
 .vl-annot-row .at { color: #9b59b6; min-width: 44px; }
-.vl-annot-row .tp {
-  font-size: 9px; color: rgba(0,210,255,0.55);
-  text-transform: uppercase; min-width: 56px;
-}
+.vl-annot-row .tp { font-size: 9px; color: rgba(0,210,255,0.55); text-transform: uppercase; min-width: 56px; }
+
+/* Hidden file input for thumbnail upload */
+#thumb-file-input { display: none; }
 </style>
 </head>
 <body>
@@ -189,7 +203,8 @@
         <div class="vl-title">VIDEO LIBRARY</div>
         <div class="vl-sub">RECORDED SESSIONS · DEMOS · TRAINING</div>
       </div>
-      <button class="hud-btn primary" onclick="HUDRecorder.start()" style="display:flex;align-items:center;gap:8px;">
+      <button class="hud-btn primary" onclick="HUDRecorder.toggle()"
+        style="display:flex;align-items:center;gap:8px;">
         <span style="color:#ff4757;font-size:14px;">⏺</span> NEW RECORDING
       </button>
     </div>
@@ -207,6 +222,9 @@
   </div>
 </div>
 
+<!-- Hidden file input for thumbnail uploads -->
+<input type="file" id="thumb-file-input" accept="image/*" />
+
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -218,40 +236,74 @@
 Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
 Sidebar.init('video-library.html');
 
+const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+
 let ALL_CLIPS = [];
 let ACTIVE_FILTER = 'all';
 
 function fmtDuration(sec) {
   sec = Math.round(sec || 0);
-  const m = Math.floor(sec/60), s = sec%60;
+  const m = Math.floor(sec / 60), s = sec % 60;
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  return new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 }
 
+// ── Get a fresh signed URL for a storage path ────────────────
+async function getSignedUrl(filePath, bucket) {
+  const token = Auth.getFreshToken
+    ? await Auth.getFreshToken()
+    : Auth.getToken?.();
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${filePath}`,
+    {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ expiresIn: 3600 }),
+    }
+  );
+  const data = await res.json();
+  if (!data.signedURL) throw new Error(data.error || 'Failed to get signed URL');
+  return `${SUPABASE_URL}/storage/v1${data.signedURL}`;
+}
+
+// ── Render grid ──────────────────────────────────────────────
 function renderGrid(clips) {
   const grid = document.getElementById('vl-grid');
   if (!clips.length) {
     grid.innerHTML = `<div style="grid-column:1/-1;padding:40px;text-align:center;">
-      ${UI.allClear('NO CLIPS', 'No recordings match this filter')}
-    </div>`;
+      ${UI.allClear('NO CLIPS', 'No recordings match this filter')}</div>`;
     return;
   }
   grid.innerHTML = clips.map(c => {
-    const annots = Array.isArray(c.annotations) ? c.annotations : [];
-    const thumb  = c.thumbnail_url
-      ? `<img src="${c.thumbnail_url}" alt="${c.title}" loading="lazy">`
-      : `<div class="vl-thumb-placeholder">▶</div>`;
-    return `<div class="vl-card" onclick="openPlayer('${c.id}')">
-      <div class="vl-thumb">
-        ${thumb}
+    const annots  = Array.isArray(c.annotations) ? c.annotations : [];
+    const hasThumb = !!c.thumbnail_url;
+    const thumbHTML = hasThumb
+      ? `<img id="thumb-${c.id}" src="" alt="${c.title}" loading="lazy" data-path="${c.thumbnail_url}">`
+      : `<div class="vl-thumb-placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="1">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <polygon points="10,8 16,12 10,16" fill="#00d2ff" stroke="none"/>
+          </svg>
+        </div>`;
+
+    return `<div class="vl-card" id="card-${c.id}">
+      <div class="vl-thumb" onclick="openPlayer('${c.id}')">
+        ${thumbHTML}
         <div class="vl-play-overlay">
           <div class="vl-play-icon">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="#00d2ff"><polygon points="4,2 14,8 4,14"/></svg>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="#00d2ff">
+              <polygon points="4,2 14,8 4,14"/>
+            </svg>
           </div>
         </div>
         <div class="vl-duration">${fmtDuration(c.duration_seconds)}</div>
+        <button class="vl-thumb-upload-btn"
+          onclick="event.stopPropagation(); triggerThumbUpload('${c.id}')"
+          title="Upload custom thumbnail">
+          ◈ THUMBNAIL
+        </button>
       </div>
       <div class="vl-card-body">
         <div class="vl-card-title">${c.title}</div>
@@ -265,6 +317,15 @@ function renderGrid(clips) {
       </div>
     </div>`;
   }).join('');
+
+  // Load thumbnail images with signed URLs
+  clips.filter(c => c.thumbnail_url).forEach(async c => {
+    try {
+      const url = await getSignedUrl(c.thumbnail_url, 'thumbnails');
+      const img = document.getElementById(`thumb-${c.id}`);
+      if (img) img.src = url;
+    } catch(e) { /* thumbnail load failed silently */ }
+  });
 }
 
 function applyFilter() {
@@ -288,32 +349,91 @@ document.querySelectorAll('.vl-filter-btn').forEach(btn => {
 });
 document.getElementById('vl-search-input').addEventListener('input', applyFilter);
 
-const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+// ── Thumbnail upload ──────────────────────────────────────────
+let _pendingThumbClipId = null;
 
+function triggerThumbUpload(clipId) {
+  _pendingThumbClipId = clipId;
+  const input = document.getElementById('thumb-file-input');
+  input.value = '';
+  input.click();
+}
+
+document.getElementById('thumb-file-input').addEventListener('change', async (e) => {
+  const file   = e.target.files[0];
+  const clipId = _pendingThumbClipId;
+  if (!file || !clipId) return;
+
+  const card = document.getElementById(`card-${clipId}`);
+  const uploadBtn = card?.querySelector('.vl-thumb-upload-btn');
+  if (uploadBtn) { uploadBtn.textContent = 'UPLOADING…'; uploadBtn.style.opacity = '1'; }
+
+  try {
+    const token = Auth.getFreshToken
+      ? await Auth.getFreshToken()
+      : Auth.getToken?.();
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const path = `${clipId}/thumbnail.${ext}`;
+
+    // Upload to thumbnails bucket
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/thumbnails/${path}`,
+      {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': file.type, 'x-upsert': 'true' },
+        body:    file,
+      }
+    );
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || err.error || 'Upload failed');
+    }
+
+    // Save path to video_clips.thumbnail_url
+    await API.patch(`video_clips?id=eq.${clipId}`, { thumbnail_url: path });
+
+    // Update local cache and re-render card thumbnail
+    const clip = ALL_CLIPS.find(c => c.id === clipId);
+    if (clip) clip.thumbnail_url = path;
+
+    // Show the new thumbnail immediately
+    const signedUrl = await getSignedUrl(path, 'thumbnails');
+    const thumbWrap = card?.querySelector('.vl-thumb');
+    if (thumbWrap) {
+      const existingImg = thumbWrap.querySelector('img');
+      const placeholder = thumbWrap.querySelector('.vl-thumb-placeholder');
+      if (placeholder) placeholder.remove();
+      if (existingImg) {
+        existingImg.src = signedUrl;
+      } else {
+        const img = document.createElement('img');
+        img.src   = signedUrl;
+        img.alt   = clip?.title || '';
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        img.id    = `thumb-${clipId}`;
+        thumbWrap.insertBefore(img, thumbWrap.firstChild);
+      }
+    }
+
+    if (uploadBtn) uploadBtn.textContent = '◈ THUMBNAIL';
+
+  } catch(err) {
+    console.error('[Thumbnail] upload error:', err);
+    if (uploadBtn) { uploadBtn.textContent = '✗ FAILED'; uploadBtn.style.color = '#ff4757'; }
+    setTimeout(() => {
+      if (uploadBtn) { uploadBtn.textContent = '◈ THUMBNAIL'; uploadBtn.style.color = ''; uploadBtn.style.opacity = ''; }
+    }, 3000);
+  }
+});
+
+// ── Open player modal ────────────────────────────────────────
 async function openPlayer(clipId) {
   const clip = ALL_CLIPS.find(c => c.id === clipId);
   if (!clip) return;
 
-  // Get signed URL via REST API (supabase client not available here)
   let videoUrl = '';
   try {
-    const token = await Auth.getFreshToken?.();
-    const res = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/sign/video-library/${clip.file_path}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ expiresIn: 3600 }),
-      }
-    );
-    const data = await res.json();
-    // Supabase returns a relative path — prepend the base URL
-    if (data.signedURL) {
-      videoUrl = `${SUPABASE_URL}/storage/v1${data.signedURL}`;
-    }
+    videoUrl = await getSignedUrl(clip.file_path, 'video-library');
   } catch(e) { console.error('Signed URL error:', e); }
 
   const annots = Array.isArray(clip.annotations) ? clip.annotations : [];
@@ -325,13 +445,14 @@ async function openPlayer(clipId) {
     <div id="vl-player-wrap">
       <div id="vl-player-header">
         <div id="vl-player-title">${clip.title}</div>
-        <button id="vl-player-close" onclick="document.getElementById('vl-player-overlay').remove()">✕</button>
+        <button id="vl-player-close"
+          onclick="document.getElementById('vl-player-overlay').remove()">✕</button>
       </div>
-      <video id="vl-player-video" controls src="${videoUrl}"></video>
+      <video id="vl-player-video" controls src="${videoUrl}" preload="metadata"></video>
       <div id="vl-player-footer">
         ${annots.length ? `
           <div id="vl-player-annots">
-            <div class="vl-annot-list-title">◆ CHAPTER MARKERS & ANNOTATIONS</div>
+            <div class="vl-annot-list-title">◆ MARKERS & ANNOTATIONS</div>
             ${annots.map(a => `
               <div class="vl-annot-row" onclick="seekTo(${a.time_seconds})">
                 <span class="at">${fmtDuration(a.time_seconds)}</span>
@@ -339,9 +460,11 @@ async function openPlayer(clipId) {
                 <span>${a.label}</span>
               </div>`).join('')}
           </div>` : '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">No annotations</div>'}
-        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:120px;">
-          <button class="hud-btn" style="font-size:11px;"
-            onclick="downloadClip('${videoUrl}','${clip.title}.webm')">↓ DOWNLOAD</button>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:130px;flex-shrink:0;">
+          <button class="hud-btn" style="font-size:11px;width:130px;"
+            onclick="downloadClip('${videoUrl}','${clip.title.replace(/'/g,"\\'")}')">
+            ↓ DOWNLOAD
+          </button>
           <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">
             ${fmtDuration(clip.duration_seconds)} · ${(clip.file_size_bytes/1024/1024).toFixed(1)} MB
           </span>
@@ -362,35 +485,43 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.getElementById('vl-player-overlay')?.remove();
 });
 
-// Download via blob to force correct filename
+// ── Download via blob ─────────────────────────────────────────
 async function downloadClip(url, filename) {
-  if (!url) return;
+  if (!url) { alert('No video URL available. Please reopen the player.'); return; }
   try {
-    const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
+    const btn = event?.target;
+    if (btn) { btn.textContent = '↓ DOWNLOADING…'; btn.disabled = true; }
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const a    = document.createElement('a');
     a.href     = URL.createObjectURL(blob);
-    a.download = filename;
+    a.download = (filename || 'recording') + '.webm';
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    if (btn) { btn.textContent = '↓ DOWNLOAD'; btn.disabled = false; }
   } catch(e) {
-    console.error('Download failed:', e);
+    console.error('[Download] failed:', e);
     alert('Download failed: ' + e.message);
+    const btn = event?.target;
+    if (btn) { btn.textContent = '↓ DOWNLOAD'; btn.disabled = false; }
   }
 }
 
+// ── Load clips ────────────────────────────────────────────────
 async function loadClips() {
   const grid = document.getElementById('vl-grid');
   grid.innerHTML = `<div style="grid-column:1/-1;padding:40px;">${UI.loading('LOADING CLIPS…')}</div>`;
   try {
-    const clips = await API.get(
-      `video_clips?select=*&order=created_at.desc`
-    );
+    const clips = await API.get('video_clips?select=*&order=created_at.desc');
     ALL_CLIPS = clips || [];
     applyFilter();
   } catch(e) {
     console.error('Video library load error:', e);
-    grid.innerHTML = `<div style="grid-column:1/-1;padding:40px;">${UI.allClear('ERROR', e.message)}</div>`;
+    grid.innerHTML = `<div style="grid-column:1/-1;padding:40px;">
+      ${UI.allClear('ERROR', e.message)}</div>`;
   }
 }
 
