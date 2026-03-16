@@ -510,18 +510,26 @@ function drawNetwork() {
       if (isCPEdge) ctx.setLineDash([]);
       else ctx.setLineDash([4, 3]);
 
-      // Bezier curve from right edge to left edge
+      // Orthogonal routing: horizontal → vertical → horizontal
       const x1 = from.x + NW, y1 = from.y + NH/2;
       const x2 = to.x,        y2 = to.y + NH/2;
-      const cp1x = x1 + (x2-x1)*0.5, cp1y = y1;
-      const cp2x = x1 + (x2-x1)*0.5, cp2y = y2;
+      const sameLine = Math.abs(y1 - y2) < 4;
       ctx.moveTo(x1, y1);
-      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+      if (sameLine) {
+        // Same row — straight horizontal line
+        ctx.lineTo(x2, y2);
+      } else {
+        // Different row — elbow: right → down/up → right
+        const midX = x1 + (x2 - x1) * 0.5;
+        ctx.lineTo(midX, y1);
+        ctx.lineTo(midX, y2);
+        ctx.lineTo(x2, y2);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Arrow head
-      const angle = Math.atan2(y2 - cp2y, x2 - cp2x);
+      // Arrow head always pointing right (angle = 0)
+      const angle = Math.atan2(y2 - y2, x2 - (x2 - 1));
       ctx.beginPath();
       ctx.fillStyle = isCPEdge ? 'rgba(255,71,87,0.8)' : 'rgba(100,160,220,0.25)';
       ctx.moveTo(x2, y2);
