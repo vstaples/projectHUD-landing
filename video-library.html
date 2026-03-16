@@ -485,29 +485,94 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.getElementById('vl-player-overlay')?.remove();
 });
 
-// ── Download via blob ─────────────────────────────────────────
+// ── REPLACEMENT for downloadClip() in video-library.html ──────
+// Uses ReadableStream to show a live progress bar while fetching
+// the blob — eliminates the "hung" feeling on large files.
+
 async function downloadClip(url, filename) {
-  if (!url) { alert('No video URL available. Please reopen the player.'); return; }
+  if (!url) { alert('No video URL — please reopen the player.'); return; }
+
+  // Find the button that triggered this (may be undefined if called programmatically)
+  const btn = document.activeElement?.tagName === 'BUTTON' ? document.activeElement : null;
+
+  // Build a small progress overlay
+  const prog = document.createElement('div');
+  prog.id = 'dl-progress-overlay';
+  prog.style.cssText = `
+    position:fixed; bottom:24px; right:24px; z-index:9999;
+    background:#0a1628; border:1px solid rgba(0,210,255,0.3);
+    padding:12px 16px; min-width:220px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.6);
+    font-family:'Share Tech Mono',monospace;
+  `;
+  prog.innerHTML = `
+    <div style="font-size:10px;letter-spacing:0.14em;color:rgba(0,210,255,0.6);margin-bottom:6px;">
+      ↓ DOWNLOADING
+    </div>
+    <div style="font-size:12px;color:rgba(220,235,250,0.9);margin-bottom:8px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;"
+      id="dl-filename">${(filename||'recording').substring(0,30)}</div>
+    <div style="height:3px;background:rgba(0,210,255,0.12);width:100%;">
+      <div id="dl-bar" style="height:100%;background:#00d2ff;width:0%;transition:width 0.2s;"></div>
+    </div>
+    <div id="dl-pct" style="font-size:11px;color:#00d2ff;margin-top:5px;text-align:right;">0%</div>
+  `;
+  document.body.appendChild(prog);
+
+  const bar = document.getElementById('dl-bar');
+  const pct = document.getElementById('dl-pct');
+
+  if (btn) { btn.disabled = true; btn.textContent = '↓ DOWNLOADING…'; }
+
   try {
-    const btn = event?.target;
-    if (btn) { btn.textContent = '↓ DOWNLOADING…'; btn.disabled = true; }
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const a    = document.createElement('a');
-    a.href     = URL.createObjectURL(blob);
-    a.download = (filename || 'recording') + '.webm';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const total = parseInt(res.headers.get('content-length') || '0', 10);
+    const reader = res.body.getReader();
+    const chunks = [];
+    let loaded = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      loaded += value.length;
+      if (total > 0) {
+        const p = Math.round((loaded / total) * 100);
+        if (bar) bar.style.width = p + '%';
+        if (pct) pct.textContent = p + '%';
+      } else {
+        // No content-length — show MB downloaded
+        if (pct) pct.textContent = (loaded/1024/1024).toFixed(1) + ' MB';
+      }
+    }
+
+    if (bar) bar.style.width = '100%';
+    if (pct) pct.textContent = '✓ COMPLETE';
+
+    // Assemble blob and trigger download
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (filename || 'recording') + (filename?.endsWith('.webm') ? '' : '.webm');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    if (btn) { btn.textContent = '↓ DOWNLOAD'; btn.disabled = false; }
+
+    setTimeout(() => prog.remove(), 2000);
+
   } catch(e) {
     console.error('[Download] failed:', e);
+    if (pct) { pct.textContent = '✗ FAILED'; pct.style.color = '#ff4757'; }
+    setTimeout(() => prog.remove(), 3000);
     alert('Download failed: ' + e.message);
-    const btn = event?.target;
-    if (btn) { btn.textContent = '↓ DOWNLOAD'; btn.disabled = false; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↓ DOWNLOAD'; }
   }
+}
+
 }
 
 // ── Load clips ────────────────────────────────────────────────
