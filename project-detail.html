@@ -586,24 +586,35 @@ html, body { overflow: visible !important; }
 
       <!-- ── GANTT TAB ──────────────────────────────────────────────── -->
       <div id="tab-gantt" class="tab-pane" style="display:none">
-        <div class="panel">
-          <div class="panel-header">
-            <div class="panel-title">PROJECT GANTT CHART</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <select id="gantt-group-by" class="hud-select" style="font-size:11px;padding:4px 8px;">
-                <option value="phase">Group by Phase</option>
-                <option value="status">Group by Status</option>
-                <option value="none">All Tasks</option>
-              </select>
-              <select id="gantt-zoom" class="hud-select" style="font-size:11px;padding:4px 8px;">
-                <option value="week">Weeks</option>
-                <option value="month">Months</option>
-                <option value="quarter">Quarters</option>
-              </select>
+        <div id="gantt-toolbar" style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(0,210,255,0.25);">
+            <button onclick="ganttZoom(-1)" title="Zoom out" style="background:none;border:none;border-right:1px solid rgba(0,210,255,0.2);color:var(--cyan);cursor:pointer;font-size:18px;width:28px;height:26px;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
+            <span id="gantt-zoom-label" style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:0.1em;min-width:60px;text-align:center;padding:0 4px;">WEEKS</span>
+            <button onclick="ganttZoom(1)" title="Zoom in" style="background:none;border:none;border-left:1px solid rgba(0,210,255,0.2);color:var(--cyan);cursor:pointer;font-size:18px;width:28px;height:26px;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+          </div>
+          <select id="gantt-group-by" onchange="renderGanttTab()" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--text1);font-family:var(--font-mono);font-size:10px;padding:4px 8px;letter-spacing:0.08em;outline:none;height:26px;">
+            <option value="phase">BY PHASE</option>
+            <option value="status">BY STATUS</option>
+            <option value="none">ALL TASKS</option>
+          </select>
+          <div style="position:relative;">
+            <button id="gantt-col-btn" onclick="toggleGanttColPanel(event)" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:4px 10px;letter-spacing:0.08em;cursor:pointer;height:26px;">▤ COLUMNS</button>
+            <div id="gantt-col-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:var(--bg2);border:1px solid rgba(0,210,255,0.28);padding:12px 14px;min-width:155px;box-shadow:0 8px 28px rgba(0,0,0,0.6);">
+              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.14em;margin-bottom:9px;border-bottom:1px solid var(--border);padding-bottom:6px;">VISIBLE COLUMNS</div>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-units" checked onchange="renderGanttTab()"> # UNITS</label>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-duration" checked onchange="renderGanttTab()"> DURATION</label>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-start" checked onchange="renderGanttTab()"> START</label>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-finish" checked onchange="renderGanttTab()"> FINISH</label>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-pred" onchange="renderGanttTab()"> PRED</label>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-pct" checked onchange="renderGanttTab()"> % DONE</label>
+              <label style="display:flex;align-items:center;gap:7px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-status" checked onchange="renderGanttTab()"> STATUS</label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-resource" checked onchange="renderGanttTab()"> RESOURCES</label>
             </div>
           </div>
-          <div id="gantt-container" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);"></div>
+          <div style="flex:1;"></div>
+          <span id="gantt-task-count" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.1em;"></span>
         </div>
+        <div id="gantt-container" style="overflow:auto;max-height:calc(100vh - 225px);"></div>
       </div>
 
             <!-- ── MILESTONES TAB ────────────────────────────────── -->
@@ -1569,246 +1580,409 @@ async function loadProjectDetail() {
 loadProjectDetail();
 
 // ── ============================================================
-// ── renderGanttTab — SVG Gantt Chart
+// ── GANTT — State & helpers
+// ── ============================================================
+let _ganttZoom = 1; // 0=quarter,1=week,2=month (matches zoom levels)
+const GANTT_ZOOMS = ['QUARTERS','WEEKS','MONTHS'];
+
+function ganttZoom(dir) {
+  _ganttZoom = Math.max(0, Math.min(2, _ganttZoom + dir));
+  const lbl = document.getElementById('gantt-zoom-label');
+  if (lbl) lbl.textContent = GANTT_ZOOMS[_ganttZoom];
+  renderGanttTab();
+}
+
+function toggleGanttColPanel(e) {
+  if (e) e.stopPropagation();
+  const panel = document.getElementById('gantt-col-panel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  const panel = document.getElementById('gantt-col-panel');
+  if (panel && !panel.contains(e.target) && e.target.id !== 'gantt-col-btn') {
+    panel.style.display = 'none';
+  }
+});
+
+// ── ============================================================
+// ── renderGanttTab — Full-featured Gantt Chart
 // ── ============================================================
 function renderGanttTab() {
   const container = document.getElementById('gantt-container');
   if (!container) return;
 
-  const tasks      = (STATE.tasks || []).filter(t => t.start_date && t.due_date);
+  // Sync zoom label
+  const lbl = document.getElementById('gantt-zoom-label');
+  if (lbl) lbl.textContent = GANTT_ZOOMS[_ganttZoom];
+
+  const allTasks = (STATE.tasks || []);
+  const tasks    = allTasks.filter(t => t.start_date && t.due_date);
   const milestones = STATE.milestones || [];
 
+  // Update count label
+  const cntEl = document.getElementById('gantt-task-count');
+  if (cntEl) cntEl.textContent = tasks.length + ' TASKS';
+
   if (!tasks.length) {
-    container.innerHTML = '<div style="padding:40px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text3);">NO TASKS WITH START & DUE DATES</div>';
+    container.innerHTML = '<div style="padding:48px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text3);letter-spacing:0.12em;">NO TASKS WITH START & DUE DATES</div>';
     return;
   }
 
-  // ── Date helpers ──────────────────────────────────────────
-  const parseDate  = s => new Date(s + 'T00:00:00');
-  const today      = new Date(); today.setHours(0,0,0,0);
-  const allDates   = tasks.flatMap(t => [parseDate(t.start_date), parseDate(t.due_date)]);
-  milestones.forEach(m => { if (m.due_date) allDates.push(parseDate(m.due_date)); });
+  // ── Which info columns are visible ───────────────────────
+  const col = {
+    units:    document.getElementById('gcol-units')?.checked    ?? true,
+    duration: document.getElementById('gcol-duration')?.checked ?? true,
+    start:    document.getElementById('gcol-start')?.checked    ?? true,
+    finish:   document.getElementById('gcol-finish')?.checked   ?? true,
+    pred:     document.getElementById('gcol-pred')?.checked     ?? false,
+    pct:      document.getElementById('gcol-pct')?.checked      ?? true,
+    status:   document.getElementById('gcol-status')?.checked   ?? true,
+    resource: document.getElementById('gcol-resource')?.checked ?? true,
+  };
+
+  // ── Column widths ─────────────────────────────────────────
+  const COL_W = {
+    activity: 200,
+    units:    52,
+    duration: 62,
+    start:    72,
+    finish:   72,
+    pred:     44,
+    pct:      52,
+    status:   78,
+    resource: 100,
+  };
+  const visibleCols = ['activity',
+    ...(col.units    ? ['units']    : []),
+    ...(col.duration ? ['duration'] : []),
+    ...(col.start    ? ['start']    : []),
+    ...(col.finish   ? ['finish']   : []),
+    ...(col.pred     ? ['pred']     : []),
+    ...(col.pct      ? ['pct']      : []),
+    ...(col.status   ? ['status']   : []),
+    ...(col.resource ? ['resource'] : []),
+  ];
+  const INFO_W = visibleCols.reduce((s, c) => s + COL_W[c], 0);
+
+  // ── Date math ─────────────────────────────────────────────
+  const parseDate = s => { const d = new Date(s + 'T00:00:00'); d.setHours(0,0,0,0); return d; };
+  const today     = new Date(); today.setHours(0,0,0,0);
+  const MS_DAY    = 86400000;
+  const fmtShort  = d => d ? d.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'}) : '—';
+
+  const allDates = tasks.flatMap(t => [parseDate(t.start_date), parseDate(t.due_date)]);
+  milestones.forEach(m => { if (m.due_date || m.current_target_date) allDates.push(parseDate(m.due_date || m.current_target_date)); });
 
   let minDate = new Date(Math.min(...allDates));
   let maxDate = new Date(Math.max(...allDates));
+  minDate = new Date(minDate.getTime() - 14 * MS_DAY);
+  maxDate = new Date(maxDate.getTime() + 14 * MS_DAY);
 
-  // Pad by 2 weeks on each side
-  minDate = new Date(minDate.getTime() - 14 * 86400000);
-  maxDate = new Date(maxDate.getTime() + 14 * 86400000);
+  // ── Zoom: px per day & column interval ───────────────────
+  const zoomLevel = _ganttZoom; // 0=quarter,1=week,2=month
+  const pxPerDay  = zoomLevel === 0 ? 2.5 : zoomLevel === 1 ? 20 : 7;
+  const totalDays = Math.ceil((maxDate - minDate) / MS_DAY);
+  const CHART_W   = Math.max(totalDays * pxPerDay, 600);
 
-  // ── Layout constants ──────────────────────────────────────
-  const ROW_H      = 28;
-  const LABEL_W    = 220;
-  const HDR_H      = 48;
-  const BAR_PAD    = 5;
-  const BAR_H      = ROW_H - BAR_PAD * 2;
-  const totalDays  = Math.ceil((maxDate - minDate) / 86400000);
-  const zoom       = document.getElementById('gantt-zoom')?.value || 'month';
-  const CHART_W    = Math.max(totalDays * (zoom === 'week' ? 24 : zoom === 'month' ? 8 : 3), 800);
-  const pxPerDay   = CHART_W / totalDays;
-
-  function dayX(date) {
-    return LABEL_W + Math.round((date - minDate) / 86400000 * pxPerDay);
-  }
+  function dayX(date) { return INFO_W + (date - minDate) / MS_DAY * pxPerDay; }
 
   // ── Group tasks ───────────────────────────────────────────
   const groupBy = document.getElementById('gantt-group-by')?.value || 'phase';
   let groups = [];
   if (groupBy === 'phase') {
-    const phases = [...new Set(tasks.map(t => t.phase || 'No Phase'))];
-    groups = phases.map(p => ({ label: p, tasks: tasks.filter(t => (t.phase || 'No Phase') === p) }));
+    const phases = [...new Set(tasks.map(t => t.phase || 'No Phase').filter(Boolean))];
+    groups = phases.map(p => ({ label: p, tasks: tasks.filter(t => (t.phase||'No Phase') === p) }));
   } else if (groupBy === 'status') {
-    ['in_progress','not_started','complete','on_hold'].forEach(s => {
+    [['in_progress','IN PROGRESS'],['not_started','NOT STARTED'],['complete','COMPLETE'],['on_hold','ON HOLD']].forEach(([s,l]) => {
       const t = tasks.filter(x => x.status === s);
-      if (t.length) groups.push({ label: s.replace(/_/g,' ').toUpperCase(), tasks: t });
+      if (t.length) groups.push({ label: l, tasks: t });
     });
+    const rest = tasks.filter(t => !['in_progress','not_started','complete','on_hold'].includes(t.status));
+    if (rest.length) groups.push({ label: 'OTHER', tasks: rest });
   } else {
     groups = [{ label: 'ALL TASKS', tasks }];
   }
 
-  // ── Status colors ─────────────────────────────────────────
-  function barColor(t) {
-    const due = parseDate(t.due_date);
-    if (t.status === 'complete')    return '#00e5a0';
-    if (t.status === 'on_hold')     return '#9b59b6';
-    if (due < today && t.status !== 'complete') return '#ff4757';
-    if (t.status === 'in_progress') return '#00d2ff';
-    return 'rgba(100,160,220,0.45)';
-  }
+  // ── Colors ────────────────────────────────────────────────
+  const statusColor = t => {
+    if (t.status === 'complete')                                     return '#00e5a0';
+    if (t.status === 'on_hold')                                      return '#9b59b6';
+    if (t.due_date && parseDate(t.due_date) < today && t.status !== 'complete') return '#ff4757';
+    if (t.status === 'in_progress')                                  return '#00d2ff';
+    return 'rgba(120,170,220,0.5)';
+  };
+  const statusBadge = s => {
+    const MAP = { complete:'#00e5a0', in_progress:'#00d2ff', on_hold:'#9b59b6', not_started:'rgba(150,170,200,0.4)' };
+    return MAP[s] || 'rgba(150,170,200,0.4)';
+  };
 
-  // ── Build header date labels ──────────────────────────────
-  function buildHeader() {
-    let labels = '';
+  // ── Build SVG rows ────────────────────────────────────────
+  const ROW_H    = 26;
+  const HDR_H1   = 22; // month/quarter header
+  const HDR_H2   = 22; // week/day sub-header
+  const HDR_H    = HDR_H1 + HDR_H2;
+  const BAR_H    = 14;
+  const BAR_Y_OFF = (ROW_H - BAR_H) / 2;
+
+  let svgRows = '';
+  let rowCount = 0;
+
+  // ── Header: build month spans + week/day ticks ────────────
+  // First pass: collect month boundaries
+  let headerTop = '';    // month/quarter labels
+  let headerBot = '';    // week/day labels + vertical gridlines (full height, drawn later)
+  let gridLines = '';    // vertical period lines spanning full chart
+
+  {
     const cur = new Date(minDate);
+    let lastMonth = -1, lastQuarter = -1;
+    let monthStartX = INFO_W;
+    let quarterStartX = INFO_W;
+
     while (cur <= maxDate) {
-      const x   = dayX(cur) - LABEL_W;
-      let text  = '';
-      let tick  = false;
-      if (zoom === 'week') {
-        if (cur.getDay() === 1) { // Monday
-          text = cur.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-          tick = true;
+      const x   = dayX(cur);
+      const mo  = cur.getMonth();
+      const yr  = cur.getFullYear();
+      const qtr = Math.floor(mo / 3);
+      const dom = cur.getDate();
+      const dow = cur.getDay();
+
+      // Month boundary tick
+      if (dom === 1) {
+        if (lastMonth !== -1) {
+          // draw previous month label
+          const moW = x - monthStartX;
+          const moLabel = new Date(yr, mo - 1 === -1 ? 11 : mo-1, 1).toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+          headerTop += `<rect x="${monthStartX}" y="0" width="${moW}" height="${HDR_H1}" fill="rgba(0,0,0,0.0)" stroke="rgba(0,210,255,0.18)" stroke-width="0.5"/>
+<text x="${monthStartX + 5}" y="${HDR_H1 - 7}" fill="rgba(0,210,255,0.70)" font-size="10" font-family="Share Tech Mono,monospace" letter-spacing="0.1em">${moLabel}</text>`;
+          // strong month line
+          gridLines += `<line x1="${x}" y1="${HDR_H}" x2="${x}" y2="SVGH_PLACEHOLDER" stroke="rgba(0,210,255,0.25)" stroke-width="1"/>`;
         }
-      } else if (zoom === 'month') {
-        if (cur.getDate() === 1) {
-          text = cur.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
-          tick = true;
-        }
-      } else { // quarter
-        if (cur.getDate() === 1 && cur.getMonth() % 3 === 0) {
-          const q = Math.floor(cur.getMonth()/3)+1;
-          text = 'Q' + q + ' ' + cur.getFullYear();
-          tick = true;
-        }
+        monthStartX = x;
+        lastMonth = mo;
       }
-      if (tick) {
-        labels += `<line x1="${x}" y1="0" x2="${x}" y2="${HDR_H}" stroke="rgba(0,210,255,0.15)" stroke-width="1"/>
-<text x="${x+4}" y="${HDR_H-8}" fill="rgba(0,210,255,0.55)" font-size="10" font-family="Share Tech Mono,monospace" letter-spacing="0.08em">${text}</text>`;
+
+      // Week tick (Mondays)
+      if (zoomLevel <= 1 && dow === 1) {
+        const weekLabel = dom.toString();
+        headerBot += `<line x1="${x}" y1="${HDR_H1}" x2="${x}" y2="${HDR_H}" stroke="rgba(0,210,255,0.15)" stroke-width="0.5"/>
+<text x="${x+2}" y="${HDR_H - 5}" fill="rgba(0,210,255,0.45)" font-size="9" font-family="Share Tech Mono,monospace">${weekLabel}</text>`;
+        // light week gridline through chart
+        gridLines += `<line x1="${x}" y1="${HDR_H}" x2="${x}" y2="SVGH_PLACEHOLDER" stroke="rgba(0,210,255,0.06)" stroke-width="0.5"/>`;
       }
+
+      // Quarter header (zoom=0)
+      if (zoomLevel === 0 && dom === 1 && qtr !== lastQuarter) {
+        if (lastQuarter !== -1) {
+          const qW = x - quarterStartX;
+          headerTop += `<rect x="${quarterStartX}" y="0" width="${qW}" height="${HDR_H1}" fill="rgba(0,0,0,0.0)" stroke="rgba(0,210,255,0.18)" stroke-width="0.5"/>
+<text x="${quarterStartX+5}" y="${HDR_H1-7}" fill="rgba(0,210,255,0.70)" font-size="10" font-family="Share Tech Mono,monospace">Q${lastQuarter+1} ${lastQuarter < qtr ? yr : yr-1}</text>`;
+          gridLines += `<line x1="${x}" y1="${HDR_H}" x2="${x}" y2="SVGH_PLACEHOLDER" stroke="rgba(0,210,255,0.25)" stroke-width="1"/>`;
+        }
+        quarterStartX = x;
+        lastQuarter = qtr;
+      }
+
       cur.setDate(cur.getDate() + 1);
     }
-    return labels;
+    // Last month/quarter label
+    const endX = dayX(maxDate);
+    if (lastMonth !== -1 && zoomLevel > 0) {
+      const moW = endX - monthStartX;
+      const lastMonthDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+      const moLabel = lastMonthDate.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+      headerTop += `<rect x="${monthStartX}" y="0" width="${moW}" height="${HDR_H1}" fill="rgba(0,0,0,0)" stroke="rgba(0,210,255,0.18)" stroke-width="0.5"/>
+<text x="${monthStartX+5}" y="${HDR_H1-7}" fill="rgba(0,210,255,0.70)" font-size="10" font-family="Share Tech Mono,monospace" letter-spacing="0.1em">${moLabel}</text>`;
+    }
   }
 
-  // ── Build rows ────────────────────────────────────────────
-  let rows = '';
-  let rowIdx = 0;
-  const rowMap = []; // for tooltip positioning
+  // ── Info column header row ────────────────────────────────
+  const COL_LABELS = { activity:'ACTIVITY', units:'# UNITS', duration:'DURATION', start:'START', finish:'FINISH', pred:'PRED', pct:'% DONE', status:'STATUS', resource:'RESOURCES' };
+  let infoHdr = '';
+  let cx = 0;
+  visibleCols.forEach(c => {
+    const w = COL_W[c];
+    infoHdr += `<rect x="${cx}" y="0" width="${w}" height="${HDR_H}" fill="rgba(0,0,0,0.25)" stroke="rgba(0,210,255,0.12)" stroke-width="0.5"/>
+<text x="${cx + (c==='activity' ? 8 : w/2)}" y="${HDR_H/2+4}" text-anchor="${c==='activity'?'start':'middle'}" fill="rgba(0,210,255,0.55)" font-size="9" font-family="Share Tech Mono,monospace" letter-spacing="0.1em">${COL_LABELS[c]}</text>`;
+    cx += w;
+  });
 
+  // ── Task rows ─────────────────────────────────────────────
   groups.forEach(group => {
-    // Group header row
-    const gy = HDR_H + rowIdx * ROW_H;
-    rows += `<rect x="0" y="${gy}" width="${LABEL_W + CHART_W}" height="${ROW_H}"
-      fill="rgba(0,210,255,0.04)"/>
-<text x="8" y="${gy + ROW_H/2 + 4}" fill="rgba(0,210,255,0.7)"
-  font-size="10" font-weight="bold" font-family="Share Tech Mono,monospace"
-  letter-spacing="0.12em">${group.label.toUpperCase()}</text>`;
-    rowIdx++;
+    // Phase header row
+    const gy = HDR_H + rowCount * ROW_H;
+    svgRows += `<rect x="0" y="${gy}" width="${INFO_W + CHART_W}" height="${ROW_H}" fill="rgba(0,210,255,0.055)"/>
+<line x1="0" y1="${gy}" x2="${INFO_W+CHART_W}" y2="${gy}" stroke="rgba(0,210,255,0.20)" stroke-width="0.7"/>
+<text x="8" y="${gy + ROW_H/2 + 4}" fill="rgba(0,210,255,0.80)" font-size="10" font-weight="bold" font-family="Share Tech Mono,monospace" letter-spacing="0.14em">${group.label.toUpperCase()}</text>`;
+
+    // Phase summary bar: span from earliest start to latest finish
+    const phaseDates = group.tasks.flatMap(t => [parseDate(t.start_date), parseDate(t.due_date)]);
+    if (phaseDates.length) {
+      const pMin = new Date(Math.min(...phaseDates));
+      const pMax = new Date(Math.max(...phaseDates));
+      const px1 = dayX(pMin), px2 = Math.max(dayX(pMax), px1+4);
+      svgRows += `<rect x="${px1}" y="${gy + ROW_H/2 - 3}" width="${px2-px1}" height="6" rx="3" fill="rgba(0,210,255,0.25)" stroke="rgba(0,210,255,0.45)" stroke-width="0.8"/>`;
+    }
+    rowCount++;
 
     group.tasks.forEach(t => {
-      const y   = HDR_H + rowIdx * ROW_H;
-      const sd  = parseDate(t.start_date);
-      const ed  = parseDate(t.due_date);
-      const x1  = dayX(sd);
-      const x2  = Math.max(dayX(ed), x1 + 4);
-      const w   = x2 - x1;
-      const col = barColor(t);
-      const pct = t.percent_complete || 0;
-      const user = STATE.users?.find(u => u.id === t.assigned_to);
-      const initials = user ? (user.name||'').split(' ').map(n=>n[0]).join('').toUpperCase().substring(0,2) : '';
+      const ry    = HDR_H + rowCount * ROW_H;
+      const color = statusColor(t);
+      const user  = STATE.users?.find(u => u.id === t.assigned_to);
+      const pct   = parseFloat(t.percent_complete || t.pct_complete || 0);
 
-      // Zebra background
-      rows += `<rect x="0" y="${y}" width="${LABEL_W + CHART_W}" height="${ROW_H}"
-        fill="${rowIdx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}"/>`;
+      // ── Zebra ─────────────────────────────────────────────
+      svgRows += `<rect x="0" y="${ry}" width="${INFO_W+CHART_W}" height="${ROW_H}" fill="${rowCount%2===0?'rgba(255,255,255,0.015)':'transparent'}"/>
+<line x1="0" y1="${ry}" x2="${INFO_W+CHART_W}" y2="${ry}" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>`;
 
-      // Task label
-      const labelText = (t.name||'').length > 28 ? (t.name||'').substring(0,27)+'…' : (t.name||'');
-      rows += `<text x="12" y="${y + ROW_H/2 + 4}" fill="rgba(210,230,248,0.75)"
-        font-size="11" font-family="Barlow Condensed,sans-serif" letter-spacing="0.04em">${labelText}</text>`;
+      // ── Info columns ──────────────────────────────────────
+      let icx = 0;
+      const cell = (val, cname, color2='rgba(210,230,248,0.72)', anchor='middle') => {
+        const cw = COL_W[cname];
+        const tx = anchor==='start' ? icx+8 : icx + cw/2;
+        svgRows += `<text x="${tx}" y="${ry + ROW_H/2 + 4}" text-anchor="${anchor}" fill="${color2}" font-size="11" font-family="Barlow Condensed,sans-serif" clip-path="url(#clip-col-${cname})">${val||'—'}</text>`;
+        icx += cw;
+      };
 
-      // Separator line
-      rows += `<line x1="0" y1="${y}" x2="${LABEL_W + CHART_W}" y2="${y}"
-        stroke="rgba(255,255,255,0.04)" stroke-width="1"/>`;
+      visibleCols.forEach(c => {
+        if (c === 'activity') {
+          const nm = (t.name||'').length > 25 ? t.name.substring(0,24)+'…' : (t.name||'');
+          svgRows += `<text x="8" y="${ry + ROW_H/2 + 4}" fill="rgba(215,232,248,0.82)" font-size="11" font-family="Barlow Condensed,sans-serif" letter-spacing="0.02em" clip-path="url(#clip-col-activity)">${nm}</text>`;
+          icx += COL_W.activity;
+        } else if (c === 'units')    { cell(t.units || t.unit_count || '—', 'units'); }
+        else if (c === 'duration')   { cell(t.duration != null ? t.duration+'d' : '—', 'duration'); }
+        else if (c === 'start')      { cell(t.start_date ? t.start_date.slice(5).replace('-','/') : '—', 'start', 'rgba(180,210,235,0.60)'); }
+        else if (c === 'finish')     {
+          const isLate = t.due_date && parseDate(t.due_date) < today && t.status !== 'complete';
+          cell(t.due_date ? t.due_date.slice(5).replace('-','/') : '—', 'finish', isLate ? '#ff4757' : 'rgba(180,210,235,0.60)');
+        }
+        else if (c === 'pred')       { cell(t.predecessors || '—', 'pred', 'rgba(160,195,225,0.50)'); }
+        else if (c === 'pct')        { cell(pct+'%', 'pct', pct>=100?'#00e5a0':'rgba(0,210,255,0.70)'); }
+        else if (c === 'status')     {
+          const sl = (t.status||'').replace(/_/g,' ').toUpperCase();
+          cell(sl.length>9 ? sl.substring(0,8)+'…' : sl, 'status', statusBadge(t.status));
+        }
+        else if (c === 'resource')   {
+          const rname = user ? (user.name||'').split(' ').map((n,i)=>i===0?n:n[0]+'.').join(' ') : '—';
+          cell(rname.length>11?rname.substring(0,10)+'…':rname, 'resource', 'rgba(180,210,235,0.65)');
+        }
+      });
 
-      // Bar background
-      rows += `<rect x="${x1}" y="${y + BAR_PAD}" width="${w}" height="${BAR_H}"
-        rx="2" fill="rgba(0,0,0,0.3)"/>`;
+      // ── Gantt bar ─────────────────────────────────────────
+      const x1 = dayX(parseDate(t.start_date));
+      const x2 = Math.max(dayX(parseDate(t.due_date)), x1 + 3);
+      const bw = x2 - x1;
+      const bTop = ry + BAR_Y_OFF;
 
-      // Bar fill (progress)
+      // Background track
+      svgRows += `<rect x="${x1}" y="${bTop}" width="${bw}" height="${BAR_H}" rx="2" fill="rgba(0,0,0,0.28)"/>`;
+      // Progress fill
       if (pct > 0) {
-        rows += `<rect x="${x1}" y="${y + BAR_PAD}" width="${Math.round(w * pct/100)}" height="${BAR_H}"
-          rx="2" fill="${col}" opacity="0.5"/>`;
+        svgRows += `<rect x="${x1}" y="${bTop}" width="${Math.round(bw*pct/100)}" height="${BAR_H}" rx="2" fill="${color}" opacity="0.45"/>`;
       }
-      // Bar outline
-      rows += `<rect x="${x1}" y="${y + BAR_PAD}" width="${w}" height="${BAR_H}"
-        rx="2" fill="none" stroke="${col}" stroke-width="1.5">`;
-      rows += `<title>${t.name} | ${t.start_date} → ${t.due_date} | ${(t.status||'').replace(/_/g,' ')} | ${pct}%${initials ? ' | ' + initials : ''}</title>`;
-      rows += `</rect>`;
+      // Bar border
+      svgRows += `<rect x="${x1}" y="${bTop}" width="${bw}" height="${BAR_H}" rx="2" fill="none" stroke="${color}" stroke-width="1.5"/>
+<title>${t.name} | ${t.start_date} → ${t.due_date} | ${(t.status||'').replace(/_/g,' ')} | ${pct}%</title>`;
 
-      // Assignee initials
-      if (initials && w > 24) {
-        rows += `<text x="${x1 + w - 4}" y="${y + ROW_H/2 + 3}" text-anchor="end"
-          fill="${col}" font-size="9" font-family="Share Tech Mono,monospace" opacity="0.8">${initials}</text>`;
+      // Hours-per-week cells (weekly zoom only)
+      if (zoomLevel === 1 && t.estimated_hours && bw > 0) {
+        const estHrs = parseFloat(t.estimated_hours);
+        const taskDays = Math.max((parseDate(t.due_date) - parseDate(t.start_date)) / MS_DAY, 1);
+        const hrsPerDay = estHrs / taskDays;
+        const hrsPerWeek = (hrsPerDay * 7).toFixed(1);
+        // Show in centre of bar if wide enough
+        if (bw > 28) {
+          svgRows += `<text x="${x1 + bw/2}" y="${bTop + BAR_H/2 + 4}" text-anchor="middle" fill="${color}" font-size="9" font-family="Share Tech Mono,monospace" opacity="0.9">${hrsPerWeek}</text>`;
+        }
       }
 
-      rowIdx++;
+      rowCount++;
     });
   });
 
   // ── Milestone diamonds ────────────────────────────────────
   let diamonds = '';
-  milestones.filter(m => m.due_date).forEach(m => {
-    const mx  = dayX(parseDate(m.due_date));
-    const col = m.status === 'complete' ? '#00e5a0' : parseDate(m.due_date) < today ? '#ff4757' : '#ffaa00';
-    const size = 7;
-    diamonds += `<polygon points="${mx},${HDR_H-size} ${mx+size},${HDR_H} ${mx},${HDR_H+size} ${mx-size},${HDR_H}"
-      fill="${col}" opacity="0.85">
-      <title>MILESTONE: ${m.title||m.name||''} | ${m.due_date}</title>
-    </polygon>`;
+  milestones.filter(m => m.due_date || m.current_target_date).forEach(m => {
+    const mDate = m.current_target_date || m.due_date;
+    const mx    = dayX(parseDate(mDate));
+    const dcol  = m.status === 'complete' ? '#00e5a0' : parseDate(mDate) < today ? '#ff4757' : '#ffaa00';
+    const sz    = 7;
+    const my    = HDR_H + 2;
+    diamonds += `<polygon points="${mx},${my} ${mx+sz},${my+sz} ${mx},${my+2*sz} ${mx-sz},${my+sz}" fill="${dcol}" opacity="0.85"><title>◆ ${m.description||m.title||''} | ${mDate}</title></polygon>`;
   });
 
   // ── Today line ────────────────────────────────────────────
-  const totalRows = rowIdx;
-  const svgH      = HDR_H + totalRows * ROW_H + 4;
-  const todayX    = dayX(today) - LABEL_W;
-  const todayLine = todayX >= 0 && todayX <= CHART_W
-    ? `<line x1="${todayX}" y1="0" x2="${todayX}" y2="${svgH}"
-        stroke="#ff4757" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
-      <text x="${todayX+3}" y="14" fill="#ff4757" font-size="9"
-        font-family="Share Tech Mono,monospace">TODAY</text>`
+  const svgH   = HDR_H + rowCount * ROW_H + 2;
+  const todayX = dayX(today);
+  const todayLine = todayX >= INFO_W && todayX <= INFO_W + CHART_W
+    ? `<line x1="${todayX}" y1="0" x2="${todayX}" y2="${svgH}" stroke="#ff4757" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.75"/>
+<rect x="${todayX+1}" y="2" width="34" height="13" rx="2" fill="rgba(255,71,87,0.15)"/>
+<text x="${todayX+4}" y="12" fill="#ff4757" font-size="9" font-family="Share Tech Mono,monospace" font-weight="bold">TODAY</text>`
     : '';
 
-  // ── Label divider ─────────────────────────────────────────
-  const divider = `<line x1="${LABEL_W}" y1="0" x2="${LABEL_W}" y2="${svgH}"
-    stroke="rgba(0,210,255,0.20)" stroke-width="1"/>`;
+  // ── Info column dividers ──────────────────────────────────
+  let colDividers = '';
+  let divX = 0;
+  visibleCols.forEach(c => {
+    divX += COL_W[c];
+    colDividers += `<line x1="${divX}" y1="0" x2="${divX}" y2="${svgH}" stroke="rgba(0,210,255,0.12)" stroke-width="0.5"/>`;
+  });
 
-  // ── Assemble SVG ──────────────────────────────────────────
-  const chartSVG = `<svg xmlns="http://www.w3.org/2000/svg"
-    width="${LABEL_W + CHART_W}" height="${svgH}"
-    style="background:#060a10;display:block;min-width:${LABEL_W + CHART_W}px">
-    <defs>
-      <clipPath id="chart-clip">
-        <rect x="${LABEL_W}" y="0" width="${CHART_W}" height="${svgH}"/>
-      </clipPath>
-    </defs>
+  // ── Clip paths for info columns ───────────────────────────
+  let clipPaths = '';
+  let cpX = 0;
+  visibleCols.forEach(c => {
+    clipPaths += `<clipPath id="clip-col-${c}"><rect x="${cpX+2}" y="0" width="${COL_W[c]-4}" height="${svgH}"/></clipPath>`;
+    cpX += COL_W[c];
+  });
+  clipPaths += `<clipPath id="clip-chart"><rect x="${INFO_W}" y="0" width="${CHART_W}" height="${svgH}"/></clipPath>`;
 
-    <!-- Header background -->
-    <rect x="0" y="0" width="${LABEL_W + CHART_W}" height="${HDR_H}"
-      fill="rgba(0,0,0,0.3)"/>
-    <rect x="${LABEL_W}" y="0" width="${CHART_W}" height="${HDR_H}"
-      fill="rgba(0,0,0,0.2)"/>
+  // ── Replace height placeholder in gridlines ───────────────
+  const finalGridLines = gridLines.replace(/SVGH_PLACEHOLDER/g, svgH);
 
-    <!-- Header labels (clipped to chart area) -->
-    <g clip-path="url(#chart-clip)" transform="translate(${LABEL_W},0)">
-      ${buildHeader()}
-      ${todayLine}
-    </g>
+  // ── Assemble ──────────────────────────────────────────────
+  const SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${INFO_W+CHART_W}" height="${svgH}" style="background:#060a10;display:block;">
+  <defs>${clipPaths}</defs>
 
-    <!-- Rows -->
-    ${rows}
+  <!-- Background -->
+  <rect x="0" y="0" width="${INFO_W+CHART_W}" height="${svgH}" fill="#060a10"/>
+  <rect x="${INFO_W}" y="0" width="${CHART_W}" height="${svgH}" fill="rgba(0,0,0,0.10)"/>
 
-    <!-- Milestones (clipped) -->
-    <g clip-path="url(#chart-clip)">
-      ${diamonds}
-    </g>
+  <!-- Grid lines (clipped to chart area) -->
+  <g clip-path="url(#clip-chart)">${finalGridLines}</g>
 
-    <!-- Label/chart divider -->
-    ${divider}
+  <!-- Task rows -->
+  ${svgRows}
 
-    <!-- Header bottom border -->
-    <line x1="0" y1="${HDR_H}" x2="${LABEL_W + CHART_W}" y2="${HDR_H}"
-      stroke="rgba(0,210,255,0.20)" stroke-width="1"/>
-  </svg>`;
+  <!-- Milestone diamonds -->
+  <g clip-path="url(#clip-chart)">${diamonds}</g>
 
-  container.innerHTML = chartSVG;
+  <!-- Today line -->
+  ${todayLine}
+
+  <!-- Header backgrounds -->
+  <rect x="0" y="0" width="${INFO_W}" height="${HDR_H}" fill="rgba(0,0,0,0.35)"/>
+  <rect x="${INFO_W}" y="0" width="${CHART_W}" height="${HDR_H}" fill="rgba(0,0,0,0.25)"/>
+
+  <!-- Info column headers -->
+  ${infoHdr}
+
+  <!-- Timeline headers (month/quarter on top, weeks on bottom) -->
+  <g clip-path="url(#clip-chart)">${headerTop}${headerBot}</g>
+
+  <!-- Header bottom border -->
+  <line x1="0" y1="${HDR_H}" x2="${INFO_W+CHART_W}" y2="${HDR_H}" stroke="rgba(0,210,255,0.25)" stroke-width="1"/>
+
+  <!-- Info/chart separator -->
+  <line x1="${INFO_W}" y1="0" x2="${INFO_W}" y2="${svgH}" stroke="rgba(0,210,255,0.30)" stroke-width="1"/>
+
+  <!-- Column dividers -->
+  ${colDividers}
+</svg>`;
+
+  container.innerHTML = SVG;
 }
-
-// Re-render Gantt when controls change
-document.addEventListener('change', e => {
-  if (e.target.id === 'gantt-zoom' || e.target.id === 'gantt-group-by') {
-    renderGanttTab();
-  }
-});
 
 </script>
 
