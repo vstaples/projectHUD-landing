@@ -14,6 +14,7 @@
   }
   html,body { width:100%;height:100%;background:var(--bg);overflow:hidden;
     font-family:'Barlow Condensed','Segoe UI',sans-serif;user-select:none; }
+
   #drag-bar { height:32px;background:var(--bg2);border-bottom:1px solid var(--border);
     display:flex;align-items:center;justify-content:space-between;padding:0 10px;cursor:move; }
   #drag-title { font-size:10px;letter-spacing:0.18em;color:var(--text2);
@@ -21,38 +22,46 @@
   #drag-close { background:none;border:none;color:var(--text3);cursor:pointer;
     font-size:14px;line-height:1;transition:color 0.15s; }
   #drag-close:hover { color:var(--red); }
+
   body.recording { box-shadow:inset 0 0 0 2px var(--red); }
   body.paused    { box-shadow:inset 0 0 0 2px var(--amber); }
+
   #panel { padding:12px 12px 8px;display:flex;flex-direction:column;gap:10px; }
+
   #timer-row { display:flex;align-items:center;gap:10px; }
-  #rec-dot { width:10px;height:10px;border-radius:50%;background:var(--red);
-    flex-shrink:0;transition:background 0.2s; }
-  body.recording #rec-dot { animation:pulse 1.2s ease-in-out infinite; }
+  #rec-dot { width:10px;height:10px;border-radius:50%;background:var(--text3);flex-shrink:0; }
+  body.recording #rec-dot { background:var(--red);animation:pulse 1.2s ease-in-out infinite; }
   body.paused    #rec-dot { background:var(--amber);animation:none; }
-  body.idle      #rec-dot { background:var(--text3);animation:none; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.75)} }
+
   #timer { font-family:'Share Tech Mono','Courier New',monospace;font-size:28px;
-    font-weight:700;color:var(--red);letter-spacing:0.06em;flex:1;transition:color 0.2s; }
-  body.paused #timer { color:var(--amber); }
-  body.idle   #timer { color:var(--text3); }
+    font-weight:700;color:var(--text3);letter-spacing:0.06em;flex:1;transition:color 0.2s; }
+  body.recording #timer { color:var(--red); }
+  body.paused    #timer { color:var(--amber); }
+
   #state-label { font-size:10px;letter-spacing:0.18em;color:var(--text3);
     text-transform:uppercase;min-width:70px;text-align:right; }
   body.recording #state-label { color:var(--red); }
   body.paused    #state-label { color:var(--amber); }
+
   #controls { display:flex;gap:6px; }
   .ctrl-btn { flex:1;height:36px;border:1px solid;background:none;cursor:pointer;
     font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:600;
     letter-spacing:0.1em;display:flex;align-items:center;justify-content:center;
     gap:5px;transition:background 0.15s;border-radius:2px; }
-  #btn-start  { border-color:rgba(255,71,87,0.45);color:var(--red); }
+  #btn-start  { border-color:rgba(255,71,87,0.45);  color:var(--red);   }
   #btn-start:hover  { background:rgba(255,71,87,0.10); }
-  #btn-pause  { border-color:rgba(255,170,0,0.45);color:var(--amber); }
+  #btn-pause  { border-color:rgba(255,170,0,0.45);  color:var(--amber); }
   #btn-pause:hover  { background:rgba(255,170,0,0.10); }
-  #btn-stop   { border-color:rgba(255,71,87,0.35);color:var(--red); }
+  #btn-stop   { border-color:rgba(255,71,87,0.35);  color:var(--red);   }
   #btn-stop:hover   { background:rgba(255,71,87,0.10); }
+  #btn-mic    { flex:0 0 40px;border-color:rgba(0,210,255,0.20);color:var(--text3); }
+  #btn-mic:hover    { background:rgba(0,210,255,0.08);color:var(--cyan); }
+  #btn-mic.active   { color:var(--cyan);border-color:rgba(0,210,255,0.55); }
   .ctrl-btn:disabled { opacity:0.25;cursor:not-allowed; }
+
   #annot-row { display:flex;gap:6px; }
-  #annot-type { width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(155,89,182,0.25);
+  #annot-type { width:96px;background:rgba(0,0,0,0.3);border:1px solid rgba(155,89,182,0.25);
     color:rgba(210,230,245,0.8);font-family:'Barlow Condensed',sans-serif;
     font-size:11px;padding:5px 8px;outline:none;flex-shrink:0; }
   #annot-input { flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(155,89,182,0.25);
@@ -67,13 +76,15 @@
     transition:background 0.15s;border-radius:2px; }
   #btn-mark:hover { background:rgba(155,89,182,0.22); }
   #btn-mark:disabled { opacity:0.25;cursor:not-allowed; }
-  #marker-list { max-height:90px;overflow-y:auto;display:flex;flex-direction:column;gap:1px; }
+
+  #marker-list { max-height:80px;overflow-y:auto;display:flex;flex-direction:column;gap:1px; }
   .marker-row { display:flex;align-items:center;gap:8px;
     font-family:'Share Tech Mono',monospace;font-size:10px;
     color:var(--text2);padding:3px 4px;background:rgba(0,0,0,0.15); }
   .marker-time { color:var(--purple);min-width:38px; }
   .marker-type { color:rgba(0,210,255,0.55);min-width:52px;font-size:9px;text-transform:uppercase; }
   .marker-label { flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+
   #status-bar { font-size:10px;letter-spacing:0.1em;color:var(--text3);
     text-align:center;padding:4px 0;border-top:1px solid var(--border);margin-top:2px; }
 
@@ -111,10 +122,9 @@
 
   ::-webkit-scrollbar { width:4px; }
   ::-webkit-scrollbar-thumb { background:rgba(0,210,255,0.15);border-radius:2px; }
-  #rec-mic-btn.active { color:#00d2ff !important; border-color:rgba(0,210,255,0.55) !important; }
 </style>
 </head>
-<body class="idle">
+<body>
 
 <div id="drag-bar">
   <div id="drag-title">
@@ -129,6 +139,7 @@
     <div id="timer">00:00</div>
     <div id="state-label">READY</div>
   </div>
+
   <div id="controls">
     <button class="ctrl-btn" id="btn-start">
       <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
@@ -146,7 +157,14 @@
         <rect x="1" y="1" width="10" height="10"/>
       </svg>STOP
     </button>
+    <button class="ctrl-btn" id="btn-mic" title="Toggle microphone">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+        <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+      </svg>
+    </button>
   </div>
+
   <div id="annot-row">
     <select id="annot-type">
       <option value="chapter">Chapter</option>
@@ -157,19 +175,20 @@
     <input id="annot-input" type="text" placeholder="Annotation label…"/>
     <button id="btn-mark" disabled>◆ MARK</button>
   </div>
+
   <div id="marker-list"></div>
   <div id="status-bar">READY TO RECORD</div>
 </div>
 
 <script>
-// ── Config (same as main app) ────────────────────────────────
+// ── Config ────────────────────────────────────────────────────
 const SUPABASE_URL      = 'https://dvbetgdzksatcgdfftbs.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
 
-// ── BroadcastChannel to notify main window of state ──────────
+// ── BroadcastChannel ──────────────────────────────────────────
 const ch = new BroadcastChannel('hud-recorder');
 
-// ── ALL recording state lives HERE in this window ────────────
+// ── State ─────────────────────────────────────────────────────
 let state        = 'idle';
 let stream       = null;
 let recorder     = null;
@@ -179,8 +198,10 @@ let pausedMs     = 0;
 let pauseStart   = 0;
 let annotations  = [];
 let timerInterval= null;
+let micStream    = null;
+let micEnabled   = false;
 
-// ── DOM ───────────────────────────────────────────────────────
+// ── DOM refs ──────────────────────────────────────────────────
 const timerEl    = document.getElementById('timer');
 const stateEl    = document.getElementById('state-label');
 const markerList = document.getElementById('marker-list');
@@ -191,6 +212,7 @@ const btnStart   = document.getElementById('btn-start');
 const btnPause   = document.getElementById('btn-pause');
 const btnStop    = document.getElementById('btn-stop');
 const btnMark    = document.getElementById('btn-mark');
+const btnMic     = document.getElementById('btn-mic');
 const pauseLabel = document.getElementById('pause-label');
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -201,72 +223,80 @@ function elapsed() {
 }
 function fmtTime(s) {
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-  if (h > 0) return `${h}:${pad(m)}:${pad(sec)}`;
-  return `${pad(m)}:${pad(sec)}`;
+  if (h > 0) return h+':'+pad(m)+':'+pad(sec);
+  return pad(m)+':'+pad(sec);
 }
 function pad(n) { return String(n).padStart(2,'0'); }
-
 function tick() { timerEl.textContent = fmtTime(elapsed()); }
+function setBodyState(s) { document.body.className = s; stateEl.textContent = s.toUpperCase(); }
+function setStatus(msg, color) { statusBar.textContent = msg; statusBar.style.color = color||''; }
 
-function setBodyState(s) {
-  document.body.className = s;
-  stateEl.textContent = s.toUpperCase();
-}
-function setStatus(msg, color) {
-  statusBar.textContent = msg;
-  statusBar.style.color = color || '';
-}
-
-// ── Start recording ───────────────────────────────────────────
+// ── START ─────────────────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
   if (state !== 'idle') return;
 
-        // Try with audio (tab capture). Fall back to video-only (window/desktop capture).
+  setStatus('Requesting screen share…', 'var(--cyan)');
+
+  // Try with audio — fall back to video-only if rejected
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30, cursor: 'always' },
+      audio: true,
+    });
+  } catch (e1) {
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30, cursor: 'always' },
-        audio: true,
+        audio: false,
       });
-    } catch(audioErr) {
-      try {
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30, cursor: 'always' },
-          audio: false,
-        });
-      } catch(e) {
-        setStatus('\u2717 Screen share cancelled', 'var(--red)');
-        return;
-      }
+    } catch (e2) {
+      setStatus('Screen share cancelled', 'var(--text3)');
+      return;
     }
-
-  chunks = []; annotations = []; pausedMs = 0;
-  startTime = Date.now();
-  state = 'recording';
-
-  // If mic is active, merge mic audio track into stream
-  if (micStream) {
-    micStream.getAudioTracks().forEach(track => stream.addTrack(track));
   }
 
-  // Pick best supported mimeType with audio codec
-  const mimeType = [
+  // Merge mic if active
+  if (micEnabled && micStream) {
+    micStream.getAudioTracks().forEach(t => stream.addTrack(t));
+  }
+
+  // Pick best mimeType — pass nothing if unsupported to let browser choose
+  const MIME_CANDIDATES = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
-    'video/webm;codecs=h264,opus',
     'video/webm;codecs=vp9',
     'video/webm',
-  ].find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  ];
+  const mimeType = MIME_CANDIDATES.find(t => MediaRecorder.isTypeSupported(t));
 
-  recorder = new MediaRecorder(stream, { mimeType });
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  try {
+    recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
+  } catch (e) {
+    // Last resort — no options
+    recorder = new MediaRecorder(stream);
+  }
+
+  chunks      = [];
+  annotations = [];
+  pausedMs    = 0;
+  startTime   = Date.now();
+  state       = 'recording';
+
+  recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
   recorder.onstop = onRecorderStop;
   recorder.start(1000);
 
-  // If user stops sharing via browser UI
-  stream.getVideoTracks()[0].addEventListener('ended', () => {
-    if (state !== 'idle') doStop();
-  });
+  // Watch for user closing the share via browser chrome
+  const videoTracks = stream.getVideoTracks();
+  if (videoTracks.length > 0) {
+    videoTracks[0].addEventListener('ended', () => {
+      if (state !== 'idle') doStop();
+    });
+  }
 
+  // Update UI
   setBodyState('recording');
   timerInterval = setInterval(tick, 500);
   btnStart.disabled = true;
@@ -275,11 +305,11 @@ btnStart.addEventListener('click', async () => {
   btnMark.disabled  = false;
   setStatus('● RECORDING', 'var(--red)');
 
-  // Tell main window — it adds the red border
+  // Notify main window (red border)
   ch.postMessage({ evt: 'RECORDING_STARTED', startTime });
 });
 
-// ── Pause / Resume ────────────────────────────────────────────
+// ── PAUSE / RESUME ────────────────────────────────────────────
 btnPause.addEventListener('click', () => {
   if (state === 'recording') {
     recorder.pause();
@@ -300,7 +330,7 @@ btnPause.addEventListener('click', () => {
   }
 });
 
-// ── Stop ──────────────────────────────────────────────────────
+// ── STOP ──────────────────────────────────────────────────────
 btnStop.addEventListener('click', doStop);
 
 function doStop() {
@@ -313,13 +343,14 @@ function doStop() {
   btnStop.disabled  = true;
   btnMark.disabled  = true;
   pauseLabel.textContent = 'PAUSE';
-  stream?.getTracks().forEach(t => t.stop());
-  micStream?.getTracks().forEach(t => t.stop());
-  micStream  = null;
-  micEnabled = false;
-  const btnMicEl = document.getElementById('rec-mic-btn');
-  if (btnMicEl) { btnMicEl.classList.remove('active'); }
-  recorder.stop(); // triggers onRecorderStop
+
+  stream.getTracks().forEach(t => t.stop());
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; micEnabled = false; btnMic.classList.remove('active'); }
+
+  if (recorder && recorder.state !== 'inactive') {
+    recorder.stop(); // triggers onRecorderStop
+  }
+
   setStatus('PROCESSING…', 'var(--cyan)');
   ch.postMessage({ evt: 'STOPPED' });
 }
@@ -330,34 +361,33 @@ function onRecorderStop() {
   showSaveDialog(blob, duration);
 }
 
-// ── Annotations ───────────────────────────────────────────────
-btnMark.addEventListener('click', addMark);
-
-// MIC toggle
-const btnMic = document.getElementById('rec-mic-btn');
-if (btnMic) {
-  btnMic.addEventListener('click', async () => {
-    if (micEnabled) {
-      micStream?.getTracks().forEach(t => t.stop());
-      micStream = null; micEnabled = false;
-      btnMic.classList.remove('active');
-      btnMic.title = 'Enable microphone';
-    } else {
-      try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        micEnabled = true;
-        btnMic.classList.add('active');
-        btnMic.title = 'Disable microphone';
-        if (state === 'recording' && stream) {
-          micStream.getAudioTracks().forEach(t => stream.addTrack(t));
-        }
-      } catch(e) {
-        setStatus('✗ Mic denied', 'var(--red)');
-        setTimeout(() => { if (state === 'recording') setStatus('● RECORDING','var(--red)'); }, 2000);
+// ── MIC TOGGLE ────────────────────────────────────────────────
+btnMic.addEventListener('click', async () => {
+  if (micEnabled) {
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+    micEnabled = false;
+    btnMic.classList.remove('active');
+    btnMic.title = 'Enable microphone';
+  } else {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      micEnabled = true;
+      btnMic.classList.add('active');
+      btnMic.title = 'Disable microphone';
+      // Add live if already recording
+      if (state === 'recording' && stream) {
+        micStream.getAudioTracks().forEach(t => stream.addTrack(t));
       }
+    } catch (e) {
+      setStatus('Mic access denied', 'var(--red)');
+      setTimeout(() => { if (state !== 'idle') setStatus('● RECORDING','var(--red)'); else setStatus('READY TO RECORD'); }, 2000);
     }
-  });
-}
+  }
+});
+
+// ── ANNOTATIONS ───────────────────────────────────────────────
+btnMark.addEventListener('click', addMark);
 annotInput.addEventListener('keydown', e => { if (e.key === 'Enter') addMark(); });
 
 function addMark() {
@@ -367,9 +397,9 @@ function addMark() {
   annotations.push(ann);
   const row = document.createElement('div');
   row.className = 'marker-row';
-  row.innerHTML = `<span class="marker-time">${fmtTime(ann.time_seconds)}</span>
-    <span class="marker-type">${ann.type}</span>
-    <span class="marker-label">${ann.label}</span>`;
+  row.innerHTML = '<span class="marker-time">'+fmtTime(ann.time_seconds)+'</span>'
+    +'<span class="marker-type">'+ann.type+'</span>'
+    +'<span class="marker-label">'+ann.label+'</span>';
   markerList.appendChild(row);
   markerList.scrollTop = markerList.scrollHeight;
   annotInput.value = '';
@@ -378,7 +408,7 @@ function addMark() {
   setTimeout(() => { btnMark.textContent = orig; }, 800);
 }
 
-// ── Close button ──────────────────────────────────────────────
+// ── CLOSE ─────────────────────────────────────────────────────
 document.getElementById('drag-close').addEventListener('click', () => {
   if (state !== 'idle') {
     if (!confirm('Recording in progress. Stop and close?')) return;
@@ -389,47 +419,26 @@ document.getElementById('drag-close').addEventListener('click', () => {
   }
 });
 
-// ── Listen for events FROM main window ───────────────────────
-// (main window only sends border state updates back — no commands needed here)
-
-// ── Save dialog ───────────────────────────────────────────────
+// ── SAVE DIALOG ───────────────────────────────────────────────
 function showSaveDialog(blob, duration) {
   const dlg = document.createElement('div');
   dlg.id = 'save-overlay';
-  dlg.innerHTML = `
-    <div class="save-panel">
-      <div class="save-hdr">
-        <span>⏺ SAVE RECORDING</span>
-        <span style="color:rgba(0,210,255,0.4);font-size:10px;">
-          ${fmtTime(duration)} · ${(blob.size/1024/1024).toFixed(1)}MB
-        </span>
-      </div>
-      <div class="save-body">
-        <div>
-          <label class="save-label">TITLE *</label>
-          <input id="sv-title" type="text" placeholder="e.g. EVM Walkthrough"/>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <div>
-            <label class="save-label">CATEGORY</label>
-            <select id="sv-cat">
-              <option value="internal">Internal</option>
-              <option value="training">Training</option>
-              <option value="marketing">Marketing</option>
-            </select>
-          </div>
-          <div>
-            <label class="save-label">TAGS</label>
-            <input id="sv-tags" type="text" placeholder="tag1, tag2"/>
-          </div>
-        </div>
-        <div id="sv-progress" class="save-progress" style="display:none;"></div>
-      </div>
-      <div class="save-footer">
-        <button class="save-submit" id="sv-save">↑ SAVE TO LIBRARY</button>
-        <button class="save-discard" id="sv-discard">DISCARD</button>
-      </div>
-    </div>`;
+  dlg.innerHTML =
+    '<div class="save-panel">'
+    +'<div class="save-hdr"><span>⏺ SAVE RECORDING</span>'
+    +'<span style="color:rgba(0,210,255,0.4);font-size:10px;">'+fmtTime(duration)+' · '+(blob.size/1024/1024).toFixed(1)+'MB</span></div>'
+    +'<div class="save-body">'
+    +'<div><label class="save-label">TITLE *</label><input id="sv-title" type="text" placeholder="e.g. EVM Walkthrough"/></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    +'<div><label class="save-label">CATEGORY</label><select id="sv-cat"><option value="internal">Internal</option><option value="training">Training</option><option value="marketing">Marketing</option></select></div>'
+    +'<div><label class="save-label">TAGS</label><input id="sv-tags" type="text" placeholder="tag1, tag2"/></div>'
+    +'</div>'
+    +'<div id="sv-progress" class="save-progress" style="display:none;"></div>'
+    +'</div>'
+    +'<div class="save-footer">'
+    +'<button class="save-submit" id="sv-save">↑ SAVE TO LIBRARY</button>'
+    +'<button class="save-discard" id="sv-discard">DISCARD</button>'
+    +'</div></div>';
 
   document.body.appendChild(dlg);
   dlg.querySelector('#sv-title').focus();
@@ -438,14 +447,15 @@ function showSaveDialog(blob, duration) {
   dlg.querySelector('#sv-discard').addEventListener('click', () => {
     if (confirm('Discard recording?')) {
       dlg.remove();
-      setStatus('READY TO RECORD');
       timerEl.textContent = '00:00';
+      setStatus('READY TO RECORD');
       chunks = []; annotations = [];
       ch.postMessage({ evt: 'DISCARDED' });
     }
   });
 }
 
+// ── UPLOAD ────────────────────────────────────────────────────
 async function doSave(blob, duration, dlg) {
   const title = dlg.querySelector('#sv-title').value.trim();
   if (!title) { dlg.querySelector('#sv-title').focus(); return; }
@@ -454,50 +464,32 @@ async function doSave(blob, duration, dlg) {
   const prog = dlg.querySelector('#sv-progress');
   btn.disabled = true;
   prog.style.display = 'block';
+  prog.textContent = 'REQUESTING AUTH…';
 
   try {
-    // Get current user via main window's Auth — use a cross-window API call
-    // We call the Supabase Auth API directly since Auth is in main window
-    prog.textContent = 'AUTHENTICATING…';
-    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY,
-      }
-    });
-
-    // Get session token from main window via BroadcastChannel
-    prog.textContent = 'UPLOADING…';
-    const ts   = new Date().toISOString().replace(/[:.]/g,'-');
-    const category = dlg.querySelector('#sv-cat').value;
-
-    // Request auth token from main window
-    const tokenPromise = new Promise(resolve => {
+    // Get fresh token from main window
+    const tokenPromise = new Promise((resolve) => {
       const tmpCh = new BroadcastChannel('hud-recorder');
+      const timeout = setTimeout(() => { tmpCh.close(); resolve(null); }, 4000);
       tmpCh.addEventListener('message', e => {
-        if (e.data.evt === 'AUTH_TOKEN') { tmpCh.close(); resolve(e.data.token); }
+        if (e.data.evt === 'AUTH_TOKEN') {
+          clearTimeout(timeout); tmpCh.close(); resolve(e.data.token);
+        }
       });
       ch.postMessage({ evt: 'REQUEST_AUTH_TOKEN' });
-      // Timeout fallback
-      setTimeout(() => resolve(null), 3000);
     });
 
     const token = await tokenPromise;
-    if (!token) throw new Error('Could not get auth token from main window');
+    if (!token) throw new Error('Auth token unavailable — is ProjectHUD open?');
 
-    const path = `recordings/${ts}.webm`;
+    prog.textContent = 'UPLOADING…';
+    const ts   = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = 'recordings/' + ts + '.webm';
+    const category = dlg.querySelector('#sv-cat').value;
 
     const uploadRes = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/video-library/${path}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'video/webm',
-          'x-upsert': 'false',
-        },
-        body: blob,
-      }
+      SUPABASE_URL + '/storage/v1/object/video-library/' + path,
+      { method:'POST', headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'video/webm', 'x-upsert':'false' }, body:blob }
     );
     if (!uploadRes.ok) {
       const err = await uploadRes.json().catch(() => ({}));
@@ -507,31 +499,23 @@ async function doSave(blob, duration, dlg) {
     prog.textContent = 'SAVING METADATA…';
     const tags = dlg.querySelector('#sv-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
 
-    // Send metadata to main window to save via API.post
     ch.postMessage({
       evt: 'SAVE_CLIP',
-      payload: {
-        title,
-        duration_seconds: duration,
-        file_path: path,
-        file_size_bytes: blob.size,
-        category,
-        tags,
-        annotations,
-        is_public: category === 'marketing',
-      }
+      payload: { title, duration_seconds: duration, file_path: path,
+        file_size_bytes: blob.size, category, tags, annotations,
+        is_public: category === 'marketing' },
     });
 
     prog.textContent = '✓ SAVED';
     prog.style.color = '#00e5a0';
     setTimeout(() => {
       dlg.remove();
-      setStatus('READY TO RECORD');
       timerEl.textContent = '00:00';
+      setStatus('READY TO RECORD');
       chunks = []; annotations = [];
     }, 1400);
 
-  } catch(err) {
+  } catch (err) {
     prog.textContent = '✗ ' + err.message;
     prog.style.color = '#ff4757';
     btn.disabled = false;
