@@ -220,15 +220,24 @@ function setStatus(msg, color) {
 // ── Start recording ───────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
   if (state !== 'idle') return;
-  try {
-    stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30, cursor: 'always' },
-      audio: true,   // capture system/tab audio
-    });
-  } catch(e) {
-    setStatus('✗ Screen share cancelled', 'var(--red)');
-    return;
-  }
+
+        // Try with audio (tab capture). Fall back to video-only (window/desktop capture).
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30, cursor: 'always' },
+        audio: true,
+      });
+    } catch(audioErr) {
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30, cursor: 'always' },
+          audio: false,
+        });
+      } catch(e) {
+        setStatus('\u2717 Screen share cancelled', 'var(--red)');
+        return;
+      }
+    }
 
   chunks = []; annotations = []; pausedMs = 0;
   startTime = Date.now();
