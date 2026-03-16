@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HUD Recorder</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:     #060a10;
+    --bg2:    #0c1628;
+    --border: rgba(0,210,255,0.14);
+    --cyan:   #00d2ff;
+    --green:  #00e5a0;
+    --amber:  #ffaa00;
+    --red:    #ff4757;
+    --purple: #9b59b6;
+    --text0:  rgba(230,240,250,0.95);
+    --text2:  rgba(180,210,235,0.55);
+    --text3:  rgba(140,175,210,0.35);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: 'Barlow Condensed', 'Segoe UI', sans-serif;
+    user-select: none;
+  }
+
+  /* Drag handle — whole top bar */
+  #drag-bar {
+    height: 32px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    cursor: move;
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+  #drag-title {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #drag-close {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    -webkit-app-region: no-drag;
+    transition: color 0.15s;
+  }
+  #drag-close:hover { color: var(--red); }
+
+  /* State border */
+  body.recording { box-shadow: inset 0 0 0 2px var(--red); }
+  body.paused    { box-shadow: inset 0 0 0 2px var(--amber); }
+
+  /* Main panel */
+  #panel {
+    padding: 12px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Timer row */
+  #timer-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #rec-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  body.recording #rec-dot { animation: pulse 1.2s ease-in-out infinite; }
+  body.paused    #rec-dot { background: var(--amber); animation: none; }
+  body.idle      #rec-dot { background: var(--text3); animation: none; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.3; transform: scale(0.75); }
+  }
+
+  #timer {
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--red);
+    letter-spacing: 0.06em;
+    flex: 1;
+    transition: color 0.2s;
+  }
+  body.paused #timer { color: var(--amber); }
+  body.idle   #timer { color: var(--text3); }
+
+  #state-label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--text3);
+    text-transform: uppercase;
+    min-width: 70px;
+    text-align: right;
+  }
+  body.recording #state-label { color: var(--red); }
+  body.paused    #state-label { color: var(--amber); }
+
+  /* Controls row */
+  #controls {
+    display: flex;
+    gap: 6px;
+  }
+  .ctrl-btn {
+    flex: 1;
+    height: 36px;
+    border: 1px solid;
+    background: none;
+    cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: background 0.15s;
+    border-radius: 2px;
+  }
+  #btn-start  { border-color: rgba(255,71,87,0.45);  color: var(--red);    }
+  #btn-start:hover  { background: rgba(255,71,87,0.10); }
+  #btn-pause  { border-color: rgba(255,170,0,0.45);  color: var(--amber);  }
+  #btn-pause:hover  { background: rgba(255,170,0,0.10); }
+  #btn-stop   { border-color: rgba(255,71,87,0.35);  color: var(--red);    }
+  #btn-stop:hover   { background: rgba(255,71,87,0.10); }
+  .ctrl-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  /* Annotation row */
+  #annot-row {
+    display: flex;
+    gap: 6px;
+  }
+  #annot-type {
+    width: 100px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(155,89,182,0.25);
+    color: rgba(210,230,245,0.8);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    padding: 5px 8px;
+    outline: none;
+    flex-shrink: 0;
+  }
+  #annot-input {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(155,89,182,0.25);
+    color: rgba(210,230,245,0.8);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    padding: 5px 8px;
+    outline: none;
+  }
+  #annot-input:focus { border-color: rgba(155,89,182,0.55); }
+  #annot-input::placeholder { color: var(--text3); }
+  #btn-mark {
+    flex-shrink: 0;
+    height: 30px;
+    padding: 0 12px;
+    background: rgba(155,89,182,0.10);
+    border: 1px solid rgba(155,89,182,0.35);
+    color: var(--purple);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 2px;
+  }
+  #btn-mark:hover { background: rgba(155,89,182,0.22); }
+  #btn-mark:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  /* Marker list */
+  #marker-list {
+    max-height: 90px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .marker-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    padding: 3px 4px;
+    background: rgba(0,0,0,0.15);
+  }
+  .marker-time { color: var(--purple); min-width: 38px; }
+  .marker-type { color: rgba(0,210,255,0.55); min-width: 52px; font-size: 9px; text-transform: uppercase; }
+  .marker-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Status bar */
+  #status-bar {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    text-align: center;
+    padding: 4px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,210,255,0.15); border-radius: 2px; }
+</style>
+</head>
+<body class="idle">
+
+<div id="drag-bar">
+  <div id="drag-title">
+    <span style="color:#ff4757;font-size:12px;">⏺</span>
+    HUD RECORDER
+  </div>
+  <button id="drag-close" title="Close">✕</button>
+</div>
+
+<div id="panel">
+
+  <div id="timer-row">
+    <div id="rec-dot"></div>
+    <div id="timer">00:00</div>
+    <div id="state-label">READY</div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="btn-start">
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="6" cy="6" r="3" fill="currentColor"/></svg>
+      START
+    </button>
+    <button class="ctrl-btn" id="btn-pause" disabled>
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1" width="3" height="10"/><rect x="7.5" y="1" width="3" height="10"/></svg>
+      PAUSE
+    </button>
+    <button class="ctrl-btn" id="btn-stop" disabled>
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><rect x="1" y="1" width="10" height="10"/></svg>
+      STOP
+    </button>
+  </div>
+
+  <div id="annot-row">
+    <select id="annot-type">
+      <option value="chapter">Chapter</option>
+      <option value="callout">Callout</option>
+      <option value="zoom">Zoom</option>
+      <option value="note">Note</option>
+    </select>
+    <input id="annot-input" type="text" placeholder="Annotation label…" />
+    <button id="btn-mark" disabled>◆ MARK</button>
+  </div>
+
+  <div id="marker-list"></div>
+
+  <div id="status-bar">READY TO RECORD</div>
+
+</div>
+
+<script>
+// ── BroadcastChannel to main window ────────────────────────
+const ch = new BroadcastChannel('hud-recorder');
+
+// ── State ───────────────────────────────────────────────────
+let state       = 'idle';   // idle | recording | paused
+let startTime   = 0;
+let pausedMs    = 0;
+let pauseStart  = 0;
+let timerInterval = null;
+let annotations = [];
+
+// ── DOM refs ─────────────────────────────────────────────────
+const timerEl    = document.getElementById('timer');
+const stateEl    = document.getElementById('state-label');
+const markerList = document.getElementById('marker-list');
+const statusBar  = document.getElementById('status-bar');
+const annotInput = document.getElementById('annot-input');
+const annotType  = document.getElementById('annot-type');
+const btnStart   = document.getElementById('btn-start');
+const btnPause   = document.getElementById('btn-pause');
+const btnStop    = document.getElementById('btn-stop');
+const btnMark    = document.getElementById('btn-mark');
+
+// ── Helpers ──────────────────────────────────────────────────
+function elapsed() {
+  if (state === 'idle') return 0;
+  const now = state === 'paused' ? pauseStart : Date.now();
+  return Math.floor((now - startTime - pausedMs) / 1000);
+}
+function fmtTime(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if (h > 0) return `${h}:${pad(m)}:${pad(sec)}`;
+  return `${pad(m)}:${pad(sec)}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function tick() {
+  timerEl.textContent = fmtTime(elapsed());
+}
+
+function setBodyState(s) {
+  document.body.className = s;
+  stateEl.textContent = s.toUpperCase();
+}
+
+function setStatus(msg, color) {
+  statusBar.textContent = msg;
+  statusBar.style.color = color || '';
+}
+
+function addMarkerRow(ann) {
+  const row = document.createElement('div');
+  row.className = 'marker-row';
+  row.innerHTML = `
+    <span class="marker-time">${fmtTime(ann.time_seconds)}</span>
+    <span class="marker-type">${ann.type}</span>
+    <span class="marker-label">${ann.label}</span>
+  `;
+  markerList.appendChild(row);
+  markerList.scrollTop = markerList.scrollHeight;
+}
+
+// ── Button wiring ────────────────────────────────────────────
+btnStart.addEventListener('click', () => ch.postMessage({ cmd: 'START' }));
+btnPause.addEventListener('click', () => ch.postMessage({ cmd: state === 'paused' ? 'RESUME' : 'PAUSE' }));
+btnStop.addEventListener('click',  () => ch.postMessage({ cmd: 'STOP' }));
+
+btnMark.addEventListener('click', addMark);
+annotInput.addEventListener('keydown', e => { if (e.key === 'Enter') addMark(); });
+
+function addMark() {
+  const label = annotInput.value.trim();
+  if (!label || state === 'idle') return;
+  const ann = { time_seconds: elapsed(), type: annotType.value, label };
+  annotations.push(ann);
+  addMarkerRow(ann);
+  ch.postMessage({ cmd: 'ANNOTATION', annotation: ann });
+  annotInput.value = '';
+  // Flash feedback
+  btnMark.textContent = '✓';
+  setTimeout(() => { btnMark.textContent = '◆ MARK'; }, 800);
+}
+
+document.getElementById('drag-close').addEventListener('click', () => {
+  if (state !== 'idle') {
+    if (!confirm('Recording in progress. Stop and close?')) return;
+    ch.postMessage({ cmd: 'STOP' });
+  }
+  window.close();
+});
+
+// ── Listen for state updates from main window ────────────────
+ch.addEventListener('message', e => {
+  const { evt } = e.data;
+
+  if (evt === 'RECORDING_STARTED') {
+    state     = 'recording';
+    startTime = e.data.startTime;
+    pausedMs  = 0;
+    annotations = [];
+    markerList.innerHTML = '';
+    setBodyState('recording');
+    timerInterval = setInterval(tick, 500);
+    btnStart.disabled = true;
+    btnPause.disabled = false;
+    btnStop.disabled  = false;
+    btnMark.disabled  = false;
+    setStatus('● RECORDING', 'var(--red)');
+  }
+
+  else if (evt === 'PAUSED') {
+    state      = 'paused';
+    pauseStart = e.data.pauseStart;
+    setBodyState('paused');
+    btnPause.innerHTML = `<svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg> RESUME`;
+    setStatus('⏸ PAUSED', 'var(--amber)');
+  }
+
+  else if (evt === 'RESUMED') {
+    state     = 'recording';
+    pausedMs  = e.data.pausedMs;
+    setBodyState('recording');
+    btnPause.innerHTML = `<svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1" width="3" height="10"/><rect x="7.5" y="1" width="3" height="10"/></svg> PAUSE`;
+    setStatus('● RECORDING', 'var(--red)');
+  }
+
+  else if (evt === 'STOPPED') {
+    state = 'idle';
+    clearInterval(timerInterval);
+    setBodyState('idle');
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+    btnStop.disabled  = true;
+    btnMark.disabled  = true;
+    btnPause.innerHTML = `<svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1" width="3" height="10"/><rect x="7.5" y="1" width="3" height="10"/></svg> PAUSE`;
+    timerEl.textContent = '00:00';
+    setStatus('SAVING…', 'var(--cyan)');
+  }
+
+  else if (evt === 'SAVED') {
+    setStatus('✓ SAVED TO LIBRARY', 'var(--green)');
+    setTimeout(() => setStatus('READY TO RECORD'), 3000);
+  }
+
+  else if (evt === 'DISCARDED') {
+    setStatus('READY TO RECORD');
+  }
+
+  else if (evt === 'ERROR') {
+    state = 'idle';
+    clearInterval(timerInterval);
+    setBodyState('idle');
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+    btnStop.disabled  = true;
+    btnMark.disabled  = true;
+    timerEl.textContent = '00:00';
+    setStatus('✗ ' + (e.data.message || 'ERROR'), 'var(--red)');
+  }
+});
+
+// Notify main window this panel is ready
+ch.postMessage({ cmd: 'PANEL_READY' });
+</script>
+</body>
+</html>
