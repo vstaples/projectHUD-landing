@@ -99,8 +99,10 @@
 .ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
 
 /* Task table */
-.task-table-wrap { overflow-x: auto; position:relative; width:100%; }
-.task-tbl { width: max-content; border-collapse: collapse; border-spacing:0; }
+.task-table-wrap { overflow-x: auto; position:relative; width:100%; max-width:100%; display:block; }
+.task-tbl { width: max-content; min-width:100%; border-collapse: collapse; border-spacing:0; }
+/* When any group is active, prevent table from being constrained by parent */
+.task-tbl.show-cpm, .task-tbl.show-pert, .task-tbl.show-actuals, .task-tbl.show-budget { min-width:unset; }
 /* Sticky left columns */
 .task-tbl .col-sticky { position:sticky; background:var(--bg1); z-index:2; }
 .task-tbl th.col-sticky { background:var(--bg2); z-index:3; }
@@ -112,6 +114,9 @@
 .col-grp-cpm, .col-grp-pert, .col-grp-actuals, .col-grp-budget { display:none; }
 .show-cpm .col-grp-cpm, .show-pert .col-grp-pert,
 .show-actuals .col-grp-actuals, .show-budget .col-grp-budget { display:table-cell; }
+/* PROJECT DATA group — shown by default, hidden when toggled off */
+.col-grp-projdata { display:table-cell; }
+.hide-projdata .col-grp-projdata { display:none; }
 /* Column toggle buttons */
 .col-toggle-btn { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em;
   padding:3px 9px; border:1px solid var(--border); background:none;
@@ -492,6 +497,7 @@
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <div style="display:flex;gap:4px;border:1px solid var(--border);padding:3px 6px;border-radius:2px;" id="col-toggle-group">
               <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;align-self:center;margin-right:2px;">SHOW:</span>
+              <button class="col-toggle-btn active" data-col="projdata" onclick="toggleColGroup('projdata')">PROJECT DATA</button>
               <button class="col-toggle-btn" data-col="actuals" onclick="toggleColGroup('actuals')">ACTUALS</button>
               <button class="col-toggle-btn" data-col="cpm"     onclick="toggleColGroup('cpm')">CPM</button>
               <button class="col-toggle-btn" data-col="pert"    onclick="toggleColGroup('pert')">PERT</button>
@@ -506,7 +512,7 @@
             </div>
           </div>
         </div>
-        <div class="panel">
+        <div class="panel" style="overflow:hidden;">
           <div class="task-table-wrap">
             <table class="task-tbl" id="tasks-table">
               <thead id="tasks-thead">
@@ -517,7 +523,7 @@
                   <th class="col-sticky col-group-hdr" style="left:46px;width:26px;"></th>
                   <th class="col-sticky col-group-hdr" style="left:72px;min-width:72px;"></th>
                   <th class="col-sticky col-group-hdr" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.2);"></th>
-                  <th class="col-group-hdr" style="background:rgba(0,0,0,0.15);" colspan="8">— PROJECT DATA —</th>
+                  <th class="col-grp-projdata col-group-hdr" style="background:rgba(0,0,0,0.15);" colspan="8">— PROJECT DATA —</th>
                   <th class="col-grp-actuals col-group-hdr" style="color:var(--amber);background:rgba(255,170,0,0.05);" colspan="3">ACTUALS</th>
                   <th class="col-grp-cpm    col-group-hdr" style="color:#8b5cf6;background:rgba(139,92,246,0.05);" colspan="5">CRITICAL PATH</th>
                   <th class="col-grp-pert   col-group-hdr" style="color:var(--green);background:rgba(0,229,160,0.05);" colspan="6">PERT</th>
@@ -531,15 +537,15 @@
                   <th class="col-sticky" style="left:46px;width:26px;font-size:13px;color:var(--cyan);padding:0 4px;" title="Link">&#9741;</th>
                   <th class="col-sticky" style="left:72px;min-width:72px;" title="Predecessor">PRED</th>
                   <th class="col-sticky" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.2);">TASK</th>
-                  <!-- STANDARD SCROLLABLE COLS -->
-                  <th>ASSIGNED</th>
-                  <th>START</th>
-                  <th>DUE</th>
-                  <th>DURATION</th>
-                  <th>EFFORT</th>
-                  <th>% DONE</th>
-                  <th>STATUS</th>
-                  <th></th>
+                  <!-- STANDARD SCROLLABLE COLS (PROJECT DATA group) -->
+                  <th class="col-grp-projdata">ASSIGNED</th>
+                  <th class="col-grp-projdata">START</th>
+                  <th class="col-grp-projdata">DUE</th>
+                  <th class="col-grp-projdata">DURATION</th>
+                  <th class="col-grp-projdata">EFFORT</th>
+                  <th class="col-grp-projdata">% DONE</th>
+                  <th class="col-grp-projdata">STATUS</th>
+                  <th class="col-grp-projdata"></th>
                   <!-- ACTUALS GROUP -->
                   <th class="col-grp-actuals" style="color:var(--amber);">ACT START</th>
                   <th class="col-grp-actuals" style="color:var(--amber);">ACT FINISH</th>
@@ -1404,13 +1410,13 @@ function renderTasksTable() {
                   </td>`;
         })()}
         <td class="col-sticky" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.1);"><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
-        <td><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${_fmtD(t.start_date)}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${_fmtD(t.due_date)}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
-        <td><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
-        <td>${UI.badge(t.status)}</td>
+        <td class="col-grp-projdata"><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
+        <td class="col-grp-projdata" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${_fmtD(t.start_date)}</td>
+        <td class="col-grp-projdata" style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${_fmtD(t.due_date)}</td>
+        <td class="col-grp-projdata" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
+        <td class="col-grp-projdata" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
+        <td class="col-grp-projdata"><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
+        <td class="col-grp-projdata">${UI.badge(t.status)}</td>
         <td style="white-space:nowrap;">
           <button class="panel-action" onclick="openJournalPanel(this.dataset.tid,this.dataset.tname)" data-tid="${t.id}" data-tname="${t.name.replace(/"/g,'&quot;')}">&#9636;</button>
           ${planEdit ? '<button onclick="openEditTaskPanel(\'' + t.id + '\')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit task">&#9998;</button><button onclick="confirmDeleteTask(\'' + t.id + '\',\'' + t.name.replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete task">&#128465;</button>' : ''}
@@ -2333,6 +2339,17 @@ function openAddTaskPanel(phase) {
   document.getElementById('tf-phase').style.opacity = '0.7';
   document.getElementById('tf-phase').style.cursor  = 'default';
   const depsSection = document.getElementById('tf-deps-section');
+  // Clear actuals lock for new task
+  window._actualsLocked = false;
+  const startEl2 = document.getElementById('tf-start');
+  const dueEl2   = document.getElementById('tf-due');
+  if (startEl2) { startEl2.readOnly = false; startEl2.style.opacity = '1'; }
+  if (dueEl2)   { dueEl2.readOnly   = false; dueEl2.style.opacity   = '1'; }
+  const ov2 = document.getElementById('tf-actuals-override');
+  if (ov2) ov2.style.display = 'none';
+  document.getElementById('tf-actual-start').value  = '';
+  document.getElementById('tf-actual-finish').value = '';
+  document.getElementById('tf-actual-hours').value  = '';
   if (depsSection) depsSection.style.display = 'none';
   document.getElementById('tf-status').value      = 'not_started';
   document.getElementById('tf-start').value       = '';
@@ -2376,6 +2393,22 @@ function openEditTaskPanel(taskId) {
   const sel = document.getElementById('tf-assigned');
   sel.innerHTML = '<option value="">— Unassigned —</option>' +
     (STATE.users||[]).map(u => `<option value="${u.id}" ${u.id===t.assigned_to?'selected':''}>${u.name}</option>`).join('');
+  // Actuals fields
+  document.getElementById('tf-actual-start').value  = t.actual_start  ? t.actual_start.substring(0,10)  : '';
+  document.getElementById('tf-actual-finish').value = t.actual_finish ? t.actual_finish.substring(0,10) : '';
+  document.getElementById('tf-actual-hours').value  = t.actual_hours  || '';
+  // Lock planned dates if actuals are present (PMI policy)
+  const hasActStart  = !!t.actual_start;
+  const hasActFinish = !!t.actual_finish;
+  const startEl = document.getElementById('tf-start');
+  const dueEl   = document.getElementById('tf-due');
+  const overrideDiv = document.getElementById('tf-actuals-override');
+  window._actualsLocked = hasActStart || hasActFinish;
+  startEl.readOnly = hasActStart;
+  startEl.style.opacity = hasActStart ? '0.6' : '1';
+  dueEl.readOnly   = hasActFinish;
+  dueEl.style.opacity = hasActFinish ? '0.6' : '1';
+  if (overrideDiv) overrideDiv.style.display = (hasActStart || hasActFinish) ? 'block' : 'none';
   _clearErr('tf-error');
   loadTaskDepsForEdit(taskId);
   _openSlidePanel('task-form-panel');
@@ -2398,7 +2431,10 @@ async function saveTaskForm() {
     duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
     effort_days:  parseFloat(document.getElementById('tf-effort').value)   || null,
     pct_complete: parseFloat(document.getElementById('tf-pct').value)      || 0,
-    assigned_to:  document.getElementById('tf-assigned').value             || null,
+    assigned_to:   document.getElementById('tf-assigned').value              || null,
+    actual_start:  document.getElementById('tf-actual-start').value           || null,
+    actual_finish: document.getElementById('tf-actual-finish').value          || null,
+    actual_hours:  parseFloat(document.getElementById('tf-actual-hours').value) || null,
   };
   try {
     if (_editingTaskId) {
@@ -2416,7 +2452,14 @@ async function saveTaskForm() {
       if (created) STATE.tasks.push(created);
     }
     closeTaskFormPanel();
-    renderTasksTable();
+    // Invalidate CPM cache — dates/durations may have changed
+    window._taskCPM = null;
+    // Recompute if CPM group is currently visible
+    if (document.getElementById('tasks-table')?.classList.contains('show-cpm')) {
+      computeTasksCPM().then(() => renderTasksTable());
+    } else {
+      renderTasksTable();
+    }
     renderHeader();
   } catch(err) {
     _showErr('tf-error', err.message || 'Save failed');
@@ -2559,7 +2602,10 @@ function _toInputDate(d) { return d.toISOString().substring(0,10); }
 function _fmtD(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit' });
+  const mo  = d.toLocaleDateString('en-US', { month:'short' });
+  const day = d.getDate();
+  const yr  = d.getFullYear();
+  return mo + '. ' + day + ', ' + yr;
 }
 
 function onTaskStartChange() {
@@ -2783,6 +2829,17 @@ const _activeColGroups = new Set();
 function toggleColGroup(group) {
   const wrap = document.getElementById('tasks-table');
   const btn  = document.querySelector(`.col-toggle-btn[data-col="${group}"]`);
+  if (group === 'projdata') {
+    // PROJECT DATA is shown by default — toggle adds hide class
+    if (wrap?.classList.contains('hide-projdata')) {
+      wrap?.classList.remove('hide-projdata');
+      if (btn) { btn.classList.add('active'); }
+    } else {
+      wrap?.classList.add('hide-projdata');
+      if (btn) { btn.classList.remove('active'); }
+    }
+    return;
+  }
   if (_activeColGroups.has(group)) {
     _activeColGroups.delete(group);
     wrap?.classList.remove('show-' + group);
@@ -2851,13 +2908,18 @@ async function computeTasksCPM() {
 }
 
 function resetTableView() {
+  const tbl = document.getElementById('tasks-table');
   // Clear all column groups
   _activeColGroups.forEach(g => {
-    document.getElementById('tasks-table')?.classList.remove('show-' + g);
+    tbl?.classList.remove('show-' + g);
     const btn = document.querySelector(`.col-toggle-btn[data-col="${g}"]`);
     if (btn) btn.classList.remove('active');
   });
   _activeColGroups.clear();
+  // Restore PROJECT DATA visibility
+  tbl?.classList.remove('hide-projdata');
+  const pdBtn = document.querySelector('.col-toggle-btn[data-col="projdata"]');
+  if (pdBtn) pdBtn.classList.add('active');
   // Scroll table back to left
   const wrap = document.querySelector('.task-table-wrap');
   if (wrap) wrap.scrollLeft = 0;
@@ -2977,6 +3039,9 @@ async function resetPlanDates() {
   try {
     await Promise.all(patches.map(p => API.patch(`tasks?id=eq.${p.id}`, { start_date: p.start_date, due_date: p.due_date })));
     window._taskCPM = null;
+    if (document.getElementById('tasks-table')?.classList.contains('show-cpm')) {
+      await computeTasksCPM();
+    }
     renderTasksTable();
     renderHeader();
   } catch(e) {
@@ -3007,6 +3072,18 @@ async function clearAllDeps() {
     window._taskCPM = null;
     renderTasksTable();
   } catch(e) { alert('Clear failed: ' + (e.message||e)); }
+}
+
+// ── ACTUALS LOCK / OVERRIDE ───────────────────────────────────
+function overrideActualLock() {
+  if (!confirm('Override actuals lock?\n\nActual dates have been recorded for this task.\nUnlocking allows editing planned dates — only do this to correct data entry errors.')) return;
+  window._actualsLocked = false;
+  const startEl = document.getElementById('tf-start');
+  const dueEl   = document.getElementById('tf-due');
+  startEl.readOnly = false; startEl.style.opacity = '1';
+  dueEl.readOnly   = false; dueEl.style.opacity   = '1';
+  const ov = document.getElementById('tf-actuals-override');
+  if (ov) ov.innerHTML = '<span style="font-family:var(--font-mono);font-size:10px;color:var(--red);">&#9888; LOCK OVERRIDDEN — edit with care</span>';
 }
 </script>
 
@@ -3084,6 +3161,33 @@ async function clearAllDeps() {
       <label class="exp-label">ASSIGNED TO</label>
       <select id="tf-assigned" class="hud-select" style="width:100%;"><option value="">— Unassigned —</option></select>
     </div>
+
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--amber);letter-spacing:0.14em;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid rgba(255,170,0,0.2);">ACTUALS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div>
+        <label class="exp-label">ACT START</label>
+        <div style="position:relative;">
+          <input id="tf-actual-start" class="hud-input" type="date" style="width:100%;" />
+          <div id="tf-actual-start-lock" style="display:none;position:absolute;inset:0;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.3);display:none;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--amber);">&#128274; LOCKED</div>
+        </div>
+      </div>
+      <div>
+        <label class="exp-label">ACT FINISH</label>
+        <div style="position:relative;">
+          <input id="tf-actual-finish" class="hud-input" type="date" style="width:100%;" />
+          <div id="tf-actual-finish-lock" style="display:none;position:absolute;inset:0;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.3);display:none;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--amber);">&#128274; LOCKED</div>
+        </div>
+      </div>
+      <div>
+        <label class="exp-label">ACT HRS</label>
+        <input id="tf-actual-hours" class="hud-input" type="number" min="0" step="0.5" style="width:100%;" />
+      </div>
+    </div>
+    <div id="tf-actuals-override" style="display:none;margin-bottom:10px;">
+      <button onclick="overrideActualLock()" style="background:none;border:1px solid rgba(255,170,0,0.4);color:var(--amber);font-family:var(--font-mono);font-size:10px;padding:4px 10px;cursor:pointer;">&#9888; OVERRIDE LOCK</button>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-left:8px;">Actuals recorded — planned dates are locked</span>
+    </div>
+
     <div id="tf-deps-section" style="margin-bottom:14px;display:none;">
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:0.14em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">DEPENDENCIES</div>
       <div id="tf-deps-list" style="display:flex;flex-direction:column;gap:4px;"></div>
