@@ -1280,7 +1280,7 @@ async function loadCPMData() {
   }
 }
 
-// Handle resize
+// Handle resizes
 window.addEventListener('resize', () => {
   if (!STATE_CPM.topo.length) return;
   const view = document.querySelector('.cpm-tab.active')?.dataset.view;
