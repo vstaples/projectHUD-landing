@@ -2860,6 +2860,10 @@ async function computeTasksCPM() {
   const tasks = (STATE.tasks || []).filter(t => t.duration_days && t.duration_days > 0);
   if (!tasks.length) { window._taskCPM = null; return; }
   let deps = STATE.deps || [];
+  // Ensure deps have id field for clearing — reload if needed
+  if (deps.length && !deps[0].id) {
+    try { deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${tasks.map(t=>t.id).join(',')})`); STATE.deps = deps; } catch(e) {}
+  }
   // If no real deps, auto-generate sequential within-phase deps
   if (!deps.length) {
     const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
@@ -3064,9 +3068,11 @@ function confirmClearAllDeps() {
 async function clearAllDeps() {
   _closeSlidePanel('confirm-panel');
   try {
-    if (STATE.deps?.length) {
-      const ids = STATE.deps.map(d=>d.id);
-      await API.del(`task_dependencies?id=in.(${ids.join(',')})`);
+    // Delete by successor_task_id — covers all deps for this project's tasks
+    // (STATE.deps may not have id field depending on how they were loaded)
+    const taskIds = STATE.tasks.map(t => t.id);
+    if (taskIds.length) {
+      await API.del(`task_dependencies?successor_task_id=in.(${taskIds.join(',')})`);
     }
     STATE.deps = [];
     window._taskCPM = null;
