@@ -1292,7 +1292,7 @@ function renderTasksTable() {
           <button onclick="openEditPhasePanel(this.closest('tr').dataset.phase,this.closest('tr').dataset.phasekey)" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit phase">&#9998;</button>
           <button onclick="confirmDeletePhase(this.closest('tr').dataset.phase,this.closest('tr').dataset.phasekey)" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete phase">&#128465;</button>
         ` : ''}
-        <span onclick="togglePhaseCollapse('${phaseKey}')" style="cursor:pointer;font-size:12px;color:var(--cyan);user-select:none;padding:2px 6px;" title="${isCollapsed?'Expand':'Collapse'}">${isCollapsed ? '&#9654;' : '&#9660;'}</span>
+        <span onclick="togglePhaseCollapse('${phaseKey}')" style="cursor:pointer;font-size:12px;color:var(--cyan);user-select:none;padding:2px 6px;display:inline-block;width:16px;text-align:center;line-height:1;" title="${isCollapsed?'Expand':'Collapse'}">${isCollapsed ? '&#9654;' : '&#9660;'}</span>
       </td>
     </tr>`;
     if (isCollapsed) return;
@@ -2178,6 +2178,9 @@ function openAddTaskPanel(phase) {
   document.getElementById('tf-panel-title').textContent = 'ADD TASK';
   document.getElementById('tf-name').value        = '';
   document.getElementById('tf-phase').value       = phase || '';
+  document.getElementById('tf-phase').readOnly    = true;
+  document.getElementById('tf-phase').style.opacity = '0.7';
+  document.getElementById('tf-phase').style.cursor  = 'default';
   document.getElementById('tf-status').value      = 'not_started';
   document.getElementById('tf-start').value       = '';
   document.getElementById('tf-due').value         = '';
@@ -2199,6 +2202,9 @@ function openEditTaskPanel(taskId) {
   document.getElementById('tf-panel-title').textContent = 'EDIT TASK';
   document.getElementById('tf-name').value        = t.name || '';
   document.getElementById('tf-phase').value       = t.phase || '';
+  document.getElementById('tf-phase').readOnly    = false;
+  document.getElementById('tf-phase').style.opacity = '1';
+  document.getElementById('tf-phase').style.cursor  = '';
   document.getElementById('tf-status').value      = t.status || 'not_started';
   document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
   document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
@@ -2243,6 +2249,7 @@ async function saveTaskForm() {
       const phaseTasks = STATE.tasks.filter(t => t.phase === phase);
       const maxSeq = phaseTasks.length ? Math.max(...phaseTasks.map(t => t.sequence_order||0)) : 0;
       payload.project_id     = PROJECT_ID;
+      payload.firm_id        = STATE.project.firm_id || null;
       payload.sequence_order = maxSeq + 10;
       const [created] = await API.post('tasks', payload);
       if (created) STATE.tasks.push(created);
@@ -2354,6 +2361,82 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+
+// ── TASK FORM DATE / DURATION HELPERS ────────────────────────
+
+function _businessDaysBetween(start, end) {
+  let count = 0;
+  const d = new Date(start); d.setHours(0,0,0,0);
+  const e = new Date(end);   e.setHours(0,0,0,0);
+  if (d > e) return 0;
+  while (d <= e) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+function _addBusinessDays(startDate, days) {
+  const d = new Date(startDate); d.setHours(0,0,0,0);
+  let remaining = Math.round(days) - 1;
+  while (remaining > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) remaining--;
+  }
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function _nextWeekday(date) {
+  const d = new Date(date);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function _toInputDate(d) { return d.toISOString().substring(0,10); }
+
+function onTaskStartChange() {
+  const startVal = document.getElementById('tf-start').value;
+  if (!startVal) return;
+  const start = new Date(startVal + 'T00:00:00');
+  const dow = start.getDay();
+  if (dow === 0 || dow === 6) {
+    const dayName = dow === 0 ? 'Sunday' : 'Saturday';
+    if (!confirm(startVal + ' is a ' + dayName + '. Use this as the start date?')) {
+      document.getElementById('tf-start').value = _toInputDate(_nextWeekday(start));
+    }
+  }
+  const dur = parseFloat(document.getElementById('tf-duration').value);
+  if (dur > 0) {
+    const startFinal = new Date(document.getElementById('tf-start').value + 'T00:00:00');
+    document.getElementById('tf-due').value = _toInputDate(_addBusinessDays(startFinal, dur));
+  }
+}
+
+function onTaskDueChange() {
+  const startVal = document.getElementById('tf-start').value;
+  const dueVal   = document.getElementById('tf-due').value;
+  if (!startVal || !dueVal) return;
+  const start = new Date(startVal + 'T00:00:00');
+  let   due   = new Date(dueVal   + 'T00:00:00');
+  if (due.getDay() === 0 || due.getDay() === 6) {
+    due = _nextWeekday(due);
+    document.getElementById('tf-due').value = _toInputDate(due);
+  }
+  if (start <= due) {
+    document.getElementById('tf-duration').value = _businessDaysBetween(start, due);
+  }
+}
+
+function onTaskDurationChange() {
+  const startVal = document.getElementById('tf-start').value;
+  const dur      = parseFloat(document.getElementById('tf-duration').value);
+  if (!startVal || !(dur > 0)) return;
+  const start = new Date(startVal + 'T00:00:00');
+  document.getElementById('tf-due').value = _toInputDate(_addBusinessDays(start, dur));
+}
+
 </script>
 
 <!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
@@ -2418,11 +2501,11 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" /></div>
-      <div><label class="exp-label">DUE DATE</label><input id="tf-due" class="hud-input" type="date" style="width:100%;" /></div>
+      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" oninput="onTaskStartChange()" /></div>
+      <div><label class="exp-label">DUE DATE</label><input id="tf-due" class="hud-input" type="date" style="width:100%;" oninput="onTaskDueChange()" /></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">DURATION (d)</label><input id="tf-duration" class="hud-input" type="number" min="0" step="0.5" style="width:100%;" /></div>
+      <div><label class="exp-label">DURATION (d)</label><input id="tf-duration" class="hud-input" type="number" min="0" step="0.5" style="width:100%;" oninput="onTaskDurationChange()" /></div>
       <div><label class="exp-label">EFFORT (d)</label><input id="tf-effort" class="hud-input" type="number" min="0" step="0.5" style="width:100%;" /></div>
       <div><label class="exp-label">% DONE</label><input id="tf-pct" class="hud-input" type="number" min="0" max="100" step="5" value="0" style="width:100%;" /></div>
     </div>
