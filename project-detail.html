@@ -1651,6 +1651,102 @@ function _initGanttPan(rd) {
   }, { passive: false });
 }
 
+
+// ── computeCPMForGantt ────────────────────────────────────────
+// Exact copy of computeCPM from cpm-pert.html.
+// Builds deps from task_dependencies if available, else falls back
+// to sequential phase ordering by sequence_order.
+// Stores result in window._ganttCPM for use by drawGanttChart.
+async function computeCPMForGantt() {
+  const tasks = (STATE.tasks || []).filter(t => t.duration_days && t.duration_days > 0);
+  if (!tasks.length) { window._ganttCPM = null; return; }
+
+  // Fetch deps from task_dependencies table
+  let deps = [];
+  try {
+    const taskIds = tasks.map(t => t.id);
+    deps = await API.get(`task_dependencies?select=*&task_id=in.(${taskIds.join(',')})`);
+  } catch(e) { deps = []; }
+
+  // Auto-generate sequential deps within each phase if none found
+  if (!deps || deps.length === 0) {
+    const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+    phases.forEach(phase => {
+      const phaseTasks = tasks
+        .filter(t => t.phase === phase)
+        .sort((a,b) => (a.sequence_order||0) - (b.sequence_order||0));
+      for (let i = 1; i < phaseTasks.length; i++) {
+        deps.push({
+          id:                   `auto-${phaseTasks[i-1].id}-${phaseTasks[i].id}`,
+          task_id:              phaseTasks[i].id,
+          predecessor_task_id:  phaseTasks[i-1].id,
+          successor_task_id:    phaseTasks[i].id,
+          dependency_type:      'FS',
+          lag_days:             0,
+        });
+      }
+    });
+  }
+
+  // Run CPM (exact algorithm from cpm-pert.html)
+  const nodes = {};
+  tasks.forEach(t => {
+    nodes[t.id] = {
+      id: t.id, name: t.name, phase: t.phase,
+      duration: parseFloat(t.duration_days || 1),
+      status: t.status,
+      ES:0, EF:0, LS:0, LF:0, TF:0, FF:0,
+      preds: [], succs: [],
+    };
+  });
+
+  deps.forEach(d => {
+    if (nodes[d.predecessor_task_id] && nodes[d.successor_task_id]) {
+      nodes[d.predecessor_task_id].succs.push(d.successor_task_id);
+      nodes[d.successor_task_id].preds.push(d.predecessor_task_id);
+    }
+  });
+
+  // Topological sort (Kahn's algorithm)
+  const inDeg = {};
+  const ids = Object.keys(nodes);
+  ids.forEach(id => { inDeg[id] = nodes[id].preds.length; });
+  const queue = ids.filter(id => inDeg[id] === 0);
+  const topo = [];
+  while (queue.length) {
+    const cur = queue.shift(); topo.push(cur);
+    nodes[cur].succs.forEach(s => { inDeg[s]--; if (inDeg[s]===0) queue.push(s); });
+  }
+
+  // Forward pass — ES / EF
+  topo.forEach(id => {
+    const n = nodes[id];
+    n.ES = n.preds.length ? Math.max(...n.preds.map(p => nodes[p].EF)) : 0;
+    n.EF = n.ES + n.duration;
+  });
+
+  const projectDuration = Math.max(...ids.map(id => nodes[id].EF));
+
+  // Backward pass — LS / LF
+  [...topo].reverse().forEach(id => {
+    const n = nodes[id];
+    n.LF = n.succs.length ? Math.min(...n.succs.map(s => nodes[s].LS)) : projectDuration;
+    n.LS = n.LF - n.duration;
+  });
+
+  // Total Float & Free Float
+  ids.forEach(id => {
+    const n = nodes[id];
+    n.TF = Math.round((n.LS - n.ES) * 10) / 10;
+    n.FF = n.succs.length
+      ? Math.round((Math.min(...n.succs.map(s => nodes[s].ES)) - n.EF) * 10) / 10
+      : 0;
+  });
+
+  const criticalPath = ids.filter(id => nodes[id].TF <= 0);
+  window._ganttCPM = { nodes, topo, projectDuration, criticalPath };
+}
+
 function renderGanttTab() {
   const lc = document.getElementById('gantt-left-canvas');
   const cc = document.getElementById('gantt-chart-canvas');
@@ -1674,6 +1770,10 @@ function renderGanttTab() {
     lx.fillText('NO TASKS WITH DATES', 8, 44);
     _initGanttPan(rd); return;
   }
+
+  // Run CPM to get TF/FF for float & lag visualisation
+  // (async, runs in background — chart redraws when done)
+  computeCPMForGantt().then(() => drawGanttChart());
 
   const CS = {
     units:    document.getElementById('gcol-units')?.checked    ?? true,
@@ -1906,56 +2006,44 @@ function drawGanttChart() {
         if (hl) { cc.fillStyle=color; cc.font='9px Share Tech Mono,monospace'; cc.textAlign='center'; cc.textBaseline='middle'; cc.fillText(hl,x1+bw/2,bt+BH/2); }
       }
 
-      // FLOAT — thin gray line: bar end to earliest successor start (or project target)
-      let fED = null;
-      if (t.status !== 'complete') {
-        const mySq = t.sequence_order != null ? String(t.sequence_order) : '';
-        if (mySq) {
-          const ss = [];
-          ROWS.forEach(r2 => {
-            if (r2.type!=='task') return;
-            const pr = r2.task.predecessors ? String(r2.task.predecessors) : '';
-            if (pr.split(/[,; ]+/).map(s=>s.trim()).includes(mySq) && r2.task.start_date)
-              ss.push(pD(r2.task.start_date));
-          });
-          if (ss.length>0) fED = new Date(Math.min(...ss));
-        }
-        if (!fED && STATE.project?.target_date) {
-          const pe=pD(STATE.project.target_date); if (pe>pD(t.due_date)) fED=pe;
-        }
-      }
-      if (fED && fED>pD(t.due_date)) {
-        const fxE=Math.min(dX(fED)-IW,CW);
-        if (fxE>x2+2) {
-          const fM=bt+BH/2;
-          cc.strokeStyle='rgba(160,185,205,0.55)'; cc.lineWidth=1.5;
-          cc.beginPath(); cc.moveTo(x2,fM); cc.lineTo(fxE,fM); cc.stroke();
-          cc.strokeStyle='rgba(160,185,205,0.70)'; cc.lineWidth=1.5;
-          cc.beginPath(); cc.moveTo(fxE-1,bt+3); cc.lineTo(fxE-1,bt+BH-3); cc.stroke();
+      // FLOAT — CPM Total Float (TF): thin gray line right of bar end
+      // TF is in duration-days from computeCPMForGantt() stored in window._ganttCPM
+      const cpmNode = window._ganttCPM?.nodes?.[t.id];
+      if (cpmNode && cpmNode.TF > 0 && t.status !== 'complete') {
+        const floatPx = cpmNode.TF * ppd;
+        const fxE = Math.min(x2 + floatPx, CW);
+        if (fxE > x2 + 2) {
+          const fM = bt + BH / 2;
+          cc.strokeStyle = 'rgba(160,185,205,0.55)'; cc.lineWidth = 1.5;
+          cc.beginPath(); cc.moveTo(x2, fM); cc.lineTo(fxE, fM); cc.stroke();
+          // End cap
+          cc.strokeStyle = 'rgba(160,185,205,0.70)'; cc.lineWidth = 1.5;
+          cc.beginPath(); cc.moveTo(fxE - 1, bt + 3); cc.lineTo(fxE - 1, bt + BH - 3); cc.stroke();
         }
       }
 
-      // LAG — thin amber line: predecessor end to this task start
-      let lagD = (t.lag && parseFloat(t.lag)>0) ? parseFloat(t.lag) : 0;
-      if (!lagD && t.predecessors && t.start_date) {
-        String(t.predecessors).split(/[,; ]+/).map(s=>s.trim()).filter(Boolean).forEach(ps => {
-          ROWS.forEach(r3 => {
-            if (r3.type!=='task') return;
-            if (r3.task.sequence_order!=null && String(r3.task.sequence_order)===ps && r3.task.due_date) {
-              const gap=Math.round((pD(t.start_date)-pD(r3.task.due_date))/MS);
-              if (gap>0) lagD=Math.max(lagD,gap);
-            }
-          });
+      // LAG — CPM: lag between predecessor EF and this task ES
+      // lag in days = ES(this) - EF(predecessor) if positive
+      if (cpmNode && cpmNode.preds?.length > 0) {
+        let maxLagDays = 0;
+        cpmNode.preds.forEach(predId => {
+          const pn = window._ganttCPM.nodes[predId];
+          if (pn) {
+            const lagDays = cpmNode.ES - pn.EF;
+            if (lagDays > 0) maxLagDays = Math.max(maxLagDays, lagDays);
+          }
         });
-      }
-      if (lagD>0) {
-        const lP=lagD*ppd, lxS=x1-lP;
-        if (lxS>=0) {
-          const lM=bt+BH/2;
-          cc.strokeStyle='rgba(255,170,0,0.60)'; cc.lineWidth=1.5;
-          cc.beginPath(); cc.moveTo(lxS,lM); cc.lineTo(x1,lM); cc.stroke();
-          cc.strokeStyle='rgba(255,170,0,0.75)'; cc.lineWidth=1.5;
-          cc.beginPath(); cc.moveTo(lxS+1,bt+3); cc.lineTo(lxS+1,bt+BH-3); cc.stroke();
+        if (maxLagDays > 0) {
+          const lagPx = maxLagDays * ppd;
+          const lxS = x1 - lagPx;
+          if (lxS >= 0) {
+            const lM = bt + BH / 2;
+            cc.strokeStyle = 'rgba(255,170,0,0.60)'; cc.lineWidth = 1.5;
+            cc.beginPath(); cc.moveTo(lxS, lM); cc.lineTo(x1, lM); cc.stroke();
+            // Start cap
+            cc.strokeStyle = 'rgba(255,170,0,0.75)'; cc.lineWidth = 1.5;
+            cc.beginPath(); cc.moveTo(lxS + 1, bt + 3); cc.lineTo(lxS + 1, bt + BH - 3); cc.stroke();
+          }
         }
       }
     }
