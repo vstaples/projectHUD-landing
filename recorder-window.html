@@ -255,12 +255,40 @@ btnStart.addEventListener('click', async () => {
     }
   }
 
-  // Merge mic if active
-  if (micEnabled && micStream) {
-    micStream.getAudioTracks().forEach(t => stream.addTrack(t));
+  // Build a combined stream using AudioContext so mic + tab audio are properly mixed
+  let recordStream = stream;
+  try {
+    const audioCtx   = new AudioContext();
+    const dest        = audioCtx.createMediaStreamDestination();
+
+    // Add tab audio if present
+    const tabAudioTracks = stream.getAudioTracks();
+    if (tabAudioTracks.length > 0) {
+      const tabSource = audioCtx.createMediaStreamSource(new MediaStream(tabAudioTracks));
+      tabSource.connect(dest);
+    }
+
+    // Add mic audio if enabled
+    if (micEnabled && micStream) {
+      const micSource = audioCtx.createMediaStreamSource(micStream);
+      micSource.connect(dest);
+    }
+
+    // Combine: mixed audio + original video track
+    const videoTrack = stream.getVideoTracks()[0];
+    const combinedTracks = videoTrack
+      ? [videoTrack, ...dest.stream.getAudioTracks()]
+      : dest.stream.getAudioTracks();
+    recordStream = new MediaStream(combinedTracks);
+  } catch (audioMixErr) {
+    // AudioContext failed — fall back to original stream
+    console.warn('AudioContext mix failed, using original stream:', audioMixErr.message);
+    if (micEnabled && micStream) {
+      micStream.getAudioTracks().forEach(t => stream.addTrack(t));
+    }
   }
 
-  // Pick best mimeType — pass nothing if unsupported to let browser choose
+  // Pick best mimeType
   const MIME_CANDIDATES = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
@@ -271,11 +299,10 @@ btnStart.addEventListener('click', async () => {
 
   try {
     recorder = mimeType
-      ? new MediaRecorder(stream, { mimeType })
-      : new MediaRecorder(stream);
+      ? new MediaRecorder(recordStream, { mimeType })
+      : new MediaRecorder(recordStream);
   } catch (e) {
-    // Last resort — no options
-    recorder = new MediaRecorder(stream);
+    recorder = new MediaRecorder(recordStream);
   }
 
   chunks      = [];
