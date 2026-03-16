@@ -1,11 +1,13 @@
 // ============================================================
-// ProjectHUD — sidebar.js  v2
-// Primary nav (trimmed) + context toolbar on dashboard
+// ProjectHUD — sidebar.js  v3
+// Logo: full 220px wide
+// Below logo: left nav (164px) + right icon toolbar (56px)
+// Both sit inside the 220px sidebar — main content unchanged
 // ============================================================
 
 const Sidebar = (() => {
 
-  // ── SVG icons for context toolbar ────────────────────────
+  // ── SVG icons ─────────────────────────────────────────────
   const ICONS = {
     projects:
       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -43,8 +45,8 @@ const Sidebar = (() => {
         <path d="M9 5H7a2 2 0 00-2 2v13a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
         <rect x="9" y="3" width="6" height="4" rx="1"/>
         <path d="M9 12h6M9 16h4"/>
-        <path d="M16 19l-2-2 1-4 3-3 2 2-3 3z" stroke="#ffaa00"/>
-        <path d="M17.5 14.5l1.5 1.5" stroke="#ffaa00"/>
+        <path d="M15 19l-1.5-1.5 1-3.5 3-3 2 2-3 3z" stroke="#ffaa00" fill="none"/>
+        <line x1="17" y1="13.5" x2="18.5" y2="15" stroke="#ffaa00"/>
       </svg>`,
     usermgmt:
       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -68,40 +70,78 @@ const Sidebar = (() => {
     { key: 'risks',        label: 'Risk Register', href: '/risks.html' },
     { key: 'stakeholders', label: 'Stakeholders',  href: '/stakeholders.html' },
     { key: 'actions',      label: 'Action Items',  href: '/action-items.html' },
-    null, // separator — admin group below
+    null, // separator
     { key: 'usermgmt',     label: 'User Mgmt',     href: '/users.html' },
     { key: 'auditlog',     label: 'Audit Log',     href: '/audit-log.html' },
   ];
 
-  // ── Inject context toolbar styles ────────────────────────
+  // ── Inject styles ──────────────────────────────────────────
   function injectStyles() {
-    if (document.getElementById('ctx-toolbar-styles')) return;
+    if (document.getElementById('sidebar-v3-styles')) return;
     const s = document.createElement('style');
-    s.id = 'ctx-toolbar-styles';
+    s.id = 'sidebar-v3-styles';
     s.textContent = `
+      /* ── Sidebar inner layout ───────────────────────────── */
+      /* Logo takes full 220px width */
+      .sidebar-logo {
+        flex-shrink: 0;
+      }
+
+      /* Below logo: flex row — nav on left, toolbar on right */
+      #sidebar-body {
+        display: flex;
+        flex-direction: row;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* Left nav column — fills remaining width after toolbar */
+      #sidebar-nav {
+        flex: 1;
+        min-width: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Nav items — tighter to fit narrower column */
+      #sidebar-nav .nav-item {
+        font-size: 11px;
+        padding: 9px 10px 9px 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #sidebar-nav .nav-section-label {
+        font-size: 10px;
+        padding: 8px 12px 4px;
+      }
+
+      /* ── Right icon toolbar ─────────────────────────────── */
       #ctx-toolbar {
-        position: fixed;
-        left: 220px;
-        top: 32px;
         width: 56px;
-        bottom: 0;
-        background: var(--bg2, #0c1628);
-        border-right: 1px solid rgba(0,210,255,0.10);
-        z-index: 100;
+        flex-shrink: 0;
+        background: rgba(0,0,0,0.15);
+        border-left: 1px solid rgba(0,210,255,0.08);
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 8px 0;
+        padding: 6px 0;
         gap: 2px;
-        box-shadow: 2px 0 12px rgba(0,0,0,0.25);
+        overflow-y: auto;
+        overflow-x: hidden;
       }
+
       .ctx-sep {
         width: 32px;
         height: 1px;
         background: rgba(0,210,255,0.12);
-        margin: 6px 0;
+        margin: 4px 0;
         flex-shrink: 0;
       }
+
       .ctx-btn {
         position: relative;
         width: 48px;
@@ -111,10 +151,10 @@ const Sidebar = (() => {
         justify-content: center;
         background: none;
         border: none;
-        border-radius: 6px;
-        color: rgba(160, 200, 235, 0.40);
+        border-radius: 5px;
+        color: rgba(160,200,235,0.38);
         cursor: pointer;
-        transition: background 0.15s, color 0.15s, border-left 0.15s;
+        transition: background 0.15s, color 0.15s;
         flex-shrink: 0;
         text-decoration: none;
         border-left: 2px solid transparent;
@@ -134,12 +174,13 @@ const Sidebar = (() => {
         pointer-events: none;
         flex-shrink: 0;
       }
-      /* Tooltip — appears to the right */
+
+      /* Tooltip — floats to the RIGHT of the sidebar (outside) */
       .ctx-btn::after {
         content: attr(data-label);
         position: fixed;
-        left: 278px;
-        background: #0c1628;
+        left: 224px;
+        background: #0a1525;
         border: 1px solid rgba(0,210,255,0.28);
         color: #00d2ff;
         font-family: 'Barlow Condensed', sans-serif;
@@ -153,24 +194,22 @@ const Sidebar = (() => {
         opacity: 0;
         transition: opacity 0.12s;
         z-index: 9999;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.5);
       }
       .ctx-btn:hover::after {
         opacity: 1;
       }
-      /* Push content right when toolbar present */
-      body.has-ctx-toolbar #main {
-        margin-left: 56px;
+
+      /* Operator section stays at full 220px bottom */
+      .sidebar-operator {
+        flex-shrink: 0;
       }
     `;
     document.head.appendChild(s);
   }
 
-  // ── Build and inject context toolbar ─────────────────────
-  function buildContextToolbar(currentPage) {
-    document.getElementById('ctx-toolbar')?.remove();
-    injectStyles();
-
+  // ── Build toolbar items ───────────────────────────────────
+  function buildToolbar(currentPage) {
     const bar = document.createElement('div');
     bar.id = 'ctx-toolbar';
 
@@ -186,64 +225,66 @@ const Sidebar = (() => {
       btn.href = item.href;
       btn.dataset.label = item.label;
       btn.innerHTML = ICONS[item.key] || '';
-      // Active state
-      if (currentPage && (currentPage.includes(item.href.replace('/','').replace('.html',''))
-          || window.location.pathname === item.href)) {
+      if (currentPage && window.location.pathname === item.href) {
         btn.classList.add('active');
       }
       bar.appendChild(btn);
     });
 
-    document.body.appendChild(bar);
-    document.body.classList.add('has-ctx-toolbar');
+    return bar;
   }
 
-  // ── Render sidebar HTML (preserves existing hud.css classes) ──
-  function render(activePage, firmName, currentUser, notifCount) {
+  // ── Render full sidebar HTML ──────────────────────────────
+  function render(activePage, firmName, currentUser, notifCount, showToolbar) {
     const currentPath = window.location.pathname;
 
     const NAV_ITEMS = [
-      { href: '/dashboard.html',  icon: '◈', label: 'Dashboard', section: 'main' },
-      { href: '/gantt.html',      icon: '▤', label: 'Gantt',     section: 'main' },
-      { href: '/audit-log.html',  icon: '▦', label: 'Audit Log', section: 'admin' },
-      { href: '/users.html',      icon: '◑', label: 'User Mgmt', section: 'admin' },
+      { href: '/dashboard.html', icon: '◈', label: 'Dashboard', section: 'main'  },
+      { href: '/gantt.html',     icon: '▤', label: 'Gantt',     section: 'main'  },
+      { href: '/audit-log.html', icon: '▦', label: 'Audit Log', section: 'admin' },
+      { href: '/users.html',     icon: '◑', label: 'User Mgmt', section: 'admin' },
     ];
 
-    function navItem(item) {
-      const isActive = currentPath === item.href || (activePage && activePage === item.href.replace('/',''));
-      return `<a href="${item.href}" class="nav-item${isActive ? ' active' : ''}">
+    const navItem = item => {
+      const isActive = currentPath === item.href
+        || (activePage && activePage === item.href.replace('/',''));
+      return `<a href="${item.href}" class="nav-item${isActive?' active':''}">
         <span class="nav-icon">${item.icon}</span>${item.label}
       </a>`;
-    }
+    };
 
-    const mainItems  = NAV_ITEMS.filter(n => n.section === 'main').map(navItem).join('');
-    const adminItems = NAV_ITEMS.filter(n => n.section === 'admin').map(navItem).join('');
+    const mainItems  = NAV_ITEMS.filter(n=>n.section==='main').map(navItem).join('');
+    const adminItems = NAV_ITEMS.filter(n=>n.section==='admin').map(navItem).join('');
 
-    const initStr  = UI.initials ? UI.initials(currentUser?.name || '') : (currentUser?.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2);
-    const roleName = currentUser?.is_admin ? 'Admin' : 'Operator';
-    const notifBadge = notifCount > 0
-      ? `<span class="notif-badge">${notifCount}</span>` : '';
+    const initStr  = UI?.initials
+      ? UI.initials(currentUser?.name||'')
+      : (currentUser?.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2);
+    const roleName = currentUser?.is_admin ? 'ADMIN' : 'OPERATOR';
 
     return `
       <div class="sidebar-logo">
         <div class="logo-mark">
           <svg viewBox="0 0 40 40" width="32" height="32">
             <polygon points="20,4 36,36 4,36" fill="none" stroke="#00d2ff" stroke-width="2"/>
-            <polygon points="20,10 31,32 9,32" fill="rgba(0,210,255,0.08)" stroke="none"/>
+            <polygon points="20,10 31,32 9,32" fill="rgba(0,210,255,0.08)"/>
             <circle cx="20" cy="20" r="4" fill="#00d2ff"/>
             <line x1="20" y1="14" x2="20" y2="10" stroke="#00d2ff" stroke-width="1.5"/>
           </svg>
         </div>
         <div class="logo-text">
           <div class="wordmark"><span>Project</span>HUD</div>
-          <div class="firm" id="firm-name">${firmName || ''}</div>
+          <div class="firm" id="firm-name">${firmName||''}</div>
         </div>
       </div>
 
-      <div id="sidebar-nav">
-        ${mainItems}
-        <div class="nav-section-label">Admin</div>
-        ${adminItems}
+      <div id="sidebar-body">
+        <div id="sidebar-nav">
+          ${mainItems}
+          <div class="nav-section-label">Admin</div>
+          ${adminItems}
+          <div style="flex:1;"></div>
+        </div>
+        ${showToolbar ? '<div id="ctx-toolbar-placeholder"></div>' : ''}
       </div>
 
       <div class="sidebar-operator">
@@ -251,14 +292,14 @@ const Sidebar = (() => {
         <div class="op-user">
           <div class="op-avatar">${initStr}</div>
           <div>
-            <div class="op-name">${currentUser?.name || '—'}</div>
-            <div class="op-role">${roleName.toUpperCase()}</div>
+            <div class="op-name">${currentUser?.name||'—'}</div>
+            <div class="op-role">${roleName}</div>
           </div>
         </div>
         <div class="op-tools">
-          <button class="op-btn" title="HUD Intelligence" onclick="UI && console.log('HUD Intelligence')">◈</button>
-          <button class="op-btn" title="Report Issue" onclick="UI && console.log('Report Issue')">⚑</button>
-          <button class="op-btn" title="Chat" onclick="UI && console.log('Chat')">◉</button>
+          <button class="op-btn" title="HUD Intelligence">◈</button>
+          <button class="op-btn" title="Report Issue">⚑</button>
+          <button class="op-btn" title="Chat">◉</button>
         </div>
         <div class="op-bottom">
           <div class="op-version">
@@ -266,7 +307,9 @@ const Sidebar = (() => {
             <a href="#" style="font-size:10px;color:var(--text3);font-family:var(--font-mono);">RELEASE NOTES</a>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button class="op-notif" title="Notifications">◉ <span class="notif-badge" style="${notifCount>0?'':'display:none'}">${notifCount}</span></button>
+            <button class="op-notif" title="Notifications">◉
+              <span class="notif-badge" style="${notifCount>0?'':'display:none'}">${notifCount}</span>
+            </button>
             <button class="op-logout" onclick="Auth.logout()">LOGOUT</button>
           </div>
         </div>
@@ -279,14 +322,16 @@ const Sidebar = (() => {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
 
+    const showToolbar = activePage === 'dashboard.html';
+
     try {
       const [users, firms] = await Promise.all([
         API.getUsers(),
         API.getFirms(),
       ]);
 
-      const userId      = await Auth.getCurrentUserId();
-      const currentUser = users?.find(u => u.id === userId);
+      const userId       = await Auth.getCurrentUserId();
+      const currentUser  = users?.find(u => u.id === userId);
       const internalFirm = firms?.find(f => f.is_internal);
 
       let notifCount = 0;
@@ -295,18 +340,24 @@ const Sidebar = (() => {
         notifCount = notifs?.filter(n => !n.read_at)?.length || 0;
       } catch(e) {}
 
-      sidebar.innerHTML = render(activePage, internalFirm?.name || '', currentUser, notifCount);
+      injectStyles();
+      sidebar.innerHTML = render(activePage, internalFirm?.name||'', currentUser, notifCount, showToolbar);
 
-      // Context toolbar — dashboard only, always visible
-      if (activePage === 'dashboard.html') {
-        buildContextToolbar(activePage);
+      // Replace placeholder with real toolbar element
+      if (showToolbar) {
+        const placeholder = document.getElementById('ctx-toolbar-placeholder');
+        if (placeholder) {
+          placeholder.replaceWith(buildToolbar(activePage));
+        }
       }
 
     } catch(err) {
       console.error('Sidebar init error:', err);
-      sidebar.innerHTML = render(activePage, '', null, 0);
-      if (activePage === 'dashboard.html') {
-        buildContextToolbar(activePage);
+      injectStyles();
+      sidebar.innerHTML = render(activePage, '', null, 0, showToolbar);
+      if (showToolbar) {
+        const placeholder = document.getElementById('ctx-toolbar-placeholder');
+        if (placeholder) placeholder.replaceWith(buildToolbar(activePage));
       }
     }
   }
