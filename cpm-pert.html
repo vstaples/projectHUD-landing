@@ -1011,6 +1011,7 @@ loadCPMData();
 // ── EDIT ORDER MODE ───────────────────────────────────────────
 let _editOriginalOrder = {};
 let _editCurrentOrder  = {};
+let _editPhaseOrder    = [];  // locked phase sequence — never changes during edit
 let _dragSrc = null;
 
 function enterEditMode() {
@@ -1019,6 +1020,7 @@ function enterEditMode() {
   _editOriginalOrder = {};
   tasks.forEach(t => { _editOriginalOrder[t.id] = { seq: t.sequence_order, phase: t.phase }; });
   _editCurrentOrder = {};
+  _editPhaseOrder = [...phases];  // lock phase order now — never mutate
   phases.forEach(ph => {
     _editCurrentOrder[ph] = tasks
       .filter(t => t.phase === ph)
@@ -1045,7 +1047,8 @@ function renderEditOverlay() {
       <button id="edit-save-btn" onclick="saveEditOrder()" style="background:rgba(255,170,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:6px 18px;cursor:pointer;">&#10003; SAVE</button>
       <button onclick="cancelEditOrder()" style="background:none;border:1px solid rgba(255,71,87,0.4);color:#ff4757;font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:6px 18px;cursor:pointer;">&#10005; CANCEL</button>
     </div>`;
-  Object.entries(_editCurrentOrder).forEach(([ph, ids]) => {
+  _editPhaseOrder.forEach(ph => {
+    const ids = _editCurrentOrder[ph] || [];
     html += `<div style="margin-bottom:20px;">
       <div style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:6px;padding-left:8px;border-left:3px solid var(--cyan);">${ph.toUpperCase()}</div>
       <div class="edit-lane" data-phase="${ph.replace(/"/g,'&quot;')}" style="display:flex;flex-wrap:wrap;gap:8px;min-height:68px;padding:8px;border:1px solid rgba(0,210,255,0.12);background:rgba(0,0,0,0.2);">`;
@@ -1147,9 +1150,11 @@ async function saveEditOrder() {
   const btn = document.getElementById('edit-save-btn');
   btn.textContent = '⏳ SAVING...'; btn.disabled = true;
   const patches = [];
-  Object.entries(_editCurrentOrder).forEach(([phase, ids]) => {
+  _editPhaseOrder.forEach((phase, phaseIdx) => {
+    const ids = _editCurrentOrder[phase] || [];
+    const phaseBase = (phaseIdx + 1) * 1000;  // globally unique — phase 1=1000s, phase 2=2000s
     ids.forEach((id, idx) => {
-      const newSeq = (idx + 1) * 10;
+      const newSeq = phaseBase + (idx + 1) * 10;
       const orig = _editOriginalOrder[id];
       const task = STATE_CPM.tasks.find(t => t.id === id);
       if (newSeq !== orig?.seq || phase !== orig?.phase) patches.push({ id, sequence_order: newSeq, phase });
@@ -1177,7 +1182,7 @@ async function saveEditOrder() {
 }
 async function rebuildWaterfallDeps() {
   await API.del('task_dependencies?id=neq.00000000-0000-0000-0000-000000000000');
-  const phases = Object.keys(_editCurrentOrder);
+  const phases = _editPhaseOrder;  // use locked order
   const newDeps = [];
   // Within-phase chains only — phases run in parallel, not in series
   phases.forEach(phase => {
@@ -1200,7 +1205,7 @@ function exitEditMode() {
   document.getElementById('cpm-canvas-wrap').style.visibility = 'visible';
   document.querySelector('.cpm-legend').style.visibility = 'visible';
   document.getElementById('edit-mode-btn').style.display = '';
-  _editOriginalOrder = {}; _editCurrentOrder = {}; _dragSrc = null;
+  _editOriginalOrder = {}; _editCurrentOrder = {}; _editPhaseOrder = []; _dragSrc = null;
 }
 
 </script>
