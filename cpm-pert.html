@@ -128,6 +128,9 @@
         <button onclick="window.location.href='/project-detail.html?id=' + PROJECT_ID" style="margin-left:auto;background:none;border:1px solid rgba(0,210,255,0.25);color:var(--cyan);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:5px 14px;cursor:pointer;white-space:nowrap;">◄ BACK</button>
       </div>
 
+
+      <!-- ── EDIT ORDER OVERLAY ─────────────────────────────── -->
+      <div id="edit-overlay" style="display:none;position:absolute;inset:0;z-index:200;overflow:auto;background:var(--bg1);padding:14px 28px 40px;"></div>
       <!-- ── NETWORK DIAGRAM VIEW ─────────────────────── -->
       <div id="view-network" class="view-pane" style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:14px 28px 0;">
         <div class="cpm-controls">
@@ -140,6 +143,7 @@
           <button class="filter-btn" onclick="resetZoom()">⟲ RESET VIEW</button>
           <button class="filter-btn" onclick="toggleCriticalOnly()">⚑ CRITICAL PATH ONLY</button>
           <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.08em;" id="cp-duration-label"></span>
+          <button class="filter-btn" id="edit-mode-btn" onclick="enterEditMode()" style="border-color:rgba(255,170,0,0.4);color:var(--amber);margin-left:8px;">&#9998; EDIT ORDER</button>
         </div>
         <div class="cpm-legend">
           <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Critical Path Task</div>
@@ -236,7 +240,281 @@
   </div><!-- /main -->
 </div><!-- /app -->
 
-<script src="/js/config.js"></script>
+<script src="/js/config.js">
+// ── EDIT ORDER MODE ───────────────────────────────────────────
+let _editOriginalOrder = {};   // taskId → original sequence_order backup
+let _editCurrentOrder  = {};   // phase → [taskId, ...] current order in edit mode
+let _dragSrc = null;           // currently dragged card { taskId, phase }
+
+function enterEditMode() {
+  const { tasks, phases } = STATE_CPM;
+  if (!tasks || !tasks.length) return;
+
+  // Backup original sequence_order
+  _editOriginalOrder = {};
+  tasks.forEach(t => { _editOriginalOrder[t.id] = t.sequence_order; });
+
+  // Build current order per phase (sorted by sequence_order)
+  _editCurrentOrder = {};
+  phases.forEach(ph => {
+    _editCurrentOrder[ph] = tasks
+      .filter(t => t.phase === ph)
+      .sort((a,b) => (a.sequence_order||0) - (b.sequence_order||0))
+      .map(t => t.id);
+  });
+
+  // Swap toolbar button
+  document.getElementById('edit-mode-btn').style.display = 'none';
+
+  // Show overlay, hide canvas controls
+  document.getElementById('edit-overlay').style.display = 'block';
+  document.getElementById('cpm-canvas-wrap').style.visibility = 'hidden';
+  document.querySelector('.cpm-legend').style.visibility = 'hidden';
+
+  renderEditOverlay();
+}
+
+function renderEditOverlay() {
+  const { tasks, nodes } = STATE_CPM;
+  const taskById = {};
+  tasks.forEach(t => { taskById[t.id] = t; });
+
+  const overlay = document.getElementById('edit-overlay');
+
+  // Build header
+  let html = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid rgba(0,210,255,0.2);">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--amber);letter-spacing:0.14em;">✎ EDIT TASK ORDER — DRAG TO REORDER WITHIN PHASE</span>
+      <div style="flex:1"></div>
+      <button onclick="saveEditOrder()" style="background:rgba(255,170,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:6px 18px;cursor:pointer;">✓ SAVE</button>
+      <button onclick="cancelEditOrder()" style="background:none;border:1px solid rgba(255,71,87,0.4);color:var(--red);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:6px 18px;cursor:pointer;">✕ CANCEL</button>
+    </div>`;
+
+  // Build each phase swimlane
+  const phases = Object.keys(_editCurrentOrder);
+  phases.forEach(ph => {
+    const ids = _editCurrentOrder[ph];
+    const cpSet = new Set(STATE_CPM.criticalPath);
+
+    html += `
+      <div class="edit-phase-row" data-phase="${ph.replace(/"/g,'&quot;')}" style="margin-bottom:24px;">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:8px;padding-left:2px;border-left:3px solid var(--cyan);padding-left:8px;">${ph.toUpperCase()}</div>
+        <div class="edit-lane" data-phase="${ph.replace(/"/g,'&quot;')}" style="display:flex;flex-wrap:wrap;gap:8px;min-height:70px;padding:8px;border:1px solid rgba(0,210,255,0.12);background:rgba(0,0,0,0.2);">`;
+
+    ids.forEach((id, idx) => {
+      const t = taskById[id];
+      if (!t) return;
+      const n = nodes[id];
+      const isCrit = cpSet.has(id);
+      const borderColor = isCrit ? 'var(--red)' : 'rgba(0,210,255,0.35)';
+      const seqLabel = `#${idx + 1}`;
+      html += `
+          <div class="edit-card" draggable="true"
+            data-id="${id}" data-phase="${ph.replace(/"/g,'&quot;')}"
+            style="width:150px;min-height:60px;background:var(--bg2);border:1px solid ${borderColor};
+                   padding:8px 10px;cursor:grab;user-select:none;position:relative;
+                   font-family:var(--font-mono);">
+            <div style="font-size:8px;color:var(--text3);margin-bottom:3px;letter-spacing:0.1em;">${seqLabel} · ${t.duration_days}d</div>
+            <div style="font-size:10px;color:var(--text1);line-height:1.3;">${t.name}</div>
+            ${isCrit ? '<div style="position:absolute;top:4px;right:6px;font-size:7px;color:var(--red);letter-spacing:0.1em;">CP</div>' : ''}
+            <div style="position:absolute;top:4px;left:4px;font-size:14px;color:rgba(0,210,255,0.3);cursor:grab;">⠿</div>
+          </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  overlay.innerHTML = html;
+
+  // Attach drag events to all cards
+  overlay.querySelectorAll('.edit-card').forEach(card => {
+    card.addEventListener('dragstart', onEditDragStart);
+    card.addEventListener('dragend',   onEditDragEnd);
+  });
+
+  // Attach drop events to all lanes
+  overlay.querySelectorAll('.edit-lane').forEach(lane => {
+    lane.addEventListener('dragover',  onEditDragOver);
+    lane.addEventListener('dragleave', onEditDragLeave);
+    lane.addEventListener('drop',      onEditDrop);
+  });
+}
+
+function onEditDragStart(e) {
+  _dragSrc = { id: e.currentTarget.dataset.id, phase: e.currentTarget.dataset.phase };
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onEditDragEnd(e) {
+  e.currentTarget.style.opacity = '1';
+  document.querySelectorAll('.edit-lane').forEach(l => l.style.background = 'rgba(0,0,0,0.2)');
+  _dragSrc = null;
+}
+
+function onEditDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.background = 'rgba(0,210,255,0.06)';
+
+  // Show insertion indicator
+  const lane = e.currentTarget;
+  const afterCard = getCardAfterCursor(lane, e.clientX);
+  const existing = lane.querySelector('.drop-indicator');
+  if (existing) existing.remove();
+  const indicator = document.createElement('div');
+  indicator.className = 'drop-indicator';
+  indicator.style.cssText = 'width:3px;min-height:60px;background:var(--amber);opacity:0.8;border-radius:2px;flex-shrink:0;';
+  if (afterCard) {
+    lane.insertBefore(indicator, afterCard);
+  } else {
+    lane.appendChild(indicator);
+  }
+}
+
+function onEditDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+    const ind = e.currentTarget.querySelector('.drop-indicator');
+    if (ind) ind.remove();
+  }
+}
+
+function onEditDrop(e) {
+  e.preventDefault();
+  if (!_dragSrc) return;
+  const lane = e.currentTarget;
+  const targetPhase = lane.dataset.phase;
+  lane.style.background = 'rgba(0,0,0,0.2)';
+
+  // Find drop position
+  const afterCard = getCardAfterCursor(lane, e.clientX);
+  const afterId = afterCard ? afterCard.dataset.id : null;
+
+  // Remove from source phase
+  const srcPhase = _dragSrc.phase;
+  _editCurrentOrder[srcPhase] = _editCurrentOrder[srcPhase].filter(id => id !== _dragSrc.id);
+
+  // Insert into target phase at correct position
+  if (!_editCurrentOrder[targetPhase]) _editCurrentOrder[targetPhase] = [];
+  if (afterId) {
+    const idx = _editCurrentOrder[targetPhase].indexOf(afterId);
+    _editCurrentOrder[targetPhase].splice(idx, 0, _dragSrc.id);
+  } else {
+    _editCurrentOrder[targetPhase].push(_dragSrc.id);
+  }
+
+  // Also update the task's phase in STATE_CPM.tasks if moved across phases
+  if (srcPhase !== targetPhase) {
+    const t = STATE_CPM.tasks.find(t => t.id === _dragSrc.id);
+    if (t) t.phase = targetPhase;
+    const n = STATE_CPM.nodes[_dragSrc.id];
+    if (n) n.phase = targetPhase;
+  }
+
+  renderEditOverlay();
+}
+
+function getCardAfterCursor(lane, clientX) {
+  const cards = [...lane.querySelectorAll('.edit-card')];
+  return cards.reduce((closest, card) => {
+    const box = card.getBoundingClientRect();
+    const offset = clientX - (box.left + box.width / 2);
+    if (offset < 0 && offset > (closest.offset || -Infinity)) {
+      return { offset, element: card };
+    }
+    return closest;
+  }, {}).element || null;
+}
+
+async function saveEditOrder() {
+  const saveBtn = document.querySelector('#edit-overlay button');
+  saveBtn.textContent = '⏳ SAVING...';
+  saveBtn.disabled = true;
+
+  const patches = [];
+  Object.entries(_editCurrentOrder).forEach(([phase, ids]) => {
+    ids.forEach((id, idx) => {
+      const newSeq = (idx + 1) * 10;
+      const task = STATE_CPM.tasks.find(t => t.id === id);
+      const phaseChanged = task && task.phase !== phase;
+      if (newSeq !== _editOriginalOrder[id] || phaseChanged) {
+        patches.push({ id, sequence_order: newSeq, phase });
+      }
+      // Update in-memory
+      if (task) { task.sequence_order = newSeq; task.phase = phase; }
+      const node = STATE_CPM.nodes[id];
+      if (node) { node.seq = newSeq; node.phase = phase; }
+    });
+  });
+
+  try {
+    // Patch each changed task
+    await Promise.all(patches.map(p =>
+      API.patch(`tasks?id=eq.${p.id}`, { sequence_order: p.sequence_order, phase: p.phase })
+    ));
+
+    // Rebuild task_dependencies for new order
+    await rebuildWaterfallDeps();
+
+    // Recompute CPM
+    const { nodes, topo, projectDuration, criticalPath } = computeCPM(STATE_CPM.tasks, STATE_CPM.deps);
+    Object.assign(STATE_CPM, { nodes, topo, projectDuration, criticalPath });
+    document.getElementById('cp-duration-label').textContent =
+      `CRITICAL PATH: ${projectDuration}d · ${criticalPath.length} TASKS`;
+
+    exitEditMode();
+    drawNetwork();
+  } catch(err) {
+    saveBtn.textContent = '✓ SAVE';
+    saveBtn.disabled = false;
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function rebuildWaterfallDeps() {
+  // Delete all existing deps
+  await API.del('task_dependencies?id=neq.00000000-0000-0000-0000-000000000000');
+
+  // Rebuild full waterfall chain from new order
+  const phases = Object.keys(_editCurrentOrder);
+  const newDeps = [];
+  phases.forEach((phase, phaseIdx) => {
+    const ids = _editCurrentOrder[phase];
+    for (let i = 1; i < ids.length; i++) {
+      newDeps.push({ predecessor_task_id: ids[i-1], successor_task_id: ids[i], link_type: 'FS', lag_days: 0 });
+    }
+    if (phaseIdx < phases.length - 1) {
+      const nextIds = _editCurrentOrder[phases[phaseIdx + 1]];
+      if (nextIds && nextIds.length) {
+        newDeps.push({ predecessor_task_id: ids[ids.length-1], successor_task_id: nextIds[0], link_type: 'FS', lag_days: 0 });
+      }
+    }
+  });
+
+  if (newDeps.length) await API.post('task_dependencies', newDeps);
+  STATE_CPM.deps = newDeps;
+}
+
+function cancelEditOrder() {
+  // Restore original sequence_order in memory
+  STATE_CPM.tasks.forEach(t => {
+    if (_editOriginalOrder[t.id] !== undefined) t.sequence_order = _editOriginalOrder[t.id];
+  });
+  exitEditMode();
+}
+
+function exitEditMode() {
+  document.getElementById('edit-overlay').style.display = 'none';
+  document.getElementById('cpm-canvas-wrap').style.visibility = 'visible';
+  document.querySelector('.cpm-legend').style.visibility = 'visible';
+  document.getElementById('edit-mode-btn').style.display = '';
+  _editOriginalOrder = {};
+  _editCurrentOrder  = {};
+  _dragSrc = null;
+}
+
+</script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
