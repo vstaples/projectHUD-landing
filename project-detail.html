@@ -2856,8 +2856,9 @@ async function saveLinkDeps() {
       const taskIds = STATE.tasks.map(t=>t.id);
       STATE.deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${taskIds.join(',')})`);
     } catch(e) { STATE.deps = []; }
+    // Propagate dates forward from today through the new dependency chain
+    await _propagateDates(new Date());
     closeLinkPanel();
-    // Show brief confirmation
     const lbtn = document.getElementById('btn-link-tasks');
     if (lbtn) { lbtn.textContent = '\u26d3 LINK \u2713'; setTimeout(() => { lbtn.textContent='\u26d3 LINK'; }, 2000); }
   } catch(err) {
@@ -3029,21 +3030,27 @@ async function deleteDep(depId, taskId) {
   try {
     await API.del(`task_dependencies?id=eq.${depId}`);
     STATE.deps = (STATE.deps||[]).filter(d => d.id !== depId);
+    // Re-propagate dates — the freed task now starts today
+    await _propagateDates(new Date());
     loadTaskDepsForEdit(taskId);
-    renderTasksTable();
   } catch(e) {
     alert('Failed to remove dependency: ' + (e.message||e));
   }
 }
 
 // ── RESET PLAN DATES ──────────────────────────────────────────
-async function resetPlanDates() {
-  const tasks = STATE.tasks;
-  if (!tasks.length) return;
-  if (!confirm('Reset all task START dates to today and recalculate DUE dates from duration?\n\nLinked tasks will propagate forward skipping weekends.\nThis will update the database.')) return;
-
-  // Sort all tasks by phase order then sequence_order
+// ── SHARED DATE PROPAGATION ENGINE ───────────────────────────
+// Computes start/due for every task based on current STATE.deps.
+// Tasks with no predecessor start on `fromDate` (default: today).
+// Patches DB and updates STATE in place. Returns patch count.
+async function _propagateDates(fromDate, statusBtn) {
   const allTasks = STATE.tasks;
+  if (!allTasks.length) return 0;
+
+  const today = fromDate || new Date();
+  today.setHours(0,0,0,0);
+
+  // Sort phases by min sequence_order
   const phasesSorted = [...new Set(allTasks.map(t=>t.phase).filter(Boolean))]
     .sort((a,b) => {
       const minA = Math.min(...allTasks.filter(t=>t.phase===a).map(t=>t.sequence_order||9999));
@@ -3051,63 +3058,56 @@ async function resetPlanDates() {
       return minA - minB;
     });
 
-  // Build dep map: taskId → predecessor task id
+  // Build pred map from current STATE.deps
   const predMap = {};
   (STATE.deps||[]).forEach(d => { predMap[d.successor_task_id] = d.predecessor_task_id; });
 
-  // Track computed end dates per task
   const endDateMap = {};
-  const today = new Date(); today.setHours(0,0,0,0);
-
-  // Process tasks in topo order — phases first, then seq within phase
   const ordered = [];
   phasesSorted.forEach(ph => {
-    const pt = allTasks.filter(t=>t.phase===ph).sort((a,b)=>(a.sequence_order||0)-(b.sequence_order||0));
-    pt.forEach(t => ordered.push(t));
+    allTasks.filter(t=>t.phase===ph).sort((a,b)=>(a.sequence_order||0)-(b.sequence_order||0)).forEach(t => ordered.push(t));
   });
-  // Add tasks with no phase
   allTasks.filter(t=>!t.phase).forEach(t => ordered.push(t));
 
   const patches = [];
-
   ordered.forEach(t => {
     const dur = Math.max(parseFloat(t.duration_days||1), 1);
     let startDate;
-
     const predId = predMap[t.id];
     if (predId && endDateMap[predId]) {
-      // Start day after predecessor finishes, skip weekends
       startDate = new Date(endDateMap[predId]);
       startDate.setDate(startDate.getDate() + 1);
       while (startDate.getDay() === 0 || startDate.getDay() === 6) startDate.setDate(startDate.getDate() + 1);
     } else {
-      // No dependency — start today (skip to Monday if weekend)
       startDate = new Date(today);
       while (startDate.getDay() === 0 || startDate.getDay() === 6) startDate.setDate(startDate.getDate() + 1);
     }
-
     const dueDate = _addBusinessDays(startDate, dur);
     endDateMap[t.id] = dueDate;
-
     const startStr = _toInputDate(startDate);
     const dueStr   = _toInputDate(dueDate);
-
     patches.push({ id: t.id, start_date: startStr, due_date: dueStr });
     t.start_date = startStr;
     t.due_date   = dueStr;
   });
 
-  // Patch all in parallel
+  await Promise.all(patches.map(p => API.patch(`tasks?id=eq.${p.id}`, { start_date: p.start_date, due_date: p.due_date })));
+  window._taskCPM = null;
+  if (document.getElementById('tasks-table')?.classList.contains('show-cpm')) {
+    await computeTasksCPM();
+  }
+  renderTasksTable();
+  renderHeader();
+  return patches.length;
+}
+
+async function resetPlanDates() {
+  if (!STATE.tasks.length) return;
+  if (!confirm('Reset all task START dates to today and recalculate DUE dates from duration?\n\nLinked tasks will propagate forward skipping weekends.\nThis will update the database.')) return;
   const btn = document.querySelector('[onclick="resetPlanDates()"]');
   if (btn) { btn.textContent = '⏳ SAVING...'; btn.disabled = true; }
   try {
-    await Promise.all(patches.map(p => API.patch(`tasks?id=eq.${p.id}`, { start_date: p.start_date, due_date: p.due_date })));
-    window._taskCPM = null;
-    if (document.getElementById('tasks-table')?.classList.contains('show-cpm')) {
-      await computeTasksCPM();
-    }
-    renderTasksTable();
-    renderHeader();
+    await _propagateDates(new Date());
   } catch(e) {
     alert('Reset failed: ' + (e.message||e));
   } finally {
@@ -3128,15 +3128,13 @@ function confirmClearAllDeps() {
 async function clearAllDeps() {
   _closeSlidePanel('confirm-panel');
   try {
-    // Delete by successor_task_id — covers all deps for this project's tasks
-    // (STATE.deps may not have id field depending on how they were loaded)
     const taskIds = STATE.tasks.map(t => t.id);
     if (taskIds.length) {
       await API.del(`task_dependencies?successor_task_id=in.(${taskIds.join(',')})`);
     }
     STATE.deps = [];
-    window._taskCPM = null;
-    renderTasksTable();
+    // Reset all dates to today now that no deps exist
+    await _propagateDates(new Date());
   } catch(e) { alert('Clear failed: ' + (e.message||e)); }
 }
 
