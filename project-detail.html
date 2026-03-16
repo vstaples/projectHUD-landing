@@ -485,6 +485,8 @@
                 <tr>
                   <th style="width:28px;font-family:var(--font-mono);font-size:10px;color:var(--text3);">#</th>
                   <th style="width:18px;"></th>
+                  <th style="width:22px;font-size:13px;color:var(--cyan);padding:0 4px;" title="Dependency link">&#9741;</th>
+                  <th style="font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;" title="Predecessor task ID">PRED</th>
                   <th>TASK</th>
                   <th>ASSIGNED</th>
                   <th>START</th>
@@ -1296,7 +1298,7 @@ function renderTasksTable() {
           style="cursor:pointer;accent-color:var(--cyan);"
           onchange="onLinkCheckChange()" />
       </td>
-      <td colspan="9"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-right:6px;">${phaseNum}</span>${phaseLabel}</td>
+      <td colspan="11"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-right:6px;">${phaseNum}</span>${phaseLabel}</td>
       <td style="text-align:right;padding-right:8px;">
         ${planEdit ? `
           <button onclick="openEditPhasePanel(this.closest('tr').dataset.phase,this.closest('tr').dataset.phasekey)" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit phase">&#9998;</button>
@@ -1321,6 +1323,22 @@ function renderTasksTable() {
             : taskId}
         </td>
         <td><div class="cp-flag"></div></td>
+        ${(() => {
+          const dep = (STATE.deps||[]).find(d => d.successor_task_id === t.id);
+          if (!dep) return '<td></td><td></td>';
+          const predTask = STATE.tasks.find(t2 => t2.id === dep.predecessor_task_id);
+          const predPhaseN = predTask ? (window._phaseNumMap?.[predTask.phase] || '') : '';
+          const predTaskN  = predTask ? (STATE.tasks.filter(t2=>t2.phase===predTask.phase).sort((a,b)=>(a.sequence_order||0)-(b.sequence_order||0)).indexOf(predTask)+1) : '';
+          const predLabel  = predPhaseN && predTaskN ? predPhaseN+'.'+predTaskN : (predTask?.name?.substring(0,8)||'?');
+          const lagStr     = dep.lag_days ? (dep.lag_days > 0 ? '+'+dep.lag_days+'d' : dep.lag_days+'d') : '';
+          return `<td style="text-align:center;font-size:14px;color:var(--cyan);padding:0 4px;">&#9741;</td>
+                  <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);white-space:nowrap;">
+                    <span style="color:var(--cyan);font-weight:700;">${dep.link_type||'FS'}</span>
+                    <span style="color:var(--text3);margin:0 2px;">&#8592;</span>
+                    <span>${predLabel}</span>
+                    ${lagStr ? `<span style="color:var(--amber);margin-left:3px;">${lagStr}</span>` : ''}
+                  </td>`;
+        })()}
         <td><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
         <td><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
@@ -1337,7 +1355,7 @@ function renderTasksTable() {
       </tr>`;
     });
     if (planEdit) {
-      html += `<tr class="plan-edit-add-row" data-phase="${phaseLabel}"><td colspan="12" style="padding:0;"><div style="display:flex;gap:8px;padding:6px 14px;background:rgba(0,210,255,0.02);border-top:1px dashed rgba(0,210,255,0.12);">
+      html += `<tr class="plan-edit-add-row" data-phase="${phaseLabel}"><td colspan="14" style="padding:0;"><div style="display:flex;gap:8px;padding:6px 14px;background:rgba(0,210,255,0.02);border-top:1px dashed rgba(0,210,255,0.12);">
         <button onclick="openAddTaskPanel(this.closest('tr').dataset.phase)" style="background:none;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:4px 12px;cursor:pointer;">+ ADD TASK</button>
         <button onclick="openAddPhasePanel(this.closest('tr').dataset.phase)" style="background:none;border:1px solid rgba(255,170,0,0.3);color:var(--amber);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:4px 12px;cursor:pointer;">+ ADD PHASE AFTER</button>
       </div></td></tr>`;
@@ -1357,7 +1375,7 @@ function renderTasksTable() {
 
   phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
   if (nophase.length) renderPhase('NO PHASE', nophase);
-  tbody.innerHTML = html || `<tr><td colspan="12">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
+  tbody.innerHTML = html || `<tr><td colspan="14">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
 }
 
 function renderMilestones() {
@@ -1600,7 +1618,13 @@ async function loadProjectDetail() {
       API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`),
     ]);
     if (!project) { window.location.href = '/projects.html'; return; }
-    STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures };
+    // Load task dependencies — needed for PRED column in task table
+    let deps = [];
+    if (tasks.length) {
+      try { deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${tasks.map(t=>t.id).join(',')})`); }
+      catch(e) { deps = []; }
+    }
+    STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures, deps };
     renderHeader();
     renderOverviewMilestones();
     renderOverviewTasks();
@@ -2615,6 +2639,11 @@ async function saveLinkDeps() {
     if (!newDeps.length) { _showErr('link-error','No valid task pairs found'); btn.textContent='\u26d3 CREATE LINKS'; btn.disabled=false; return; }
     await API.post('task_dependencies', newDeps);
 
+    // Reload deps so PRED column refreshes
+    try {
+      const taskIds = STATE.tasks.map(t=>t.id);
+      STATE.deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${taskIds.join(',')})`);
+    } catch(e) { STATE.deps = []; }
     closeLinkPanel();
     // Show brief confirmation
     const lbtn = document.getElementById('btn-link-tasks');
