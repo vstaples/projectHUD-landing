@@ -507,8 +507,7 @@ async function doSave(blob, duration, dlg) {
 
     prog.textContent = 'SAVING METADATA…';
 
-    // Extract user ID from JWT payload
-    let userId = null;
+    // Extract user ID from JWT payload (declared above)
     try { userId = JSON.parse(atob(token.split('.')[1])).sub || null; } catch(e) {}
 
     // Save metadata directly via Supabase REST API using the same fresh token
