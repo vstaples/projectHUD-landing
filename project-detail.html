@@ -100,10 +100,16 @@
 
 /* Task table */
 .task-table-wrap { overflow-x: auto; position:relative; display:block; width:100%; }
+.task-table-wrap.pan-mode { cursor:grab; user-select:none; }
+.task-table-wrap.pan-mode:active { cursor:grabbing; }
+.task-table-wrap.pan-mode.is-panning { cursor:grabbing; }
 .task-tbl { width: max-content; border-collapse: collapse; border-spacing:0; }
 /* Contain the tab pane so the max-content table creates real scroll overflow */
 #tab-tasks { overflow: hidden; }
 #tab-tasks .panel { overflow: hidden; }
+/* Hide horizontal scrollbar — drag-to-pan replaces it */
+.task-table-wrap { scrollbar-width: none; }
+.task-table-wrap::-webkit-scrollbar { display: none; }
 /* Sticky left columns */
 .task-tbl .col-sticky { position:sticky; background:var(--bg1); z-index:2; }
 .task-tbl th.col-sticky { background:var(--bg2); z-index:3; }
@@ -1480,6 +1486,8 @@ function renderTasksTable() {
   if (nophase.length) renderPhase('NO PHASE', nophase);
   tbody.innerHTML = html || `<tr><td colspan="14">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
   setTimeout(constrainTableWrap, 100);
+  _initTablePan();
+  _updateTablePanMode();
   // If CPM group is active but cache is stale, recompute silently
   const tblEl = document.getElementById('tasks-table');
   if (tblEl?.classList.contains('show-cpm') && !window._taskCPM) {
@@ -2292,6 +2300,7 @@ function togglePlanEditMode() {
     if (linkBtn?.dataset.linking === '1') closeLinkPanel();
   }
   renderTasksTable();
+  _updateTablePanMode();
 }
 
 // ── SLIDE PANEL HELPER ────────────────────────────────────────
@@ -3116,6 +3125,68 @@ const _origSwitchTab = typeof switchTab === 'function' ? switchTab : null;
 window.addEventListener('resize', () => { constrainTableWrap(); });
 document.addEventListener('visibilitychange', () => { constrainTableWrap(); });
 
+
+// ── TASK TABLE DRAG-TO-PAN ────────────────────────────────────
+// Enabled whenever NOT in edit plan mode. Works like CPM diagram pan.
+let _tblPanning   = false;
+let _tblPanStartX = 0;
+let _tblPanStartScrollLeft = 0;
+
+function _initTablePan() {
+  const wrap = document.querySelector('.task-table-wrap');
+  if (!wrap || wrap._panInited) return;
+  wrap._panInited = true;
+
+  wrap.addEventListener('mousedown', e => {
+    // Don't pan if in edit plan mode or clicking a button/input/checkbox
+    if (_planEditMode) return;
+    if (e.target.closest('button, input, a, select')) return;
+    _tblPanning = true;
+    _tblPanStartX = e.clientX;
+    _tblPanStartScrollLeft = wrap.scrollLeft;
+    wrap.classList.add('is-panning');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!_tblPanning) return;
+    const dx = e.clientX - _tblPanStartX;
+    wrap.scrollLeft = _tblPanStartScrollLeft - dx;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!_tblPanning) return;
+    _tblPanning = false;
+    const wrap = document.querySelector('.task-table-wrap');
+    if (wrap) wrap.classList.remove('is-panning');
+  });
+
+  // Touch support
+  wrap.addEventListener('touchstart', e => {
+    if (_planEditMode) return;
+    _tblPanning = true;
+    _tblPanStartX = e.touches[0].clientX;
+    _tblPanStartScrollLeft = wrap.scrollLeft;
+  }, { passive: true });
+
+  wrap.addEventListener('touchmove', e => {
+    if (!_tblPanning) return;
+    const dx = e.touches[0].clientX - _tblPanStartX;
+    wrap.scrollLeft = _tblPanStartScrollLeft - dx;
+  }, { passive: true });
+
+  wrap.addEventListener('touchend', () => { _tblPanning = false; });
+}
+
+function _updateTablePanMode() {
+  const wrap = document.querySelector('.task-table-wrap');
+  if (!wrap) return;
+  if (_planEditMode) {
+    wrap.classList.remove('pan-mode');
+  } else {
+    wrap.classList.add('pan-mode');
+  }
+}
 </script>
 
 <!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
