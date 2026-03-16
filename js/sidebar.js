@@ -61,6 +61,11 @@ const Sidebar = (() => {
         <line x1="8" y1="17" x2="16" y2="17"/>
         <line x1="8" y1="9" x2="10" y2="9"/>
       </svg>`,
+    videolibrary:
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/>
+      </svg>`,
   };
 
   const TOOLBAR_ITEMS = [
@@ -70,9 +75,11 @@ const Sidebar = (() => {
     { key: 'risks',        label: 'Risk Register', href: '/risks.html' },
     { key: 'stakeholders', label: 'Stakeholders',  href: '/stakeholders.html' },
     { key: 'actions',      label: 'Action Items',  href: '/action-items.html' },
-    null, // separator
+    null, // separator — admin group
     { key: 'usermgmt',     label: 'User Mgmt',     href: '/users.html' },
     { key: 'auditlog',     label: 'Audit Log',     href: '/audit-log.html' },
+    null, // separator — media group
+    { key: 'videolibrary', label: 'Video Library', href: '/video-library.html' },
   ];
 
   // ── Inject styles ──────────────────────────────────────────
@@ -300,6 +307,8 @@ const Sidebar = (() => {
           <button class="op-btn" title="HUD Intelligence">◈</button>
           <button class="op-btn" title="Report Issue">⚑</button>
           <button class="op-btn" title="Chat">◉</button>
+          <button class="op-btn" title="Start Recording" data-rec="1"
+            onclick="HUDRecorder.toggle()" style="font-size:16px;line-height:1;">⏺</button>
         </div>
         <div class="op-bottom">
           <div class="op-version">
