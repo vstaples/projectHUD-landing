@@ -1891,4 +1891,202 @@ function renderGanttTab() {
   });
   clips += `<clipPath id="gcp-chart"><rect x="${INFO_W}" y="0" width="${CHART_W}" height="9999"/></clipPath>`;
 
-  // ──
+  // ── Task rows ─────────────────────────────────────────────
+  groups.forEach(group => {
+    const gy = HDR_H + rowCount * ROW_H;
+    // Phase header
+    svgRows += `<rect x="0" y="${gy}" width="${INFO_W+CHART_W}" height="${ROW_H}" fill="rgba(0,210,255,0.05)"/>
+<line x1="0" y1="${gy}" x2="${INFO_W+CHART_W}" y2="${gy}" stroke="rgba(0,210,255,0.22)" stroke-width="0.8"/>
+<text x="8" y="${gy+ROW_H/2+4}" fill="rgba(0,210,255,0.80)" font-size="10" font-weight="bold" font-family="Share Tech Mono,monospace" letter-spacing="0.14em">${group.label.toUpperCase()}</text>`;
+    // Phase summary bar
+    const pd = group.tasks.flatMap(t=>[parseDate(t.start_date),parseDate(t.due_date)]);
+    if (pd.length) {
+      const px1=dayX(new Date(Math.min(...pd))), px2=Math.max(dayX(new Date(Math.max(...pd))),px1+4);
+      svgRows += `<rect x="${px1}" y="${gy+ROW_H/2-2}" width="${px2-px1}" height="5" rx="2" fill="rgba(0,210,255,0.20)" stroke="rgba(0,210,255,0.40)" stroke-width="0.8"/>`;
+    }
+    rowCount++;
+
+    group.tasks.forEach(t => {
+      const ry    = HDR_H + rowCount * ROW_H;
+      const color = barColor(t);
+      const user  = STATE.users?.find(u => u.id === t.assigned_to);
+      const pct   = parseFloat(t.percent_complete || t.pct_complete || 0);
+      const isLate = t.due_date && parseDate(t.due_date) < today && t.status !== 'complete';
+
+      // Zebra + row separator
+      svgRows += `<rect x="0" y="${ry}" width="${INFO_W+CHART_W}" height="${ROW_H}" fill="${rowCount%2===0?'rgba(255,255,255,0.015)':'transparent'}"/>
+<line x1="0" y1="${ry}" x2="${INFO_W+CHART_W}" y2="${ry}" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>`;
+
+      // Info cells
+      let icx = 0;
+      visCols.forEach(c => {
+        const cw = COL_W[c]; const tx = c==='activity' ? icx+8 : icx+cw/2; const ta = c==='activity'?'start':'middle';
+        let val = '—', fillCol = 'rgba(210,230,248,0.72)';
+        if (c==='activity') { val = (t.name||'').length>25?(t.name||'').substring(0,24)+'…':(t.name||''); fillCol='rgba(215,232,248,0.85)'; }
+        else if (c==='units')    { val = t.units ?? t.unit_count ?? '—'; }
+        else if (c==='duration') { val = t.duration!=null ? t.duration+'d' : '—'; }
+        else if (c==='start')    { val = t.start_date ? t.start_date.slice(5).replace('-','/') : '—'; fillCol='rgba(180,210,235,0.60)'; }
+        else if (c==='finish')   { val = t.due_date ? t.due_date.slice(5).replace('-','/') : '—'; fillCol = isLate ? '#ff4757' : 'rgba(180,210,235,0.60)'; }
+        else if (c==='pred')     { val = t.predecessors || '—'; fillCol='rgba(160,195,225,0.50)'; }
+        else if (c==='pct')      { val = pct+'%'; fillCol = pct>=100?'#00e5a0':'rgba(0,210,255,0.72)'; }
+        else if (c==='status')   { const sl=(t.status||'').replace(/_/g,' ').toUpperCase(); val=sl.length>9?sl.substring(0,8)+'…':sl; fillCol=statusBadgeColor(t.status); }
+        else if (c==='resource') { const rn=user?(user.name||'').split(' ').map((n,i)=>i===0?n:n[0]+'.').join(' '):'—'; val=rn.length>12?rn.substring(0,11)+'…':rn; fillCol='rgba(180,210,235,0.65)'; }
+        svgRows += `<text x="${tx}" y="${ry+ROW_H/2+4}" text-anchor="${ta}" fill="${fillCol}" font-size="11" font-family="Barlow Condensed,sans-serif" clip-path="url(#gcp-${c})">${val}</text>`;
+        icx += cw;
+      });
+
+      // Gantt bar
+      const x1 = dayX(parseDate(t.start_date));
+      const x2 = Math.max(dayX(parseDate(t.due_date)), x1+3);
+      const bw = x2-x1; const bt = ry+BAR_OFF;
+      svgRows += `<rect x="${x1}" y="${bt}" width="${bw}" height="${BAR_H}" rx="2" fill="rgba(0,0,0,0.28)"/>`;
+      if (pct>0) svgRows += `<rect x="${x1}" y="${bt}" width="${Math.round(bw*pct/100)}" height="${BAR_H}" rx="2" fill="${color}" opacity="0.45"/>`;
+      svgRows += `<rect x="${x1}" y="${bt}" width="${bw}" height="${BAR_H}" rx="2" fill="none" stroke="${color}" stroke-width="1.5">
+<title>${t.name} | ${t.start_date} → ${t.due_date} | ${(t.status||'').replace(/_/g,' ')} | ${pct}%</title></rect>`;
+
+      // Hrs/week label inside bar (weeks zoom)
+      if (_ganttZoom===1 && t.estimated_hours && bw>28) {
+        const hpw = (parseFloat(t.estimated_hours) / Math.max((parseDate(t.due_date)-parseDate(t.start_date))/MS_DAY,1)*7).toFixed(1);
+        svgRows += `<text x="${x1+bw/2}" y="${bt+BAR_H/2+4}" text-anchor="middle" fill="${color}" font-size="9" font-family="Share Tech Mono,monospace" opacity="0.9">${hpw}</text>`;
+      }
+      // Daily hour cells (days zoom)
+      if (_ganttZoom===0 && t.estimated_hours && pxPerDay>=20) {
+        const taskDays = Math.max((parseDate(t.due_date)-parseDate(t.start_date))/MS_DAY,1);
+        const hpd = (parseFloat(t.estimated_hours)/taskDays).toFixed(1);
+        svgRows += `<text x="${x1+bw/2}" y="${bt+BAR_H/2+4}" text-anchor="middle" fill="${color}" font-size="9" font-family="Share Tech Mono,monospace" opacity="0.9">${hpd}h</text>`;
+      }
+
+      rowCount++;
+    });
+  });
+
+  // ── Milestone diamonds ────────────────────────────────────
+  let diamonds = '';
+  milestones.filter(m => m.due_date||m.current_target_date).forEach(m => {
+    const md  = m.current_target_date || m.due_date;
+    const mx  = dayX(parseDate(md));
+    const dc  = m.status==='complete'?'#00e5a0':parseDate(md)<today?'#ff4757':'#ffaa00';
+    const sz  = 7; const my = HDR_H+2;
+    diamonds += `<polygon points="${mx},${my} ${mx+sz},${my+sz} ${mx},${my+2*sz} ${mx-sz},${my+sz}" fill="${dc}" opacity="0.85"><title>◆ ${m.description||''} | ${md}</title></polygon>`;
+  });
+
+  // ── Today line ────────────────────────────────────────────
+  const svgH   = HDR_H + rowCount * ROW_H + 2;
+  const todayX = dayX(today);
+  const todayLine = todayX>=INFO_W && todayX<=INFO_W+CHART_W
+    ? `<line x1="${todayX}" y1="0" x2="${todayX}" y2="${svgH}" stroke="#ff4757" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.75"/>
+<rect x="${todayX+1}" y="1" width="36" height="14" rx="2" fill="rgba(255,71,87,0.15)"/>
+<text x="${todayX+4}" y="12" fill="#ff4757" font-size="9" font-family="Share Tech Mono,monospace" font-weight="bold">TODAY</text>`
+    : '';
+
+  // ── Col dividers ──────────────────────────────────────────
+  let colDivs = ''; let dvx = 0;
+  visCols.forEach(c => { dvx+=COL_W[c]; colDivs+=`<line x1="${dvx}" y1="0" x2="${dvx}" y2="${svgH}" stroke="rgba(0,210,255,0.12)" stroke-width="0.5"/>`; });
+
+  // ── Stamp height into grid lines ──────────────────────────
+  const finalGrid = gridLines.replace(/__H__/g, svgH);
+
+  // ── Assemble SVG ──────────────────────────────────────────
+  const SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${INFO_W+CHART_W}" height="${svgH}" style="display:block;">
+<defs>${clips}</defs>
+<rect x="0" y="0" width="${INFO_W+CHART_W}" height="${svgH}" fill="#060a10"/>
+<rect x="${INFO_W}" y="0" width="${CHART_W}" height="${svgH}" fill="rgba(0,0,0,0.10)"/>
+<g clip-path="url(#gcp-chart)">${finalGrid}</g>
+${svgRows}
+<g clip-path="url(#gcp-chart)">${diamonds}</g>
+${todayLine}
+<rect x="0" y="0" width="${INFO_W}" height="${HDR_H}" fill="rgba(0,0,0,0.35)"/>
+<rect x="${INFO_W}" y="0" width="${CHART_W}" height="${HDR_H}" fill="rgba(0,0,0,0.22)"/>
+${infoHdr}
+<g clip-path="url(#gcp-chart)">${hdrTop}${hdrBot}</g>
+<line x1="0" y1="${HDR_H}" x2="${INFO_W+CHART_W}" y2="${HDR_H}" stroke="rgba(0,210,255,0.28)" stroke-width="1"/>
+<line x1="${INFO_W}" y1="0" x2="${INFO_W}" y2="${svgH}" stroke="rgba(0,210,255,0.32)" stroke-width="1"/>
+${colDivs}
+</svg>`;
+
+  container.innerHTML = SVG;
+  _initGanttPan();
+}
+
+</script>
+
+<div class="journal-panel" id="journal-panel">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="jp-title">TASK JOURNAL</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeJournalPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" id="jp-body"></div>
+</div>
+<div id="evm-popup-overlay" class="evm-popup-overlay" style="display:none;" onclick="closeEVMPopup(event)">
+  <div class="evm-popup" onclick="event.stopPropagation()">
+    <div class="evm-popup-header">
+      <div class="evm-popup-title" id="evm-popup-title">—</div>
+      <button class="evm-popup-close" onclick="closeEVMPopup()">✕</button>
+    </div>
+    <div class="evm-popup-body">
+      <div class="evm-popup-formula" id="evm-popup-formula"></div>
+      <div class="evm-popup-calc" id="evm-popup-calc"></div>
+      <div class="evm-popup-interp" id="evm-popup-interp"></div>
+      <div class="evm-popup-result" id="evm-popup-result"></div>
+      <div class="evm-popup-grid" id="evm-popup-grid"></div>
+    </div>
+    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+      <span style="font-size:14px;color:var(--text3);cursor:se-resize;user-select:none;line-height:1;" title="Drag to resize">⠿</span>
+    </div>
+  </div>
+</div>
+<div class="journal-panel" id="exp-form-panel" style="width:480px;right:-500px;">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="exp-form-title">ADD EXPENDITURE</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="exp-form-subtitle">Fill in procurement details</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeExpForm()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">PHASE</label><input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" /></div>
+      <div><label class="exp-label">TYPE</label>
+        <select id="ef-type" class="hud-select" style="width:100%;"><option value="">— Select —</option><option>Materials</option><option>Rental</option><option>Capital</option><option>Shipping</option><option>Travel</option><option>Service</option><option>Other</option></select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">PART NUMBER</label><input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" /></div>
+      <div><label class="exp-label">VENDOR PN</label><input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" /></div>
+    </div>
+    <div style="margin-bottom:12px;"><label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label><input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" /></div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">QTY</label><input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" /></div>
+      <div><label class="exp-label">VENDOR</label><input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">UNIT PRICE ($)</label><input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" /></div>
+      <div><label class="exp-label">TOTAL PRICE</label><div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div><label class="exp-label">PO NUMBER</label><input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" /></div>
+      <div><label class="exp-label">CATEGORY</label><input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" /></div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">PROCUREMENT DATES</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">FORECAST DATE</label><input id="ef-forecast-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">REQUESTED DATE</label><input id="ef-requested-date" class="hud-input" type="date" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">APPROVED DATE</label><input id="ef-approved-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">ORDERED DATE</label><input id="ef-ordered-date" class="hud-input" type="date" /></div>
+    </div>
+    <div style="margin-bottom:16px;"><label class="exp-label">RECEIVED DATE</label><input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" /></div>
+    <div style="margin-bottom:20px;"><label class="exp-label">COMMENTS</label><textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea></div>
+    <div id="ef-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" onclick="saveExpenditure()" id="ef-save-btn" style="flex:1;">SAVE EXPENDITURE</button>
+      <button class="hud-btn" onclick="closeExpForm()">CANCEL</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
