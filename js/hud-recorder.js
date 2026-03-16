@@ -434,7 +434,7 @@ const HUDRecorder = (() => {
     }
   }
 
-  // ── Public API ────────────────────────────────────────────
+  // ── Public APIs ────────────────────────────────────────────
   function toggle() {
     initChannel();
     if (_recWin && !_recWin.closed) {
