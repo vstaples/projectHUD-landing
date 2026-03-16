@@ -947,27 +947,7 @@ async function loadCPMData() {
       } catch(e) { deps = []; }
     }
 
-    // If no explicit dependencies exist, auto-generate sequential deps
-    // within each phase from sequence_order — this gives the CPM
-    // something meaningful to compute even without formal WBS dependencies
-    if (!deps || deps.length === 0) {
-      const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
-      phases.forEach(phase => {
-        const phaseTasks = tasks
-          .filter(t => t.phase === phase && t.duration_days > 0)
-          .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0));
-        for (let i = 1; i < phaseTasks.length; i++) {
-          deps.push({
-            id: `auto-${phaseTasks[i-1].id}-${phaseTasks[i].id}`,
-            task_id:              phaseTasks[i].id,
-            predecessor_task_id:  phaseTasks[i-1].id,
-            successor_task_id:    phaseTasks[i].id,
-            link_type:            'FS',
-            lag_days:             0,
-          });
-        }
-      });
-    }
+    // With no real deps, tasks are independent — each starts at ES=0
 
     document.getElementById('page-proj-title').textContent = `CPM / PERT — ${project.name}`;
     document.getElementById('page-proj-sub').textContent   = `CRITICAL PATH METHOD · PROGRAM EVALUATION & REVIEW TECHNIQUE`;

@@ -1874,25 +1874,8 @@ async function computeCPMForGantt() {
     deps = await API.get(`task_dependencies?select=*&task_id=in.(${taskIds.join(',')})`);
   } catch(e) { deps = []; }
 
-  // Auto-generate sequential deps within each phase if none found
-  if (!deps || deps.length === 0) {
-    const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
-    phases.forEach(phase => {
-      const phaseTasks = tasks
-        .filter(t => t.phase === phase)
-        .sort((a,b) => (a.sequence_order||0) - (b.sequence_order||0));
-      for (let i = 1; i < phaseTasks.length; i++) {
-        deps.push({
-          id:                   `auto-${phaseTasks[i-1].id}-${phaseTasks[i].id}`,
-          task_id:              phaseTasks[i].id,
-          predecessor_task_id:  phaseTasks[i-1].id,
-          successor_task_id:    phaseTasks[i].id,
-          dependency_type:      'FS',
-          lag_days:             0,
-        });
-      }
-    });
-  }
+  // With no real deps, tasks are independent — each starts at ES=0
+  // Do NOT auto-generate phantom deps
 
   // Run CPM (exact algorithm from cpm-pert.html)
   const nodes = {};
@@ -2908,16 +2891,8 @@ async function computeTasksCPM() {
   if (deps.length && !deps[0].id) {
     try { deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${tasks.map(t=>t.id).join(',')})`); STATE.deps = deps; } catch(e) {}
   }
-  // If no real deps, auto-generate sequential within-phase deps
-  if (!deps.length) {
-    const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
-    phases.forEach(phase => {
-      const pt = tasks.filter(t => t.phase === phase).sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0));
-      for (let i = 1; i < pt.length; i++) {
-        deps.push({ predecessor_task_id: pt[i-1].id, successor_task_id: pt[i].id, link_type: 'FS', lag_days: 0 });
-      }
-    });
-  }
+  // With no real deps, tasks are independent — each starts at ES=0
+  // Do NOT auto-generate phantom deps; true float reflects independent phases
   const nodes = {};
   tasks.forEach(t => {
     nodes[t.id] = { id:t.id, duration:parseFloat(t.duration_days||1), ES:0, EF:0, LS:0, LF:0, TF:0, FF:0, preds:[], succs:[] };
