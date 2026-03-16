@@ -297,7 +297,7 @@ async function openPlayer(clipId) {
   // Get signed URL via REST API (supabase client not available here)
   let videoUrl = '';
   try {
-    const token = Auth.getToken?.();
+    const token = await Auth.getFreshToken?.();
     const res = await fetch(
       `${SUPABASE_URL}/storage/v1/object/sign/video-library/${clip.file_path}`,
       {
@@ -366,7 +366,7 @@ document.addEventListener('keydown', e => {
 async function downloadClip(url, filename) {
   if (!url) return;
   try {
-    const res  = await fetch(url);
+    const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
     const blob = await res.blob();
     const a    = document.createElement('a');
     a.href     = URL.createObjectURL(blob);
