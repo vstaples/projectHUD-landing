@@ -1470,6 +1470,7 @@ function renderTasksTable() {
   phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
   if (nophase.length) renderPhase('NO PHASE', nophase);
   tbody.innerHTML = html || `<tr><td colspan="14">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
+  setTimeout(constrainTableWrap, 50);
 }
 
 function renderMilestones() {
@@ -2847,6 +2848,7 @@ function toggleColGroup(group) {
   } else {
     _activeColGroups.add(group);
     wrap?.classList.add('show-' + group);
+    setTimeout(constrainTableWrap, 50);
     if (btn) { btn.classList.add('active'); }
     // CPM group: compute fresh CPM for tasks tab if not already done
     if (group === 'cpm' && !window._taskCPM) {
