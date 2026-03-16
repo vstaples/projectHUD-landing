@@ -187,6 +187,33 @@
 
 /* Hidden file input for thumbnail upload */
 #thumb-file-input { display: none; }
+
+/* Trash delete button — lower-right of card */
+.vl-delete-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid rgba(255,71,87,0.25);
+  border-radius: 3px;
+  color: rgba(255,71,87,0.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+  z-index: 10;
+}
+.vl-card:hover .vl-delete-btn { opacity: 1; }
+.vl-delete-btn:hover {
+  color: #ff4757;
+  border-color: rgba(255,71,87,0.6);
+  background: rgba(255,71,87,0.12);
+}
+.vl-delete-btn svg { pointer-events: none; }
 </style>
 </head>
 <body>
@@ -303,6 +330,16 @@ function renderGrid(clips) {
           onclick="event.stopPropagation(); triggerThumbUpload('${c.id}')"
           title="Upload custom thumbnail">
           ◈ THUMBNAIL
+        </button>
+        <button class="vl-delete-btn"
+          onclick="event.stopPropagation(); deleteClip('${c.id}', '${c.title.replace(/'/g, "\\'")}')"
+          title="Delete recording">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+          </svg>
         </button>
       </div>
       <div class="vl-card-body">
@@ -570,6 +607,59 @@ async function downloadClip(url, filename) {
     alert('Download failed: ' + e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '↓ DOWNLOAD'; }
+  }
+}
+
+
+// ── Delete clip ──────────────────────────────────────────────
+async function deleteClip(clipId, clipTitle) {
+  if (!confirm(`Delete "${clipTitle}"?\n\nThis will permanently remove the video file and cannot be undone.`)) return;
+
+  const card = document.getElementById('card-' + clipId);
+  if (card) {
+    card.style.opacity = '0.4';
+    card.style.pointerEvents = 'none';
+  }
+
+  try {
+    const clip = ALL_CLIPS.find(c => c.id === clipId);
+    const token = Auth.getFreshToken ? await Auth.getFreshToken() : Auth.getToken?.();
+    const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+
+    // Delete video file from storage
+    if (clip?.file_path) {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/video-library/${clip.file_path}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    }
+
+    // Delete thumbnail from storage (if exists)
+    if (clip?.thumbnail_url) {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/thumbnails/${clip.thumbnail_url}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    }
+
+    // Delete database row
+    await API.del(`video_clips?id=eq.${clipId}`);
+
+    // Remove from local cache and re-render
+    ALL_CLIPS = ALL_CLIPS.filter(c => c.id !== clipId);
+
+    // Animate card out then remove
+    if (card) {
+      card.style.transition = 'all 0.25s';
+      card.style.transform = 'scale(0.95)';
+      card.style.opacity = '0';
+      setTimeout(() => { card.remove(); }, 250);
+    }
+
+  } catch(err) {
+    console.error('[Delete] failed:', err);
+    if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+    alert('Delete failed: ' + err.message);
   }
 }
 
