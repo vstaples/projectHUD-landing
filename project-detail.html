@@ -473,13 +473,17 @@
             <button class="hud-btn task-filter" data-filter="complete">COMPLETE</button>
             <button class="hud-btn task-filter" data-filter="overdue" style="color:var(--red);">OVERDUE</button>
           </div>
-          <button class="hud-btn" id="btn-edit-plan" onclick="togglePlanEditMode()">&#9998; EDIT PLAN</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="hud-btn" id="btn-link-tasks" onclick="openLinkPanel()" style="border-color:rgba(0,210,255,0.35);">&#9741; LINK</button>
+            <button class="hud-btn" id="btn-edit-plan" onclick="togglePlanEditMode()">&#9998; EDIT PLAN</button>
+          </div>
         </div>
         <div class="panel">
           <div class="task-table-wrap">
             <table class="task-tbl" id="tasks-table">
               <thead>
                 <tr>
+                  <th style="width:28px;font-family:var(--font-mono);font-size:10px;color:var(--text3);">#</th>
                   <th style="width:18px;"></th>
                   <th>TASK</th>
                   <th>ASSIGNED</th>
@@ -1285,8 +1289,14 @@ function renderTasksTable() {
     const phaseKey    = phaseLabel.replace(/[^a-zA-Z0-9]/g,'_');
     const isCollapsed = _collapsedPhases.has(phaseKey);
     const planEdit    = document.getElementById('btn-edit-plan')?.dataset.active === '1';
+    const phaseNum = window._phaseNumMap?.[phaseLabel] || '';
     html += `<tr class="phase-header" data-phase-key="${phaseKey}" data-phase="${phaseLabel}" data-phasekey="${phaseKey}">
-      <td colspan="10">${phaseLabel}</td>
+      <td style="padding:0 6px;width:28px;">
+        <input type="checkbox" class="task-link-check" data-type="phase" data-phase="${phaseLabel}"
+          style="cursor:pointer;accent-color:var(--cyan);"
+          onchange="onLinkCheckChange()" />
+      </td>
+      <td colspan="9"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-right:6px;">${phaseNum}</span>${phaseLabel}</td>
       <td style="text-align:right;padding-right:8px;">
         ${planEdit ? `
           <button onclick="openEditPhasePanel(this.closest('tr').dataset.phase,this.closest('tr').dataset.phasekey)" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit phase">&#9998;</button>
@@ -1300,7 +1310,16 @@ function renderTasksTable() {
       const asgn = STATE.users.find(u => u.id === t.assigned_to);
       const due  = t.due_date ? UI.dueDateLabel(t.due_date) : { text: '—', color: 'var(--text3)' };
       const hasJournal = STATE.journal.some(j => j.task_id === t.id);
-      html += `<tr>
+      const phaseN = window._phaseNumMap?.[t.phase] || '';
+      const taskN  = phaseTasks.indexOf(t) + 1;
+      const taskId = phaseN ? phaseN + '.' + taskN : taskN;
+      html += `<tr data-task-id="${t.id}">
+        <td style="padding:0 4px;font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;min-width:28px;">
+          ${planEdit || document.getElementById('btn-link-tasks')?.dataset.linking === '1'
+            ? `<input type="checkbox" class="task-link-check" data-type="task" data-id="${t.id}" data-label="${taskId}"
+                style="cursor:pointer;accent-color:var(--cyan);" onchange="onLinkCheckChange()" />`
+            : taskId}
+        </td>
         <td><div class="cp-flag"></div></td>
         <td><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
         <td><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
@@ -1318,15 +1337,27 @@ function renderTasksTable() {
       </tr>`;
     });
     if (planEdit) {
-      html += `<tr class="plan-edit-add-row" data-phase="${phaseLabel}"><td colspan="11" style="padding:0;"><div style="display:flex;gap:8px;padding:6px 14px;background:rgba(0,210,255,0.02);border-top:1px dashed rgba(0,210,255,0.12);">
+      html += `<tr class="plan-edit-add-row" data-phase="${phaseLabel}"><td colspan="12" style="padding:0;"><div style="display:flex;gap:8px;padding:6px 14px;background:rgba(0,210,255,0.02);border-top:1px dashed rgba(0,210,255,0.12);">
         <button onclick="openAddTaskPanel(this.closest('tr').dataset.phase)" style="background:none;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:4px 12px;cursor:pointer;">+ ADD TASK</button>
         <button onclick="openAddPhasePanel(this.closest('tr').dataset.phase)" style="background:none;border:1px solid rgba(255,170,0,0.3);color:var(--amber);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:4px 12px;cursor:pointer;">+ ADD PHASE AFTER</button>
       </div></td></tr>`;
     }
   };
+  // Sort phases by min sequence_order so numbering matches project order
+  const allTasks = STATE.tasks;
+  const phasesSorted = [...new Set(allTasks.map(t=>t.phase).filter(Boolean))]
+    .sort((a,b) => {
+      const minA = Math.min(...allTasks.filter(t=>t.phase===a).map(t=>t.sequence_order||9999));
+      const minB = Math.min(...allTasks.filter(t=>t.phase===b).map(t=>t.sequence_order||9999));
+      return minA - minB;
+    });
+  // Build global phase number map
+  window._phaseNumMap = {};
+  phasesSorted.forEach((ph, i) => { window._phaseNumMap[ph] = i + 1; });
+
   phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
   if (nophase.length) renderPhase('NO PHASE', nophase);
-  tbody.innerHTML = html || `<tr><td colspan="11">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
+  tbody.innerHTML = html || `<tr><td colspan="12">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
 }
 
 function renderMilestones() {
@@ -2397,14 +2428,20 @@ function _nextWeekday(date) {
 function _toInputDate(d) { return d.toISOString().substring(0,10); }
 
 function onTaskStartChange() {
-  const startVal = document.getElementById('tf-start').value;
+  const el = document.getElementById('tf-start');
+  const startVal = el.value;
   if (!startVal) return;
   const start = new Date(startVal + 'T00:00:00');
   const dow = start.getDay();
   if (dow === 0 || dow === 6) {
     const dayName = dow === 0 ? 'Sunday' : 'Saturday';
-    if (!confirm(startVal + ' is a ' + dayName + '. Use this as the start date?')) {
-      document.getElementById('tf-start').value = _toInputDate(_nextWeekday(start));
+    const next = _toInputDate(_nextWeekday(start));
+    const choice = confirm(startVal + ' is a ' + dayName + '.\n\nOK = use next weekday (' + next + ')\nCancel = clear the date');
+    if (choice) {
+      el.value = next;
+    } else {
+      el.value = el.dataset.prev || '';
+      return;
     }
   }
   const dur = parseFloat(document.getElementById('tf-duration').value);
@@ -2437,6 +2474,159 @@ function onTaskDurationChange() {
   document.getElementById('tf-due').value = _toInputDate(_addBusinessDays(start, dur));
 }
 
+
+// ── TASK DEPENDENCY LINKING ───────────────────────────────────
+let _selectedLinkType = 'FS';
+
+function onLinkCheckChange() {
+  // Update the LINK button to show count of selections
+  const checked = document.querySelectorAll('.task-link-check:checked');
+  const btn = document.getElementById('btn-link-tasks');
+  if (btn) {
+    btn.textContent = checked.length > 0
+      ? '\u26d3 LINK (' + checked.length + ')'
+      : '\u26d3 LINK';
+    btn.style.color = checked.length > 0 ? 'var(--cyan)' : '';
+    btn.style.borderColor = checked.length > 0 ? 'rgba(0,210,255,0.6)' : '';
+  }
+}
+
+function openLinkPanel() {
+  const checked = [...document.querySelectorAll('.task-link-check:checked')];
+  if (checked.length < 2) {
+    // Enter linking mode — show checkboxes
+    const btn = document.getElementById('btn-link-tasks');
+    if (btn.dataset.linking !== '1') {
+      btn.dataset.linking = '1';
+      btn.style.color = 'var(--amber)';
+      btn.style.borderColor = 'rgba(255,170,0,0.5)';
+      btn.textContent = '\u26d3 LINKING... (select tasks)';
+      renderTasksTable();
+      return;
+    }
+    _showErr('link-error','Select at least 2 tasks to create a dependency');
+    return;
+  }
+  _buildLinkPanel(checked);
+  _openSlidePanel('link-panel');
+}
+
+function _buildLinkPanel(checkedEls) {
+  _selectedLinkType = 'FS';
+
+  // Reset type buttons
+  document.querySelectorAll('.link-type-btn').forEach(b => {
+    const active = b.dataset.type === 'FS';
+    b.style.background = active ? 'rgba(0,210,255,0.08)' : 'none';
+    b.style.borderColor = active ? 'rgba(0,210,255,0.4)' : 'rgba(100,140,180,0.2)';
+    b.style.color = active ? 'var(--cyan)' : 'var(--text2)';
+  });
+
+  // Build chain visual + selection info
+  const items = checkedEls.map(el => ({
+    type:  el.dataset.type,
+    id:    el.dataset.id   || null,
+    phase: el.dataset.phase || null,
+    label: el.dataset.label || el.dataset.phase || el.dataset.id || '?',
+  }));
+
+  // Chain visual
+  const visual = document.getElementById('link-chain-visual');
+  visual.innerHTML = items.map((item, i) => `
+    <div style="display:flex;align-items:center;gap:6px;">
+      ${i > 0 ? '<span style="font-size:18px;color:var(--cyan);opacity:0.7;">\u26d3</span>' : ''}
+      <div style="background:var(--bg2);border:1px solid rgba(0,210,255,0.3);padding:6px 10px;font-family:var(--font-mono);font-size:11px;">
+        <div style="color:var(--cyan);font-size:9px;letter-spacing:0.12em;">${item.type === 'phase' ? 'PHASE' : 'TASK'}</div>
+        <div style="color:var(--text1);font-weight:700;">${item.label}</div>
+        ${item.type === 'phase' ? `<div style="font-size:9px;color:var(--text3);">${item.phase}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  // Selection info
+  const info = document.getElementById('link-selection-info');
+  info.innerHTML = items.map((item, i) =>
+    `<span style="color:var(--text3);">${i === 0 ? 'PREDECESSOR' : 'SUCCESSOR ' + (i > 1 ? i : '')}:</span> <span style="color:var(--text1);">${item.label}</span>${item.type === 'phase' ? ' <span style="color:var(--text3);">(all tasks in phase)</span>' : ''}`
+  ).join('<br>');
+
+  // Store selected for save
+  window._linkSelectedItems = items;
+  document.getElementById('link-lag').value = '0';
+  _clearErr('link-error');
+}
+
+function selectLinkType(type) {
+  _selectedLinkType = type;
+  document.querySelectorAll('.link-type-btn').forEach(b => {
+    const active = b.dataset.type === type;
+    b.style.background = active ? 'rgba(0,210,255,0.08)' : 'none';
+    b.style.borderColor = active ? 'rgba(0,210,255,0.4)' : 'rgba(100,140,180,0.2)';
+    b.style.color = active ? 'var(--cyan)' : 'var(--text2)';
+  });
+}
+
+async function saveLinkDeps() {
+  const items = window._linkSelectedItems;
+  if (!items || items.length < 2) { _showErr('link-error','No items selected'); return; }
+  const lagDays = parseInt(document.getElementById('link-lag').value) || 0;
+  const btn = document.getElementById('link-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+
+  try {
+    // Expand phase items to their task IDs
+    const expandItem = (item) => {
+      if (item.type === 'task') return [item.id];
+      // Phase: return all task IDs in that phase sorted by sequence_order
+      return STATE.tasks
+        .filter(t => t.phase === item.phase)
+        .sort((a,b) => (a.sequence_order||0) - (b.sequence_order||0))
+        .map(t => t.id);
+    };
+
+    // Build FS chain: each item's last task → next item's first task
+    const newDeps = [];
+    for (let i = 0; i < items.length - 1; i++) {
+      const predIds = expandItem(items[i]);
+      const succIds = expandItem(items[i+1]);
+      if (!predIds.length || !succIds.length) continue;
+      const predId = predIds[predIds.length - 1]; // last task of predecessor
+      const succId = succIds[0];                  // first task of successor
+      newDeps.push({
+        predecessor_task_id: predId,
+        successor_task_id:   succId,
+        link_type:           _selectedLinkType,
+        lag_days:            lagDays,
+      });
+    }
+
+    if (!newDeps.length) { _showErr('link-error','No valid task pairs found'); btn.textContent='\u26d3 CREATE LINKS'; btn.disabled=false; return; }
+    await API.post('task_dependencies', newDeps);
+
+    closeLinkPanel();
+    // Show brief confirmation
+    const lbtn = document.getElementById('btn-link-tasks');
+    if (lbtn) { lbtn.textContent = '\u26d3 LINK \u2713'; setTimeout(() => { lbtn.textContent='\u26d3 LINK'; }, 2000); }
+  } catch(err) {
+    _showErr('link-error', err.message || 'Save failed');
+  } finally {
+    btn.textContent = '\u26d3 CREATE LINKS'; btn.disabled = false;
+  }
+}
+
+function closeLinkPanel() {
+  _closeSlidePanel('link-panel');
+  // Exit linking mode
+  const btn = document.getElementById('btn-link-tasks');
+  if (btn) {
+    btn.dataset.linking = '0';
+    btn.textContent = '\u26d3 LINK';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+  // Uncheck all
+  document.querySelectorAll('.task-link-check').forEach(el => { el.checked = false; });
+  renderTasksTable();
+}
 </script>
 
 <!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
@@ -2501,7 +2691,7 @@ function onTaskDurationChange() {
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" oninput="onTaskStartChange()" /></div>
+      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" onfocus="this.dataset.prev=this.value" oninput="onTaskStartChange()" /></div>
       <div><label class="exp-label">DUE DATE</label><input id="tf-due" class="hud-input" type="date" style="width:100%;" oninput="onTaskDueChange()" /></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
@@ -2554,6 +2744,60 @@ function onTaskDurationChange() {
     <div style="display:flex;gap:10px;">
       <button id="confirm-ok-btn" class="hud-btn" style="flex:1;background:rgba(255,71,87,0.1);border-color:rgba(255,71,87,0.5);color:var(--red);">DELETE</button>
       <button class="hud-btn" onclick="_closeSlidePanel('confirm-panel')" style="flex:1;">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── TASK DEPENDENCY LINK PANEL ─────────────────────────── -->
+<div class="journal-panel" id="link-panel" style="width:520px;right:-540px;" data-width="-540px">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title">&#9741; LINK TASKS</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;">Define dependency between selected tasks</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeLinkPanel()">&#10005;</button>
+  </div>
+  <div class="journal-panel-body" style="padding:18px;">
+
+    <!-- Chain visual -->
+    <div id="link-chain-visual" style="display:flex;align-items:center;gap:0;margin-bottom:20px;flex-wrap:wrap;gap:6px;"></div>
+
+    <!-- Dependency type selector -->
+    <div style="margin-bottom:14px;">
+      <label class="exp-label">DEPENDENCY TYPE</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;" id="link-type-btns">
+        <button onclick="selectLinkType('FS')" data-type="FS" class="link-type-btn active-link-type"
+          style="font-family:var(--font-mono);font-size:10px;padding:5px 12px;border:1px solid rgba(0,210,255,0.4);background:rgba(0,210,255,0.08);color:var(--cyan);cursor:pointer;">
+          FS — Finish to Start
+        </button>
+        <button onclick="selectLinkType('SS')" data-type="SS" class="link-type-btn"
+          style="font-family:var(--font-mono);font-size:10px;padding:5px 12px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;">
+          SS — Start to Start
+        </button>
+        <button onclick="selectLinkType('FF')" data-type="FF" class="link-type-btn"
+          style="font-family:var(--font-mono);font-size:10px;padding:5px 12px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;">
+          FF — Finish to Finish
+        </button>
+        <button onclick="selectLinkType('SF')" data-type="SF" class="link-type-btn"
+          style="font-family:var(--font-mono);font-size:10px;padding:5px 12px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;">
+          SF — Start to Finish
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label class="exp-label">LAG DAYS <span style="color:var(--text3);font-weight:normal;">(negative = lead)</span></label>
+      <input id="link-lag" class="hud-input" type="number" step="1" value="0" style="max-width:120px;" />
+    </div>
+
+    <!-- Selected items summary -->
+    <div id="link-selection-info" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:16px;line-height:1.7;padding:8px 10px;background:rgba(0,0,0,0.2);border:1px solid var(--border);"></div>
+
+    <div id="link-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" id="link-save-btn" onclick="saveLinkDeps()" style="flex:1;">&#9741; CREATE LINKS</button>
+      <button class="hud-btn" onclick="closeLinkPanel()">CANCEL</button>
     </div>
   </div>
 </div>
