@@ -99,8 +99,24 @@
 .ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
 
 /* Task table */
-.task-table-wrap { overflow-x: auto; }
-.task-tbl { width: 100%; border-collapse: collapse; }
+.task-table-wrap { overflow-x: auto; position:relative; }
+.task-tbl { width: max-content; min-width:100%; border-collapse: collapse; border-spacing:0; }
+/* Sticky left columns */
+.task-tbl .col-sticky { position:sticky; background:var(--bg1); z-index:2; }
+.task-tbl th.col-sticky { background:var(--bg2); z-index:3; }
+.task-tbl .phase-header .col-sticky { background:rgba(0,210,255,0.04); }
+/* Column group headers */
+.col-group-hdr { font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em; text-align:center;
+  padding:3px 6px; border-bottom:1px solid var(--border); white-space:nowrap; }
+/* Hidden column groups */
+.col-grp-cpm, .col-grp-pert, .col-grp-actuals, .col-grp-budget { display:none; }
+.show-cpm .col-grp-cpm, .show-pert .col-grp-pert,
+.show-actuals .col-grp-actuals, .show-budget .col-grp-budget { display:table-cell; }
+/* Column toggle buttons */
+.col-toggle-btn { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em;
+  padding:3px 9px; border:1px solid var(--border); background:none;
+  color:var(--text3); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+.col-toggle-btn.active { background:rgba(0,210,255,0.08); border-color:var(--cyan); color:var(--cyan); }
 .task-tbl th {
   font-family: var(--font-mono); font-size:11px; color: var(--text3);
   letter-spacing: 0.14em; text-transform: uppercase;
@@ -473,7 +489,15 @@
             <button class="hud-btn task-filter" data-filter="complete">COMPLETE</button>
             <button class="hud-btn task-filter" data-filter="overdue" style="color:var(--red);">OVERDUE</button>
           </div>
-          <div style="display:flex;gap:6px;align-items:center;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <div style="display:flex;gap:4px;border:1px solid var(--border);padding:3px 6px;border-radius:2px;" id="col-toggle-group">
+              <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;align-self:center;margin-right:2px;">SHOW:</span>
+              <button class="col-toggle-btn" data-col="actuals" onclick="toggleColGroup('actuals')">ACTUALS</button>
+              <button class="col-toggle-btn" data-col="cpm"     onclick="toggleColGroup('cpm')">CPM</button>
+              <button class="col-toggle-btn" data-col="pert"    onclick="toggleColGroup('pert')">PERT</button>
+              <button class="col-toggle-btn" data-col="budget"  onclick="toggleColGroup('budget')">BUDGET</button>
+              <button class="col-toggle-btn" onclick="resetTableView()" style="color:var(--text3);border-color:rgba(255,255,255,0.1);">&#8634; RESET</button>
+            </div>
             <button class="hud-btn" id="btn-link-tasks" onclick="openLinkPanel()" style="border-color:rgba(0,210,255,0.35);">&#9741; LINK</button>
             <button class="hud-btn" id="btn-edit-plan" onclick="togglePlanEditMode()">&#9998; EDIT PLAN</button>
           </div>
@@ -481,13 +505,29 @@
         <div class="panel">
           <div class="task-table-wrap">
             <table class="task-tbl" id="tasks-table">
-              <thead>
+              <thead id="tasks-thead">
+                <!-- GROUP HEADER ROW -->
+                <tr class="col-group-row" style="height:18px;">
+                  <th class="col-sticky col-group-hdr" style="left:0;width:28px;"></th>
+                  <th class="col-sticky col-group-hdr" style="left:28px;width:18px;"></th>
+                  <th class="col-sticky col-group-hdr" style="left:46px;width:26px;"></th>
+                  <th class="col-sticky col-group-hdr" style="left:72px;min-width:72px;"></th>
+                  <th class="col-sticky col-group-hdr" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.2);"></th>
+                  <th class="col-group-hdr" style="background:rgba(0,0,0,0.15);" colspan="8">— PROJECT DATA —</th>
+                  <th class="col-grp-actuals col-group-hdr" style="color:var(--amber);background:rgba(255,170,0,0.05);" colspan="3">ACTUALS</th>
+                  <th class="col-grp-cpm    col-group-hdr" style="color:#8b5cf6;background:rgba(139,92,246,0.05);" colspan="5">CRITICAL PATH</th>
+                  <th class="col-grp-pert   col-group-hdr" style="color:var(--green);background:rgba(0,229,160,0.05);" colspan="6">PERT</th>
+                  <th class="col-grp-budget col-group-hdr" style="color:var(--cyan);background:rgba(0,210,255,0.05);" colspan="3">BUDGET</th>
+                </tr>
+                <!-- COLUMN HEADER ROW -->
                 <tr>
-                  <th style="width:28px;font-family:var(--font-mono);font-size:10px;color:var(--text3);">#</th>
-                  <th style="width:18px;"></th>
-                  <th style="width:22px;font-size:13px;color:var(--cyan);padding:0 4px;" title="Dependency link">&#9741;</th>
-                  <th style="font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;" title="Predecessor task ID">PRED</th>
-                  <th>TASK</th>
+                  <!-- STICKY LEFT COLS -->
+                  <th class="col-sticky" style="left:0;width:28px;">#</th>
+                  <th class="col-sticky" style="left:28px;width:18px;"></th>
+                  <th class="col-sticky" style="left:46px;width:26px;font-size:13px;color:var(--cyan);padding:0 4px;" title="Link">&#9741;</th>
+                  <th class="col-sticky" style="left:72px;min-width:72px;" title="Predecessor">PRED</th>
+                  <th class="col-sticky" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.2);">TASK</th>
+                  <!-- STANDARD SCROLLABLE COLS -->
                   <th>ASSIGNED</th>
                   <th>START</th>
                   <th>DUE</th>
@@ -495,8 +535,28 @@
                   <th>EFFORT</th>
                   <th>% DONE</th>
                   <th>STATUS</th>
-                  <th>ACT HRS</th>
                   <th></th>
+                  <!-- ACTUALS GROUP -->
+                  <th class="col-grp-actuals" style="color:var(--amber);">ACT START</th>
+                  <th class="col-grp-actuals" style="color:var(--amber);">ACT FINISH</th>
+                  <th class="col-grp-actuals" style="color:var(--amber);">ACT HRS</th>
+                  <!-- CPM GROUP -->
+                  <th class="col-grp-cpm" style="color:#8b5cf6;">ES</th>
+                  <th class="col-grp-cpm" style="color:#8b5cf6;">EF</th>
+                  <th class="col-grp-cpm" style="color:#8b5cf6;">LS</th>
+                  <th class="col-grp-cpm" style="color:#8b5cf6;">LF</th>
+                  <th class="col-grp-cpm" style="color:#8b5cf6;">FLOAT</th>
+                  <!-- PERT GROUP -->
+                  <th class="col-grp-pert" style="color:var(--green);">O</th>
+                  <th class="col-grp-pert" style="color:var(--green);">ML</th>
+                  <th class="col-grp-pert" style="color:var(--green);">P</th>
+                  <th class="col-grp-pert" style="color:var(--green);">t (exp)</th>
+                  <th class="col-grp-pert" style="color:var(--green);">&sigma;</th>
+                  <th class="col-grp-pert" style="color:var(--green);">&sigma;&sup2;</th>
+                  <!-- BUDGET GROUP -->
+                  <th class="col-grp-budget" style="color:var(--cyan);">BGT HRS</th>
+                  <th class="col-grp-budget" style="color:var(--cyan);">BGT COST</th>
+                  <th class="col-grp-budget" style="color:var(--cyan);">LABOR RATE</th>
                 </tr>
               </thead>
               <tbody id="tasks-tbody"></tbody>
@@ -1325,21 +1385,21 @@ function renderTasksTable() {
         <td><div class="cp-flag"></div></td>
         ${(() => {
           const dep = (STATE.deps||[]).find(d => d.successor_task_id === t.id);
-          if (!dep) return '<td></td><td></td>';
+          if (!dep) return '<td class="col-sticky" style="left:46px;"></td><td class="col-sticky" style="left:72px;"></td>';
           const predTask = STATE.tasks.find(t2 => t2.id === dep.predecessor_task_id);
           const predPhaseN = predTask ? (window._phaseNumMap?.[predTask.phase] || '') : '';
           const predTaskN  = predTask ? (STATE.tasks.filter(t2=>t2.phase===predTask.phase).sort((a,b)=>(a.sequence_order||0)-(b.sequence_order||0)).indexOf(predTask)+1) : '';
           const predLabel  = predPhaseN && predTaskN ? predPhaseN+'.'+predTaskN : (predTask?.name?.substring(0,8)||'?');
           const lagStr     = dep.lag_days ? (dep.lag_days > 0 ? '+'+dep.lag_days+'d' : dep.lag_days+'d') : '';
-          return `<td style="text-align:center;font-size:14px;color:var(--cyan);padding:0 4px;">&#9741;</td>
-                  <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);white-space:nowrap;">
+          return `<td class="col-sticky" style="left:46px;text-align:center;font-size:14px;color:var(--cyan);padding:0 4px;">&#9741;</td>
+                  <td class="col-sticky" style="left:72px;font-family:var(--font-mono);font-size:10px;color:var(--text2);white-space:nowrap;">
                     <span style="color:var(--cyan);font-weight:700;">${dep.link_type||'FS'}</span>
                     <span style="color:var(--text3);margin:0 2px;">&#8592;</span>
                     <span>${predLabel}</span>
                     ${lagStr ? `<span style="color:var(--amber);margin-left:3px;">${lagStr}</span>` : ''}
                   </td>`;
         })()}
-        <td><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
+        <td class="col-sticky" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.1);"><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
         <td><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${due.text}</td>
@@ -1347,11 +1407,35 @@ function renderTasksTable() {
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
         <td><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
         <td>${UI.badge(t.status)}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
         <td style="white-space:nowrap;">
           <button class="panel-action" onclick="openJournalPanel(this.dataset.tid,this.dataset.tname)" data-tid="${t.id}" data-tname="${t.name.replace(/"/g,'&quot;')}">&#9636;</button>
           ${planEdit ? '<button onclick="openEditTaskPanel(\'' + t.id + '\')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit task">&#9998;</button><button onclick="confirmDeleteTask(\'' + t.id + '\',\'' + t.name.replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete task">&#128465;</button>' : ''}
         </td>
+        <!-- ACTUALS group -->
+        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_start ? UI.fmtDateShort(t.actual_start) : '—'}</td>
+        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_finish ? UI.fmtDateShort(t.actual_finish) : '—'}</td>
+        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
+        <!-- CPM group -->
+        ${(()=>{ const cn=window._ganttCPM?.nodes?.[t.id]; const tf=cn?cn.TF.toFixed(0):'—'; const tfc=cn?(cn.TF<=0?'var(--red)':cn.TF<=5?'var(--amber)':'var(--green)'):'var(--text3)';
+          return '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.ES.toFixed(0):'—')+'</td>'+
+                 '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.EF.toFixed(0):'—')+'</td>'+
+                 '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.LS.toFixed(0):'—')+'</td>'+
+                 '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.LF.toFixed(0):'—')+'</td>'+
+                 '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:'+tfc+';font-weight:700;">'+tf+'</td>';
+        })()}
+        <!-- PERT group -->
+        ${(()=>{ const dur=parseFloat(t.duration_days||1),o=parseFloat(t.duration_optimistic||dur*0.7),p=parseFloat(t.duration_pessimistic||dur*1.6),te=((o+4*dur+p)/6),sd=((p-o)/6);
+          return '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+o.toFixed(1)+'</td>'+
+                 '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+dur.toFixed(1)+'</td>'+
+                 '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+p.toFixed(1)+'</td>'+
+                 '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--green);">'+te.toFixed(2)+'</td>'+
+                 '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+sd.toFixed(2)+'</td>'+
+                 '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(sd*sd).toFixed(2)+'</td>';
+        })()}
+        <!-- BUDGET group -->
+        <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.budget_hours ? parseFloat(t.budget_hours).toFixed(1)+'h' : '—'}</td>
+        <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.budget_cost ? '$'+parseFloat(t.budget_cost).toFixed(0) : '—'}</td>
+        <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.labor_rate ? '$'+parseFloat(t.labor_rate).toFixed(0)+'/h' : '—'}</td>
       </tr>`;
     });
     if (planEdit) {
@@ -2172,6 +2256,11 @@ function togglePlanEditMode() {
     btn.style.color    = _planEditMode ? 'var(--amber)' : '';
     btn.style.borderColor = _planEditMode ? 'rgba(255,170,0,0.5)' : '';
   }
+  // If exiting edit mode, also cancel any active link mode
+  if (!_planEditMode) {
+    const linkBtn = document.getElementById('btn-link-tasks');
+    if (linkBtn?.dataset.linking === '1') closeLinkPanel();
+  }
   renderTasksTable();
 }
 
@@ -2236,6 +2325,8 @@ function openAddTaskPanel(phase) {
   document.getElementById('tf-phase').readOnly    = true;
   document.getElementById('tf-phase').style.opacity = '0.7';
   document.getElementById('tf-phase').style.cursor  = 'default';
+  const depsSection = document.getElementById('tf-deps-section');
+  if (depsSection) depsSection.style.display = 'none';
   document.getElementById('tf-status').value      = 'not_started';
   document.getElementById('tf-start').value       = '';
   document.getElementById('tf-due').value         = '';
@@ -2279,6 +2370,7 @@ function openEditTaskPanel(taskId) {
   sel.innerHTML = '<option value="">— Unassigned —</option>' +
     (STATE.users||[]).map(u => `<option value="${u.id}" ${u.id===t.assigned_to?'selected':''}>${u.name}</option>`).join('');
   _clearErr('tf-error');
+  loadTaskDepsForEdit(taskId);
   _openSlidePanel('task-form-panel');
 }
 function closeTaskFormPanel() { _closeSlidePanel('task-form-panel'); }
@@ -2529,23 +2621,25 @@ function onLinkCheckChange() {
 function openLinkPanel() {
   const btn = document.getElementById('btn-link-tasks');
   const checked = [...document.querySelectorAll('.task-link-check:checked')];
-  if (checked.length < 2) {
-    // Toggle linking mode on/off
-    if (btn.dataset.linking !== '1') {
-      btn.dataset.linking = '1';
-      btn.style.color = 'var(--amber)';
-      btn.style.borderColor = 'rgba(255,170,0,0.5)';
-      btn.innerHTML = '&#9741; LINK <span style="font-size:9px;opacity:0.7;">(select 2+ tasks, then click again)</span>';
-      renderTasksTable();
+
+  // If already in linking mode — second click either opens panel or cancels
+  if (btn.dataset.linking === '1') {
+    if (checked.length >= 2) {
+      _buildLinkPanel(checked);
+      _openSlidePanel('link-panel');
     } else {
-      // Already in link mode but not enough selected — flash the button
-      btn.style.background = 'rgba(255,71,87,0.12)';
-      setTimeout(() => { btn.style.background = ''; }, 600);
+      // Cancel linking mode
+      closeLinkPanel();
     }
     return;
   }
-  _buildLinkPanel(checked);
-  _openSlidePanel('link-panel');
+
+  // Enter linking mode
+  btn.dataset.linking = '1';
+  btn.style.color = 'var(--amber)';
+  btn.style.borderColor = 'rgba(255,170,0,0.5)';
+  btn.innerHTML = '&#9741; LINKING &nbsp;<span style="font-size:9px;opacity:0.7;">(select 2+ tasks then click LINK, or click LINK to cancel)</span>';
+  renderTasksTable();
 }
 
 function _buildLinkPanel(checkedEls) {
@@ -2669,6 +2763,83 @@ function closeLinkPanel() {
   document.querySelectorAll('.task-link-check').forEach(el => { el.checked = false; });
   renderTasksTable();
 }
+
+// ── COLUMN GROUP TOGGLES ──────────────────────────────────────
+const _activeColGroups = new Set();
+
+function toggleColGroup(group) {
+  const wrap = document.getElementById('tasks-table');
+  const btn  = document.querySelector(`.col-toggle-btn[data-col="${group}"]`);
+  if (_activeColGroups.has(group)) {
+    _activeColGroups.delete(group);
+    wrap?.classList.remove('show-' + group);
+    if (btn) { btn.classList.remove('active'); }
+  } else {
+    _activeColGroups.add(group);
+    wrap?.classList.add('show-' + group);
+    if (btn) { btn.classList.add('active'); }
+  }
+}
+
+function resetTableView() {
+  // Clear all column groups
+  _activeColGroups.forEach(g => {
+    document.getElementById('tasks-table')?.classList.remove('show-' + g);
+    const btn = document.querySelector(`.col-toggle-btn[data-col="${g}"]`);
+    if (btn) btn.classList.remove('active');
+  });
+  _activeColGroups.clear();
+  // Scroll table back to left
+  const wrap = document.querySelector('.task-table-wrap');
+  if (wrap) wrap.scrollLeft = 0;
+}
+
+// ── EDIT TASK DEPS SECTION ────────────────────────────────────
+async function loadTaskDepsForEdit(taskId) {
+  const section = document.getElementById('tf-deps-section');
+  const list    = document.getElementById('tf-deps-list');
+  if (!section || !list) return;
+
+  const deps = (STATE.deps || []).filter(d =>
+    d.successor_task_id === taskId || d.predecessor_task_id === taskId
+  );
+
+  if (!deps.length) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  list.innerHTML = deps.map(d => {
+    const isPred = d.successor_task_id === taskId;
+    const otherTask = STATE.tasks.find(t => t.id === (isPred ? d.predecessor_task_id : d.successor_task_id));
+    const phaseN = otherTask ? (window._phaseNumMap?.[otherTask.phase] || '') : '';
+    const taskN  = otherTask ? (STATE.tasks.filter(t=>t.phase===otherTask.phase)
+                    .sort((a,b)=>(a.sequence_order||0)-(b.sequence_order||0)).indexOf(otherTask)+1) : '';
+    const label  = phaseN && taskN ? phaseN + '.' + taskN + ' — ' + (otherTask?.name||'') : (otherTask?.name || d.predecessor_task_id);
+    const role   = isPred ? 'predecessor' : 'successor';
+    const lag    = d.lag_days ? (d.lag_days > 0 ? '+' + d.lag_days + 'd' : d.lag_days + 'd') : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(0,0,0,0.2);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;">
+      <span style="color:var(--cyan);">${d.link_type||'FS'}</span>
+      <span style="color:var(--text3);">${role}:</span>
+      <span style="color:var(--text1);flex:1;">${label}</span>
+      ${lag ? `<span style="color:var(--amber);">${lag}</span>` : ''}
+      <button onclick="deleteDep('${d.id}','${taskId}')"
+        style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 2px;" title="Remove dependency">&#10005;</button>
+    </div>`;
+  }).join('');
+}
+
+async function deleteDep(depId, taskId) {
+  try {
+    await API.del(`task_dependencies?id=eq.${depId}`);
+    STATE.deps = (STATE.deps||[]).filter(d => d.id !== depId);
+    loadTaskDepsForEdit(taskId);
+    renderTasksTable();
+  } catch(e) {
+    alert('Failed to remove dependency: ' + (e.message||e));
+  }
+}
 </script>
 
 <!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
@@ -2744,6 +2915,10 @@ function closeLinkPanel() {
     <div style="margin-bottom:18px;">
       <label class="exp-label">ASSIGNED TO</label>
       <select id="tf-assigned" class="hud-select" style="width:100%;"><option value="">— Unassigned —</option></select>
+    </div>
+    <div id="tf-deps-section" style="margin-bottom:14px;display:none;">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:0.14em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">DEPENDENCIES</div>
+      <div id="tf-deps-list" style="display:flex;flex-direction:column;gap:4px;"></div>
     </div>
     <div id="tf-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
     <div style="display:flex;gap:10px;">
