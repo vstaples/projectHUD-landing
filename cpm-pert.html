@@ -927,7 +927,7 @@ async function loadCPMData() {
     let deps = [];
     if (taskIds.length > 0) {
       try {
-        deps = await API.get(`task_dependencies?select=*&task_id=in.(${taskIds.join(',')})`);
+        deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${taskIds.join(',')})`);
       } catch(e) { deps = []; }
     }
 
@@ -946,7 +946,7 @@ async function loadCPMData() {
             task_id:              phaseTasks[i].id,
             predecessor_task_id:  phaseTasks[i-1].id,
             successor_task_id:    phaseTasks[i].id,
-            dependency_type:      'FS',
+            link_type:            'FS',
             lag_days:             0,
           });
         }

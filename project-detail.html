@@ -1665,7 +1665,7 @@ async function computeCPMForGantt() {
   let deps = [];
   try {
     const taskIds = tasks.map(t => t.id);
-    deps = await API.get(`task_dependencies?select=*&task_id=in.(${taskIds.join(',')})`);
+    deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${taskIds.join(',')})`);
   } catch(e) { deps = []; }
 
   // Auto-generate sequential deps within each phase if none found
@@ -1681,7 +1681,7 @@ async function computeCPMForGantt() {
           task_id:              phaseTasks[i].id,
           predecessor_task_id:  phaseTasks[i-1].id,
           successor_task_id:    phaseTasks[i].id,
-          dependency_type:      'FS',
+          link_type:            'FS',
           lag_days:             0,
         });
       }
