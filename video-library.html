@@ -288,17 +288,32 @@ document.querySelectorAll('.vl-filter-btn').forEach(btn => {
 });
 document.getElementById('vl-search-input').addEventListener('input', applyFilter);
 
+const SUPABASE_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+
 async function openPlayer(clipId) {
   const clip = ALL_CLIPS.find(c => c.id === clipId);
   if (!clip) return;
 
-  // Get signed URL from Supabase Storage
+  // Get signed URL via REST API (supabase client not available here)
   let videoUrl = '';
   try {
-    const { data } = await supabase.storage
-      .from('video-library')
-      .createSignedUrl(clip.file_path, 3600);
-    videoUrl = data?.signedUrl || '';
+    const token = Auth.getToken?.();
+    const res = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/sign/video-library/${clip.file_path}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ expiresIn: 3600 }),
+      }
+    );
+    const data = await res.json();
+    // Supabase returns a relative path — prepend the base URL
+    if (data.signedURL) {
+      videoUrl = `${SUPABASE_URL}/storage/v1${data.signedURL}`;
+    }
   } catch(e) { console.error('Signed URL error:', e); }
 
   const annots = Array.isArray(clip.annotations) ? clip.annotations : [];
@@ -325,8 +340,8 @@ async function openPlayer(clipId) {
               </div>`).join('')}
           </div>` : '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">No annotations</div>'}
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:120px;">
-          <a href="${videoUrl}" download="${clip.title}.webm"
-            class="hud-btn" style="font-size:11px;">↓ DOWNLOAD</a>
+          <button class="hud-btn" style="font-size:11px;"
+            onclick="downloadClip('${videoUrl}','${clip.title}.webm')">↓ DOWNLOAD</button>
           <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">
             ${fmtDuration(clip.duration_seconds)} · ${(clip.file_size_bytes/1024/1024).toFixed(1)} MB
           </span>
@@ -346,6 +361,23 @@ function seekTo(seconds) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.getElementById('vl-player-overlay')?.remove();
 });
+
+// Download via blob to force correct filename
+async function downloadClip(url, filename) {
+  if (!url) return;
+  try {
+    const res  = await fetch(url);
+    const blob = await res.blob();
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch(e) {
+    console.error('Download failed:', e);
+    alert('Download failed: ' + e.message);
+  }
+}
 
 async function loadClips() {
   const grid = document.getElementById('vl-grid');
