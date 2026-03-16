@@ -584,22 +584,21 @@ html, body { overflow: visible !important; }
         </div>
       </div>
 
-      <!-- ── GANTT TAB ──────────────────────────────────────────────── -->
-      <div id="tab-gantt" class="tab-pane" style="display:none">
-        <div id="gantt-toolbar" style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;">
-          <!-- Zoom: Days/Quarters/Weeks/Months -->
+            <!-- ── GANTT TAB ──────────────────────────────────────────────── -->
+      <div id="tab-gantt" class="tab-pane" style="display:none;">
+
+        <!-- TOOLBAR -->
+        <div id="gantt-toolbar" style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;">
           <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(0,210,255,0.25);">
-            <button onclick="ganttZoom(-1)" title="Zoom out" style="background:none;border:none;border-right:1px solid rgba(0,210,255,0.2);color:var(--cyan);cursor:pointer;font-size:18px;width:28px;height:26px;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
-            <span id="gantt-zoom-label" style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:0.1em;min-width:70px;text-align:center;padding:0 4px;" title="Zoom levels: DAYS → WEEKS → MONTHS → QUARTERS">WEEKS</span>
-            <button onclick="ganttZoom(1)" title="Zoom in" style="background:none;border:none;border-left:1px solid rgba(0,210,255,0.2);color:var(--cyan);cursor:pointer;font-size:18px;width:28px;height:26px;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+            <button onclick="ganttZoom(1)" title="Zoom in (more detail)" style="background:none;border:none;border-right:1px solid rgba(0,210,255,0.2);color:var(--cyan);cursor:pointer;font-size:18px;width:28px;height:26px;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+            <span id="gantt-zoom-label" style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:0.1em;min-width:70px;text-align:center;padding:0 4px;">WEEKS</span>
+            <button onclick="ganttZoom(-1)" title="Zoom out (less detail)" style="background:none;border:none;border-left:1px solid rgba(0,210,255,0.2);color:var(--cyan);cursor:pointer;font-size:18px;width:28px;height:26px;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
           </div>
-          <!-- Group by -->
           <select id="gantt-group-by" onchange="renderGanttTab()" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--text1);font-family:var(--font-mono);font-size:10px;padding:4px 8px;letter-spacing:0.08em;outline:none;height:26px;">
             <option value="phase">BY PHASE</option>
             <option value="status">BY STATUS</option>
             <option value="none">ALL TASKS</option>
           </select>
-          <!-- Column toggle -->
           <div style="position:relative;">
             <button id="gantt-col-btn" onclick="toggleGanttColPanel(event)" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:4px 10px;letter-spacing:0.08em;cursor:pointer;height:26px;">▤ COLUMNS</button>
             <div id="gantt-col-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:var(--bg2);border:1px solid rgba(0,210,255,0.28);padding:12px 14px;min-width:155px;box-shadow:0 8px 28px rgba(0,0,0,0.6);">
@@ -614,18 +613,25 @@ html, body { overflow: visible !important; }
               <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text1);"><input type="checkbox" id="gcol-resource" checked onchange="renderGanttTab()"> RESOURCES</label>
             </div>
           </div>
-          <!-- Reset pan/zoom -->
-          <button onclick="ganttResetView()" title="Reset pan & zoom" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--text2);font-family:var(--font-mono);font-size:10px;padding:4px 9px;letter-spacing:0.08em;cursor:pointer;height:26px;">⌖ RESET</button>
+          <button onclick="ganttResetView()" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--text2);font-family:var(--font-mono);font-size:10px;padding:4px 9px;letter-spacing:0.08em;cursor:pointer;height:26px;">⌖ RESET</button>
           <div style="flex:1;"></div>
           <span id="gantt-task-count" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.1em;margin-right:4px;"></span>
-          <!-- Expand/fullscreen -->
-          <button id="gantt-expand-btn" onclick="ganttToggleFullscreen()" title="Expand to full screen" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:4px 10px;letter-spacing:0.08em;cursor:pointer;height:26px;">⛶ EXPAND</button>
+          <button id="gantt-expand-btn" onclick="ganttToggleFullscreen()" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.22);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:4px 10px;letter-spacing:0.08em;cursor:pointer;height:26px;">⛶ EXPAND</button>
         </div>
-        <!-- Pan wrapper: mousedown/move/up + wheel on this div -->
-        <div id="gantt-pan-wrap" style="overflow:hidden;max-height:calc(100vh - 225px);cursor:grab;position:relative;background:#060a10;">
-          <div id="gantt-svg-wrap" style="transform-origin:0 0;transform:translate(0px,0px) scale(1);will-change:transform;">
-            <div id="gantt-container"></div>
+
+        <!-- SPLIT LAYOUT: frozen left + scrollable right -->
+        <div id="gantt-body" style="display:flex;flex:1;overflow:hidden;max-height:calc(100vh - 225px);">
+
+          <!-- LEFT: frozen info columns (never pans/zooms) -->
+          <div id="gantt-left" style="flex-shrink:0;overflow:hidden;border-right:1px solid rgba(0,210,255,0.30);background:#060a10;z-index:2;position:relative;">
+            <canvas id="gantt-left-canvas" style="display:block;"></canvas>
           </div>
+
+          <!-- RIGHT: chart area (pans/zooms horizontally and vertically) -->
+          <div id="gantt-right" style="flex:1;overflow:hidden;cursor:grab;position:relative;background:#060a10;">
+            <canvas id="gantt-chart-canvas" style="display:block;"></canvas>
+          </div>
+
         </div>
       </div>
 
@@ -2007,6 +2013,588 @@ ${colDivs}
   container.innerHTML = SVG;
   _initGanttPan();
 }
+
+</script>
+
+<div class="journal-panel" id="journal-panel">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="jp-title">TASK JOURNAL</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="jp-task-name">—</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeJournalPanel()">✕</button>
+  </div>
+  <div class="journal-panel-body" id="jp-body"></div>
+</div>
+<div id="evm-popup-overlay" class="evm-popup-overlay" style="display:none;" onclick="closeEVMPopup(event)">
+  <div class="evm-popup" onclick="event.stopPropagation()">
+    <div class="evm-popup-header">
+      <div class="evm-popup-title" id="evm-popup-title">—</div>
+      <button class="evm-popup-close" onclick="closeEVMPopup()">✕</button>
+    </div>
+    <div class="evm-popup-body">
+      <div class="evm-popup-formula" id="evm-popup-formula"></div>
+      <div class="evm-popup-calc" id="evm-popup-calc"></div>
+      <div class="evm-popup-interp" id="evm-popup-interp"></div>
+      <div class="evm-popup-result" id="evm-popup-result"></div>
+      <div class="evm-popup-grid" id="evm-popup-grid"></div>
+    </div>
+    <div style="position:sticky;bottom:0;right:0;display:flex;justify-content:flex-end;padding:2px 4px;background:var(--bg2);border-top:1px solid var(--border);" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+      <span style="font-size:14px;color:var(--text3);cursor:se-resize;user-select:none;line-height:1;" title="Drag to resize">⠿</span>
+    </div>
+  </div>
+</div>
+<div class="journal-panel" id="exp-form-panel" style="width:480px;right:-500px;">
+  <div class="journal-panel-header">
+    <div>
+      <div class="journal-panel-title" id="exp-form-title">ADD EXPENDITURE</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;" id="exp-form-subtitle">Fill in procurement details</div>
+    </div>
+    <button class="journal-panel-close" onclick="closeExpForm()">✕</button>
+  </div>
+  <div class="journal-panel-body" style="padding:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">PHASE</label><input id="ef-phase" class="hud-input" placeholder="e.g. R&D, Quality" /></div>
+      <div><label class="exp-label">TYPE</label>
+        <select id="ef-type" class="hud-select" style="width:100%;"><option value="">— Select —</option><option>Materials</option><option>Rental</option><option>Capital</option><option>Shipping</option><option>Travel</option><option>Service</option><option>Other</option></select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">PART NUMBER</label><input id="ef-part-number" class="hud-input" placeholder="e.g. 80022771" /></div>
+      <div><label class="exp-label">VENDOR PN</label><input id="ef-vendor-pn" class="hud-input" placeholder="Vendor part number" /></div>
+    </div>
+    <div style="margin-bottom:12px;"><label class="exp-label">DESCRIPTION <span style="color:var(--red);">*</span></label><input id="ef-description" class="hud-input" placeholder="e.g. PCB Layout, EB3 Image Engine" /></div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">QTY</label><input id="ef-qty" class="hud-input" type="number" min="1" step="1" value="1" /></div>
+      <div><label class="exp-label">VENDOR</label><input id="ef-vendor" class="hud-input" placeholder="e.g. PalPilot, Schott" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">UNIT PRICE ($)</label><input id="ef-unit-price" class="hud-input" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateExpTotal()" /></div>
+      <div><label class="exp-label">TOTAL PRICE</label><div id="ef-total-display" style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:var(--cyan);padding:8px 0 0;">$0.00</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div><label class="exp-label">PO NUMBER</label><input id="ef-po-number" class="hud-input" placeholder="e.g. PO-2025-001" /></div>
+      <div><label class="exp-label">CATEGORY</label><input id="ef-category" class="hud-input" placeholder="e.g. Equipment, Travel" /></div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.16em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">PROCUREMENT DATES</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">FORECAST DATE</label><input id="ef-forecast-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">REQUESTED DATE</label><input id="ef-requested-date" class="hud-input" type="date" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label class="exp-label">APPROVED DATE</label><input id="ef-approved-date" class="hud-input" type="date" /></div>
+      <div><label class="exp-label">ORDERED DATE</label><input id="ef-ordered-date" class="hud-input" type="date" /></div>
+    </div>
+    <div style="margin-bottom:16px;"><label class="exp-label">RECEIVED DATE</label><input id="ef-received-date" class="hud-input" type="date" style="max-width:200px;" /></div>
+    <div style="margin-bottom:20px;"><label class="exp-label">COMMENTS</label><textarea id="ef-notes" class="hud-input" rows="3" placeholder="Notes, comments, or additional details..." style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;"></textarea></div>
+    <div id="ef-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="hud-btn primary" onclick="saveExpenditure()" id="ef-save-btn" style="flex:1;">SAVE EXPENDITURE</button>
+      <button class="hud-btn" onclick="closeExpForm()">CANCEL</button>
+    </div>
+  </div>
+</div>
+</body>
+</html// ══════════════════════════════════════════════════════════════
+// GANTT — Split-pane canvas renderer
+// Left canvas  = frozen info columns (ACTIVITY … RESOURCES)
+// Right canvas = chart-only (pans & zooms, text stays readable)
+// ══════════════════════════════════════════════════════════════
+
+// ── Zoom levels ───────────────────────────────────────────────
+// Index 0=DAYS  1=WEEKS  2=MONTHS  3=QUARTERS
+// + = more detail (lower index)   − = less detail (higher index)
+const GANTT_ZOOMS  = ['DAYS','WEEKS','MONTHS','QUARTERS'];
+const GANTT_PX_DAY = [60, 20, 7, 2.5];
+let _gz = 1;          // default: WEEKS
+
+function ganttZoom(dir) {
+  _gz = Math.max(0, Math.min(3, _gz - dir));
+  const lbl = document.getElementById('gantt-zoom-label');
+  if (lbl) lbl.textContent = GANTT_ZOOMS[_gz];
+  renderGanttTab();
+}
+
+// ── Pan state (chart canvas only) ────────────────────────────
+let _gPanX = 0, _gPanY = 0;       // current offset in px
+let _gIsPan = false;
+let _gLast  = {x:0, y:0};
+let _gFullscreen = false;
+let _gPanInit = false;
+
+function ganttResetView() {
+  _gPanX = 0; _gPanY = 0;
+  renderGanttTab();
+}
+
+function ganttToggleFullscreen() {
+  const pane    = document.getElementById('tab-gantt');
+  const body    = document.getElementById('gantt-body');
+  const btn     = document.getElementById('gantt-expand-btn');
+  _gFullscreen  = !_gFullscreen;
+  if (_gFullscreen) {
+    pane.style.cssText = 'display:flex!important;flex-direction:column;position:fixed;top:32px;left:0;right:0;bottom:0;z-index:500;background:var(--bg1);';
+    body.style.maxHeight = 'calc(100vh - 32px - 42px)';
+    if (btn) btn.textContent = '⊠ RESTORE';
+  } else {
+    pane.style.cssText = '';
+    body.style.maxHeight = 'calc(100vh - 225px)';
+    if (btn) btn.textContent = '⛶ EXPAND';
+  }
+  renderGanttTab();
+}
+
+function toggleGanttColPanel(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('gantt-col-panel');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  const p = document.getElementById('gantt-col-panel');
+  if (p && !p.contains(e.target) && e.target.id !== 'gantt-col-btn') p.style.display = 'none';
+});
+
+// ── Wire pan + wheel on right canvas ─────────────────────────
+function _initGanttPan(rightDiv) {
+  if (_gPanInit) return;
+  _gPanInit = true;
+
+  rightDiv.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    _gIsPan = true;
+    _gLast  = { x: e.clientX - _gPanX, y: e.clientY - _gPanY };
+    rightDiv.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!_gIsPan) return;
+    _gPanX = e.clientX - _gLast.x;
+    _gPanY = e.clientY - _gLast.y;
+    drawGanttChart();   // redraw chart canvas only
+  });
+  document.addEventListener('mouseup', () => {
+    if (!_gIsPan) return;
+    _gIsPan = false;
+    rightDiv.style.cursor = 'grab';
+  });
+  // Wheel: horizontal scroll only (vertical via trackpad deltaY → panY)
+  rightDiv.addEventListener('wheel', e => {
+    e.preventDefault();
+    _gPanX -= e.deltaX || 0;
+    _gPanY -= e.deltaY || 0;
+    drawGanttChart();
+  }, { passive: false });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// renderGanttTab — builds layout, draws both canvases
+// ═══════════════════════════════════════════════════════════════
+function renderGanttTab() {
+  const leftCanvas  = document.getElementById('gantt-left-canvas');
+  const chartCanvas = document.getElementById('gantt-chart-canvas');
+  const leftDiv     = document.getElementById('gantt-left');
+  const rightDiv    = document.getElementById('gantt-right');
+  const bodyDiv     = document.getElementById('gantt-body');
+  if (!leftCanvas || !chartCanvas) return;
+
+  // Sync zoom label
+  const lbl = document.getElementById('gantt-zoom-label');
+  if (lbl) lbl.textContent = GANTT_ZOOMS[_gz];
+
+  const tasks      = (STATE.tasks || []).filter(t => t.start_date && t.due_date);
+  const milestones = STATE.milestones || [];
+
+  const cntEl = document.getElementById('gantt-task-count');
+  if (cntEl) cntEl.textContent = tasks.length + ' TASKS';
+
+  if (!tasks.length) {
+    const lc = leftCanvas.getContext('2d');
+    leftCanvas.width  = 200; leftCanvas.height = 80;
+    lc.fillStyle = '#060a10'; lc.fillRect(0,0,200,80);
+    lc.fillStyle = 'rgba(0,210,255,0.4)'; lc.font = '11px Share Tech Mono,monospace';
+    lc.fillText('NO TASKS', 20, 44);
+    chartCanvas.width = 400; chartCanvas.height = 80;
+    _initGanttPan(rightDiv);
+    return;
+  }
+
+  // ── Column config ────────────────────────────────────────
+  const COL_SHOW = {
+    units:    document.getElementById('gcol-units')?.checked    ?? true,
+    duration: document.getElementById('gcol-duration')?.checked ?? true,
+    start:    document.getElementById('gcol-start')?.checked    ?? true,
+    finish:   document.getElementById('gcol-finish')?.checked   ?? true,
+    pred:     document.getElementById('gcol-pred')?.checked     ?? false,
+    pct:      document.getElementById('gcol-pct')?.checked      ?? true,
+    status:   document.getElementById('gcol-status')?.checked   ?? true,
+    resource: document.getElementById('gcol-resource')?.checked ?? true,
+  };
+  const ALL_COLS = [
+    {id:'activity', w:200, label:'ACTIVITY'},
+    {id:'units',    w:52,  label:'# UNITS'},
+    {id:'duration', w:62,  label:'DURATION'},
+    {id:'start',    w:72,  label:'START'},
+    {id:'finish',   w:72,  label:'FINISH'},
+    {id:'pred',     w:44,  label:'PRED'},
+    {id:'pct',      w:52,  label:'% DONE'},
+    {id:'status',   w:78,  label:'STATUS'},
+    {id:'resource', w:100, label:'RESOURCES'},
+  ];
+  const VIS_COLS = ALL_COLS.filter(c => c.id === 'activity' || COL_SHOW[c.id]);
+  const INFO_W   = VIS_COLS.reduce((s,c) => s+c.w, 0);
+
+  // ── Layout constants ──────────────────────────────────────
+  const ROW_H  = 26;
+  const HDR_H  = 44;   // two-band header (top: month/quarter, bot: week/day)
+  const HDR_H1 = 22;   // top band height
+  const BAR_H  = 14;
+  const BAR_OFF = (ROW_H - BAR_H) / 2;
+  const MS_DAY  = 86400000;
+
+  // ── Date range ────────────────────────────────────────────
+  const parseDate = s => { const d = new Date(s+'T00:00:00'); d.setHours(0,0,0,0); return d; };
+  const today     = new Date(); today.setHours(0,0,0,0);
+  const allD = tasks.flatMap(t => [parseDate(t.start_date), parseDate(t.due_date)]);
+  milestones.forEach(m => { const d = m.current_target_date||m.due_date; if(d) allD.push(parseDate(d)); });
+  let minDate = new Date(Math.min(...allD) - 7*MS_DAY);
+  let maxDate = new Date(Math.max(...allD) + 14*MS_DAY);
+  const pxPerDay  = GANTT_PX_DAY[_gz];
+  const totalDays = Math.ceil((maxDate-minDate)/MS_DAY);
+  const CHART_W   = Math.max(totalDays*pxPerDay, 600);
+  const dayX = d => (d-minDate)/MS_DAY*pxPerDay;  // relative to chart canvas left edge
+
+  // ── Groups ────────────────────────────────────────────────
+  const groupBy = document.getElementById('gantt-group-by')?.value || 'phase';
+  let groups = [];
+  if (groupBy==='phase') {
+    const phases = [...new Set(tasks.map(t=>t.phase||'No Phase'))];
+    groups = phases.map(p => ({label:p, tasks:tasks.filter(t=>(t.phase||'No Phase')===p)}));
+  } else if (groupBy==='status') {
+    [['in_progress','IN PROGRESS'],['not_started','NOT STARTED'],['complete','COMPLETE'],['on_hold','ON HOLD']].forEach(([s,l]) => {
+      const t=tasks.filter(x=>x.status===s); if(t.length) groups.push({label:l,tasks:t});
+    });
+    const rest=tasks.filter(t=>!['in_progress','not_started','complete','on_hold'].includes(t.status));
+    if(rest.length) groups.push({label:'OTHER',tasks:rest});
+  } else { groups=[{label:'ALL TASKS',tasks}]; }
+
+  // ── Color helpers ─────────────────────────────────────────
+  const barColor = t => {
+    if(t.status==='complete')   return '#00e5a0';
+    if(t.status==='on_hold')    return '#9b59b6';
+    if(t.due_date&&parseDate(t.due_date)<today&&t.status!=='complete') return '#ff4757';
+    if(t.status==='in_progress') return '#00d2ff';
+    return 'rgba(120,170,220,0.55)';
+  };
+
+  // ── Build row list ────────────────────────────────────────
+  // Each row: {type:'group'|'task', label, task?, color?}
+  const ROWS = [];
+  groups.forEach(g => {
+    ROWS.push({type:'group', label:g.label, tasks:g.tasks});
+    g.tasks.forEach(t => ROWS.push({type:'task', task:t}));
+  });
+  const TOTAL_ROWS = ROWS.length;
+  const CANVAS_H   = HDR_H + TOTAL_ROWS * ROW_H + 2;
+
+  // ────────────────────────────────────────────────────────
+  // LEFT CANVAS — info columns, fixed, no transform
+  // ────────────────────────────────────────────────────────
+  leftCanvas.width  = INFO_W;
+  leftCanvas.height = CANVAS_H;
+  leftDiv.style.width = INFO_W + 'px';
+  const lc = leftCanvas.getContext('2d');
+  lc.clearRect(0,0,INFO_W,CANVAS_H);
+
+  // Background
+  lc.fillStyle = '#060a10'; lc.fillRect(0,0,INFO_W,CANVAS_H);
+
+  // Column header background
+  lc.fillStyle = 'rgba(0,0,0,0.35)'; lc.fillRect(0,0,INFO_W,HDR_H);
+  lc.strokeStyle = 'rgba(0,210,255,0.22)'; lc.lineWidth = 0.5;
+  lc.strokeRect(0,0,INFO_W,HDR_H);
+
+  // Column header labels
+  lc.font = 'bold 9px Share Tech Mono,monospace';
+  lc.fillStyle = 'rgba(0,210,255,0.55)';
+  lc.textBaseline = 'middle';
+  let cx = 0;
+  VIS_COLS.forEach(col => {
+    const tx = col.id==='activity' ? cx+8 : cx+col.w/2;
+    lc.textAlign = col.id==='activity' ? 'left' : 'center';
+    lc.fillText(col.label, tx, HDR_H/2);
+    // Col divider
+    lc.strokeStyle='rgba(0,210,255,0.15)'; lc.lineWidth=0.5;
+    lc.beginPath(); lc.moveTo(cx+col.w,0); lc.lineTo(cx+col.w,CANVAS_H); lc.stroke();
+    cx += col.w;
+  });
+
+  // Row separator bottom of header
+  lc.strokeStyle='rgba(0,210,255,0.28)'; lc.lineWidth=1;
+  lc.beginPath(); lc.moveTo(0,HDR_H); lc.lineTo(INFO_W,HDR_H); lc.stroke();
+
+  // Draw rows
+  ROWS.forEach((row, ri) => {
+    const ry = HDR_H + ri*ROW_H;
+    if (row.type==='group') {
+      lc.fillStyle='rgba(0,210,255,0.05)'; lc.fillRect(0,ry,INFO_W,ROW_H);
+      lc.fillStyle='rgba(0,210,255,0.80)'; lc.font='bold 10px Share Tech Mono,monospace';
+      lc.textAlign='left'; lc.textBaseline='middle';
+      lc.fillText(row.label.toUpperCase(), 8, ry+ROW_H/2);
+      lc.strokeStyle='rgba(0,210,255,0.22)'; lc.lineWidth=0.8;
+      lc.beginPath(); lc.moveTo(0,ry); lc.lineTo(INFO_W,ry); lc.stroke();
+    } else {
+      const t = row.task;
+      const color = barColor(t);
+      const user  = STATE.users?.find(u=>u.id===t.assigned_to);
+      const pct   = parseFloat(t.percent_complete||t.pct_complete||0);
+      const isLate = t.due_date&&parseDate(t.due_date)<today&&t.status!=='complete';
+      // Zebra
+      if (ri%2===0) { lc.fillStyle='rgba(255,255,255,0.015)'; lc.fillRect(0,ry,INFO_W,ROW_H); }
+      lc.strokeStyle='rgba(255,255,255,0.03)'; lc.lineWidth=0.5;
+      lc.beginPath(); lc.moveTo(0,ry); lc.lineTo(INFO_W,ry); lc.stroke();
+      // Cell values
+      let icx=0;
+      VIS_COLS.forEach(col => {
+        let val='—', fillColor='rgba(210,230,248,0.72)';
+        lc.textBaseline='middle'; lc.font='11px Barlow Condensed,sans-serif';
+        if(col.id==='activity') {
+          const nm=(t.name||'');
+          fillColor='rgba(215,232,248,0.85)';
+          lc.fillStyle=fillColor; lc.textAlign='left';
+          // Clip text to column width
+          lc.save(); lc.beginPath(); lc.rect(icx+2,ry,col.w-4,ROW_H); lc.clip();
+          lc.fillText(nm, icx+8, ry+ROW_H/2);
+          lc.restore();
+        } else {
+          if(col.id==='units')    val=t.units??t.unit_count??'—';
+          else if(col.id==='duration') val=t.duration!=null?t.duration+'d':'—';
+          else if(col.id==='start')    { val=t.start_date?t.start_date.slice(5).replace('-','/'):'—'; fillColor='rgba(180,210,235,0.60)'; }
+          else if(col.id==='finish')   { val=t.due_date?t.due_date.slice(5).replace('-','/'):'—'; fillColor=isLate?'#ff4757':'rgba(180,210,235,0.60)'; }
+          else if(col.id==='pred')     { val=t.predecessors||'—'; fillColor='rgba(160,195,225,0.50)'; }
+          else if(col.id==='pct')      { val=pct+'%'; fillColor=pct>=100?'#00e5a0':'rgba(0,210,255,0.72)'; }
+          else if(col.id==='status')   { const sl=(t.status||'').replace(/_/g,' ').toUpperCase(); val=sl.length>9?sl.slice(0,8)+'…':sl; fillColor=barColor(t); }
+          else if(col.id==='resource') { const rn=user?(user.name||'').split(' ').map((n,i)=>i?n[0]+'.':n).join(' '):'—'; val=rn.length>12?rn.slice(0,11)+'…':rn; fillColor='rgba(180,210,235,0.65)'; }
+          lc.fillStyle=fillColor; lc.textAlign='center';
+          lc.save(); lc.beginPath(); lc.rect(icx+2,ry,col.w-4,ROW_H); lc.clip();
+          lc.fillText(val+'', icx+col.w/2, ry+ROW_H/2);
+          lc.restore();
+        }
+        icx+=col.w;
+      });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────
+  // RIGHT CANVAS — chart, panned by _gPanX/_gPanY
+  // ────────────────────────────────────────────────────────
+  const rightW = rightDiv.offsetWidth  || (window.innerWidth - INFO_W - 220);
+  const rightH = bodyDiv.offsetHeight  || 500;
+  chartCanvas.width  = rightW;
+  chartCanvas.height = rightH;
+  const cc = chartCanvas.getContext('2d');
+  window._ganttCc = cc;
+  window._ganttMeta = { CHART_W, CANVAS_H, HDR_H, HDR_H1, ROW_H, BAR_H, BAR_OFF, MS_DAY, pxPerDay, minDate, maxDate, ROWS, today, milestones, parseDate, dayX, barColor, rightW, rightH };
+  drawGanttChart();
+
+  _initGanttPan(rightDiv);
+}
+
+// ────────────────────────────────────────────────────────────
+// drawGanttChart — redraws right canvas at current pan offset
+// Called on mousemove, wheel, and renderGanttTab
+// ────────────────────────────────────────────────────────────
+function drawGanttChart() {
+  const m  = window._ganttMeta;
+  const cc = window._ganttCc;
+  if (!m || !cc) return;
+
+  const {CHART_W, CANVAS_H, HDR_H, HDR_H1, ROW_H, BAR_H, BAR_OFF, MS_DAY, pxPerDay, minDate, maxDate, ROWS, today, milestones, parseDate, dayX, barColor, rightW, rightH} = m;
+
+  // Clamp pan
+  _gPanX = Math.min(0, Math.max(_gPanX, -(CHART_W - rightW + 40)));
+  _gPanY = Math.min(0, Math.max(_gPanY, -(CANVAS_H - rightH + 40)));
+
+  cc.clearRect(0,0,rightW,rightH);
+  cc.fillStyle='#060a10'; cc.fillRect(0,0,rightW,rightH);
+
+  cc.save();
+  cc.translate(_gPanX, _gPanY);
+
+  // ── Background ──────────────────────────────────────────
+  cc.fillStyle='rgba(0,0,0,0.10)'; cc.fillRect(0,0,CHART_W,CANVAS_H);
+
+  // ── Grid lines + headers ─────────────────────────────────
+  const cur = new Date(minDate);
+  while (cur <= maxDate) {
+    const x   = dayX(cur);
+    const mo  = cur.getMonth();
+    const yr  = cur.getFullYear();
+    const qtr = Math.floor(mo/3);
+    const dom = cur.getDate();
+    const dow = cur.getDay();
+
+    // Month boundary
+    if (dom===1) {
+      cc.strokeStyle='rgba(0,210,255,0.28)'; cc.lineWidth=1;
+      cc.beginPath(); cc.moveTo(x,HDR_H); cc.lineTo(x,CANVAS_H); cc.stroke();
+      // Month label in top band
+      if (_gz>=1 && _gz<=2) {
+        const ml=cur.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+        cc.fillStyle='rgba(0,210,255,0.72)'; cc.font='10px Share Tech Mono,monospace';
+        cc.textAlign='left'; cc.textBaseline='middle';
+        cc.fillText(ml, x+3, HDR_H1/2);
+      }
+      // Quarter boundary marker
+      if (_gz===3 && qtr!==_prevQtr) {
+        const ql='Q'+(qtr+1)+' '+yr;
+        cc.fillStyle='rgba(0,210,255,0.72)'; cc.font='10px Share Tech Mono,monospace';
+        cc.textAlign='left'; cc.textBaseline='middle';
+        cc.fillText(ql, x+3, HDR_H1/2);
+        _prevQtr=qtr;
+      }
+    }
+
+    // Week tick (Monday) — show at DAYS and WEEKS zoom
+    if (_gz<=1 && dow===1) {
+      cc.strokeStyle='rgba(0,210,255,0.12)'; cc.lineWidth=0.5;
+      cc.beginPath(); cc.moveTo(x,HDR_H); cc.lineTo(x,CANVAS_H); cc.stroke();
+      // Week tick in header bottom band
+      cc.strokeStyle='rgba(0,210,255,0.20)'; cc.lineWidth=0.5;
+      cc.beginPath(); cc.moveTo(x,HDR_H1); cc.lineTo(x,HDR_H); cc.stroke();
+      // Day number label in bottom band
+      cc.fillStyle='rgba(0,210,255,0.50)'; cc.font='9px Share Tech Mono,monospace';
+      cc.textAlign='left'; cc.textBaseline='middle';
+      cc.fillText(dom+'', x+2, HDR_H1+(HDR_H-HDR_H1)/2);
+    }
+
+    // At WEEKS zoom: show all day numbers in bottom band
+    if (_gz===1 && dow!==1) {
+      cc.fillStyle='rgba(0,210,255,0.25)'; cc.font='8px Share Tech Mono,monospace';
+      cc.textAlign='center'; cc.textBaseline='middle';
+      cc.fillText(dom+'', x+pxPerDay/2, HDR_H1+(HDR_H-HDR_H1)/2);
+      // Light day tick
+      cc.strokeStyle='rgba(0,210,255,0.05)'; cc.lineWidth=0.5;
+      cc.beginPath(); cc.moveTo(x,HDR_H); cc.lineTo(x,CANVAS_H); cc.stroke();
+    }
+
+    // At MONTHS zoom: show first Monday of each week
+    if (_gz===2 && dow===1) {
+      const ml=cur.toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
+      cc.fillStyle='rgba(0,210,255,0.40)'; cc.font='9px Share Tech Mono,monospace';
+      cc.textAlign='left'; cc.textBaseline='middle';
+      cc.fillText(ml, x+2, HDR_H1+(HDR_H-HDR_H1)/2);
+      cc.strokeStyle='rgba(0,210,255,0.08)'; cc.lineWidth=0.5;
+      cc.beginPath(); cc.moveTo(x,HDR_H); cc.lineTo(x,CANVAS_H); cc.stroke();
+    }
+
+    // At DAYS zoom: draw every day
+    if (_gz===0) {
+      const isMonday = dow===1;
+      cc.strokeStyle=isMonday?'rgba(0,210,255,0.22)':'rgba(0,210,255,0.05)'; cc.lineWidth=isMonday?1:0.5;
+      cc.beginPath(); cc.moveTo(x,HDR_H); cc.lineTo(x,CANVAS_H); cc.stroke();
+      // Tick in bottom band
+      cc.strokeStyle=isMonday?'rgba(0,210,255,0.30)':'rgba(0,210,255,0.10)'; cc.lineWidth=0.5;
+      cc.beginPath(); cc.moveTo(x,HDR_H1); cc.lineTo(x,HDR_H); cc.stroke();
+      if (isMonday || dom%5===0) {
+        cc.fillStyle='rgba(0,210,255,0.55)'; cc.font='9px Share Tech Mono,monospace';
+        cc.textAlign='center'; cc.textBaseline='middle';
+        cc.fillText(dom+'', x, HDR_H1+(HDR_H-HDR_H1)/2);
+      }
+    }
+
+    cur.setDate(cur.getDate()+1);
+  }
+
+  // ── Header backgrounds (drawn after grid, on top) ────────
+  cc.fillStyle='rgba(0,0,0,0.25)'; cc.fillRect(0,0,CHART_W,HDR_H);
+  // Header bottom border
+  cc.strokeStyle='rgba(0,210,255,0.28)'; cc.lineWidth=1;
+  cc.beginPath(); cc.moveTo(0,HDR_H); cc.lineTo(CHART_W,HDR_H); cc.stroke();
+  // Band divider
+  cc.strokeStyle='rgba(0,210,255,0.12)'; cc.lineWidth=0.5;
+  cc.beginPath(); cc.moveTo(0,HDR_H1); cc.lineTo(CHART_W,HDR_H1); cc.stroke();
+
+  // ── Draw rows ─────────────────────────────────────────────
+  ROWS.forEach((row, ri) => {
+    const ry = HDR_H + ri*ROW_H;
+    if (row.type==='group') {
+      cc.fillStyle='rgba(0,210,255,0.05)'; cc.fillRect(0,ry,CHART_W,ROW_H);
+      // Phase summary span bar
+      const pd=row.tasks.flatMap(t=>[parseDate(t.start_date),parseDate(t.due_date)]);
+      if(pd.length){
+        const px1=dayX(new Date(Math.min(...pd))); const px2=Math.max(dayX(new Date(Math.max(...pd))),px1+4);
+        cc.fillStyle='rgba(0,210,255,0.18)'; cc.beginPath();
+        roundRect(cc,px1,ry+ROW_H/2-2,px2-px1,5,2); cc.fill();
+        cc.strokeStyle='rgba(0,210,255,0.40)'; cc.lineWidth=0.8; cc.stroke();
+      }
+      cc.strokeStyle='rgba(0,210,255,0.22)'; cc.lineWidth=0.8;
+      cc.beginPath(); cc.moveTo(0,ry); cc.lineTo(CHART_W,ry); cc.stroke();
+    } else {
+      const t=row.task;
+      const color=barColor(t);
+      const pct=parseFloat(t.percent_complete||t.pct_complete||0);
+      if(ri%2===0){cc.fillStyle='rgba(255,255,255,0.015)'; cc.fillRect(0,ry,CHART_W,ROW_H);}
+      cc.strokeStyle='rgba(255,255,255,0.03)'; cc.lineWidth=0.5;
+      cc.beginPath(); cc.moveTo(0,ry); cc.lineTo(CHART_W,ry); cc.stroke();
+      // Bar
+      const x1=dayX(parseDate(t.start_date)); const x2=Math.max(dayX(parseDate(t.due_date)),x1+3);
+      const bw=x2-x1; const bt=ry+BAR_OFF;
+      cc.fillStyle='rgba(0,0,0,0.28)'; cc.beginPath(); roundRect(cc,x1,bt,bw,BAR_H,2); cc.fill();
+      if(pct>0){
+        cc.fillStyle=color; cc.globalAlpha=0.45;
+        cc.beginPath(); roundRect(cc,x1,bt,Math.round(bw*pct/100),BAR_H,2); cc.fill();
+        cc.globalAlpha=1;
+      }
+      cc.strokeStyle=color; cc.lineWidth=1.5;
+      cc.beginPath(); roundRect(cc,x1,bt,bw,BAR_H,2); cc.stroke();
+      // Hours label inside bar
+      if(bw>28 && t.estimated_hours) {
+        const taskDays=Math.max((parseDate(t.due_date)-parseDate(t.start_date))/MS_DAY,1);
+        const hLabel = _gz===0 ? (parseFloat(t.estimated_hours)/taskDays).toFixed(1)+'h'
+                     : _gz===1 ? (parseFloat(t.estimated_hours)/taskDays*7).toFixed(1)
+                     : null;
+        if(hLabel){
+          cc.fillStyle=color; cc.font='9px Share Tech Mono,monospace';
+          cc.textAlign='center'; cc.textBaseline='middle';
+          cc.fillText(hLabel, x1+bw/2, bt+BAR_H/2);
+        }
+      }
+    }
+  });
+
+  // ── Milestone diamonds ────────────────────────────────────
+  milestones.filter(m=>m.due_date||m.current_target_date).forEach(m=>{
+    const md=m.current_target_date||m.due_date;
+    const mx=dayX(parseDate(md));
+    const dc=m.status==='complete'?'#00e5a0':parseDate(md)<today?'#ff4757':'#ffaa00';
+    const sz=7; const my=HDR_H+2;
+    cc.fillStyle=dc; cc.globalAlpha=0.85;
+    cc.beginPath(); cc.moveTo(mx,my); cc.lineTo(mx+sz,my+sz); cc.lineTo(mx,my+2*sz); cc.lineTo(mx-sz,my+sz); cc.closePath(); cc.fill();
+    cc.globalAlpha=1;
+  });
+
+  // ── Today line ────────────────────────────────────────────
+  const tx=dayX(today);
+  if(tx>=0 && tx<=CHART_W) {
+    cc.strokeStyle='#ff4757'; cc.lineWidth=1.5; cc.setLineDash([4,3]);
+    cc.beginPath(); cc.moveTo(tx,0); cc.lineTo(tx,CANVAS_H); cc.stroke();
+    cc.setLineDash([]);
+    cc.fillStyle='rgba(255,71,87,0.15)'; cc.fillRect(tx+1,1,38,14);
+    cc.fillStyle='#ff4757'; cc.font='bold 9px Share Tech Mono,monospace';
+    cc.textAlign='left'; cc.textBaseline='top';
+    cc.fillText('TODAY',tx+4,3);
+  }
+
+  cc.restore();
+}
+
+// Polyfill roundRect for older browsers
+function roundRect(ctx,x,y,w,h,r){
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+}
+
+let _prevQtr = -1;
 
 </script>
 
