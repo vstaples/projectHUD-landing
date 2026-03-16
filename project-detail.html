@@ -2239,7 +2239,14 @@ function openEditTaskPanel(taskId) {
   document.getElementById('tf-status').value      = t.status || 'not_started';
   document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
   document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
-  document.getElementById('tf-duration').value    = t.duration_days || '';
+  // Recalculate duration from actual dates if both present
+  if (t.start_date && t.due_date) {
+    const s = new Date(t.start_date.substring(0,10) + 'T00:00:00');
+    const e = new Date(t.due_date.substring(0,10)   + 'T00:00:00');
+    document.getElementById('tf-duration').value = _businessDaysBetween(s, e);
+  } else {
+    document.getElementById('tf-duration').value = t.duration_days || '';
+  }
   document.getElementById('tf-effort').value      = t.effort_days   || '';
   document.getElementById('tf-pct').value         = t.pct_complete  || '0';
   document.getElementById('tf-assigned').value    = t.assigned_to   || '';
@@ -2436,14 +2443,16 @@ function onTaskStartChange() {
   if (dow === 0 || dow === 6) {
     const dayName = dow === 0 ? 'Sunday' : 'Saturday';
     const next = _toInputDate(_nextWeekday(start));
-    const choice = confirm(startVal + ' is a ' + dayName + '.\n\nOK = use next weekday (' + next + ')\nCancel = clear the date');
+    const choice = confirm(startVal + ' is a ' + dayName + '.\n\nOK = use next weekday (' + next + ')\nCancel = restore previous date');
     if (choice) {
       el.value = next;
     } else {
-      el.value = el.dataset.prev || '';
+      el.value = window._prevStartDate || '';
+      window._prevStartDate = el.value;
       return;
     }
   }
+  window._prevStartDate = el.value;
   const dur = parseFloat(document.getElementById('tf-duration').value);
   if (dur > 0) {
     const startFinal = new Date(document.getElementById('tf-start').value + 'T00:00:00');
@@ -2479,32 +2488,36 @@ function onTaskDurationChange() {
 let _selectedLinkType = 'FS';
 
 function onLinkCheckChange() {
-  // Update the LINK button to show count of selections
-  const checked = document.querySelectorAll('.task-link-check:checked');
+  const checked = [...document.querySelectorAll('.task-link-check:checked')];
   const btn = document.getElementById('btn-link-tasks');
   if (btn) {
-    btn.textContent = checked.length > 0
-      ? '\u26d3 LINK (' + checked.length + ')'
-      : '\u26d3 LINK';
-    btn.style.color = checked.length > 0 ? 'var(--cyan)' : '';
-    btn.style.borderColor = checked.length > 0 ? 'rgba(0,210,255,0.6)' : '';
+    if (checked.length === 0) {
+      btn.innerHTML = '&#9741; LINK <span style="font-size:9px;opacity:0.7;">(select 2+ tasks, then click again)</span>';
+      btn.style.color = 'var(--amber)';
+    } else {
+      btn.innerHTML = '&#9741; LINK ' + checked.length + ' SELECTED — click to link';
+      btn.style.color = 'var(--cyan)';
+      btn.style.borderColor = 'rgba(0,210,255,0.6)';
+    }
   }
 }
 
 function openLinkPanel() {
+  const btn = document.getElementById('btn-link-tasks');
   const checked = [...document.querySelectorAll('.task-link-check:checked')];
   if (checked.length < 2) {
-    // Enter linking mode — show checkboxes
-    const btn = document.getElementById('btn-link-tasks');
+    // Toggle linking mode on/off
     if (btn.dataset.linking !== '1') {
       btn.dataset.linking = '1';
       btn.style.color = 'var(--amber)';
       btn.style.borderColor = 'rgba(255,170,0,0.5)';
-      btn.textContent = '\u26d3 LINKING... (select tasks)';
+      btn.innerHTML = '&#9741; LINK <span style="font-size:9px;opacity:0.7;">(select 2+ tasks, then click again)</span>';
       renderTasksTable();
-      return;
+    } else {
+      // Already in link mode but not enough selected — flash the button
+      btn.style.background = 'rgba(255,71,87,0.12)';
+      setTimeout(() => { btn.style.background = ''; }, 600);
     }
-    _showErr('link-error','Select at least 2 tasks to create a dependency');
     return;
   }
   _buildLinkPanel(checked);
@@ -2691,7 +2704,7 @@ function closeLinkPanel() {
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" onfocus="this.dataset.prev=this.value" oninput="onTaskStartChange()" /></div>
+      <div><label class="exp-label">START DATE</label><input id="tf-start" class="hud-input" type="date" style="width:100%;" oninput="onTaskStartChange()" onchange="window._prevStartDate=this.value" /></div>
       <div><label class="exp-label">DUE DATE</label><input id="tf-due" class="hud-input" type="date" style="width:100%;" oninput="onTaskDueChange()" /></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
@@ -2791,7 +2804,7 @@ function closeLinkPanel() {
       <input id="link-lag" class="hud-input" type="number" step="1" value="0" style="max-width:120px;" />
     </div>
 
-    <!-- Selected items summarys -->
+    <!-- Selected items summary -->
     <div id="link-selection-info" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:16px;line-height:1.7;padding:8px 10px;background:rgba(0,0,0,0.2);border:1px solid var(--border);"></div>
 
     <div id="link-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
