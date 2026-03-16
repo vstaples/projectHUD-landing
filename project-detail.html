@@ -118,9 +118,9 @@
 .col-group-hdr { font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em; text-align:center;
   padding:3px 6px; border-bottom:1px solid var(--border); white-space:nowrap; }
 /* Hidden column groups */
-.col-grp-cpm, .col-grp-pert, .col-grp-actuals, .col-grp-budget { display:none; }
+.col-grp-cpm, .col-grp-pert, .col-grp-actuals, .col-grp-budget, .col-grp-evm { display:none; }
 .show-cpm .col-grp-cpm, .show-pert .col-grp-pert,
-.show-actuals .col-grp-actuals, .show-budget .col-grp-budget { display:table-cell; }
+.show-actuals .col-grp-actuals, .show-budget .col-grp-budget, .show-evm .col-grp-evm { display:table-cell; }
 /* PROJECT DATA group — shown by default, hidden when toggled off */
 .col-grp-projdata { display:table-cell; }
 .hide-projdata .col-grp-projdata { display:none; }
@@ -509,6 +509,7 @@
               <button class="col-toggle-btn" data-col="cpm"     onclick="toggleColGroup('cpm')">CPM</button>
               <button class="col-toggle-btn" data-col="pert"    onclick="toggleColGroup('pert')">PERT</button>
               <button class="col-toggle-btn" data-col="budget"  onclick="toggleColGroup('budget')">BUDGET</button>
+              <button class="col-toggle-btn" data-col="evm"     onclick="toggleColGroup('evm')">EVM</button>
               <button class="col-toggle-btn" onclick="resetTableView()" style="color:var(--text3);border-color:rgba(255,255,255,0.1);">&#8634; RESET</button>
             </div>
             <button class="hud-btn" id="btn-link-tasks" onclick="openLinkPanel()" style="border-color:rgba(0,210,255,0.35);">&#9741; LINK</button>
@@ -535,6 +536,7 @@
                   <th class="col-grp-cpm    col-group-hdr" style="color:#8b5cf6;background:rgba(139,92,246,0.05);" colspan="5">CRITICAL PATH</th>
                   <th class="col-grp-pert   col-group-hdr" style="color:var(--green);background:rgba(0,229,160,0.05);" colspan="6">PERT <span style="opacity:0.5;font-size:8px;">(O=0.7×ML, P=1.6×ML if not set)</span></th>
                   <th class="col-grp-budget col-group-hdr" style="color:var(--cyan);background:rgba(0,210,255,0.05);" colspan="3">BUDGET</th>
+                  <th class="col-grp-evm    col-group-hdr" style="color:#f59e0b;background:rgba(245,158,11,0.05);" colspan="8">EVM</th>
                 </tr>
                 <!-- COLUMN HEADER ROW -->
                 <tr>
@@ -574,6 +576,15 @@
                   <th class="col-grp-budget" style="color:var(--cyan);">BGT HRS</th>
                   <th class="col-grp-budget" style="color:var(--cyan);">BGT COST</th>
                   <th class="col-grp-budget" style="color:var(--cyan);">LABOR RATE</th>
+                  <!-- EVM GROUP -->
+                  <th class="col-grp-evm" style="color:#f59e0b;">BAC</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">EV</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">AC</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">CV</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">CPI</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">EAC</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">VAC</th>
+                  <th class="col-grp-evm" style="color:#f59e0b;">% SPENT</th>
                 </tr>
               </thead>
               <tbody id="tasks-tbody"></tbody>
@@ -1461,6 +1472,28 @@ function renderTasksTable() {
         <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.budget_hours ? parseFloat(t.budget_hours).toFixed(1)+'h' : '—'}</td>
         <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.budget_cost ? '$'+parseFloat(t.budget_cost).toFixed(0) : '—'}</td>
         <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.labor_rate ? '$'+parseFloat(t.labor_rate).toFixed(0)+'/h' : '—'}</td>
+        <!-- EVM group -->
+        ${(()=>{
+          const RATE=175;
+          const bh=parseFloat(t.budget_hours||0), ah=parseFloat(t.actual_hours||0), pct=parseFloat(t.pct_complete||0)/100;
+          const E="col-grp-evm", S="font-family:var(--font-mono);font-size:11px;";
+          if (!bh) return ('<td class="'+E+'">—</td>').repeat(8);
+          const bac=bh*RATE, ev=bac*pct, ac=ah*RATE;
+          const cv=ev-ac, cpi=ac>0?ev/ac:null, eac=cpi?bac/cpi:null, vac=eac?bac-eac:null;
+          const spent=bh>0?Math.round(ah/bh*100):0;
+          const cvC  = cv>=0 ? "var(--green)" : cv < -bac*0.1 ? "var(--red)" : "var(--amber)";
+          const cpiC = cpi==null ? "var(--text3)" : cpi>=1 ? "var(--green)" : cpi>=0.9 ? "var(--amber)" : "var(--red)";
+          const sC   = spent>100 ? "var(--red)" : spent>85 ? "var(--amber)" : "var(--text2)";
+          const td=(v,c,b)=>'<td class="'+E+'" style="'+S+'color:'+c+';'+( b?"font-weight:700;":"")+'">'+v+"</td>";
+          return td("$"+bac.toFixed(0),"var(--text2)")+
+                 td("$"+ev.toFixed(0),"var(--cyan)")+
+                 td("$"+ac.toFixed(0),"var(--text2)")+
+                 td((cv>=0?"+":"")+"$"+Math.abs(cv).toFixed(0),cvC,true)+
+                 td(cpi?cpi.toFixed(2):"—",cpiC,true)+
+                 td(eac?"$"+eac.toFixed(0):"—","var(--text2)")+
+                 td(vac==null?"—":(vac>=0?"+":"")+"$"+Math.abs(vac).toFixed(0),vac==null?"var(--text3)":vac>=0?"var(--green)":"var(--red)")+
+                 td(spent+"%",sC);
+        })()}
       </tr>`;
     });
     if (planEdit) {
