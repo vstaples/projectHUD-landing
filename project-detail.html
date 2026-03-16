@@ -99,10 +99,11 @@
 .ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
 
 /* Task table */
-.task-table-wrap { overflow-x: auto; position:relative; width:100%; max-width:100%; display:block; }
-.task-tbl { width: max-content; min-width:100%; border-collapse: collapse; border-spacing:0; }
-/* When any group is active, prevent table from being constrained by parent */
-.task-tbl.show-cpm, .task-tbl.show-pert, .task-tbl.show-actuals, .task-tbl.show-budget { min-width:unset; }
+.task-table-wrap { overflow-x: auto; position:relative; display:block; width:100%; }
+.task-tbl { width: max-content; border-collapse: collapse; border-spacing:0; }
+/* Contain the tab pane so the max-content table creates real scroll overflow */
+#tab-tasks { overflow: hidden; }
+#tab-tasks .panel { overflow: hidden; }
 /* Sticky left columns */
 .task-tbl .col-sticky { position:sticky; background:var(--bg1); z-index:2; }
 .task-tbl th.col-sticky { background:var(--bg2); z-index:3; }
@@ -512,7 +513,7 @@
             </div>
           </div>
         </div>
-        <div class="panel" style="overflow:hidden;">
+        <div class="panel" id="tasks-panel">
           <div class="task-table-wrap">
             <table class="task-tbl" id="tasks-table">
               <thead id="tasks-thead">
@@ -2863,20 +2864,9 @@ const _activeColGroups = new Set();
 
 // ── TABLE HORIZONTAL SCROLL ──────────────────────────────────
 function constrainTableWrap() {
+  // Width handled purely by CSS — just clear any stale inline style
   const wrap = document.querySelector('.task-table-wrap');
-  if (!wrap) return;
-  // Only constrain when the tab is actually visible
-  const tabPane = document.getElementById('tab-tasks');
-  if (!tabPane || tabPane.style.display === 'none' || !tabPane.offsetParent) {
-    // Tab is hidden — clear any stale width so it doesn't stay at 0
-    wrap.style.width = '';
-    wrap.style.maxWidth = '';
-    return;
-  }
-  const available = tabPane.clientWidth;
-  if (available <= 0) return; // still hidden, don't set 0
-  wrap.style.width = available + 'px';
-  wrap.style.maxWidth = available + 'px';
+  if (wrap) { wrap.style.width = ''; wrap.style.maxWidth = ''; }
 }
 
 function toggleColGroup(group) {
