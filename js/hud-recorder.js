@@ -173,6 +173,15 @@ const HUDRecorder = (() => {
       // Window loaded — nothing needed, user clicks START
     }
     else if (cmd === 'START')      { await startRecording(); }
+    else if (cmd === 'SYNC_STATE') {
+      // Restore state after page navigation
+      _state     = e.data.state;
+      _startTime = e.data.startTime;
+      _pausedMs  = e.data.pausedMs || 0;
+      document.body.classList.toggle('hud-recording', _state === 'recording');
+      document.body.classList.toggle('hud-paused',    _state === 'paused');
+      updateRecBtn();
+    }
     else if (cmd === 'PAUSE')      { pauseRecording(); }
     else if (cmd === 'RESUME')     { resumeRecording(); }
     else if (cmd === 'STOP')       { stopRecording(); }
@@ -244,6 +253,10 @@ const HUDRecorder = (() => {
     updateRecBtn();
 
     broadcast({ evt: 'RECORDING_STARTED', startTime: _startTime });
+    // Broadcast sync every 5s for pages loaded mid-recording
+    _syncInterval = setInterval(() => {
+      broadcast({ cmd: 'SYNC_STATE', state: _state, startTime: _startTime, pausedMs: _pausedMs });
+    }, 5000);
   }
 
   // ── Pause ─────────────────────────────────────────────────
@@ -273,12 +286,18 @@ const HUDRecorder = (() => {
   // ── Stop ──────────────────────────────────────────────────
   function stopRecording() {
     if (_state === 'idle') return;
+    const duration = elapsed();
     _state = 'idle';
     document.body.classList.remove('hud-recording', 'hud-paused');
     updateRecBtn();
     _stream?.getTracks().forEach(t => t.stop());
-    _recorder?.stop();  // triggers _onRecorderStop
-    broadcast({ evt: 'STOPPED', duration: elapsed() });
+    if (_recorder) {
+      _recorder.stop(); // triggers _onRecorderStop which shows save dialog
+    } else {
+      // Navigated to new page — recorder lives on original page
+      // Just broadcast STOPPED; original page handles save dialog
+      broadcast({ evt: 'STOPPED', duration });
+    }
   }
 
   // ── After recorder finishes collecting chunks ─────────────
@@ -443,6 +462,9 @@ const HUDRecorder = (() => {
       openWindow();
     }
   }
+
+  // Auto-init channel on every page load so recording survives navigation
+  initChannel();
 
   return { toggle, getState: () => _state };
 
