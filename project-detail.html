@@ -99,8 +99,8 @@
 .ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
 
 /* Task table */
-.task-table-wrap { overflow-x: auto; position:relative; }
-.task-tbl { width: max-content; min-width:100%; border-collapse: collapse; border-spacing:0; }
+.task-table-wrap { overflow-x: auto; position:relative; width:100%; }
+.task-tbl { width: max-content; border-collapse: collapse; border-spacing:0; }
 /* Sticky left columns */
 .task-tbl .col-sticky { position:sticky; background:var(--bg1); z-index:2; }
 .task-tbl th.col-sticky { background:var(--bg2); z-index:3; }
@@ -500,6 +500,10 @@
             </div>
             <button class="hud-btn" id="btn-link-tasks" onclick="openLinkPanel()" style="border-color:rgba(0,210,255,0.35);">&#9741; LINK</button>
             <button class="hud-btn" id="btn-edit-plan" onclick="togglePlanEditMode()">&#9998; EDIT PLAN</button>
+            <div id="plan-edit-actions" style="display:none;display:flex;gap:4px;">
+              <button class="hud-btn" onclick="resetPlanDates()" style="border-color:rgba(0,229,160,0.35);color:var(--green);font-size:10px;" title="Reset all task START dates to today, propagating through dependencies">&#8635; RESET DATES</button>
+              <button class="hud-btn" onclick="confirmClearAllDeps()" style="border-color:rgba(255,71,87,0.35);color:var(--red);font-size:10px;" title="Remove all task dependencies from this project">&#9741; CLEAR DEPS</button>
+            </div>
           </div>
         </div>
         <div class="panel">
@@ -1401,8 +1405,8 @@ function renderTasksTable() {
         })()}
         <td class="col-sticky" style="left:144px;min-width:180px;border-right:2px solid rgba(0,210,255,0.1);"><div class="task-name-cell">${UI.taskDot(t.status)}<span class="task-name-text" title="${t.name}">${t.name}</span>${hasJournal ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);cursor:pointer;" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')" title="View journal">▤</span>` : ''}</div></td>
         <td><div style="display:flex;align-items:center;gap:6px;">${asgn ? UI.avatar(asgn, 20) : ''}<span style="font-family:var(--font-ui);font-size:12.0px;">${asgn?.name || '—'}</span></div></td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${UI.fmtDateShort(t.start_date)}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${due.text}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${_fmtD(t.start_date)}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:${due.color};">${_fmtD(t.due_date)}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
         <td><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
@@ -1412,11 +1416,11 @@ function renderTasksTable() {
           ${planEdit ? '<button onclick="openEditTaskPanel(\'' + t.id + '\')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit task">&#9998;</button><button onclick="confirmDeleteTask(\'' + t.id + '\',\'' + t.name.replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete task">&#128465;</button>' : ''}
         </td>
         <!-- ACTUALS group -->
-        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_start ? UI.fmtDateShort(t.actual_start) : '—'}</td>
-        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_finish ? UI.fmtDateShort(t.actual_finish) : '—'}</td>
+        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${_fmtD(t.actual_start)}</td>
+        <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${_fmtD(t.actual_finish)}</td>
         <td class="col-grp-actuals" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.actual_hours ? parseFloat(t.actual_hours).toFixed(1)+'h' : '—'}</td>
         <!-- CPM group -->
-        ${(()=>{ const cn=window._ganttCPM?.nodes?.[t.id]; const tf=cn?cn.TF.toFixed(0):'—'; const tfc=cn?(cn.TF<=0?'var(--red)':cn.TF<=5?'var(--amber)':'var(--green)'):'var(--text3)';
+        ${(()=>{ const cn=(window._taskCPM||window._ganttCPM)?.nodes?.[t.id]; const tf=cn?cn.TF.toFixed(0):'—'; const tfc=cn?(cn.TF<=0?'var(--red)':cn.TF<=5?'var(--amber)':'var(--green)'):'var(--text3)';
           return '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.ES.toFixed(0):'—')+'</td>'+
                  '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.EF.toFixed(0):'—')+'</td>'+
                  '<td class="col-grp-cpm" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(cn?cn.LS.toFixed(0):'—')+'</td>'+
@@ -2256,6 +2260,9 @@ function togglePlanEditMode() {
     btn.style.color    = _planEditMode ? 'var(--amber)' : '';
     btn.style.borderColor = _planEditMode ? 'rgba(255,170,0,0.5)' : '';
   }
+  // Show/hide plan edit action buttons
+  const pea = document.getElementById('plan-edit-actions');
+  if (pea) pea.style.display = _planEditMode ? 'flex' : 'none';
   // If exiting edit mode, also cancel any active link mode
   if (!_planEditMode) {
     const linkBtn = document.getElementById('btn-link-tasks');
@@ -2549,6 +2556,11 @@ function _nextWeekday(date) {
 }
 
 function _toInputDate(d) { return d.toISOString().substring(0,10); }
+function _fmtD(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit' });
+}
 
 function onTaskStartChange() {
   const el = document.getElementById('tf-start');
@@ -2734,6 +2746,7 @@ async function saveLinkDeps() {
     await API.post('task_dependencies', newDeps);
 
     // Reload deps so PRED column refreshes
+    window._taskCPM = null;  // invalidate CPM cache
     try {
       const taskIds = STATE.tasks.map(t=>t.id);
       STATE.deps = await API.get(`task_dependencies?select=*&successor_task_id=in.(${taskIds.join(',')})`);
@@ -2778,7 +2791,63 @@ function toggleColGroup(group) {
     _activeColGroups.add(group);
     wrap?.classList.add('show-' + group);
     if (btn) { btn.classList.add('active'); }
+    // CPM group: compute fresh CPM for tasks tab if not already done
+    if (group === 'cpm' && !window._taskCPM) {
+      computeTasksCPM().then(() => renderTasksTable());
+    }
   }
+}
+
+async function computeTasksCPM() {
+  // Run CPM computation using current STATE.deps (same algorithm as computeCPMForGantt)
+  const tasks = (STATE.tasks || []).filter(t => t.duration_days && t.duration_days > 0);
+  if (!tasks.length) { window._taskCPM = null; return; }
+  let deps = STATE.deps || [];
+  // If no real deps, auto-generate sequential within-phase deps
+  if (!deps.length) {
+    const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+    phases.forEach(phase => {
+      const pt = tasks.filter(t => t.phase === phase).sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0));
+      for (let i = 1; i < pt.length; i++) {
+        deps.push({ predecessor_task_id: pt[i-1].id, successor_task_id: pt[i].id, link_type: 'FS', lag_days: 0 });
+      }
+    });
+  }
+  const nodes = {};
+  tasks.forEach(t => {
+    nodes[t.id] = { id:t.id, duration:parseFloat(t.duration_days||1), ES:0, EF:0, LS:0, LF:0, TF:0, FF:0, preds:[], succs:[] };
+  });
+  deps.forEach(d => {
+    if (nodes[d.predecessor_task_id] && nodes[d.successor_task_id]) {
+      nodes[d.predecessor_task_id].succs.push(d.successor_task_id);
+      nodes[d.successor_task_id].preds.push(d.predecessor_task_id);
+    }
+  });
+  const inDeg = {}, ids = Object.keys(nodes);
+  ids.forEach(id => { inDeg[id] = nodes[id].preds.length; });
+  const queue = ids.filter(id => inDeg[id] === 0), topo = [];
+  while (queue.length) {
+    const cur = queue.shift(); topo.push(cur);
+    nodes[cur].succs.forEach(s => { inDeg[s]--; if (!inDeg[s]) queue.push(s); });
+  }
+  topo.forEach(id => {
+    const n = nodes[id];
+    n.ES = n.preds.length ? Math.max(...n.preds.map(p => nodes[p].EF)) : 0;
+    n.EF = n.ES + n.duration;
+  });
+  const projDur = Math.max(...ids.map(id => nodes[id].EF));
+  [...topo].reverse().forEach(id => {
+    const n = nodes[id];
+    n.LF = n.succs.length ? Math.min(...n.succs.map(s => nodes[s].LS)) : projDur;
+    n.LS = n.LF - n.duration;
+  });
+  ids.forEach(id => {
+    const n = nodes[id];
+    n.TF = Math.round((n.LS - n.ES) * 10) / 10;
+  });
+  window._taskCPM = { nodes, topo, projDur };
+  // Also update _ganttCPM so Gantt stays in sync
+  window._ganttCPM = window._taskCPM;
 }
 
 function resetTableView() {
@@ -2839,6 +2908,105 @@ async function deleteDep(depId, taskId) {
   } catch(e) {
     alert('Failed to remove dependency: ' + (e.message||e));
   }
+}
+
+// ── RESET PLAN DATES ──────────────────────────────────────────
+async function resetPlanDates() {
+  const tasks = STATE.tasks;
+  if (!tasks.length) return;
+  if (!confirm('Reset all task START dates to today and recalculate DUE dates from duration?\n\nLinked tasks will propagate forward skipping weekends.\nThis will update the database.')) return;
+
+  // Sort all tasks by phase order then sequence_order
+  const allTasks = STATE.tasks;
+  const phasesSorted = [...new Set(allTasks.map(t=>t.phase).filter(Boolean))]
+    .sort((a,b) => {
+      const minA = Math.min(...allTasks.filter(t=>t.phase===a).map(t=>t.sequence_order||9999));
+      const minB = Math.min(...allTasks.filter(t=>t.phase===b).map(t=>t.sequence_order||9999));
+      return minA - minB;
+    });
+
+  // Build dep map: taskId → predecessor task id
+  const predMap = {};
+  (STATE.deps||[]).forEach(d => { predMap[d.successor_task_id] = d.predecessor_task_id; });
+
+  // Track computed end dates per task
+  const endDateMap = {};
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Process tasks in topo order — phases first, then seq within phase
+  const ordered = [];
+  phasesSorted.forEach(ph => {
+    const pt = allTasks.filter(t=>t.phase===ph).sort((a,b)=>(a.sequence_order||0)-(b.sequence_order||0));
+    pt.forEach(t => ordered.push(t));
+  });
+  // Add tasks with no phase
+  allTasks.filter(t=>!t.phase).forEach(t => ordered.push(t));
+
+  const patches = [];
+
+  ordered.forEach(t => {
+    const dur = Math.max(parseFloat(t.duration_days||1), 1);
+    let startDate;
+
+    const predId = predMap[t.id];
+    if (predId && endDateMap[predId]) {
+      // Start day after predecessor finishes, skip weekends
+      startDate = new Date(endDateMap[predId]);
+      startDate.setDate(startDate.getDate() + 1);
+      while (startDate.getDay() === 0 || startDate.getDay() === 6) startDate.setDate(startDate.getDate() + 1);
+    } else {
+      // No dependency — start today (skip to Monday if weekend)
+      startDate = new Date(today);
+      while (startDate.getDay() === 0 || startDate.getDay() === 6) startDate.setDate(startDate.getDate() + 1);
+    }
+
+    const dueDate = _addBusinessDays(startDate, dur);
+    endDateMap[t.id] = dueDate;
+
+    const startStr = _toInputDate(startDate);
+    const dueStr   = _toInputDate(dueDate);
+
+    patches.push({ id: t.id, start_date: startStr, due_date: dueStr });
+    t.start_date = startStr;
+    t.due_date   = dueStr;
+  });
+
+  // Patch all in parallel
+  const btn = document.querySelector('[onclick="resetPlanDates()"]');
+  if (btn) { btn.textContent = '⏳ SAVING...'; btn.disabled = true; }
+  try {
+    await Promise.all(patches.map(p => API.patch(`tasks?id=eq.${p.id}`, { start_date: p.start_date, due_date: p.due_date })));
+    window._taskCPM = null;
+    renderTasksTable();
+    renderHeader();
+  } catch(e) {
+    alert('Reset failed: ' + (e.message||e));
+  } finally {
+    if (btn) { btn.innerHTML = '&#8635; RESET DATES'; btn.disabled = false; }
+  }
+}
+
+// ── CLEAR ALL DEPENDENCIES ────────────────────────────────────
+function confirmClearAllDeps() {
+  const count = (STATE.deps||[]).length;
+  if (!count) { alert('No dependencies to clear.'); return; }
+  document.getElementById('confirm-msg').textContent =
+    `Remove all ${count} task dependenc${count===1?'y':'ies'} from this project? This cannot be undone.`;
+  document.getElementById('confirm-ok-btn').onclick = clearAllDeps;
+  _openSlidePanel('confirm-panel');
+}
+
+async function clearAllDeps() {
+  _closeSlidePanel('confirm-panel');
+  try {
+    if (STATE.deps?.length) {
+      const ids = STATE.deps.map(d=>d.id);
+      await API.del(`task_dependencies?id=in.(${ids.join(',')})`);
+    }
+    STATE.deps = [];
+    window._taskCPM = null;
+    renderTasksTable();
+  } catch(e) { alert('Clear failed: ' + (e.message||e)); }
 }
 </script>
 
