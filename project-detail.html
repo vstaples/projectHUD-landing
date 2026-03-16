@@ -1375,9 +1375,7 @@ function renderTasksTable() {
     const phaseNum = window._phaseNumMap?.[phaseLabel] || '';
     html += `<tr class="phase-header" data-phase-key="${phaseKey}" data-phase="${phaseLabel}" data-phasekey="${phaseKey}">
       <td style="padding:0 6px;width:28px;">
-        <input type="checkbox" class="task-link-check" data-type="phase" data-phase="${phaseLabel}"
-          style="cursor:pointer;accent-color:var(--cyan);"
-          onchange="onLinkCheckChange()" />
+        ${document.getElementById('btn-link-tasks')?.dataset.linking === '1' ? `<input type="checkbox" class="task-link-check" data-type="phase" data-phase="${phaseLabel}" style="cursor:pointer;accent-color:var(--cyan);" onchange="onLinkCheckChange()" />` : ''}
       </td>
       <td colspan="11"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-right:6px;">${phaseNum}</span>${phaseLabel}</td>
       <td style="text-align:right;padding-right:8px;">
