@@ -34,13 +34,13 @@
 .node-tooltip {
   position:fixed; z-index:200;
   background:var(--bg2); border:1px solid var(--border-act);
-  padding:12px 14px; pointer-events:none;
-  font-family:var(--font-mono); font-size:11px;
+  padding:18px 22px; pointer-events:none; min-width:300px;
+  font-family:var(--font-mono); font-size:13px;
   max-width:280px;
   box-shadow:0 8px 24px rgba(0,0,0,0.5);
 }
-.node-tooltip-title { font-family:var(--font-ui); font-size:13px; color:var(--text0); margin-bottom:8px; font-weight:600; }
-.node-tooltip-row   { display:flex; justify-content:space-between; gap:16px; margin-bottom:3px; }
+.node-tooltip-title { font-family:var(--font-ui); font-size:16px; color:var(--text0); margin-bottom:10px; font-weight:600; }
+.node-tooltip-row   { display:flex; justify-content:space-between; gap:24px; margin-bottom:5px; }
 .node-tooltip-key   { color:var(--text3); letter-spacing:0.08em; }
 .node-tooltip-val   { color:var(--text0); font-weight:700; }
 .node-tooltip-cp    { color:var(--red); font-weight:700; margin-top:6px; letter-spacing:0.1em; }
@@ -1179,15 +1179,11 @@ async function rebuildWaterfallDeps() {
   await API.del('task_dependencies?id=neq.00000000-0000-0000-0000-000000000000');
   const phases = Object.keys(_editCurrentOrder);
   const newDeps = [];
-  phases.forEach((phase, phaseIdx) => {
+  // Within-phase chains only — phases run in parallel, not in series
+  phases.forEach(phase => {
     const ids = _editCurrentOrder[phase];
     for (let i = 1; i < ids.length; i++)
       newDeps.push({ predecessor_task_id: ids[i-1], successor_task_id: ids[i], link_type: 'FS', lag_days: 0 });
-    if (phaseIdx < phases.length - 1) {
-      const nextIds = _editCurrentOrder[phases[phaseIdx + 1]];
-      if (nextIds && nextIds.length)
-        newDeps.push({ predecessor_task_id: ids[ids.length-1], successor_task_id: nextIds[0], link_type: 'FS', lag_days: 0 });
-    }
   });
   if (newDeps.length) await API.post('task_dependencies', newDeps);
   STATE_CPM.deps = newDeps;
