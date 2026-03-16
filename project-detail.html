@@ -526,7 +526,7 @@
                   <th class="col-grp-projdata col-group-hdr" style="background:rgba(0,0,0,0.15);" colspan="8">— PROJECT DATA —</th>
                   <th class="col-grp-actuals col-group-hdr" style="color:var(--amber);background:rgba(255,170,0,0.05);" colspan="3">ACTUALS</th>
                   <th class="col-grp-cpm    col-group-hdr" style="color:#8b5cf6;background:rgba(139,92,246,0.05);" colspan="5">CRITICAL PATH</th>
-                  <th class="col-grp-pert   col-group-hdr" style="color:var(--green);background:rgba(0,229,160,0.05);" colspan="6">PERT</th>
+                  <th class="col-grp-pert   col-group-hdr" style="color:var(--green);background:rgba(0,229,160,0.05);" colspan="6">PERT <span style="opacity:0.5;font-size:8px;">(O=0.7×ML, P=1.6×ML if not set)</span></th>
                   <th class="col-grp-budget col-group-hdr" style="color:var(--cyan);background:rgba(0,210,255,0.05);" colspan="3">BUDGET</th>
                 </tr>
                 <!-- COLUMN HEADER ROW -->
@@ -832,7 +832,7 @@ function switchTab(tab) {
     if (tab === 'risks')         renderRisks();
     if (tab === 'documents')     renderDocuments();
     if (tab === 'journal')       renderJournalTab();
-    if (tab === 'tasks')         renderTasksTable();
+    if (tab === 'tasks')         { renderTasksTable(); setTimeout(constrainTableWrap, 100); }
     if (tab === 'gantt')         renderGanttTab();
     if (tab === 'labor')         renderLabor();
   }
@@ -1471,6 +1471,30 @@ function renderTasksTable() {
   if (nophase.length) renderPhase('NO PHASE', nophase);
   tbody.innerHTML = html || `<tr><td colspan="14">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
   setTimeout(constrainTableWrap, 50);
+  // If CPM group is active but cache is stale, recompute silently
+  const tblEl = document.getElementById('tasks-table');
+  if (tblEl?.classList.contains('show-cpm') && !window._taskCPM) {
+    computeTasksCPM().then(() => {
+      // Re-render just the CPM cells without full re-render to avoid loop
+      document.querySelectorAll('.col-grp-cpm').forEach((td, i) => {
+        const row = td.closest('tr');
+        const taskId = row?.dataset.taskId;
+        if (!taskId) return;
+        const cn = window._taskCPM?.nodes?.[taskId];
+        if (!cn) return;
+        const vals = [cn.ES, cn.EF, cn.LS, cn.LF, cn.TF];
+        const cpmCells = row.querySelectorAll('.col-grp-cpm');
+        cpmCells.forEach((cell, ci) => {
+          const v = vals[ci];
+          if (v === undefined) return;
+          const tfc = ci === 4 ? (v<=0?'var(--red)':v<=5?'var(--amber)':'var(--green)') : 'var(--text3)';
+          cell.style.color = tfc;
+          cell.style.fontWeight = ci === 4 ? '700' : '';
+          cell.textContent = v.toFixed(0);
+        });
+      });
+    });
+  }
 }
 
 function renderMilestones() {
@@ -2827,6 +2851,18 @@ function closeLinkPanel() {
 // ── COLUMN GROUP TOGGLES ──────────────────────────────────────
 const _activeColGroups = new Set();
 
+// ── TABLE HORIZONTAL SCROLL ──────────────────────────────────
+function constrainTableWrap() {
+  const wrap = document.querySelector('.task-table-wrap');
+  if (!wrap) return;
+  // Set wrap to a fixed pixel width equal to the tab pane viewport width
+  // so that a wider max-content table can genuinely overflow and scroll
+  const tabPane = document.getElementById('tab-tasks');
+  const available = tabPane ? tabPane.clientWidth : window.innerWidth - 200;
+  wrap.style.width = available + 'px';
+  wrap.style.maxWidth = available + 'px';
+}
+
 function toggleColGroup(group) {
   const wrap = document.getElementById('tasks-table');
   const btn  = document.querySelector(`.col-toggle-btn[data-col="${group}"]`);
@@ -2848,13 +2884,13 @@ function toggleColGroup(group) {
   } else {
     _activeColGroups.add(group);
     wrap?.classList.add('show-' + group);
-    setTimeout(constrainTableWrap, 50);
     if (btn) { btn.classList.add('active'); }
     // CPM group: compute fresh CPM for tasks tab if not already done
     if (group === 'cpm' && !window._taskCPM) {
       computeTasksCPM().then(() => renderTasksTable());
     }
   }
+  setTimeout(constrainTableWrap, 50);
 }
 
 async function computeTasksCPM() {
@@ -2928,7 +2964,8 @@ function resetTableView() {
   if (pdBtn) pdBtn.classList.add('active');
   // Scroll table back to left
   const wrap = document.querySelector('.task-table-wrap');
-  if (wrap) wrap.scrollLeft = 0;
+  if (wrap) { wrap.scrollLeft = 0; wrap.style.width = ''; wrap.style.maxWidth = ''; }
+  setTimeout(constrainTableWrap, 50);
 }
 
 // ── EDIT TASK DEPS SECTION ────────────────────────────────────
@@ -3093,6 +3130,13 @@ function overrideActualLock() {
   const ov = document.getElementById('tf-actuals-override');
   if (ov) ov.innerHTML = '<span style="font-family:var(--font-mono);font-size:10px;color:var(--red);">&#9888; LOCK OVERRIDDEN — edit with care</span>';
 }
+
+// Constrain table wrap on tab switch to tasks
+const _origSwitchTab = typeof switchTab === 'function' ? switchTab : null;
+
+window.addEventListener('resize', () => { constrainTableWrap(); });
+document.addEventListener('visibilitychange', () => { constrainTableWrap(); });
+
 </script>
 
 <!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
