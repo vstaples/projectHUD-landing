@@ -832,7 +832,17 @@ function switchTab(tab) {
     if (tab === 'risks')         renderRisks();
     if (tab === 'documents')     renderDocuments();
     if (tab === 'journal')       renderJournalTab();
-    if (tab === 'tasks')         { renderTasksTable(); setTimeout(constrainTableWrap, 100); }
+    if (tab === 'tasks') {
+      renderTasksTable();
+      setTimeout(constrainTableWrap, 200);
+      // Recompute CPM if group is active and cache is stale
+      setTimeout(() => {
+        const tbl = document.getElementById('tasks-table');
+        if (tbl?.classList.contains('show-cpm') && !window._taskCPM) {
+          computeTasksCPM().then(() => renderTasksTable());
+        }
+      }, 300);
+    }
     if (tab === 'gantt')         renderGanttTab();
     if (tab === 'labor')         renderLabor();
   }
@@ -1470,7 +1480,7 @@ function renderTasksTable() {
   phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
   if (nophase.length) renderPhase('NO PHASE', nophase);
   tbody.innerHTML = html || `<tr><td colspan="14">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
-  setTimeout(constrainTableWrap, 50);
+  setTimeout(constrainTableWrap, 100);
   // If CPM group is active but cache is stale, recompute silently
   const tblEl = document.getElementById('tasks-table');
   if (tblEl?.classList.contains('show-cpm') && !window._taskCPM) {
@@ -2855,10 +2865,16 @@ const _activeColGroups = new Set();
 function constrainTableWrap() {
   const wrap = document.querySelector('.task-table-wrap');
   if (!wrap) return;
-  // Set wrap to a fixed pixel width equal to the tab pane viewport width
-  // so that a wider max-content table can genuinely overflow and scroll
+  // Only constrain when the tab is actually visible
   const tabPane = document.getElementById('tab-tasks');
-  const available = tabPane ? tabPane.clientWidth : window.innerWidth - 200;
+  if (!tabPane || tabPane.style.display === 'none' || !tabPane.offsetParent) {
+    // Tab is hidden — clear any stale width so it doesn't stay at 0
+    wrap.style.width = '';
+    wrap.style.maxWidth = '';
+    return;
+  }
+  const available = tabPane.clientWidth;
+  if (available <= 0) return; // still hidden, don't set 0
   wrap.style.width = available + 'px';
   wrap.style.maxWidth = available + 'px';
 }
@@ -2890,7 +2906,7 @@ function toggleColGroup(group) {
       computeTasksCPM().then(() => renderTasksTable());
     }
   }
-  setTimeout(constrainTableWrap, 50);
+  setTimeout(constrainTableWrap, 100);
 }
 
 async function computeTasksCPM() {
@@ -2965,7 +2981,7 @@ function resetTableView() {
   // Scroll table back to left
   const wrap = document.querySelector('.task-table-wrap');
   if (wrap) { wrap.scrollLeft = 0; wrap.style.width = ''; wrap.style.maxWidth = ''; }
-  setTimeout(constrainTableWrap, 50);
+  setTimeout(constrainTableWrap, 100);
 }
 
 // ── EDIT TASK DEPS SECTION ────────────────────────────────────
