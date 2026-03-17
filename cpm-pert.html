@@ -576,7 +576,7 @@ function drawNetwork() {
 
     // Phase label text
     ctx.fillStyle = '#00d2ff';
-    ctx.font = 'bold 11px Barlow Condensed, sans-serif';
+    ctx.font = 'bold 11px DM Sans, sans-serif';
     ctx.textAlign = 'left';
     ctx.letterSpacing = '0.14em';
     ctx.fillText(ph.toUpperCase(), 36, startY + 17);
@@ -624,7 +624,7 @@ function drawNetwork() {
     ctx.fillText(`EF: ${n.EF.toFixed(0)}`, x + 3*NW/4, y + 14);
 
     // Task name (truncated)
-    ctx.fillStyle = '#c8dff0'; ctx.font = '600 10px Barlow Condensed, sans-serif';
+    ctx.fillStyle = '#c8dff0'; ctx.font = '600 10px DM Sans, sans-serif';
     ctx.textAlign = 'center';
     const maxLen = 22;
     const label = n.name.length > maxLen ? n.name.slice(0, maxLen-1)+'…' : n.name;
