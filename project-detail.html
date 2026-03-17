@@ -2515,10 +2515,12 @@ function openAddTaskPanel(phase) {
   document.getElementById('tf-duration').value    = '';
   document.getElementById('tf-effort').value      = '';
   document.getElementById('tf-pct').value         = '0';
-  // Populate assigned select
+  // tf-assigned replaced by tf-assignments-list
   const asel = document.getElementById('tf-assigned');
-  asel.innerHTML = '<option value="">— Unassigned —</option>' +
-    (STATE.users||[]).map(u => `<option value="${u.id}">` + u.name + '</option>').join('');
+  if (asel) {
+    asel.innerHTML = '<option value="">— Unassigned —</option>' +
+      (STATE.users||[]).map(u => `<option value="${u.id}">` + u.name + '</option>').join('');
+  }
   _clearErr('tf-error');
   _openSlidePanel('task-form-panel');
 }
@@ -2546,11 +2548,13 @@ function openEditTaskPanel(taskId) {
   }
   document.getElementById('tf-effort').value      = t.effort_days   || '';
   document.getElementById('tf-pct').value         = t.pct_complete  || '0';
-  document.getElementById('tf-assigned').value    = t.assigned_to   || '';
-  // Populate assigned select
-  const sel = document.getElementById('tf-assigned');
-  sel.innerHTML = '<option value="">— Unassigned —</option>' +
-    (STATE.users||[]).map(u => `<option value="${u.id}" ${u.id===t.assigned_to?'selected':''}>${u.name}</option>`).join('');
+  // tf-assigned replaced by tf-assignments-list — handled in patched openEditTaskPanel
+  const _legacySel = document.getElementById('tf-assigned');
+  if (_legacySel) {
+    _legacySel.value = t.assigned_to || '';
+    _legacySel.innerHTML = '<option value="">— Unassigned —</option>' +
+      (STATE.users||[]).map(u => `<option value="${u.id}" ${u.id===t.assigned_to?'selected':''}>${u.name}</option>`).join('');
+  }
   // Actuals fields
   document.getElementById('tf-actual-start').value  = t.actual_start  ? t.actual_start.substring(0,10)  : '';
   document.getElementById('tf-actual-finish').value = t.actual_finish ? t.actual_finish.substring(0,10) : '';
@@ -2589,7 +2593,7 @@ async function saveTaskForm() {
     duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
     effort_days:  parseFloat(document.getElementById('tf-effort').value)   || null,
     pct_complete: parseFloat(document.getElementById('tf-pct').value)      || 0,
-    assigned_to:   document.getElementById('tf-assigned').value              || null,
+    assigned_to:   document.getElementById('tf-assigned')?.value             || null,
     hud_role_id:   document.getElementById('tf-role')?.value                 || null,
     actual_start:  document.getElementById('tf-actual-start').value           || null,
     actual_finish: document.getElementById('tf-actual-finish').value          || null,
@@ -2899,6 +2903,7 @@ saveTaskForm = async function() {
 document.addEventListener('DOMContentLoaded', () => {
   // Populate assigned select in task form on open
   document.getElementById('task-form-panel')?.addEventListener('transitionend', () => {
+    // tf-assigned is now legacy — multi-assignment handled by tf-assignments-list
     const sel = document.getElementById('tf-assigned');
     if (sel && !sel.options.length) {
       sel.innerHTML = '<option value="">— Unassigned —</option>' +
