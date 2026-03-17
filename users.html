@@ -39,7 +39,7 @@
 
 /* ── RESOURCE CARD SKILL CHIPS ───────────────────────────────── */
 .skill-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
-.skill-chip { font-family:var(--font-mono); font-size:9px; padding:2px 7px; border:1px solid var(--border);
+.skill-chip { font-family:var(--font-mono); font-size:11px; padding:3px 9px; border:1px solid var(--border);
   color:var(--text3); background:var(--bg3); cursor:default; }
 .skill-chip.aware       { border-color:rgba(100,140,180,.3); color:var(--text2); }
 .skill-chip.practitioner{ border-color:rgba(0,210,255,.25); color:var(--cyan); background:rgba(0,210,255,.04); }
@@ -285,15 +285,15 @@
 
 /* ── SKILLS LIBRARY TAB ──────────────────────────────────────── */
 .skill-cat-block { margin-bottom:24px; }
-.skill-cat-hdr { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:0.14em;
+.skill-cat-hdr { font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.14em;
   padding:6px 12px; background:rgba(0,210,255,0.04); border:1px solid var(--border); margin-bottom:8px;
   display:flex; justify-content:space-between; align-items:center; }
 .skill-chips { display:flex; flex-wrap:wrap; gap:6px; }
-.skill-chip { font-family:var(--font-mono); font-size:10px; padding:4px 10px;
+.skill-chip { font-family:var(--font-ui); font-size:13px; padding:6px 12px;
   border:1px solid var(--border); color:var(--text2); background:var(--bg2);
   cursor:pointer; transition:all 0.15s; }
 .skill-chip:hover { border-color:rgba(0,210,255,0.4); color:var(--cyan); }
-.skill-chip .sk-alias { font-size:9px; color:var(--text3); display:block; margin-top:1px; }
+.skill-chip .sk-alias { font-size:11px; color:var(--text3); display:block; margin-top:2px; }
 
 /* ── CALENDAR TAB ────────────────────────────────────────────── */
 .cal-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
@@ -873,6 +873,17 @@ function renderResources() {
       ${r.availability_pct != null ? `<div class="um-card-field"><label>AVAILABILITY</label><span>${r.availability_pct}%</span></div>` : ''}
     </div>`;
   }).join('');
+  // Attach hover card listeners after DOM is painted
+  setTimeout(() => {
+    document.querySelectorAll('.um-card').forEach(card => {
+      const editBtn = card.querySelector('.um-card-action.edit');
+      if (!editBtn) return;
+      const onclick = editBtn.getAttribute('onclick') || '';
+      const match = onclick.match(/openResourceDrawer\('([^']+)'\)/);
+      if (!match) return;
+      _attachHoverCard(card, match[1]);
+    });
+  }, 50);
 }
 
 function openResourceDrawer(id) {
