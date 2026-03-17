@@ -881,7 +881,7 @@ let UM = {
   firms: [], categories: [], roles: [], roleLevels: [],
   resources: [], users: [], firmId: null,
   skillCats: [], skills: [], domains: [],
-  resourceSkills: {}, resourceProfiles: {}, domainExps: {},
+  resourceSkills: {}, resourceProfiles: {}, resourceDomains: {},
   calendarEntries: [], ptoEntries: [],
   editingResourceId: null, editingRoleId: null, editingSkillId: null,
   editingCatId: null, editingUserId: null,
@@ -1902,7 +1902,7 @@ async function showHoverCard(resourceId, anchorEl) {
     html += '<div class="hc-section">';
     html += '<div class="hc-section-lbl">DOMAIN EXPERIENCE</div>';
     domains.slice(0,4).forEach(d => {
-      const dom = UM.skillDomains?.find(x => x.id === d.domain_id);
+      const dom = UM.domains?.find(x => x.id === d.domain_id);
       html += `<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);">
         <div style="font-family:var(--font-hud);font-size:12px;font-weight:700;color:var(--text0);">
           ${dom?.name || d.domain_name || '—'}</div>`;
