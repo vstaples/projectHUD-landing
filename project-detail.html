@@ -1835,7 +1835,7 @@ function ganttZoom(dir) {
 let _gPX = 0, _gPY = 0, _gIP = false, _gL = {x:0,y:0};
 let _gFS = false, _gPI = false;
 
-function ganttResetView() { _gPX = 0; _gPY = 0; renderGanttTab(); }
+function ganttResetView() { _gPX = 0; _gPY = 0; window._gLastMn = null; renderGanttTab(); }
 
 function ganttToggleFullscreen() {
   const pane = document.getElementById('tab-gantt');
@@ -2029,6 +2029,10 @@ function renderGanttTab() {
   miles.forEach(m => { const d = m.current_target_date || m.due_date; if (d) allD.push(pD(d)); });
   const mn  = new Date(Math.min(...allD) - 7  * MS);
   const mx  = new Date(Math.max(...allD) + 14 * MS);
+  // Reset pan when date range changes (e.g. after date propagation)
+  if (!window._gLastMn || window._gLastMn !== mn.getTime()) {
+    _gPX = 0; _gPY = 0; window._gLastMn = mn.getTime();
+  }
   const ppd = GANTT_PX_DAY[_gz];
   const CW  = Math.max(Math.ceil((mx - mn) / MS) * ppd, 600);
   const dX  = d => IW + (d - mn) / MS * ppd;
@@ -2154,7 +2158,7 @@ function drawGanttChart() {
       cc.strokeStyle='rgba(0,210,255,0.50)'; cc.lineWidth=1.5;
       cc.beginPath(); cc.moveTo(x,HH); cc.lineTo(x,CH); cc.stroke();
       if (_gz>=1 && _gz<=2) {
-        const ml=cur.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+        const ml=cur.toLocaleDateString('en-US',{month:'short',year:'numeric'});
         cc.fillStyle='rgba(0,210,255,0.72)'; cc.font='10px Share Tech Mono,monospace';
         cc.textAlign='left'; cc.textBaseline='middle'; cc.fillText(ml,x+3,HH1/2);
       }
@@ -2179,7 +2183,7 @@ function drawGanttChart() {
       cc.beginPath(); cc.moveTo(x,HH); cc.lineTo(x,CH); cc.stroke();
     }
     if (_gz===2 && dow===1) {
-      const ml=cur.toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
+      const ml=cur.toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
       cc.fillStyle='rgba(0,210,255,0.50)'; cc.font='9px Share Tech Mono,monospace';
       cc.textAlign='left'; cc.textBaseline='middle'; cc.fillText(ml,x+2,HH1+(HH-HH1)/2);
       cc.strokeStyle='rgba(0,210,255,0.25)'; cc.lineWidth=0.8;
