@@ -283,6 +283,59 @@
 .hc-skill-chip .prof { color:var(--cyan); }
 .hc-empty { font-family:var(--font-mono); font-size:10px; color:var(--text3); text-align:center; padding:8px; }
 
+
+/* ── SKILL MANAGEMENT ────────────────────────────────────────── */
+.skill-cat-hdr { display:flex; align-items:center; justify-content:space-between;
+  font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.14em;
+  padding:8px 12px; background:rgba(0,210,255,0.04); border:1px solid rgba(0,210,255,0.12);
+  margin-bottom:8px; }
+.skill-cat-hdr .cat-actions { display:flex; gap:6px; opacity:0; transition:opacity .15s; }
+.skill-cat-block:hover .cat-actions { opacity:1; }
+.skill-mgmt-btn { background:none; border:1px solid var(--border); color:var(--text3);
+  font-family:var(--font-mono); font-size:9px; padding:2px 7px; cursor:pointer;
+  letter-spacing:0.08em; transition:all .15s; }
+.skill-mgmt-btn:hover { color:var(--text1); border-color:rgba(0,210,255,0.3); }
+.skill-mgmt-btn.add   { color:var(--cyan); border-color:rgba(0,210,255,0.3); }
+.skill-mgmt-btn.edit  { color:var(--amber); border-color:rgba(255,170,0,0.3); }
+.skill-mgmt-btn.del   { color:var(--red); border-color:rgba(255,71,87,0.3); }
+.skill-chip-wrap { position:relative; display:inline-block; }
+.skill-chip-del { position:absolute; top:-5px; right:-5px; width:14px; height:14px;
+  border-radius:50%; background:var(--red); color:#fff; font-size:9px; border:none;
+  cursor:pointer; display:none; align-items:center; justify-content:center;
+  line-height:1; padding:0; }
+.skill-chip-wrap:hover .skill-chip-del { display:flex; }
+
+/* ── SKILL HOVER TOOLTIP ─────────────────────────────────────── */
+#skill-hover-tt {
+  position:fixed; z-index:600; width:300px; pointer-events:none;
+  background:var(--bg1); border:1px solid var(--border2);
+  box-shadow:0 8px 32px rgba(0,0,0,.6); opacity:0; transition:opacity .15s;
+}
+#skill-hover-tt.visible { opacity:1; }
+.stt-hdr { padding:10px 14px 8px; border-bottom:1px solid var(--border);
+  font-family:var(--font-hud); font-size:14px; font-weight:700; color:var(--text0); }
+.stt-sub { font-family:var(--font-mono); font-size:9px; color:var(--text3);
+  letter-spacing:0.1em; margin-top:2px; }
+.stt-section { padding:8px 14px; }
+.stt-section-lbl { font-family:var(--font-mono); font-size:9px; color:var(--cyan);
+  letter-spacing:0.14em; margin-bottom:6px; }
+.stt-person-row { display:flex; align-items:center; gap:8px; padding:3px 0;
+  border-bottom:1px solid rgba(255,255,255,.03); }
+.stt-person-row:last-child { border-bottom:none; }
+.stt-person-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.stt-prof { font-family:var(--font-mono); font-size:9px; padding:1px 6px;
+  border-radius:1px; }
+.stt-prof.aware       { background:rgba(100,140,180,.1); color:var(--text2);
+  border:1px solid rgba(100,140,180,.3); }
+.stt-prof.practitioner{ background:rgba(0,210,255,.08); color:var(--cyan);
+  border:1px solid rgba(0,210,255,.25); }
+.stt-prof.expert      { background:rgba(255,170,0,.08); color:var(--amber);
+  border:1px solid rgba(255,170,0,.3); }
+.stt-prof.authority   { background:rgba(168,85,247,.1); color:var(--purple);
+  border:1px solid rgba(168,85,247,.35); }
+.stt-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.stt-empty { font-family:var(--font-mono); font-size:10px; color:var(--text3);
+  padding:4px 0; }
 /* ── SKILLS LIBRARY TAB ──────────────────────────────────────── */
 .skill-cat-block { margin-bottom:24px; }
 .skill-cat-hdr { font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.14em;
@@ -409,7 +462,10 @@
     <div class="um-panel" id="tab-skills">
       <div class="um-section-hdr">
         <div class="um-section-title">SKILL CATALOGUE</div>
-        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);" id="skill-count-lbl"></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);" id="skill-count-lbl"></div>
+          <button class="um-add-btn" onclick="openSkillCatDrawer()">+ ADD CATEGORY</button>
+        </div>
       </div>
       <div id="skills-library-wrap">
         <div class="um-loading">LOADING SKILLS...</div>
@@ -492,6 +548,60 @@
     </div>
   </div>
   <div id="hc-body"></div>
+</div>
+
+<!-- ── SKILL CATEGORY DRAWER ──────────────────────────────── -->
+<div class="um-drawer" id="skill-cat-drawer" style="width:380px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="skill-cat-drawer-title">ADD CATEGORY</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>CATEGORY NAME <span class="req">*</span></label>
+      <input id="scat-name" class="um-input" type="text" placeholder="e.g. Biomedical Engineering" /></div>
+    <div class="um-field"><label>ICON (emoji)</label>
+      <input id="scat-icon" class="um-input" type="text" placeholder="🧬" maxlength="4" style="font-size:20px;width:60px;" /></div>
+    <div id="scat-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="scat-save-btn" onclick="saveSkillCategory()">SAVE CATEGORY</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── ADD SKILL DRAWER ────────────────────────────────────── -->
+<div class="um-drawer" id="skill-drawer" style="width:420px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="skill-drawer-title">ADD SKILL</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>SKILL NAME <span class="req">*</span></label>
+      <input id="sk-name" class="um-input" type="text" placeholder="e.g. Optical Fiber Design" /></div>
+    <div class="um-field"><label>CATEGORY</label>
+      <select id="sk-cat" class="um-select"></select></div>
+    <div class="um-field"><label>DESCRIPTION</label>
+      <textarea id="sk-desc" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
+    <div class="um-field"><label>ALIASES / KEYWORDS (comma separated)</label>
+      <input id="sk-aliases" class="um-input" type="text" placeholder="e.g. fiber optics, optical waveguide" /></div>
+    <div id="sk-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="sk-save-btn" onclick="saveSkill()">SAVE SKILL</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── SKILL HOVER TOOLTIP ───────────────────────────────────── -->
+<div id="skill-hover-tt">
+  <div class="stt-hdr">
+    <div id="stt-name"></div>
+    <div class="stt-sub" id="stt-cat"></div>
+  </div>
+  <div class="stt-section">
+    <div class="stt-section-lbl">TEAM MEMBERS WITH THIS SKILL</div>
+    <div id="stt-people"></div>
+  </div>
 </div>
 
 <!-- ── OVERLAY ──────────────────────────────────────────────── -->
@@ -773,7 +883,7 @@ let UM = {
   skillCats: [], skills: [], domains: [],
   resourceSkills: {}, resourceProfiles: {}, domainExps: {},
   calendarEntries: [], ptoEntries: [],
-  editingResourceId: null, editingRoleId: null,
+  editingResourceId: null, editingRoleId: null, editingSkillId: null,
   editingCatId: null, editingUserId: null,
   // hover card
   _hoverTimer: null, _hoverId: null,
@@ -1251,22 +1361,41 @@ async function saveUserRole() {
 function renderSkillsLibrary() {
   const wrap = document.getElementById('skills-library-wrap');
   const lbl  = document.getElementById('skill-count-lbl');
-  if (!UM.skills.length) { wrap.innerHTML = '<div class="um-empty">NO SKILLS LOADED</div>'; return; }
-  if (lbl) lbl.textContent = UM.skills.length + ' SKILLS · ' + UM.skillCats.length + ' CATEGORIES';
+  const total = UM.skills.filter(s => s.is_active !== false).length;
+  if (lbl) lbl.textContent = total + ' SKILLS · ' + UM.skillCats.length + ' CATEGORIES';
+  if (!UM.skillCats.length) {
+    wrap.innerHTML = '<div class="um-empty">NO CATEGORIES YET — ADD YOUR FIRST CATEGORY</div>';
+    return;
+  }
   let html = '';
   UM.skillCats.forEach(cat => {
     const catSkills = UM.skills.filter(s => s.category_id === cat.id && s.is_active !== false);
-    if (!catSkills.length) return;
-    html += `<div class="skill-cat-block">
+    html += `<div class="skill-cat-block" data-cat-id="${cat.id}">
       <div class="skill-cat-hdr">
-        <span>${cat.icon || ''} ${cat.name.toUpperCase()}</span>
-        <span style="color:var(--text3);font-size:9px;">${catSkills.length} SKILLS</span>
+        <span>${cat.icon || '◈'} ${cat.name.toUpperCase()}
+          <span style="color:var(--text3);font-size:9px;margin-left:8px;">${catSkills.length} SKILLS</span>
+        </span>
+        <div class="cat-actions">
+          <button class="skill-mgmt-btn add"  onclick="openSkillDrawer('${cat.id}','${cat.name.replace(/'/g,"\'")}')">+ SKILL</button>
+          <button class="skill-mgmt-btn edit" onclick="openSkillCatDrawer('${cat.id}')">✎ RENAME</button>
+          <button class="skill-mgmt-btn del"  onclick="deleteSkillCategory('${cat.id}','${cat.name.replace(/'/g,"\'")}')">🗑 DELETE</button>
+        </div>
       </div>
       <div class="skill-chips">
-        ${catSkills.map(s => `<div class="skill-chip" title="${s.description||''}">
-          ${s.name}
-          ${s.aliases?.length ? `<span class="sk-alias">${s.aliases.slice(0,2).join(', ')}</span>` : ''}
-        </div>`).join('')}
+        ${catSkills.length ? catSkills.map(s => {
+          const aliases = Array.isArray(s.aliases) ? s.aliases : [];
+          return `<div class="skill-chip-wrap">
+            <div class="skill-chip" data-skill-id="${s.id}"
+              onmouseenter="_showSkillTT(event,'${s.id}')"
+              onmouseleave="_hideSkillTT()"
+              onmousemove="_moveSkillTT(event)">
+              ${s.name}
+              ${aliases.length ? `<span class="sk-alias">${aliases.slice(0,2).join(', ')}</span>` : ''}
+            </div>
+            <button class="skill-chip-del" onclick="deleteSkill('${s.id}','${s.name.replace(/'/g,"\'")}','${cat.id}')" title="Delete skill">✕</button>
+          </div>`;
+        }).join('') : `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:8px;">
+          No skills yet — click + SKILL to add one</div>`}
       </div>
     </div>`;
   });
@@ -1764,6 +1893,230 @@ function hideHoverCard() {
   if (card) card.classList.remove('visible');
   UM._hoverId = null;
 }
+
+// ── DRAWER HELPERS ────────────────────────────────────────────
+function openDrawer(id) {
+  document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.right = '0';
+    el.classList.add('open');
+  }
+  const overlay = document.getElementById('drawer-overlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeDrawer() {
+  document.querySelectorAll('.um-drawer').forEach(d => {
+    d.classList.remove('open');
+    d.style.right = '';
+  });
+  const overlay = document.getElementById('drawer-overlay');
+  if (overlay) overlay.classList.remove('open');
+  UM.editingResourceId = UM.editingRoleId = UM.editingCatId = UM.editingUserId = null;
+}
+
+
+// ── SKILL CATEGORY MANAGEMENT ─────────────────────────────────
+function openSkillCatDrawer(catId) {
+  UM.editingCatId = catId || null;
+  const cat = catId ? UM.skillCats.find(c => c.id === catId) : null;
+  document.getElementById('skill-cat-drawer-title').textContent = catId ? 'EDIT CATEGORY' : 'ADD CATEGORY';
+  document.getElementById('scat-name').value = cat?.name || '';
+  document.getElementById('scat-icon').value = cat?.icon || '';
+  document.getElementById('scat-err').style.display = 'none';
+  openDrawer('skill-cat-drawer');
+}
+
+async function saveSkillCategory() {
+  const name = document.getElementById('scat-name').value.trim();
+  const icon = document.getElementById('scat-icon').value.trim() || null;
+  const errEl = document.getElementById('scat-err');
+  if (!name) { errEl.textContent = 'Category name is required'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('scat-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    if (UM.editingCatId) {
+      await API.patch(`hud_skill_categories?id=eq.${UM.editingCatId}`, { name, icon });
+      const c = UM.skillCats.find(x => x.id === UM.editingCatId);
+      if (c) { c.name = name; c.icon = icon; }
+    } else {
+      const payload = { firm_id: UM.firmId, name, icon, sort_order: UM.skillCats.length * 10 };
+      const [created] = await API.post('hud_skill_categories', payload);
+      if (created) UM.skillCats.push(created);
+    }
+    closeDrawer();
+    renderSkillsLibrary();
+  } catch(e) { errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block'; }
+  finally { btn.textContent = 'SAVE CATEGORY'; btn.disabled = false; }
+}
+
+async function deleteSkillCategory(catId, catName) {
+  const skillCount = UM.skills.filter(s => s.category_id === catId).length;
+  const msg = skillCount
+    ? `Delete category "${catName}" and its ${skillCount} skill(s)? This cannot be undone.`
+    : `Delete category "${catName}"?`;
+  if (!confirm(msg)) return;
+  try {
+    // Delete skills first
+    if (skillCount) await API.del(`hud_skills?category_id=eq.${catId}`).catch(()=>{});
+    await API.del(`hud_skill_categories?id=eq.${catId}`);
+    UM.skillCats = UM.skillCats.filter(c => c.id !== catId);
+    UM.skills    = UM.skills.filter(s => s.category_id !== catId);
+    renderSkillsLibrary();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── SKILL MANAGEMENT ──────────────────────────────────────────
+function openSkillDrawer(catId, catName) {
+  UM.editingSkillId = null;
+  UM._defaultSkillCat = catId;
+  document.getElementById('skill-drawer-title').textContent = 'ADD SKILL' + (catName ? ' — ' + catName : '');
+  document.getElementById('sk-name').value    = '';
+  document.getElementById('sk-desc').value    = '';
+  document.getElementById('sk-aliases').value = '';
+  // Populate category select
+  const catSel = document.getElementById('sk-cat');
+  catSel.innerHTML = UM.skillCats.map(c =>
+    `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+  document.getElementById('sk-err').style.display = 'none';
+  openDrawer('skill-drawer');
+}
+
+function openEditSkillDrawer(skillId) {
+  const s = UM.skills.find(x => x.id === skillId);
+  if (!s) return;
+  UM.editingSkillId = skillId;
+  document.getElementById('skill-drawer-title').textContent = 'EDIT SKILL';
+  document.getElementById('sk-name').value    = s.name || '';
+  document.getElementById('sk-desc').value    = s.description || '';
+  const aliases = Array.isArray(s.aliases) ? s.aliases : [];
+  document.getElementById('sk-aliases').value = aliases.join(', ');
+  const catSel = document.getElementById('sk-cat');
+  catSel.innerHTML = UM.skillCats.map(c =>
+    `<option value="${c.id}" ${c.id === s.category_id ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+  document.getElementById('sk-err').style.display = 'none';
+  openDrawer('skill-drawer');
+}
+
+async function saveSkill() {
+  const name    = document.getElementById('sk-name').value.trim();
+  const catId   = document.getElementById('sk-cat').value;
+  const desc    = document.getElementById('sk-desc').value.trim() || null;
+  const aliasRaw= document.getElementById('sk-aliases').value;
+  const aliases = aliasRaw.split(',').map(a => a.trim()).filter(Boolean);
+  const errEl   = document.getElementById('sk-err');
+  if (!name) { errEl.textContent = 'Skill name is required'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('sk-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  const payload = { firm_id: UM.firmId, category_id: catId||null, name, description: desc,
+    aliases: aliases.length ? aliases : null, is_active: true,
+    sort_order: UM.skills.filter(s=>s.category_id===catId).length * 10 };
+  try {
+    if (UM.editingSkillId) {
+      await API.patch(`hud_skills?id=eq.${UM.editingSkillId}`, payload);
+      const idx = UM.skills.findIndex(s => s.id === UM.editingSkillId);
+      if (idx >= 0) UM.skills[idx] = { ...UM.skills[idx], ...payload };
+    } else {
+      const [created] = await API.post('hud_skills', payload);
+      if (created) UM.skills.push(created);
+    }
+    closeDrawer();
+    renderSkillsLibrary();
+  } catch(e) { errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block'; }
+  finally { btn.textContent = 'SAVE SKILL'; btn.disabled = false; }
+}
+
+async function deleteSkill(skillId, skillName, catId) {
+  if (!confirm(`Delete skill "${skillName}"? This will also remove it from all resource profiles.`)) return;
+  try {
+    await API.del(`resource_skills?skill_id=eq.${skillId}`).catch(()=>{});
+    await API.del(`hud_skills?id=eq.${skillId}`);
+    UM.skills = UM.skills.filter(s => s.id !== skillId);
+    renderSkillsLibrary();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── SKILL HOVER TOOLTIP ───────────────────────────────────────
+let _skillTTTimer = null;
+let _skillTTCache = {};
+
+function _showSkillTT(e, skillId) {
+  clearTimeout(_skillTTTimer);
+  _skillTTTimer = setTimeout(async () => {
+    const skill = UM.skills.find(s => s.id === skillId);
+    if (!skill) return;
+    const tt = document.getElementById('skill-hover-tt');
+    document.getElementById('stt-name').textContent = skill.name;
+    const cat = UM.skillCats.find(c => c.id === skill.category_id);
+    document.getElementById('stt-cat').textContent = cat ? cat.name.toUpperCase() : '';
+    const peopleEl = document.getElementById('stt-people');
+    peopleEl.innerHTML = '<div class="stt-empty">Loading...</div>';
+    tt.classList.add('visible');
+    _positionSkillTT(e.clientX, e.clientY);
+    // Fetch resource_skills for this skill (cached)
+    if (!_skillTTCache[skillId]) {
+      try {
+        _skillTTCache[skillId] = await API.get(
+          `resource_skills?select=*&skill_id=eq.${skillId}`
+        ).catch(() => []);
+      } catch(err) { _skillTTCache[skillId] = []; }
+    }
+    const entries = _skillTTCache[skillId] || [];
+    if (!entries.length) {
+      peopleEl.innerHTML = '<div class="stt-empty">No team members have this skill yet</div>';
+      return;
+    }
+    const profOrder = { authority:0, expert:1, practitioner:2, aware:3 };
+    const sorted = [...entries].sort((a,b) =>
+      (profOrder[a.proficiency]||9) - (profOrder[b.proficiency]||9));
+    const profColors = {
+      authority:'var(--purple)', expert:'var(--amber)',
+      practitioner:'var(--cyan)', aware:'var(--text3)'
+    };
+    peopleEl.innerHTML = sorted.slice(0, 8).map(rs => {
+      const res = UM.resources.find(r => r.id === rs.resource_id);
+      if (!res) return '';
+      const dotColor = profColors[rs.proficiency] || 'var(--text3)';
+      return `<div class="stt-person-row">
+        <div class="stt-dot" style="background:${dotColor};"></div>
+        <div class="stt-person-name">${res.first_name} ${res.last_name}</div>
+        <span class="stt-prof ${rs.proficiency}">${rs.proficiency?.charAt(0).toUpperCase()+rs.proficiency?.slice(1)}</span>
+      </div>`;
+    }).join('') + (sorted.length > 8 ?
+      `<div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:4px 0;">
+        +${sorted.length-8} more</div>` : '');
+  }, 600);
+}
+
+function _hideSkillTT() {
+  clearTimeout(_skillTTTimer);
+  const tt = document.getElementById('skill-hover-tt');
+  if (tt) tt.classList.remove('visible');
+}
+
+function _moveSkillTT(e) {
+  const tt = document.getElementById('skill-hover-tt');
+  if (tt?.classList.contains('visible')) _positionSkillTT(e.clientX, e.clientY);
+}
+
+function _positionSkillTT(x, y) {
+  const tt = document.getElementById('skill-hover-tt');
+  if (!tt) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let left = x + 14, top = y - 10;
+  if (left + 310 > vw - 8) left = x - 314;
+  if (top + tt.offsetHeight > vh - 8) top = vh - tt.offsetHeight - 8;
+  tt.style.left = Math.max(8, left) + 'px';
+  tt.style.top  = Math.max(8, top) + 'px';
+}
+
+// Invalidate cache when skills are updated
+const _origSaveSkill = typeof saveSkill !== 'undefined' ? saveSkill : null;
 
 // ── NAVIGATION ───────────────────────────────────────────────
 function goBack() {
