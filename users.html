@@ -151,9 +151,12 @@
 
   <div class="um-main">
     <div class="um-header">
-      <div>
-        <div class="um-title">USER MANAGEMENT</div>
-        <div class="um-subtitle">RESOURCES · ROLES · RATES · ACCESS</div>
+      <div style="display:flex;align-items:flex-start;gap:16px;">
+        <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--text3);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:5px 12px;cursor:pointer;margin-top:4px;white-space:nowrap;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(0,210,255,0.4)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">&#8592; BACK</button>
+        <div>
+          <div class="um-title">USER MANAGEMENT</div>
+          <div class="um-subtitle">RESOURCES · ROLES · RATES · ACCESS</div>
+        </div>
       </div>
       <div id="um-firm-label" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:right;"></div>
     </div>
@@ -835,6 +838,17 @@ function closeDrawer() {
   document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
   document.getElementById('drawer-overlay').classList.remove('open');
   UM.editingResourceId = UM.editingRoleId = UM.editingCatId = UM.editingUserId = null;
+}
+
+// ── NAVIGATION ───────────────────────────────────────────────
+function goBack() {
+  // Try to return to the last project page, or fall back to projects list
+  const lastProject = sessionStorage.getItem('lastProjectId') || localStorage.getItem('lastProjectId');
+  if (lastProject) {
+    window.location.href = '/project-detail.html?id=' + lastProject;
+  } else {
+    window.history.length > 1 ? window.history.back() : window.location.href = '/projects.html';
+  }
 }
 
 // ── BOOT ──────────────────────────────────────────────────────

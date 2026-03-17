@@ -1820,6 +1820,9 @@ async function loadProjectDetail() {
       catch(e) { deps = []; }
     }
     STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures, deps };
+    // Store for back-navigation from other pages
+    sessionStorage.setItem('lastProjectId', PROJECT_ID);
+    localStorage.setItem('lastProjectId', PROJECT_ID);
     renderHeader();
     renderOverviewMilestones();
     renderOverviewTasks();
