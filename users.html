@@ -24,9 +24,9 @@
 .hc-tags { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
 .hc-section { padding:10px 16px; border-bottom:1px solid var(--border); }
 .hc-section:last-child { border-bottom:none; }
-.hc-section-title { font-family:var(--font-mono); font-size:9px; color:var(--cyan); letter-spacing:.14em; margin-bottom:7px; }
+.hc-section-title { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:.14em; margin-bottom:7px; }
 .hc-field { display:flex; justify-content:space-between; align-items:center; padding:2px 0; }
-.hc-field label { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:.08em; }
+.hc-field label { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:.08em; }
 .hc-field span { font-family:var(--font-mono); font-size:10px; color:var(--text2); }
 .hc-alloc-bar { height:5px; background:rgba(255,255,255,.05); margin-top:3px; margin-bottom:8px; }
 .hc-alloc-fill { height:100%; transition:width .3s; }
@@ -35,7 +35,7 @@
 .hc-alloc-pct { font-family:var(--font-mono); font-size:10px; }
 .hc-task-row { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.03); }
 .hc-task-name { font-family:var(--font-ui); font-size:10px; color:var(--text1); }
-.hc-task-dates { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
+.hc-task-dates { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
 
 /* ── RESOURCE CARD SKILL CHIPS ───────────────────────────────── */
 .skill-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
@@ -62,7 +62,7 @@
   border-bottom:1px solid rgba(255,255,255,.03); transition:background .1s; }
 .skill-row:hover { background:rgba(0,210,255,.02); }
 .skill-name { font-family:var(--font-ui); font-size:13px; color:var(--text1); flex:1; }
-.skill-aliases { font-family:var(--font-mono); font-size:9px; color:var(--text3); flex:2; overflow:hidden;
+.skill-aliases { font-family:var(--font-mono); font-size:10px; color:var(--text3); flex:2; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap; }
 .skill-count { font-family:var(--font-mono); font-size:10px; color:var(--text3); width:60px; text-align:right; }
 
@@ -75,7 +75,7 @@
   padding:3px 10px; cursor:pointer; font-family:var(--font-mono); }
 .cal-nav:hover { border-color:var(--cyan); color:var(--cyan); }
 .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); }
-.cal-dow { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:.1em;
+.cal-dow { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:.1em;
   padding:8px; text-align:center; border-bottom:1px solid var(--border); }
 .cal-day { padding:6px; min-height:52px; border-right:1px solid var(--border);
   border-bottom:1px solid var(--border); position:relative; cursor:pointer; transition:background .1s; }
@@ -83,7 +83,7 @@
 .cal-day.other-month .cal-day-num { color:var(--text3); opacity:.4; }
 .cal-day.today .cal-day-num { color:var(--cyan); font-weight:700; }
 .cal-day-num { font-family:var(--font-mono); font-size:10px; color:var(--text2); }
-.cal-event { font-family:var(--font-mono); font-size:8px; padding:1px 4px; margin-top:2px; border-radius:1px; }
+.cal-event { font-family:var(--font-mono); font-size:10px; padding:1px 4px; margin-top:2px; border-radius:1px; }
 .cal-event.holiday { background:rgba(255,71,87,.15); color:var(--red); border:1px solid rgba(255,71,87,.3); }
 .cal-event.pto     { background:rgba(0,210,255,.12); color:var(--cyan); border:1px solid rgba(0,210,255,.25); }
 .cal-event.training{ background:rgba(255,170,0,.12); color:var(--amber); border:1px solid rgba(255,170,0,.25); }
@@ -91,7 +91,7 @@
 .cal-sidebar { display:flex; flex-direction:column; gap:14px; }
 .cal-event-panel { background:var(--bg2); border:1px solid var(--border); }
 .cal-event-hdr { padding:9px 14px; border-bottom:1px solid var(--border);
-  font-family:var(--font-mono); font-size:9px; color:var(--cyan); letter-spacing:.14em; }
+  font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:.14em; }
 .cal-event-list { padding:8px; max-height:200px; overflow-y:auto; }
 .cal-event-item { display:flex; align-items:center; gap:8px; padding:5px 6px;
   border-bottom:1px solid rgba(255,255,255,.03); }
@@ -99,13 +99,13 @@
 .cal-event-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 .cal-event-info { flex:1; }
 .cal-event-name { font-family:var(--font-ui); font-size:11px; color:var(--text1); }
-.cal-event-who { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
+.cal-event-who { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
 .cal-event-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; padding:0 2px; }
 .cal-event-del:hover { color:var(--red); }
 
 /* ── ADD EVENT FORM ──────────────────────────────────────────── */
 .cal-add-form { background:var(--bg2); border:1px solid var(--border); padding:14px; }
-.cal-add-title { font-family:var(--font-mono); font-size:9px; color:var(--amber); letter-spacing:.14em; margin-bottom:12px; }
+.cal-add-title { font-family:var(--font-mono); font-size:10px; color:var(--amber); letter-spacing:.14em; margin-bottom:12px; }
 
 /* ── RESOURCE DRAWER TABS ────────────────────────────────────── */
 .res-drawer-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; }
@@ -118,7 +118,7 @@
 
 /* ── PROFICIENCY SELECTOR ────────────────────────────────────── */
 .prof-select { display:flex; gap:4px; }
-.prof-btn { font-family:var(--font-mono); font-size:9px; padding:3px 8px; cursor:pointer;
+.prof-btn { font-family:var(--font-mono); font-size:10px; padding:3px 8px; cursor:pointer;
   border:1px solid var(--border); background:none; color:var(--text3); transition:all .15s; }
 .prof-btn:hover { color:var(--text1); }
 .prof-btn.active-aware       { border-color:rgba(100,140,180,.5); color:var(--text1); background:rgba(100,140,180,.1); }
@@ -160,7 +160,7 @@
 .um-card-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
 .um-card-name { font-family:var(--font-ui); font-size:14px; font-weight:600; color:var(--text0); }
 .um-card-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:0.08em; margin-top:2px; }
-.um-card-badge { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em;
+.um-card-badge { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;
   padding:2px 8px; border:1px solid rgba(0,210,255,0.3); color:var(--cyan); background:rgba(0,210,255,0.06); }
 .um-card-actions { display:flex; gap:6px; }
 .um-card-action { background:none; border:none; cursor:pointer; font-size:13px; padding:2px 4px; opacity:0.6; }
@@ -244,7 +244,7 @@
   padding:7px 10px; margin-bottom:12px; display:none; }
 
 /* ── SECTION DIVIDER ─────────────────────────────────────────── */
-.um-divider { font-family:var(--font-mono); font-size:9px; letter-spacing:0.16em;
+.um-divider { font-family:var(--font-mono); font-size:10px; letter-spacing:0.16em;
   color:var(--cyan); margin:10px 0 6px; padding-bottom:5px; border-bottom:1px solid rgba(0,210,255,0.12); }
 
 /* ── EMPTY STATE ─────────────────────────────────────────────── */
@@ -266,9 +266,9 @@
 .hc-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
 .hc-section { padding:10px 16px; border-bottom:1px solid var(--border); }
 .hc-section:last-child { border-bottom:none; }
-.hc-section-lbl { font-family:var(--font-mono); font-size:9px; color:var(--cyan); letter-spacing:0.14em; margin-bottom:8px; }
+.hc-section-lbl { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:0.14em; margin-bottom:8px; }
 .hc-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:11px; }
-.hc-row-lbl { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; }
+.hc-row-lbl { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:0.08em; }
 .hc-row-val { font-family:var(--font-mono); font-size:11px; color:var(--text2); }
 .hc-alloc-bar { height:5px; background:rgba(255,255,255,0.06); margin-top:2px; margin-bottom:6px; }
 .hc-alloc-fill { height:100%; transition:width 0.3s; }
@@ -277,8 +277,8 @@
 .hc-task-row:last-child { border-bottom:none; }
 .hc-task-name { font-family:var(--font-ui); font-size:11px; color:var(--text1); max-width:180px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.hc-task-meta { font-family:var(--font-mono); font-size:9px; color:var(--text3); white-space:nowrap; }
-.hc-skill-chip { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px;
+.hc-task-meta { font-family:var(--font-mono); font-size:10px; color:var(--text3); white-space:nowrap; }
+.hc-skill-chip { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:10px;
   padding:2px 7px; border:1px solid var(--border); color:var(--text2); margin:2px; }
 .hc-skill-chip .prof { color:var(--cyan); }
 .hc-empty { font-family:var(--font-mono); font-size:10px; color:var(--text3); text-align:center; padding:8px; }
@@ -292,7 +292,7 @@
 .skill-cat-hdr .cat-actions { display:flex; gap:6px; opacity:0; transition:opacity .15s; }
 .skill-cat-block:hover .cat-actions { opacity:1; }
 .skill-mgmt-btn { background:none; border:1px solid var(--border); color:var(--text3);
-  font-family:var(--font-mono); font-size:9px; padding:2px 7px; cursor:pointer;
+  font-family:var(--font-mono); font-size:10px; padding:2px 7px; cursor:pointer;
   letter-spacing:0.08em; transition:all .15s; }
 .skill-mgmt-btn:hover { color:var(--text1); border-color:rgba(0,210,255,0.3); }
 .skill-mgmt-btn.add   { color:var(--cyan); border-color:rgba(0,210,255,0.3); }
@@ -300,7 +300,7 @@
 .skill-mgmt-btn.del   { color:var(--red); border-color:rgba(255,71,87,0.3); }
 .skill-chip-wrap { position:relative; display:inline-block; }
 .skill-chip-del { position:absolute; top:-5px; right:-5px; width:14px; height:14px;
-  border-radius:50%; background:var(--red); color:#fff; font-size:9px; border:none;
+  border-radius:50%; background:var(--red); color:#fff; font-size:10px; border:none;
   cursor:pointer; display:none; align-items:center; justify-content:center;
   line-height:1; padding:0; }
 .skill-chip-wrap:hover .skill-chip-del { display:flex; }
@@ -314,16 +314,16 @@
 #skill-hover-tt.visible { opacity:1; }
 .stt-hdr { padding:10px 14px 8px; border-bottom:1px solid var(--border);
   font-family:var(--font-hud); font-size:14px; font-weight:700; color:var(--text0); }
-.stt-sub { font-family:var(--font-mono); font-size:9px; color:var(--text3);
+.stt-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3);
   letter-spacing:0.1em; margin-top:2px; }
 .stt-section { padding:8px 14px; }
-.stt-section-lbl { font-family:var(--font-mono); font-size:9px; color:var(--cyan);
+.stt-section-lbl { font-family:var(--font-mono); font-size:10px; color:var(--cyan);
   letter-spacing:0.14em; margin-bottom:6px; }
 .stt-person-row { display:flex; align-items:center; gap:8px; padding:3px 0;
   border-bottom:1px solid rgba(255,255,255,.03); }
 .stt-person-row:last-child { border-bottom:none; }
 .stt-person-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
-.stt-prof { font-family:var(--font-mono); font-size:9px; padding:1px 6px;
+.stt-prof { font-family:var(--font-mono); font-size:10px; padding:1px 6px;
   border-radius:1px; }
 .stt-prof.aware       { background:rgba(100,140,180,.1); color:var(--text2);
   border:1px solid rgba(100,140,180,.3); }
@@ -352,12 +352,12 @@
 .cal-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 .cal-panel { background:var(--bg2); border:1px solid var(--border); }
 .cal-hdr { padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--border);
-  font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em; display:flex; align-items:center; justify-content:space-between; }
+  font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; display:flex; align-items:center; justify-content:space-between; }
 .cal-entry { display:flex; align-items:center; gap:10px; padding:7px 14px; border-bottom:1px solid rgba(255,255,255,0.03); }
 .cal-entry:last-child { border-bottom:none; }
 .cal-date { font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:80px; flex-shrink:0; }
 .cal-note { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
-.cal-type { font-family:var(--font-mono); font-size:9px; padding:1px 6px; border:1px solid; }
+.cal-type { font-family:var(--font-mono); font-size:10px; padding:1px 6px; border:1px solid; }
 .cal-hours { font-family:var(--font-mono); font-size:10px; color:var(--text3); width:30px; text-align:right; }
 .cal-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; opacity:0.6; }
 .cal-del:hover { color:var(--red); opacity:1; }
@@ -368,8 +368,8 @@
   cursor:pointer; transition:background 0.1s; }
 .sp-row:hover { background:rgba(0,210,255,0.04); }
 .sp-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
-.sp-cat { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
-.sp-add { font-family:var(--font-mono); font-size:9px; color:var(--cyan); padding:2px 7px;
+.sp-cat { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
+.sp-add { font-family:var(--font-mono); font-size:10px; color:var(--cyan); padding:2px 7px;
   border:1px solid rgba(0,210,255,0.3); background:none; cursor:pointer; flex-shrink:0; }
 .as-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.03); }
 .as-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
@@ -488,9 +488,9 @@
             <div id="holiday-list"><div class="um-loading">...</div></div>
             <div class="cal-add-form">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
                   <input id="hol-date" class="um-input" type="date" style="width:100%;box-sizing:border-box;"/></div>
-                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
                   <input id="hol-hrs" class="um-input" type="number" min="0" max="8" value="0" style="width:100%;box-sizing:border-box;"/></div>
               </div>
               <input id="hol-note" class="um-input" type="text" placeholder="Holiday name..." style="width:100%;box-sizing:border-box;margin-bottom:8px;"/>
@@ -505,7 +505,7 @@
               <span style="color:var(--cyan)">👤 RESOURCE PTO / EXCEPTIONS</span>
             </div>
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
-              <label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">SELECT RESOURCE</label>
+              <label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">SELECT RESOURCE</label>
               <select id="pto-resource-sel" class="um-select" onchange="loadResourceCalendar()" style="width:100%;">
                 <option value="">— Select resource —</option>
               </select>
@@ -513,9 +513,9 @@
             <div id="pto-list"><div class="hc-empty">Select a resource to view their calendar</div></div>
             <div class="cal-add-form" id="pto-add-form" style="display:none;">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
                   <input id="pto-date" class="um-input" type="date" style="width:100%;box-sizing:border-box;"/></div>
-                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">TYPE</label>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">TYPE</label>
                   <select id="pto-type" class="um-select" style="width:100%;box-sizing:border-box;">
                     <option value="pto">PTO</option>
                     <option value="training">Training</option>
@@ -524,9 +524,9 @@
                   </select></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
                   <input id="pto-hrs" class="um-input" type="number" min="0" max="8" value="0" style="width:100%;box-sizing:border-box;"/></div>
-                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">NOTE</label>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">NOTE</label>
                   <input id="pto-note" class="um-input" type="text" placeholder="Optional note" style="width:100%;box-sizing:border-box;"/></div>
               </div>
               <button class="um-add-btn" onclick="addPTO()" style="width:100%;">+ ADD EXCEPTION</button>
@@ -1373,7 +1373,7 @@ function renderSkillsLibrary() {
     html += `<div class="skill-cat-block" data-cat-id="${cat.id}">
       <div class="skill-cat-hdr">
         <span>${cat.icon || '◈'} ${cat.name.toUpperCase()}
-          <span style="color:var(--text3);font-size:9px;margin-left:8px;">${catSkills.length} SKILLS</span>
+          <span style="color:var(--text3);font-size:10px;margin-left:8px;">${catSkills.length} SKILLS</span>
         </span>
         <div class="cat-actions">
           <button class="skill-mgmt-btn add"  onclick="openSkillDrawer('${cat.id}','${cat.name.replace(/'/g,"\'")}')">+ SKILL</button>
@@ -1645,8 +1645,8 @@ function renderDomainList() {
       ${d.subsystem ? `<div class="de-sub">Subsystem: ${d.subsystem}</div>` : ''}
       ${d.context   ? `<div class="de-ctx">${d.context}</div>` : ''}
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${d.years||0}yrs</span>
-        ${d.reg_class && d.reg_class !== 'N/A' ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);">${d.reg_class}</span>` : ''}
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">${d.years||0}yrs</span>
+        ${d.reg_class && d.reg_class !== 'N/A' ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--amber);">${d.reg_class}</span>` : ''}
       </div>
       <button class="de-del" onclick="removeDomainPending(${i})">✕</button>
     </div>`).join('');
@@ -1780,110 +1780,205 @@ async function showHoverCard(resourceId, anchorEl) {
   const r = UM.resources.find(x => x.id === resourceId);
   if (!r || !card) return;
 
-  const role = UM.roles.find(x => x.id === r.hud_role_id);
-  const initials = ((r.first_name||'?')[0]+(r.last_name||'?')[0]).toUpperCase();
-  const colors = ['#00d2ff','#00e5a0','#ffaa00','#a855f7','#ff4757'];
-  const color = colors[initials.charCodeAt(0) % colors.length];
+  const role    = UM.roles.find(x => x.id === r.hud_role_id);
+  const cat     = role ? UM.categories.find(c => c.id === role.category_id) : null;
+  const initials= ((r.first_name||'?')[0]+(r.last_name||'?')[0]).toUpperCase();
+  const colors  = ['#00d2ff','#00e5a0','#ffaa00','#a855f7','#ff4757'];
+  const color   = colors[initials.charCodeAt(0) % colors.length];
 
   document.getElementById('hc-avatar').textContent = initials;
-  document.getElementById('hc-avatar').style.background = color + '18';
-  document.getElementById('hc-avatar').style.color = color;
-  document.getElementById('hc-name').textContent = `${r.first_name} ${r.last_name}`;
+  document.getElementById('hc-avatar').style.cssText = `background:${color}18;color:${color};border-color:${color}44;`;
+  document.getElementById('hc-name').textContent  = `${r.first_name} ${r.last_name}`;
   document.getElementById('hc-title').textContent = r.title || role?.name || '—';
 
-  // Load skills + domain exp + allocation if not cached
-  let skills = UM.resourceSkills[resourceId];
-  if (!skills) {
-    try {
-      skills = await API.get(`resource_skills?resource_id=eq.${resourceId}&limit=6`);
-      UM.resourceSkills[resourceId] = skills || [];
-    } catch(e) { skills = []; }
-  }
+  // Load all extended data in parallel
+  const [skills, profile, domains, assignments] = await Promise.all([
+    UM.resourceSkills[resourceId]
+      ? Promise.resolve(UM.resourceSkills[resourceId])
+      : API.get(`resource_skills?resource_id=eq.${resourceId}`).catch(()=>[]),
+    UM.resourceProfiles[resourceId]
+      ? Promise.resolve([UM.resourceProfiles[resourceId]])
+      : API.get(`resource_profiles?resource_id=eq.${resourceId}&limit=1`).catch(()=>[]),
+    UM.resourceDomains[resourceId]
+      ? Promise.resolve(UM.resourceDomains[resourceId])
+      : API.get(`resource_domain_experience?resource_id=eq.${resourceId}`).catch(()=>[]),
+    API.get(`task_resource_assignments?resource_id=eq.${resourceId}&select=*,tasks(name,start_date,due_date,project_id,status)`).catch(()=>[]),
+  ]);
 
-  // Load task assignments for this resource across all projects
-  let assignments = [];
-  try {
-    assignments = await API.get(
-      `task_resource_assignments?resource_id=eq.${resourceId}&select=*,tasks(name,start_date,due_date,project_id,status)`
-    ) || [];
-  } catch(e) {}
+  // Cache
+  UM.resourceSkills[resourceId]   = skills  || [];
+  UM.resourceProfiles[resourceId] = profile?.[0] || null;
+  UM.resourceDomains[resourceId]  = domains || [];
 
-  // Build allocation by project
+  const prof = profile?.[0];
+
+  // Build allocation map
   const byProject = {};
-  assignments.forEach(a => {
+  (assignments||[]).forEach(a => {
     const pid = a.tasks?.project_id || 'unknown';
-    if (!byProject[pid]) byProject[pid] = {tasks:[], totalPct:0};
+    if (!byProject[pid]) byProject[pid] = { tasks:[], totalPct:0 };
     byProject[pid].tasks.push(a);
     byProject[pid].totalPct += (a.allocation_pct || 0);
   });
+  const totalPct = Object.values(byProject).reduce((s,p) => s+(p.totalPct||0), 0);
+  const availPct = r.availability_pct ?? 100;
+  const utilColor = totalPct > availPct ? 'var(--red)' : totalPct > availPct*0.8 ? 'var(--amber)' : 'var(--green)';
+
+  const profColors = { aware:'var(--text2)', practitioner:'var(--cyan)', expert:'var(--amber)', authority:'var(--purple)' };
 
   let html = '';
 
-  // Info section
+  // ── SECTION 1: CONTACT & INFO ─────────────────────────────
   html += '<div class="hc-section">';
+  html += '<div class="hc-section-lbl">CONTACT &amp; INFO</div>';
   if (r.email)      html += `<div class="hc-row"><span class="hc-row-lbl">EMAIL</span><span class="hc-row-val">${r.email}</span></div>`;
   if (r.phone)      html += `<div class="hc-row"><span class="hc-row-lbl">PHONE</span><span class="hc-row-val">${r.phone}</span></div>`;
   if (r.department) html += `<div class="hc-row"><span class="hc-row-lbl">DEPT</span><span class="hc-row-val">${r.department}</span></div>`;
   if (r.location)   html += `<div class="hc-row"><span class="hc-row-lbl">LOCATION</span><span class="hc-row-val">${r.location}</span></div>`;
   if (r.hire_date)  html += `<div class="hc-row"><span class="hc-row-lbl">HIRED</span><span class="hc-row-val">${_fmtCalDate(r.hire_date)}</span></div>`;
-  if (r.notes)      html += `<div class="hc-row" style="margin-top:4px;"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);font-style:italic;">${r.notes}</span></div>`;
+  if (cat)          html += `<div class="hc-row"><span class="hc-row-lbl">CATEGORY</span><span class="hc-row-val">${cat.name}</span></div>`;
+  if (r.availability_pct != null) html += `<div class="hc-row"><span class="hc-row-lbl">AVAILABILITY</span><span class="hc-row-val" style="color:${availPct<100?'var(--amber)':'var(--text1)'};">${availPct}%</span></div>`;
   html += '</div>';
 
-  // Skills section
+  // ── SECTION 2: PROFESSIONAL PROFILE ──────────────────────
+  if (prof) {
+    const hasProfile = (prof.specialty_summary || prof.education?.length ||
+      prof.certifications?.length || prof.prior_companies?.length || prof.notable_projects?.length);
+    if (hasProfile) {
+      html += '<div class="hc-section">';
+      html += '<div class="hc-section-lbl">PROFESSIONAL PROFILE</div>';
+      if (prof.specialty_summary) {
+        html += `<div style="font-family:var(--font-body);font-size:11px;color:var(--text2);
+          line-height:1.55;margin-bottom:8px;font-style:italic;">${prof.specialty_summary}</div>`;
+      }
+      if (prof.certifications?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">CERTS</span>
+          <span class="hc-row-val">${prof.certifications.join(' · ')}</span></div>`;
+      }
+      if (prof.education?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">EDUCATION</span>
+          <span class="hc-row-val">${prof.education[0]}${prof.education.length>1?' +'+( prof.education.length-1):''}</span></div>`;
+      }
+      if (prof.prior_companies?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">PRIOR</span>
+          <span class="hc-row-val">${prof.prior_companies.slice(0,2).join(' · ')}</span></div>`;
+      }
+      if (prof.notable_projects?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">NOTABLE</span>
+          <span class="hc-row-val">${prof.notable_projects[0]}${prof.notable_projects.length>1?' +'+( prof.notable_projects.length-1):''}</span></div>`;
+      }
+      if (prof.linkedin_url) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">LINKEDIN</span>
+          <span class="hc-row-val"><a href="${prof.linkedin_url}" target="_blank"
+            style="color:var(--cyan);">View Profile ↗</a></span></div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  // ── SECTION 3: SKILLS ────────────────────────────────────
   if (skills?.length) {
-    html += '<div class="hc-section"><div class="hc-section-lbl">SKILLS</div><div>';
-    const profColors = {aware:'var(--text3)',practitioner:'var(--cyan)',expert:'var(--amber)',authority:'var(--green)'};
-    skills.slice(0,6).forEach(s => {
-      const sk = UM.skills.find(x => x.id === s.skill_id);
-      html += `<span class="hc-skill-chip">${sk?.name||'?'} <span class="prof" style="color:${profColors[s.proficiency]||'var(--cyan)'};">${s.proficiency?.charAt(0).toUpperCase()}</span></span>`;
+    const sorted = [...skills].sort((a,b) => {
+      const order = {authority:0,expert:1,practitioner:2,aware:3};
+      return (order[a.proficiency]||9)-(order[b.proficiency]||9);
     });
-    if (skills.length > 6) html += `<span class="hc-skill-chip" style="color:var(--text3);">+${skills.length-6} more</span>`;
+    html += '<div class="hc-section">';
+    html += '<div class="hc-section-lbl">SKILLS &amp; PROFICIENCY</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    sorted.slice(0,10).forEach(s => {
+      const sk = UM.skills.find(x => x.id === s.skill_id);
+      const pc = profColors[s.proficiency] || 'var(--text3)';
+      html += `<span style="font-family:var(--font-mono);font-size:10px;padding:2px 7px;
+        border:1px solid ${pc}44;color:${pc};background:${pc}0d;white-space:nowrap;">
+        ${sk?.name||'?'}</span>`;
+    });
+    if (sorted.length > 10) html += `<span style="font-family:var(--font-mono);font-size:10px;
+      color:var(--text3);padding:2px 4px;">+${sorted.length-10} more</span>`;
     html += '</div></div>';
   }
 
-  // Allocation section
-  const totalPct = Object.values(byProject).reduce((sum,p) => sum + (p.totalPct||0), 0);
-  const availPct = r.availability_pct ?? 100;
-  const utilColor = totalPct > availPct ? 'var(--red)' : totalPct > availPct*0.8 ? 'var(--amber)' : 'var(--green)';
+  // ── SECTION 4: DOMAIN EXPERIENCE ─────────────────────────
+  if (domains?.length) {
+    html += '<div class="hc-section">';
+    html += '<div class="hc-section-lbl">DOMAIN EXPERIENCE</div>';
+    domains.slice(0,4).forEach(d => {
+      const dom = UM.skillDomains?.find(x => x.id === d.domain_id);
+      html += `<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+        <div style="font-family:var(--font-hud);font-size:12px;font-weight:700;color:var(--text0);">
+          ${dom?.name || d.domain_name || '—'}</div>`;
+      if (d.subsystem) html += `<div style="font-family:var(--font-mono);font-size:10px;
+        color:var(--cyan);margin-top:1px;">${d.subsystem}</div>`;
+      const meta = [
+        d.years_experience ? d.years_experience+'yr exp' : null,
+        d.regulatory_class && d.regulatory_class!=='N/A' ? d.regulatory_class : null,
+      ].filter(Boolean);
+      if (meta.length) html += `<div style="font-family:var(--font-mono);font-size:10px;
+        color:var(--text3);margin-top:2px;">${meta.join(' · ')}</div>`;
+      if (d.context) html += `<div style="font-family:var(--font-body);font-size:10px;
+        color:var(--text2);margin-top:2px;font-style:italic;">${d.context}</div>`;
+      html += '</div>';
+    });
+    if (domains.length > 4) html += `<div style="font-family:var(--font-mono);font-size:10px;
+      color:var(--text3);padding:4px 0;">+${domains.length-4} more domains</div>`;
+    html += '</div>';
+  }
+
+  // ── SECTION 5: ALLOCATION & TASKS ────────────────────────
   html += `<div class="hc-section">
-    <div class="hc-section-lbl">FIRM-WIDE ALLOCATION</div>
+    <div class="hc-section-lbl">ALLOCATION — FIRM-WIDE</div>
     <div class="hc-row">
-      <span class="hc-row-lbl">CAPACITY</span>
-      <span class="hc-row-val">${availPct}%</span>
+      <span class="hc-row-lbl">CAPACITY</span><span class="hc-row-val">${availPct}%</span>
     </div>
     <div class="hc-row">
       <span class="hc-row-lbl">COMMITTED</span>
-      <span style="font-family:var(--font-mono);font-size:11px;color:${utilColor};font-weight:700;">${totalPct.toFixed(0)}% ${totalPct > availPct ? '⚠ OVER' : ''}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:${utilColor};font-weight:700;">
+        ${totalPct.toFixed(0)}%${totalPct>availPct?' ⚠ OVERLOADED':''}</span>
     </div>
-    <div class="hc-alloc-bar">
+    <div class="hc-alloc-bar" style="margin:5px 0;">
       <div class="hc-alloc-fill" style="width:${Math.min(totalPct/availPct*100,100)}%;background:${utilColor};"></div>
     </div>`;
-  if (assignments.length) {
-    html += '<div class="hc-section-lbl" style="margin-top:6px;">ASSIGNED TASKS</div>';
+  if (assignments?.length) {
+    html += '<div class="hc-section-lbl" style="margin-top:6px;">ACTIVE TASKS</div>';
     assignments.slice(0,4).forEach(a => {
-      const t = a.tasks || {};
+      const t  = a.tasks || {};
+      const st = t.start_date ? new Date(t.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+      const en = t.due_date   ? new Date(t.due_date  +'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
       html += `<div class="hc-task-row">
         <span class="hc-task-name">${t.name||'—'}</span>
-        <span class="hc-task-meta">${a.allocation_pct||100}% · ${t.status||''}</span>
+        <span class="hc-task-meta">[${a.allocation_pct||100}%] ${st}${en?' – '+en:''}</span>
       </div>`;
     });
-    if (assignments.length > 4) html += `<div class="hc-task-meta" style="padding:3px 0;color:var(--text3);">+${assignments.length-4} more tasks</div>`;
+    if (assignments.length > 4) html += `<div class="hc-task-meta" style="padding:3px 0;">
+      +${assignments.length-4} more tasks</div>`;
   } else {
-    html += '<div class="hc-empty" style="padding:4px 0;text-align:left;">No active task assignments</div>';
+    html += '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">No active task assignments</div>';
   }
   html += '</div>';
 
+  // ── Notes ─────────────────────────────────────────────────
+  if (r.notes) {
+    html += `<div class="hc-section" style="border-bottom:none;">
+      <div class="hc-section-lbl">NOTES</div>
+      <div style="font-family:var(--font-body);font-size:11px;color:var(--text2);
+        line-height:1.5;font-style:italic;">${r.notes}</div>
+    </div>`;
+  }
+
   document.getElementById('hc-body').innerHTML = html;
 
-  // Position card
-  const rect = anchorEl.getBoundingClientRect();
-  const cardW = 340, cardH = 420;
-  let left = rect.right + 10;
+  // ── Position card ─────────────────────────────────────────
+  const rect   = anchorEl.getBoundingClientRect();
+  const cardW  = 360;
+  const cardH  = Math.min(card.scrollHeight + 20, window.innerHeight - 20);
+  card.style.maxHeight = (window.innerHeight - 20) + 'px';
+  card.style.overflowY = 'auto';
+  let left = rect.right + 12;
   let top  = rect.top;
-  if (left + cardW > window.innerWidth - 10)  left = rect.left - cardW - 10;
+  if (left + cardW > window.innerWidth  - 10) left = rect.left - cardW - 12;
   if (top  + cardH > window.innerHeight - 10) top  = window.innerHeight - cardH - 10;
-  card.style.left = left + 'px';
-  card.style.top  = Math.max(10, top) + 'px';
+  card.style.left  = Math.max(10, left) + 'px';
+  card.style.top   = Math.max(10, top)  + 'px';
+  card.style.width = cardW + 'px';
   card.classList.add('visible');
 }
 
@@ -2088,7 +2183,7 @@ function _showSkillTT(e, skillId) {
         <span class="stt-prof ${rs.proficiency}">${rs.proficiency?.charAt(0).toUpperCase()+rs.proficiency?.slice(1)}</span>
       </div>`;
     }).join('') + (sorted.length > 8 ?
-      `<div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:4px 0;">
+      `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">
         +${sorted.length-8} more</div>` : '');
   }, 600);
 }
