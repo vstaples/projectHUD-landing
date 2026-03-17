@@ -2528,6 +2528,7 @@ async function saveTaskForm() {
   };
   try {
     if (_editingTaskId) {
+      const oldTask = { ...STATE.tasks.find(t => t.id === _editingTaskId) } || {};
       await API.patch(`tasks?id=eq.${_editingTaskId}`, payload);
       const idx = STATE.tasks.findIndex(t => t.id === _editingTaskId);
       if (idx >= 0) Object.assign(STATE.tasks[idx], payload);
