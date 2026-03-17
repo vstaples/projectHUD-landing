@@ -393,17 +393,18 @@ async function initUM() {
     const [firms, users, categories, roles, roleLevels, resources] = await Promise.all([
       API.get('firms?select=*&limit=10'),
       API.get('users?select=*&order=name.asc'),
-      API.get('role_categories?select=*&order=sort_order.asc'),
-      API.get('roles?select=*&order=sort_order.asc'),
-      API.get('role_levels?select=*').catch(() => []),
-      API.get('resources?select=*&order=last_name.asc').catch(() => []),
+      API.get('hud_role_categories?select=*').catch(() => []),
+      API.get('hud_roles?select=*').catch(() => []),
+      API.get('hud_role_levels?select=*').catch(() => []),
+      API.get('resources?select=*').catch(() => []),
     ]);
     UM.firms      = firms || [];
     UM.users      = users || [];
-    UM.categories = categories || [];
-    UM.roles      = roles || [];
+    // Sort client-side since sort_order column may not exist on pre-existing tables
+    UM.categories = (categories || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
+    UM.roles      = (roles || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
     UM.roleLevels = roleLevels || [];
-    UM.resources  = resources || [];
+    UM.resources  = (resources || []).sort((a,b) => (a.last_name||a.name||'').localeCompare(b.last_name||b.name||''));
     UM.firmId     = firms?.[0]?.id || null;
 
     const lbl = document.getElementById('um-firm-label');
@@ -633,11 +634,11 @@ async function saveRate(roleId, level, value, existingId) {
   if (isNaN(rate)) return;
   try {
     if (existingId) {
-      await API.patch(`role_levels?id=eq.${existingId}`, { overhead_rate_per_hour: rate });
+      await API.patch(`hud_role_levels?id=eq.${existingId}`, { overhead_rate_per_hour: rate });
       const rl = UM.roleLevels.find(r => r.id === existingId);
       if (rl) rl.overhead_rate_per_hour = rate;
     } else {
-      const [created] = await API.post('role_levels', { role_id: roleId, level, overhead_rate_per_hour: rate });
+      const [created] = await API.post('hud_role_levels', { role_id: roleId, level, overhead_rate_per_hour: rate });
       if (created) {
         UM.roleLevels.push(created);
         // Re-render so the new ID is in the input's onchange
@@ -688,11 +689,11 @@ async function saveRole() {
   try {
     let roleId = UM.editingRoleId;
     if (roleId) {
-      await API.patch(`roles?id=eq.${roleId}`, payload);
+      await API.patch(`hud_roles?id=eq.${roleId}`, payload);
       const idx = UM.roles.findIndex(r => r.id === roleId);
       if (idx >= 0) UM.roles[idx] = { ...UM.roles[idx], ...payload };
     } else {
-      const [created] = await API.post('roles', payload);
+      const [created] = await API.post('hud_roles', payload);
       if (created) { UM.roles.push(created); roleId = created.id; }
     }
     // Save rates
@@ -701,10 +702,10 @@ async function saveRole() {
       if (isNaN(val)) continue;
       const existing = UM.roleLevels.find(rl => rl.role_id===roleId && rl.level===level);
       if (existing) {
-        await API.patch(`role_levels?id=eq.${existing.id}`, { overhead_rate_per_hour: val });
+        await API.patch(`hud_role_levels?id=eq.${existing.id}`, { overhead_rate_per_hour: val });
         existing.overhead_rate_per_hour = val;
       } else {
-        const [created] = await API.post('role_levels', { role_id: roleId, level, overhead_rate_per_hour: val });
+        const [created] = await API.post('hud_role_levels', { role_id: roleId, level, overhead_rate_per_hour: val });
         if (created) UM.roleLevels.push(created);
       }
     }
@@ -721,8 +722,8 @@ async function saveRole() {
 async function deleteRole(id, name) {
   if (!confirm(`Delete role "${name}"? This will remove all associated rates.`)) return;
   try {
-    await API.del(`role_levels?role_id=eq.${id}`);
-    await API.del(`roles?id=eq.${id}`);
+    await API.del(`hud_role_levels?role_id=eq.${id}`);
+    await API.del(`hud_roles?id=eq.${id}`);
     UM.roles = UM.roles.filter(r => r.id !== id);
     UM.roleLevels = UM.roleLevels.filter(rl => rl.role_id !== id);
     renderRolesTable();
@@ -748,11 +749,11 @@ async function saveCategory() {
   btn.textContent = 'SAVING...'; btn.disabled = true;
   try {
     if (UM.editingCatId) {
-      await API.patch(`role_categories?id=eq.${UM.editingCatId}`, { name });
+      await API.patch(`hud_role_categories?id=eq.${UM.editingCatId}`, { name });
       const c = UM.categories.find(x => x.id === UM.editingCatId);
       if (c) c.name = name;
     } else {
-      const [created] = await API.post('role_categories', { firm_id: UM.firmId, name, sort_order: UM.categories.length * 10 });
+      const [created] = await API.post('hud_role_categories', { firm_id: UM.firmId, name, sort_order: UM.categories.length * 10 });
       if (created) UM.categories.push(created);
     }
     closeDrawer();
