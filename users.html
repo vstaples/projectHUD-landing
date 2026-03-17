@@ -785,8 +785,8 @@ function renderUsersTable() {
     const res = UM.resources.find(r => r.id === u.resource_id);
     const roleBadge = `<span class="app-role ${u.app_role||'viewer'}">${(u.app_role||'viewer').toUpperCase()}</span>`;
     html += `<tr>
-      <td><div style="display:flex;align-items:center;gap:8px;">${UI.avatar(u,22)}<span>${u.name||'—'}</span></div></td>
-      <td class="mono" style="color:var(--text3);font-size:10px;">${u.email||'—'}</td>
+      <td><div style="display:flex;align-items:center;gap:8px;">${UI.avatar(u,22)}<span style="font-size:15px;font-weight:600;color:var(--text0);">${u.name||'—'}</span></div></td>
+      <td class="mono" style="color:var(--text3);font-size:13px;">${u.email||'—'}</td>
       <td>${roleBadge}</td>
       <td style="font-size:11px;color:var(--text2);">${res ? res.first_name+' '+res.last_name : '<span style="color:var(--text3);">—</span>'}</td>
       <td><button class="um-card-action edit" onclick="openUserDrawer('${u.id}')" title="Edit access">✎</button></td>
