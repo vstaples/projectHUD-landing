@@ -6,6 +6,126 @@
 <title>ProjectHUD — User Management</title>
 <link rel="stylesheet" href="/css/hud.css">
 <style>
+
+/* ── HOVER CARD ──────────────────────────────────────────────── */
+#res-hover-card {
+  position:fixed; z-index:500; width:340px;
+  background:var(--bg1); border:1px solid var(--border2);
+  box-shadow:0 8px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(0,210,255,.08);
+  pointer-events:none; opacity:0; transition:opacity .15s;
+}
+#res-hover-card.visible { opacity:1; }
+.hc-top { padding:14px 16px 10px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px; }
+.hc-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:15px; font-weight:700; color:var(--cyan);
+  background:rgba(0,210,255,.1); border:1px solid rgba(0,210,255,.3); flex-shrink:0; }
+.hc-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
+.hc-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.hc-tags { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+.hc-section { padding:10px 16px; border-bottom:1px solid var(--border); }
+.hc-section:last-child { border-bottom:none; }
+.hc-section-title { font-family:var(--font-mono); font-size:9px; color:var(--cyan); letter-spacing:.14em; margin-bottom:7px; }
+.hc-field { display:flex; justify-content:space-between; align-items:center; padding:2px 0; }
+.hc-field label { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:.08em; }
+.hc-field span { font-family:var(--font-mono); font-size:10px; color:var(--text2); }
+.hc-alloc-bar { height:5px; background:rgba(255,255,255,.05); margin-top:3px; margin-bottom:8px; }
+.hc-alloc-fill { height:100%; transition:width .3s; }
+.hc-alloc-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+.hc-alloc-proj { font-family:var(--font-ui); font-size:10px; color:var(--text2); }
+.hc-alloc-pct { font-family:var(--font-mono); font-size:10px; }
+.hc-task-row { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.03); }
+.hc-task-name { font-family:var(--font-ui); font-size:10px; color:var(--text1); }
+.hc-task-dates { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
+
+/* ── RESOURCE CARD SKILL CHIPS ───────────────────────────────── */
+.skill-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.skill-chip { font-family:var(--font-mono); font-size:9px; padding:2px 7px; border:1px solid var(--border);
+  color:var(--text3); background:var(--bg3); cursor:default; }
+.skill-chip.aware       { border-color:rgba(100,140,180,.3); color:var(--text2); }
+.skill-chip.practitioner{ border-color:rgba(0,210,255,.25); color:var(--cyan); background:rgba(0,210,255,.04); }
+.skill-chip.expert      { border-color:rgba(255,170,0,.3); color:var(--amber); background:rgba(255,170,0,.04); }
+.skill-chip.authority   { border-color:rgba(168,85,247,.35); color:var(--purple); background:rgba(168,85,247,.04); }
+
+/* ── SKILLS TAB ──────────────────────────────────────────────── */
+.skills-layout { display:grid; grid-template-columns:220px 1fr; gap:0; height:calc(100vh - 200px); overflow:hidden; }
+.skills-sidebar { border-right:1px solid var(--border); overflow-y:auto; }
+.skills-cat-item { padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.03);
+  font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:.1em;
+  display:flex; align-items:center; gap:8px; transition:all .15s; }
+.skills-cat-item:hover { color:var(--text1); background:rgba(255,255,255,.02); }
+.skills-cat-item.active { color:var(--cyan); background:rgba(0,210,255,.04); border-left:2px solid var(--cyan); }
+.skills-cat-icon { font-size:14px; }
+.skills-content { overflow-y:auto; padding:20px; }
+.skills-cat-header { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:.16em;
+  margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid rgba(0,210,255,.15); }
+.skill-row { display:flex; align-items:center; gap:12px; padding:8px 10px;
+  border-bottom:1px solid rgba(255,255,255,.03); transition:background .1s; }
+.skill-row:hover { background:rgba(0,210,255,.02); }
+.skill-name { font-family:var(--font-ui); font-size:13px; color:var(--text1); flex:1; }
+.skill-aliases { font-family:var(--font-mono); font-size:9px; color:var(--text3); flex:2; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.skill-count { font-family:var(--font-mono); font-size:10px; color:var(--text3); width:60px; text-align:right; }
+
+/* ── CALENDAR TAB ────────────────────────────────────────────── */
+.cal-layout { display:grid; grid-template-columns:1fr 320px; gap:20px; }
+.cal-month { background:var(--bg2); border:1px solid var(--border); }
+.cal-month-hdr { padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.cal-month-title { font-family:var(--font-hud); font-size:16px; font-weight:700; color:var(--text0); flex:1; }
+.cal-nav { background:none; border:1px solid var(--border); color:var(--text3); font-size:14px;
+  padding:3px 10px; cursor:pointer; font-family:var(--font-mono); }
+.cal-nav:hover { border-color:var(--cyan); color:var(--cyan); }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.cal-dow { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:.1em;
+  padding:8px; text-align:center; border-bottom:1px solid var(--border); }
+.cal-day { padding:6px; min-height:52px; border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border); position:relative; cursor:pointer; transition:background .1s; }
+.cal-day:hover { background:rgba(0,210,255,.03); }
+.cal-day.other-month .cal-day-num { color:var(--text3); opacity:.4; }
+.cal-day.today .cal-day-num { color:var(--cyan); font-weight:700; }
+.cal-day-num { font-family:var(--font-mono); font-size:10px; color:var(--text2); }
+.cal-event { font-family:var(--font-mono); font-size:8px; padding:1px 4px; margin-top:2px; border-radius:1px; }
+.cal-event.holiday { background:rgba(255,71,87,.15); color:var(--red); border:1px solid rgba(255,71,87,.3); }
+.cal-event.pto     { background:rgba(0,210,255,.12); color:var(--cyan); border:1px solid rgba(0,210,255,.25); }
+.cal-event.training{ background:rgba(255,170,0,.12); color:var(--amber); border:1px solid rgba(255,170,0,.25); }
+.cal-event.travel  { background:rgba(168,85,247,.12); color:var(--purple); border:1px solid rgba(168,85,247,.25); }
+.cal-sidebar { display:flex; flex-direction:column; gap:14px; }
+.cal-event-panel { background:var(--bg2); border:1px solid var(--border); }
+.cal-event-hdr { padding:9px 14px; border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:9px; color:var(--cyan); letter-spacing:.14em; }
+.cal-event-list { padding:8px; max-height:200px; overflow-y:auto; }
+.cal-event-item { display:flex; align-items:center; gap:8px; padding:5px 6px;
+  border-bottom:1px solid rgba(255,255,255,.03); }
+.cal-event-item:last-child { border-bottom:none; }
+.cal-event-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.cal-event-info { flex:1; }
+.cal-event-name { font-family:var(--font-ui); font-size:11px; color:var(--text1); }
+.cal-event-who { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
+.cal-event-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; padding:0 2px; }
+.cal-event-del:hover { color:var(--red); }
+
+/* ── ADD EVENT FORM ──────────────────────────────────────────── */
+.cal-add-form { background:var(--bg2); border:1px solid var(--border); padding:14px; }
+.cal-add-title { font-family:var(--font-mono); font-size:9px; color:var(--amber); letter-spacing:.14em; margin-bottom:12px; }
+
+/* ── RESOURCE DRAWER TABS ────────────────────────────────────── */
+.res-drawer-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.res-drawer-tab { font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; color:var(--text3);
+  padding:7px 14px; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+.res-drawer-tab:hover { color:var(--text1); }
+.res-drawer-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+.res-drawer-panel { display:none; }
+.res-drawer-panel.active { display:block; }
+
+/* ── PROFICIENCY SELECTOR ────────────────────────────────────── */
+.prof-select { display:flex; gap:4px; }
+.prof-btn { font-family:var(--font-mono); font-size:9px; padding:3px 8px; cursor:pointer;
+  border:1px solid var(--border); background:none; color:var(--text3); transition:all .15s; }
+.prof-btn:hover { color:var(--text1); }
+.prof-btn.active-aware       { border-color:rgba(100,140,180,.5); color:var(--text1); background:rgba(100,140,180,.1); }
+.prof-btn.active-practitioner{ border-color:rgba(0,210,255,.4); color:var(--cyan); background:rgba(0,210,255,.08); }
+.prof-btn.active-expert      { border-color:rgba(255,170,0,.4); color:var(--amber); background:rgba(255,170,0,.08); }
+.prof-btn.active-authority   { border-color:rgba(168,85,247,.45); color:var(--purple); background:rgba(168,85,247,.08); }
+
 /* ── PAGE LAYOUT ─────────────────────────────────────────────── */
 .um-wrap { display:flex; height:100vh; overflow:hidden; }
 .um-main { flex:1; overflow-y:auto; padding:28px 32px; }
@@ -131,6 +251,86 @@
 .um-empty { text-align:center; padding:40px 20px; font-family:var(--font-mono);
   font-size:11px; color:var(--text3); letter-spacing:0.1em; }
 
+/* ── HOVER CARD ──────────────────────────────────────────────── */
+#res-hover-card {
+  position:fixed; z-index:500; width:340px;
+  background:var(--bg2); border:1px solid var(--border2);
+  box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 0 1px rgba(0,210,255,0.08);
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+}
+#res-hover-card.visible { opacity:1; }
+.hc-top { padding:14px 16px 10px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:flex-start; }
+.hc-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:15px; font-weight:700; flex-shrink:0; border:1px solid rgba(0,210,255,0.3); }
+.hc-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
+.hc-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.hc-section { padding:10px 16px; border-bottom:1px solid var(--border); }
+.hc-section:last-child { border-bottom:none; }
+.hc-section-lbl { font-family:var(--font-mono); font-size:9px; color:var(--cyan); letter-spacing:0.14em; margin-bottom:8px; }
+.hc-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:11px; }
+.hc-row-lbl { font-family:var(--font-mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; }
+.hc-row-val { font-family:var(--font-mono); font-size:11px; color:var(--text2); }
+.hc-alloc-bar { height:5px; background:rgba(255,255,255,0.06); margin-top:2px; margin-bottom:6px; }
+.hc-alloc-fill { height:100%; transition:width 0.3s; }
+.hc-task-row { display:flex; justify-content:space-between; align-items:center;
+  padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.03); font-size:10px; }
+.hc-task-row:last-child { border-bottom:none; }
+.hc-task-name { font-family:var(--font-ui); font-size:11px; color:var(--text1); max-width:180px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hc-task-meta { font-family:var(--font-mono); font-size:9px; color:var(--text3); white-space:nowrap; }
+.hc-skill-chip { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px;
+  padding:2px 7px; border:1px solid var(--border); color:var(--text2); margin:2px; }
+.hc-skill-chip .prof { color:var(--cyan); }
+.hc-empty { font-family:var(--font-mono); font-size:10px; color:var(--text3); text-align:center; padding:8px; }
+
+/* ── SKILLS LIBRARY TAB ──────────────────────────────────────── */
+.skill-cat-block { margin-bottom:24px; }
+.skill-cat-hdr { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:0.14em;
+  padding:6px 12px; background:rgba(0,210,255,0.04); border:1px solid var(--border); margin-bottom:8px;
+  display:flex; justify-content:space-between; align-items:center; }
+.skill-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.skill-chip { font-family:var(--font-mono); font-size:10px; padding:4px 10px;
+  border:1px solid var(--border); color:var(--text2); background:var(--bg2);
+  cursor:pointer; transition:all 0.15s; }
+.skill-chip:hover { border-color:rgba(0,210,255,0.4); color:var(--cyan); }
+.skill-chip .sk-alias { font-size:9px; color:var(--text3); display:block; margin-top:1px; }
+
+/* ── CALENDAR TAB ────────────────────────────────────────────── */
+.cal-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.cal-panel { background:var(--bg2); border:1px solid var(--border); }
+.cal-hdr { padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em; display:flex; align-items:center; justify-content:space-between; }
+.cal-entry { display:flex; align-items:center; gap:10px; padding:7px 14px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.cal-entry:last-child { border-bottom:none; }
+.cal-date { font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:80px; flex-shrink:0; }
+.cal-note { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.cal-type { font-family:var(--font-mono); font-size:9px; padding:1px 6px; border:1px solid; }
+.cal-hours { font-family:var(--font-mono); font-size:10px; color:var(--text3); width:30px; text-align:right; }
+.cal-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; opacity:0.6; }
+.cal-del:hover { color:var(--red); opacity:1; }
+.cal-add-form { padding:12px 14px; border-top:1px solid var(--border); background:var(--bg3); }
+
+/* ── SKILL PICKER (in resource drawer) ──────────────────────── */
+.sp-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.03);
+  cursor:pointer; transition:background 0.1s; }
+.sp-row:hover { background:rgba(0,210,255,0.04); }
+.sp-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.sp-cat { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
+.sp-add { font-family:var(--font-mono); font-size:9px; color:var(--cyan); padding:2px 7px;
+  border:1px solid rgba(0,210,255,0.3); background:none; cursor:pointer; flex-shrink:0; }
+.as-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.as-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.as-prof { font-family:var(--font-mono); font-size:10px; }
+.as-prof-sel { background:var(--bg3); border:1px solid var(--border); color:var(--text1);
+  font-family:var(--font-mono); font-size:10px; padding:2px 6px; outline:none; }
+.as-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; }
+.as-del:hover { color:var(--red); }
+.de-row { background:var(--bg3); border:1px solid var(--border); padding:8px 10px; margin-bottom:6px; position:relative; }
+.de-domain { font-family:var(--font-hud); font-size:13px; font-weight:700; color:var(--text0); }
+.de-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.de-ctx { font-family:var(--font-mono); font-size:10px; color:var(--cyan); margin-top:3px; }
+.de-del { position:absolute; top:8px; right:8px; background:none; border:none; color:var(--text3); cursor:pointer; }
+
 /* ── LOADING ─────────────────────────────────────────────────── */
 .um-loading { text-align:center; padding:32px; font-family:var(--font-mono);
   font-size:11px; color:var(--text3); letter-spacing:0.1em; animation:pulse 1.4s ease-in-out infinite; }
@@ -167,6 +367,8 @@
       <div class="um-tab active" data-tab="resources" onclick="switchUMTab('resources')">RESOURCES</div>
       <div class="um-tab" data-tab="roles"     onclick="switchUMTab('roles')">ROLES &amp; RATES</div>
       <div class="um-tab" data-tab="users"     onclick="switchUMTab('users')">APP USERS</div>
+      <div class="um-tab" data-tab="skills"    onclick="switchUMTab('skills')">SKILLS LIBRARY</div>
+      <div class="um-tab" data-tab="calendar"  onclick="switchUMTab('calendar')">CALENDAR</div>
     </div>
 
     <!-- ── RESOURCES TAB ────────────────────────────────────── -->
@@ -203,7 +405,93 @@
         <div class="um-loading">LOADING USERS...</div>
       </div>
     </div>
+    <!-- ── SKILLS LIBRARY TAB ────────────────────────────────── -->
+    <div class="um-panel" id="tab-skills">
+      <div class="um-section-hdr">
+        <div class="um-section-title">SKILL CATALOGUE</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);" id="skill-count-lbl"></div>
+      </div>
+      <div id="skills-library-wrap">
+        <div class="um-loading">LOADING SKILLS...</div>
+      </div>
+    </div>
+
+    <!-- ── CALENDAR TAB ──────────────────────────────────────── -->
+    <div class="um-panel" id="tab-calendar">
+      <div class="um-section-hdr">
+        <div class="um-section-title">FIRM CALENDAR &amp; PTO</div>
+      </div>
+      <div class="cal-grid">
+        <!-- Firm-wide holidays -->
+        <div>
+          <div class="cal-panel">
+            <div class="cal-hdr">
+              <span style="color:var(--amber)">🏢 FIRM-WIDE HOLIDAYS</span>
+              <span id="holiday-count" style="color:var(--text3)"></span>
+            </div>
+            <div id="holiday-list"><div class="um-loading">...</div></div>
+            <div class="cal-add-form">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
+                  <input id="hol-date" class="um-input" type="date" style="width:100%;box-sizing:border-box;"/></div>
+                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
+                  <input id="hol-hrs" class="um-input" type="number" min="0" max="8" value="0" style="width:100%;box-sizing:border-box;"/></div>
+              </div>
+              <input id="hol-note" class="um-input" type="text" placeholder="Holiday name..." style="width:100%;box-sizing:border-box;margin-bottom:8px;"/>
+              <button class="um-add-btn" onclick="addHoliday()" style="width:100%;">+ ADD HOLIDAY</button>
+            </div>
+          </div>
+        </div>
+        <!-- Per-resource PTO -->
+        <div>
+          <div class="cal-panel">
+            <div class="cal-hdr">
+              <span style="color:var(--cyan)">👤 RESOURCE PTO / EXCEPTIONS</span>
+            </div>
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+              <label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">SELECT RESOURCE</label>
+              <select id="pto-resource-sel" class="um-select" onchange="loadResourceCalendar()" style="width:100%;">
+                <option value="">— Select resource —</option>
+              </select>
+            </div>
+            <div id="pto-list"><div class="hc-empty">Select a resource to view their calendar</div></div>
+            <div class="cal-add-form" id="pto-add-form" style="display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
+                  <input id="pto-date" class="um-input" type="date" style="width:100%;box-sizing:border-box;"/></div>
+                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">TYPE</label>
+                  <select id="pto-type" class="um-select" style="width:100%;box-sizing:border-box;">
+                    <option value="pto">PTO</option>
+                    <option value="training">Training</option>
+                    <option value="travel">Travel</option>
+                    <option value="other">Other</option>
+                  </select></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
+                  <input id="pto-hrs" class="um-input" type="number" min="0" max="8" value="0" style="width:100%;box-sizing:border-box;"/></div>
+                <div><label style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">NOTE</label>
+                  <input id="pto-note" class="um-input" type="text" placeholder="Optional note" style="width:100%;box-sizing:border-box;"/></div>
+              </div>
+              <button class="um-add-btn" onclick="addPTO()" style="width:100%;">+ ADD EXCEPTION</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
+
+<!-- ── HOVER CARD ─────────────────────────────────────────────── -->
+<div id="res-hover-card">
+  <div class="hc-top">
+    <div class="hc-avatar" id="hc-avatar"></div>
+    <div>
+      <div class="hc-name" id="hc-name"></div>
+      <div class="hc-title" id="hc-title"></div>
+    </div>
+  </div>
+  <div id="hc-body"></div>
 </div>
 
 <!-- ── OVERLAY ──────────────────────────────────────────────── -->
@@ -216,6 +504,15 @@
     <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
   </div>
   <div class="um-drawer-body">
+    <div class="res-drawer-tabs">
+      <div class="res-drawer-tab active" data-rtab="info"    onclick="switchResTab('info')">INFO</div>
+      <div class="res-drawer-tab"        data-rtab="skills"  onclick="switchResTab('skills')">SKILLS</div>
+      <div class="res-drawer-tab"        data-rtab="profile" onclick="switchResTab('profile')">PROFILE</div>
+      <div class="res-drawer-tab"        data-rtab="domain"  onclick="switchResTab('domain')">DOMAINS</div>
+    </div>
+
+    <!-- INFO TAB -->
+    <div class="res-drawer-panel active" id="rdp-info">
     <div class="um-divider">PERSONAL INFO</div>
     <div class="um-2col">
       <div class="um-field"><label>FIRST NAME <span class="req">*</span></label>
@@ -276,6 +573,92 @@
       <textarea id="res-notes" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
 
     <div id="res-err" class="um-err"></div>
+    </div><!-- end rdp-info -->
+
+    <!-- SKILLS TAB -->
+    <div class="res-drawer-panel" id="rdp-skills">
+      <div class="um-divider">SKILL PROFICIENCIES</div>
+      <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:12px;">
+        Click a skill to add it. Select proficiency level. Only shows skills not yet assigned.</p>
+      <div class="um-field">
+        <label>FILTER SKILLS</label>
+        <select id="res-skill-cat-filter" class="um-select" onchange="renderSkillPicker()">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <div id="res-skill-picker" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);margin-bottom:12px;"></div>
+      <div class="um-divider">ASSIGNED SKILLS</div>
+      <div id="res-assigned-skills" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- PROFILE TAB -->
+    <div class="res-drawer-panel" id="rdp-profile">
+      <div class="um-divider">EDUCATION</div>
+      <div id="edu-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="edu-input" class="um-input" type="text" placeholder="e.g. BSME, Georgia Tech, 2012" style="flex:1;"/>
+        <button class="um-add-btn" onclick="addListItem('edu')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">CERTIFICATIONS</div>
+      <div id="cert-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="cert-input" class="um-input" type="text" placeholder="e.g. PMP, ASQ CQE, RAC"/>
+        <button class="um-add-btn" onclick="addListItem('cert')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">PRIOR COMPANIES</div>
+      <div id="co-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="co-input" class="um-input" type="text" placeholder="e.g. Intuitive Surgical 4yr"/>
+        <button class="um-add-btn" onclick="addListItem('co')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">NOTABLE PROJECTS</div>
+      <div id="proj-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="proj-input" class="um-input" type="text" placeholder="e.g. da Vinci Si instrument redesign"/>
+        <button class="um-add-btn" onclick="addListItem('proj')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">SPECIALTY SUMMARY</div>
+      <textarea id="res-specialty" class="um-input" rows="3" placeholder="2-3 sentence summary of this resource's expertise..." style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;"></textarea>
+      <div class="um-field"><label>LINKEDIN URL</label>
+        <input id="res-linkedin" class="um-input" type="url" placeholder="https://linkedin.com/in/..."/></div>
+    </div>
+
+    <!-- DOMAIN TAB -->
+    <div class="res-drawer-panel" id="rdp-domain">
+      <div class="um-divider">DOMAIN EXPERIENCE</div>
+      <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:12px;">
+        Document industry domains and subsystems this resource has hands-on experience with.</p>
+      <div id="domain-exp-list" style="margin-bottom:12px;"></div>
+      <div style="background:var(--bg3);border:1px solid var(--border);padding:12px;margin-bottom:8px;">
+        <div class="um-divider" style="margin-top:0;">ADD DOMAIN EXPERIENCE</div>
+        <div class="um-field"><label>DOMAIN</label>
+          <select id="domain-sel" class="um-select">
+            <option value="">— Select domain —</option>
+          </select>
+        </div>
+        <div class="um-field"><label>SUBSYSTEM (optional)</label>
+          <input id="domain-subsystem" class="um-input" type="text" placeholder="e.g. Cable Drive Mechanism, Sterile Barrier"/></div>
+        <div class="um-2col">
+          <div class="um-field"><label>YEARS EXP</label>
+            <input id="domain-years" class="um-input" type="number" min="0" step="0.5" placeholder="0"/></div>
+          <div class="um-field"><label>REG. CLASS</label>
+            <select id="domain-regclass" class="um-select">
+              <option value="N/A">N/A</option>
+              <option value="Class I">Class I</option>
+              <option value="Class II">Class II</option>
+              <option value="Class III">Class III</option>
+              <option value="510(k)">510(k)</option>
+              <option value="PMA">PMA</option>
+              <option value="De Novo">De Novo</option>
+            </select>
+          </div>
+        </div>
+        <div class="um-field"><label>CONTEXT / COMPANY</label>
+          <input id="domain-context" class="um-input" type="text" placeholder="e.g. Led fixture design at Intuitive Surgical 2018-2022"/></div>
+        <button class="um-add-btn" onclick="addDomainExp()" style="width:100%;margin-top:4px;">+ ADD EXPERIENCE</button>
+      </div>
+    </div>
+
   </div>
   <div class="um-drawer-footer">
     <button class="um-save-btn" id="res-save-btn" onclick="saveResource()">SAVE RESOURCE</button>
@@ -387,28 +770,45 @@
 let UM = {
   firms: [], categories: [], roles: [], roleLevels: [],
   resources: [], users: [], firmId: null,
+  skillCats: [], skills: [], domains: [],
+  resourceSkills: {}, resourceProfiles: {}, domainExps: {},
+  calendarEntries: [], ptoEntries: [],
   editingResourceId: null, editingRoleId: null,
   editingCatId: null, editingUserId: null,
+  // hover card
+  _hoverTimer: null, _hoverId: null,
+  // skill picker state
+  _pendingSkills: [],   // [{skill_id, proficiency, skill_name}] for current drawer
+  _pendingDomains: [],  // [{domain_id, domain_name, subsystem, years, reg_class, context}]
+  _pendingProfile: {education:[], certifications:[], prior_companies:[], notable_projects:[], specialty_summary:'', linkedin_url:''},
 };
 
 // ── INIT ──────────────────────────────────────────────────────
 async function initUM() {
   try {
-    const [firms, users, categories, roles, roleLevels, resources] = await Promise.all([
+    const [firms, users, categories, roles, roleLevels, resources,
+           skillCats, skills, domains, calEntries] = await Promise.all([
       API.get('firms?select=*&limit=10'),
       API.get('users?select=*&order=name.asc'),
       API.get('hud_role_categories?select=*').catch(() => []),
       API.get('hud_roles?select=*').catch(() => []),
       API.get('hud_role_levels?select=*').catch(() => []),
       API.get('resources?select=*').catch(() => []),
+      API.get('hud_skill_categories?select=*').catch(() => []),
+      API.get('hud_skills?select=*').catch(() => []),
+      API.get('hud_skill_domains?select=*').catch(() => []),
+      API.get('resource_calendars?select=*&is_firm_wide=eq.true').catch(() => []),
     ]);
     UM.firms      = firms || [];
     UM.users      = users || [];
-    // Sort client-side since sort_order column may not exist on pre-existing tables
     UM.categories = (categories || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
     UM.roles      = (roles || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
     UM.roleLevels = roleLevels || [];
     UM.resources  = (resources || []).sort((a,b) => (a.last_name||a.name||'').localeCompare(b.last_name||b.name||''));
+    UM.skillCats  = (skillCats || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+    UM.skills     = (skills || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
+    UM.domains    = (domains || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+    UM.calendarEntries = calEntries || [];
     UM.firmId     = firms?.[0]?.id || null;
 
     const lbl = document.getElementById('um-firm-label');
@@ -419,6 +819,9 @@ async function initUM() {
     renderResources();
     renderRolesTable();
     renderUsersTable();
+    renderSkillsLibrary();
+    renderHolidayList();
+    populatePTOResourceSelect();
   } catch(e) {
     console.error('UM init failed:', e);
     document.getElementById('resources-grid').innerHTML =
@@ -831,16 +1234,524 @@ async function saveUserRole() {
   }
 }
 
-// ── DRAWER HELPERS ────────────────────────────────────────────
-function openDrawer(id) {
-  document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
-  document.getElementById(id).classList.add('open');
-  document.getElementById('drawer-overlay').classList.add('open');
+
+// ── EXTENDED STATE ────────────────────────────────────────────
+// ── SKILLS LIBRARY ────────────────────────────────────────────
+function renderSkillsLibrary() {
+  const wrap = document.getElementById('skills-library-wrap');
+  const lbl  = document.getElementById('skill-count-lbl');
+  if (!UM.skills.length) { wrap.innerHTML = '<div class="um-empty">NO SKILLS LOADED</div>'; return; }
+  if (lbl) lbl.textContent = UM.skills.length + ' SKILLS · ' + UM.skillCats.length + ' CATEGORIES';
+  let html = '';
+  UM.skillCats.forEach(cat => {
+    const catSkills = UM.skills.filter(s => s.category_id === cat.id && s.is_active !== false);
+    if (!catSkills.length) return;
+    html += `<div class="skill-cat-block">
+      <div class="skill-cat-hdr">
+        <span>${cat.icon || ''} ${cat.name.toUpperCase()}</span>
+        <span style="color:var(--text3);font-size:9px;">${catSkills.length} SKILLS</span>
+      </div>
+      <div class="skill-chips">
+        ${catSkills.map(s => `<div class="skill-chip" title="${s.description||''}">
+          ${s.name}
+          ${s.aliases?.length ? `<span class="sk-alias">${s.aliases.slice(0,2).join(', ')}</span>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
 }
-function closeDrawer() {
-  document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
-  document.getElementById('drawer-overlay').classList.remove('open');
-  UM.editingResourceId = UM.editingRoleId = UM.editingCatId = UM.editingUserId = null;
+
+// ── CALENDAR — HOLIDAYS ────────────────────────────────────────
+function renderHolidayList() {
+  const el = document.getElementById('holiday-list');
+  const cnt = document.getElementById('holiday-count');
+  const entries = UM.calendarEntries.filter(e => e.is_firm_wide);
+  if (cnt) cnt.textContent = entries.length + ' ENTRIES';
+  if (!entries.length) { el.innerHTML = '<div class="hc-empty">No holidays added yet</div>'; return; }
+  const sorted = [...entries].sort((a,b) => a.date.localeCompare(b.date));
+  el.innerHTML = sorted.map(e => {
+    const typeColor = e.calendar_type === 'holiday' ? 'var(--amber)' : 'var(--cyan)';
+    return `<div class="cal-entry">
+      <div class="cal-date">${_fmtCalDate(e.date)}</div>
+      <div class="cal-note">${e.note || '—'}</div>
+      <div class="cal-type" style="color:${typeColor};border-color:${typeColor}33;">${(e.calendar_type||'').toUpperCase()}</div>
+      <div class="cal-hours">${e.available_hours}h</div>
+      <button class="cal-del" onclick="deleteCalEntry('${e.id}', true)">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function _fmtCalDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T12:00:00');
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+async function addHoliday() {
+  const date = document.getElementById('hol-date').value;
+  const note = document.getElementById('hol-note').value.trim();
+  const hrs  = parseFloat(document.getElementById('hol-hrs').value) || 0;
+  if (!date) return;
+  try {
+    const [created] = await API.post('resource_calendars', {
+      firm_id: UM.firmId, resource_id: null, date, available_hours: hrs,
+      note: note || null, calendar_type: 'holiday', is_firm_wide: true,
+    });
+    if (created) UM.calendarEntries.push(created);
+    renderHolidayList();
+    document.getElementById('hol-date').value = '';
+    document.getElementById('hol-note').value = '';
+    document.getElementById('hol-hrs').value  = '0';
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+// ── CALENDAR — PTO ─────────────────────────────────────────────
+function populatePTOResourceSelect() {
+  const sel = document.getElementById('pto-resource-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Select resource —</option>' +
+    UM.resources.map(r => `<option value="${r.id}">${r.first_name} ${r.last_name}</option>`).join('');
+}
+
+async function loadResourceCalendar() {
+  const resId = document.getElementById('pto-resource-sel').value;
+  const list  = document.getElementById('pto-list');
+  const form  = document.getElementById('pto-add-form');
+  if (!resId) { list.innerHTML = '<div class="hc-empty">Select a resource</div>'; form.style.display='none'; return; }
+  form.style.display = 'block';
+  list.innerHTML = '<div class="um-loading">...</div>';
+  try {
+    const entries = await API.get(`resource_calendars?resource_id=eq.${resId}&order=date.asc`);
+    UM.ptoEntries = entries || [];
+    renderPTOList(resId);
+  } catch(e) { list.innerHTML = '<div class="hc-empty" style="color:var(--red)">Load failed</div>'; }
+}
+
+function renderPTOList(resId) {
+  const el = document.getElementById('pto-list');
+  const entries = UM.ptoEntries;
+  if (!entries.length) { el.innerHTML = '<div class="hc-empty">No exceptions recorded</div>'; return; }
+  el.innerHTML = entries.map(e => {
+    const typeColors = {pto:'var(--cyan)',training:'var(--green)',travel:'var(--amber)',other:'var(--text2)'};
+    const tc = typeColors[e.calendar_type] || 'var(--text2)';
+    return `<div class="cal-entry">
+      <div class="cal-date">${_fmtCalDate(e.date)}</div>
+      <div class="cal-note">${e.note || e.calendar_type}</div>
+      <div class="cal-type" style="color:${tc};border-color:${tc}33;">${(e.calendar_type||'').toUpperCase()}</div>
+      <div class="cal-hours">${e.available_hours}h</div>
+      <button class="cal-del" onclick="deleteCalEntry('${e.id}', false, '${resId}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function addPTO() {
+  const resId = document.getElementById('pto-resource-sel').value;
+  if (!resId) return;
+  const date  = document.getElementById('pto-date').value;
+  const type  = document.getElementById('pto-type').value;
+  const hrs   = parseFloat(document.getElementById('pto-hrs').value) || 0;
+  const note  = document.getElementById('pto-note').value.trim();
+  if (!date) return;
+  try {
+    const [created] = await API.post('resource_calendars', {
+      firm_id: UM.firmId, resource_id: resId, date, available_hours: hrs,
+      note: note || null, calendar_type: type, is_firm_wide: false,
+    });
+    if (created) UM.ptoEntries.push(created);
+    renderPTOList(resId);
+    document.getElementById('pto-date').value = '';
+    document.getElementById('pto-note').value = '';
+    document.getElementById('pto-hrs').value  = '0';
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function deleteCalEntry(id, isFirmWide, resId) {
+  if (!confirm('Remove this calendar entry?')) return;
+  try {
+    await API.del(`resource_calendars?id=eq.${id}`);
+    if (isFirmWide) {
+      UM.calendarEntries = UM.calendarEntries.filter(e => e.id !== id);
+      renderHolidayList();
+    } else {
+      UM.ptoEntries = UM.ptoEntries.filter(e => e.id !== id);
+      renderPTOList(resId);
+    }
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── RESOURCE DRAWER — SKILL PICKER ────────────────────────────
+function switchResTab(tab) {
+  document.querySelectorAll('.res-drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.rtab === tab));
+  document.querySelectorAll('.res-drawer-panel').forEach(p => p.classList.toggle('active', p.id === 'rdp-' + tab));
+  if (tab === 'skills') renderSkillPicker();
+  if (tab === 'domain') renderDomainPicker();
+}
+
+function renderSkillPicker() {
+  const catFilter = document.getElementById('res-skill-cat-filter');
+  // Populate category filter
+  if (catFilter && catFilter.options.length <= 1) {
+    catFilter.innerHTML = '<option value="">All Categories</option>' +
+      UM.skillCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+  const selectedCat = catFilter?.value || '';
+  const assignedIds = new Set(UM._pendingSkills.map(s => s.skill_id));
+  const filtered = UM.skills.filter(s =>
+    (!selectedCat || s.category_id === selectedCat) && !assignedIds.has(s.id)
+  );
+  const picker = document.getElementById('res-skill-picker');
+  if (!filtered.length) {
+    picker.innerHTML = '<div class="hc-empty">All skills in this category assigned</div>';
+  } else {
+    const cat = {};
+    UM.skillCats.forEach(c => { cat[c.id] = c.name; });
+    picker.innerHTML = filtered.map(s => `
+      <div class="sp-row">
+        <div>
+          <div class="sp-name">${s.name}</div>
+          <div class="sp-cat">${cat[s.category_id] || ''}</div>
+        </div>
+        <button class="sp-add" onclick="addSkillToPending('${s.id}','${s.name.replace(/'/g,"\'")}')">+ ADD</button>
+      </div>`).join('');
+  }
+  renderAssignedSkills();
+}
+
+function addSkillToPending(skillId, skillName) {
+  if (UM._pendingSkills.find(s => s.skill_id === skillId)) return;
+  UM._pendingSkills.push({ skill_id: skillId, skill_name: skillName, proficiency: 'practitioner' });
+  renderSkillPicker();
+}
+
+function renderAssignedSkills() {
+  const el = document.getElementById('res-assigned-skills');
+  if (!UM._pendingSkills.length) {
+    el.innerHTML = '<div class="hc-empty">No skills assigned yet</div>';
+    return;
+  }
+  el.innerHTML = UM._pendingSkills.map((s, i) => `
+    <div class="as-row">
+      <div class="as-name">${s.skill_name}</div>
+      <select class="as-prof-sel" onchange="UM._pendingSkills[${i}].proficiency=this.value">
+        ${['aware','practitioner','expert','authority'].map(p =>
+          `<option value="${p}" ${s.proficiency===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`
+        ).join('')}
+      </select>
+      <button class="as-del" onclick="removeSkillPending(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removeSkillPending(i) {
+  UM._pendingSkills.splice(i, 1);
+  renderSkillPicker();
+}
+
+// ── RESOURCE DRAWER — PROFILE TAB ─────────────────────────────
+function addListItem(type) {
+  const inputs = {edu:'edu-input', cert:'cert-input', co:'co-input', proj:'proj-input'};
+  const lists  = {edu:'education', cert:'certifications', co:'prior_companies', proj:'notable_projects'};
+  const el = document.getElementById(inputs[type]);
+  const val = el?.value.trim();
+  if (!val) return;
+  UM._pendingProfile[lists[type]].push(val);
+  el.value = '';
+  renderProfileLists();
+}
+
+function renderProfileLists() {
+  const cfg = [
+    {key:'education',        id:'edu-list'},
+    {key:'certifications',   id:'cert-list'},
+    {key:'prior_companies',  id:'co-list'},
+    {key:'notable_projects', id:'proj-list'},
+  ];
+  cfg.forEach(({key, id}) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = (UM._pendingProfile[key] || []).map((v, i) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);margin-bottom:4px;">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text1);flex:1;">${v}</span>
+        <button onclick="removeListItem('${key}',${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;">✕</button>
+      </div>`).join('') || '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">None added</div>';
+  });
+}
+
+function removeListItem(key, i) {
+  UM._pendingProfile[key].splice(i, 1);
+  renderProfileLists();
+}
+
+// ── RESOURCE DRAWER — DOMAIN TAB ──────────────────────────────
+function renderDomainPicker() {
+  const sel = document.getElementById('domain-sel');
+  if (sel && sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">— Select domain —</option>' +
+      UM.domains.map(d => `<option value="${d.id}">${d.name} (${d.industry||''})</option>`).join('');
+  }
+  renderDomainList();
+}
+
+function renderDomainList() {
+  const el = document.getElementById('domain-exp-list');
+  if (!el) return;
+  if (!UM._pendingDomains.length) {
+    el.innerHTML = '<div class="hc-empty">No domain experience added</div>';
+    return;
+  }
+  el.innerHTML = UM._pendingDomains.map((d, i) => `
+    <div class="de-row">
+      <div class="de-domain">${d.domain_name}</div>
+      ${d.subsystem ? `<div class="de-sub">Subsystem: ${d.subsystem}</div>` : ''}
+      ${d.context   ? `<div class="de-ctx">${d.context}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">${d.years||0}yrs</span>
+        ${d.reg_class && d.reg_class !== 'N/A' ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);">${d.reg_class}</span>` : ''}
+      </div>
+      <button class="de-del" onclick="removeDomainPending(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addDomainExp() {
+  const sel = document.getElementById('domain-sel');
+  const domId = sel?.value;
+  const dom = UM.domains.find(d => d.id === domId);
+  const domName = dom?.name || document.getElementById('domain-subsystem')?.value || '';
+  if (!domId && !domName) return;
+  UM._pendingDomains.push({
+    domain_id:   domId || null,
+    domain_name: domName,
+    subsystem:   document.getElementById('domain-subsystem').value.trim() || null,
+    years:       parseFloat(document.getElementById('domain-years').value) || 0,
+    reg_class:   document.getElementById('domain-regclass').value || 'N/A',
+    context:     document.getElementById('domain-context').value.trim() || null,
+  });
+  if (sel) sel.value = '';
+  document.getElementById('domain-subsystem').value = '';
+  document.getElementById('domain-years').value = '';
+  document.getElementById('domain-context').value = '';
+  renderDomainList();
+}
+
+function removeDomainPending(i) {
+  UM._pendingDomains.splice(i, 1);
+  renderDomainList();
+}
+
+// ── OPEN RESOURCE DRAWER — extended to load skills/profile/domains ──
+async function _loadResourceExtras(resourceId) {
+  if (!resourceId) {
+    UM._pendingSkills   = [];
+    UM._pendingDomains  = [];
+    UM._pendingProfile  = {education:[],certifications:[],prior_companies:[],notable_projects:[],specialty_summary:'',linkedin_url:''};
+    return;
+  }
+  try {
+    const [skills, profile, domains] = await Promise.all([
+      API.get(`resource_skills?resource_id=eq.${resourceId}`).catch(() => []),
+      API.get(`resource_profiles?resource_id=eq.${resourceId}&limit=1`).catch(() => []),
+      API.get(`resource_domain_experience?resource_id=eq.${resourceId}`).catch(() => []),
+    ]);
+    UM._pendingSkills = (skills || []).map(s => {
+      const sk = UM.skills.find(x => x.id === s.skill_id);
+      return { skill_id: s.skill_id, skill_name: sk?.name || '?', proficiency: s.proficiency, _dbId: s.id };
+    });
+    const prof = profile?.[0] || {};
+    UM._pendingProfile = {
+      education:        prof.education || [],
+      certifications:   prof.certifications || [],
+      prior_companies:  prof.prior_companies || [],
+      notable_projects: prof.notable_projects || [],
+      specialty_summary: prof.specialty_summary || '',
+      linkedin_url:     prof.linkedin_url || '',
+      _dbId:            prof.id || null,
+    };
+    UM._pendingDomains = (domains || []).map(d => {
+      const dom = UM.domains.find(x => x.id === d.domain_id);
+      return {
+        _dbId: d.id, domain_id: d.domain_id,
+        domain_name: dom?.name || d.domain_name || '?',
+        subsystem: d.subsystem, years: d.years_experience,
+        reg_class: d.regulatory_class, context: d.context,
+      };
+    });
+    UM.resourceSkills[resourceId] = skills;
+    UM.resourceProfiles[resourceId] = prof;
+  } catch(e) { console.error('Load extras failed:', e); }
+}
+
+// ── SAVE RESOURCE — extended to save skills/profile/domains ───
+async function _saveResourceExtras(resourceId) {
+  // Skills — delete all then re-insert (simpler than diffing)
+  try {
+    await API.del(`resource_skills?resource_id=eq.${resourceId}`);
+    if (UM._pendingSkills.length) {
+      for (const s of UM._pendingSkills) {
+        await API.post('resource_skills', {
+          resource_id: resourceId, skill_id: s.skill_id, proficiency: s.proficiency,
+        });
+      }
+    }
+  } catch(e) { console.warn('Skills save err:', e); }
+
+  // Profile — upsert
+  try {
+    const profPayload = {
+      resource_id: resourceId,
+      education:        UM._pendingProfile.education,
+      certifications:   UM._pendingProfile.certifications,
+      prior_companies:  UM._pendingProfile.prior_companies,
+      notable_projects: UM._pendingProfile.notable_projects,
+      specialty_summary: document.getElementById('res-specialty')?.value.trim() || null,
+      linkedin_url:     document.getElementById('res-linkedin')?.value.trim() || null,
+    };
+    if (UM._pendingProfile._dbId) {
+      await API.patch(`resource_profiles?resource_id=eq.${resourceId}`, profPayload);
+    } else {
+      await API.post('resource_profiles', profPayload);
+    }
+  } catch(e) { console.warn('Profile save err:', e); }
+
+  // Domain experience — delete all then re-insert
+  try {
+    await API.del(`resource_domain_experience?resource_id=eq.${resourceId}`);
+    for (const d of UM._pendingDomains) {
+      await API.post('resource_domain_experience', {
+        resource_id: resourceId, domain_id: d.domain_id || null,
+        domain_name: d.domain_name, subsystem: d.subsystem || null,
+        years_experience: d.years || 0, regulatory_class: d.reg_class || 'N/A',
+        context: d.context || null,
+      });
+    }
+  } catch(e) { console.warn('Domain exp save err:', e); }
+}
+
+// ── HOVER CARD ─────────────────────────────────────────────────
+function _attachHoverCard(el, resourceId) {
+  el.addEventListener('mouseenter', () => {
+    UM._hoverId = resourceId;
+    UM._hoverTimer = setTimeout(() => showHoverCard(resourceId, el), 900);
+  });
+  el.addEventListener('mouseleave', hideHoverCard);
+}
+
+async function showHoverCard(resourceId, anchorEl) {
+  const card = document.getElementById('res-hover-card');
+  const r = UM.resources.find(x => x.id === resourceId);
+  if (!r || !card) return;
+
+  const role = UM.roles.find(x => x.id === r.hud_role_id);
+  const initials = ((r.first_name||'?')[0]+(r.last_name||'?')[0]).toUpperCase();
+  const colors = ['#00d2ff','#00e5a0','#ffaa00','#a855f7','#ff4757'];
+  const color = colors[initials.charCodeAt(0) % colors.length];
+
+  document.getElementById('hc-avatar').textContent = initials;
+  document.getElementById('hc-avatar').style.background = color + '18';
+  document.getElementById('hc-avatar').style.color = color;
+  document.getElementById('hc-name').textContent = `${r.first_name} ${r.last_name}`;
+  document.getElementById('hc-title').textContent = r.title || role?.name || '—';
+
+  // Load skills + domain exp + allocation if not cached
+  let skills = UM.resourceSkills[resourceId];
+  if (!skills) {
+    try {
+      skills = await API.get(`resource_skills?resource_id=eq.${resourceId}&limit=6`);
+      UM.resourceSkills[resourceId] = skills || [];
+    } catch(e) { skills = []; }
+  }
+
+  // Load task assignments for this resource across all projects
+  let assignments = [];
+  try {
+    assignments = await API.get(
+      `task_resource_assignments?resource_id=eq.${resourceId}&select=*,tasks(name,start_date,due_date,project_id,status)`
+    ) || [];
+  } catch(e) {}
+
+  // Build allocation by project
+  const byProject = {};
+  assignments.forEach(a => {
+    const pid = a.tasks?.project_id || 'unknown';
+    if (!byProject[pid]) byProject[pid] = {tasks:[], totalPct:0};
+    byProject[pid].tasks.push(a);
+    byProject[pid].totalPct += (a.allocation_pct || 0);
+  });
+
+  let html = '';
+
+  // Info section
+  html += '<div class="hc-section">';
+  if (r.email)      html += `<div class="hc-row"><span class="hc-row-lbl">EMAIL</span><span class="hc-row-val">${r.email}</span></div>`;
+  if (r.phone)      html += `<div class="hc-row"><span class="hc-row-lbl">PHONE</span><span class="hc-row-val">${r.phone}</span></div>`;
+  if (r.department) html += `<div class="hc-row"><span class="hc-row-lbl">DEPT</span><span class="hc-row-val">${r.department}</span></div>`;
+  if (r.location)   html += `<div class="hc-row"><span class="hc-row-lbl">LOCATION</span><span class="hc-row-val">${r.location}</span></div>`;
+  if (r.hire_date)  html += `<div class="hc-row"><span class="hc-row-lbl">HIRED</span><span class="hc-row-val">${_fmtCalDate(r.hire_date)}</span></div>`;
+  if (r.notes)      html += `<div class="hc-row" style="margin-top:4px;"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);font-style:italic;">${r.notes}</span></div>`;
+  html += '</div>';
+
+  // Skills section
+  if (skills?.length) {
+    html += '<div class="hc-section"><div class="hc-section-lbl">SKILLS</div><div>';
+    const profColors = {aware:'var(--text3)',practitioner:'var(--cyan)',expert:'var(--amber)',authority:'var(--green)'};
+    skills.slice(0,6).forEach(s => {
+      const sk = UM.skills.find(x => x.id === s.skill_id);
+      html += `<span class="hc-skill-chip">${sk?.name||'?'} <span class="prof" style="color:${profColors[s.proficiency]||'var(--cyan)'};">${s.proficiency?.charAt(0).toUpperCase()}</span></span>`;
+    });
+    if (skills.length > 6) html += `<span class="hc-skill-chip" style="color:var(--text3);">+${skills.length-6} more</span>`;
+    html += '</div></div>';
+  }
+
+  // Allocation section
+  const totalPct = Object.values(byProject).reduce((sum,p) => sum + (p.totalPct||0), 0);
+  const availPct = r.availability_pct ?? 100;
+  const utilColor = totalPct > availPct ? 'var(--red)' : totalPct > availPct*0.8 ? 'var(--amber)' : 'var(--green)';
+  html += `<div class="hc-section">
+    <div class="hc-section-lbl">FIRM-WIDE ALLOCATION</div>
+    <div class="hc-row">
+      <span class="hc-row-lbl">CAPACITY</span>
+      <span class="hc-row-val">${availPct}%</span>
+    </div>
+    <div class="hc-row">
+      <span class="hc-row-lbl">COMMITTED</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:${utilColor};font-weight:700;">${totalPct.toFixed(0)}% ${totalPct > availPct ? '⚠ OVER' : ''}</span>
+    </div>
+    <div class="hc-alloc-bar">
+      <div class="hc-alloc-fill" style="width:${Math.min(totalPct/availPct*100,100)}%;background:${utilColor};"></div>
+    </div>`;
+  if (assignments.length) {
+    html += '<div class="hc-section-lbl" style="margin-top:6px;">ASSIGNED TASKS</div>';
+    assignments.slice(0,4).forEach(a => {
+      const t = a.tasks || {};
+      html += `<div class="hc-task-row">
+        <span class="hc-task-name">${t.name||'—'}</span>
+        <span class="hc-task-meta">${a.allocation_pct||100}% · ${t.status||''}</span>
+      </div>`;
+    });
+    if (assignments.length > 4) html += `<div class="hc-task-meta" style="padding:3px 0;color:var(--text3);">+${assignments.length-4} more tasks</div>`;
+  } else {
+    html += '<div class="hc-empty" style="padding:4px 0;text-align:left;">No active task assignments</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('hc-body').innerHTML = html;
+
+  // Position card
+  const rect = anchorEl.getBoundingClientRect();
+  const cardW = 340, cardH = 420;
+  let left = rect.right + 10;
+  let top  = rect.top;
+  if (left + cardW > window.innerWidth - 10)  left = rect.left - cardW - 10;
+  if (top  + cardH > window.innerHeight - 10) top  = window.innerHeight - cardH - 10;
+  card.style.left = left + 'px';
+  card.style.top  = Math.max(10, top) + 'px';
+  card.classList.add('visible');
+}
+
+function hideHoverCard() {
+  clearTimeout(UM._hoverTimer);
+  const card = document.getElementById('res-hover-card');
+  if (card) card.classList.remove('visible');
+  UM._hoverId = null;
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────
