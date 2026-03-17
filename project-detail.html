@@ -110,6 +110,31 @@
 /* Hide horizontal scrollbar — drag-to-pan replaces it */
 .task-table-wrap { scrollbar-width: none; }
 .task-table-wrap::-webkit-scrollbar { display: none; }
+/* Audit hover tooltip */
+#audit-tooltip {
+  position:fixed; z-index:9999; pointer-events:none;
+  background:var(--bg2); border:1px solid rgba(0,210,255,0.25);
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  width:320px; padding:0; border-radius:2px;
+  opacity:0; transition:opacity 0.15s; display:none;
+}
+#audit-tooltip.visible { opacity:1; display:block; }
+.audit-tt-header {
+  font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em;
+  color:var(--cyan); padding:7px 10px 5px;
+  border-bottom:1px solid rgba(0,210,255,0.12);
+  text-transform:uppercase;
+}
+.audit-tt-row {
+  padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.04);
+  font-family:var(--font-mono); font-size:10px;
+}
+.audit-tt-row:last-child { border-bottom:none; }
+.audit-tt-action { color:var(--cyan); font-weight:700; margin-right:6px; }
+.audit-tt-who { color:var(--text3); margin-right:4px; }
+.audit-tt-when { color:var(--text3); float:right; }
+.audit-tt-fields { color:var(--text2); font-size:9px; margin-top:2px; opacity:0.8; }
+.audit-tt-empty { padding:10px; color:var(--text3); font-family:var(--font-mono); font-size:10px; text-align:center; }
 /* Sticky left columns */
 .task-tbl .col-sticky { position:sticky; background:var(--bg1); z-index:2; }
 .task-tbl th.col-sticky { background:var(--bg2); z-index:3; }
@@ -881,44 +906,11 @@ document.querySelectorAll('.task-filter').forEach(btn => {
 });
 
 // ── JOURNAL PANEL ─────────────────────────────────────────────
-async function openJournalPanel(taskId, taskName) {
-  document.getElementById('jp-task-name').textContent = taskName;
-  document.getElementById('jp-title').textContent = 'TASK JOURNAL';
-  document.getElementById('jp-body').innerHTML = UI.loading('LOADING JOURNAL...');
-  document.getElementById('journal-panel').classList.add('open');
-  try {
-    const entries = await API.getJournalByTask(taskId);
-    const users = STATE.users;
-    if (!entries?.length) {
-      document.getElementById('jp-body').innerHTML = UI.allClear('NO ENTRIES', 'No journal entries for this task yet');
-      return;
-    }
-    document.getElementById('jp-body').innerHTML = entries.map(e => {
-      const author = users.find(u => u.id === e.user_id);
-      return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}">
-        <div class="journal-header">
-          ${UI.avatar(author, 22)}
-          <span class="journal-date">${UI.fmtDate(e.entry_date)}</span>
-          <span class="journal-hours">${e.hours_spent}h</span>
-          ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
-          ${e.blockers ? `<span class="journal-blocker">⚑ BLOCKER</span>` : ''}
-        </div>
-        <div class="journal-body">${e.accomplishment}</div>
-        ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
-      </div>`;
-    }).join('');
-    // ── Inject reply threads after entries are rendered ────
-    await loadRepliesForTask(taskId);
-    document.querySelectorAll('#jp-body .journal-entry').forEach(el => {
-      injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
-    });
-  } catch(err) {
-    document.getElementById('jp-body').innerHTML = UI.allClear('ERROR', 'Could not load journal entries');
-  }
-}
+// openJournalPanel — defined in injected JS block below
 
 function closeJournalPanel() {
   document.getElementById('journal-panel').classList.remove('open');
+  if (typeof _jpTaskId !== 'undefined') _jpTaskId = null;
 }
 
 // ── EXPENDITURE FORM ──────────────────────────────────────────
@@ -1521,6 +1513,7 @@ function renderTasksTable() {
   setTimeout(constrainTableWrap, 100);
   _initTablePan();
   _updateTablePanMode();
+  setTimeout(_attachAllAuditHovers, 150);
   // If CPM group is active but cache is stale, recompute silently
   const tblEl = document.getElementById('tasks-table');
   if (tblEl?.classList.contains('show-cpm') && !window._taskCPM) {
@@ -1769,6 +1762,39 @@ async function renderJournalTab() {
   document.querySelectorAll('#journal-list .journal-entry').forEach(el => {
     injectReplyThread(el, el.dataset.journalId, el.dataset.taskId, PROJECT_ID);
   });
+}
+
+// ── AUDIT LOG ─────────────────────────────────────────────────
+async function _writeAudit(action, table, recordId, before, after) {
+  try {
+    // Get current user from STATE (loaded on init)
+    const userId = STATE.currentUserId || null;
+    await API.post('audit_log', {
+      firm_id:            STATE.project?.firm_id || null,
+      user_id:            userId,
+      action:             action,
+      affected_table:     table,
+      affected_record_id: recordId || null,
+      before_value:       before ? JSON.stringify(before) : null,
+      after_value:        after  ? JSON.stringify(after)  : null,
+      ip_address:         null,
+    });
+  } catch(e) {
+    console.warn('Audit write failed:', e.message);
+  }
+}
+
+// Diff two objects — returns only changed fields with before/after
+function _diffObj(before, after) {
+  const diff = { before: {}, after: {} };
+  const keys = new Set([...Object.keys(before||{}), ...Object.keys(after||{})]);
+  keys.forEach(k => {
+    const bv = (before||{})[k], av = (after||{})[k];
+    if (JSON.stringify(bv) !== JSON.stringify(av)) {
+      diff.before[k] = bv; diff.after[k] = av;
+    }
+  });
+  return Object.keys(diff.before).length ? diff : null;
 }
 
 // ── MAIN LOAD ─────────────────────────────────────────────────
@@ -2381,6 +2407,7 @@ async function saveEditProject() {
     STATE.project.name        = name;
     STATE.project.description = desc;
     if (clientId) STATE.project.client_id = clientId;
+    _writeAudit('updated', 'projects', STATE.project.id, { name: _projNameBefore }, { name: STATE.project.name, description: STATE.project.description });
     renderHeader();
     closeEditProjectPanel();
   } catch(err) {
@@ -2504,6 +2531,7 @@ async function saveTaskForm() {
       await API.patch(`tasks?id=eq.${_editingTaskId}`, payload);
       const idx = STATE.tasks.findIndex(t => t.id === _editingTaskId);
       if (idx >= 0) Object.assign(STATE.tasks[idx], payload);
+      const _td = _diffObj(oldTask, payload); if (_td) _writeAudit('updated', 'tasks', _editingTaskId, _td.before, _td.after);
     } else {
       // Compute next sequence_order for this phase
       const phaseTasks = STATE.tasks.filter(t => t.phase === phase);
@@ -2512,7 +2540,7 @@ async function saveTaskForm() {
       payload.firm_id        = STATE.project.firm_id || null;
       payload.sequence_order = maxSeq + 10;
       const [created] = await API.post('tasks', payload);
-      if (created) STATE.tasks.push(created);
+      if (created) { STATE.tasks.push(created); _writeAudit('created','tasks',created.id,null,{name:payload.name,phase:payload.phase}); }
     }
     closeTaskFormPanel();
     // Invalidate CPM cache — dates/durations may have changed
@@ -2568,6 +2596,9 @@ async function savePhaseForm() {
       const affected = STATE.tasks.filter(t => t.phase === _editingPhaseOrig);
       await Promise.all(affected.map(t => API.patch(`tasks?id=eq.${t.id}`, { phase: newName })));
       affected.forEach(t => { t.phase = newName; });
+      _writeAudit('updated', 'phases', null, { phase: _editingPhaseOrig }, { phase: newName });
+    } else {
+      _writeAudit('created', 'phases', null, null, { phase: newName });
     }
     // For ADD PHASE: just opens with the new name ready — tasks will be added to it via ADD TASK
     closePhaseFormPanel();
@@ -2590,8 +2621,10 @@ function confirmDeleteTask(taskId, taskName) {
 async function deleteTask(taskId) {
   _closeSlidePanel('confirm-panel');
   try {
+    const _delTask = STATE.tasks.find(t => t.id === taskId);
     await API.del(`tasks?id=eq.${taskId}`);
     STATE.tasks = STATE.tasks.filter(t => t.id !== taskId);
+    if (_delTask) _writeAudit('deleted', 'tasks', taskId, { name: _delTask.name, phase: _delTask.phase }, null);
     renderTasksTable();
     renderHeader();
   } catch(err) { alert('Delete failed: ' + (err.message||err)); }
@@ -2609,6 +2642,7 @@ async function deletePhase(phaseLabel) {
   _closeSlidePanel('confirm-panel');
   try {
     const ids = STATE.tasks.filter(t => t.phase === phaseLabel).map(t => t.id);
+    _writeAudit('deleted', 'phases', null, { phase: phaseLabel, task_count: ids.length }, null);
     if (ids.length) await API.del(`tasks?id=in.(${ids.join(',')})`);
     STATE.tasks = STATE.tasks.filter(t => t.phase !== phaseLabel);
     renderTasksTable();
@@ -2853,6 +2887,7 @@ async function saveLinkDeps() {
 
     if (!newDeps.length) { _showErr('link-error','No valid task pairs found'); btn.textContent='\u26d3 CREATE LINKS'; btn.disabled=false; return; }
     await API.post('task_dependencies', newDeps);
+    _writeAudit('linked', 'task_dependencies', null, null, { count: newDeps.length, type: _selectedLinkType });
 
     // Reload deps so PRED column refreshes
     window._taskCPM = null;  // invalidate CPM cache
@@ -3135,6 +3170,7 @@ async function clearAllDeps() {
     const taskIds = STATE.tasks.map(t => t.id);
     if (taskIds.length) {
       await API.del(`task_dependencies?successor_task_id=in.(${taskIds.join(',')})`);
+      _writeAudit('cleared_deps', 'task_dependencies', null, { count: STATE.deps?.length || 0 }, null);
     }
     STATE.deps = [];
     // Reset all dates to today now that no deps exist
@@ -3220,6 +3256,240 @@ function _updateTablePanMode() {
     wrap.classList.remove('pan-mode');
   } else {
     wrap.classList.add('pan-mode');
+  }
+}
+
+// ── AUDIT HOVER TOOLTIP ───────────────────────────────────────
+let _auditHoverTimer = null;
+let _auditCache = {};  // keyed by "type:id"
+
+const _auditTT = {
+  show(entityType, entityId, entityName, x, y) {
+    const tt = document.getElementById('audit-tooltip');
+    const title = document.getElementById('audit-tt-title');
+    const body  = document.getElementById('audit-tt-body');
+    if (!tt) return;
+    title.textContent = (entityType === 'phase' ? 'PHASE' : 'TASK') + ' AUDIT — ' + (entityName || '').substring(0, 30).toUpperCase();
+    body.innerHTML = '<div class="audit-tt-empty">Loading...</div>';
+    // Position tooltip
+    const pad = 12;
+    tt.style.left = Math.min(x + pad, window.innerWidth - 340) + 'px';
+    tt.style.top  = Math.max(y - 20, 8) + 'px';
+    tt.classList.add('visible');
+    // Fetch audit entries
+    const cacheKey = entityType + ':' + (entityId || entityName);
+    if (_auditCache[cacheKey]) {
+      _auditTT.render(body, _auditCache[cacheKey]);
+      return;
+    }
+    let query;
+    if (entityType === 'task') {
+      query = `audit_log?affected_table=eq.tasks&affected_record_id=eq.${entityId}&order=created_at.desc&limit=5`;
+    } else {
+      // Phase — search by before_value or after_value containing the phase name
+      query = `audit_log?affected_table=eq.phases&order=created_at.desc&limit=5`;
+    }
+    API.get(query)
+      .then(rows => {
+        // Filter phase rows by name match client-side
+        if (entityType === 'phase' && entityName) {
+          rows = rows.filter(r => {
+            const bv = r.before_value ? JSON.parse(r.before_value) : {};
+            const av = r.after_value  ? JSON.parse(r.after_value)  : {};
+            return bv.phase === entityName || av.phase === entityName;
+          });
+        }
+        _auditCache[cacheKey] = rows;
+        _auditTT.render(body, rows);
+      })
+      .catch(() => {
+        body.innerHTML = '<div class="audit-tt-empty">Could not load audit history</div>';
+      });
+  },
+
+  render(body, rows) {
+    if (!rows || !rows.length) {
+      body.innerHTML = '<div class="audit-tt-empty">No audit history yet</div>';
+      return;
+    }
+    body.innerHTML = rows.map(r => {
+      const user   = STATE.users?.find(u => u.id === r.user_id);
+      const who    = user?.name || 'Unknown';
+      const when   = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit', hour:'numeric', minute:'2-digit' }) : '';
+      const action = (r.action || '').replace('_', ' ').toUpperCase();
+      let fields = '';
+      try {
+        const bv = r.before_value ? JSON.parse(r.before_value) : null;
+        const av = r.after_value  ? JSON.parse(r.after_value)  : null;
+        if (bv && av) {
+          const changed = Object.keys(av).filter(k => bv[k] !== av[k])
+            .map(k => `${k}: ${bv[k] ?? '—'} → ${av[k] ?? '—'}`).join('  ·  ');
+          if (changed) fields = `<div class="audit-tt-fields">${changed}</div>`;
+        } else if (av) {
+          const summary = Object.entries(av).map(([k,v]) => `${k}: ${v}`).join('  ·  ');
+          if (summary) fields = `<div class="audit-tt-fields">${summary}</div>`;
+        }
+      } catch(e) {}
+      return `<div class="audit-tt-row">
+        <span class="audit-tt-when">${when}</span>
+        <span class="audit-tt-action">${action}</span>
+        <span class="audit-tt-who">${who}</span>
+        ${fields}
+      </div>`;
+    }).join('');
+  },
+
+  hide() {
+    const tt = document.getElementById('audit-tooltip');
+    if (tt) tt.classList.remove('visible');
+  }
+};
+
+function _attachAuditHover(el, entityType, entityId, entityName) {
+  el.addEventListener('mouseenter', e => {
+    _auditHoverTimer = setTimeout(() => {
+      _auditTT.show(entityType, entityId, entityName, e.clientX, e.clientY);
+    }, 1800);
+  });
+  el.addEventListener('mouseleave', () => {
+    clearTimeout(_auditHoverTimer);
+    _auditTT.hide();
+  });
+  el.addEventListener('mousemove', e => {
+    // Reposition while hovering
+    const tt = document.getElementById('audit-tooltip');
+    if (tt?.classList.contains('visible')) {
+      tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 340) + 'px';
+      tt.style.top  = Math.max(e.clientY - 20, 8) + 'px';
+    }
+  });
+}
+
+// Called after renderTasksTable to attach hover listeners
+function _attachAllAuditHovers() {
+  _auditCache = {}; // Clear cache on re-render
+  // Task rows
+  document.querySelectorAll('#tasks-tbody tr[data-task-id]').forEach(row => {
+    const taskId = row.dataset.taskId;
+    const task = STATE.tasks.find(t => t.id === taskId);
+    if (task) _attachAuditHover(row, 'task', taskId, task.name);
+  });
+  // Phase header rows
+  document.querySelectorAll('#tasks-tbody tr.phase-header').forEach(row => {
+    const phase = row.dataset.phase;
+    if (phase) _attachAuditHover(row, 'phase', null, phase);
+  });
+}
+
+// ── JOURNAL PANEL — ADD ENTRY ─────────────────────────────────
+let _jpTaskId = null;
+
+async function openJournalPanel(taskId, taskName) {
+  _jpTaskId = taskId;
+  document.getElementById('jp-task-name').textContent = taskName;
+  document.getElementById('jp-title').textContent = 'TASK JOURNAL';
+  const body = document.getElementById('jp-body');
+  body.innerHTML = '<div style="padding:16px;font-family:var(--font-mono);font-size:11px;color:var(--text3);">Loading...</div>';
+  document.getElementById('journal-panel').classList.add('open');
+  await _renderJournalBody(taskId);
+}
+
+async function _renderJournalBody(taskId) {
+  const body = document.getElementById('jp-body');
+  try {
+    const entries = await API.getJournalByTask(taskId);
+    const users = STATE.users;
+    let html = '';
+    if (!entries?.length) {
+      html = '<div style="padding:16px;font-family:var(--font-mono);font-size:11px;color:var(--text3);text-align:center;">No journal entries yet</div>';
+    } else {
+      html = entries.map(e => {
+        const author = users.find(u => u.id === e.user_id);
+        return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}">
+          <div class="journal-header">
+            ${UI.avatar(author, 22)}
+            <span class="journal-date">${UI.fmtDate(e.entry_date)}</span>
+            <span class="journal-hours">${e.hours_spent}h</span>
+            ${e.pct_complete_snapshot != null ? `<span class="journal-pct">${e.pct_complete_snapshot}%</span>` : ''}
+            ${e.blockers ? `<span class="journal-blocker">⚑ BLOCKER</span>` : ''}
+          </div>
+          <div class="journal-body">${e.accomplishment}</div>
+          ${e.blockers ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--amber);padding:5px 8px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);">⚑ ${e.blockers}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+    // Add entry form at bottom
+    html += `<div id="jp-add-entry" style="padding:14px;border-top:1px solid var(--border);margin-top:8px;">
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:0.14em;margin-bottom:8px;">ADD JOURNAL ENTRY</div>
+      <textarea id="jp-accomplishment" placeholder="What was accomplished..." style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:8px;resize:vertical;min-height:72px;outline:none;" rows="3"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+        <div>
+          <label style="font-family:var(--font-mono);font-size:9px;color:var(--text3);display:block;margin-bottom:3px;">HOURS SPENT</label>
+          <input id="jp-hours" type="number" min="0" step="0.5" value="0" style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-mono);font-size:12px;padding:6px;" />
+        </div>
+        <div>
+          <label style="font-family:var(--font-mono);font-size:9px;color:var(--text3);display:block;margin-bottom:3px;">% COMPLETE</label>
+          <input id="jp-pct" type="number" min="0" max="100" step="5" value="${(() => { const t=STATE.tasks.find(t=>t.id===taskId); return t?.pct_complete||0; })()}" style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-mono);font-size:12px;padding:6px;" />
+        </div>
+      </div>
+      <textarea id="jp-blockers" placeholder="Blockers (optional)..." style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:8px;resize:vertical;min-height:44px;outline:none;margin-top:6px;" rows="2"></textarea>
+      <div id="jp-entry-error" style="display:none;font-family:var(--font-mono);font-size:10px;color:var(--red);margin-top:4px;"></div>
+      <button id="jp-submit-btn" onclick="submitJournalEntry('${taskId}')" style="margin-top:8px;width:100%;background:rgba(0,210,255,0.08);border:1px solid rgba(0,210,255,0.35);color:var(--cyan);font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;padding:8px;cursor:pointer;">+ ADD ENTRY</button>
+    </div>`;
+
+    body.innerHTML = html;
+    // Wire reply threads
+    await loadRepliesForTask(taskId);
+    body.querySelectorAll('.journal-entry').forEach(el => {
+      injectReplyThread(el, el.dataset.journalId, taskId, PROJECT_ID);
+    });
+  } catch(err) {
+    body.innerHTML = '<div style="padding:16px;font-family:var(--font-mono);font-size:11px;color:var(--red);">Could not load journal</div>';
+  }
+}
+
+async function submitJournalEntry(taskId) {
+  const accomplishment = document.getElementById('jp-accomplishment')?.value?.trim();
+  const hours   = parseFloat(document.getElementById('jp-hours')?.value) || 0;
+  const pct     = parseFloat(document.getElementById('jp-pct')?.value) || 0;
+  const blockers = document.getElementById('jp-blockers')?.value?.trim() || null;
+  const errEl   = document.getElementById('jp-entry-error');
+  const btn     = document.getElementById('jp-submit-btn');
+
+  if (!accomplishment) {
+    if (errEl) { errEl.textContent = 'Accomplishment is required'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (errEl) errEl.style.display = 'none';
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+
+  try {
+    const entry = {
+      task_id:               taskId,
+      project_id:            PROJECT_ID,
+      user_id:               STATE.currentUserId || null,
+      entry_date:            new Date().toISOString().substring(0, 10),
+      accomplishment,
+      hours_spent:           hours,
+      pct_complete_snapshot: pct,
+      blockers:              blockers,
+    };
+    await API.post('task_journal', entry);
+    // Also update task pct_complete and actual_hours
+    const task = STATE.tasks.find(t => t.id === taskId);
+    if (task) {
+      const newPct = pct;
+      const newHrs = parseFloat(task.actual_hours || 0) + hours;
+      await API.patch(`tasks?id=eq.${taskId}`, { pct_complete: newPct, actual_hours: newHrs });
+      task.pct_complete = newPct;
+      task.actual_hours = newHrs;
+      renderTasksTable();
+    }
+    // Reload journal
+    await _renderJournalBody(taskId);
+  } catch(e) {
+    if (errEl) { errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block'; }
+    btn.textContent = '+ ADD ENTRY'; btn.disabled = false;
   }
 }
 </script>
@@ -3426,6 +3696,13 @@ function _updateTablePanMode() {
       <button class="hud-btn" onclick="closeLinkPanel()">CANCEL</button>
     </div>
   </div>
+</div>
+
+
+<!-- ── AUDIT HOVER TOOLTIP ──────────────────────────────── -->
+<div id="audit-tooltip">
+  <div class="audit-tt-header" id="audit-tt-title">AUDIT HISTORY</div>
+  <div id="audit-tt-body"><div class="audit-tt-empty">Loading...</div></div>
 </div>
 
 </body>
