@@ -1373,19 +1373,23 @@ function renderDescription() {
 // ── TASK TABLE CELL HELPERS ───────────────────────────────────
 function _taskRoleLabel(t) {
   const ra = (STATE.taskAssignments||[]).filter(a => a.task_id === t.id);
-  if (!ra.length) {
-    // Fall back to task-level role
-    if (t.hud_role_id) {
-      const role = (STATE.hudRoles||[]).find(r => r.id === t.hud_role_id);
-      return role ? (role.abbreviation || role.name) : '—';
-    }
-    return '—';
-  }
-  const abbrs = ra.map(a => {
+  // Collect unique role abbrs from all assignment rows
+  const seen = new Set();
+  const abbrs = [];
+  ra.forEach(a => {
+    if (!a.hud_role_id) return;
+    if (seen.has(a.hud_role_id)) return;
+    seen.add(a.hud_role_id);
     const role = (STATE.hudRoles||[]).find(r => r.id === a.hud_role_id);
-    return role ? (role.abbreviation || role.name.substring(0,4)) : null;
-  }).filter(Boolean);
-  return abbrs.length ? abbrs.join(', ') : '—';
+    if (role) abbrs.push(role.abbreviation || role.name.substring(0,4));
+  });
+  if (abbrs.length) return abbrs.join(' · ');
+  // Fall back to task-level hud_role_id
+  if (t.hud_role_id) {
+    const role = (STATE.hudRoles||[]).find(r => r.id === t.hud_role_id);
+    return role ? (role.abbreviation || role.name) : '—';
+  }
+  return '—';
 }
 
 function _taskAssignedCell(t, asgn) {
@@ -2594,7 +2598,7 @@ async function saveTaskForm() {
     effort_days:  parseFloat(document.getElementById('tf-effort').value)   || null,
     pct_complete: parseFloat(document.getElementById('tf-pct').value)      || 0,
     assigned_to:   document.getElementById('tf-assigned')?.value             || null,
-    hud_role_id:   document.getElementById('tf-role')?.value                 || null,
+    // hud_role_id set from assignments in post-save hook
     actual_start:  document.getElementById('tf-actual-start').value           || null,
     actual_finish: document.getElementById('tf-actual-finish').value          || null,
     actual_hours:  parseFloat(document.getElementById('tf-actual-hours').value) || null,
@@ -2726,104 +2730,118 @@ async function deletePhase(phaseLabel) {
 
 // ── INIT BUTTON WIRING ────────────────────────────────────────
 
-// ── TASK FORM — ROLE & MULTI-RESOURCE ASSIGNMENT ─────────────
+// ── TASK FORM — MULTI-ROLE / MULTI-RESOURCE ASSIGNMENT ──────────
+// Each assignment row = { hud_role_id, resource_id, allocation_pct, is_primary }
+// Roles and people are independent — set either or both per row
 
-function _populateRoleSelect() {
-  const sel = document.getElementById('tf-role');
-  if (!sel || !STATE.hudRoles?.length) return;
-  // Group by category
+function _buildRoleOptions(selectedId) {
+  // Group roles by category for optgroups
   const catMap = {};
-  STATE.hudRoles.forEach(r => {
-    const cat = r.category_id||'other';
-    if (!catMap[cat]) catMap[cat] = [];
-    catMap[cat].push(r);
+  (STATE.hudRoles||[]).forEach(r => {
+    const key = r.category_id || '__other';
+    if (!catMap[key]) catMap[key] = [];
+    catMap[key].push(r);
   });
-  sel.innerHTML = '<option value="">— No role assigned —</option>';
+  let html = '<option value="">— Role (optional) —</option>';
   Object.values(catMap).forEach(roles => {
     roles.forEach(r => {
-      const o = document.createElement('option');
-      o.value = r.id;
-      o.textContent = r.abbreviation ? `${r.name} (${r.abbreviation})` : r.name;
-      sel.appendChild(o);
+      const sel = r.id === selectedId ? ' selected' : '';
+      const label = r.abbreviation ? `${r.name} (${r.abbreviation})` : r.name;
+      html += `<option value="${r.id}"${sel}>${label}</option>`;
     });
   });
+  return html;
 }
 
-function _populateRoleSelectGrouped() {
-  const sel = document.getElementById('tf-role');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— No role assigned (AI will suggest) —</option>';
-  // Build grouped options using hud_role_categories from STATE
-  const catIds = [...new Set((STATE.hudRoles||[]).map(r=>r.category_id).filter(Boolean))];
-  catIds.forEach(catId => {
-    const catRoles = (STATE.hudRoles||[]).filter(r=>r.category_id===catId);
-    if (!catRoles.length) return;
-    const og = document.createElement('optgroup');
-    // Find category name from existing data if available
-    og.label = catId.substring(0,8)+'…';
-    catRoles.forEach(r => {
-      const o = document.createElement('option');
-      o.value = r.id;
-      o.textContent = r.abbreviation ? `${r.name} (${r.abbreviation})` : r.name;
-      og.appendChild(o);
-    });
-    sel.appendChild(og);
+function _buildResourceOptions(selectedId) {
+  let html = '<option value="">— Person (TBD / AI) —</option>';
+  (STATE.resources||[]).forEach(r => {
+    const sel = r.id === selectedId ? ' selected' : '';
+    const role = STATE.hudRoles?.find(ro => ro.id === r.hud_role_id);
+    const hint = role ? ` · ${role.abbreviation||role.name}` : '';
+    html += `<option value="${r.id}"${sel}>${r.first_name} ${r.last_name}${hint}</option>`;
   });
+  return html;
 }
 
-// Render multi-resource assignment rows
 function _renderAssignmentRows(assignments) {
   const list = document.getElementById('tf-assignments-list');
   if (!list) return;
   if (!assignments || !assignments.length) {
-    list.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">No resources assigned — click ADD RESOURCE or assign a role above for AI matching.</div>';
+    list.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+      padding:8px;border:1px solid var(--border);text-align:center;">
+      No roles assigned — click ADD ROLE / RESOURCE below</div>`;
     return;
   }
   list.innerHTML = assignments.map((a, idx) => {
-    const res = STATE.resources?.find(r => r.id === a.resource_id);
-    const resName = res ? `${res.first_name} ${res.last_name}` : (a.resource_id ? '?' : 'TBD');
-    return `<div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);padding:6px 8px;" data-idx="${idx}">
-      <select onchange="window._tfAssignments[${idx}].resource_id=this.value||null;_autoBackfillRole(${idx})"
-        style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:4px 6px;outline:none;">
-        <option value="">— TBD (role-only) —</option>
-        ${(STATE.resources||[]).map(r=>`<option value="${r.id}" ${a.resource_id===r.id?'selected':''}>${r.first_name} ${r.last_name}${r.title?' · '+r.title:''}</option>`).join('')}
+    const isPrimary = idx === 0;
+    return `<div style="display:grid;grid-template-columns:1fr 1fr 52px 22px;gap:5px;align-items:center;
+        background:var(--bg3);border:1px solid var(--border);padding:6px 8px;position:relative;"
+        data-idx="${idx}">
+      ${isPrimary ? `<div style="position:absolute;top:-1px;left:-1px;font-family:var(--font-mono);
+        font-size:8px;color:var(--cyan);letter-spacing:.08em;padding:1px 5px;
+        background:rgba(0,210,255,.12);border:1px solid rgba(0,210,255,.25);">PRIMARY</div>` : ''}
+      <select onchange="window._tfAssignments[${idx}].hud_role_id=this.value||null;_syncRoleFromResource(${idx})"
+        style="background:var(--bg2);border:1px solid var(--border);color:var(--cyan);
+        font-family:var(--font-mono);font-size:10px;padding:3px 5px;outline:none;width:100%;
+        margin-top:${isPrimary?'10px':'0'};">
+        ${_buildRoleOptions(a.hud_role_id)}
       </select>
-      <div style="display:flex;align-items:center;gap:3px;">
+      <select onchange="window._tfAssignments[${idx}].resource_id=this.value||null;_autoBackfillRole(${idx})"
+        style="background:var(--bg2);border:1px solid var(--border);color:var(--text1);
+        font-family:var(--font-ui);font-size:12px;padding:3px 5px;outline:none;width:100%;
+        margin-top:${isPrimary?'10px':'0'};">
+        ${_buildResourceOptions(a.resource_id)}
+      </select>
+      <div style="display:flex;align-items:center;gap:2px;margin-top:${isPrimary?'10px':'0'};">
         <input type="number" min="1" max="100" value="${a.allocation_pct||100}"
           onchange="window._tfAssignments[${idx}].allocation_pct=parseFloat(this.value)||100"
-          style="width:48px;background:var(--bg2);border:1px solid var(--border);color:var(--amber);font-family:var(--font-mono);font-size:11px;padding:3px 5px;outline:none;text-align:center;" />
-        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">%</span>
+          style="width:38px;background:var(--bg2);border:1px solid var(--border);
+          color:var(--amber);font-family:var(--font-mono);font-size:10px;
+          padding:3px 4px;outline:none;text-align:center;" />
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">%</span>
       </div>
       <button onclick="_removeAssignmentRow(${idx})"
-        style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;">✕</button>
+        style="background:none;border:none;color:var(--text3);cursor:pointer;
+        font-size:14px;padding:0;margin-top:${isPrimary?'10px':'0'};line-height:1;"
+        title="Remove">✕</button>
     </div>`;
   }).join('');
 }
 
 function addAssignmentRow() {
   if (!window._tfAssignments) window._tfAssignments = [];
-  window._tfAssignments.push({ resource_id: null, hud_role_id: null, allocation_pct: 100, is_primary: !window._tfAssignments.length });
+  window._tfAssignments.push({
+    hud_role_id:   null,
+    resource_id:   null,
+    allocation_pct:100,
+    is_primary:    window._tfAssignments.length === 0
+  });
   _renderAssignmentRows(window._tfAssignments);
 }
 
 function _removeAssignmentRow(idx) {
   window._tfAssignments.splice(idx, 1);
+  // Re-mark first row as primary
+  if (window._tfAssignments.length > 0) window._tfAssignments[0].is_primary = true;
   _renderAssignmentRows(window._tfAssignments);
 }
 
-// Auto-backfill role from selected resource
+// When person selected → auto-fill their role in that row (if empty)
 function _autoBackfillRole(idx) {
   const a = window._tfAssignments?.[idx];
   if (!a?.resource_id) return;
   const res = STATE.resources?.find(r => r.id === a.resource_id);
-  if (!res?.hud_role_id) return;
-  // Set hud_role_id on this assignment
-  a.hud_role_id = res.hud_role_id;
-  // Also set the task-level role if not already set
-  const roleSel = document.getElementById('tf-role');
-  if (roleSel && !roleSel.value && window._tfAssignments.length === 1) {
-    roleSel.value = res.hud_role_id;
+  if (res?.hud_role_id && !a.hud_role_id) {
+    a.hud_role_id = res.hud_role_id;
+    _renderAssignmentRows(window._tfAssignments);
   }
+}
+
+// When role changed, don't overwrite an already-selected resource
+function _syncRoleFromResource(idx) {
+  // Nothing to do — role is set by the select itself
+  // Future: could filter resource dropdown to matching role only
 }
 
 // ── PATCH openAddTaskPanel to init role + assignments ──────────
@@ -2831,9 +2849,7 @@ const _origOpenAddTask = openAddTaskPanel;
 openAddTaskPanel = function(phase) {
   _origOpenAddTask(phase);
   window._tfAssignments = [];
-  _populateRoleSelectGrouped();
   _renderAssignmentRows([]);
-  document.getElementById('tf-role').value = '';
 };
 
 // ── PATCH openEditTaskPanel to load role + assignments ─────────
@@ -2846,53 +2862,44 @@ openEditTaskPanel = async function(taskId) {
   const existing = (STATE.taskAssignments||[]).filter(a => a.task_id === taskId);
   window._tfAssignments = existing.map(a => ({...a}));
   _renderAssignmentRows(window._tfAssignments);
-  // Set role from task or first assignment
-  const roleSel = document.getElementById('tf-role');
-  if (roleSel) {
-    const t = STATE.tasks.find(x => x.id === taskId);
-    // Try task-level role first, then first assignment role
-    const firstRoleId = t?.hud_role_id || existing[0]?.hud_role_id || '';
-    roleSel.value = firstRoleId;
-  }
+  // Role is now per-row in _tfAssignments — no task-level role dropdown
 };
 
 // ── PATCH saveTaskForm to save role + assignments ──────────────
 const _origSaveTaskForm = saveTaskForm;
 saveTaskForm = async function() {
   // Add role to payload by temporarily patching the form
-  const roleId = document.getElementById('tf-role')?.value || null;
+  // roleId is now per-assignment-row, not a single task-level field
   // Call original save
   await _origSaveTaskForm();
-  // Now save assignments and role
+  // Save assignments — each row has its own role + resource
   const taskId = _editingTaskId || STATE.tasks[STATE.tasks.length-1]?.id;
   if (!taskId) return;
   try {
-    // Save task-level role
-    if (roleId !== undefined) {
-      await API.patch(`tasks?id=eq.${taskId}`, { hud_role_id: roleId||null }).catch(()=>{});
-      // Update STATE
-      const t = STATE.tasks.find(x=>x.id===taskId);
-      if (t) t.hud_role_id = roleId||null;
-    }
-    // Delete old assignments and re-create
     if (window._tfAssignments !== undefined) {
+      // Delete old, re-create
       await API.del(`task_resource_assignments?task_id=eq.${taskId}`).catch(()=>{});
-      // Re-create
       for (const a of window._tfAssignments) {
-        if (!a.resource_id && !a.hud_role_id && !roleId) continue;
+        if (!a.resource_id && !a.hud_role_id) continue; // skip empty rows
         await API.post('task_resource_assignments', {
-          task_id:       taskId,
-          resource_id:   a.resource_id||null,
-          hud_role_id:   a.hud_role_id||roleId||null,
-          allocation_pct:a.allocation_pct||100,
-          is_primary:    a.is_primary||false,
-          ai_assigned:   false,
+          task_id:        taskId,
+          resource_id:    a.resource_id||null,
+          hud_role_id:    a.hud_role_id||null,
+          allocation_pct: a.allocation_pct||100,
+          is_primary:     a.is_primary||false,
+          ai_assigned:    false,
         }).catch(e => console.warn('Assignment save failed:', e));
       }
+      // Derive task-level hud_role_id from primary assignment for backward compat
+      const primaryRole = window._tfAssignments.find(a => a.is_primary)?.hud_role_id
+                       || window._tfAssignments[0]?.hud_role_id || null;
+      await API.patch(`tasks?id=eq.${taskId}`, { hud_role_id: primaryRole }).catch(()=>{});
+      const t = STATE.tasks.find(x => x.id === taskId);
+      if (t) t.hud_role_id = primaryRole;
       // Refresh STATE.taskAssignments
       const fresh = await API.get(`task_resource_assignments?select=*&task_id=eq.${taskId}`).catch(()=>[]);
       STATE.taskAssignments = [
-        ...(STATE.taskAssignments||[]).filter(a=>a.task_id!==taskId),
+        ...(STATE.taskAssignments||[]).filter(a => a.task_id !== taskId),
         ...(fresh||[])
       ];
     }
@@ -3815,18 +3822,15 @@ async function submitJournalEntry(taskId) {
       <div><label class="exp-label">% DONE</label><input id="tf-pct" class="hud-input" type="number" min="0" max="100" step="5" value="0" style="width:100%;" /></div>
     </div>
     <div style="margin-bottom:10px;">
-      <label class="exp-label">ROLE</label>
-      <select id="tf-role" class="hud-select" style="width:100%;">
-        <option value="">— No role assigned —</option>
-      </select>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:3px;">
-        Assign a role for AI resource matching, or leave blank if assigning explicit person
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label class="exp-label" style="margin-bottom:0;">ROLES &amp; RESOURCES</label>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">ROLE · PERSON · ALLOC%</div>
       </div>
-    </div>
-    <div style="margin-bottom:10px;">
-      <label class="exp-label">ASSIGNED TO</label>
-      <div id="tf-assignments-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
-      <button onclick="addAssignmentRow()" style="background:none;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:4px 12px;cursor:pointer;width:100%;">+ ADD RESOURCE</button>
+      <div id="tf-assignments-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px;"></div>
+      <button onclick="addAssignmentRow()" style="background:none;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:5px 12px;cursor:pointer;width:100%;letter-spacing:0.1em;">+ ADD ROLE / RESOURCE</button>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:4px;">
+        Set ROLE only for AI auto-assign · Set PERSON to lock assignment · Set both to specify explicitly
+      </div>
     </div>
 
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--amber);letter-spacing:0.14em;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid rgba(255,170,0,0.2);">ACTUALS</div>
