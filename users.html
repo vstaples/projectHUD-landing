@@ -26,7 +26,7 @@
 
 /* ── SECTION HEADER ──────────────────────────────────────────── */
 .um-section-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-.um-section-title { font-family:var(--font-mono); font-size:10px; letter-spacing:0.16em; color:var(--cyan); }
+.um-section-title { font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; color:var(--cyan); }
 .um-add-btn { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;
   padding:5px 14px; background:rgba(0,210,255,0.08); border:1px solid rgba(0,210,255,0.35);
   color:var(--cyan); cursor:pointer; transition:all 0.15s; }
@@ -50,18 +50,18 @@
 .um-card-field { display:flex; justify-content:space-between; align-items:center;
   padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; }
 .um-card-field:last-child { border-bottom:none; }
-.um-card-field label { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em; color:var(--text3); }
-.um-card-field span { font-family:var(--font-mono); font-size:11px; color:var(--text2); }
+.um-card-field label { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; color:var(--text3); }
+.um-card-field span { font-family:var(--font-mono); font-size:12px; color:var(--text2); }
 
 /* ── RESOURCE CARD ───────────────────────────────────────────── */
 .res-avatar { width:36px; height:36px; border-radius:50%; background:rgba(0,210,255,0.12);
   border:1px solid rgba(0,210,255,0.3); display:flex; align-items:center; justify-content:center;
   font-family:var(--font-hud); font-size:13px; font-weight:700; color:var(--cyan); flex-shrink:0; }
 .res-info { flex:1; margin-left:12px; }
-.res-name { font-family:var(--font-ui); font-size:14px; font-weight:600; color:var(--text0); }
-.res-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:1px; }
+.res-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
+.res-title { font-family:var(--font-mono); font-size:11px; color:var(--text3); margin-top:1px; }
 .res-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.res-tag { font-family:var(--font-mono); font-size:9px; letter-spacing:0.08em;
+.res-tag { font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em;
   padding:2px 7px; border-radius:1px; }
 .res-tag.level-junior    { background:rgba(100,200,100,0.08); border:1px solid rgba(100,200,100,0.3); color:#6cc; }
 .res-tag.level-staff     { background:rgba(0,210,255,0.08); border:1px solid rgba(0,210,255,0.3); color:var(--cyan); }
@@ -72,22 +72,22 @@
 
 /* ── ROLES TABLE ─────────────────────────────────────────────── */
 .um-tbl { width:100%; border-collapse:collapse; }
-.um-tbl th { font-family:var(--font-mono); font-size:11px; color:var(--text3); letter-spacing:0.12em;
+.um-tbl th { font-family:var(--font-mono); font-size:12px; color:var(--text3); letter-spacing:0.12em;
   padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; background:var(--bg2);
   white-space:nowrap; }
 .um-tbl td { font-family:var(--font-ui); font-size:14px; color:var(--text1);
   padding:9px 12px; border-bottom:1px solid rgba(100,160,220,0.06); vertical-align:middle; }
 .um-tbl tr:hover td { background:rgba(0,210,255,0.02); }
-.um-tbl .mono { font-family:var(--font-mono); font-size:11px; }
-.um-tbl .abbr { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:0.1em; }
-.um-cat-header td { font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em;
+.um-tbl .mono { font-family:var(--font-mono); font-size:12px; }
+.um-tbl .abbr { font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.1em; }
+.um-cat-header td { font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em;
   color:var(--cyan); background:rgba(0,210,255,0.04); padding:6px 12px;
   border-top:1px solid rgba(0,210,255,0.12); }
 
 /* Level rate cells */
 .rate-cell { font-family:var(--font-mono); font-size:11px; }
 .rate-input { background:var(--bg1); border:1px solid var(--border); color:var(--text1);
-  font-family:var(--font-mono); font-size:12px; padding:4px 8px; width:86px; outline:none; }
+  font-family:var(--font-mono); font-size:13px; padding:4px 8px; width:86px; outline:none; }
 .rate-input:focus { border-color:rgba(0,210,255,0.4); }
 
 /* ── SLIDE PANEL ─────────────────────────────────────────────── */
@@ -137,7 +137,7 @@
 @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
 
 /* ── APP ROLE BADGE ──────────────────────────────────────────── */
-.app-role { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em; padding:2px 8px; }
+.app-role { font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; padding:3px 9px; }
 .app-role.admin    { background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.3); color:var(--red); }
 .app-role.pm       { background:rgba(255,170,0,0.1); border:1px solid rgba(255,170,0,0.3); color:var(--amber); }
 .app-role.resource { background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.3); color:var(--cyan); }
@@ -597,7 +597,7 @@ function renderRolesTable() {
       html += `<tr>
         <td>${r.name}</td>
         <td class="abbr">${r.abbreviation || '—'}</td>
-        <td class="mono" style="color:var(--text3);font-size:10px;">${cat.name}</td>
+        <td class="mono" style="color:var(--text3);font-size:12px;">${cat.name}</td>
         ${levelCols.map(l => {
           const rl = rates[l];
           return `<td><input class="rate-input" type="number" min="0" step="0.01"
