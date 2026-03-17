@@ -1077,6 +1077,8 @@ async function saveResource() {
       const [created] = await API.post('resources', payload);
       if (created) UM.resources.push(created);
     }
+    const savedId = UM.editingResourceId || UM.resources[UM.resources.length-1]?.id;
+    if (savedId) await _saveResourceExtras(savedId).catch(e => console.warn('Extras save failed:', e));
     closeDrawer();
     renderResources();
   } catch(e) {
@@ -1706,6 +1708,7 @@ async function _loadResourceExtras(resourceId) {
       linkedin_url:     prof.linkedin_url || '',
       _dbId:            prof.id || null,
     };
+    UM.resourceDomains[resourceId] = domains || [];
     UM._pendingDomains = (domains || []).map(d => {
       const dom = UM.domains.find(x => x.id === d.domain_id);
       return {
