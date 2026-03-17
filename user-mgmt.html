@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectHUD — User Management</title>
+<link rel="stylesheet" href="/css/hud.css">
+<style>
+/* ── PAGE LAYOUT ─────────────────────────────────────────────── */
+.um-wrap { display:flex; height:100vh; overflow:hidden; }
+.um-main { flex:1; overflow-y:auto; padding:28px 32px; }
+.um-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+.um-title { font-family:var(--font-hud); font-size:22px; font-weight:700; color:var(--text0); letter-spacing:0.04em; }
+.um-subtitle { font-family:var(--font-mono); font-size:11px; color:var(--text3); letter-spacing:0.12em; margin-top:3px; }
+
+/* ── TABS ────────────────────────────────────────────────────── */
+.um-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; }
+.um-tab { font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; color:var(--text3);
+  padding:8px 18px; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; }
+.um-tab:hover { color:var(--text1); }
+.um-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+
+/* ── PANELS ──────────────────────────────────────────────────── */
+.um-panel { display:none; }
+.um-panel.active { display:block; }
+
+/* ── SECTION HEADER ──────────────────────────────────────────── */
+.um-section-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.um-section-title { font-family:var(--font-mono); font-size:10px; letter-spacing:0.16em; color:var(--cyan); }
+.um-add-btn { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;
+  padding:5px 14px; background:rgba(0,210,255,0.08); border:1px solid rgba(0,210,255,0.35);
+  color:var(--cyan); cursor:pointer; transition:all 0.15s; }
+.um-add-btn:hover { background:rgba(0,210,255,0.15); }
+
+/* ── CARDS GRID ──────────────────────────────────────────────── */
+.um-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; margin-bottom:28px; }
+.um-card { background:var(--bg2); border:1px solid var(--border); padding:16px 18px; position:relative;
+  transition:border-color 0.15s; }
+.um-card:hover { border-color:rgba(0,210,255,0.25); }
+.um-card-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.um-card-name { font-family:var(--font-ui); font-size:14px; font-weight:600; color:var(--text0); }
+.um-card-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:0.08em; margin-top:2px; }
+.um-card-badge { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em;
+  padding:2px 8px; border:1px solid rgba(0,210,255,0.3); color:var(--cyan); background:rgba(0,210,255,0.06); }
+.um-card-actions { display:flex; gap:6px; }
+.um-card-action { background:none; border:none; cursor:pointer; font-size:13px; padding:2px 4px; opacity:0.6; }
+.um-card-action:hover { opacity:1; }
+.um-card-action.edit { color:var(--amber); }
+.um-card-action.del  { color:var(--red); }
+.um-card-field { display:flex; justify-content:space-between; align-items:center;
+  padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; }
+.um-card-field:last-child { border-bottom:none; }
+.um-card-field label { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em; color:var(--text3); }
+.um-card-field span { font-family:var(--font-mono); font-size:11px; color:var(--text2); }
+
+/* ── RESOURCE CARD ───────────────────────────────────────────── */
+.res-avatar { width:36px; height:36px; border-radius:50%; background:rgba(0,210,255,0.12);
+  border:1px solid rgba(0,210,255,0.3); display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:13px; font-weight:700; color:var(--cyan); flex-shrink:0; }
+.res-info { flex:1; margin-left:12px; }
+.res-name { font-family:var(--font-ui); font-size:14px; font-weight:600; color:var(--text0); }
+.res-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:1px; }
+.res-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.res-tag { font-family:var(--font-mono); font-size:9px; letter-spacing:0.08em;
+  padding:2px 7px; border-radius:1px; }
+.res-tag.level-junior    { background:rgba(100,200,100,0.08); border:1px solid rgba(100,200,100,0.3); color:#6cc; }
+.res-tag.level-staff     { background:rgba(0,210,255,0.08); border:1px solid rgba(0,210,255,0.3); color:var(--cyan); }
+.res-tag.level-senior    { background:rgba(255,170,0,0.08); border:1px solid rgba(255,170,0,0.3); color:var(--amber); }
+.res-tag.level-principal { background:rgba(200,100,255,0.08); border:1px solid rgba(200,100,255,0.3); color:#c8a0ff; }
+.res-tag.active   { background:rgba(0,229,160,0.08); border:1px solid rgba(0,229,160,0.3); color:var(--green); }
+.res-tag.inactive { background:rgba(255,71,87,0.08); border:1px solid rgba(255,71,87,0.3); color:var(--red); }
+
+/* ── ROLES TABLE ─────────────────────────────────────────────── */
+.um-tbl { width:100%; border-collapse:collapse; }
+.um-tbl th { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:0.12em;
+  padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; background:var(--bg2);
+  white-space:nowrap; }
+.um-tbl td { font-family:var(--font-ui); font-size:12px; color:var(--text1);
+  padding:9px 12px; border-bottom:1px solid rgba(100,160,220,0.06); vertical-align:middle; }
+.um-tbl tr:hover td { background:rgba(0,210,255,0.02); }
+.um-tbl .mono { font-family:var(--font-mono); font-size:11px; }
+.um-tbl .abbr { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:0.1em; }
+.um-cat-header td { font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em;
+  color:var(--cyan); background:rgba(0,210,255,0.04); padding:6px 12px;
+  border-top:1px solid rgba(0,210,255,0.12); }
+
+/* Level rate cells */
+.rate-cell { font-family:var(--font-mono); font-size:11px; }
+.rate-input { background:var(--bg1); border:1px solid var(--border); color:var(--text1);
+  font-family:var(--font-mono); font-size:11px; padding:3px 7px; width:80px; outline:none; }
+.rate-input:focus { border-color:rgba(0,210,255,0.4); }
+
+/* ── SLIDE PANEL ─────────────────────────────────────────────── */
+.um-panel-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; display:none; }
+.um-panel-overlay.open { display:block; }
+.um-drawer { position:fixed; top:0; right:-520px; width:500px; height:100vh;
+  background:var(--bg1); border-left:1px solid var(--border); z-index:101;
+  transition:right 0.25s cubic-bezier(0.4,0,0.2,1); overflow-y:auto; }
+.um-drawer.open { right:0; }
+.um-drawer-hdr { display:flex; align-items:flex-start; justify-content:space-between;
+  padding:20px 22px 16px; border-bottom:1px solid var(--border); }
+.um-drawer-title { font-family:var(--font-hud); font-size:16px; font-weight:700; color:var(--text0); }
+.um-drawer-close { background:none; border:none; color:var(--text3); font-size:18px; cursor:pointer; padding:0 4px; }
+.um-drawer-body { padding:22px; }
+.um-field { margin-bottom:16px; }
+.um-field label { display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:0.12em;
+  color:var(--cyan); margin-bottom:5px; }
+.um-field label .req { color:var(--red); margin-left:3px; }
+.um-input, .um-select { width:100%; box-sizing:border-box; background:var(--bg2); border:1px solid var(--border);
+  color:var(--text1); font-family:var(--font-ui); font-size:13px; padding:8px 10px; outline:none; }
+.um-input:focus, .um-select:focus { border-color:rgba(0,210,255,0.4); }
+.um-select { background:var(--bg2); }
+.um-2col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.um-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.um-drawer-footer { display:flex; gap:10px; padding:16px 22px; border-top:1px solid var(--border); }
+.um-save-btn { flex:1; background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.4);
+  color:var(--cyan); font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em;
+  padding:10px; cursor:pointer; transition:all 0.15s; }
+.um-save-btn:hover { background:rgba(0,210,255,0.18); }
+.um-cancel-btn { background:none; border:1px solid var(--border); color:var(--text3);
+  font-family:var(--font-mono); font-size:11px; padding:10px 18px; cursor:pointer; }
+.um-err { font-family:var(--font-mono); font-size:11px; color:var(--red);
+  background:rgba(255,71,87,0.08); border:1px solid rgba(255,71,87,0.25);
+  padding:7px 10px; margin-bottom:12px; display:none; }
+
+/* ── SECTION DIVIDER ─────────────────────────────────────────── */
+.um-divider { font-family:var(--font-mono); font-size:9px; letter-spacing:0.16em;
+  color:var(--cyan); margin:10px 0 6px; padding-bottom:5px; border-bottom:1px solid rgba(0,210,255,0.12); }
+
+/* ── EMPTY STATE ─────────────────────────────────────────────── */
+.um-empty { text-align:center; padding:40px 20px; font-family:var(--font-mono);
+  font-size:11px; color:var(--text3); letter-spacing:0.1em; }
+
+/* ── LOADING ─────────────────────────────────────────────────── */
+.um-loading { text-align:center; padding:32px; font-family:var(--font-mono);
+  font-size:11px; color:var(--text3); letter-spacing:0.1em; animation:pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+/* ── APP ROLE BADGE ──────────────────────────────────────────── */
+.app-role { font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em; padding:2px 8px; }
+.app-role.admin    { background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.3); color:var(--red); }
+.app-role.pm       { background:rgba(255,170,0,0.1); border:1px solid rgba(255,170,0,0.3); color:var(--amber); }
+.app-role.resource { background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.3); color:var(--cyan); }
+.app-role.viewer   { background:rgba(100,140,180,0.1); border:1px solid rgba(100,140,180,0.2); color:var(--text3); }
+</style>
+</head>
+<body>
+<div class="um-wrap">
+  <!-- Sidebar injected by sidebar.js -->
+  <div id="sidebar-mount"></div>
+
+  <div class="um-main">
+    <div class="um-header">
+      <div>
+        <div class="um-title">USER MANAGEMENT</div>
+        <div class="um-subtitle">RESOURCES · ROLES · RATES · ACCESS</div>
+      </div>
+      <div id="um-firm-label" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:right;"></div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="um-tabs">
+      <div class="um-tab active" data-tab="resources" onclick="switchUMTab('resources')">RESOURCES</div>
+      <div class="um-tab" data-tab="roles"     onclick="switchUMTab('roles')">ROLES &amp; RATES</div>
+      <div class="um-tab" data-tab="users"     onclick="switchUMTab('users')">APP USERS</div>
+    </div>
+
+    <!-- ── RESOURCES TAB ────────────────────────────────────── -->
+    <div class="um-panel active" id="tab-resources">
+      <div class="um-section-hdr">
+        <div class="um-section-title">COMPANY DIRECTORY</div>
+        <button class="um-add-btn" onclick="openResourceDrawer()">+ ADD RESOURCE</button>
+      </div>
+      <div id="resources-grid" class="um-grid">
+        <div class="um-loading">LOADING RESOURCES...</div>
+      </div>
+    </div>
+
+    <!-- ── ROLES & RATES TAB ─────────────────────────────────── -->
+    <div class="um-panel" id="tab-roles">
+      <div class="um-section-hdr">
+        <div class="um-section-title">ROLE CATALOGUE</div>
+        <div style="display:flex;gap:8px;">
+          <button class="um-add-btn" onclick="openCategoryDrawer()" style="border-color:rgba(255,170,0,0.35);color:var(--amber);">+ CATEGORY</button>
+          <button class="um-add-btn" onclick="openRoleDrawer()">+ ROLE</button>
+        </div>
+      </div>
+      <div id="roles-table-wrap">
+        <div class="um-loading">LOADING ROLES...</div>
+      </div>
+    </div>
+
+    <!-- ── APP USERS TAB ─────────────────────────────────────── -->
+    <div class="um-panel" id="tab-users">
+      <div class="um-section-hdr">
+        <div class="um-section-title">APP ACCESS &amp; ROLES</div>
+      </div>
+      <div id="users-table-wrap">
+        <div class="um-loading">LOADING USERS...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── OVERLAY ──────────────────────────────────────────────── -->
+<div class="um-panel-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- ── RESOURCE DRAWER ──────────────────────────────────────── -->
+<div class="um-drawer" id="resource-drawer">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="res-drawer-title">ADD RESOURCE</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-divider">PERSONAL INFO</div>
+    <div class="um-2col">
+      <div class="um-field"><label>FIRST NAME <span class="req">*</span></label>
+        <input id="res-first" class="um-input" type="text" /></div>
+      <div class="um-field"><label>LAST NAME <span class="req">*</span></label>
+        <input id="res-last" class="um-input" type="text" /></div>
+    </div>
+    <div class="um-field"><label>TITLE / POSITION</label>
+      <input id="res-title" class="um-input" type="text" placeholder="e.g. Senior Mechanical Engineer" /></div>
+    <div class="um-2col">
+      <div class="um-field"><label>EMAIL</label>
+        <input id="res-email" class="um-input" type="email" /></div>
+      <div class="um-field"><label>PHONE</label>
+        <input id="res-phone" class="um-input" type="text" /></div>
+    </div>
+    <div class="um-2col">
+      <div class="um-field"><label>DEPARTMENT</label>
+        <input id="res-dept" class="um-input" type="text" /></div>
+      <div class="um-field"><label>LOCATION / SITE</label>
+        <input id="res-location" class="um-input" type="text" /></div>
+    </div>
+
+    <div class="um-divider">ROLE CLASSIFICATION</div>
+    <div class="um-2col">
+      <div class="um-field"><label>ROLE</label>
+        <select id="res-role" class="um-select">
+          <option value="">— Select role —</option>
+        </select>
+      </div>
+      <div class="um-field"><label>LEVEL</label>
+        <select id="res-level" class="um-select">
+          <option value="">— Select level —</option>
+          <option value="junior">Junior (0–3 yrs)</option>
+          <option value="staff">Staff (3–7 yrs)</option>
+          <option value="senior">Senior (7–15 yrs)</option>
+          <option value="principal">Principal (15+ yrs)</option>
+        </select>
+      </div>
+    </div>
+    <div class="um-2col">
+      <div class="um-field"><label>HIRE DATE</label>
+        <input id="res-hire" class="um-input" type="date" /></div>
+      <div class="um-field"><label>AVAILABILITY %</label>
+        <input id="res-avail" class="um-input" type="number" min="0" max="100" value="100" /></div>
+    </div>
+    <div class="um-field"><label>STATUS</label>
+      <select id="res-status" class="um-select">
+        <option value="true">Active</option>
+        <option value="false">Inactive</option>
+      </select>
+    </div>
+    <div class="um-field"><label>LINK TO APP USER (optional)</label>
+      <select id="res-user-link" class="um-select">
+        <option value="">— Not linked —</option>
+      </select>
+    </div>
+    <div class="um-field"><label>NOTES</label>
+      <textarea id="res-notes" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
+
+    <div id="res-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="res-save-btn" onclick="saveResource()">SAVE RESOURCE</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── ROLE DRAWER ───────────────────────────────────────────── -->
+<div class="um-drawer" id="role-drawer" style="width:460px;right:-480px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="role-drawer-title">ADD ROLE</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>ROLE NAME <span class="req">*</span></label>
+      <input id="role-name" class="um-input" type="text" placeholder="e.g. Electrical Engineer" /></div>
+    <div class="um-2col">
+      <div class="um-field"><label>ABBREVIATION</label>
+        <input id="role-abbr" class="um-input" type="text" placeholder="EE" maxlength="6" /></div>
+      <div class="um-field"><label>CATEGORY</label>
+        <select id="role-cat" class="um-select">
+          <option value="">— Select category —</option>
+        </select>
+      </div>
+    </div>
+    <div class="um-field"><label>DESCRIPTION</label>
+      <textarea id="role-desc" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
+
+    <div class="um-divider">OVERHEAD RATES (ADMIN ONLY)</div>
+    <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin:0 0 12px;">
+      Set the blended overhead rate per hour for each seniority level. Used to calculate project budget.</p>
+    <div class="um-2col">
+      <div class="um-field"><label>JUNIOR $/hr</label>
+        <input id="rate-junior" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+      <div class="um-field"><label>STAFF $/hr</label>
+        <input id="rate-staff" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+    </div>
+    <div class="um-2col">
+      <div class="um-field"><label>SENIOR $/hr</label>
+        <input id="rate-senior" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+      <div class="um-field"><label>PRINCIPAL $/hr</label>
+        <input id="rate-principal" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+    </div>
+    <div id="role-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="role-save-btn" onclick="saveRole()">SAVE ROLE</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── CATEGORY DRAWER ──────────────────────────────────────── -->
+<div class="um-drawer" id="cat-drawer" style="width:380px;right:-400px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="cat-drawer-title">ADD CATEGORY</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>CATEGORY NAME <span class="req">*</span></label>
+      <input id="cat-name" class="um-input" type="text" placeholder="e.g. Engineering" /></div>
+    <div id="cat-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="cat-save-btn" onclick="saveCategory()">SAVE CATEGORY</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── USER ROLE DRAWER ──────────────────────────────────────── -->
+<div class="um-drawer" id="user-drawer" style="width:400px;right:-420px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title">EDIT APP ACCESS</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div id="user-drawer-name" style="font-family:var(--font-ui);font-size:15px;font-weight:600;color:var(--text0);margin-bottom:16px;"></div>
+    <div class="um-field"><label>APP ROLE</label>
+      <select id="user-app-role" class="um-select">
+        <option value="admin">Admin — full access + user management</option>
+        <option value="pm">Project Manager — manage assigned projects</option>
+        <option value="resource">Resource — view assigned tasks + enter actuals</option>
+        <option value="viewer">Viewer — read-only access</option>
+      </select>
+    </div>
+    <div class="um-field"><label>LINKED RESOURCE RECORD</label>
+      <select id="user-resource-link" class="um-select">
+        <option value="">— Not linked —</option>
+      </select>
+    </div>
+    <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:8px;">
+      Linking a user to a resource record enables actuals entry and task assignment visibility.</p>
+    <div id="user-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="user-save-btn" onclick="saveUserRole()">SAVE ACCESS</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- External scripts -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/ticker.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+let UM = {
+  firms: [], categories: [], roles: [], roleLevels: [],
+  resources: [], users: [], firmId: null,
+  editingResourceId: null, editingRoleId: null,
+  editingCatId: null, editingUserId: null,
+};
+
+// ── INIT ──────────────────────────────────────────────────────
+async function initUM() {
+  try {
+    const [firms, users, categories, roles, roleLevels, resources] = await Promise.all([
+      API.get('firms?select=*&limit=10'),
+      API.get('users?select=*&order=name.asc'),
+      API.get('role_categories?select=*&order=sort_order.asc'),
+      API.get('roles?select=*&order=sort_order.asc'),
+      API.get('role_levels?select=*').catch(() => []),
+      API.get('resources?select=*&order=last_name.asc').catch(() => []),
+    ]);
+    UM.firms      = firms || [];
+    UM.users      = users || [];
+    UM.categories = categories || [];
+    UM.roles      = roles || [];
+    UM.roleLevels = roleLevels || [];
+    UM.resources  = resources || [];
+    UM.firmId     = firms?.[0]?.id || null;
+
+    const lbl = document.getElementById('um-firm-label');
+    if (lbl && firms?.[0]) lbl.textContent = firms[0].name?.toUpperCase();
+
+    renderResources();
+    renderRolesTable();
+    renderUsersTable();
+  } catch(e) {
+    console.error('UM init failed:', e);
+  }
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────
+function switchUMTab(tab) {
+  document.querySelectorAll('.um-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.um-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+}
+
+// ── RESOURCES ─────────────────────────────────────────────────
+function renderResources() {
+  const grid = document.getElementById('resources-grid');
+  const list = UM.resources;
+  if (!list.length) {
+    grid.innerHTML = '<div class="um-empty">NO RESOURCES YET — ADD YOUR FIRST TEAM MEMBER</div>';
+    return;
+  }
+  grid.innerHTML = list.map(r => {
+    const role  = UM.roles.find(ro => ro.id === r.role_id);
+    const cat   = role ? UM.categories.find(c => c.id === role.category_id) : null;
+    const initials = ((r.first_name||'?')[0] + (r.last_name||'?')[0]).toUpperCase();
+    const levelTag = r.level ? `<span class="res-tag level-${r.level}">${r.level.toUpperCase()}</span>` : '';
+    const statusTag = `<span class="res-tag ${r.is_active !== false ? 'active' : 'inactive'}">${r.is_active !== false ? 'ACTIVE' : 'INACTIVE'}</span>`;
+    return `<div class="um-card">
+      <div class="um-card-top">
+        <div class="res-row">
+          <div class="res-avatar">${initials}</div>
+          <div class="res-info">
+            <div class="res-name">${r.first_name} ${r.last_name}</div>
+            <div class="res-title">${r.title || (role ? role.name : '—')}</div>
+          </div>
+        </div>
+        <div class="um-card-actions">
+          <button class="um-card-action edit" onclick="openResourceDrawer('${r.id}')" title="Edit">✎</button>
+          <button class="um-card-action del"  onclick="deleteResource('${r.id}','${r.first_name} ${r.last_name}')" title="Delete">🗑</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        ${levelTag}${statusTag}
+        ${cat ? `<span class="res-tag" style="border:1px solid var(--border);color:var(--text3);">${cat.name.toUpperCase()}</span>` : ''}
+      </div>
+      ${r.email ? `<div class="um-card-field"><label>EMAIL</label><span>${r.email}</span></div>` : ''}
+      ${r.phone ? `<div class="um-card-field"><label>PHONE</label><span>${r.phone}</span></div>` : ''}
+      ${r.department ? `<div class="um-card-field"><label>DEPT</label><span>${r.department}</span></div>` : ''}
+      ${r.availability_pct != null ? `<div class="um-card-field"><label>AVAILABILITY</label><span>${r.availability_pct}%</span></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function openResourceDrawer(id) {
+  UM.editingResourceId = id || null;
+  const r = id ? UM.resources.find(x => x.id === id) : null;
+  document.getElementById('res-drawer-title').textContent = id ? 'EDIT RESOURCE' : 'ADD RESOURCE';
+
+  // Populate role select
+  const roleEl = document.getElementById('res-role');
+  roleEl.innerHTML = '<option value="">— Select role —</option>';
+  UM.categories.forEach(cat => {
+    const catRoles = UM.roles.filter(ro => ro.category_id === cat.id);
+    if (!catRoles.length) return;
+    const og = document.createElement('optgroup');
+    og.label = cat.name;
+    catRoles.forEach(ro => {
+      const o = document.createElement('option');
+      o.value = ro.id; o.textContent = ro.name;
+      if (r && r.role_id === ro.id) o.selected = true;
+      og.appendChild(o);
+    });
+    roleEl.appendChild(og);
+  });
+
+  // Populate user link select
+  const ulEl = document.getElementById('res-user-link');
+  ulEl.innerHTML = '<option value="">— Not linked —</option>' +
+    UM.users.map(u => `<option value="${u.id}" ${r?.user_id===u.id?'selected':''}>${u.name} (${u.email||'no email'})</option>`).join('');
+
+  // Fill fields
+  document.getElementById('res-first').value    = r?.first_name || '';
+  document.getElementById('res-last').value     = r?.last_name  || '';
+  document.getElementById('res-title').value    = r?.title      || '';
+  document.getElementById('res-email').value    = r?.email      || '';
+  document.getElementById('res-phone').value    = r?.phone      || '';
+  document.getElementById('res-dept').value     = r?.department || '';
+  document.getElementById('res-location').value = r?.location   || '';
+  document.getElementById('res-level').value    = r?.level      || '';
+  document.getElementById('res-hire').value     = r?.hire_date  || '';
+  document.getElementById('res-avail').value    = r?.availability_pct ?? 100;
+  document.getElementById('res-status').value   = String(r?.is_active !== false);
+  document.getElementById('res-notes').value    = r?.notes      || '';
+  document.getElementById('res-err').style.display = 'none';
+
+  openDrawer('resource-drawer');
+}
+
+async function saveResource() {
+  const first = document.getElementById('res-first').value.trim();
+  const last  = document.getElementById('res-last').value.trim();
+  const errEl = document.getElementById('res-err');
+  if (!first || !last) { errEl.textContent='First and last name are required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('res-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+
+  const payload = {
+    firm_id:          UM.firmId,
+    first_name:       first,
+    last_name:        last,
+    title:            document.getElementById('res-title').value.trim()    || null,
+    email:            document.getElementById('res-email').value.trim()    || null,
+    phone:            document.getElementById('res-phone').value.trim()    || null,
+    department:       document.getElementById('res-dept').value.trim()     || null,
+    location:         document.getElementById('res-location').value.trim() || null,
+    role_id:          document.getElementById('res-role').value            || null,
+    level:            document.getElementById('res-level').value           || null,
+    hire_date:        document.getElementById('res-hire').value            || null,
+    availability_pct: parseFloat(document.getElementById('res-avail').value) || 100,
+    is_active:        document.getElementById('res-status').value === 'true',
+    user_id:          document.getElementById('res-user-link').value       || null,
+    notes:            document.getElementById('res-notes').value.trim()    || null,
+  };
+
+  try {
+    if (UM.editingResourceId) {
+      await API.patch(`resources?id=eq.${UM.editingResourceId}`, payload);
+      const idx = UM.resources.findIndex(r => r.id === UM.editingResourceId);
+      if (idx >= 0) UM.resources[idx] = { ...UM.resources[idx], ...payload };
+    } else {
+      const [created] = await API.post('resources', payload);
+      if (created) UM.resources.push(created);
+    }
+    closeDrawer();
+    renderResources();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE RESOURCE'; btn.disabled = false;
+  }
+}
+
+async function deleteResource(id, name) {
+  if (!confirm(`Delete resource "${name}"? This cannot be undone.`)) return;
+  try {
+    await API.del(`resources?id=eq.${id}`);
+    UM.resources = UM.resources.filter(r => r.id !== id);
+    renderResources();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── ROLES TABLE ───────────────────────────────────────────────
+function renderRolesTable() {
+  const wrap = document.getElementById('roles-table-wrap');
+  if (!UM.roles.length) {
+    wrap.innerHTML = '<div class="um-empty">NO ROLES DEFINED YET</div>';
+    return;
+  }
+
+  const levelCols = ['junior','staff','senior','principal'];
+  let html = `<table class="um-tbl">
+    <thead><tr>
+      <th>ROLE</th><th>ABBR</th><th>CATEGORY</th>
+      ${levelCols.map(l=>`<th style="color:${levelColor(l)};">${l.toUpperCase()} $/hr</th>`).join('')}
+      <th></th>
+    </tr></thead><tbody>`;
+
+  UM.categories.forEach(cat => {
+    const catRoles = UM.roles.filter(r => r.category_id === cat.id);
+    if (!catRoles.length) return;
+    html += `<tr class="um-cat-header"><td colspan="8">▸ ${cat.name.toUpperCase()}</td></tr>`;
+    catRoles.forEach(r => {
+      const rates = {};
+      UM.roleLevels.filter(rl => rl.role_id === r.id).forEach(rl => { rates[rl.level] = rl; });
+      html += `<tr>
+        <td>${r.name}</td>
+        <td class="abbr">${r.abbreviation || '—'}</td>
+        <td class="mono" style="color:var(--text3);font-size:10px;">${cat.name}</td>
+        ${levelCols.map(l => {
+          const rl = rates[l];
+          return `<td><input class="rate-input" type="number" min="0" step="0.01"
+            value="${rl ? rl.overhead_rate_per_hour : ''}"
+            placeholder="—"
+            onchange="saveRate('${r.id}','${l}',this.value,'${rl?.id||''}')"
+            style="color:${levelColor(l)};" /></td>`;
+        }).join('')}
+        <td style="white-space:nowrap;">
+          <button class="um-card-action edit" onclick="openRoleDrawer('${r.id}')" title="Edit">✎</button>
+          <button class="um-card-action del"  onclick="deleteRole('${r.id}','${r.name}')" title="Delete">🗑</button>
+        </td>
+      </tr>`;
+    });
+  });
+
+  // Uncategorised roles
+  const uncatRoles = UM.roles.filter(r => !r.category_id);
+  if (uncatRoles.length) {
+    html += `<tr class="um-cat-header"><td colspan="8">▸ UNCATEGORISED</td></tr>`;
+    uncatRoles.forEach(r => {
+      html += `<tr><td>${r.name}</td><td class="abbr">${r.abbreviation||'—'}</td><td>—</td>
+        ${['junior','staff','senior','principal'].map(()=>'<td>—</td>').join('')}
+        <td><button class="um-card-action edit" onclick="openRoleDrawer('${r.id}')">✎</button>
+            <button class="um-card-action del" onclick="deleteRole('${r.id}','${r.name}')">🗑</button></td>
+      </tr>`;
+    });
+  }
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function levelColor(l) {
+  return l==='junior'?'#6cc':l==='staff'?'var(--cyan)':l==='senior'?'var(--amber)':'#c8a0ff';
+}
+
+async function saveRate(roleId, level, value, existingId) {
+  const rate = parseFloat(value);
+  if (isNaN(rate)) return;
+  try {
+    if (existingId) {
+      await API.patch(`role_levels?id=eq.${existingId}`, { overhead_rate_per_hour: rate });
+      const rl = UM.roleLevels.find(r => r.id === existingId);
+      if (rl) rl.overhead_rate_per_hour = rate;
+    } else {
+      const [created] = await API.post('role_levels', { role_id: roleId, level, overhead_rate_per_hour: rate });
+      if (created) {
+        UM.roleLevels.push(created);
+        // Re-render so the new ID is in the input's onchange
+        renderRolesTable();
+      }
+    }
+  } catch(e) { alert('Rate save failed: ' + e.message); }
+}
+
+function openRoleDrawer(id) {
+  UM.editingRoleId = id || null;
+  const r = id ? UM.roles.find(x => x.id === id) : null;
+  document.getElementById('role-drawer-title').textContent = id ? 'EDIT ROLE' : 'ADD ROLE';
+
+  const catEl = document.getElementById('role-cat');
+  catEl.innerHTML = '<option value="">— Select category —</option>' +
+    UM.categories.map(c => `<option value="${c.id}" ${r?.category_id===c.id?'selected':''}>${c.name}</option>`).join('');
+
+  document.getElementById('role-name').value = r?.name         || '';
+  document.getElementById('role-abbr').value = r?.abbreviation || '';
+  document.getElementById('role-desc').value = r?.description  || '';
+
+  // Pre-fill rates
+  ['junior','staff','senior','principal'].forEach(l => {
+    const rl = id ? UM.roleLevels.find(x => x.role_id===id && x.level===l) : null;
+    document.getElementById('rate-'+l).value = rl?.overhead_rate_per_hour ?? '';
+  });
+  document.getElementById('role-err').style.display = 'none';
+  openDrawer('role-drawer');
+}
+
+async function saveRole() {
+  const name = document.getElementById('role-name').value.trim();
+  const errEl = document.getElementById('role-err');
+  if (!name) { errEl.textContent='Role name is required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('role-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+
+  const payload = {
+    firm_id:      UM.firmId,
+    name,
+    abbreviation: document.getElementById('role-abbr').value.trim() || null,
+    category_id:  document.getElementById('role-cat').value         || null,
+    description:  document.getElementById('role-desc').value.trim() || null,
+  };
+
+  try {
+    let roleId = UM.editingRoleId;
+    if (roleId) {
+      await API.patch(`roles?id=eq.${roleId}`, payload);
+      const idx = UM.roles.findIndex(r => r.id === roleId);
+      if (idx >= 0) UM.roles[idx] = { ...UM.roles[idx], ...payload };
+    } else {
+      const [created] = await API.post('roles', payload);
+      if (created) { UM.roles.push(created); roleId = created.id; }
+    }
+    // Save rates
+    for (const level of ['junior','staff','senior','principal']) {
+      const val = parseFloat(document.getElementById('rate-'+level).value);
+      if (isNaN(val)) continue;
+      const existing = UM.roleLevels.find(rl => rl.role_id===roleId && rl.level===level);
+      if (existing) {
+        await API.patch(`role_levels?id=eq.${existing.id}`, { overhead_rate_per_hour: val });
+        existing.overhead_rate_per_hour = val;
+      } else {
+        const [created] = await API.post('role_levels', { role_id: roleId, level, overhead_rate_per_hour: val });
+        if (created) UM.roleLevels.push(created);
+      }
+    }
+    closeDrawer();
+    renderRolesTable();
+    renderResources();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE ROLE'; btn.disabled = false;
+  }
+}
+
+async function deleteRole(id, name) {
+  if (!confirm(`Delete role "${name}"? This will remove all associated rates.`)) return;
+  try {
+    await API.del(`role_levels?role_id=eq.${id}`);
+    await API.del(`roles?id=eq.${id}`);
+    UM.roles = UM.roles.filter(r => r.id !== id);
+    UM.roleLevels = UM.roleLevels.filter(rl => rl.role_id !== id);
+    renderRolesTable();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── CATEGORIES ────────────────────────────────────────────────
+function openCategoryDrawer(id) {
+  UM.editingCatId = id || null;
+  const c = id ? UM.categories.find(x => x.id === id) : null;
+  document.getElementById('cat-drawer-title').textContent = id ? 'EDIT CATEGORY' : 'ADD CATEGORY';
+  document.getElementById('cat-name').value = c?.name || '';
+  document.getElementById('cat-err').style.display = 'none';
+  openDrawer('cat-drawer');
+}
+
+async function saveCategory() {
+  const name = document.getElementById('cat-name').value.trim();
+  const errEl = document.getElementById('cat-err');
+  if (!name) { errEl.textContent='Category name is required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('cat-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    if (UM.editingCatId) {
+      await API.patch(`role_categories?id=eq.${UM.editingCatId}`, { name });
+      const c = UM.categories.find(x => x.id === UM.editingCatId);
+      if (c) c.name = name;
+    } else {
+      const [created] = await API.post('role_categories', { firm_id: UM.firmId, name, sort_order: UM.categories.length * 10 });
+      if (created) UM.categories.push(created);
+    }
+    closeDrawer();
+    renderRolesTable();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE CATEGORY'; btn.disabled = false;
+  }
+}
+
+// ── APP USERS TABLE ───────────────────────────────────────────
+function renderUsersTable() {
+  const wrap = document.getElementById('users-table-wrap');
+  if (!UM.users.length) {
+    wrap.innerHTML = '<div class="um-empty">NO USERS FOUND</div>';
+    return;
+  }
+  let html = `<table class="um-tbl"><thead><tr>
+    <th>NAME</th><th>EMAIL</th><th>APP ROLE</th><th>LINKED RESOURCE</th><th></th>
+  </tr></thead><tbody>`;
+  UM.users.forEach(u => {
+    const res = UM.resources.find(r => r.id === u.resource_id);
+    const roleBadge = `<span class="app-role ${u.app_role||'viewer'}">${(u.app_role||'viewer').toUpperCase()}</span>`;
+    html += `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px;">${UI.avatar(u,22)}<span>${u.name||'—'}</span></div></td>
+      <td class="mono" style="color:var(--text3);font-size:10px;">${u.email||'—'}</td>
+      <td>${roleBadge}</td>
+      <td style="font-size:11px;color:var(--text2);">${res ? res.first_name+' '+res.last_name : '<span style="color:var(--text3);">—</span>'}</td>
+      <td><button class="um-card-action edit" onclick="openUserDrawer('${u.id}')" title="Edit access">✎</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function openUserDrawer(id) {
+  UM.editingUserId = id;
+  const u = UM.users.find(x => x.id === id);
+  document.getElementById('user-drawer-name').textContent = u?.name || '';
+  document.getElementById('user-app-role').value = u?.app_role || 'viewer';
+
+  const ulEl = document.getElementById('user-resource-link');
+  ulEl.innerHTML = '<option value="">— Not linked —</option>' +
+    UM.resources.map(r => `<option value="${r.id}" ${u?.resource_id===r.id?'selected':''}>${r.first_name} ${r.last_name}</option>`).join('');
+
+  document.getElementById('user-err').style.display = 'none';
+  openDrawer('user-drawer');
+}
+
+async function saveUserRole() {
+  const errEl = document.getElementById('user-err');
+  const btn   = document.getElementById('user-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    const payload = {
+      app_role:    document.getElementById('user-app-role').value,
+      resource_id: document.getElementById('user-resource-link').value || null,
+    };
+    await API.patch(`users?id=eq.${UM.editingUserId}`, payload);
+    const u = UM.users.find(x => x.id === UM.editingUserId);
+    if (u) Object.assign(u, payload);
+    closeDrawer();
+    renderUsersTable();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE ACCESS'; btn.disabled = false;
+  }
+}
+
+// ── DRAWER HELPERS ────────────────────────────────────────────
+function openDrawer(id) {
+  document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
+  document.getElementById(id).classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+function closeDrawer() {
+  document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
+  document.getElementById('drawer-overlay').classList.remove('open');
+  UM.editingResourceId = UM.editingRoleId = UM.editingCatId = UM.editingUserId = null;
+}
+
+// ── BOOT ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', initUM);
+</script>
+</body>
+</html>
