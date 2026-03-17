@@ -414,6 +414,8 @@ async function initUM() {
     renderUsersTable();
   } catch(e) {
     console.error('UM init failed:', e);
+    document.getElementById('resources-grid').innerHTML =
+      `<div class="um-empty" style="color:var(--red);">Load failed: ${e.message}</div>`;
   }
 }
 
@@ -835,7 +837,14 @@ function closeDrawer() {
 }
 
 // ── BOOT ──────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', initUM);
+document.addEventListener('DOMContentLoaded', async () => {
+  // Ensure auth session is active before making API calls
+  try {
+    Auth.requireAuth();           // redirects to login if not authenticated
+    await Auth.getFreshToken();   // waits for token to be available
+  } catch(e) { /* not authenticated — requireAuth will redirect */ return; }
+  initUM();
+});
 </script>
 </body>
 </html>
