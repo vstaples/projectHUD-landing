@@ -862,10 +862,10 @@ let STATE = {
 };
 function _effectiveStatus(t) {
   if (!t) return 'not_started';
-  if (t.status === 'complete' || t.status === 'on_hold') return t.status;
-  if (t.actual_finish || parseFloat(t.pct_complete) >= 100) return 'complete';
-  if (t.actual_start  || parseFloat(t.pct_complete)  >  0)  return 'in_progress';
-  return t.status || 'not_started';
+  if (t.status==='complete'||t.status==='on_hold') return t.status;
+  if (t.actual_finish||parseFloat(t.pct_complete)>=100) return 'complete';
+  if (t.actual_start||parseFloat(t.pct_complete)>0) return 'in_progress';
+  return t.status||'not_started';
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
@@ -1533,7 +1533,7 @@ function renderTasksTable() {
           const _rl=(STATE.hudRoleLevels||[]).find(l=>l.role_id===(_ra?.hud_role_id||t.hud_role_id)&&l.level===(_res?.level||'staff'));
           const _rate=_rl?.overhead_rate_per_hour||t.labor_rate||175;
           const _bh=parseFloat(t.budget_hours||t.effort_days||0);
-          const C='col-grp-budget', S='font-family:var(--font-mono);font-size:11px;color:var(--text2);';
+          const C='col-grp-budget',S='font-family:var(--font-mono);font-size:11px;color:var(--text2);';
           return '<td class="'+C+'" style="'+S+'">'+(_bh?_bh.toFixed(1)+'h':'—')+'</td>'+'<td class="'+C+'" style="'+S+'">'+(_bh?'$'+(_bh*_rate).toFixed(0):'—')+'</td>'+'<td class="'+C+'" style="'+S+'">$'+_rate.toFixed(0)+'/h</td>';
         })()}
         <!-- EVM group -->
@@ -1582,8 +1582,8 @@ function renderTasksTable() {
   window._phaseNumMap = {};
   phasesSorted.forEach((ph, i) => { window._phaseNumMap[ph] = i + 1; });
 
-  phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase)));
-  if (nophase.length) renderPhase('NO PHASE', nophase);
+  phases.forEach(phase => renderPhase(phase, tasks.filter(t => t.phase === phase).slice().sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0))));
+  if (nophase.length) renderPhase('NO PHASE', nophase.slice().sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0)));
   tbody.innerHTML = html || `<tr><td colspan="14">${UI.allClear('NO TASKS', 'No tasks match this filter')}</td></tr>`;
   setTimeout(constrainTableWrap, 100);
   _initTablePan();
@@ -3011,7 +3011,7 @@ function _nextWeekday(date) {
 }
 
 function _toInputDate(d) {
-  const yr=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dy=String(d.getDate()).padStart(2,'0');
+  const yr=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');
   return yr+'-'+mo+'-'+dy;
 }
 function _fmtD(dateStr) {
@@ -4340,180 +4340,89 @@ function _p2PatchFunctions() {
 }
 </script>
 
-
 <script>
-// ── TASK DRAG-TO-REORDER ──────────────────────────────────────────
-// Long-press (600ms) to drag within a phase. Ctrl+drag to clone.
-// Visual: cyan outline on dragged row, amber drop-line between rows.
-(function() {
-  let _dragTaskId   = null;
-  let _dragIsClone  = false;
-  let _dragRow      = null;
-  let _dropLine     = null;
-  let _longPressTimer = null;
-  let _dragStartY   = 0;
-  let _isDragging   = false;
+// ── TASK DRAG-TO-REORDER ─────────────────────────────────────────
+// Long-press 600ms to drag within a phase. Ctrl+drag to clone.
+(function initDragReorder() {
+  let _dragTaskId  = null;
+  let _dragIsClone = false;
+  let _dragRow     = null;
+  let _dropLine    = null;
+  let _longTimer   = null;
+  let _startY      = 0;
+  let _dragging    = false;
 
-  // Create the amber drop indicator line
-  function getDropLine() {
+  function dropLine() {
     if (!_dropLine) {
       _dropLine = document.createElement('tr');
       _dropLine.id = 'task-drop-line';
-      _dropLine.style.cssText = 'pointer-events:none;';
-      _dropLine.innerHTML = '<td colspan="20" style="padding:0;height:3px;background:var(--amber);box-shadow:0 0 8px rgba(245,166,35,0.8);"></td>';
+      _dropLine.style.cssText = 'pointer-events:none;height:0;';
+      _dropLine.innerHTML = '<td colspan="20" style="padding:0;height:3px;background:var(--amber);box-shadow:0 0 8px rgba(245,166,35,.8);"></td>';
     }
     return _dropLine;
   }
 
-  // Find nearest task row for drop target
-  function getRowAtY(y) {
+  // Find which task row is at clientY, returns {row, before:bool}
+  function rowAtY(clientY) {
     const rows = [...document.querySelectorAll('#tasks-tbody tr[data-task-id]')];
-    for (const row of rows) {
-      const rect = row.getBoundingClientRect();
-      const mid  = rect.top + rect.height / 2;
-      if (y < mid) return { row, position: 'before' };
+    for (const r of rows) {
+      const rect = r.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return { row: r, before: true };
     }
-    // After last row
-    if (rows.length) return { row: rows[rows.length-1], position: 'after' };
-    return null;
-  }
-
-  // Attach listeners to tbody (event delegation)
-  function attachDragListeners() {
-    const tbody = document.getElementById('tasks-tbody');
-    if (!tbody || tbody._dragAttached) return;
-    tbody._dragAttached = true;
-
-    tbody.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup',   onMouseUp);
-
-    // Touch support
-    tbody.addEventListener('touchstart', onTouchStart, { passive: false });
-    document.addEventListener('touchmove',  onTouchMove,  { passive: false });
-    document.addEventListener('touchend',   onTouchEnd);
-  }
-
-  function onMouseDown(e) {
-    const row = e.target.closest('tr[data-task-id]');
-    if (!row) return;
-    // Only activate on the first cell (row number) or row itself — not on buttons/inputs
-    if (e.target.closest('button, input, select, a, .cp-flag')) return;
-    _dragStartY = e.clientY;
-    _dragIsClone = e.ctrlKey || e.metaKey;
-    _longPressTimer = setTimeout(() => startDrag(row, e.clientY, _dragIsClone), 600);
-  }
-
-  function onTouchStart(e) {
-    const row = e.target.closest('tr[data-task-id]');
-    if (!row) return;
-    if (e.target.closest('button, input, select, a')) return;
-    const touch = e.touches[0];
-    _dragStartY = touch.clientY;
-    _dragIsClone = false;
-    _longPressTimer = setTimeout(() => startDrag(row, touch.clientY, false), 600), e.preventDefault();
+    const last = rows[rows.length - 1];
+    return last ? { row: last, before: false } : null;
   }
 
   function startDrag(row, clientY, isClone) {
-    _isDragging   = true;
-    _dragRow      = row;
-    _dragTaskId   = row.dataset.taskId;
-    _dragIsClone  = isClone;
-
-    // Visual: highlight dragged row
-    row.style.outline = isClone
-      ? '2px solid var(--purple)'
-      : '2px solid var(--cyan)';
-    row.style.background = isClone
-      ? 'rgba(168,85,247,0.12)'
-      : 'rgba(0,210,255,0.10)';
-    row.style.opacity   = '0.75';
-    document.body.style.cursor = isClone ? 'copy' : 'grabbing';
+    _dragging = true;
+    _dragRow  = row;
+    _dragTaskId  = row.dataset.taskId;
+    _dragIsClone = isClone;
+    row.style.outline    = isClone ? '2px solid var(--purple)' : '2px solid var(--cyan)';
+    row.style.background = isClone ? 'rgba(168,85,247,.12)' : 'rgba(0,210,255,.10)';
+    row.style.opacity    = '0.75';
+    document.body.style.cursor     = isClone ? 'copy' : 'grabbing';
     document.body.style.userSelect = 'none';
-
-    // Show cursor label
-    const lbl = document.getElementById('drag-cursor-label') || (() => {
-      const el = document.createElement('div');
-      el.id = 'drag-cursor-label';
-      el.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;font-family:var(--font-mono);font-size:10px;padding:3px 8px;border:1px solid;border-radius:2px;letter-spacing:.08em;';
-      document.body.appendChild(el);
-      return el;
-    })();
-    lbl.textContent = isClone ? '⎘ CLONE TASK' : '↕ MOVE TASK';
+    // Floating label
+    let lbl = document.getElementById('_dragLbl');
+    if (!lbl) {
+      lbl = document.createElement('div');
+      lbl.id = '_dragLbl';
+      lbl.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;font-family:var(--font-mono);font-size:10px;padding:3px 8px;border:1px solid;letter-spacing:.08em;display:none;';
+      document.body.appendChild(lbl);
+    }
+    lbl.textContent   = isClone ? '⎘ CLONE TASK' : '↕ MOVE TASK';
     lbl.style.color       = isClone ? 'var(--purple)' : 'var(--cyan)';
     lbl.style.borderColor = isClone ? 'rgba(168,85,247,.5)' : 'rgba(0,210,255,.5)';
     lbl.style.background  = isClone ? 'rgba(168,85,247,.12)' : 'rgba(0,210,255,.10)';
-    lbl.style.display     = 'block';
-    _moveCursorLabel(clientY);
+    lbl.style.display = 'block';
+    moveLbl(clientY);
   }
 
-  function _moveCursorLabel(clientY) {
-    const lbl = document.getElementById('drag-cursor-label');
-    if (lbl) { lbl.style.top = (clientY + 16) + 'px'; lbl.style.left = '80px'; }
+  function moveLbl(clientY) {
+    const lbl = document.getElementById('_dragLbl');
+    if (lbl) { lbl.style.top = (clientY + 16) + 'px'; lbl.style.left = '120px'; }
   }
 
-  function onMouseMove(e) {
-    if (!_isDragging) {
-      // Cancel long press if mouse moved significantly
-      if (_longPressTimer && Math.abs(e.clientY - _dragStartY) > 8) {
-        clearTimeout(_longPressTimer); _longPressTimer = null;
-      }
-      return;
-    }
-    e.preventDefault();
-    _moveCursorLabel(e.clientY);
-    updateDropIndicator(e.clientY);
-  }
-
-  function onTouchMove(e) {
-    if (!_isDragging) {
-      if (_longPressTimer && Math.abs(e.touches[0].clientY - _dragStartY) > 8) {
-        clearTimeout(_longPressTimer); _longPressTimer = null;
-      }
-      return;
-    }
-    e.preventDefault();
-    updateDropIndicator(e.touches[0].clientY);
-  }
-
-  function updateDropIndicator(clientY) {
-    const target = getRowAtY(clientY);
+  function updateDropLine(clientY) {
+    if (!_dragging) return;
+    const target = rowAtY(clientY);
     if (!target) return;
-    const line = getDropLine();
-    const tbody = document.getElementById('tasks-tbody');
-    // Only allow drop within same phase
-    const dragTask = STATE.tasks.find(t => t.id === _dragTaskId);
+    const dragTask   = STATE.tasks.find(t => t.id === _dragTaskId);
     const targetTask = STATE.tasks.find(t => t.id === target.row.dataset.taskId);
     if (!dragTask || !targetTask) return;
-    if (dragTask.phase !== targetTask.phase) {
-      line.querySelector('td').style.background = 'var(--red)'; // red = cross-phase not allowed
-    } else {
-      line.querySelector('td').style.background = 'var(--amber)';
-    }
-    if (target.position === 'before') {
-      tbody.insertBefore(line, target.row);
-    } else {
-      target.row.after(line);
+    const samePhase  = dragTask.phase === targetTask.phase;
+    const dl = dropLine();
+    dl.querySelector('td').style.background = samePhase ? 'var(--amber)' : 'var(--red)';
+    const tbody = document.getElementById('tasks-tbody');
+    if (tbody) {
+      if (target.before) tbody.insertBefore(dl, target.row);
+      else               target.row.after(dl);
     }
   }
 
-  function onMouseUp(e) {
-    clearTimeout(_longPressTimer); _longPressTimer = null;
-    if (!_isDragging) return;
-    finishDrag(e.clientY);
-  }
-
-  function onTouchEnd(e) {
-    clearTimeout(_longPressTimer); _longPressTimer = null;
-    if (!_isDragging) return;
-    const touch = e.changedTouches[0];
-    finishDrag(touch.clientY);
-  }
-
-  async function finishDrag(clientY) {
-    _isDragging = false;
-
-    // Restore dragged row appearance
+  function cancelDrag() {
+    clearTimeout(_longTimer); _longTimer = null;
     if (_dragRow) {
       _dragRow.style.outline = '';
       _dragRow.style.background = '';
@@ -4521,138 +4430,135 @@ function _p2PatchFunctions() {
     }
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    const lbl = document.getElementById('drag-cursor-label');
+    const lbl = document.getElementById('_dragLbl');
     if (lbl) lbl.style.display = 'none';
-
-    // Remove drop line
     if (_dropLine && _dropLine.parentNode) _dropLine.parentNode.removeChild(_dropLine);
+    _dragging = false; _dragRow = null; _dragTaskId = null;
+  }
 
-    const target = getRowAtY(clientY);
-    if (!target || !_dragTaskId) { _dragRow=null; _dragTaskId=null; return; }
-
-    const dragTask   = STATE.tasks.find(t => t.id === _dragTaskId);
+  async function finishDrag(clientY) {
+    if (!_dragging) { cancelDrag(); return; }
+    const target    = rowAtY(clientY);
+    const taskId    = _dragTaskId;
+    const isClone   = _dragIsClone;
+    cancelDrag();
+    if (!target || !taskId) return;
+    const dragTask   = STATE.tasks.find(t => t.id === taskId);
     const targetTask = STATE.tasks.find(t => t.id === target.row.dataset.taskId);
-    if (!dragTask || !targetTask || dragTask.phase !== targetTask.phase) {
-      _dragRow=null; _dragTaskId=null; return;
-    }
-
-    // Don't drop on self
-    if (dragTask.id === targetTask.id) { _dragRow=null; _dragTaskId=null; return; }
-
-    if (_dragIsClone) {
-      // Clone: create a new task with same data, insert at new position
-      await cloneTaskAt(dragTask, targetTask, target.position);
-    } else {
-      // Move: reassign sequence_order
-      await moveTaskTo(dragTask, targetTask, target.position);
-    }
-
-    _dragRow=null; _dragTaskId=null;
+    if (!dragTask || !targetTask || dragTask.phase !== targetTask.phase) return;
+    if (dragTask.id === targetTask.id) return;
+    if (isClone) await cloneTask(dragTask, targetTask, target.before);
+    else         await moveTask(dragTask, targetTask, target.before);
   }
 
-  async function moveTaskTo(dragTask, targetTask, position) {
-    // Reorder STATE.tasks array within the phase
-    const phaseTasks = STATE.tasks.filter(t => t.phase === dragTask.phase)
-                                   .sort((a,b) => (a.sequence_order||0) - (b.sequence_order||0));
-
-    // Remove drag task from array
-    const arr = phaseTasks.filter(t => t.id !== dragTask.id);
-    const targetIdx = arr.findIndex(t => t.id === targetTask.id);
-    const insertIdx = position === 'before' ? targetIdx : targetIdx + 1;
-    arr.splice(insertIdx, 0, dragTask);
-
-    // Reassign sequence_orders in increments of 10
-    const updates = arr.map((t, i) => ({ id: t.id, sequence_order: (i + 1) * 10 }));
-
-    // Update STATE immediately for snappy UI
-    updates.forEach(u => {
-      const t = STATE.tasks.find(x => x.id === u.id);
-      if (t) t.sequence_order = u.sequence_order;
-    });
+  async function moveTask(drag, target, before) {
+    // Rebuild phase task order
+    const phase = drag.phase;
+    let arr = STATE.tasks.filter(t => t.phase === phase)
+                          .slice().sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0));
+    // Remove drag task
+    arr = arr.filter(t => t.id !== drag.id);
+    const ti = arr.findIndex(t => t.id === target.id);
+    const at = before ? ti : ti + 1;
+    arr.splice(at, 0, drag);
+    // Assign new sequence_orders
+    arr.forEach((t,i) => { t.sequence_order = (i + 1) * 10; });
+    // Re-render immediately (sorts by sequence_order now)
     renderTasksTable();
-
-    // Persist to DB — only update changed rows
-    for (const u of updates) {
-      await API.patch('tasks?id=eq.' + u.id, { sequence_order: u.sequence_order }).catch(()=>{});
+    // Persist
+    for (const t of arr) {
+      await API.patch('tasks?id=eq.' + t.id, { sequence_order: t.sequence_order }).catch(() => {});
     }
   }
 
-  async function cloneTaskAt(sourceTask, targetTask, position) {
-    const phaseTasks = STATE.tasks.filter(t => t.phase === sourceTask.phase)
-                                   .sort((a,b) => (a.sequence_order||0) - (b.sequence_order||0));
-    const targetIdx  = phaseTasks.findIndex(t => t.id === targetTask.id);
-    const beforeSeq  = position === 'before'
-      ? (phaseTasks[targetIdx - 1]?.sequence_order || 0)
-      : (phaseTasks[targetIdx]?.sequence_order || 0);
-    const afterSeq   = position === 'before'
-      ? (phaseTasks[targetIdx]?.sequence_order || beforeSeq + 20)
-      : (phaseTasks[targetIdx + 1]?.sequence_order || phaseTasks[targetIdx].sequence_order + 20);
-    const newSeq = Math.floor((beforeSeq + afterSeq) / 2) || (afterSeq - 5);
-
-    // Build clone payload — strip id/timestamps/audit fields
+  async function cloneTask(source, target, before) {
+    const phase = source.phase;
+    const arr   = STATE.tasks.filter(t => t.phase === phase)
+                              .slice().sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0));
+    const ti    = arr.findIndex(t => t.id === target.id);
+    const prev  = before ? (arr[ti-1]?.sequence_order || 0)    : (arr[ti]?.sequence_order || 0);
+    const next  = before ? (arr[ti]?.sequence_order   || prev+20) : (arr[ti+1]?.sequence_order || arr[ti].sequence_order+20);
+    const newSeq = Math.round((prev + next) / 2) || (next - 5);
     const payload = {
-      project_id:     sourceTask.project_id,
-      firm_id:        sourceTask.firm_id,
-      name:           sourceTask.name + ' (copy)',
-      phase:          sourceTask.phase,
-      status:         'not_started',
-      start_date:     sourceTask.start_date,
-      due_date:       sourceTask.due_date,
-      duration_days:  sourceTask.duration_days,
-      effort_days:    sourceTask.effort_days,
-      budget_hours:   sourceTask.budget_hours,
-      pct_complete:   0,
-      hud_role_id:    sourceTask.hud_role_id,
-      description:    sourceTask.description,
-      sequence_order: newSeq,
+      project_id: source.project_id, firm_id: source.firm_id,
+      name: source.name + ' (copy)', phase: source.phase,
+      status: 'not_started', start_date: source.start_date,
+      due_date: source.due_date, duration_days: source.duration_days,
+      effort_days: source.effort_days, budget_hours: source.budget_hours,
+      pct_complete: 0, hud_role_id: source.hud_role_id,
+      description: source.description, sequence_order: newSeq,
     };
-
     try {
       const [created] = await API.post('tasks', payload);
       if (created) {
         STATE.tasks.push(created);
-        // Clone resource assignments too
-        const srcAssignments = (STATE.taskAssignments||[]).filter(a => a.task_id === sourceTask.id);
-        for (const a of srcAssignments) {
-          const newA = await API.post('task_resource_assignments', {
-            task_id:        created.id,
-            resource_id:    a.resource_id,
-            hud_role_id:    a.hud_role_id,
-            allocation_pct: a.allocation_pct,
-            is_primary:     a.is_primary,
-            ai_assigned:    false,
-          }).catch(()=>null);
-          if (newA?.[0]) STATE.taskAssignments.push(newA[0]);
+        const src = (STATE.taskAssignments||[]).filter(a => a.task_id === source.id);
+        for (const a of src) {
+          const r = await API.post('task_resource_assignments', {
+            task_id: created.id, resource_id: a.resource_id,
+            hud_role_id: a.hud_role_id, allocation_pct: a.allocation_pct,
+            is_primary: a.is_primary, ai_assigned: false,
+          }).catch(() => null);
+          if (r?.[0]) STATE.taskAssignments.push(r[0]);
         }
         renderTasksTable();
       }
-    } catch(e) { console.warn('Clone task error:', e); }
+    } catch(e) { console.warn('clone err:', e); }
   }
 
-  // Re-attach after every renderTasksTable call
-  const _origRenderTasksTable = window.renderTasksTable;
-  if (_origRenderTasksTable) {
+  // ── Event listeners ───────────────────────────────────────────
+  function attach() {
+    const tbody = document.getElementById('tasks-tbody');
+    if (!tbody || tbody._dragReady) return;
+    tbody._dragReady = true;
+    tbody.addEventListener('mousedown', e => {
+      const row = e.target.closest('tr[data-task-id]');
+      if (!row || e.target.closest('button,input,select,a,.cp-flag')) return;
+      _startY = e.clientY;
+      _longTimer = setTimeout(() => startDrag(row, e.clientY, e.ctrlKey||e.metaKey), 600);
+    });
+    tbody.addEventListener('touchstart', e => {
+      const row = e.target.closest('tr[data-task-id]');
+      if (!row || e.target.closest('button,input,select,a')) return;
+      _startY = e.touches[0].clientY;
+      _longTimer = setTimeout(() => startDrag(row, e.touches[0].clientY, false), 600);
+    }, { passive: true });
+  }
+
+  document.addEventListener('mousemove', e => {
+    if (!_dragging) {
+      if (_longTimer && Math.abs(e.clientY - _startY) > 8) { clearTimeout(_longTimer); _longTimer = null; }
+      return;
+    }
+    e.preventDefault();
+    moveLbl(e.clientY);
+    updateDropLine(e.clientY);
+  });
+  document.addEventListener('mouseup',   e => { if (_longTimer) { clearTimeout(_longTimer); _longTimer = null; } finishDrag(e.clientY); });
+  document.addEventListener('touchmove',  e => {
+    if (!_dragging) { if (_longTimer && Math.abs(e.touches[0].clientY - _startY) > 8) { clearTimeout(_longTimer); _longTimer = null; } return; }
+    e.preventDefault(); updateDropLine(e.touches[0].clientY);
+  }, { passive: false });
+  document.addEventListener('touchend',  e => { if (_longTimer) { clearTimeout(_longTimer); _longTimer = null; } finishDrag(e.changedTouches[0].clientY); });
+  document.addEventListener('keydown',   e => { if (e.key === 'Escape' && _dragging) cancelDrag(); });
+
+  // Re-attach after every render
+  const _origRender = window.renderTasksTable;
+  if (typeof _origRender === 'function') {
     window.renderTasksTable = function() {
-      _origRenderTasksTable.apply(this, arguments);
-      setTimeout(attachDragListeners, 50);
+      _origRender.apply(this, arguments);
+      setTimeout(attach, 60);
     };
   }
-  // Also attach on DOMContentLoaded and tab switch
-  document.addEventListener('DOMContentLoaded', () => setTimeout(attachDragListeners, 500));
-  setTimeout(attachDragListeners, 1000);
+  setTimeout(attach, 800);
 
-  // Tooltip in task table header
-  const style = document.createElement('style');
-  style.textContent = `
-    #tasks-tbody tr[data-task-id] { cursor: default; transition: outline .1s, background .1s; }
-    #tasks-tbody tr[data-task-id]:active { outline: 1px solid rgba(0,210,255,.3); }
-    #task-drop-line td { transition: background .1s; }
-  `;
-  document.head.appendChild(style);
+  // Cursor style hint
+  const s = document.createElement('style');
+  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); }';
+  document.head.appendChild(s);
 
-  console.log('[DragReorder] task drag-to-reorder enabled');
+  console.log('[DragReorder] ready');
 })();
 </script>
-
 </body>
 </html>
