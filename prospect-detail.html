@@ -1302,15 +1302,26 @@ function renderActions() {
                   ? (assignee.first_name[0] + assignee.last_name[0]).toUpperCase() : '?';
                 const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
                 return `
-                <tr style="border-bottom:1px solid var(--border);cursor:pointer"
+                <tr style="border-bottom:1px solid var(--border)"
                   data-ai-id="${ai.id}"
                   data-ai-desc="${escHtml(ai.description)}"
                   data-ai-assigned="${ai.assigned_to||''}"
                   data-ai-due="${ai.due_date||''}"
-                  data-ai-status="${ai.status||'open'}"
-                  onclick="event.stopPropagation();openEditActionItemFromRow(this)">
-                  <td style="padding:10px 12px">
-                    <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
+                  data-ai-status="${ai.status||'open'}">
+                  <td style="padding:10px 12px;cursor:pointer"
+                    onclick="openEditActionItemFromRow(this.closest('tr'))">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div style="width:14px;height:14px;border-radius:3px;
+                        border:1px solid var(--border2);flex-shrink:0;cursor:pointer;
+                        display:flex;align-items:center;justify-content:center;
+                        background:${ai.status==='complete'?'var(--green)':'transparent'};
+                        border-color:${ai.status==='complete'?'var(--green)':'var(--border2)'};
+                        font-size:8px;color:#fff"
+                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this)">
+                        ${ai.status==='complete'?'✓':''}
+                      </div>
+                      <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
+                    </div>
                   </td>
                   <td style="padding:10px 12px">
                     <div style="display:flex;align-items:center;gap:6px">
@@ -1480,20 +1491,25 @@ async function loadMeetingDetail(meetId) {
           const assigneeName = resMap[ai.assigned_to_resource] || '—';
           const assigneeInitials = assigneeName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
           const done = ai.status === 'complete';
+          // Parse attachments and comments from description
+          const hasAttach = ai.description && ai.description.includes('[attachments:');
+          const commentCount = (_replyCache['ai-' + ai.id] || []).length;
           return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;
-              border-bottom:1px solid var(--border);cursor:pointer"
+              border-bottom:1px solid var(--border)"
               data-ai-id="${ai.id}"
               data-ai-desc="${escHtml(ai.description)}"
               data-ai-assigned="${ai.assigned_to_resource||''}"
               data-ai-due="${ai.due_date||''}"
-              data-ai-status="${ai.status||'open'}"
-              onclick="event.stopPropagation();openEditActionItemFromRow(this)">
+              data-ai-status="${ai.status||'open'}">
             <div style="width:16px;height:16px;border-radius:4px;border:1px solid var(--border2);
-              flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
+              flex-shrink:0;margin-top:3px;display:flex;align-items:center;justify-content:center;
+              cursor:pointer;
               background:${done?'var(--green)':'transparent'};
               border-color:${done?'var(--green)':'var(--border2)'};
-              font-size:9px;color:#fff">${done?'✓':''}</div>
-            <div style="flex:1;min-width:0">
+              font-size:9px;color:#fff"
+              onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this)">${done?'✓':''}</div>
+            <div style="flex:1;min-width:0;cursor:pointer"
+              onclick="event.stopPropagation();openEditActionItemFromRow(this.closest('[data-ai-id]'),'${meetId}')">
               <div style="font-size:12px;color:${done?'var(--muted)':'var(--text)'};
                 text-decoration:${done?'line-through':'none'};line-height:1.4">
                 ${escHtml(ai.description)}
@@ -1512,6 +1528,11 @@ async function loadMeetingDetail(meetId) {
                   color:${done?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
                   ${ai.status||'open'}
                 </span>
+                ${hasAttach ? `<span style="font-size:10px;color:var(--muted)" title="Has attachments">📎</span>` : ''}
+                ${commentCount > 0 ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;
+                  background:rgba(79,142,247,.12);color:var(--accent)">
+                  💬 ${commentCount}
+                </span>` : ''}
               </div>
             </div>
           </div>`;
@@ -1665,7 +1686,8 @@ async function saveActionItem() {
 // ── action item edit ───────────────────────────────────
 let _attachedFiles = [];
 
-function openEditActionItemFromRow(row) {
+function openEditActionItemFromRow(row, sourceMeetId) {
+  window._editAISourceMeetId = sourceMeetId || null;
   openEditActionItem(
     row.dataset.aiId,
     row.dataset.aiDesc,
@@ -1708,6 +1730,7 @@ function openEditActionItem(id, desc, assignedTo, dueDate, status) {
     if (filesEl) filesEl.innerHTML = '';
 
     overlay.classList.add('open');
+    overlay.dataset.sourceMeetId = window._editAISourceMeetId || '';
   } catch(e) {
     console.error('openEditActionItem error:', e);
   }
@@ -1773,8 +1796,22 @@ async function saveEditActionItem() {
 
     await API.patch(`prospect_action_items?id=eq.${id}`, payload);
     closeDrawer('ai-edit-overlay');
+    const returnMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     await loadAll();
-    switchTab('actions');
+    if (returnMeetId) {
+      switchTab('meetings');
+      // Re-expand the meeting card after loadAll re-renders
+      setTimeout(() => {
+        const card = document.getElementById('mcard-' + returnMeetId);
+        if (card && !card.classList.contains('open')) {
+          toggleMeetingCard(returnMeetId);
+        } else if (card && card.classList.contains('open')) {
+          loadMeetingDetail(returnMeetId);
+        }
+      }, 100);
+    } else {
+      switchTab('actions');
+    }
   } catch(e) {
     console.error(e);
     alert('Failed to save changes.');
@@ -1787,8 +1824,18 @@ async function deleteActionItem() {
   try {
     await API.del(`prospect_action_items?id=eq.${id}`);
     closeDrawer('ai-edit-overlay');
+    const returnMeetId2 = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     await loadAll();
-    switchTab('actions');
+    if (returnMeetId2) {
+      switchTab('meetings');
+      setTimeout(() => {
+        const card = document.getElementById('mcard-' + returnMeetId2);
+        if (card && !card.classList.contains('open')) toggleMeetingCard(returnMeetId2);
+        else if (card) loadMeetingDetail(returnMeetId2);
+      }, 100);
+    } else {
+      switchTab('actions');
+    }
   } catch(e) {
     console.error(e);
     alert('Failed to delete action item.');
@@ -2049,6 +2096,36 @@ function startProposal() {
 
 // helpers
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+
+// ── toggle action item status from checkbox ──────────────
+async function toggleMeetingAIStatus(id, currentStatus, el) {
+  const newStatus = currentStatus === 'complete' ? 'open' : 'complete';
+  try {
+    await API.patch(`prospect_action_items?id=eq.${id}`, {
+      status: newStatus,
+      completed_at: newStatus === 'complete' ? new Date().toISOString() : null,
+    });
+    // Update checkbox visually immediately
+    el.style.background    = newStatus === 'complete' ? 'var(--green)' : 'transparent';
+    el.style.borderColor   = newStatus === 'complete' ? 'var(--green)' : 'rgba(255,255,255,.14)';
+    el.textContent         = newStatus === 'complete' ? '✓' : '';
+    el.dataset.aiStatus    = newStatus;
+    // Update parent row data attr
+    const row = el.closest('[data-ai-id]');
+    if (row) row.dataset.aiStatus = newStatus;
+    // Update description strikethrough
+    const descEl = row?.querySelector('[style*="text-decoration"]');
+    if (descEl) {
+      descEl.style.textDecoration = newStatus === 'complete' ? 'line-through' : 'none';
+      descEl.style.color = newStatus === 'complete' ? 'var(--muted)' : 'var(--text)';
+    }
+    // Refresh badge counts
+    document.getElementById('tbadge-ai').textContent =
+      (actionItems.filter(a => a.status === 'open').length);
+  } catch(e) {
+    console.error('toggleMeetingAIStatus error:', e);
+  }
+}
 
 // ── meeting minutes reply thread ────────────────────────
 // Replies stored as prospect_activities notes tagged [meeting:ID]
