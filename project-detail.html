@@ -1469,11 +1469,11 @@ function renderTasksTable() {
       const taskN  = phaseTasks.indexOf(t) + 1;
       const taskId = phaseN ? phaseN + '.' + taskN : taskN;
       html += `<tr data-task-id="${t.id}">
-        <td style="padding:0 4px;font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;min-width:28px;">
+        <td style="padding:0 4px;font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;min-width:28px;user-select:none;">
           ${planEdit || document.getElementById('btn-link-tasks')?.dataset.linking === '1'
             ? `<input type="checkbox" class="task-link-check" data-type="task" data-id="${t.id}" data-label="${taskId}"
                 style="cursor:pointer;accent-color:var(--cyan);" onchange="onLinkCheckChange()" />`
-            : taskId}
+            : `<span class="drag-handle" title="Hold to drag · Ctrl+hold to clone" style="opacity:0;margin-right:4px;font-size:12px;cursor:grab;color:var(--text3);transition:opacity .15s;vertical-align:middle;">⠿</span>${taskId}`}
         </td>
         <td><div class="cp-flag"></div></td>
         ${(() => {
@@ -4522,21 +4522,21 @@ function _p2PatchFunctions() {
     tbody._dragReady = true;
     tbody.addEventListener('mousedown', e => {
       const row = e.target.closest('tr[data-task-id]');
-      if (!row || e.target.closest('button,input,select,a,.cp-flag')) return;
+      if (!row || e.target.closest('button,input,select,a')) return;
       _startY = e.clientY; _startX = e.clientX;
-      _longTimer = setTimeout(() => startDrag(row, e.clientY, e.ctrlKey||e.metaKey), 600);
+      _longTimer = setTimeout(() => startDrag(row, e.clientY, e.ctrlKey||e.metaKey), 400);
     });
     tbody.addEventListener('touchstart', e => {
       const row = e.target.closest('tr[data-task-id]');
       if (!row || e.target.closest('button,input,select,a')) return;
       _startY = e.touches[0].clientY;
-      _longTimer = setTimeout(() => startDrag(row, e.touches[0].clientY, false), 600);
+      _longTimer = setTimeout(() => startDrag(row, e.touches[0].clientY, false), 400);
     }, { passive: true });
   }
 
   document.addEventListener('mousemove', e => {
     if (!_dragging) {
-      if (_longTimer && (Math.abs(e.clientY - _startY) > 20 || Math.abs(e.clientX - _startX) > 20)) { clearTimeout(_longTimer); _longTimer = null; }
+      if (_longTimer && (Math.abs(e.clientY - _startY) > 6 || Math.abs(e.clientX - _startX) > 6)) { clearTimeout(_longTimer); _longTimer = null; }
       return;
     }
     e.preventDefault();
@@ -4563,7 +4563,7 @@ function _p2PatchFunctions() {
 
   // Cursor style hint
   const s = document.createElement('style');
-  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); }';
+  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); } #tasks-tbody tr[data-task-id]:hover .drag-handle { opacity:0.4 !important; } #tasks-tbody tr[data-task-id].dragging .drag-handle { opacity:1 !important; cursor:grabbing; }';
   document.head.appendChild(s);
 
   console.log('[DragReorder] ready');
