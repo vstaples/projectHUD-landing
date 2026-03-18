@@ -2622,7 +2622,6 @@ async function saveTaskForm() {
     }
     // ── Phase 2: save complexity + skill requirements ──────────────
     const _p2TaskId = _editingTaskId || (STATE.tasks.length && STATE.tasks[STATE.tasks.length-1].id);
-    console.log('[Phase2] saving for taskId:', _p2TaskId, '| skills:', (window._tfTaskSkills||[]).length, '| complexity:', window._tfComplexity);
     if (_p2TaskId) {
       try {
         if (window._tfComplexity) {
@@ -2634,13 +2633,13 @@ async function saveTaskForm() {
           const _p2t = STATE.tasks.find(function(x){ return x.id===_p2TaskId; });
           if (_p2t) { _p2t.complexity_rating=window._tfComplexity; _p2t.complexity_ai_inferred=window._tfComplexityAI||false; _p2t.complexity_reasoning=window._tfComplexityReasoning||null; }
         }
-        await API.del('task_skill_requirements?task_id=eq.' + _p2TaskId);
+        await API.del('task_skill_requirements?task_id=eq.' + _p2TaskId).catch(function(){});
         const _p2Skills = window._tfTaskSkills||[];
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
           await API.post('task_skill_requirements', {
             task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
             is_required:true, proficiency_needed:'practitioner'
-          });
+          }).catch(function(e){ console.warn('skill req save:',e); });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
@@ -2878,16 +2877,15 @@ openAddTaskPanel = function(phase) {
 };
 
 // ── PATCH openEditTaskPanel to load role + assignments ─────────
+// (role dropdown population handled by Phase 2 patch — _renderAssignmentRows)
 const _origOpenEditTask = openEditTaskPanel;
 openEditTaskPanel = async function(taskId) {
   _origOpenEditTask(taskId);
   window._editingTaskId2 = taskId;
-  _populateRoleSelectGrouped();
   // Load existing assignments
   const existing = (STATE.taskAssignments||[]).filter(a => a.task_id === taskId);
   window._tfAssignments = existing.map(a => ({...a}));
   _renderAssignmentRows(window._tfAssignments);
-  // Role is now per-row in _tfAssignments — no task-level role dropdown
 };
 
 // ── PATCH saveTaskForm to save role + assignments ──────────────
@@ -4199,7 +4197,7 @@ function _p2PatchFunctions() {
     }
     window._tfTaskSkills = []; _renderTaskSkillChips(); _ensureSkillsLoaded();
     try {
-      var reqs = await API.get('task_skill_requirements?select=skill_id,hud_skills!task_skill_requirements_skill_id_fkey(id,name)&task_id=eq.' + taskId).catch(function(){ return []; });
+      var reqs = await API.get('task_skill_requirements?select=skill_id,hud_skills(id,name)&task_id=eq.' + taskId).catch(function(){ return []; });
       window._tfTaskSkills = (reqs||[]).map(function(r) {
         return {skill_id:r.skill_id, skill_name:(r.hud_skills&&r.hud_skills.name)||'?'};
       });
