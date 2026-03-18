@@ -1481,7 +1481,13 @@ async function loadMeetingDetail(meetId) {
           const assigneeInitials = assigneeName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
           const done = ai.status === 'complete';
           return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;
-              border-bottom:1px solid var(--border)">
+              border-bottom:1px solid var(--border);cursor:pointer"
+              data-ai-id="${ai.id}"
+              data-ai-desc="${escHtml(ai.description)}"
+              data-ai-assigned="${ai.assigned_to_resource||''}"
+              data-ai-due="${ai.due_date||''}"
+              data-ai-status="${ai.status||'open'}"
+              onclick="event.stopPropagation();openEditActionItemFromRow(this)">
             <div style="width:16px;height:16px;border-radius:4px;border:1px solid var(--border2);
               flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
               background:${done?'var(--green)':'transparent'};
@@ -1526,7 +1532,7 @@ async function loadMeetingDetail(meetId) {
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
                 Meeting minutes
               </div>
-              <button class="minutes-reply-btn" onclick="event.stopPropagation();toggleReplyThread('${meetId}')">
+              <button class="minutes-reply-btn" onclick="event.stopPropagation();openReplyThread('${meetId}')">
                 ↩ Reply
               </button>
             </div>
@@ -1555,7 +1561,7 @@ async function loadMeetingDetail(meetId) {
             </div>
           </div>`;
         // Load existing replies
-        loadReplies('${meetId}');
+        loadReplies(meetId);
       }
     }
   } catch(e) {
@@ -1670,30 +1676,41 @@ function openEditActionItemFromRow(row) {
 }
 
 function openEditActionItem(id, desc, assignedTo, dueDate, status) {
-  document.getElementById('ai-edit-id').value   = id;
-  document.getElementById('ai-edit-desc').value = desc;
-  document.getElementById('ai-edit-due').value  = dueDate;
+  try {
+    const idEl = document.getElementById('ai-edit-id');
+    const descEl = document.getElementById('ai-edit-desc');
+    const dueEl = document.getElementById('ai-edit-due');
+    const sel = document.getElementById('ai-edit-assignee');
+    const statusSel = document.getElementById('ai-edit-status');
+    const filesEl = document.getElementById('ai-edit-files');
+    const overlay = document.getElementById('ai-edit-overlay');
 
-  // Populate assignee dropdown
-  const sel = document.getElementById('ai-edit-assignee');
-  sel.innerHTML = '<option value="">— Assign to —</option>';
-  resources.forEach(r => {
-    const o = document.createElement('option');
-    o.value = r.id;
-    o.textContent = r.first_name + ' ' + r.last_name;
-    if (r.id === assignedTo) o.selected = true;
-    sel.appendChild(o);
-  });
+    if (!idEl || !descEl || !sel || !statusSel || !overlay) {
+      console.error('Edit drawer elements missing:', {idEl, descEl, sel, statusSel, overlay});
+      return;
+    }
 
-  // Set status
-  const statusSel = document.getElementById('ai-edit-status');
-  statusSel.value = status || 'open';
+    idEl.value   = id || '';
+    descEl.value = desc || '';
+    if (dueEl) dueEl.value = dueDate || '';
 
-  // Clear files
-  _attachedFiles = [];
-  document.getElementById('ai-edit-files').innerHTML = '';
+    sel.innerHTML = '<option value="">— Assign to —</option>';
+    (resources || []).forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.id;
+      o.textContent = (r.first_name || '') + ' ' + (r.last_name || '');
+      if (r.id === assignedTo) o.selected = true;
+      sel.appendChild(o);
+    });
 
-  document.getElementById('ai-edit-overlay').classList.add('open');
+    statusSel.value = status || 'open';
+    _attachedFiles = [];
+    if (filesEl) filesEl.innerHTML = '';
+
+    overlay.classList.add('open');
+  } catch(e) {
+    console.error('openEditActionItem error:', e);
+  }
 }
 
 function handleFileAttach(input) {
@@ -2037,6 +2054,16 @@ function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).repla
 // Replies stored as prospect_activities notes tagged [meeting:ID]
 // Sub-replies tagged [meeting:ID][replyto:INDEX]
 const _replyCache = {};
+
+function openReplyThread(meetId) {
+  const thread = document.getElementById('rthread-' + meetId);
+  if (!thread) return;
+  thread.style.display = 'block';
+  setTimeout(() => {
+    const inp = document.getElementById('rthread-input-' + meetId);
+    if (inp) inp.focus();
+  }, 50);
+}
 
 function toggleReplyThread(meetId) {
   const thread = document.getElementById('rthread-' + meetId);
