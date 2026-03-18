@@ -857,26 +857,26 @@ body {
 <div class="overlay" id="ai-edit-overlay" onclick="handleOverlay(event,'ai-edit-overlay')">
   <div class="drawer" onclick="event.stopPropagation()">
     <div class="drawer-head">
-      <span class="drawer-title">Edit action item</span>
+      <span class="drawer-title">EDIT ACTION ITEM</span>
       <button class="drawer-close" onclick="closeDrawer('ai-edit-overlay')">✕</button>
     </div>
     <div class="drawer-body">
       <input type="hidden" id="ai-edit-id" />
       <div class="field">
-        <label>Description <span style="color:#f07a7a">*</span></label>
+        <label>DESCRIPTION <span style="color:#f07a7a">*</span></label>
         <textarea id="ai-edit-desc" rows="3"></textarea>
       </div>
       <div class="field">
-        <label>Assign to <span style="color:#f07a7a">*</span></label>
+        <label>ASSIGN TO <span style="color:#f07a7a">*</span></label>
         <select id="ai-edit-assignee"></select>
       </div>
       <div class="field-row">
         <div class="field">
-          <label>Due date</label>
+          <label>DUE DATE</label>
           <input type="date" id="ai-edit-due" />
         </div>
         <div class="field">
-          <label>Status</label>
+          <label>STATUS</label>
           <select id="ai-edit-status">
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
@@ -885,7 +885,7 @@ body {
           </select>
         </div>
       </div>
-      <div class="sec-label">Attachments</div>
+      <div class="sec-label">ATTACHMENTS</div>
       <div id="ai-edit-files" style="margin-bottom:8px"></div>
       <label style="display:inline-flex;align-items:center;gap:6px;
         padding:6px 12px;border-radius:6px;border:1px dashed var(--border2);
@@ -897,6 +897,18 @@ body {
       </label>
       <div style="font-size:10px;color:var(--muted);margin-top:5px">
         Files are noted in the action item. Max 10MB per file.
+      </div>
+    </div>
+      <div class="sec-label">COMMENTS</div>
+      <div id="ai-edit-comments" style="margin-bottom:8px;max-height:160px;overflow-y:auto"></div>
+      <div style="display:flex;gap:6px">
+        <textarea id="ai-edit-comment-input" rows="2"
+          placeholder="Add a comment…"
+          style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--border2);
+            background:var(--surf2);color:var(--text);font-size:12px;
+            font-family:inherit;outline:none;resize:none;line-height:1.5"
+          onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();addAIComment()}"></textarea>
+        <button class="btn btn-primary" onclick="addAIComment()" style="align-self:flex-end">Post</button>
       </div>
     </div>
     <div class="drawer-foot">
@@ -917,12 +929,12 @@ body {
     </div>
     <div class="drawer-body">
       <div class="field">
-        <label>Description <span style="color:#f07a7a">*</span></label>
+        <label>DESCRIPTION <span style="color:#f07a7a">*</span></label>
         <textarea id="ai-desc-input" rows="3"
           placeholder="What needs to be done?"></textarea>
       </div>
       <div class="field">
-        <label>Assign to <span style="color:#f07a7a">*</span></label>
+        <label>ASSIGN TO <span style="color:#f07a7a">*</span></label>
         <select id="ai-assignee-sel"></select>
       </div>
       <div class="field">
@@ -1423,6 +1435,11 @@ function renderMeetings() {
         </div>
         <div class="meet-expand" id="mexpand-${m.id}" onclick="event.stopPropagation()">
 
+          <div class="mb-label">Next meeting</div>
+          <div id="mnextmeet-${m.id}" style="margin-bottom:12px;font-size:12px;color:var(--muted)">
+            None
+          </div>
+
           <div class="mb-label">Attendees</div>
           <div id="mattendees-${m.id}" style="margin-bottom:12px">
             <div style="font-size:11px;color:var(--muted)">Loading…</div>
@@ -1602,6 +1619,13 @@ async function loadMeetingDetail(meetId) {
     if (minutesEl) {
       const mins = minutesList?.[0];
       if (!mins) {
+        // Populate next meeting from minutes record even when no minutes exist
+        const nextMeetEl = document.getElementById('mnextmeet-' + meetId);
+        if (nextMeetEl && mins?.next_meeting_date) {
+          nextMeetEl.textContent = fmtDate(mins.next_meeting_date);
+          nextMeetEl.style.color = 'var(--text)';
+          nextMeetEl.style.fontWeight = '600';
+        }
         minutesEl.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic">No minutes on file.</div>';
       } else {
         minutesEl.innerHTML = `
@@ -1632,7 +1656,19 @@ async function loadMeetingDetail(meetId) {
             <div style="font-size:10px;color:var(--muted);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
               Status: ${capitalize(mins.status||'')}
               ${mins.submitted_at ? ' · Submitted ' + fmtDate(mins.submitted_at) : ''}
-            </div>
+            </div>`;
+        // Populate next meeting field
+        const nmEl = document.getElementById('mnextmeet-' + meetId);
+        if (nmEl) {
+          if (mins.next_meeting_date) {
+            nmEl.textContent   = fmtDate(mins.next_meeting_date);
+            nmEl.style.color   = 'var(--text)';
+            nmEl.style.fontWeight = '600';
+          } else {
+            nmEl.textContent = 'None';
+          }
+        }
+        minutesEl.innerHTML += `
             <div class="reply-thread" id="rthread-${meetId}" style="display:none" onclick="event.stopPropagation()">
               <div id="rthread-entries-${meetId}"></div>
               <!-- main compose injected by renderMainCompose() -->
@@ -1790,6 +1826,11 @@ function openEditActionItem(id, desc, assignedTo, dueDate, status) {
 
     overlay.classList.add('open');
     overlay.dataset.sourceMeetId = window._editAISourceMeetId || '';
+
+    // Load comments for this action item
+    const commentEl = document.getElementById('ai-edit-comments');
+    if (commentEl) commentEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">Loading…</div>';
+    loadAIComments(id);
   } catch(e) {
     console.error('openEditActionItem error:', e);
   }
@@ -2633,6 +2674,85 @@ async function postReply(meetId, parentIdx) {
     renderReplies(meetId);
   } catch(e) {
     console.error(e);
+    alert('Failed to post comment.');
+  }
+}
+
+// ── action item comments ───────────────────────────────────
+// Stored as prospect_activities notes tagged [ai-comment:ID]
+const _aiCommentCache = {};
+
+async function loadAIComments(aiId) {
+  try {
+    const tag  = '[ai-comment:' + aiId + ']';
+    const acts = await API.get(
+      'prospect_activities?prospect_id=eq.' + PROSPECT_ID +
+      '&type=eq.note&order=created_at'
+    );
+    _aiCommentCache[aiId] = (acts||[]).filter(a => a.summary && a.summary.includes(tag));
+    renderAIComments(aiId);
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderAIComments(aiId) {
+  const el = document.getElementById('ai-edit-comments');
+  if (!el) return;
+  const comments = _aiCommentCache[aiId] || [];
+  if (!comments.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:6px">No comments yet.</div>';
+    return;
+  }
+  el.innerHTML = comments.map(c => {
+    const author = resolveName ? resolveName(c.created_by) : 'Team member';
+    const initials = author.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const text = (c.summary||'').split('[ai-comment:')[0].trim();
+    return `
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;
+          background:rgba(79,142,247,.15);color:var(--accent);
+          font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">
+          ${initials}
+        </div>
+        <div style="flex:1;background:var(--surf3);border:1px solid var(--border);
+          border-radius:0 7px 7px 7px;padding:7px 10px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;
+            display:flex;justify-content:space-between">
+            <span style="font-weight:600;color:var(--text)">${escHtml(author)}</span>
+            <span>${fmtDateTime(c.created_at)}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text);line-height:1.5">${escHtml(text)}</div>
+        </div>
+      </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function addAIComment() {
+  const aiId = document.getElementById('ai-edit-id').value;
+  const inp  = document.getElementById('ai-edit-comment-input');
+  const text = inp ? inp.value.trim() : '';
+  if (!text || !aiId) return;
+
+  const tag        = '[ai-comment:' + aiId + ']';
+  const resourceId = _currentResource ? _currentResource.id : null;
+  try {
+    await API.post('prospect_activities', {
+      prospect_id: PROSPECT_ID,
+      type:        'note',
+      date:        new Date().toISOString(),
+      summary:     text + ' ' + tag,
+      ...(resourceId ? { created_by: resourceId } : {}),
+    });
+    if (!_aiCommentCache[aiId]) _aiCommentCache[aiId] = [];
+    _aiCommentCache[aiId].push({
+      summary:    text + ' ' + tag,
+      created_by: resourceId,
+      created_at: new Date().toISOString(),
+    });
+    if (inp) inp.value = '';
+    renderAIComments(aiId);
+  } catch(e) {
+    console.error('Failed to post comment:', e);
     alert('Failed to post comment.');
   }
 }
