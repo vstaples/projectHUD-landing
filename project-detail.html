@@ -4283,5 +4283,306 @@ function _patchTaskFormFunctions() {
 }
 
 </script>
+
+
+<script>
+// ── PHASE 2: Complexity + Skills + Role-Filtered Resources ───
+document.addEventListener('DOMContentLoaded', function() {
+  _p2InjectForm();
+  _p2PatchFunctions();
+});
+
+// ── INJECT FORM SECTIONS ─────────────────────────────────────
+function _p2InjectForm() {
+  var body = document.getElementById('task-form-panel');
+  if (!body) return;
+  body = body.querySelector('.journal-panel-body');
+  if (!body) return;
+
+  var insertBefore = null;
+  for (var i = 0; i < body.children.length; i++) {
+    var txt = body.children[i].textContent && body.children[i].textContent.trim();
+    if (txt === 'ACTUALS') { insertBefore = body.children[i]; break; }
+  }
+  if (!insertBefore) insertBefore = document.getElementById('tf-deps-section');
+  if (!insertBefore) return;
+
+  // ── Complexity section ────────────────────────────────────
+  var cx = document.createElement('div');
+  cx.id = 'tf-complexity-section';
+  cx.style.marginBottom = '12px';
+  var h = '';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+  h += '<label class="exp-label" style="margin-bottom:0;">COMPLEXITY RATING</label>';
+  h += '<button id="tf-ai-btn" onclick="inferComplexity()" style="background:none;border:1px solid rgba(168,85,247,0.4);color:var(--purple);font-family:var(--font-mono);font-size:10px;padding:3px 10px;cursor:pointer;letter-spacing:0.1em;">&#9889; AI INFER</button>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:5px;margin-bottom:5px;" id="tf-complexity-btns">';
+  var lbls = ['Trivial','Low','Medium','High','Critical'];
+  for (var n = 1; n <= 5; n++) {
+    h += '<button onclick="setComplexity(' + n + ')" data-val="' + n + '" title="' + n + ' - ' + lbls[n-1] + '" style="flex:1;height:30px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-family:var(--font-mono);font-size:12px;cursor:pointer;transition:all .15s;">' + n + '</button>';
+  }
+  h += '</div>';
+  var leg = [['1','Trivial','var(--green)'],['2','Low','var(--cyan)'],['3','Medium','var(--amber)'],['4','High','#ff6b35'],['5','Critical','var(--red)']];
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">';
+  for (var l = 0; l < leg.length; l++) {
+    if (l > 0) h += '<span style="color:var(--text3);font-size:9px;"> · </span>';
+    h += '<span style="font-family:var(--font-mono);font-size:9px;color:' + leg[l][2] + ';opacity:0.7;">' + leg[l][0] + '=' + leg[l][1] + '</span>';
+  }
+  h += '</div>';
+  h += '<div id="tf-complexity-reasoning" style="display:none;font-family:var(--font-mono);font-size:10px;color:var(--text3);background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);padding:6px 10px;line-height:1.5;margin-top:4px;"></div>';
+  cx.innerHTML = h;
+  body.insertBefore(cx, insertBefore);
+
+  // ── Skills section ────────────────────────────────────────
+  var sk = document.createElement('div');
+  sk.id = 'tf-skills-section';
+  sk.style.marginBottom = '12px';
+  var sh = '';
+  sh += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+  sh += '<label class="exp-label" style="margin-bottom:0;">SKILL REQUIREMENTS</label>';
+  sh += '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">required for this task</span>';
+  sh += '</div>';
+  sh += '<div style="display:flex;gap:6px;margin-bottom:6px;">';
+  sh += '<select id="tf-skill-pick" class="hud-select" style="flex:1;font-size:11px;"><option value="">— Add required skill —</option></select>';
+  sh += '<button onclick="addTaskSkill()" style="background:none;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:4px 12px;cursor:pointer;letter-spacing:0.08em;">+ ADD</button>';
+  sh += '</div>';
+  sh += '<div id="tf-skill-chips" style="display:flex;flex-wrap:wrap;gap:5px;min-height:24px;"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">No skill requirements set</span></div>';
+  sk.innerHTML = sh;
+  body.insertBefore(sk, insertBefore);
+}
+
+// ── PATCH FUNCTIONS ──────────────────────────────────────────
+function _p2PatchFunctions() {
+
+  // Complexity rating
+  window.setComplexity = function(val) {
+    window._tfComplexity = val;
+    var col = {1:'var(--green)',2:'var(--cyan)',3:'var(--amber)',4:'#ff6b35',5:'var(--red)'};
+    document.querySelectorAll('#tf-complexity-btns button').forEach(function(b) {
+      var n = parseInt(b.dataset.val), a = n === val;
+      b.style.background  = a ? col[val] + '22' : 'var(--bg3)';
+      b.style.borderColor = a ? col[val] : 'var(--border)';
+      b.style.color       = a ? col[val] : 'var(--text2)';
+      b.style.fontWeight  = a ? '700' : '400';
+    });
+  };
+
+  window._resetComplexity = function() {
+    window._tfComplexity = null; window._tfComplexityAI = false; window._tfComplexityReasoning = '';
+    document.querySelectorAll('#tf-complexity-btns button').forEach(function(b) {
+      b.style.background='var(--bg3)'; b.style.borderColor='var(--border)';
+      b.style.color='var(--text2)'; b.style.fontWeight='400';
+    });
+    var r = document.getElementById('tf-complexity-reasoning');
+    if (r) r.style.display = 'none';
+  };
+
+  window.inferComplexity = async function() {
+    var nm  = document.getElementById('tf-name') ? document.getElementById('tf-name').value.trim() : '';
+    var ph  = document.getElementById('tf-phase') ? document.getElementById('tf-phase').value.trim() : '';
+    var sk  = (window._tfTaskSkills||[]).map(function(s){ return s.skill_name; }).join(', ');
+    var rl  = (window._tfAssignments||[]).map(function(a) {
+      var r = STATE.hudRoles && STATE.hudRoles.find(function(x){ return x.id === a.hud_role_id; });
+      return r ? r.name : '';
+    }).filter(Boolean).join(', ');
+    if (!nm) { alert('Enter a task name first'); return; }
+    var btn = document.getElementById('tf-ai-btn');
+    var rea = document.getElementById('tf-complexity-reasoning');
+    btn.textContent = 'INFERRING...'; btn.disabled = true; rea.style.display = 'none';
+    try {
+      var prompt = 'PMI project manager, medical device / engineering.\nTask: "' + nm + '"\nPhase: "' + (ph||'?') + '"\nRoles: ' + (rl||'none') + '\nSkills: ' + (sk||'none') + '\nRate 1-5 (1=Trivial 2=Low 3=Medium 4=High 5=Critical).\nJSON only: {"rating":<1-5>,"reasoning":"<110 chars max>"}';
+      var res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:150,messages:[{role:'user',content:prompt}]})
+      });
+      var data = await res.json();
+      var parsed = JSON.parse((data.content&&data.content[0]&&data.content[0].text||'').replace(/```json|```/g,'').trim());
+      setComplexity(parsed.rating);
+      rea.textContent = 'AI: ' + parsed.reasoning; rea.style.display = 'block';
+      window._tfComplexityAI = true; window._tfComplexityReasoning = parsed.reasoning;
+    } catch(e) {
+      rea.textContent = 'AI inference failed — rate manually'; rea.style.display = 'block';
+    } finally { btn.innerHTML = '&#9889; AI INFER'; btn.disabled = false; }
+  };
+
+  // Skills
+  window._tfTaskSkills = [];
+
+  window._populateSkillPicker = function() {
+    var sel = document.getElementById('tf-skill-pick'); if (!sel) return;
+    var map = {};
+    (STATE.hudSkills||[]).forEach(function(s) {
+      var c = (STATE.hudSkillCats||[]).find(function(x){ return x.id===s.category_id; });
+      var k = c ? c.name : 'Other';
+      if (!map[k]) map[k] = [];
+      map[k].push(s);
+    });
+    sel.innerHTML = '<option value="">— Add required skill —</option>';
+    Object.keys(map).sort().forEach(function(cat) {
+      var og = document.createElement('optgroup'); og.label = cat;
+      map[cat].sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
+        var o = document.createElement('option'); o.value=s.id; o.textContent=s.name; og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  };
+
+  window._renderTaskSkillChips = function() {
+    var el = document.getElementById('tf-skill-chips'); if (!el) return;
+    if (!window._tfTaskSkills.length) {
+      el.innerHTML = '<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">No skill requirements set</span>'; return;
+    }
+    el.innerHTML = window._tfTaskSkills.map(function(s, i) {
+      return '<span style="display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;padding:3px 8px;border:1px solid rgba(0,210,255,0.3);color:var(--cyan);background:rgba(0,210,255,0.06);">' +
+        s.skill_name + '<button onclick="removeTaskSkill(' + i + ')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0;line-height:1;">&#10005;</button></span>';
+    }).join('');
+  };
+
+  window.addTaskSkill = function() {
+    var sel = document.getElementById('tf-skill-pick');
+    var id = sel ? sel.value : '';
+    var name = sel ? sel.options[sel.selectedIndex].text : '';
+    if (!id) return;
+    if (window._tfTaskSkills.find(function(s){ return s.skill_id===id; })) return;
+    window._tfTaskSkills.push({skill_id:id,skill_name:name}); sel.value=''; _renderTaskSkillChips();
+  };
+
+  window.removeTaskSkill = function(i) { window._tfTaskSkills.splice(i,1); _renderTaskSkillChips(); };
+
+  window._ensureSkillsLoaded = function() {
+    if (STATE.hudSkills && STATE.hudSkills.length) { _populateSkillPicker(); return; }
+    Promise.all([
+      API.get('hud_skills?select=id,name,category_id&is_active=eq.true').catch(function(){ return []; }),
+      API.get('hud_skill_categories?select=id,name').catch(function(){ return []; })
+    ]).then(function(r) { STATE.hudSkills=r[0]||[]; STATE.hudSkillCats=r[1]||[]; _populateSkillPicker(); });
+  };
+
+  // ── PATCH openAddTaskPanel ────────────────────────────────
+  var _origAdd = window.openAddTaskPanel;
+  window.openAddTaskPanel = function(phase) {
+    _origAdd(phase); _resetComplexity();
+    window._tfTaskSkills = []; _renderTaskSkillChips(); _ensureSkillsLoaded();
+  };
+
+  // ── PATCH openEditTaskPanel ───────────────────────────────
+  var _origEdit = window.openEditTaskPanel;
+  window.openEditTaskPanel = async function(taskId) {
+    _origEdit(taskId);
+    var t = STATE.tasks && STATE.tasks.find(function(x){ return x.id===taskId; });
+    _resetComplexity();
+    if (t && t.complexity_rating) {
+      setComplexity(t.complexity_rating);
+      window._tfComplexityAI = t.complexity_ai_inferred||false;
+      window._tfComplexityReasoning = t.complexity_reasoning||'';
+      var r = document.getElementById('tf-complexity-reasoning');
+      if (r && t.complexity_reasoning) {
+        r.textContent = (t.complexity_ai_inferred?'AI: ':'Manual: ') + t.complexity_reasoning;
+        r.style.display = 'block';
+      }
+    }
+    window._tfTaskSkills = []; _renderTaskSkillChips(); _ensureSkillsLoaded();
+    try {
+      var reqs = await API.get('task_skill_requirements?select=skill_id,hud_skills(id,name)&task_id=eq.' + taskId).catch(function(){ return []; });
+      window._tfTaskSkills = (reqs||[]).map(function(r) {
+        return {skill_id:r.skill_id, skill_name:(r.hud_skills&&r.hud_skills.name)||'?'};
+      });
+      _renderTaskSkillChips();
+    } catch(e) { console.warn('skill req load:',e); }
+  };
+
+  // ── PATCH saveTaskForm ────────────────────────────────────
+  // CRITICAL: uses the global `_editingTaskId` (not window._editingTaskId)
+  var _origSave = window.saveTaskForm;
+  window.saveTaskForm = async function() {
+    await _origSave();
+    // Resolve correct task ID — edit uses global _editingTaskId, add uses last task
+    var taskId = _editingTaskId || (STATE.tasks && STATE.tasks.length && STATE.tasks[STATE.tasks.length-1].id);
+    if (!taskId) { console.warn('Phase2: no taskId after save'); return; }
+    try {
+      // Save complexity rating
+      if (window._tfComplexity) {
+        var cpx = {
+          complexity_rating:      window._tfComplexity,
+          complexity_ai_inferred: window._tfComplexityAI||false,
+          complexity_reasoning:   window._tfComplexityReasoning||null
+        };
+        await API.patch('tasks?id=eq.' + taskId, cpx).catch(function(e){ console.warn('cpx save:',e); });
+        var t = STATE.tasks && STATE.tasks.find(function(x){ return x.id===taskId; });
+        if (t) Object.assign(t, cpx);
+      }
+      // Save skill requirements — wipe + re-insert
+      await API.del('task_skill_requirements?task_id=eq.' + taskId).catch(function(){});
+      for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
+        var s = window._tfTaskSkills[i];
+        await API.post('task_skill_requirements', {
+          task_id:taskId, skill_id:s.skill_id,
+          is_required:true, proficiency_needed:'practitioner'
+        }).catch(function(e){ console.warn('skill req save:',e); });
+      }
+    } catch(e) { console.warn('Phase2 save err:',e); }
+    if (typeof renderTasksTable==='function') renderTasksTable();
+  };
+
+  // ── PATCH _renderAssignmentRows — filter resources by role ─
+  var _origRender = window._renderAssignmentRows;
+  window._renderAssignmentRows = function(assignments) {
+    var list = document.getElementById('tf-assignments-list');
+    if (!list) return;
+    if (!assignments || !assignments.length) {
+      list.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:8px;border:1px solid var(--border);text-align:center;">No roles assigned — click ADD ROLE / RESOURCE below</div>';
+      return;
+    }
+    var levelOrder = {authority:0,principal:0,senior:1,staff:2,associate:3,junior:4};
+    list.innerHTML = assignments.map(function(a, idx) {
+      var isPrimary = idx === 0;
+      // Filter resources by selected role
+      var filteredResources = (STATE.resources||[]).filter(function(r) {
+        if (!a.hud_role_id) return true; // no role set — show all
+        // Match by hud_role_id on the resource
+        return r.hud_role_id === a.hud_role_id;
+      }).sort(function(a,b) {
+        var ao = levelOrder[a.level]!==undefined ? levelOrder[a.level] : 9;
+        var bo = levelOrder[b.level]!==undefined ? levelOrder[b.level] : 9;
+        return ao - bo || (a.last_name||'').localeCompare(b.last_name||'');
+      });
+
+      var roleOpts = '<option value="">— Role (optional) —</option>';
+      (STATE.hudRoles||[]).forEach(function(r) {
+        roleOpts += '<option value="' + r.id + '"' + (r.id===a.hud_role_id?' selected':'') + '>' +
+          (r.abbreviation ? r.name + ' (' + r.abbreviation + ')' : r.name) + '</option>';
+      });
+
+      var resOpts = '<option value="">— Person (TBD / AI) —</option>';
+      // If role is set and no matches — show note then show all
+      if (a.hud_role_id && filteredResources.length === 0) {
+        resOpts += '<option value="" disabled>— No resources with this role —</option>';
+        filteredResources = (STATE.resources||[]);
+      }
+      filteredResources.forEach(function(r) {
+        var levelLbl = r.level ? ' [' + r.level.charAt(0).toUpperCase() + r.level.slice(1) + ']' : '';
+        resOpts += '<option value="' + r.id + '"' + (r.id===a.resource_id?' selected':'') + '>' +
+          r.first_name + ' ' + r.last_name + levelLbl + '</option>';
+      });
+
+      var primaryBadge = isPrimary ? '<div style="position:absolute;top:-1px;left:-1px;font-family:var(--font-mono);font-size:8px;color:var(--cyan);letter-spacing:.08em;padding:1px 5px;background:rgba(0,210,255,.12);border:1px solid rgba(0,210,255,.25);">PRIMARY</div>' : '';
+      var mt = isPrimary ? 'margin-top:10px;' : '';
+
+      return '<div style="display:grid;grid-template-columns:1fr 1fr 52px 22px;gap:5px;align-items:center;background:var(--bg3);border:1px solid var(--border);padding:6px 8px;position:relative;" data-idx="' + idx + '">' +
+        primaryBadge +
+        '<select onchange="window._tfAssignments[' + idx + '].hud_role_id=this.value||null;_renderAssignmentRows(window._tfAssignments)" style="' + mt + 'background:var(--bg2);border:1px solid var(--border);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:3px 5px;outline:none;width:100%;">' + roleOpts + '</select>' +
+        '<select onchange="window._tfAssignments[' + idx + '].resource_id=this.value||null;_autoBackfillRole(' + idx + ')" style="' + mt + 'background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:3px 5px;outline:none;width:100%;">' + resOpts + '</select>' +
+        '<div style="display:flex;align-items:center;gap:2px;' + mt + '">' +
+          '<input type="number" min="1" max="100" value="' + (a.allocation_pct||100) + '" onchange="window._tfAssignments[' + idx + '].allocation_pct=parseFloat(this.value)||100" style="width:38px;background:var(--bg2);border:1px solid var(--border);color:var(--amber);font-family:var(--font-mono);font-size:10px;padding:3px 4px;outline:none;text-align:center;" />' +
+          '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">%</span>' +
+        '</div>' +
+        '<button onclick="_removeAssignmentRow(' + idx + ')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;' + mt + 'line-height:1;" title="Remove">&#10005;</button>' +
+      '</div>';
+    }).join('');
+  };
+
+  console.log('[Phase2] all patches applied — complexity, skills, role filter');
+}
+</script>
+
 </body>
 </html>
