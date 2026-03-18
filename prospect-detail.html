@@ -853,6 +853,61 @@ body {
   </div>
 </div>
 
+<!-- EDIT ACTION ITEM DRAWER -->
+<div class="overlay" id="ai-edit-overlay" onclick="handleOverlay(event,'ai-edit-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">Edit action item</span>
+      <button class="drawer-close" onclick="closeDrawer('ai-edit-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="ai-edit-id" />
+      <div class="field">
+        <label>Description <span style="color:#f07a7a">*</span></label>
+        <textarea id="ai-edit-desc" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label>Assign to <span style="color:#f07a7a">*</span></label>
+        <select id="ai-edit-assignee"></select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Due date</label>
+          <input type="date" id="ai-edit-due" />
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="ai-edit-status">
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="complete">Complete</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="sec-label">Attachments</div>
+      <div id="ai-edit-files" style="margin-bottom:8px"></div>
+      <label style="display:inline-flex;align-items:center;gap:6px;
+        padding:6px 12px;border-radius:6px;border:1px dashed var(--border2);
+        background:transparent;color:var(--muted);font-size:11px;cursor:pointer;
+        transition:background .15s">
+        <span>📎</span> Attach file
+        <input type="file" id="ai-edit-file-input" multiple
+          style="display:none" onchange="handleFileAttach(this)" />
+      </label>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px">
+        Files are noted in the action item. Max 10MB per file.
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveEditActionItem()">Save changes</button>
+      <button class="btn" style="color:#f07a7a;border-color:rgba(192,64,74,.3)"
+        onclick="deleteActionItem()">Delete</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer('ai-edit-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ACTION ITEM DRAWER -->
 <div class="overlay" id="ai-overlay" onclick="handleOverlay(event,'ai-overlay')">
   <div class="drawer" onclick="event.stopPropagation()">
@@ -1228,7 +1283,8 @@ function renderActions() {
                   ? (assignee.first_name[0] + assignee.last_name[0]).toUpperCase() : '?';
                 const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
                 return `
-                <tr style="border-bottom:1px solid var(--border)">
+                <tr style="border-bottom:1px solid var(--border);cursor:pointer"
+                  onclick="openEditActionItem('${ai.id}','${escHtml(ai.description)}','${ai.assigned_to||''}','${ai.due_date||''}','${ai.status||'open'}')">
                   <td style="padding:10px 12px">
                     <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
                   </td>
@@ -1446,7 +1502,7 @@ async function loadMeetingDetail(meetId) {
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
                 Meeting minutes
               </div>
-              <button class="minutes-reply-btn" onclick="toggleReplyThread('${meetId}')">
+              <button class="minutes-reply-btn" onclick="event.stopPropagation();toggleReplyThread('${meetId}')">
                 ↩ Reply
               </button>
             </div>
@@ -1469,14 +1525,15 @@ async function loadMeetingDetail(meetId) {
               Status: ${capitalize(mins.status||'')}
               ${mins.submitted_at ? ' · Submitted ' + fmtDate(mins.submitted_at) : ''}
             </div>
-            <div class="reply-thread" id="rthread-${meetId}" style="display:none">
+            <div class="reply-thread" id="rthread-${meetId}" style="display:none" onclick="event.stopPropagation()">
               <div id="rthread-entries-${meetId}"></div>
-              <div class="reply-compose">
+              <div class="reply-compose" onclick="event.stopPropagation()">
                 <textarea id="rthread-input-${meetId}"
                   placeholder="Ask a question, raise a concern, or note a follow-up…"
                   rows="2"
-                  onkeydown="handleReplyKey(event,'${meetId}')"></textarea>
-                <button class="reply-send" onclick="postReply('${meetId}')">Send</button>
+                  onkeydown="handleReplyKey(event,'${meetId}')"
+                  onclick="event.stopPropagation()"></textarea>
+                <button class="reply-send" onclick="event.stopPropagation();postReply('${meetId}')">Send</button>
               </div>
             </div>
           </div>`;
@@ -1581,6 +1638,119 @@ async function saveActionItem() {
     alert('Failed to save action item.');
   }
 }
+
+// ── action item edit ───────────────────────────────────
+let _attachedFiles = [];
+
+function openEditActionItem(id, desc, assignedTo, dueDate, status) {
+  document.getElementById('ai-edit-id').value   = id;
+  document.getElementById('ai-edit-desc').value = desc;
+  document.getElementById('ai-edit-due').value  = dueDate;
+
+  // Populate assignee dropdown
+  const sel = document.getElementById('ai-edit-assignee');
+  sel.innerHTML = '<option value="">— Assign to —</option>';
+  resources.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.first_name + ' ' + r.last_name;
+    if (r.id === assignedTo) o.selected = true;
+    sel.appendChild(o);
+  });
+
+  // Set status
+  const statusSel = document.getElementById('ai-edit-status');
+  statusSel.value = status || 'open';
+
+  // Clear files
+  _attachedFiles = [];
+  document.getElementById('ai-edit-files').innerHTML = '';
+
+  document.getElementById('ai-edit-overlay').classList.add('open');
+}
+
+function handleFileAttach(input) {
+  const files = Array.from(input.files);
+  files.forEach(f => {
+    if (f.size > 10 * 1024 * 1024) {
+      alert(f.name + ' exceeds 10MB limit.');
+      return;
+    }
+    _attachedFiles.push(f);
+  });
+  renderAttachedFiles();
+  input.value = ''; // reset so same file can be re-added
+}
+
+function renderAttachedFiles() {
+  const el = document.getElementById('ai-edit-files');
+  el.innerHTML = _attachedFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 0;
+      font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">
+      <span>📄</span>
+      <span style="flex:1">${escHtml(f.name)}</span>
+      <span style="color:var(--muted)">${(f.size/1024).toFixed(0)} KB</span>
+      <span style="cursor:pointer;color:var(--muted);padding:0 4px"
+        onclick="removeAttachment(${i})">×</span>
+    </div>`).join('');
+}
+
+function removeAttachment(i) {
+  _attachedFiles.splice(i, 1);
+  renderAttachedFiles();
+}
+
+async function saveEditActionItem() {
+  const id       = document.getElementById('ai-edit-id').value;
+  const desc     = document.getElementById('ai-edit-desc').value.trim();
+  const assigned = document.getElementById('ai-edit-assignee').value;
+  const due      = document.getElementById('ai-edit-due').value;
+  const status   = document.getElementById('ai-edit-status').value;
+
+  if (!desc)     { alert('Description is required.'); return; }
+  if (!assigned) { alert('Assignee is required.'); return; }
+
+  try {
+    const payload = {
+      description:  desc,
+      assigned_to:  assigned,
+      due_date:     due || null,
+      status,
+      completed_at: status === 'complete' ? new Date().toISOString() : null,
+    };
+
+    // If files attached, note them in the description
+    if (_attachedFiles.length > 0) {
+      const fileNames = _attachedFiles.map(f => f.name).join(', ');
+      payload.description = desc + ' [attachments: ' + fileNames + ']';
+      // Note: actual file upload requires Supabase Storage — 
+      // file names are recorded in description for now
+    }
+
+    await API.patch(`prospect_action_items?id=eq.${id}`, payload);
+    closeDrawer('ai-edit-overlay');
+    await loadAll();
+    switchTab('actions');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save changes.');
+  }
+}
+
+async function deleteActionItem() {
+  const id = document.getElementById('ai-edit-id').value;
+  if (!confirm('Delete this action item? This cannot be undone.')) return;
+  try {
+    await API.del(`prospect_action_items?id=eq.${id}`);
+    closeDrawer('ai-edit-overlay');
+    await loadAll();
+    switchTab('actions');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to delete action item.');
+  }
+}
+
 
 function closeDrawer(id) {
   document.getElementById(id).classList.remove('open');
