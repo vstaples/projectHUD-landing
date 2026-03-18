@@ -332,13 +332,14 @@ body {
 }
 .finding-card-meta {
   display: flex; align-items: center; gap: 8px;
-  font-size: 10px; color: var(--muted); flex-wrap: wrap;
+  font-size: 11px; color: var(--muted); flex-wrap: wrap;
+  margin-top: 4px;
 }
 .finding-content {
   font-size: 13px; color: var(--text);
   line-height: 1.6; margin-bottom: 8px;
 }
-.finding-content.flag { color: #f07a7a; }
+.finding-content.flag { color: var(--text); }  /* flag = amber icon only, not red text */
 .finding-content.positive { color: #7af0a0; }
 .finding-actions {
   display: flex; gap: 6px; margin-top: 8px;
@@ -1301,6 +1302,24 @@ async function loadAll() {
         }
       });
 
+    // Load finding attachment metadata from prospect_activities tagged [finding-attach:ID]
+    activities.filter(a => a.type === 'note' && a.summary && a.summary.includes('[finding-attach:'))
+      .forEach(a => {
+        const match = a.summary.match(/\[finding-attach:([^\]]+)\]/);
+        if (match) {
+          const fid = match[1];
+          const raw = a.summary.replace(/\[finding-attach:[^\]]+\]/, '').trim();
+          if (raw) {
+            _aiAttachments['finding-' + fid] = raw.split('|').map(entry => {
+              const parts = entry.split('::');
+              return parts.length > 1
+                ? { name: parts[1].trim(), path: parts[0].trim(), size: 0, url: null, type: '' }
+                : { name: entry.trim(), path: null, size: 0, url: null, type: '' };
+            });
+          }
+        }
+      });
+
     // Parse Format B from both prospect_action_items AND meeting_action_items
     const parseAttachTag = (ai) => {
       if (ai.description && ai.description.includes('[attachments:')) {
@@ -1548,7 +1567,7 @@ function renderFindings() {
               <span>${icon} ${capitalize(f.sentiment||'neutral')}</span>
               <span>${escHtml(authorName)}</span>
               <span>${fmtDate(f.created_at)}</span>
-              ${hasAttach ? '<span>📎 ' + _aiAttachments['finding-' + f.id].length + '</span>' : ''}
+              ${hasAttach ? '<span style="cursor:pointer;color:var(--accent)" onclick="showFindingAttachments(\'' + f.id + '\')" title="View attachments">📎 ' + _aiAttachments['finding-' + f.id].length + ' attachment' + (_aiAttachments['finding-' + f.id].length!==1?'s':'') + '</span>' : ''}
               ${comments.length > 0 ? '<span>💬 ' + comments.length + '</span>' : ''}
             </div>
           </div>
@@ -2284,6 +2303,25 @@ async function saveFinding() {
       }
     }
 
+    // Persist attachment metadata as tagged activity note
+    const key = 'finding-' + savedId;
+    const uploads = (_aiAttachments[key] || []).filter(f => f.path);
+    if (uploads.length > 0) {
+      const encoded = uploads.map(f => f.path + '::' + f.name).join('|');
+      const tag = '[finding-attach:' + savedId + ']';
+      try {
+        const existing = (activities || []).find(a => a.summary && a.summary.includes(tag));
+        if (existing) {
+          await API.patch('prospect_activities?id=eq.' + existing.id, { summary: encoded + ' ' + tag });
+        } else {
+          await API.post('prospect_activities', {
+            prospect_id: PROSPECT_ID, type: 'note',
+            date: new Date().toISOString(), summary: encoded + ' ' + tag,
+          });
+        }
+      } catch(e) { /* non-fatal */ }
+    }
+
     closeDrawer('finding-overlay');
     await loadAll();
     switchTab('findings');
@@ -2332,6 +2370,56 @@ function renderFindingFiles() {
 function removeFindingFile(i) {
   _findingStagedFiles.splice(i, 1);
   renderFindingFiles();
+}
+
+function showFindingAttachments(fid) {
+  const files = _aiAttachments['finding-' + fid] || [];
+  if (!files.length) { alert('No attachments for this finding yet.'); return; }
+
+  const existing = document.getElementById('attach-popup');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'attach-popup';
+  popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+    'background:#1e2436;border:1px solid rgba(255,255,255,.14);border-radius:10px;' +
+    'padding:16px;z-index:300;min-width:320px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.6)';
+
+  const loadUrls = async () => {
+    const rows = await Promise.all(files.map(async f => {
+      if (!f.url && f.path) f.url = await getSignedUrl(f.path);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<span style="font-size:16px">' + fileIcon(f.type) + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          (f.url
+            ? '<a href="' + f.url + '" target="_blank" download="' + escHtml(f.name) + '" style="color:#4f8ef7;text-decoration:none;font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="event.stopPropagation()">' + escHtml(f.name) + '</a>'
+            : '<span style="color:#e8eaf0;font-size:12px">' + escHtml(f.name) + '</span>') +
+          '<div style="font-size:10px;color:#7a8099">' + (f.size > 0 ? (f.size/1024).toFixed(0) + ' KB' : 'Re-upload to access') + '</div>' +
+        '</div>' +
+        (f.url ? '<a href="' + f.url + '" target="_blank" download="' + escHtml(f.name) + '" style="color:#7a8099;font-size:12px;white-space:nowrap" onclick="event.stopPropagation()">⬇</a>' : '') +
+      '</div>';
+    }));
+    popup.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+        '<div style="font-size:13px;font-weight:600;color:#e8eaf0">Attachments</div>' +
+        '<button onclick="document.getElementById('attach-popup').remove()" style="background:none;border:none;color:#7a8099;cursor:pointer;font-size:16px">✕</button>' +
+      '</div>' +
+      rows.join('') +
+      '<div style="margin-top:10px;font-size:10px;color:#7a8099">Click a filename to open · ⬇ to download</div>';
+  };
+
+  popup.innerHTML = '<div style="color:#7a8099;text-align:center;padding:20px">Loading…</div>';
+  document.body.appendChild(popup);
+  loadUrls();
+
+  setTimeout(() => {
+    document.addEventListener('click', function closePopup(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closePopup);
+      }
+    });
+  }, 100);
 }
 
 function attachToFinding(fid) {
