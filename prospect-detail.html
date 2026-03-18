@@ -1209,11 +1209,11 @@ function renderMeetings() {
             </div>
           </div>
 
-          \${m.status !== 'scheduled' ? \`
+          ${m.status !== 'scheduled' ? `
           <div class="mb-label" style="margin-top:10px">Meeting minutes</div>
-          <div id="mminutes-\${m.id}">
+          <div id="mminutes-${m.id}">
             <div style="font-size:11px;color:var(--muted)">Loading…</div>
-          </div>\` : ''}
+          </div>` : ''}
         </div>
       </div>`).join('')}`;
 }
