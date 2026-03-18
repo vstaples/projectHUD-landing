@@ -1491,8 +1491,8 @@ async function loadMeetingDetail(meetId) {
           const assigneeName = resMap[ai.assigned_to_resource] || '—';
           const assigneeInitials = assigneeName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
           const done = ai.status === 'complete';
-          // Parse attachments and comments from description
-          const hasAttach = ai.description && ai.description.includes('[attachments:');
+          const hasAttach = (_aiAttachments[ai.id] && _aiAttachments[ai.id].length > 0)
+            || (ai.description && ai.description.includes('[attachments:'));
           const commentCount = (_replyCache['ai-' + ai.id] || []).length;
           return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;
               border-bottom:1px solid var(--border)"
@@ -1528,7 +1528,14 @@ async function loadMeetingDetail(meetId) {
                   color:${done?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
                   ${ai.status||'open'}
                 </span>
-                ${hasAttach ? `<span style="font-size:10px;color:var(--muted)" title="Has attachments">📎</span>` : ''}
+                ${hasAttach ? `
+                  <span style="font-size:10px;cursor:pointer;
+                    padding:1px 6px;border-radius:8px;
+                    background:rgba(255,255,255,.06);color:var(--muted)"
+                    title="View attachments"
+                    onclick="event.stopPropagation();showAttachments('${ai.id}')">
+                    📎 ${(_aiAttachments[ai.id]||[]).length || ''}
+                  </span>` : ''}
                 ${commentCount > 0 ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;
                   background:rgba(79,142,247,.12);color:var(--accent)">
                   💬 ${commentCount}
@@ -1684,7 +1691,8 @@ async function saveActionItem() {
 }
 
 // ── action item edit ───────────────────────────────────
-let _attachedFiles = [];
+let _attachedFiles = [];       // files staged in current edit session
+const _aiAttachments = {};    // { [aiId]: [{name, size, url, type}] } — persists across drawer opens
 
 function openEditActionItemFromRow(row, sourceMeetId) {
   window._editAISourceMeetId = sourceMeetId || null;
@@ -1726,8 +1734,9 @@ function openEditActionItem(id, desc, assignedTo, dueDate, status) {
     });
 
     statusSel.value = status || 'open';
-    _attachedFiles = [];
-    if (filesEl) filesEl.innerHTML = '';
+    // Restore any previously attached files for this action item
+    _attachedFiles = _aiAttachments[id] ? [..._aiAttachments[id]] : [];
+    renderAttachedFiles();
 
     overlay.classList.add('open');
     overlay.dataset.sourceMeetId = window._editAISourceMeetId || '';
@@ -1737,33 +1746,110 @@ function openEditActionItem(id, desc, assignedTo, dueDate, status) {
 }
 
 function handleFileAttach(input) {
+  const aiId = document.getElementById('ai-edit-id').value;
   const files = Array.from(input.files);
   files.forEach(f => {
-    if (f.size > 10 * 1024 * 1024) {
-      alert(f.name + ' exceeds 10MB limit.');
-      return;
-    }
-    _attachedFiles.push(f);
+    if (f.size > 10 * 1024 * 1024) { alert(f.name + ' exceeds 10MB limit.'); return; }
+    const url = URL.createObjectURL(f);
+    _attachedFiles.push({ name: f.name, size: f.size, url, type: f.type });
+    // Also persist to the AI attachment map immediately
+    if (!_aiAttachments[aiId]) _aiAttachments[aiId] = [];
+    _aiAttachments[aiId].push({ name: f.name, size: f.size, url, type: f.type });
   });
   renderAttachedFiles();
-  input.value = ''; // reset so same file can be re-added
+  input.value = '';
 }
 
 function renderAttachedFiles() {
   const el = document.getElementById('ai-edit-files');
+  if (!el) return;
   el.innerHTML = _attachedFiles.map((f, i) => `
-    <div style="display:flex;align-items:center;gap:6px;padding:4px 0;
-      font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">
-      <span>📄</span>
-      <span style="flex:1">${escHtml(f.name)}</span>
-      <span style="color:var(--muted)">${(f.size/1024).toFixed(0)} KB</span>
-      <span style="cursor:pointer;color:var(--muted);padding:0 4px"
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;
+      font-size:11px;border-bottom:1px solid var(--border)">
+      <span>${fileIcon(f.type)}</span>
+      <a href="${f.url}" target="_blank"
+        style="flex:1;color:var(--accent);text-decoration:none;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap"
+        onclick="event.stopPropagation()">${escHtml(f.name)}</a>
+      <span style="color:var(--muted);white-space:nowrap">${(f.size/1024).toFixed(0)} KB</span>
+      <span style="cursor:pointer;color:var(--muted);padding:0 4px;font-size:14px"
         onclick="removeAttachment(${i})">×</span>
     </div>`).join('');
 }
 
+function fileIcon(type) {
+  if (!type) return '📄';
+  if (type.startsWith('image/')) return '🖼';
+  if (type === 'application/pdf') return '📕';
+  if (type.includes('word') || type.includes('document')) return '📝';
+  if (type.includes('sheet') || type.includes('excel')) return '📊';
+  if (type.includes('presentation') || type.includes('powerpoint')) return '📋';
+  return '📄';
+}
+
+function showAttachments(aiId) {
+  const files = _aiAttachments[aiId] || [];
+  if (!files.length) {
+    alert('No attachments for this item yet. Open the edit form to add files.');
+    return;
+  }
+  // Build a quick inline popup
+  const existing = document.getElementById('attach-popup');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'attach-popup';
+  popup.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:#1e2436;border:1px solid rgba(255,255,255,.14);border-radius:10px;
+    padding:16px;z-index:300;min-width:320px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.6)`;
+  popup.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;color:#e8eaf0">Attachments</div>
+      <button onclick="document.getElementById('attach-popup').remove()"
+        style="background:none;border:none;color:#7a8099;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    ${files.map(f => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;
+        border-bottom:1px solid rgba(255,255,255,.08)">
+        <span style="font-size:16px">${fileIcon(f.type)}</span>
+        <div style="flex:1;min-width:0">
+          <a href="${f.url}" target="_blank" download="${escHtml(f.name)}"
+            style="color:#4f8ef7;text-decoration:none;font-size:12px;
+              display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            onclick="event.stopPropagation()">
+            ${escHtml(f.name)}
+          </a>
+          <div style="font-size:10px;color:#7a8099">${(f.size/1024).toFixed(0)} KB</div>
+        </div>
+        <a href="${f.url}" target="_blank" download="${escHtml(f.name)}"
+          style="color:#7a8099;text-decoration:none;font-size:12px;white-space:nowrap"
+          onclick="event.stopPropagation()">⬇ Download</a>
+      </div>`).join('')}
+    <div style="margin-top:10px;font-size:10px;color:#7a8099">
+      Files are stored for this browser session. 
+      Supabase Storage integration coming in a future build.
+    </div>`;
+  document.body.appendChild(popup);
+
+  // Click outside to close
+  setTimeout(() => {
+    document.addEventListener('click', function closePopup(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closePopup);
+      }
+    });
+  }, 100);
+}
+
 function removeAttachment(i) {
-  _attachedFiles.splice(i, 1);
+  const aiId = document.getElementById('ai-edit-id').value;
+  const removed = _attachedFiles.splice(i, 1)[0];
+  // Remove from persistent map too
+  if (_aiAttachments[aiId] && removed) {
+    const idx = _aiAttachments[aiId].findIndex(a => a.name === removed.name);
+    if (idx > -1) _aiAttachments[aiId].splice(idx, 1);
+  }
   renderAttachedFiles();
 }
 
@@ -1800,15 +1886,16 @@ async function saveEditActionItem() {
     await loadAll();
     if (returnMeetId) {
       switchTab('meetings');
-      // Re-expand the meeting card after loadAll re-renders
       setTimeout(() => {
-        const card = document.getElementById('mcard-' + returnMeetId);
-        if (card && !card.classList.contains('open')) {
-          toggleMeetingCard(returnMeetId);
-        } else if (card && card.classList.contains('open')) {
+        const card   = document.getElementById('mcard-' + returnMeetId);
+        const expand = document.getElementById('mexpand-' + returnMeetId);
+        if (card && expand) {
+          card.classList.add('open');
+          expand.style.display = 'block';
+          card.dataset.loaded = '1';
           loadMeetingDetail(returnMeetId);
         }
-      }, 100);
+      }, 150);
     } else {
       switchTab('actions');
     }
@@ -1829,10 +1916,15 @@ async function deleteActionItem() {
     if (returnMeetId2) {
       switchTab('meetings');
       setTimeout(() => {
-        const card = document.getElementById('mcard-' + returnMeetId2);
-        if (card && !card.classList.contains('open')) toggleMeetingCard(returnMeetId2);
-        else if (card) loadMeetingDetail(returnMeetId2);
-      }, 100);
+        const card   = document.getElementById('mcard-' + returnMeetId2);
+        const expand = document.getElementById('mexpand-' + returnMeetId2);
+        if (card && expand) {
+          card.classList.add('open');
+          expand.style.display = 'block';
+          card.dataset.loaded = '1';
+          loadMeetingDetail(returnMeetId2);
+        }
+      }, 150);
     } else {
       switchTab('actions');
     }
