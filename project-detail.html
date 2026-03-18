@@ -1880,14 +1880,18 @@ async function loadProjectDetail() {
     STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures, deps };
     // Load supplemental resource/role data
     try {
-      const [hudRoles, resources, taskAssignments] = await Promise.all([
+      const [hudRoles, resources, taskAssignments, hudSkills, hudSkillCats] = await Promise.all([
         API.get('hud_roles?select=id,name,abbreviation,category_id').catch(()=>[]),
         API.get('resources?select=id,first_name,last_name,title,hud_role_id,level,email').catch(()=>[]),
+        API.get('hud_skills?select=id,name,category_id&is_active=eq.true').catch(()=>[]),
+        API.get('hud_skill_categories?select=id,name').catch(()=>[]),
         API.get(`task_resource_assignments?select=*&task_id=in.(${(tasks||[]).map(t=>t.id).join(',')})`.replace('in.()', 'in.(00000000-0000-0000-0000-000000000000)')).catch(()=>[]),
       ]);
       STATE.hudRoles        = hudRoles||[];
       STATE.resources       = resources||[];
       STATE.taskAssignments = taskAssignments||[];
+      STATE.hudSkills       = hudSkills||[];
+      STATE.hudSkillCats    = hudSkillCats||[];
     } catch(e) { STATE.hudRoles=[]; STATE.resources=[]; STATE.taskAssignments=[]; }
     // Store for back-navigation from other pages
     sessionStorage.setItem('lastProjectId', PROJECT_ID);
@@ -3969,5 +3973,7 @@ async function submitJournalEntry(taskId) {
   <div id="audit-tt-body"><div class="audit-tt-empty">Loading...</div></div>
 </div>
 
+
+<script src="/js/phase2.js"></script>
 </body>
 </html>
