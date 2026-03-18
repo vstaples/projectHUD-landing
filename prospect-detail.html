@@ -555,6 +555,61 @@ body {
   display: flex; align-items: center; justify-content: center;
   height: 200px; color: var(--muted); font-size: 13px; gap: 8px;
 }
+
+/* ── minutes reply thread ──────────────────────────────── */
+.minutes-reply-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 11px; padding: 0;
+  display: flex; align-items: center; gap: 4px;
+  transition: color .15s;
+}
+.minutes-reply-btn:hover { color: var(--accent); }
+.reply-thread {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.reply-entry {
+  display: flex; gap: 8px;
+  margin-bottom: 10px;
+}
+.reply-av {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(79,142,247,.15); color: var(--accent);
+  font-size: 8px; font-weight: 700; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.reply-bubble {
+  flex: 1; background: var(--surf3);
+  border: 1px solid var(--border);
+  border-radius: 0 8px 8px 8px; padding: 8px 10px;
+}
+.reply-meta {
+  font-size: 10px; color: var(--muted); margin-bottom: 4px;
+  display: flex; justify-content: space-between;
+}
+.reply-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+.reply-compose {
+  display: flex; gap: 8px; margin-top: 8px; align-items: flex-end;
+}
+.reply-compose textarea {
+  flex: 1; padding: 7px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 12px; font-family: inherit;
+  outline: none; resize: none; min-height: 36px; max-height: 100px;
+  transition: border-color .15s; line-height: 1.5;
+}
+.reply-compose textarea:focus { border-color: var(--accent); }
+.reply-send {
+  padding: 7px 12px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--accent);
+  color: #fff; font-size: 12px; font-weight: 600;
+  cursor: pointer; flex-shrink: 0; transition: opacity .15s;
+}
+.reply-send:hover { opacity: .85; }
+
+/* ── action item drawer ────────────────────────────────── */
+.field select option { background: #1e2436; }
 .spinner {
   width: 16px; height: 16px;
   border: 2px solid var(--border2);
@@ -794,6 +849,35 @@ body {
     <div class="drawer-foot">
       <button class="btn btn-primary" onclick="saveMeeting()">Save meeting</button>
       <button class="btn" onclick="closeDrawer('meet-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION ITEM DRAWER -->
+<div class="overlay" id="ai-overlay" onclick="handleOverlay(event,'ai-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">Add action item</span>
+      <button class="drawer-close" onclick="closeDrawer('ai-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field">
+        <label>Description <span style="color:#f07a7a">*</span></label>
+        <textarea id="ai-desc-input" rows="3"
+          placeholder="What needs to be done?"></textarea>
+      </div>
+      <div class="field">
+        <label>Assign to <span style="color:#f07a7a">*</span></label>
+        <select id="ai-assignee-sel"></select>
+      </div>
+      <div class="field">
+        <label>Due date <span style="color:#f07a7a">*</span></label>
+        <input type="date" id="ai-due-input" />
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveActionItem()">Save action item</button>
+      <button class="btn" onclick="closeDrawer('ai-overlay')">Cancel</button>
     </div>
   </div>
 </div>
@@ -1129,29 +1213,46 @@ function renderActions() {
         <thead>
           <tr style="background:var(--surf2)">
             <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">Item</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:120px">Assignee</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:80px">Due</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:70px">Status</th>
           </tr>
         </thead>
         <tbody>
           ${actionItems.length === 0
-            ? `<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted)">No action items</td></tr>`
-            : actionItems.map(ai => `
-              <tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:10px 12px">
-                  <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
-                </td>
-                <td style="padding:10px 12px;color:${ai.due_date && ai.due_date<today ? '#f07a7a' : 'var(--muted)'}">
-                  ${ai.due_date ? fmtDate(ai.due_date) : '—'}
-                </td>
-                <td style="padding:10px 12px">
-                  <span style="font-size:10px;padding:2px 7px;border-radius:5px;
-                    background:${ai.status==='open'?'rgba(212,144,31,.15)':'rgba(42,157,64,.15)'};
-                    color:${ai.status==='open'?'var(--amber)':'#7af0a0'}">
-                    ${ai.status}
-                  </span>
-                </td>
-              </tr>`).join('')}
+            ? `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">No action items</td></tr>`
+            : actionItems.map(ai => {
+                const assignee = resources.find(r => r.id === ai.assigned_to) || null;
+                const assigneeName = assignee ? assignee.first_name + ' ' + assignee.last_name : '—';
+                const initials = assignee
+                  ? (assignee.first_name[0] + assignee.last_name[0]).toUpperCase() : '?';
+                const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
+                return `
+                <tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:10px 12px">
+                    <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
+                  </td>
+                  <td style="padding:10px 12px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:20px;height:20px;border-radius:50%;
+                        background:rgba(79,142,247,.15);color:var(--accent);
+                        font-size:8px;font-weight:700;display:flex;
+                        align-items:center;justify-content:center;flex-shrink:0">${initials}</div>
+                      <span style="font-size:11px;color:var(--muted)">${escHtml(assigneeName)}</span>
+                    </div>
+                  </td>
+                  <td style="padding:10px 12px;color:${overdue ? '#f07a7a' : 'var(--muted)'}">
+                    ${ai.due_date ? fmtDate(ai.due_date) : '—'}
+                  </td>
+                  <td style="padding:10px 12px">
+                    <span style="font-size:10px;padding:2px 7px;border-radius:5px;
+                      background:${ai.status==='open'?'rgba(212,144,31,.15)':'rgba(42,157,64,.15)'};
+                      color:${ai.status==='open'?'var(--amber)':'#7af0a0'}">
+                      ${ai.status}
+                    </span>
+                  </td>
+                </tr>`;
+              }).join('')}
         </tbody>
       </table>
     </div>`;
@@ -1235,14 +1336,19 @@ async function toggleMeetingCard(meetId) {
 
 async function loadMeetingDetail(meetId) {
   try {
-    const [agendaItems, minutesList, actionItems, attendees] = await Promise.all([
+    const [agendaItems, minutesList, actionItems, attendees, actionResources] = await Promise.all([
       API.get(`meeting_agenda_items?meeting_id=eq.${meetId}&order=sequence_order`),
       API.get(`meeting_minutes?meeting_id=eq.${meetId}&limit=1`),
       API.get(`meeting_action_items?meeting_id=eq.${meetId}&order=created_at`),
       API.get(`meeting_attendees?meeting_id=eq.${meetId}&select=*,users(name,email)`),
+      API.get(`resources?select=id,first_name,last_name&is_active=eq.true`),
     ]);
 
-    // Render attendees
+    // Build resource lookup map
+    const resMap = {};
+    (actionResources||[]).forEach(r => { resMap[r.id] = r.first_name + ' ' + r.last_name; });
+
+    // Render attendees — resolves both user_id (Vaughn) and stakeholder_id (resource proxy)
     const attendeesEl = document.getElementById('mattendees-' + meetId);
     if (attendeesEl) {
       if (!attendees?.length) {
@@ -1250,7 +1356,8 @@ async function loadMeetingDetail(meetId) {
       } else {
         attendeesEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:5px">' +
           attendees.map(a => {
-            const name = a.users?.name || a.users?.email || 'Attendee';
+            // Resolve name: user record, or resource via stakeholder_id, or fallback
+            const name = a.users?.name || resMap[a.stakeholder_id] || 'Attendee';
             const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
             const status = a.attendance_status || 'invited';
             const statusColor = status === 'attended' ? '#7af0c0'
@@ -1290,15 +1397,37 @@ async function loadMeetingDetail(meetId) {
         const today = new Date().toLocaleDateString('en-CA');
         actionsEl.innerHTML = actionItems.map(ai => {
           const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
-          return `<div class="ai-row">
-            <div class="ai-check ${ai.status==='complete'?'done':''}">${ai.status==='complete'?'✓':''}</div>
-            <div class="ai-text">${escHtml(ai.description)}</div>
-            ${ai.due_date ? `<div class="ai-due ${overdue?'overdue':''}">${fmtDate(ai.due_date)}</div>` : ''}
-            <span style="font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px;
-              background:${ai.status==='complete'?'rgba(42,157,64,.15)':'rgba(212,144,31,.12)'};
-              color:${ai.status==='complete'?'#7af0a0':'var(--amber)'}">
-              ${ai.status||'open'}
-            </span>
+          const assigneeName = resMap[ai.assigned_to_resource] || '—';
+          const assigneeInitials = assigneeName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+          const done = ai.status === 'complete';
+          return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;
+              border-bottom:1px solid var(--border)">
+            <div style="width:16px;height:16px;border-radius:4px;border:1px solid var(--border2);
+              flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
+              background:${done?'var(--green)':'transparent'};
+              border-color:${done?'var(--green)':'var(--border2)'};
+              font-size:9px;color:#fff">${done?'✓':''}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;color:${done?'var(--muted)':'var(--text)'};
+                text-decoration:${done?'line-through':'none'};line-height:1.4">
+                ${escHtml(ai.description)}
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)">
+                  <div style="width:14px;height:14px;border-radius:50%;background:rgba(79,142,247,.2);
+                    color:var(--accent);font-size:7px;font-weight:700;display:flex;
+                    align-items:center;justify-content:center">${assigneeInitials}</div>
+                  ${escHtml(assigneeName)}
+                </div>
+                ${ai.due_date ? `<div style="font-size:10px;color:${overdue?'#f07a7a':'var(--muted)'}">
+                  ${overdue?'⚠ ':''}Due ${fmtDate(ai.due_date)}</div>` : ''}
+                <span style="font-size:10px;padding:1px 6px;border-radius:4px;
+                  background:${done?'rgba(42,157,64,.15)':overdue?'rgba(192,64,74,.15)':'rgba(212,144,31,.12)'};
+                  color:${done?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
+                  ${ai.status||'open'}
+                </span>
+              </div>
+            </div>
           </div>`;
         }).join('');
       }
@@ -1313,6 +1442,14 @@ async function loadMeetingDetail(meetId) {
       } else {
         minutesEl.innerHTML = `
           <div class="minutes-block">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
+                Meeting minutes
+              </div>
+              <button class="minutes-reply-btn" onclick="toggleReplyThread('${meetId}')">
+                ↩ Reply
+              </button>
+            </div>
             ${mins.summary ? `
               <div class="mb-section">
                 <div class="mb-section-lbl">Summary</div>
@@ -1332,7 +1469,19 @@ async function loadMeetingDetail(meetId) {
               Status: ${capitalize(mins.status||'')}
               ${mins.submitted_at ? ' · Submitted ' + fmtDate(mins.submitted_at) : ''}
             </div>
+            <div class="reply-thread" id="rthread-${meetId}" style="display:none">
+              <div id="rthread-entries-${meetId}"></div>
+              <div class="reply-compose">
+                <textarea id="rthread-input-${meetId}"
+                  placeholder="Ask a question, raise a concern, or note a follow-up…"
+                  rows="2"
+                  onkeydown="handleReplyKey(event,'${meetId}')"></textarea>
+                <button class="reply-send" onclick="postReply('${meetId}')">Send</button>
+              </div>
+            </div>
           </div>`;
+        // Load existing replies
+        loadReplies('${meetId}');
       }
     }
   } catch(e) {
@@ -1392,8 +1541,45 @@ function openMeetingDrawer() {
 }
 
 function openActionItemDrawer() {
-  openLogDrawer();
-  // focus to action items section
+  // Populate resource select
+  const sel = document.getElementById('ai-assignee-sel');
+  sel.innerHTML = '<option value="">— Assign to —</option>';
+  resources.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.first_name + ' ' + r.last_name;
+    sel.appendChild(o);
+  });
+  // Default due date to 1 week out
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  document.getElementById('ai-due-input').value = d.toLocaleDateString('en-CA');
+  document.getElementById('ai-desc-input').value = '';
+  document.getElementById('ai-overlay').classList.add('open');
+}
+
+async function saveActionItem() {
+  const desc    = document.getElementById('ai-desc-input').value.trim();
+  const assigned = document.getElementById('ai-assignee-sel').value;
+  const due     = document.getElementById('ai-due-input').value;
+  if (!desc)     { alert('Description is required.'); return; }
+  if (!assigned) { alert('Assignee is required.'); return; }
+  if (!due)      { alert('Due date is required.'); return; }
+  try {
+    await API.post('prospect_action_items', {
+      prospect_id:  PROSPECT_ID,
+      description:  desc,
+      assigned_to:  assigned,
+      due_date:     due,
+      status:       'open',
+    });
+    closeDrawer('ai-overlay');
+    await loadAll();
+    switchTab('actions');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save action item.');
+  }
 }
 
 function closeDrawer(id) {
@@ -1649,6 +1835,91 @@ function startProposal() {
 
 // helpers
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+
+// ── meeting minutes reply thread ────────────────────────
+const _replyCache = {};
+
+function toggleReplyThread(meetId) {
+  const thread = document.getElementById('rthread-' + meetId);
+  if (!thread) return;
+  const isOpen = thread.style.display !== 'none';
+  thread.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    const inp = document.getElementById('rthread-input-' + meetId);
+    if (inp) setTimeout(() => inp.focus(), 50);
+  }
+}
+
+function handleReplyKey(e, meetId) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    postReply(meetId);
+  }
+}
+
+async function loadReplies(meetId) {
+  try {
+    const tag = '[meeting:' + meetId + ']';
+    const acts = await API.get(
+      `prospect_activities?prospect_id=eq.${PROSPECT_ID}&type=eq.note&order=created_at`
+    );
+    _replyCache[meetId] = (acts || []).filter(a => a.summary && a.summary.includes(tag));
+    renderReplies(meetId);
+  } catch(e) { /* replies are optional */ }
+}
+
+function renderReplies(meetId) {
+  const el = document.getElementById('rthread-entries-' + meetId);
+  if (!el) return;
+  const replies = _replyCache[meetId] || [];
+  if (!replies.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-style:italic">No replies yet. Start the conversation.</div>';
+    return;
+  }
+  el.innerHTML = replies.map(r => {
+    const author = resources.find(res => res.id === r.created_by);
+    const name = author ? author.first_name + ' ' + author.last_name : 'Team member';
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+    const text = (r.summary || '').split('[meeting:')[0].trim();
+    return `
+      <div class="reply-entry">
+        <div class="reply-av">${initials}</div>
+        <div class="reply-bubble">
+          <div class="reply-meta">
+            <span style="font-weight:600;color:var(--text)">${escHtml(name)}</span>
+            <span>${fmtDateTime(r.created_at)}</span>
+          </div>
+          <div class="reply-text">${escHtml(text)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function postReply(meetId) {
+  const inp = document.getElementById('rthread-input-' + meetId);
+  const text = inp ? inp.value.trim() : '';
+  if (!text) return;
+  try {
+    await API.post('prospect_activities', {
+      prospect_id: PROSPECT_ID,
+      type:        'note',
+      date:        new Date().toISOString(),
+      summary:     text + ' [meeting:' + meetId + ']',
+    });
+    if (!_replyCache[meetId]) _replyCache[meetId] = [];
+    _replyCache[meetId].push({
+      summary:    text + ' [meeting:' + meetId + ']',
+      created_by: null,
+      created_at: new Date().toISOString(),
+    });
+    inp.value = '';
+    renderReplies(meetId);
+  } catch(e) {
+    console.error(e);
+    alert('Failed to post reply.');
+  }
+}
+
 function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) {
   if (!d) return '';
