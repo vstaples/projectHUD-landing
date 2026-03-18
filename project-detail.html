@@ -2637,9 +2637,8 @@ async function saveTaskForm() {
         const _p2Skills = window._tfTaskSkills||[];
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
           await API.post('task_skill_requirements', {
-            task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
-            is_required:true, proficiency_needed:'practitioner'
-          }).catch(function(e){ console.warn('skill req save:',e); });
+            task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id
+          });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
@@ -2877,7 +2876,6 @@ openAddTaskPanel = function(phase) {
 };
 
 // ── PATCH openEditTaskPanel to load role + assignments ─────────
-// (role dropdown population handled by Phase 2 patch — _renderAssignmentRows)
 const _origOpenEditTask = openEditTaskPanel;
 openEditTaskPanel = async function(taskId) {
   _origOpenEditTask(taskId);
@@ -2886,6 +2884,7 @@ openEditTaskPanel = async function(taskId) {
   const existing = (STATE.taskAssignments||[]).filter(a => a.task_id === taskId);
   window._tfAssignments = existing.map(a => ({...a}));
   _renderAssignmentRows(window._tfAssignments);
+  // Role is now per-row in _tfAssignments — no task-level role dropdown
 };
 
 // ── PATCH saveTaskForm to save role + assignments ──────────────
