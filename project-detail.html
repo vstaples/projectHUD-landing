@@ -860,6 +860,16 @@ let STATE = {
   activeTab: 'overview', taskFilter: 'all',
 };
 
+// Derive display status from stored status + actuals — handles legacy tasks
+// where status wasn't auto-updated at save time
+function _effectiveStatus(t) {
+  if (!t) return 'not_started';
+  if (t.status === 'complete' || t.status === 'on_hold') return t.status;
+  if (t.actual_finish || parseFloat(t.pct_complete) >= 100) return 'complete';
+  if (t.actual_start  || parseFloat(t.pct_complete)  >  0)  return 'in_progress';
+  return t.status || 'not_started';
+}
+
 // ── TAB SWITCHING ─────────────────────────────────────────────
 const renderedTabs = new Set();
 
@@ -1137,7 +1147,7 @@ document.addEventListener('mouseup', () => {
 function computeEVM() {
   const p     = STATE.project;
   const tasks = STATE.tasks;
-  const done  = tasks.filter(t => t.status === 'complete').length;
+  const done  = tasks.filter(t => _effectiveStatus(t) === 'complete').length;
   const total = tasks.length;
   const pctDone = UI.pct(done, total);
   const bac   = parseFloat(p.budget_baseline_hours || 0);
@@ -1278,7 +1288,7 @@ function taskRowHTML(t) {
       <div style="font-family:var(--font-ui);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;" title="${t.name}">${t.name}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;">${t.phase||'—'}${asgn?' · '+asgn.name:''}</div>
     </td>
-    <td style="padding:7px 8px;text-align:center;">${UI.badge(t.status)}</td>
+    <td style="padding:7px 8px;text-align:center;">${UI.badge(_effectiveStatus(t))}</td>
     <td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;">${startStr}</td>
     <td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:${isOverdue?'var(--red)':due.color};white-space:nowrap;text-align:center;font-weight:${isOverdue?'700':'400'};">${endStr}</td>
     <td style="padding:7px 12px 7px 8px;font-family:var(--font-mono);font-size:11px;color:var(--text2);white-space:nowrap;text-align:right;">${dur}</td>
@@ -1403,10 +1413,7 @@ function _taskAssignedCell(t, asgn) {
         ? '<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);margin-left:2px;">' + a.allocation_pct + '%</span>'
         : '';
       const av = { name: name.trim(), id: res.id };
-      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' +
-        UI.avatar(av, 20) +
-        '<span style="font-family:var(--font-ui);font-size:12px;">' + name.trim() + '</span>' +
-        '</span>' + pct;
+      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' + UI.avatar(av, 20) + '<span style="font-family:var(--font-ui);font-size:12px;">' + name.trim() + '</span></span>' + pct;
     }).filter(Boolean);
     return '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + parts.join('') + '</div>';
   }
@@ -1495,7 +1502,7 @@ function renderTasksTable() {
         <td class="col-grp-projdata" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.duration_days ? t.duration_days+'d' : '—'}</td>
         <td class="col-grp-projdata" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.effort_days ? t.effort_days+'d' : '—'}</td>
         <td class="col-grp-projdata"><div style="display:flex;align-items:center;gap:6px;min-width:70px;"><div style="flex:1;height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:${t.pct_complete||0}%;background:${t.pct_complete>=100?'var(--green)':'var(--cyan)'};"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--text2);min-width:26px;">${t.pct_complete||0}%</span></div></td>
-        <td class="col-grp-projdata">${UI.badge(t.status)}</td>
+        <td class="col-grp-projdata">${UI.badge(_effectiveStatus(t))}</td>
         <td style="white-space:nowrap;">
           <button class="panel-action" onclick="openJournalPanel(this.dataset.tid,this.dataset.tname)" data-tid="${t.id}" data-tname="${t.name.replace(/"/g,'&quot;')}">&#9636;</button>
           ${planEdit ? '<button onclick="openEditTaskPanel(\'' + t.id + '\')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 3px;" title="Edit task">&#9998;</button><button onclick="confirmDeleteTask(\'' + t.id + '\',\'' + t.name.replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;" title="Delete task">&#128465;</button>' : ''}
@@ -1525,15 +1532,11 @@ function renderTasksTable() {
         ${(()=>{
           const _ra=(STATE.taskAssignments||[]).find(a=>a.task_id===t.id&&a.is_primary);
           const _res=_ra?(STATE.resources||[]).find(r=>r.id===_ra.resource_id):null;
-          const _roleId=_ra?.hud_role_id||t.hud_role_id;
-          const _level=_res?.level||'staff';
-          const _rl=(STATE.hudRoleLevels||[]).find(l=>l.role_id===_roleId&&l.level===_level);
+          const _rl=(STATE.hudRoleLevels||[]).find(l=>l.role_id===(_ra?.hud_role_id||t.hud_role_id)&&l.level===(_res?.level||'staff'));
           const _rate=_rl?.overhead_rate_per_hour||t.labor_rate||175;
           const _bh=parseFloat(t.budget_hours||t.effort_days||0);
           const C='col-grp-budget', S='font-family:var(--font-mono);font-size:11px;color:var(--text2);';
-          return '<td class="'+C+'" style="'+S+'">'+(_bh?_bh.toFixed(1)+'h':'—')+'</td>'+
-                 '<td class="'+C+'" style="'+S+'">'+(_bh?'$'+(_bh*_rate).toFixed(0):'—')+'</td>'+
-                 '<td class="'+C+'" style="'+S+'">$'+_rate.toFixed(0)+'/h</td>';
+          return '<td class="'+C+'" style="'+S+'">'+(_bh?_bh.toFixed(1)+'h':'—')+'</td>'+'<td class="'+C+'" style="'+S+'">'+(_bh?'$'+(_bh*_rate).toFixed(0):'—')+'</td>'+'<td class="'+C+'" style="'+S+'">$'+_rate.toFixed(0)+'/h</td>';
         })()}
         <!-- EVM group -->
         ${(()=>{
@@ -2361,7 +2364,7 @@ function drawGanttChart() {
       // FLOAT — CPM Total Float (TF): thin gray line right of bar end
       // TF is in duration-days from computeCPMForGantt() stored in window._ganttCPM
       const cpmNode = window._ganttCPM?.nodes?.[t.id];
-      if (cpmNode && cpmNode.TF > 0 && t.status !== 'complete') {
+      if (cpmNode && cpmNode.TF > 0 && _effectiveStatus(t) !== 'complete') {
         const floatPx = cpmNode.TF * ppd;
         const fxE = Math.min(x2 + floatPx, CW);
         if (fxE > x2 + 2) {
@@ -2616,14 +2619,7 @@ async function saveTaskForm() {
     phase,
     status:       document.getElementById('tf-status').value   || 'not_started',
     start_date:   document.getElementById('tf-start').value    || null,
-    due_date:     (() => {
-      const dv = document.getElementById('tf-due').value;
-      if (dv) return dv;
-      const sv = document.getElementById('tf-start').value;
-      const dur = parseFloat(document.getElementById('tf-duration').value);
-      if (sv && dur > 0) return _toInputDate(_addBusinessDays(new Date(sv + 'T00:00:00'), dur));
-      return null;
-    })(),
+    due_date:     (() => { const dv=document.getElementById('tf-due').value; if(dv) return dv; const sv=document.getElementById('tf-start').value; const dur=parseFloat(document.getElementById('tf-duration').value); if(sv&&dur>0) return _toInputDate(_addBusinessDays(new Date(sv+'T00:00:00'),dur)); return null; })(),
     duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
     effort_days:  parseFloat(document.getElementById('tf-effort').value)   || null,
     pct_complete: parseFloat(document.getElementById('tf-pct').value)      || 0,
@@ -2635,11 +2631,8 @@ async function saveTaskForm() {
   };
   const _manualStatus = document.getElementById('tf-status').value;
   if (_manualStatus === 'not_started' || _manualStatus === 'in_progress') {
-    if (payload.actual_finish || payload.pct_complete >= 100) {
-      payload.status = 'complete';
-    } else if (payload.actual_start || payload.pct_complete > 0) {
-      payload.status = 'in_progress';
-    }
+    if (payload.actual_finish || payload.pct_complete >= 100) payload.status = 'complete';
+    else if (payload.actual_start || payload.pct_complete > 0) payload.status = 'in_progress';
   }
   try {
     if (_editingTaskId) {
@@ -2674,7 +2667,9 @@ async function saveTaskForm() {
         await API.del('task_skill_requirements?task_id=eq.' + _p2TaskId).catch(function(){});
         const _p2Skills = window._tfTaskSkills||[];
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
-          await API.post('task_skill_requirements', { task_id:_p2TaskId, skill_id:_s.skill_id }).catch(function(e){ console.warn('skill req save:',e); });
+          await API.post('task_skill_requirements', {
+            task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
+            }).catch(function(e){ console.warn('skill req save:',e); });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
@@ -2764,12 +2759,12 @@ async function deleteTask(taskId) {
     await API.del(`task_dependencies?successor_task_id=eq.${taskId}`).catch(()=>{});
     await API.del(`task_dependencies?predecessor_task_id=eq.${taskId}`).catch(()=>{});
     await API.del(`tasks?id=eq.${taskId}`);
-    STATE.tasks = STATE.tasks.filter(t => t.id !== taskId);
     STATE.taskAssignments = (STATE.taskAssignments||[]).filter(a => a.task_id !== taskId);
+    STATE.tasks = STATE.tasks.filter(t => t.id !== taskId);
     if (_delTask) _writeAudit('deleted', 'tasks', taskId, { name: _delTask.name, phase: _delTask.phase }, null);
     renderTasksTable();
     renderHeader();
-  } catch(err) { console.error('Delete failed:', err); alert('Delete failed: ' + (err.message||err)); }
+  } catch(err) { alert('Delete failed: ' + (err.message||err)); }
 }
 
 function confirmDeletePhase(phaseLabel, phaseKey) {
@@ -4276,7 +4271,10 @@ function _p2PatchFunctions() {
       await API.del('task_skill_requirements?task_id=eq.' + taskId).catch(function(){});
       for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
         var s = window._tfTaskSkills[i];
-        await API.post('task_skill_requirements', { task_id:_p2TaskId, skill_id:_s.skill_id }).catch(function(e){ console.warn('skill req save:',e); });
+        await API.post('task_skill_requirements', {
+          task_id:taskId, skill_id:s.skill_id,
+          is_required:true, proficiency_needed:'practitioner'
+        }).catch(function(e){ console.warn('skill req save:',e); });
       }
     } catch(e) { console.warn('Phase2 save err:',e); }
     if (typeof renderTasksTable==='function') renderTasksTable();
