@@ -2546,6 +2546,10 @@ function renderReplies(meetId) {
   const tops = all.filter(r => !r.summary.includes('[replyto:'));
   const subs = all.filter(r =>  r.summary.includes('[replyto:'));
 
+  // Auto-show thread when there are existing replies
+  const thread = document.getElementById('rthread-' + meetId);
+  if (tops.length > 0 && thread) thread.style.display = 'block';
+
   if (!tops.length) {
     el.innerHTML = `
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-style:italic">
