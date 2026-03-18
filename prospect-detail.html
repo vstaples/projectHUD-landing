@@ -314,6 +314,85 @@ body {
 
 /* ── findings ─────────────────────────────────────────── */
 .findings-section { margin-bottom: 16px; }
+
+/* finding card */
+.finding-card {
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  transition: border-color .15s;
+}
+.finding-card:hover { border-color: var(--border2); }
+.finding-card-head {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 8px;
+  margin-bottom: 6px;
+}
+.finding-card-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; color: var(--muted); flex-wrap: wrap;
+}
+.finding-content {
+  font-size: 13px; color: var(--text);
+  line-height: 1.6; margin-bottom: 8px;
+}
+.finding-content.flag { color: #f07a7a; }
+.finding-content.positive { color: #7af0a0; }
+.finding-actions {
+  display: flex; gap: 6px; margin-top: 8px;
+}
+.finding-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 5px; color: var(--muted);
+  font-size: 10px; padding: 2px 8px; cursor: pointer;
+  transition: all .15s;
+}
+.finding-btn:hover { color: var(--text); border-color: var(--border2); }
+
+/* finding comments */
+.finding-comments {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.finding-comment {
+  display: flex; gap: 7px; margin-bottom: 8px;
+}
+.fc-av {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(79,142,247,.15); color: var(--accent);
+  font-size: 7px; font-weight: 700; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.fc-bubble {
+  flex: 1; background: var(--surf3);
+  border: 1px solid var(--border);
+  border-radius: 0 7px 7px 7px; padding: 6px 9px;
+}
+.fc-meta {
+  font-size: 10px; color: var(--muted); margin-bottom: 3px;
+  display: flex; justify-content: space-between;
+}
+.fc-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+.finding-compose {
+  display: flex; gap: 6px; margin-top: 8px;
+}
+.finding-compose textarea {
+  flex: 1; padding: 6px 9px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 11px; font-family: inherit;
+  outline: none; resize: none; min-height: 32px;
+  transition: border-color .15s;
+}
+.finding-compose textarea:focus { border-color: var(--accent); }
+.finding-compose button {
+  padding: 6px 10px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--accent);
+  color: #fff; font-size: 11px; cursor: pointer; flex-shrink: 0;
+}
+
 .fs-head {
   display: flex; align-items: center; gap: 8px;
   font-size: 12px; font-weight: 600;
@@ -909,6 +988,61 @@ body {
   </div>
 </div>
 
+<!-- ADD/EDIT FINDING DRAWER -->
+<div class="overlay" id="finding-overlay" onclick="handleOverlay(event,'finding-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title" id="finding-drawer-title">ADD FINDING</span>
+      <button class="drawer-close" onclick="closeDrawer('finding-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="finding-edit-id" />
+      <div class="field">
+        <label>CONTENT <span style="color:#f07a7a">*</span></label>
+        <textarea id="finding-content" rows="4"
+          placeholder="Describe the finding in detail…"></textarea>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>CATEGORY</label>
+          <select id="finding-category">
+            <option value="technical">Technical</option>
+            <option value="commercial">Commercial</option>
+            <option value="stakeholder">Stakeholder</option>
+            <option value="regulatory">Regulatory</option>
+            <option value="risk">Risk</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>SENTIMENT</label>
+          <select id="finding-sentiment">
+            <option value="positive">Positive ✓</option>
+            <option value="neutral">Neutral ·</option>
+            <option value="flag">Flag ⚑</option>
+          </select>
+        </div>
+      </div>
+      <div class="sec-label">ATTACHMENTS</div>
+      <div id="finding-files" style="margin-bottom:8px"></div>
+      <label style="display:inline-flex;align-items:center;gap:6px;
+        padding:6px 12px;border-radius:6px;border:1px dashed var(--border2);
+        background:transparent;color:var(--muted);font-size:11px;cursor:pointer">
+        <span>📎</span> Attach file
+        <input type="file" id="finding-file-input" multiple
+          style="display:none" onchange="handleFindingFileAttach(this)" />
+      </label>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveFinding()">Save finding</button>
+      <button id="finding-delete-btn" class="btn"
+        style="color:#f07a7a;border-color:rgba(192,64,74,.3);display:none"
+        onclick="deleteFinding()">Delete</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer('finding-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- BRIEF EDITOR DRAWER -->
 <div class="overlay" id="brief-overlay" onclick="handleOverlay(event,'brief-overlay')">
   <div class="drawer" onclick="event.stopPropagation()">
@@ -1048,6 +1182,8 @@ let prospect = null;
 let activities = [], findings = [], actionItems = [], meetings = [], stakeholders = [];
 let resources = [], contacts = [];
 let _currentResource = null;  // resolved after loadAll
+const _findingComments  = {};  // { [findingId]: [{text, created_by, created_at}] }
+const _findingAttachStaged = {}; // staged files before save
 let meetingActionItems = [];  // meeting_action_items across all meetings
 let allActionItems = [];      // combined prospect + meeting action items
 
@@ -1077,6 +1213,21 @@ async function loadAll() {
     prospect    = pro?.[0];
     activities  = acts  || [];
     findings    = finds || [];
+    // Load finding comments from prospect_activities tagged [finding:ID]
+    findings.forEach(f => { _findingComments[f.id] = []; });
+    activities.filter(a => a.type === 'note' && a.summary && a.summary.includes('[finding:'))
+      .forEach(a => {
+        const match = a.summary.match(/\[finding:([^\]]+)\]/);
+        if (match) {
+          const fid = match[1];
+          if (!_findingComments[fid]) _findingComments[fid] = [];
+          _findingComments[fid].push({
+            text:       a.summary.split('[finding:')[0].trim(),
+            created_by: a.created_by,
+            created_at: a.created_at,
+          });
+        }
+      });
     actionItems = ais   || [];
     meetings    = meets || [];
     stakeholders= shs   || [];
@@ -1373,34 +1524,80 @@ function renderActivity() {
 // ── findings ───────────────────────────────────────────
 function renderFindings() {
   const panel = document.getElementById('panel-findings');
-  if (findings.length === 0) {
-    panel.innerHTML = `<div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">
-      No findings recorded yet. Log an activity with findings to populate this tab.</div>`;
-    return;
-  }
-
-  const cats = [...new Set(findings.map(f => f.category))];
   const catColors = { technical:'#2a9d7a', commercial:'#d4901f', stakeholder:'#4f8ef7',
                       risk:'#c0404a', regulatory:'#9d2a9d', other:'#7a8099' };
+  const sentimentIcon = { flag:'⚑', positive:'✓', neutral:'·' };
 
-  panel.innerHTML = cats.map(cat => `
-    <div class="findings-section">
-      <div class="fs-head">
-        <div class="fs-dot" style="background:${catColors[cat]||'#7a8099'}"></div>
-        ${capitalize(cat)}
-      </div>
-      <div class="card" style="padding:0;overflow:hidden">
-        <table class="findings-table">
-          <tbody>
-            ${findings.filter(f=>f.category===cat).map(f => `
-              <tr>
-                <td class="fd-label">${fmtDate(f.created_at)}</td>
-                <td class="fd-val ${f.sentiment==='flag'?'fd-flag':''}">${escHtml(f.content)}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`).join('');
+  const cards = findings.map(f => {
+    const color    = catColors[f.category] || '#7a8099';
+    const icon     = sentimentIcon[f.sentiment] || '·';
+    const hasAttach= _aiAttachments['finding-' + f.id]?.length > 0;
+    const comments = _findingComments[f.id] || [];
+    const author   = resources.find(r => r.id === f.created_by);
+    const authorName = author ? author.first_name + ' ' + author.last_name : 'Team';
+    return `
+      <div class="finding-card" id="finding-${f.id}">
+        <div class="finding-card-head">
+          <div style="flex:1">
+            <div class="finding-content ${f.sentiment==='flag'?'flag':f.sentiment==='positive'?'positive':''}">
+              ${escHtml(f.content)}
+            </div>
+            <div class="finding-card-meta">
+              <span style="padding:1px 7px;border-radius:4px;font-weight:600;
+                background:${color}18;color:${color}">${capitalize(f.category||'')}</span>
+              <span>${icon} ${capitalize(f.sentiment||'neutral')}</span>
+              <span>${escHtml(authorName)}</span>
+              <span>${fmtDate(f.created_at)}</span>
+              ${hasAttach ? '<span>📎 ' + _aiAttachments['finding-' + f.id].length + '</span>' : ''}
+              ${comments.length > 0 ? '<span>💬 ' + comments.length + '</span>' : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="finding-btn" onclick="openEditFinding('${f.id}')">✎ Edit</button>
+          </div>
+        </div>
+        <div class="finding-actions">
+          <button class="finding-btn" onclick="attachToFinding('${f.id}')">📎 Attach</button>
+          <button class="finding-btn" onclick="toggleFindingComments('${f.id}')">
+            💬 ${comments.length > 0 ? comments.length + ' comment' + (comments.length!==1?'s':'') : 'Comment'}
+          </button>
+        </div>
+        <div id="fcomments-${f.id}" style="display:${comments.length>0?'block':'none'}">
+          <div class="finding-comments">
+            <div id="fcomment-list-${f.id}">
+              ${comments.length === 0
+                ? '<div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:6px">No comments yet.</div>'
+                : comments.map(c => {
+                    const ca = resources.find(r => r.id === c.created_by);
+                    const cn = ca ? ca.first_name + ' ' + ca.last_name : 'Team';
+                    const ci = cn.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+                    return '<div class="finding-comment">' +
+                      '<div class="fc-av">' + ci + '</div>' +
+                      '<div class="fc-bubble">' +
+                        '<div class="fc-meta"><span style="font-weight:600;color:var(--text)">' + escHtml(cn) + '</span>' +
+                        '<span>' + fmtDateTime(c.created_at) + '</span></div>' +
+                        '<div class="fc-text">' + escHtml(c.text||'') + '</div>' +
+                      '</div></div>';
+                  }).join('')}
+            </div>
+            <div class="finding-compose">
+              <textarea id="fcompose-${f.id}" placeholder="Add a comment… (Ctrl+Enter to post)"
+                rows="2"
+                onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();postFindingComment('${f.id}')}"></textarea>
+              <button onclick="postFindingComment('${f.id}')">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn btn-primary" onclick="openAddFinding()">+ Add finding</button>
+    </div>
+    ${findings.length === 0
+      ? '<div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">No findings recorded yet.</div>'
+      : cards}`;
 }
 
 // ── stakeholders ───────────────────────────────────────
@@ -2011,6 +2208,181 @@ async function removeStakeholder() {
   } catch(e) {
     console.error(e);
     alert('Failed to remove stakeholder.');
+  }
+}
+
+// ── findings ───────────────────────────────────────────────────────────────
+let _findingStagedFiles = [];
+
+function openAddFinding() {
+  document.getElementById('finding-drawer-title').textContent = 'ADD FINDING';
+  document.getElementById('finding-edit-id').value  = '';
+  document.getElementById('finding-content').value  = '';
+  document.getElementById('finding-category').value = 'technical';
+  document.getElementById('finding-sentiment').value = 'neutral';
+  document.getElementById('finding-files').innerHTML = '';
+  document.getElementById('finding-delete-btn').style.display = 'none';
+  _findingStagedFiles = [];
+  document.getElementById('finding-overlay').classList.add('open');
+}
+
+function openEditFinding(fid) {
+  const f = findings.find(x => x.id === fid);
+  if (!f) return;
+  document.getElementById('finding-drawer-title').textContent = 'EDIT FINDING';
+  document.getElementById('finding-edit-id').value   = fid;
+  document.getElementById('finding-content').value   = f.content || '';
+  document.getElementById('finding-category').value  = f.category || 'technical';
+  document.getElementById('finding-sentiment').value = f.sentiment || 'neutral';
+  document.getElementById('finding-delete-btn').style.display = '';
+  // Restore staged attachments
+  _findingStagedFiles = _aiAttachments['finding-' + fid] ? [..._aiAttachments['finding-' + fid]] : [];
+  renderFindingFiles();
+  document.getElementById('finding-overlay').classList.add('open');
+}
+
+async function saveFinding() {
+  const content  = document.getElementById('finding-content').value.trim();
+  const category = document.getElementById('finding-category').value;
+  const sentiment= document.getElementById('finding-sentiment').value;
+  const editId   = document.getElementById('finding-edit-id').value;
+  if (!content) { alert('Content is required.'); return; }
+
+  try {
+    let savedId = editId;
+    if (editId) {
+      await API.patch(`prospect_findings?id=eq.${editId}`, { content, category, sentiment });
+    } else {
+      const res = await API.post('prospect_findings', {
+        prospect_id: PROSPECT_ID,
+        category, content, sentiment,
+        created_by: _currentResource?.id || null,
+      });
+      savedId = res?.[0]?.id;
+    }
+
+    // Upload staged files
+    if (savedId && _findingStagedFiles.some(f => f.file)) {
+      const key = 'finding-' + savedId;
+      if (!_aiAttachments[key]) _aiAttachments[key] = [];
+      for (const sf of _findingStagedFiles.filter(f => f.file)) {
+        const path = PROSPECT_ID + '/finding-' + savedId + '/' + Date.now() + '_' +
+          sf.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        try {
+          const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+          const res = await fetch(
+            PHUD.SUPABASE_URL + '/storage/v1/object/attachments/' + path,
+            { method:'POST', headers:{'Authorization':'Bearer '+token,
+              'apikey':PHUD.SUPABASE_KEY,'Content-Type':sf.type||'application/octet-stream',
+              'x-upsert':'true'}, body: sf.file }
+          );
+          if (res.ok) {
+            const url = await getSignedUrl(path);
+            _aiAttachments[key].push({ name: sf.name, size: sf.size, url, path, type: sf.type });
+          }
+        } catch(e) { /* non-fatal */ }
+      }
+    }
+
+    closeDrawer('finding-overlay');
+    await loadAll();
+    switchTab('findings');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save finding.');
+  }
+}
+
+async function deleteFinding() {
+  const id = document.getElementById('finding-edit-id').value;
+  if (!confirm('Delete this finding? This cannot be undone.')) return;
+  try {
+    await API.del(`prospect_findings?id=eq.${id}`);
+    closeDrawer('finding-overlay');
+    await loadAll();
+    switchTab('findings');
+  } catch(e) {
+    alert('Failed to delete finding.');
+  }
+}
+
+function handleFindingFileAttach(input) {
+  Array.from(input.files).forEach(f => {
+    if (f.size > 20 * 1024 * 1024) { alert(f.name + ' exceeds 20MB.'); return; }
+    _findingStagedFiles.push({ name: f.name, size: f.size, type: f.type, file: f });
+  });
+  input.value = '';
+  renderFindingFiles();
+}
+
+function renderFindingFiles() {
+  const el = document.getElementById('finding-files');
+  if (!el) return;
+  el.innerHTML = _findingStagedFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 0;
+      font-size:11px;border-bottom:1px solid var(--border)">
+      <span>${fileIcon(f.type)}</span>
+      <span style="flex:1;color:var(--text)">${escHtml(f.name)}</span>
+      <span style="color:var(--muted)">${f.size>0?(f.size/1024).toFixed(0)+' KB':''}</span>
+      <span style="cursor:pointer;color:var(--muted);padding:0 4px"
+        onclick="removeFindingFile(${i})">×</span>
+    </div>`).join('');
+}
+
+function removeFindingFile(i) {
+  _findingStagedFiles.splice(i, 1);
+  renderFindingFiles();
+}
+
+function attachToFinding(fid) {
+  openEditFinding(fid);
+  // Focus file input after drawer opens
+  setTimeout(() => document.getElementById('finding-file-input')?.click(), 300);
+}
+
+function toggleFindingComments(fid) {
+  const el = document.getElementById('fcomments-' + fid);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function postFindingComment(fid) {
+  const inp  = document.getElementById('fcompose-' + fid);
+  const text = inp?.value.trim();
+  if (!text) return;
+  const resourceId = _currentResource?.id || null;
+  try {
+    await API.post('prospect_activities', {
+      prospect_id: PROSPECT_ID,
+      type:        'note',
+      date:        new Date().toISOString(),
+      summary:     text + ' [finding:' + fid + ']',
+      ...(resourceId ? { created_by: resourceId } : {}),
+    });
+    if (!_findingComments[fid]) _findingComments[fid] = [];
+    _findingComments[fid].push({
+      text, created_by: resourceId, created_at: new Date().toISOString(),
+    });
+    if (inp) inp.value = '';
+    // Re-render just the comment list
+    const listEl = document.getElementById('fcomment-list-' + fid);
+    if (listEl) {
+      listEl.innerHTML = _findingComments[fid].map(c => {
+        const ca = resources.find(r => r.id === c.created_by);
+        const cn = ca ? ca.first_name + ' ' + ca.last_name : 'Team';
+        const ci = cn.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+        return '<div class="finding-comment">' +
+          '<div class="fc-av">' + ci + '</div>' +
+          '<div class="fc-bubble">' +
+            '<div class="fc-meta"><span style="font-weight:600;color:var(--text)">' + escHtml(cn) + '</span>' +
+            '<span>' + fmtDateTime(c.created_at) + '</span></div>' +
+            '<div class="fc-text">' + escHtml(c.text) + '</div>' +
+          '</div></div>';
+      }).join('');
+    }
+  } catch(e) {
+    console.error(e);
+    alert('Failed to post comment.');
   }
 }
 
