@@ -174,9 +174,33 @@
 .um-card-field span { font-family:var(--font-mono); font-size:12px; color:var(--text2); }
 
 /* ── RESOURCE CARD ───────────────────────────────────────────── */
-.res-avatar { width:36px; height:36px; border-radius:50%; background:rgba(0,210,255,0.12);
-  border:1px solid rgba(0,210,255,0.3); display:flex; align-items:center; justify-content:center;
-  font-family:var(--font-hud); font-size:13px; font-weight:700; color:var(--cyan); flex-shrink:0; }
+.res-avatar {
+  width:52px; height:52px; border-radius:50%;
+  background:rgba(0,210,255,0.12);
+  border:2px solid rgba(0,210,255,0.3);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:16px; font-weight:700;
+  color:var(--cyan); flex-shrink:0;
+  overflow:hidden; position:relative; cursor:pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.res-avatar:hover { border-color:rgba(0,210,255,.7); box-shadow:0 0 12px rgba(0,210,255,.25); }
+.res-avatar img {
+  width:100%; height:100%;
+  object-fit:cover;       /* fills circle, crops — never stretches */
+  object-position:center; /* keeps face centered */
+  display:block;
+}
+.res-avatar-overlay {
+  position:absolute; inset:0; border-radius:50%;
+  background:rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .2s;
+  font-size:18px; color:#fff;
+  pointer-events:none;
+}
+.res-avatar:hover .res-avatar-overlay { opacity:1; }
+.res-avatar-upload { display:none; }
 .res-info { flex:1; margin-left:12px; }
 .res-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
 .res-title { font-family:var(--font-mono); font-size:11px; color:var(--text3); margin-top:1px; }
@@ -609,9 +633,27 @@
 
 <!-- ── RESOURCE DRAWER ──────────────────────────────────────── -->
 <div class="um-drawer" id="resource-drawer">
-  <div class="um-drawer-hdr">
-    <div class="um-drawer-title" id="res-drawer-title">ADD RESOURCE</div>
-    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  <div class="um-drawer-hdr" style="flex-direction:column;align-items:stretch;gap:12px;padding-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="um-drawer-title" id="res-drawer-title">ADD RESOURCE</div>
+      <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div class="res-avatar" id="drawer-avatar" style="width:64px;height:64px;font-size:20px;cursor:pointer;"
+           onclick="document.getElementById('drawer-av-input').click()" title="Upload photo">
+        <img id="drawer-avatar-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;object-position:center;"/>
+        <span id="drawer-avatar-initials"></span>
+        <div class="res-avatar-overlay">📷</div>
+        <input type="file" id="drawer-av-input" class="res-avatar-upload"
+          accept="image/jpeg,image/png,image/webp"
+          onchange="uploadAvatarFromDrawer(this)" />
+      </div>
+      <div>
+        <div id="drawer-name-preview" style="font-family:var(--font-hud);font-size:17px;font-weight:700;color:var(--text0);"></div>
+        <div id="drawer-title-preview" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;"></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:6px;">CLICK PHOTO TO UPLOAD · JPG, PNG, WEBP · MAX 5MB</div>
+      </div>
+    </div>
   </div>
   <div class="um-drawer-body">
     <div class="res-drawer-tabs">
@@ -962,7 +1004,15 @@ function renderResources() {
     return `<div class="um-card">
       <div class="um-card-top">
         <div class="res-row">
-          <div class="res-avatar">${initials}</div>
+          <div class="res-avatar" onclick="triggerAvatarUpload('${r.id}')" title="${r.avatar_url ? 'Change photo' : 'Upload photo'}">
+            ${r.avatar_url
+              ? `<img src="${r.avatar_url}" alt="${initials}" />`
+              : initials}
+            <div class="res-avatar-overlay">📷</div>
+            <input type="file" class="res-avatar-upload" id="av-input-${r.id}"
+              accept="image/jpeg,image/png,image/webp"
+              onchange="uploadAvatar(this, '${r.id}')" />
+          </div>
           <div class="res-info">
             <div class="res-name">${r.first_name} ${r.last_name}</div>
             <div class="res-title">${r.title || (role ? role.name : '—')}</div>
@@ -1038,6 +1088,39 @@ function openResourceDrawer(id) {
   document.getElementById('res-notes').value    = r?.notes      || '';
   document.getElementById('res-err').style.display = 'none';
 
+  // Update drawer avatar preview
+  const dAvImg      = document.getElementById('drawer-avatar-img');
+  const dAvInitials = document.getElementById('drawer-avatar-initials');
+  const dAvEl       = document.getElementById('drawer-avatar');
+  const dNamePrev   = document.getElementById('drawer-name-preview');
+  const dTitlePrev  = document.getElementById('drawer-title-preview');
+  const firstName   = r?.first_name || '';
+  const lastName    = r?.last_name  || '';
+  const titleStr    = r?.title      || '';
+  const initStr     = ((firstName[0]||'') + (lastName[0]||'')).toUpperCase() || '?';
+  if (dAvInitials) dAvInitials.textContent = initStr;
+  if (dNamePrev)   dNamePrev.textContent   = firstName + ' ' + lastName;
+  if (dTitlePrev)  dTitlePrev.textContent  = titleStr;
+  if (r?.avatar_url && dAvImg) {
+    dAvImg.src = r.avatar_url; dAvImg.style.display = 'block';
+    if (dAvInitials) dAvInitials.style.display = 'none';
+  } else if (dAvImg) {
+    dAvImg.src = ''; dAvImg.style.display = 'none';
+    if (dAvInitials) dAvInitials.style.display = '';
+  }
+  // Live-update drawer preview as name fields change
+  ['res-first','res-last','res-title'].forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el) el.oninput = () => {
+      const fn = document.getElementById('res-first').value;
+      const ln = document.getElementById('res-last').value;
+      const ti = document.getElementById('res-title').value;
+      if (dNamePrev)   dNamePrev.textContent  = fn + ' ' + ln;
+      if (dTitlePrev)  dTitlePrev.textContent = ti;
+      if (dAvInitials) dAvInitials.textContent = ((fn[0]||'')+(ln[0]||'')).toUpperCase()||'?';
+    };
+  });
+
   openDrawer('resource-drawer');
 }
 
@@ -1077,8 +1160,6 @@ async function saveResource() {
       const [created] = await API.post('resources', payload);
       if (created) UM.resources.push(created);
     }
-    const savedId = UM.editingResourceId || UM.resources[UM.resources.length-1]?.id;
-    if (savedId) await _saveResourceExtras(savedId).catch(e => console.warn('Extras save failed:', e));
     closeDrawer();
     renderResources();
   } catch(e) {
@@ -1708,7 +1789,6 @@ async function _loadResourceExtras(resourceId) {
       linkedin_url:     prof.linkedin_url || '',
       _dbId:            prof.id || null,
     };
-    UM.resourceDomains[resourceId] = domains || [];
     UM._pendingDomains = (domains || []).map(d => {
       const dom = UM.domains.find(x => x.id === d.domain_id);
       return {
@@ -2236,6 +2316,118 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch(e) { /* not authenticated — requireAuth will redirect */ return; }
   initUM();
 });
+
+// ── AVATAR UPLOAD ──────────────────────────────────────────────
+const SUPABASE_STORAGE = PHUD.SUPABASE_URL + '/storage/v1';
+const AVATARS_BUCKET   = 'avatars';
+
+// Called from card click
+function triggerAvatarUpload(resourceId) {
+  const inp = document.getElementById('av-input-' + resourceId);
+  if (inp) inp.click();
+}
+
+// Upload from the resource card
+async function uploadAvatar(input, resourceId) {
+  const file = input.files[0];
+  if (!file) return;
+  await _doAvatarUpload(file, resourceId);
+  input.value = ''; // reset so same file can be re-selected
+}
+
+// Upload from the drawer
+async function uploadAvatarFromDrawer(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const resourceId = UM.editingResourceId;
+  if (!resourceId) { alert('Save the resource first before uploading a photo.'); return; }
+  const url = await _doAvatarUpload(file, resourceId);
+  if (url) {
+    // Update drawer preview immediately
+    const img = document.getElementById('drawer-avatar-img');
+    const ini = document.getElementById('drawer-avatar-initials');
+    if (img) { img.src = url; img.style.display = 'block'; }
+    if (ini) ini.style.display = 'none';
+  }
+  input.value = '';
+}
+
+async function _doAvatarUpload(file, resourceId) {
+  // Validate size (5 MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Photo must be under 5 MB. Please choose a smaller file.');
+    return null;
+  }
+
+  const ext     = file.name.split('.').pop().toLowerCase() || 'jpg';
+  const path    = resourceId + '.' + ext;
+  const token   = await Auth.getFreshToken().catch(() => Auth.getToken());
+  const headers = { 'Authorization': 'Bearer ' + token, 'apikey': PHUD.SUPABASE_KEY };
+
+  // Show uploading state on the avatar
+  const cardAv = document.querySelector('[id="av-input-' + resourceId + '"]')?.closest('.res-avatar');
+  if (cardAv) { cardAv.style.opacity = '0.5'; }
+
+  try {
+    // Delete any existing avatar first (upsert via delete + upload)
+    await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + path, {
+      method: 'DELETE', headers
+    }).catch(() => {});
+
+    // Upload new file
+    const uploadRes = await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + path, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': file.type },
+      body: file,
+    });
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      throw new Error('Upload failed: ' + err);
+    }
+
+    // Build public URL
+    const publicUrl = PHUD.SUPABASE_URL + '/storage/v1/object/public/' + AVATARS_BUCKET + '/' + path
+      + '?t=' + Date.now(); // cache-bust
+
+    // Save URL to resources table
+    await API.patch('resources?id=eq.' + resourceId, { avatar_url: publicUrl });
+
+    // Update local state
+    const res = UM.resources.find(r => r.id === resourceId);
+    if (res) res.avatar_url = publicUrl;
+
+    // Re-render cards to show new photo
+    renderResources();
+    return publicUrl;
+
+  } catch(e) {
+    console.error('Avatar upload error:', e);
+    alert('Photo upload failed: ' + e.message);
+    return null;
+  } finally {
+    if (cardAv) cardAv.style.opacity = '';
+  }
+}
+
+// Remove avatar (revert to initials)
+async function removeAvatar(resourceId) {
+  if (!confirm('Remove this photo and revert to initials?')) return;
+  const res = UM.resources.find(r => r.id === resourceId);
+  if (!res) return;
+  const token   = await Auth.getFreshToken().catch(() => Auth.getToken());
+  const headers = { 'Authorization': 'Bearer ' + token, 'apikey': PHUD.SUPABASE_KEY };
+  // Extract path from URL
+  const urlPath = res.avatar_url?.split('/' + AVATARS_BUCKET + '/')[1]?.split('?')[0];
+  if (urlPath) {
+    await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + urlPath, {
+      method: 'DELETE', headers
+    }).catch(()=>{});
+  }
+  await API.patch('resources?id=eq.' + resourceId, { avatar_url: null });
+  if (res) res.avatar_url = null;
+  renderResources();
+}
 </script>
 </body>
 </html>
