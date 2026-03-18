@@ -1021,12 +1021,15 @@ async function loadAll() {
       .forEach(a => {
         const match = a.summary.match(/\[ai-attach:([^\]]+)\]/);
         if (match) {
-          const aiId  = match[1];
-          const names = a.summary.replace(/\[ai-attach:[^\]]+\]/, '').trim();
-          if (names) {
-            _aiAttachments[aiId] = names.split('|').map(name => ({
-              name: name.trim(), size: 0, url: null, type: '',
-            }));
+          const aiId   = match[1];
+          const raw    = a.summary.replace(/\[ai-attach:[^\]]+\]/, '').trim();
+          if (raw) {
+            _aiAttachments[aiId] = raw.split('|').map(entry => {
+              const parts = entry.split('::');
+              const path  = parts.length > 1 ? parts[0].trim() : null;
+              const name  = parts.length > 1 ? parts[1].trim() : entry.trim();
+              return { name, size: 0, url: null, path, type: '' };
+            });
           }
         }
       });
@@ -1792,35 +1795,111 @@ function openEditActionItem(id, desc, assignedTo, dueDate, status) {
   }
 }
 
-function handleFileAttach(input) {
+async function handleFileAttach(input) {
   const aiId = document.getElementById('ai-edit-id').value;
   const files = Array.from(input.files);
-  files.forEach(f => {
-    if (f.size > 10 * 1024 * 1024) { alert(f.name + ' exceeds 10MB limit.'); return; }
-    const url = URL.createObjectURL(f);
-    _attachedFiles.push({ name: f.name, size: f.size, url, type: f.type });
-    // Also persist to the AI attachment map immediately
-    if (!_aiAttachments[aiId]) _aiAttachments[aiId] = [];
-    _aiAttachments[aiId].push({ name: f.name, size: f.size, url, type: f.type });
-  });
-  renderAttachedFiles();
   input.value = '';
+
+  for (const f of files) {
+    if (f.size > 20 * 1024 * 1024) { alert(f.name + ' exceeds 20MB limit.'); continue; }
+
+    // Show uploading state
+    _attachedFiles.push({ name: f.name, size: f.size, url: null, type: f.type, uploading: true });
+    renderAttachedFiles();
+
+    try {
+      const path     = `${PROSPECT_ID}/${aiId}/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+      const token    = await Auth.getFreshToken().catch(() => Auth.getToken());
+      const res      = await fetch(
+        `${PHUD.SUPABASE_URL}/storage/v1/object/attachments/${path}`,
+        {
+          method:  'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'apikey':        PHUD.SUPABASE_KEY,
+            'Content-Type':  f.type || 'application/octet-stream',
+            'x-upsert':      'true',
+          },
+          body: f,
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        console.error('Upload failed:', err);
+        alert('Upload failed for ' + f.name + ': ' + err);
+        // Remove uploading placeholder
+        _attachedFiles = _attachedFiles.filter(x => !(x.name === f.name && x.uploading));
+        renderAttachedFiles();
+        continue;
+      }
+
+      // Get signed URL for immediate viewing
+      const signedUrl = await getSignedUrl(path);
+
+      // Replace uploading placeholder with real entry
+      const idx = _attachedFiles.findIndex(x => x.name === f.name && x.uploading);
+      const entry = { name: f.name, size: f.size, url: signedUrl, type: f.type, path };
+      if (idx > -1) _attachedFiles[idx] = entry;
+      else _attachedFiles.push(entry);
+
+      if (!_aiAttachments[aiId]) _aiAttachments[aiId] = [];
+      _aiAttachments[aiId].push(entry);
+
+      renderAttachedFiles();
+    } catch(e) {
+      console.error('Upload error:', e);
+      alert('Upload error: ' + e.message);
+      _attachedFiles = _attachedFiles.filter(x => !(x.name === f.name && x.uploading));
+      renderAttachedFiles();
+    }
+  }
+}
+
+async function getSignedUrl(path) {
+  try {
+    const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+    const res = await fetch(
+      `${PHUD.SUPABASE_URL}/storage/v1/object/sign/attachments/${path}`,
+      {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey':        PHUD.SUPABASE_KEY,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({ expiresIn: 86400 }), // 24 hours
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return PHUD.SUPABASE_URL + '/storage/v1' + data.signedURL;
+  } catch(e) {
+    return null;
+  }
 }
 
 function renderAttachedFiles() {
   const el = document.getElementById('ai-edit-files');
   if (!el) return;
   el.innerHTML = _attachedFiles.map((f, i) => `
-    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;
+    <div style="display:flex;align-items:center;gap:6px;padding:6px 0;
       font-size:11px;border-bottom:1px solid var(--border)">
-      <span>${fileIcon(f.type)}</span>
-      <a href="${f.url}" target="_blank"
-        style="flex:1;color:var(--accent);text-decoration:none;overflow:hidden;
-          text-overflow:ellipsis;white-space:nowrap"
-        onclick="event.stopPropagation()">${escHtml(f.name)}</a>
-      <span style="color:var(--muted);white-space:nowrap">${(f.size/1024).toFixed(0)} KB</span>
-      <span style="cursor:pointer;color:var(--muted);padding:0 4px;font-size:14px"
-        onclick="removeAttachment(${i})">×</span>
+      <span>${f.uploading ? '⏳' : fileIcon(f.type)}</span>
+      ${f.url && !f.uploading
+        ? `<a href="${f.url}" target="_blank"
+            style="flex:1;color:var(--accent);text-decoration:none;overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap"
+            onclick="event.stopPropagation()">${escHtml(f.name)}</a>`
+        : `<span style="flex:1;color:${f.uploading?'var(--muted)':'var(--text)'};
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${escHtml(f.name)}${f.uploading?' — uploading…':''}
+          </span>`}
+      <span style="color:var(--muted);white-space:nowrap;flex-shrink:0">
+        ${f.uploading ? '' : (f.size/1024).toFixed(0) + ' KB'}
+      </span>
+      ${f.uploading ? '' : `<span style="cursor:pointer;color:var(--muted);padding:0 4px;font-size:14px"
+        onclick="removeAttachment(${i})">×</span>`}
     </div>`).join('');
 }
 
@@ -1834,12 +1913,19 @@ function fileIcon(type) {
   return '📄';
 }
 
-function showAttachments(aiId) {
-  const files = _aiAttachments[aiId] || [];
+async function showAttachments(aiId) {
+  let files = _aiAttachments[aiId] || [];
   if (!files.length) {
     alert('No attachments for this item yet. Open the edit form to add files.');
     return;
   }
+  // Refresh signed URLs for any path-based entries (they expire)
+  files = await Promise.all(files.map(async f => {
+    if (f.path && !f.url) {
+      f.url = await getSignedUrl(f.path);
+    }
+    return f;
+  }));
   // Build a quick inline popup
   const existing = document.getElementById('attach-popup');
   if (existing) existing.remove();
@@ -1894,14 +1980,29 @@ function showAttachments(aiId) {
   }, 100);
 }
 
-function removeAttachment(i) {
-  const aiId = document.getElementById('ai-edit-id').value;
+async function removeAttachment(i) {
+  const aiId   = document.getElementById('ai-edit-id').value;
   const removed = _attachedFiles.splice(i, 1)[0];
-  // Remove from persistent map too
+
   if (_aiAttachments[aiId] && removed) {
     const idx = _aiAttachments[aiId].findIndex(a => a.name === removed.name);
     if (idx > -1) _aiAttachments[aiId].splice(idx, 1);
   }
+
+  // Delete from Supabase Storage if it has a path
+  if (removed?.path) {
+    try {
+      const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+      await fetch(
+        `${PHUD.SUPABASE_URL}/storage/v1/object/attachments/${removed.path}`,
+        {
+          method:  'DELETE',
+          headers: { 'Authorization': `Bearer ${token}`, 'apikey': PHUD.SUPABASE_KEY },
+        }
+      );
+    } catch(e) { /* non-fatal */ }
+  }
+
   renderAttachedFiles();
 }
 
@@ -1948,28 +2049,31 @@ async function saveEditActionItem() {
     }
     await API.patch(`${patchTable}?id=eq.${id}`, finalPayload);
 
-    // Persist attachment metadata as a tagged activity note for cross-session recall
-    if (_attachedFiles.length > 0) {
-      const names = _attachedFiles.map(f => f.name).join('|');
-      const tag   = `[ai-attach:${id}]`;
-      // Check if an attach note already exists for this AI and update it
+    // Persist attachment paths as a tagged activity note for cross-session recall
+    // Format: "path1.jpg::name1|path2.pdf::name2 [ai-attach:ID]"
+    const uploadedFiles = _attachedFiles.filter(f => f.path && !f.uploading);
+    if (uploadedFiles.length > 0) {
+      const encoded = uploadedFiles.map(f => f.path + '::' + f.name).join('|');
+      const tag     = '[ai-attach:' + id + ']';
       try {
         const existing = await API.get(
-          `prospect_activities?prospect_id=eq.${PROSPECT_ID}&type=eq.note&summary=like.*${encodeURIComponent(tag)}*&limit=1`
+          'prospect_activities?prospect_id=eq.' + PROSPECT_ID +
+          '&type=eq.note&order=created_at.desc&limit=20'
         );
-        if (existing?.length) {
-          await API.patch(`prospect_activities?id=eq.${existing[0].id}`, {
-            summary: names + ' ' + tag,
+        const existNote = (existing||[]).find(a => a.summary && a.summary.includes(tag));
+        if (existNote) {
+          await API.patch('prospect_activities?id=eq.' + existNote.id, {
+            summary: encoded + ' ' + tag,
           });
-        } else if (names) {
+        } else {
           await API.post('prospect_activities', {
             prospect_id: PROSPECT_ID,
             type:        'note',
             date:        new Date().toISOString(),
-            summary:     names + ' ' + tag,
+            summary:     encoded + ' ' + tag,
           });
         }
-      } catch(e) { /* attachment metadata persistence is non-fatal */ }
+      } catch(e) { /* non-fatal */ }
     }
     closeDrawer('ai-edit-overlay');
     const returnMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
