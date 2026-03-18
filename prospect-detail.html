@@ -1014,6 +1014,24 @@ async function loadAll() {
     checkProposalTab();
     populateMeetingSelects();
 
+    // Rebuild attachment metadata from tagged activity notes
+    activities.filter(a => a.type === 'note' && a.summary && a.summary.includes('[ai-attach:'))
+      .forEach(a => {
+        const match = a.summary.match(/\[ai-attach:([^\]]+)\]/);
+        if (match) {
+          const aiId  = match[1];
+          const names = a.summary.replace(/\[ai-attach:[^\]]+\]/, '').trim();
+          if (names) {
+            _aiAttachments[aiId] = names.split('|').map(name => ({
+              name: name.trim(),
+              size: 0,
+              url:  null,  // file content not available — metadata only
+              type: '',
+            }));
+          }
+        }
+      });
+
     // badge counts
     document.getElementById('tbadge-activity').textContent = activities.length;
     document.getElementById('tbadge-sh').textContent       = stakeholders.length;
@@ -1317,7 +1335,7 @@ function renderActions() {
                         background:${ai.status==='complete'?'var(--green)':'transparent'};
                         border-color:${ai.status==='complete'?'var(--green)':'var(--border2)'};
                         font-size:8px;color:#fff"
-                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this,'prospect_action_items',null)">
+                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'prospect_action_items',null)">
                         ${ai.status==='complete'?'✓':''}
                       </div>
                       <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
@@ -1517,7 +1535,7 @@ async function loadMeetingDetail(meetId) {
               background:${done?'var(--green)':'transparent'};
               border-color:${done?'var(--green)':'var(--border2)'};
               font-size:9px;color:#fff"
-              onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this,'meeting_action_items','${meetId}')">${done?'✓':''}</div>
+              onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'meeting_action_items','${meetId}')">${done?'✓':''}</div>
             <div style="flex:1;min-width:0;cursor:pointer"
               onclick="event.stopPropagation();openEditActionItemFromRow(this.closest('[data-ai-id]'),'${meetId}')">
               <div style="font-size:12px;color:${done?'var(--muted)':'var(--text)'};
@@ -1823,17 +1841,22 @@ function showAttachments(aiId) {
         border-bottom:1px solid rgba(255,255,255,.08)">
         <span style="font-size:16px">${fileIcon(f.type)}</span>
         <div style="flex:1;min-width:0">
-          <a href="${f.url}" target="_blank" download="${escHtml(f.name)}"
-            style="color:#4f8ef7;text-decoration:none;font-size:12px;
-              display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-            onclick="event.stopPropagation()">
-            ${escHtml(f.name)}
-          </a>
-          <div style="font-size:10px;color:#7a8099">${(f.size/1024).toFixed(0)} KB</div>
+          ${f.url
+            ? `<a href="${f.url}" target="_blank" download="${escHtml(f.name)}"
+                style="color:#4f8ef7;text-decoration:none;font-size:12px;
+                  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                onclick="event.stopPropagation()">${escHtml(f.name)}</a>`
+            : `<span style="color:#e8eaf0;font-size:12px;overflow:hidden;
+                text-overflow:ellipsis;white-space:nowrap">${escHtml(f.name)}</span>`}
+          <div style="font-size:10px;color:#7a8099">
+            ${f.size > 0 ? (f.size/1024).toFixed(0) + ' KB' : 'Re-upload to access'}
+          </div>
         </div>
-        <a href="${f.url}" target="_blank" download="${escHtml(f.name)}"
-          style="color:#7a8099;text-decoration:none;font-size:12px;white-space:nowrap"
-          onclick="event.stopPropagation()">⬇ Download</a>
+        ${f.url
+          ? `<a href="${f.url}" target="_blank" download="${escHtml(f.name)}"
+              style="color:#7a8099;text-decoration:none;font-size:12px;white-space:nowrap"
+              onclick="event.stopPropagation()">⬇ Download</a>`
+          : `<span style="color:#7a8099;font-size:10px;white-space:nowrap">No file — metadata only</span>`}
       </div>`).join('')}
     <div style="margin-top:10px;font-size:10px;color:#7a8099">
       Files are stored for this browser session. 
@@ -1905,6 +1928,30 @@ async function saveEditActionItem() {
       finalPayload = payload;
     }
     await API.patch(`${patchTable}?id=eq.${id}`, finalPayload);
+
+    // Persist attachment metadata as a tagged activity note for cross-session recall
+    if (_attachedFiles.length > 0) {
+      const names = _attachedFiles.map(f => f.name).join('|');
+      const tag   = `[ai-attach:${id}]`;
+      // Check if an attach note already exists for this AI and update it
+      try {
+        const existing = await API.get(
+          `prospect_activities?prospect_id=eq.${PROSPECT_ID}&type=eq.note&summary=like.*${encodeURIComponent(tag)}*&limit=1`
+        );
+        if (existing?.length) {
+          await API.patch(`prospect_activities?id=eq.${existing[0].id}`, {
+            summary: names + ' ' + tag,
+          });
+        } else if (names) {
+          await API.post('prospect_activities', {
+            prospect_id: PROSPECT_ID,
+            type:        'note',
+            date:        new Date().toISOString(),
+            summary:     names + ' ' + tag,
+          });
+        }
+      } catch(e) { /* attachment metadata persistence is non-fatal */ }
+    }
     closeDrawer('ai-edit-overlay');
     const returnMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     await loadAll();
