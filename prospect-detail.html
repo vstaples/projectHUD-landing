@@ -2180,13 +2180,14 @@ async function postReply(meetId, parentIdx) {
     : ' [meeting:' + meetId + ']';
 
   try {
-    await API.post('prospect_activities', {
+    const payload = {
       prospect_id: PROSPECT_ID,
       type:        'note',
       date:        new Date().toISOString(),
       summary:     text + tag,
-      created_by:  resourceId,
-    });
+    };
+    if (resourceId) payload.created_by = resourceId;
+    await API.post('prospect_activities', payload);
 
     if (!_replyCache[meetId]) _replyCache[meetId] = [];
     _replyCache[meetId].push({
