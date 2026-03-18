@@ -1303,7 +1303,12 @@ function renderActions() {
                 const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
                 return `
                 <tr style="border-bottom:1px solid var(--border);cursor:pointer"
-                  onclick="event.stopPropagation();openEditActionItem('${ai.id}','${escHtml(ai.description)}','${ai.assigned_to||''}','${ai.due_date||''}','${ai.status||'open'}')">
+                  data-ai-id="${ai.id}"
+                  data-ai-desc="${escHtml(ai.description)}"
+                  data-ai-assigned="${ai.assigned_to||''}"
+                  data-ai-due="${ai.due_date||''}"
+                  data-ai-status="${ai.status||'open'}"
+                  onclick="event.stopPropagation();openEditActionItemFromRow(this)">
                   <td style="padding:10px 12px">
                     <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
                   </td>
@@ -1350,8 +1355,8 @@ function renderMeetings() {
       <button class="btn btn-primary" onclick="openMeetingDrawer()">+ Schedule meeting</button>
     </div>
     ${meetings.map(m => `
-      <div class="meet-card" id="mcard-${m.id}" onclick="toggleMeetingCard('${m.id}')">
-        <div class="meet-head">
+      <div class="meet-card" id="mcard-${m.id}">
+        <div class="meet-head" onclick="toggleMeetingCard('${m.id}')" style="cursor:pointer">
           <div style="flex:1">
             <div class="meet-title-text" style="display:flex;align-items:center;gap:4px">
               ${escHtml(m.title)}
@@ -1366,7 +1371,7 @@ function renderMeetings() {
             ${capitalize(m.status||'')}
           </span>
         </div>
-        <div class="meet-expand" id="mexpand-${m.id}">
+        <div class="meet-expand" id="mexpand-${m.id}" onclick="event.stopPropagation()">
 
           <div class="mb-label">Attendees</div>
           <div id="mattendees-${m.id}" style="margin-bottom:12px">
@@ -1653,6 +1658,16 @@ async function saveActionItem() {
 
 // ── action item edit ───────────────────────────────────
 let _attachedFiles = [];
+
+function openEditActionItemFromRow(row) {
+  openEditActionItem(
+    row.dataset.aiId,
+    row.dataset.aiDesc,
+    row.dataset.aiAssigned,
+    row.dataset.aiDue,
+    row.dataset.aiStatus
+  );
+}
 
 function openEditActionItem(id, desc, assignedTo, dueDate, status) {
   document.getElementById('ai-edit-id').value   = id;
