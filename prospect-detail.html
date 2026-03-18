@@ -966,6 +966,8 @@ let prospect = null;
 let activities = [], findings = [], actionItems = [], meetings = [], stakeholders = [];
 let resources = [], contacts = [];
 let _currentResource = null;  // resolved after loadAll
+let meetingActionItems = [];  // meeting_action_items across all meetings
+let allActionItems = [];      // combined prospect + meeting action items
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -973,6 +975,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.Sidebar) Sidebar.init('pipeline');
   bindTabs();
   await loadAll();
+  // Honour ?tab= param — e.g. returning from meeting-minutes.html
+  const initialTab = new URLSearchParams(location.search).get('tab');
+  if (initialTab) switchTab(initialTab);
 });
 
 async function loadAll() {
@@ -995,6 +1000,23 @@ async function loadAll() {
     stakeholders= shs   || [];
     resources   = ress  || [];
     contacts    = stakeholders.map(s => s.contacts).filter(Boolean);
+
+    // Load meeting_action_items across all meetings for this prospect
+    meetingActionItems = [];
+    if (meetings.length) {
+      const meetIds = meetings.map(m => m.id).join(',');
+      try {
+        const mais = await API.get(
+          `meeting_action_items?meeting_id=in.(${meetIds})&order=due_date&select=*`
+        );
+        meetingActionItems = mais || [];
+      } catch(e) { /* non-fatal */ }
+    }
+    // Tag each meeting action item so toggle knows which table to use
+    meetingActionItems.forEach(ai => { ai._table = 'meeting_action_items'; });
+    actionItems.forEach(ai => { ai._table = 'prospect_action_items'; });
+    // Combined list for overview — meeting AIs first since they're the primary deliverables
+    allActionItems = [...meetingActionItems, ...actionItems];
 
     // Resolve current user to a resource record for reply attribution
     if (!_currentResource) {
@@ -1068,12 +1090,13 @@ async function loadAll() {
     // badge counts
     document.getElementById('tbadge-activity').textContent = activities.length;
     document.getElementById('tbadge-sh').textContent       = stakeholders.length;
-    document.getElementById('tbadge-ai').textContent       = actionItems.filter(a => a.status === 'open').length;
+    document.getElementById('tbadge-ai').textContent       = allActionItems.filter(a => a.status === 'open').length;
     document.getElementById('tbadge-meet').textContent     = meetings.length;
 
-    // Turn meetings badge red if any action item is overdue
+    // Turn meetings badge red if any action item (prospect OR meeting) is overdue
     const today = new Date().toLocaleDateString('en-CA');
-    const hasOverdue = actionItems.some(a =>
+    // Use allActionItems (already includes both tables) for overdue check
+    const hasOverdue = allActionItems.some(a =>
       a.status !== 'complete' && a.due_date && a.due_date < today
     );
     const meetBadge = document.getElementById('tbadge-meet');
@@ -1153,7 +1176,7 @@ function renderHeader() {
 function renderOverview() {
   const p   = prospect;
   const today = new Date().toLocaleDateString('en-CA');
-  const openAI = actionItems.filter(a => a.status === 'open').slice(0, 3);
+  const openAI = allActionItems.filter(a => a.status === 'open').slice(0, 3);
   const nextMeet = meetings.find(m => m.status === 'scheduled');
 
   document.getElementById('panel-overview').innerHTML = `
@@ -1181,16 +1204,19 @@ function renderOverview() {
           ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
           : openAI.map(ai => `
             <div class="ai-row">
-              <div class="ai-check" onclick="event.stopPropagation();toggleAI('${ai.id}',this)"></div>
-              <div class="ai-text" style="font-size:12px">${escHtml(ai.description)}</div>
-              <div class="ai-due ${ai.due_date && ai.due_date < today ? 'overdue' : ''}">
+              <div class="ai-check ${ai.status==='complete'?'done':''}"
+                onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',ai.status||'open',this,'${ai._table||'prospect_action_items'}',ai.meeting_id||null)">
+                ${ai.status==='complete'?'✓':''}
+              </div>
+              <div class="ai-text" style="font-size:12px">${escHtml((ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim())}</div>
+              <div class="ai-due ${ai.due_date && ai.due_date < today && ai.status !== 'complete' ? 'overdue' : ''}">
                 ${ai.due_date ? fmtDate(ai.due_date) : ''}
               </div>
             </div>`).join('')}
-        ${actionItems.filter(a=>a.status==='open').length > 3
+        ${allActionItems.filter(a=>a.status==='open').length > 3
           ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px"
-              onclick="switchTab('actions')">
-              +${actionItems.filter(a=>a.status==='open').length - 3} more →</div>`
+              onclick="switchTab('meetings')">
+              +${allActionItems.filter(a=>a.status==='open').length - 3} more →</div>`
           : ''}
       </div>
       <div class="card">
