@@ -857,6 +857,58 @@ body {
   </div>
 </div>
 
+<!-- EDIT STAKEHOLDER DRAWER -->
+<div class="overlay" id="sh-edit-overlay" onclick="handleOverlay(event,'sh-edit-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">EDIT STAKEHOLDER</span>
+      <button class="drawer-close" onclick="closeDrawer('sh-edit-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="sh-edit-id" />
+      <div class="field">
+        <label>NAME</label>
+        <input type="text" id="sh-edit-name" disabled
+          style="opacity:.6;cursor:not-allowed" />
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">
+          Name is managed on the contact record
+        </div>
+      </div>
+      <div class="field">
+        <label>ROLE</label>
+        <select id="sh-edit-role">
+          <option value="decision_maker">Decision maker</option>
+          <option value="technical_authority">Technical authority</option>
+          <option value="budget_holder">Budget holder</option>
+          <option value="champion">Champion</option>
+          <option value="technical">Technical</option>
+          <option value="blocker">Blocker</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>INFLUENCE <span id="sh-influence-val" style="color:var(--accent);font-weight:700">5</span> / 10</label>
+        <input type="range" id="sh-edit-influence" min="1" max="10" value="5"
+          style="width:100%;accent-color:var(--accent)"
+          oninput="document.getElementById('sh-influence-val').textContent=this.value" />
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
+          <span>Low</span><span>High</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>NOTES</label>
+        <textarea id="sh-edit-notes" rows="4"
+          placeholder="Key intelligence about this stakeholder…"></textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveStakeholder()">Save changes</button>
+      <button class="btn" style="color:#f07a7a;border-color:rgba(192,64,74,.3)"
+        onclick="removeStakeholder()">Remove</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer('sh-edit-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- BRIEF EDITOR DRAWER -->
 <div class="overlay" id="brief-overlay" onclick="handleOverlay(event,'brief-overlay')">
   <div class="drawer" onclick="event.stopPropagation()">
@@ -1367,10 +1419,16 @@ function renderStakeholders() {
       <div class="sh-card">
         <div class="sh-head">
           <div class="sh-av" style="background:${hue}22;color:${hue}">${initials}</div>
-          <div>
+          <div style="flex:1;min-width:0">
             <div class="sh-name">${escHtml(c.first_name + ' ' + c.last_name)}</div>
             <div class="sh-role">${escHtml(c.title || '')}${c.email ? ' · ' + c.email : ''}</div>
           </div>
+          <button class="btn" style="font-size:10px;padding:3px 8px;height:auto;flex-shrink:0"
+            onclick="openEditStakeholder('${link.id}','${escHtml(c.first_name + ' ' + c.last_name)}',
+              '${link.stakeholder_role||''}','${link.influence_score||5}',
+              '${escHtml(link.notes||'')}')">
+            ✎
+          </button>
         </div>
         ${roleTag ? `<div class="sh-tags">${roleTag}</div>` : ''}
         ${link.notes ? `<div class="sh-note">${escHtml(link.notes)}</div>` : ''}
@@ -1910,6 +1968,51 @@ async function saveActionItem() {
 // ── action item edit ───────────────────────────────────
 let _attachedFiles = [];       // files staged in current edit session
 const _aiAttachments = {};    // { [aiId]: [{name, size, url, type}] } — persists across drawer opens
+
+function openEditStakeholder(linkId, name, role, influence, notes) {
+  document.getElementById('sh-edit-id').value          = linkId;
+  document.getElementById('sh-edit-name').value        = name;
+  document.getElementById('sh-edit-role').value        = role || 'technical';
+  document.getElementById('sh-edit-influence').value   = influence || 5;
+  document.getElementById('sh-influence-val').textContent = influence || 5;
+  document.getElementById('sh-edit-notes').value       = notes || '';
+  document.getElementById('sh-edit-overlay').classList.add('open');
+}
+
+async function saveStakeholder() {
+  const id        = document.getElementById('sh-edit-id').value;
+  const role      = document.getElementById('sh-edit-role').value;
+  const influence = parseInt(document.getElementById('sh-edit-influence').value);
+  const notes     = document.getElementById('sh-edit-notes').value.trim();
+  try {
+    await API.patch(`prospect_contact_links?id=eq.${id}`, {
+      stakeholder_role: role,
+      influence_score:  influence,
+      notes:            notes || null,
+    });
+    closeDrawer('sh-edit-overlay');
+    await loadAll();
+    switchTab('stakeholders');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save stakeholder.');
+  }
+}
+
+async function removeStakeholder() {
+  const id = document.getElementById('sh-edit-id').value;
+  const name = document.getElementById('sh-edit-name').value;
+  if (!confirm(`Remove ${name} from this prospect's stakeholders?`)) return;
+  try {
+    await API.del(`prospect_contact_links?id=eq.${id}`);
+    closeDrawer('sh-edit-overlay');
+    await loadAll();
+    switchTab('stakeholders');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to remove stakeholder.');
+  }
+}
 
 function openBriefEditor() {
   document.getElementById('brief-desc').value       = prospect?.description    || '';
