@@ -1006,7 +1006,7 @@ function renderResources() {
         <div class="res-row">
           <div class="res-avatar" onclick="triggerAvatarUpload('${r.id}')" title="${r.avatar_url ? 'Change photo' : 'Upload photo'}">
             ${r.avatar_url
-              ? `<img src="${r.avatar_url}" alt="${initials}" />`
+              ? `<img src="${r.avatar_url}?v=${Date.now()}" alt="${initials}" />`
               : initials}
             <div class="res-avatar-overlay">📷</div>
             <input type="file" class="res-avatar-upload" id="av-input-${r.id}"
@@ -1102,7 +1102,7 @@ function openResourceDrawer(id) {
   if (dNamePrev)   dNamePrev.textContent   = firstName + ' ' + lastName;
   if (dTitlePrev)  dTitlePrev.textContent  = titleStr;
   if (r?.avatar_url && dAvImg) {
-    dAvImg.src = r.avatar_url; dAvImg.style.display = 'block';
+    dAvImg.src = r.avatar_url + '?v=' + Date.now(); dAvImg.style.display = 'block';
     if (dAvInitials) dAvInitials.style.display = 'none';
   } else if (dAvImg) {
     dAvImg.src = ''; dAvImg.style.display = 'none';
@@ -2359,8 +2359,9 @@ async function _doAvatarUpload(file, resourceId) {
     return null;
   }
 
-  const ext     = file.name.split('.').pop().toLowerCase() || 'jpg';
-  const path    = resourceId + '.' + ext;
+  // Always store as .jpg to avoid extension-mismatch duplicates
+  // (uploading foo.png when foo.jpg exists causes 409)
+  const path    = resourceId + '.jpg';
   const token   = await Auth.getFreshToken().catch(() => Auth.getToken());
   const headers = { 'Authorization': 'Bearer ' + token, 'apikey': PHUD.SUPABASE_KEY };
 
@@ -2369,16 +2370,31 @@ async function _doAvatarUpload(file, resourceId) {
   if (cardAv) { cardAv.style.opacity = '0.5'; }
 
   try {
-    // Delete any existing avatar first (upsert via delete + upload)
-    await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + path, {
-      method: 'DELETE', headers
-    }).catch(() => {});
+    // Convert file to JPEG blob via canvas (normalises format + extension)
+    const jpegBlob = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        // Limit to 400x400 max — avatar display doesn't need more
+        const MAX = 400;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else        { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(resolve, 'image/jpeg', 0.88);
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
 
-    // Upload new file
+    // Use x-upsert: true — single PUT replaces existing file, no 409 possible
     const uploadRes = await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + path, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': file.type },
-      body: file,
+      method:  'POST',
+      headers: { ...headers, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+      body:    jpegBlob,
     });
 
     if (!uploadRes.ok) {
@@ -2386,18 +2402,19 @@ async function _doAvatarUpload(file, resourceId) {
       throw new Error('Upload failed: ' + err);
     }
 
-    // Build public URL
-    const publicUrl = PHUD.SUPABASE_URL + '/storage/v1/object/public/' + AVATARS_BUCKET + '/' + path
-      + '?t=' + Date.now(); // cache-bust
+    // Build permanent public URL — no token, no expiry, no cache-bust needed
+    // Strip any previous ?t= param so the stored URL stays clean
+    const publicUrl = PHUD.SUPABASE_URL + '/storage/v1/object/public/' + AVATARS_BUCKET + '/' + path;
 
     // Save URL to resources table
-    await API.patch('resources?id=eq.' + resourceId, { avatar_url: publicUrl });
+    const patchRes = await API.patch('resources?id=eq.' + resourceId, { avatar_url: publicUrl });
+    console.log('[Avatar] patch result:', patchRes);
 
-    // Update local state
+    // Update local state immediately
     const res = UM.resources.find(r => r.id === resourceId);
     if (res) res.avatar_url = publicUrl;
 
-    // Re-render cards to show new photo
+    // Re-render cards — add cache-bust on img src only (not stored URL)
     renderResources();
     return publicUrl;
 
