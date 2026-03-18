@@ -1469,11 +1469,11 @@ function renderTasksTable() {
       const taskN  = phaseTasks.indexOf(t) + 1;
       const taskId = phaseN ? phaseN + '.' + taskN : taskN;
       html += `<tr data-task-id="${t.id}">
-        <td style="padding:0 4px;font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;min-width:28px;user-select:none;">
+        <td style="padding:0 4px;font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap;min-width:28px;">
           ${planEdit || document.getElementById('btn-link-tasks')?.dataset.linking === '1'
             ? `<input type="checkbox" class="task-link-check" data-type="task" data-id="${t.id}" data-label="${taskId}"
                 style="cursor:pointer;accent-color:var(--cyan);" onchange="onLinkCheckChange()" />`
-            : `<span class="drag-handle" title="Hold to drag · Ctrl+hold to clone" style="opacity:0;margin-right:4px;font-size:12px;cursor:grab;color:var(--text3);transition:opacity .15s;vertical-align:middle;">⠿</span>${taskId}`}
+            : `<span class="drag-handle" title="Hold to drag · Ctrl+hold to clone" style="opacity:0;margin-right:3px;font-size:11px;cursor:grab;color:var(--text3);transition:opacity .15s;vertical-align:middle;user-select:none;">⠿</span>${taskId}`}
         </td>
         <td><div class="cp-flag"></div></td>
         ${(() => {
@@ -4364,15 +4364,23 @@ function _p2PatchFunctions() {
   }
 
   // Find which task row is at clientY, returns {row, before:bool}
-  function rowAtY(clientY) {
-    const rows = [...document.querySelectorAll('#tasks-tbody tr[data-task-id]')]
+  function rowAtY(clientY, dragPhase) {
+    const allRows = [...document.querySelectorAll('#tasks-tbody tr[data-task-id]')]
       .filter(r => { const rc = r.getBoundingClientRect(); return rc.height > 0; });
+    // Constrain to same-phase rows when a dragPhase is known
+    const rows = dragPhase
+      ? allRows.filter(r => {
+          const t = STATE.tasks.find(x => x.id === r.dataset.taskId);
+          return t && t.phase === dragPhase;
+        })
+      : allRows;
+    if (!rows.length) return null;
     for (const r of rows) {
       const rect = r.getBoundingClientRect();
       if (clientY < rect.top + rect.height / 2) return { row: r, before: true };
     }
-    const last = rows[rows.length - 1];
-    return last ? { row: last, before: false } : null;
+    // Below all same-phase rows → drop after the last one in this phase
+    return { row: rows[rows.length - 1], before: false };
   }
 
   function startDrag(row, clientY, isClone) {
@@ -4440,7 +4448,8 @@ function _p2PatchFunctions() {
 
   async function finishDrag(clientY) {
     if (!_dragging) { cancelDrag(); return; }
-    const target    = rowAtY(clientY);
+    const dragTask0 = STATE.tasks.find(t => t.id === _dragTaskId);
+    const target    = rowAtY(clientY, dragTask0?.phase);
     const taskId    = _dragTaskId;
     const isClone   = _dragIsClone;
     cancelDrag();
@@ -4470,12 +4479,11 @@ function _p2PatchFunctions() {
     arr.splice(at, 0, drag);
     // Assign new sequence_orders
     arr.forEach((t,i) => { t.sequence_order = (i + 1) * 10; });
-    // Persist to DB first — re-render after so the final DB state is reflected
-    for (const t of arr) {
-      await API.patch('tasks?id=eq.' + t.id, { sequence_order: t.sequence_order })
-        .catch(e => console.warn('[Drag] patch failed:', t.id, e.message));
-    }
-    // Re-render after DB confirms
+    // Persist in parallel — all patches fire simultaneously, ~300ms vs 5s serial
+    await Promise.all(arr.map(t =>
+      API.patch('tasks?id=eq.' + t.id, { sequence_order: t.sequence_order })
+        .catch(e => console.warn('[Drag] patch failed:', t.id, e.message))
+    ));
     renderTasksTable();
     _saveInd.remove();
   }
@@ -4563,7 +4571,7 @@ function _p2PatchFunctions() {
 
   // Cursor style hint
   const s = document.createElement('style');
-  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); } #tasks-tbody tr[data-task-id]:hover .drag-handle { opacity:0.4 !important; } #tasks-tbody tr[data-task-id].dragging .drag-handle { opacity:1 !important; cursor:grabbing; }';
+  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); } #tasks-tbody tr[data-task-id]:hover .drag-handle { opacity:0.5 !important; } #tasks-tbody tr[data-task-id].dragging .drag-handle { opacity:1 !important; }';
   document.head.appendChild(s);
 
   console.log('[DragReorder] ready');
