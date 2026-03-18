@@ -1880,14 +1880,18 @@ async function loadProjectDetail() {
     STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures, deps };
     // Load supplemental resource/role data
     try {
-      const [hudRoles, resources, taskAssignments] = await Promise.all([
+      const [hudRoles, resources, taskAssignments, hudSkills, hudSkillCats] = await Promise.all([
         API.get('hud_roles?select=id,name,abbreviation,category_id').catch(()=>[]),
         API.get('resources?select=id,first_name,last_name,title,hud_role_id,level,email').catch(()=>[]),
+        API.get('hud_skills?select=id,name,category_id&is_active=eq.true').catch(()=>[]),
+        API.get('hud_skill_categories?select=id,name').catch(()=>[]),
         API.get(`task_resource_assignments?select=*&task_id=in.(${(tasks||[]).map(t=>t.id).join(',')})`.replace('in.()', 'in.(00000000-0000-0000-0000-000000000000)')).catch(()=>[]),
       ]);
       STATE.hudRoles        = hudRoles||[];
       STATE.resources       = resources||[];
       STATE.taskAssignments = taskAssignments||[];
+      STATE.hudSkills       = hudSkills||[];
+      STATE.hudSkillCats    = hudSkillCats||[];
     } catch(e) { STATE.hudRoles=[]; STATE.resources=[]; STATE.taskAssignments=[]; }
     // Store for back-navigation from other pages
     sessionStorage.setItem('lastProjectId', PROJECT_ID);
@@ -2542,8 +2546,7 @@ function openEditTaskPanel(taskId) {
   document.getElementById('tf-status').value      = t.status || 'not_started';
   document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
   document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
-  // Use saved duration_days as source of truth
-  // Only recalculate from dates if duration_days is not set
+  // Use saved duration_days as source of truth; only recalc if not set
   if (t.duration_days) {
     document.getElementById('tf-duration').value = t.duration_days;
   } else if (t.start_date && t.due_date) {
@@ -2599,12 +2602,9 @@ async function saveTaskForm() {
     due_date:     (() => {
       const dueVal = document.getElementById('tf-due').value;
       if (dueVal) return dueVal;
-      // Auto-derive due from start + duration if not set
       const startVal = document.getElementById('tf-start').value;
       const dur = parseFloat(document.getElementById('tf-duration').value);
-      if (startVal && dur > 0) {
-        return _toInputDate(_addBusinessDays(new Date(startVal + 'T00:00:00'), dur));
-      }
+      if (startVal && dur > 0) return _toInputDate(_addBusinessDays(new Date(startVal + 'T00:00:00'), dur));
       return null;
     })(),
     duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
@@ -2650,8 +2650,8 @@ async function saveTaskForm() {
         const _p2Skills = window._tfTaskSkills||[];
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
           await API.post('task_skill_requirements', {
-            task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id
-          });
+            task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
+            }).catch(function(e){ console.warn('skill req save:',e); });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
@@ -2736,12 +2736,21 @@ async function deleteTask(taskId) {
   _closeSlidePanel('confirm-panel');
   try {
     const _delTask = STATE.tasks.find(t => t.id === taskId);
+    // Delete dependent records first
+    await API.del(`task_skill_requirements?task_id=eq.${taskId}`).catch(()=>{});
+    await API.del(`task_resource_assignments?task_id=eq.${taskId}`).catch(()=>{});
+    await API.del(`task_dependencies?successor_task_id=eq.${taskId}`).catch(()=>{});
+    await API.del(`task_dependencies?predecessor_task_id=eq.${taskId}`).catch(()=>{});
     await API.del(`tasks?id=eq.${taskId}`);
     STATE.tasks = STATE.tasks.filter(t => t.id !== taskId);
+    STATE.taskAssignments = (STATE.taskAssignments||[]).filter(a => a.task_id !== taskId);
     if (_delTask) _writeAudit('deleted', 'tasks', taskId, { name: _delTask.name, phase: _delTask.phase }, null);
     renderTasksTable();
     renderHeader();
-  } catch(err) { alert('Delete failed: ' + (err.message||err)); }
+  } catch(err) {
+    console.error('Delete failed:', err);
+    alert('Delete failed: ' + (err.message||err));
+  }
 }
 
 function confirmDeletePhase(phaseLabel, phaseKey) {
@@ -2893,11 +2902,23 @@ const _origOpenEditTask = openEditTaskPanel;
 openEditTaskPanel = async function(taskId) {
   _origOpenEditTask(taskId);
   window._editingTaskId2 = taskId;
-  // Load existing assignments
-  const existing = (STATE.taskAssignments||[]).filter(a => a.task_id === taskId);
-  window._tfAssignments = existing.map(a => ({...a}));
+  // Load fresh assignments from DB (STATE.taskAssignments may be stale for new tasks)
+  try {
+    const fresh = await API.get(
+      'task_resource_assignments?select=*&task_id=eq.' + taskId
+    ).catch(() => []);
+    window._tfAssignments = (fresh || []).map(a => ({...a}));
+    // Also update STATE cache
+    STATE.taskAssignments = [
+      ...(STATE.taskAssignments||[]).filter(a => a.task_id !== taskId),
+      ...(fresh||[])
+    ];
+  } catch(e) {
+    // Fallback to STATE cache
+    const existing = (STATE.taskAssignments||[]).filter(a => a.task_id === taskId);
+    window._tfAssignments = existing.map(a => ({...a}));
+  }
   _renderAssignmentRows(window._tfAssignments);
-  // Role is now per-row in _tfAssignments — no task-level role dropdown
 };
 
 // ── PATCH saveTaskForm to save role + assignments ──────────────
@@ -2987,7 +3008,6 @@ function _nextWeekday(date) {
 }
 
 function _toInputDate(d) {
-  // Use local date components to avoid UTC timezone shift
   const yr  = d.getFullYear();
   const mo  = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -4015,8 +4035,9 @@ async function submitJournalEntry(taskId) {
 
 
 
+
+
 <script>
-// ── PHASE 2 (guarded — runs once only)
 if (!window._phase2Installed) { window._phase2Installed = true;
 // ── PHASE 2: Complexity + Skills + Role-Filtered Resources ───
 document.addEventListener('DOMContentLoaded', function() {
@@ -4026,7 +4047,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ── INJECT FORM SECTIONS ─────────────────────────────────────
 function _p2InjectForm() {
-  if (document.getElementById('tf-complexity-section')) return; // already injected
+  if (document.getElementById('tf-complexity-section')) return;
   var body = document.getElementById('task-form-panel');
   if (!body) return;
   body = body.querySelector('.journal-panel-body');
@@ -4227,15 +4248,31 @@ function _p2PatchFunctions() {
   // CRITICAL: uses the global `_editingTaskId` (not window._editingTaskId)
   var _origSave = window.saveTaskForm;
   window.saveTaskForm = async function() {
-    // Capture task ID BEFORE _origSave clears _editingTaskId via closeTaskFormPanel
-    var taskId = _editingTaskId;
     await _origSave();
-    // For new tasks, _editingTaskId is null — use last task added to STATE
-    if (!taskId) taskId = STATE.tasks && STATE.tasks.length && STATE.tasks[STATE.tasks.length-1].id;
+    // Resolve correct task ID — edit uses global _editingTaskId, add uses last task
+    var taskId = _editingTaskId || (STATE.tasks && STATE.tasks.length && STATE.tasks[STATE.tasks.length-1].id);
     if (!taskId) { console.warn('Phase2: no taskId after save'); return; }
     try {
-      // Complexity + skills saved by inline code in saveTaskForm
-
+      // Save complexity rating
+      if (window._tfComplexity) {
+        var cpx = {
+          complexity_rating:      window._tfComplexity,
+          complexity_ai_inferred: window._tfComplexityAI||false,
+          complexity_reasoning:   window._tfComplexityReasoning||null
+        };
+        await API.patch('tasks?id=eq.' + taskId, cpx).catch(function(e){ console.warn('cpx save:',e); });
+        var t = STATE.tasks && STATE.tasks.find(function(x){ return x.id===taskId; });
+        if (t) Object.assign(t, cpx);
+      }
+      // Save skill requirements — wipe + re-insert
+      await API.del('task_skill_requirements?task_id=eq.' + taskId).catch(function(){});
+      for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
+        var s = window._tfTaskSkills[i];
+        await API.post('task_skill_requirements', {
+          task_id:taskId, skill_id:s.skill_id,
+          is_required:true, proficiency_needed:'practitioner'
+        }).catch(function(e){ console.warn('skill req save:',e); });
+      }
     } catch(e) { console.warn('Phase2 save err:',e); }
     if (typeof renderTasksTable==='function') renderTasksTable();
   };
