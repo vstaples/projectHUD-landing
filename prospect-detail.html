@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prospect — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── back bar ─────────────────────────────────────────── */
+.backbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.backbar a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color .15s;
+}
+.backbar a:hover { color: var(--text); }
+.backbar span { color: var(--muted); }
+
+/* ── prospect header ──────────────────────────────────── */
+.prospect-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px 0;
+  flex-shrink: 0;
+}
+
+.ph-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ph-left { display: flex; align-items: center; gap: 12px; }
+
+.co-badge {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.ph-name { font-size: 17px; font-weight: 700; }
+.ph-co   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.ph-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: background .15s, opacity .15s;
+  border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+}
+.btn:hover { background: var(--surf3); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.btn-green  { background: var(--green);  border-color: var(--green);  color: #fff; }
+
+/* meta strip */
+.ph-meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.meta-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+}
+.meta-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex; align-items: center; gap: 6px;
+}
+
+.stage-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer;
+}
+
+.suggest-badge {
+  font-size: 10px;
+  padding: 2px 7px; border-radius: 8px;
+  background: rgba(212,144,31,.2);
+  color: var(--amber);
+  border: 1px solid rgba(212,144,31,.3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pri-badge {
+  padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+
+.av-sm {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surf3); display: flex;
+  align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: var(--accent);
+}
+
+/* tabs */
+.ph-tabs {
+  display: flex;
+  gap: 2px;
+}
+.tab {
+  padding: 8px 14px;
+  font-size: 12px; font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge {
+  font-size: 10px; padding: 1px 5px; border-radius: 8px;
+  background: rgba(255,255,255,.08); color: var(--muted);
+}
+
+/* ── tab panels ───────────────────────────────────────── */
+.panels {
+  flex: 1; overflow-y: auto;
+  padding: 16px 20px;
+}
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── cards ────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 10px;
+}
+
+/* overview grid */
+.ov-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 700px) { .ov-grid { grid-template-columns: 1fr; } }
+
+.signal-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.signal-row:last-child { border-bottom: none; }
+.signal-lbl { color: var(--muted); }
+.sv-amber { color: var(--amber); font-weight: 600; }
+.sv-green { color: #7af0a0; font-weight: 600; }
+.sv-red   { color: #f07a7a; font-weight: 600; }
+
+.next-meet {
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.meet-date-box {
+  background: rgba(79,142,247,.12);
+  border: 1px solid rgba(79,142,247,.25);
+  border-radius: 8px;
+  padding: 8px 12px; text-align: center; flex-shrink: 0;
+}
+.meet-day { font-size: 22px; font-weight: 700; color: var(--accent); }
+.meet-mon { font-size: 10px; text-transform: uppercase; color: var(--accent); letter-spacing: .05em; }
+.meet-info { flex: 1; }
+.meet-title { font-size: 13px; font-weight: 600; }
+.meet-sub   { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+/* action items */
+.ai-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.ai-row:last-child { border-bottom: none; }
+.ai-check {
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 1px solid var(--border2);
+  flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.ai-check.done { background: var(--green); border-color: var(--green); color: #fff; font-size: 9px; }
+.ai-text { flex: 1; }
+.ai-due  { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.ai-due.overdue { color: #f07a7a; }
+
+/* ── activity log ─────────────────────────────────────── */
+.activity-entry {
+  display: flex; gap: 12px;
+  margin-bottom: 14px;
+}
+.act-icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; margin-top: 2px;
+}
+.ai-call  { background: rgba(42,157,122,.15); color: #7af0c0; }
+.ai-note  { background: rgba(79,142,247,.15); color: var(--accent); }
+.ai-stage { background: rgba(212,144,31,.15);  color: var(--amber); }
+
+.act-body {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.act-head {
+  display: flex; justify-content: space-between;
+  align-items: baseline; margin-bottom: 6px;
+}
+.act-type { font-size: 12px; font-weight: 600; }
+.act-meta { font-size: 10px; color: var(--muted); }
+.act-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+.finding-chips {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.fchip {
+  font-size: 10px; padding: 2px 8px; border-radius: 5px;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+}
+.fchip.flag     { background: rgba(212,144,31,.12); color: var(--amber); border-color: rgba(212,144,31,.25); }
+.fchip.positive { background: rgba(42,157,64,.12);  color: #7af0a0;      border-color: rgba(42,157,64,.25); }
+
+.act-link { font-size: 11px; color: var(--accent); cursor: pointer; margin-top: 6px; display: inline-block; }
+
+/* ── findings ─────────────────────────────────────────── */
+.findings-section { margin-bottom: 16px; }
+.fs-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600;
+  margin-bottom: 8px;
+}
+.fs-dot { width: 8px; height: 8px; border-radius: 50%; }
+.findings-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.findings-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.findings-table tr:last-child td { border-bottom: none; }
+.fd-label { color: var(--muted); font-weight: 600; width: 36%; }
+.fd-val   { color: var(--text); }
+.fd-flag  { color: #f07a7a; }
+
+/* ── stakeholders ─────────────────────────────────────── */
+.sh-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 600px) { .sh-grid { grid-template-columns: 1fr; } }
+
+.sh-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.sh-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sh-av {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.sh-name { font-size: 13px; font-weight: 600; }
+.sh-role { font-size: 11px; color: var(--muted); }
+.sh-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 7px; }
+.sh-tag  { font-size: 10px; padding: 2px 7px; border-radius: 5px; }
+.tag-dm   { background: rgba(42,157,64,.15);  color: #7af0a0; }
+.tag-champ{ background: rgba(79,142,247,.15); color: var(--accent); }
+.tag-tech { background: rgba(130,79,247,.15); color: #c07af0; }
+.tag-bgt  { background: rgba(212,144,31,.15); color: var(--amber); }
+.sh-note  { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.inf-bar-wrap { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.inf-label { font-size: 10px; color: var(--muted); }
+.inf-bar   { height: 3px; background: var(--border); border-radius: 2px; flex: 1; overflow: hidden; }
+.inf-fill  { height: 3px; border-radius: 2px; }
+
+.sh-add {
+  border: 1px dashed var(--border2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--muted); font-size: 12px; gap: 6px;
+}
+.sh-add:hover { background: rgba(255,255,255,.03); }
+
+/* ── meetings tab ─────────────────────────────────────── */
+.meet-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.meet-head {
+  display: flex; justify-content: space-between;
+  align-items: flex-start; margin-bottom: 8px;
+}
+.meet-title-text { font-size: 13px; font-weight: 600; }
+.meet-sub-text   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.meet-status {
+  font-size: 10px; padding: 2px 8px; border-radius: 6px;
+}
+.ms-upcoming { background: rgba(79,142,247,.15); color: var(--accent); }
+.ms-done     { background: rgba(255,255,255,.07); color: var(--muted); }
+.attend-row  { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.attend-chip {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 2px 8px; border-radius: 5px;
+  border: 1px solid var(--border); color: var(--muted);
+}
+.adot-us   { width: 6px; height: 6px; border-radius: 50%; background: #7af0c0; }
+.adot-them { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* ── proposal placeholder ─────────────────────────────── */
+.proposal-placeholder {
+  text-align: center;
+  padding: 48px 20px;
+}
+.pp-icon { font-size: 32px; margin-bottom: 12px; }
+.pp-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.pp-sub   { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+
+/* ── log activity slide-in ────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5); z-index: 100;
+  display: none; align-items: flex-start; justify-content: flex-end;
+}
+.overlay.open { display: flex; }
+.drawer {
+  width: 460px; height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--border2);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.drawer-title { font-size: 14px; font-weight: 600; }
+.drawer-close {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.drawer-close:hover { background: var(--surf2); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 18px; }
+.drawer-foot {
+  padding: 12px 18px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; flex-shrink: 0;
+}
+
+.field { margin-bottom: 12px; }
+.field label {
+  display: block; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: 4px;
+}
+.field input, .field select, .field textarea {
+  width: 100%; padding: 7px 10px;
+  border-radius: 6px; border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  font-size: 12px; font-family: inherit; outline: none;
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--accent);
+}
+.field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.sec-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin: 14px 0 8px;
+  padding-bottom: 5px; border-bottom: 1px solid var(--border);
+}
+
+.type-toggle {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.type-btn {
+  padding: 4px 10px; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  transition: all .15s;
+}
+.type-btn.active {
+  border-color: var(--accent);
+  background: rgba(79,142,247,.15);
+  color: var(--accent);
+}
+
+.chip-add-row { display: flex; gap: 6px; margin-top: 6px; }
+.chip-add-row input {
+  flex: 1; padding: 5px 8px;
+  border-radius: 5px; border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  font-size: 11px; outline: none;
+}
+.chip-add-row select {
+  padding: 5px 6px;
+  border-radius: 5px; border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--muted);
+  font-size: 11px; outline: none;
+}
+.chip-add-btn {
+  padding: 5px 10px; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+}
+.chip-add-btn:hover { color: var(--text); }
+
+.ai-add-row { display: flex; gap: 6px; margin-top: 6px; }
+.ai-add-row input { flex: 1; }
+.ai-add-btn {
+  padding: 5px 10px; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--muted); font-size: 13px; gap: 8px;
+}
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+  <!-- back bar -->
+  <div class="backbar">
+    <a href="/pipeline.html">← Pipeline</a>
+    <span>/</span>
+    <span id="breadcrumb-name">Loading…</span>
+  </div>
+
+  <!-- prospect header -->
+  <div class="prospect-header">
+    <div class="ph-top">
+      <div class="ph-left">
+        <div class="co-badge" id="hdr-badge">—</div>
+        <div>
+          <div class="ph-name" id="hdr-title">Loading…</div>
+          <div class="ph-co"   id="hdr-co"></div>
+        </div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn" onclick="openMeetingDrawer()">+ Schedule meeting</button>
+        <button class="btn" onclick="openActionItemDrawer()">+ Action item</button>
+        <button class="btn btn-primary" onclick="openLogDrawer()">Log activity</button>
+      </div>
+    </div>
+    <div class="ph-meta" id="ph-meta">
+      <!-- populated by JS -->
+    </div>
+    <div class="ph-tabs" id="ph-tabs">
+      <div class="tab active" data-tab="overview">Overview</div>
+      <div class="tab" data-tab="activity">Activity log <span class="tab-badge" id="tbadge-activity">0</span></div>
+      <div class="tab" data-tab="findings">Findings</div>
+      <div class="tab" data-tab="stakeholders">Stakeholders <span class="tab-badge" id="tbadge-sh">0</span></div>
+      <div class="tab" data-tab="actions">Action items <span class="tab-badge" id="tbadge-ai">0</span></div>
+      <div class="tab" data-tab="meetings">Meetings <span class="tab-badge" id="tbadge-meet">0</span></div>
+      <div class="tab" data-tab="proposal" style="color:var(--muted)">Proposal</div>
+    </div>
+  </div>
+
+  <!-- panels -->
+  <div class="panels" id="panels">
+
+    <!-- overview -->
+    <div class="panel active" id="panel-overview">
+      <div class="loading-state"><div class="spinner"></div> Loading…</div>
+    </div>
+
+    <!-- activity -->
+    <div class="panel" id="panel-activity">
+      <div class="loading-state"><div class="spinner"></div> Loading…</div>
+    </div>
+
+    <!-- findings -->
+    <div class="panel" id="panel-findings">
+      <div class="loading-state"><div class="spinner"></div> Loading…</div>
+    </div>
+
+    <!-- stakeholders -->
+    <div class="panel" id="panel-stakeholders">
+      <div class="loading-state"><div class="spinner"></div> Loading…</div>
+    </div>
+
+    <!-- action items -->
+    <div class="panel" id="panel-actions">
+      <div class="loading-state"><div class="spinner"></div> Loading…</div>
+    </div>
+
+    <!-- meetings -->
+    <div class="panel" id="panel-meetings">
+      <div class="loading-state"><div class="spinner"></div> Loading…</div>
+    </div>
+
+    <!-- proposal -->
+    <div class="panel" id="panel-proposal">
+      <div class="proposal-placeholder">
+        <div class="pp-icon">📄</div>
+        <div class="pp-title">No proposal started yet</div>
+        <div class="pp-sub">Proposals are typically started during or after the Discovery stage.<br>
+        The WBS estimator and SOW builder live here once initiated.</div>
+        <button class="btn btn-primary" onclick="startProposal()">Start WBS estimator</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- LOG ACTIVITY DRAWER -->
+<div class="overlay" id="log-overlay" onclick="handleOverlay(event,'log-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">Log activity</span>
+      <button class="drawer-close" onclick="closeDrawer('log-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="sec-label">Type</div>
+      <div class="type-toggle" id="act-type-btns">
+        <button class="type-btn active" data-val="call">Phone call</button>
+        <button class="type-btn" data-val="video_call">Video call</button>
+        <button class="type-btn" data-val="email">Email</button>
+        <button class="type-btn" data-val="in_person">In-person</button>
+        <button class="type-btn" data-val="note">Note</button>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="log-date" />
+        </div>
+        <div class="field">
+          <label>Duration (min)</label>
+          <input type="number" id="log-dur" placeholder="30" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Summary *</label>
+        <textarea id="log-summary" placeholder="What was discussed, what you learned…" rows="4"></textarea>
+      </div>
+
+      <div class="sec-label">Key findings</div>
+      <div id="log-fchips" class="finding-chips" style="margin-bottom:6px"></div>
+      <div class="chip-add-row">
+        <input type="text" id="log-ftext" placeholder="Add a finding…" />
+        <select id="log-ftype">
+          <option value="">Neutral</option>
+          <option value="flag">Flag</option>
+          <option value="positive">Positive</option>
+        </select>
+        <button class="chip-add-btn" onclick="addFinding()">+ Add</button>
+      </div>
+
+      <div class="sec-label">Action items</div>
+      <div id="log-ai-list"></div>
+      <div class="ai-add-row">
+        <input type="text" id="log-aitext" placeholder="Add action item…" class="field input" style="padding:5px 8px;border-radius:5px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:11px;outline:none" />
+        <button class="ai-add-btn" onclick="addLogAI()">+ Add</button>
+      </div>
+
+      <div class="sec-label">Follow-up</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Next follow-up</label>
+          <input type="date" id="log-followup" />
+        </div>
+        <div class="field">
+          <label>Advance stage?</label>
+          <select id="log-stage-advance">
+            <option value="">Keep current stage</option>
+            <option value="qualifying">→ Qualifying</option>
+            <option value="discovery">→ Discovery</option>
+            <option value="proposal">→ Proposal</option>
+            <option value="review">→ Review</option>
+            <option value="approved">→ Approved</option>
+            <option value="declined">→ Declined</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveActivity()">Save activity</button>
+      <button class="btn" onclick="closeDrawer('log-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULE MEETING DRAWER -->
+<div class="overlay" id="meet-overlay" onclick="handleOverlay(event,'meet-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">Schedule meeting</span>
+      <button class="drawer-close" onclick="closeDrawer('meet-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field">
+        <label>Title *</label>
+        <input type="text" id="meet-title" placeholder="e.g. Discovery call — technical deep dive" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Date *</label>
+          <input type="date" id="meet-date" />
+        </div>
+        <div class="field">
+          <label>Time</label>
+          <input type="time" id="meet-time" value="10:00" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Duration (min)</label>
+          <select id="meet-dur">
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60" selected>60 min</option>
+            <option value="90">90 min</option>
+            <option value="120">2 hrs</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Format</label>
+          <select id="meet-format">
+            <option value="video">Video call</option>
+            <option value="phone">Phone</option>
+            <option value="in_person">In-person</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Location / link</label>
+        <input type="text" id="meet-location" placeholder="Zoom URL, address, etc." />
+      </div>
+      <div class="sec-label">Our team</div>
+      <select id="meet-our-team" multiple style="width:100%;height:80px;padding:6px;border-radius:6px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:12px;outline:none"></select>
+      <div class="sec-label">Their team</div>
+      <select id="meet-their-team" multiple style="width:100%;height:80px;padding:6px;border-radius:6px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:12px;outline:none"></select>
+      <div class="sec-label">Agenda items</div>
+      <div id="meet-agenda-list" style="margin-bottom:6px"></div>
+      <div class="ai-add-row">
+        <input type="text" id="meet-agenda-input" placeholder="Add agenda item…" style="flex:1;padding:5px 8px;border-radius:5px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:11px;outline:none" />
+        <button class="ai-add-btn" onclick="addAgendaItem()">+ Add</button>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveMeeting()">Save meeting</button>
+      <button class="btn" onclick="closeDrawer('meet-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const params   = new URLSearchParams(location.search);
+const PROSPECT_ID = params.get('id');
+
+const STAGE_COLORS = {
+  prospect: '#4f6080', qualifying: '#3a7abf', discovery: '#2a9d7a',
+  proposal: '#d4901f', review: '#c0407a', approved: '#2a9d40', declined: '#c0404a'
+};
+
+let prospect = null;
+let activities = [], findings = [], actionItems = [], meetings = [], stakeholders = [];
+let resources = [], contacts = [];
+
+// ── init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!PROSPECT_ID) { location.href = '/pipeline.html'; return; }
+  if (window.Sidebar) Sidebar.init('pipeline');
+  bindTabs();
+  await loadAll();
+});
+
+async function loadAll() {
+  try {
+    const [pro, acts, finds, ais, meets, shs, ress] = await Promise.all([
+      API.get(`prospects?id=eq.${PROSPECT_ID}&select=*,companies(name,industry)`),
+      API.get(`prospect_activities?prospect_id=eq.${PROSPECT_ID}&order=date.desc`),
+      API.get(`prospect_findings?prospect_id=eq.${PROSPECT_ID}&order=created_at.desc`),
+      API.get(`prospect_action_items?prospect_id=eq.${PROSPECT_ID}&order=due_date`),
+      API.get(`v_meetings?prospect_id=eq.${PROSPECT_ID}&order=meeting_date.desc`),
+      API.get(`prospect_contact_links?prospect_id=eq.${PROSPECT_ID}&select=*,contacts(*)`),
+      API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url`),
+    ]);
+
+    prospect    = pro?.[0];
+    activities  = acts  || [];
+    findings    = finds || [];
+    actionItems = ais   || [];
+    meetings    = meets || [];
+    stakeholders= shs   || [];
+    resources   = ress  || [];
+    contacts    = stakeholders.map(s => s.contacts).filter(Boolean);
+
+    if (!prospect) { location.href = '/pipeline.html'; return; }
+
+    renderHeader();
+    renderOverview();
+    renderActivity();
+    renderFindings();
+    renderStakeholders();
+    renderActions();
+    renderMeetings();
+    checkProposalTab();
+    populateMeetingSelects();
+
+    // badge counts
+    document.getElementById('tbadge-activity').textContent = activities.length;
+    document.getElementById('tbadge-sh').textContent       = stakeholders.length;
+    document.getElementById('tbadge-ai').textContent       = actionItems.filter(a => a.status === 'open').length;
+    document.getElementById('tbadge-meet').textContent     = meetings.length;
+
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── header ─────────────────────────────────────────────
+function renderHeader() {
+  const p = prospect;
+  const co = p.companies;
+  const initials = (co?.name || p.title || '').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+  document.getElementById('breadcrumb-name').textContent = p.title;
+  document.getElementById('hdr-badge').textContent       = initials;
+  document.getElementById('hdr-title').textContent       = p.title;
+  document.getElementById('hdr-co').textContent          = (co?.name || '') + (co?.industry ? ' · ' + co.industry : '');
+  document.title = p.title + ' — ProjectHUD';
+
+  const today  = new Date().toLocaleDateString('en-CA');
+  const fu     = p.next_follow_up_date;
+  const fuText = fu ? new Date(fu+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+  const fuColor= fu && fu < today ? '#f07a7a' : fu === today ? '#f0c47a' : 'var(--text)';
+
+  const stageColor = STAGE_COLORS[p.stage] || '#4f6080';
+  const priColor   = p.priority === 'high' ? '#f07a7a' : p.priority === 'medium' ? '#f0c47a' : '#7af0a0';
+
+  document.getElementById('ph-meta').innerHTML = `
+    <div class="meta-item">
+      <span class="meta-lbl">Stage</span>
+      <span class="meta-val">
+        <span class="stage-pill" style="background:${stageColor}22;color:${stageColor};border:1px solid ${stageColor}44"
+          onclick="promptStageChange()">
+          ${capitalize(p.stage)}
+        </span>
+      </span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-lbl">Priority</span>
+      <span class="meta-val">
+        <span class="pri-badge" style="background:${priColor}22;color:${priColor}">${capitalize(p.priority)}</span>
+      </span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-lbl">Assigned</span>
+      <span class="meta-val" id="hdr-assigned">—</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-lbl">Follow-up</span>
+      <span class="meta-val" style="color:${fuColor}">${fuText}</span>
+    </div>
+    ${p.est_value ? `
+    <div class="meta-item">
+      <span class="meta-lbl">Est. value</span>
+      <span class="meta-val">¥${Number(p.est_value).toLocaleString()}</span>
+    </div>` : ''}
+  `;
+
+  // load assigned name
+  if (p.assigned_to) {
+    API.get(`resources?id=eq.${p.assigned_to}&select=first_name,last_name`).then(r => {
+      if (r?.[0]) {
+        document.getElementById('hdr-assigned').textContent =
+          r[0].first_name + ' ' + r[0].last_name;
+      }
+    });
+  }
+}
+
+// ── overview panel ─────────────────────────────────────
+function renderOverview() {
+  const p   = prospect;
+  const today = new Date().toLocaleDateString('en-CA');
+  const openAI = actionItems.filter(a => a.status === 'open').slice(0, 3);
+  const nextMeet = meetings.find(m => m.status === 'scheduled');
+
+  document.getElementById('panel-overview').innerHTML = `
+    <div class="ov-grid">
+      <div class="card">
+        <div class="card-title">Initial brief</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.7">
+          ${escHtml(p.description || 'No description provided.')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Key signals</div>
+        ${renderSignal('Budget', p.budget_range_low || p.budget_range_high
+            ? `¥${Number(p.budget_range_low||0).toLocaleString()} – ¥${Number(p.budget_range_high||0).toLocaleString()}`
+            : 'Unknown', 'amber')}
+        ${renderSignal('Timeline', p.timeline_urgency
+            ? p.timeline_urgency.replace(/_/g,' ') : '—', 'amber')}
+        ${renderSignal('Industry', p.industry_tag || '—', '')}
+        ${renderSignal('Source',   p.source || '—', '')}
+        ${renderSignal('Stage',    capitalize(p.stage), '')}
+      </div>
+      <div class="card">
+        <div class="card-title">Open action items</div>
+        ${openAI.length === 0
+          ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
+          : openAI.map(ai => `
+            <div class="ai-row">
+              <div class="ai-check" onclick="toggleAI('${ai.id}',this)"></div>
+              <div class="ai-text" style="font-size:12px">${escHtml(ai.description)}</div>
+              <div class="ai-due ${ai.due_date && ai.due_date < today ? 'overdue' : ''}">
+                ${ai.due_date ? fmtDate(ai.due_date) : ''}
+              </div>
+            </div>`).join('')}
+        ${actionItems.filter(a=>a.status==='open').length > 3
+          ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px"
+              onclick="switchTab('actions')">
+              +${actionItems.filter(a=>a.status==='open').length - 3} more →</div>`
+          : ''}
+      </div>
+      <div class="card">
+        <div class="card-title">Next meeting</div>
+        ${nextMeet ? `
+          <div class="next-meet">
+            <div class="meet-date-box">
+              <div class="meet-day">${new Date(nextMeet.meeting_date).getDate()}</div>
+              <div class="meet-mon">${new Date(nextMeet.meeting_date).toLocaleString('en',{month:'short'})}</div>
+            </div>
+            <div class="meet-info">
+              <div class="meet-title">${escHtml(nextMeet.title)}</div>
+              <div class="meet-sub">${capitalize(nextMeet.format||'')} · 
+                ${new Date(nextMeet.meeting_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} · 
+                ${nextMeet.duration_minutes} min</div>
+            </div>
+          </div>`
+          : `<div style="font-size:12px;color:var(--muted)">No meetings scheduled.
+              <span style="color:var(--accent);cursor:pointer" onclick="openMeetingDrawer()"> Schedule one →</span>
+            </div>`}
+      </div>
+    </div>`;
+}
+
+function renderSignal(lbl, val, cls) {
+  return `<div class="signal-row">
+    <span class="signal-lbl">${lbl}</span>
+    <span class="${cls ? 'sv-'+cls : ''}" style="font-size:12px;font-weight:600">${escHtml(val)}</span>
+  </div>`;
+}
+
+// ── activity log ───────────────────────────────────────
+function renderActivity() {
+  const panel = document.getElementById('panel-activity');
+  if (activities.length === 0) {
+    panel.innerHTML = `<div class="loading-state" style="height:auto;padding:40px 0">
+      <span style="color:var(--muted)">No activities logged yet.
+        <span style="color:var(--accent);cursor:pointer" onclick="openLogDrawer()"> Log the first one →</span>
+      </span></div>`;
+    return;
+  }
+
+  panel.innerHTML = activities.map(a => `
+    <div class="activity-entry">
+      <div class="act-icon ${actIconClass(a.type)}">${actIcon(a.type)}</div>
+      <div class="act-body">
+        <div class="act-head">
+          <span class="act-type">${formatActType(a.type)}</span>
+          <span class="act-meta">${a.created_by ? '' : ''}${fmtDateTime(a.date)}${a.duration_minutes ? ' · ' + a.duration_minutes + ' min' : ''}</span>
+        </div>
+        <div class="act-text">${escHtml(a.summary || '—')}</div>
+        ${a.findings_summary ? `
+          <div class="finding-chips">
+            ${a.findings_summary.split('|').map(f => `<span class="fchip">${escHtml(f.trim())}</span>`).join('')}
+          </div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ── findings ───────────────────────────────────────────
+function renderFindings() {
+  const panel = document.getElementById('panel-findings');
+  if (findings.length === 0) {
+    panel.innerHTML = `<div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">
+      No findings recorded yet. Log an activity with findings to populate this tab.</div>`;
+    return;
+  }
+
+  const cats = [...new Set(findings.map(f => f.category))];
+  const catColors = { technical:'#2a9d7a', commercial:'#d4901f', stakeholder:'#4f8ef7',
+                      risk:'#c0404a', regulatory:'#9d2a9d', other:'#7a8099' };
+
+  panel.innerHTML = cats.map(cat => `
+    <div class="findings-section">
+      <div class="fs-head">
+        <div class="fs-dot" style="background:${catColors[cat]||'#7a8099'}"></div>
+        ${capitalize(cat)}
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="findings-table">
+          <tbody>
+            ${findings.filter(f=>f.category===cat).map(f => `
+              <tr>
+                <td class="fd-label">${fmtDate(f.created_at)}</td>
+                <td class="fd-val ${f.sentiment==='flag'?'fd-flag':''}">${escHtml(f.content)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`).join('');
+}
+
+// ── stakeholders ───────────────────────────────────────
+function renderStakeholders() {
+  const panel = document.getElementById('panel-stakeholders');
+  const cards = stakeholders.map(link => {
+    const c = link.contacts;
+    if (!c) return '';
+    const initials = (c.first_name[0] + (c.last_name?.[0]||'')).toUpperCase();
+    const roleTag  = renderRoleTag(link.stakeholder_role);
+    const infPct   = link.influence_score ? (link.influence_score * 10) + '%' : '40%';
+    const hue      = {'decision_maker':'#2a9d64','technical_authority':'#4f8ef7',
+                      'budget_holder':'#d4901f','champion':'#4f8ef7',
+                      'blocker':'#c0404a','technical':'#9d4f8e'}[link.stakeholder_role] || '#4f6080';
+    return `
+      <div class="sh-card">
+        <div class="sh-head">
+          <div class="sh-av" style="background:${hue}22;color:${hue}">${initials}</div>
+          <div>
+            <div class="sh-name">${escHtml(c.first_name + ' ' + c.last_name)}</div>
+            <div class="sh-role">${escHtml(c.title || '')}${c.email ? ' · ' + c.email : ''}</div>
+          </div>
+        </div>
+        ${roleTag ? `<div class="sh-tags">${roleTag}</div>` : ''}
+        ${link.notes ? `<div class="sh-note">${escHtml(link.notes)}</div>` : ''}
+        <div class="inf-bar-wrap">
+          <span class="inf-label">Influence</span>
+          <div class="inf-bar"><div class="inf-fill" style="width:${infPct};background:${hue}"></div></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn" onclick="openAddStakeholder()">+ Add stakeholder</button>
+    </div>
+    <div class="sh-grid">
+      ${cards}
+      <div class="sh-add" onclick="openAddStakeholder()">+ Add stakeholder</div>
+    </div>`;
+}
+
+function renderRoleTag(role) {
+  const map = {
+    decision_maker:      ['Decision maker','tag-dm'],
+    technical_authority: ['Technical authority','tag-tech'],
+    budget_holder:       ['Budget holder','tag-bgt'],
+    champion:            ['Champion','tag-champ'],
+    blocker:             ['Blocker','sh-tag'],
+    technical:           ['Technical','tag-tech'],
+  };
+  const [label, cls] = map[role] || [role, 'sh-tag'];
+  return label ? `<span class="sh-tag ${cls}">${label}</span>` : '';
+}
+
+// ── action items ───────────────────────────────────────
+function renderActions() {
+  const panel = document.getElementById('panel-actions');
+  const today = new Date().toLocaleDateString('en-CA');
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-primary" onclick="openActionItemDrawer()">+ Add action item</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--surf2)">
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">Item</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:80px">Due</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:70px">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${actionItems.length === 0
+            ? `<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted)">No action items</td></tr>`
+            : actionItems.map(ai => `
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:10px 12px">
+                  <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
+                </td>
+                <td style="padding:10px 12px;color:${ai.due_date && ai.due_date<today ? '#f07a7a' : 'var(--muted)'}">
+                  ${ai.due_date ? fmtDate(ai.due_date) : '—'}
+                </td>
+                <td style="padding:10px 12px">
+                  <span style="font-size:10px;padding:2px 7px;border-radius:5px;
+                    background:${ai.status==='open'?'rgba(212,144,31,.15)':'rgba(42,157,64,.15)'};
+                    color:${ai.status==='open'?'var(--amber)':'#7af0a0'}">
+                    ${ai.status}
+                  </span>
+                </td>
+              </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── meetings ───────────────────────────────────────────
+function renderMeetings() {
+  const panel = document.getElementById('panel-meetings');
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-primary" onclick="openMeetingDrawer()">+ Schedule meeting</button>
+    </div>
+    ${meetings.length === 0
+      ? `<div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">No meetings scheduled yet.</div>`
+      : meetings.map(m => `
+        <div class="meet-card">
+          <div class="meet-head">
+            <div>
+              <div class="meet-title-text">${escHtml(m.title)}</div>
+              <div class="meet-sub-text">
+                ${fmtDateTime(m.meeting_date)} · ${m.duration_minutes} min · ${capitalize(m.format||'')}
+              </div>
+            </div>
+            <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':'ms-done'}">
+              ${capitalize(m.status||'')}
+            </span>
+          </div>
+          ${m.location_or_link ? `<div style="font-size:11px;color:var(--muted)">📍 ${escHtml(m.location_or_link)}</div>` : ''}
+        </div>`).join('')}`;
+}
+
+// ── proposal tab check ─────────────────────────────────
+async function checkProposalTab() {
+  const proposals = await API.get(`proposals?prospect_id=eq.${PROSPECT_ID}&select=id,title,status`);
+  if (proposals?.length > 0) {
+    const p = proposals[0];
+    document.getElementById('panel-proposal').innerHTML = `
+      <div class="card">
+        <div class="card-title">Linked proposal</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">${escHtml(p.title)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Status: ${capitalize(p.status)}</div>
+        <button class="btn btn-primary"
+          onclick="location.href='/proposal-detail.html?id=${p.id}'">
+          Open proposal →
+        </button>
+      </div>`;
+  }
+}
+
+// ── tabs ───────────────────────────────────────────────
+function bindTabs() {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => switchTab(t.dataset.tab));
+  });
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p =>
+    p.classList.toggle('active', p.id === 'panel-' + name));
+}
+
+// ── drawers ────────────────────────────────────────────
+function openLogDrawer() {
+  const today = new Date().toLocaleDateString('en-CA');
+  document.getElementById('log-date').value     = today;
+  document.getElementById('log-followup').value = '';
+  document.getElementById('log-fchips').innerHTML = '';
+  document.getElementById('log-ai-list').innerHTML = '';
+  document.getElementById('log-summary').value    = '';
+  document.getElementById('drawer-overlay');
+  document.getElementById('log-overlay').classList.add('open');
+}
+
+function openMeetingDrawer() {
+  document.getElementById('meet-overlay').classList.add('open');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('meet-date').value = tomorrow.toLocaleDateString('en-CA');
+}
+
+function openActionItemDrawer() {
+  openLogDrawer();
+  // focus to action items section
+}
+
+function closeDrawer(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function handleOverlay(e, id) {
+  if (e.target === document.getElementById(id)) closeDrawer(id);
+}
+
+// ── log activity save ──────────────────────────────────
+let _logFindings = [];
+let _logAIs      = [];
+
+function addFinding() {
+  const text = document.getElementById('log-ftext').value.trim();
+  const type = document.getElementById('log-ftype').value;
+  if (!text) return;
+  _logFindings.push({ content: text, sentiment: type || 'neutral' });
+  document.getElementById('log-ftext').value = '';
+  renderLogChips();
+}
+
+function renderLogChips() {
+  document.getElementById('log-fchips').innerHTML = _logFindings.map((f,i) =>
+    `<span class="fchip ${f.sentiment}">${escHtml(f.content)}
+      <span style="cursor:pointer;margin-left:4px;opacity:.6" onclick="removeChip(${i})">×</span>
+    </span>`
+  ).join('');
+}
+
+function removeChip(i) {
+  _logFindings.splice(i, 1);
+  renderLogChips();
+}
+
+let _aiItems = [];
+function addLogAI() {
+  const text = document.getElementById('log-aitext').value.trim();
+  if (!text) return;
+  _aiItems.push(text);
+  document.getElementById('log-aitext').value = '';
+  renderAIList();
+}
+
+function renderAIList() {
+  document.getElementById('log-ai-list').innerHTML = _aiItems.map((t,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border)">
+      <span style="flex:1;color:var(--text)">${escHtml(t)}</span>
+      <span style="cursor:pointer;color:var(--muted)" onclick="removeAI(${i})">×</span>
+    </div>`).join('');
+}
+
+function removeAI(i) { _aiItems.splice(i,1); renderAIList(); }
+
+// pill toggle for activity type
+document.querySelectorAll('#act-type-btns .type-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#act-type-btns .type-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
+
+async function saveActivity() {
+  const summary = document.getElementById('log-summary').value.trim();
+  if (!summary) { alert('Summary is required.'); return; }
+
+  const actType = document.querySelector('#act-type-btns .type-btn.active')?.dataset.val || 'note';
+  const stageAdv = document.getElementById('log-stage-advance').value;
+
+  try {
+    const actPayload = {
+      prospect_id:      PROSPECT_ID,
+      type:             actType,
+      date:             new Date().toISOString(),
+      duration_minutes: +document.getElementById('log-dur').value || null,
+      summary,
+      findings_summary: _logFindings.map(f=>f.content).join(' | ') || null,
+      stage_from:       stageAdv ? prospect.stage : null,
+      stage_to:         stageAdv || null,
+    };
+
+    const actResult = await API.post('prospect_activities', actPayload);
+    const actId     = actResult?.[0]?.id;
+
+    // save findings
+    for (const f of _logFindings) {
+      await API.post('prospect_findings', {
+        prospect_id: PROSPECT_ID,
+        activity_id: actId,
+        category: 'other',
+        content:  f.content,
+        sentiment: f.sentiment || 'neutral',
+      });
+    }
+
+    // save action items
+    for (const desc of _aiItems) {
+      await API.post('prospect_action_items', {
+        prospect_id: PROSPECT_ID,
+        activity_id: actId,
+        description: desc,
+        status: 'open',
+      });
+    }
+
+    // advance stage if requested
+    if (stageAdv) {
+      await API.patch(`prospects?id=eq.${PROSPECT_ID}`, { stage: stageAdv });
+    }
+
+    // update follow-up
+    const fu = document.getElementById('log-followup').value;
+    if (fu) {
+      await API.patch(`prospects?id=eq.${PROSPECT_ID}`, { next_follow_up_date: fu });
+    }
+
+    _logFindings = [];
+    _aiItems     = [];
+    closeDrawer('log-overlay');
+    await loadAll();
+    switchTab('activity');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save activity.');
+  }
+}
+
+// ── meeting save ───────────────────────────────────────
+function populateMeetingSelects() {
+  const ourSel   = document.getElementById('meet-our-team');
+  const theirSel = document.getElementById('meet-their-team');
+  ourSel.innerHTML   = '';
+  theirSel.innerHTML = '';
+
+  resources.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.first_name + ' ' + r.last_name;
+    ourSel.appendChild(o);
+  });
+
+  contacts.forEach(c => {
+    if (!c) return;
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.first_name + ' ' + c.last_name + (c.title ? ' · ' + c.title : '');
+    theirSel.appendChild(o);
+  });
+}
+
+let _agendaItems = [];
+function addAgendaItem() {
+  const inp = document.getElementById('meet-agenda-input');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  _agendaItems.push(txt);
+  inp.value = '';
+  renderAgendaList();
+}
+
+function renderAgendaList() {
+  document.getElementById('meet-agenda-list').innerHTML = _agendaItems.map((t,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;
+      border-bottom:1px solid var(--border);color:var(--muted)">
+      <span style="width:16px;text-align:right;color:var(--muted)">${i+1}.</span>
+      <span style="flex:1">${escHtml(t)}</span>
+      <span style="cursor:pointer" onclick="removeAgenda(${i})">×</span>
+    </div>`).join('');
+}
+
+function removeAgenda(i) { _agendaItems.splice(i,1); renderAgendaList(); }
+
+async function saveMeeting() {
+  const title = document.getElementById('meet-title').value.trim();
+  const date  = document.getElementById('meet-date').value;
+  const time  = document.getElementById('meet-time').value || '09:00';
+  if (!title || !date) { alert('Title and date are required.'); return; }
+
+  const meetingDatetime = date + 'T' + time + ':00';
+
+  try {
+    const payload = {
+      firm_id:          prospect.firm_id,
+      prospect_id:      PROSPECT_ID,
+      title,
+      scheduled_date:   meetingDatetime,
+      scheduled_duration_minutes: +document.getElementById('meet-dur').value || 60,
+      location:         document.getElementById('meet-location').value || null,
+      status:           'scheduled',
+      meeting_type:     document.getElementById('meet-format').value,
+    };
+
+    const result  = await API.post('meetings', payload);
+    const meetId  = result?.[0]?.id;
+
+    // save agenda items
+    for (let i = 0; i < _agendaItems.length; i++) {
+      await API.post('meeting_agenda_items', {
+        meeting_id:    meetId,
+        title:         _agendaItems[i],
+        sequence_order: i + 1,
+      });
+    }
+
+    _agendaItems = [];
+    closeDrawer('meet-overlay');
+    await loadAll();
+    switchTab('meetings');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save meeting.');
+  }
+}
+
+// ── misc ───────────────────────────────────────────────
+function toggleAI(id, el) {
+  el.classList.add('done');
+  el.textContent = '✓';
+  API.patch(`prospect_action_items?id=eq.${id}`, { status: 'complete', completed_at: new Date().toISOString() });
+}
+
+async function promptStageChange() {
+  const stages = ['prospect','qualifying','discovery','proposal','review','approved','declined'];
+  const current = prospect.stage;
+  const opts = stages.filter(s => s !== current).map(s => capitalize(s)).join('\n');
+  const choice = prompt(`Current stage: ${capitalize(current)}\n\nAdvance to:\n${opts}\n\nType new stage:`);
+  if (!choice) return;
+  const match = stages.find(s => s.toLowerCase() === choice.toLowerCase());
+  if (!match) { alert('Invalid stage.'); return; }
+  await API.patch(`prospects?id=eq.${PROSPECT_ID}`, { stage: match });
+  await loadAll();
+}
+
+function openAddStakeholder() {
+  alert('Add stakeholder panel coming — links to contacts for this prospect\'s company.');
+}
+
+function startProposal() {
+  location.href = `/proposal-detail.html?prospect_id=${PROSPECT_ID}`;
+}
+
+// helpers
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d.includes('T') ? d : d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function fmtDateTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function actIconClass(type) {
+  return type === 'call' || type === 'video_call' ? 'ai-call'
+       : type === 'stage_change' ? 'ai-stage' : 'ai-note';
+}
+function actIcon(type) {
+  return type === 'call' ? '☎' : type === 'video_call' ? '🎥'
+       : type === 'email' ? '✉' : type === 'stage_change' ? '→' : '✎';
+}
+function formatActType(type) {
+  return { call:'Phone call', video_call:'Video call', email:'Email',
+           in_person:'In-person', note:'Note', stage_change:'Stage change' }[type] || type;
+}
+</script>
+</body>
+</html>

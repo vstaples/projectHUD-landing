@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Proposal — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
+
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+}
+
+/* back bar */
+.backbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px; height: 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+  font-size: 12px; color: var(--muted);
+}
+.backbar a { color: var(--muted); text-decoration: none; }
+.backbar a:hover { color: var(--text); }
+
+/* proposal header */
+.prop-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px 0;
+  flex-shrink: 0;
+}
+.ph-row {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 12px;
+  margin-bottom: 10px;
+}
+.prop-title { font-size: 16px; font-weight: 700; }
+.prop-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.ph-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  transition: background .15s;
+}
+.btn:hover { background: var(--surf3); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.btn-teal { background: #1a6b5a; border-color: #2a9d7a; color: #7af0c0; }
+.btn-teal:hover { background: #2a9d7a; color: #fff; }
+
+/* tabs */
+.prop-tabs { display: flex; gap: 2px; }
+.tab {
+  padding: 8px 14px; font-size: 12px; font-weight: 500;
+  color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s; white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* panels */
+.panels { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.panel  { display: none; flex: 1; overflow: hidden; }
+.panel.active { display: flex; flex-direction: column; }
+
+/* ── WBS TAB ──────────────────────────────────────────── */
+.wbs-layout {
+  flex: 1; display: grid;
+  grid-template-columns: 180px 1fr 220px;
+  gap: 0; overflow: hidden;
+}
+
+/* discipline sidebar */
+.disc-sidebar {
+  border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 12px 10px;
+  background: var(--surf2);
+}
+
+.template-bar {
+  display: flex; gap: 6px; margin-bottom: 10px;
+}
+.template-bar select {
+  flex: 1; padding: 5px 8px; border-radius: 5px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--muted); font-size: 11px; outline: none;
+}
+.template-bar button {
+  padding: 5px 9px; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+}
+
+.disc-tab {
+  padding: 9px 10px; border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer;
+  margin-bottom: 6px; transition: border-color .15s;
+}
+.disc-tab:hover  { border-color: var(--border2); }
+.disc-tab.active { border-color: var(--accent); background: rgba(79,142,247,.08); }
+.dt-name {
+  font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px;
+}
+.disc-tab.active .dt-name { color: var(--accent); }
+.dt-meta {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--muted);
+}
+.dt-cost { font-weight: 600; color: var(--muted); }
+.disc-tab.active .dt-cost { color: var(--accent); }
+.dt-bar  {
+  height: 2px; border-radius: 1px;
+  background: var(--border); margin-top: 5px; overflow: hidden;
+}
+.dt-fill { height: 2px; border-radius: 1px; }
+
+.disc-add-btn {
+  width: 100%; padding: 7px; border-radius: 6px;
+  border: 1px dashed var(--border2); background: transparent;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  text-align: center; transition: all .15s;
+}
+.disc-add-btn:hover { background: rgba(255,255,255,.03); color: var(--text); }
+
+/* task grid */
+.task-area {
+  flex: 1; overflow: auto; display: flex; flex-direction: column;
+}
+
+.task-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surf2); flex-shrink: 0;
+}
+.tp-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600;
+}
+.disc-dot { width: 10px; height: 10px; border-radius: 2px; }
+.risk-flag {
+  font-size: 10px; padding: 2px 7px; border-radius: 5px;
+  background: rgba(212,144,31,.15); color: var(--amber);
+}
+
+table.task-tbl { width: 100%; border-collapse: collapse; }
+.task-tbl th {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted);
+  padding: 6px 8px; border-bottom: 1px solid var(--border2);
+  background: var(--surf2); text-align: left; white-space: nowrap;
+}
+.task-tbl td {
+  padding: 4px 5px; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.task-tbl tr:hover td { background: rgba(255,255,255,.02); }
+.task-tbl tr.risk-row td { background: rgba(212,144,31,.04); }
+.task-tbl tfoot td {
+  background: var(--surf2); font-weight: 600;
+  font-size: 11px; color: var(--muted); padding: 7px 8px;
+  border-top: 1px solid var(--border2);
+}
+
+.task-tbl input[type=text],
+.task-tbl input[type=number],
+.task-tbl select {
+  width: 100%; padding: 4px 6px;
+  border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: var(--text);
+  font-size: 11px; font-family: inherit; outline: none;
+  transition: border-color .15s, background .15s;
+}
+.task-tbl input:focus,
+.task-tbl select:focus {
+  border-color: var(--accent);
+  background: var(--surf2);
+}
+.task-tbl input[type=number] { text-align: right; }
+.task-tbl select option { background: #1e2436; }
+
+.col-task  { min-width: 130px; }
+.col-phase { width: 88px; }
+.col-role  { width: 110px; }
+.col-level { width: 78px; }
+.col-dur   { width: 48px; }
+.col-days  { width: 48px; }
+.col-ppl   { width: 40px; }
+.col-hrs   { width: 48px; text-align: right !important; }
+.col-cost  { width: 72px; text-align: right !important; }
+.col-risk  { width: 32px; text-align: center !important; }
+.col-del   { width: 26px; text-align: center !important; }
+
+.cost-cell { font-size: 11px; font-weight: 600; text-align: right; padding-right: 8px !important; }
+.hrs-cell  { font-size: 11px; color: var(--muted); text-align: right; }
+.risk-icon { cursor: pointer; font-size: 13px; text-align: center; display: block; }
+.del-btn   { font-size: 14px; color: var(--muted); cursor: pointer; text-align: center; display: block; }
+.del-btn:hover { color: var(--red); }
+
+.add-task-row {
+  padding: 8px 14px; border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.add-task-btn {
+  font-size: 11px; color: var(--accent); cursor: pointer;
+  background: none; border: none; padding: 0;
+}
+
+/* cost panel */
+.cost-panel {
+  border-left: 1px solid var(--border);
+  overflow-y: auto; padding: 14px;
+  background: var(--surf2);
+}
+.cp-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted);
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.cp-row {
+  display: flex; justify-content: space-between;
+  align-items: center; padding: 5px 0;
+  border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.cp-row:last-of-type { border-bottom: none; }
+.cp-name { color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.cp-dot  { width: 7px; height: 7px; border-radius: 50%; }
+.cp-val  { font-weight: 600; color: var(--text); }
+.cp-bar-wrap { height: 2px; background: var(--border); border-radius: 1px; margin: 2px 0 5px; overflow: hidden; }
+.cp-bar { height: 2px; border-radius: 1px; }
+
+.cp-div { border: none; border-top: 1px solid var(--border2); margin: 8px 0; }
+.cp-total { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
+.cp-grand {
+  display: flex; justify-content: space-between;
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid var(--border2);
+}
+.cp-grand-label { font-size: 13px; font-weight: 600; }
+.cp-grand-val   { font-size: 15px; font-weight: 700; color: var(--accent); }
+
+/* range band */
+.range-section {
+  margin-top: 10px; padding: 10px;
+  background: rgba(255,255,255,.03);
+  border-radius: 7px;
+}
+.range-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+.range-bar-wrap { position: relative; height: 7px; border-radius: 4px; background: var(--border); margin: 5px 0 3px; }
+.range-base  { position: absolute; left: 0; top: 0; height: 7px; border-radius: 4px 0 0 4px; background: var(--accent); }
+.range-cont  { position: absolute; height: 7px; background: var(--amber); opacity: .7; }
+.range-worst { position: absolute; height: 7px; border-radius: 0 4px 4px 0; background: var(--red); opacity: .5; }
+.range-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); }
+.range-vals  { display: flex; justify-content: space-between; margin-top: 6px; }
+.rv { text-align: center; }
+.rv-val { font-size: 11px; font-weight: 600; }
+.rv-lbl { font-size: 9px; color: var(--muted); }
+
+.contingency-block {
+  margin-top: 8px; padding: 9px 10px;
+  border: 1px solid rgba(212,144,31,.3);
+  border-radius: 7px; background: rgba(212,144,31,.06);
+}
+.cb-top { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.cb-lbl { font-size: 11px; font-weight: 600; color: var(--amber); }
+.cb-val { font-size: 13px; font-weight: 700; color: var(--amber); }
+.cb-sub { font-size: 10px; color: rgba(212,144,31,.7); margin-bottom: 6px; }
+.cb-btn {
+  width: 100%; padding: 5px; border-radius: 5px;
+  border: 1px solid rgba(212,144,31,.4); background: transparent;
+  color: var(--amber); font-size: 11px; cursor: pointer;
+}
+.cb-btn:hover { background: rgba(212,144,31,.1); }
+
+/* materials */
+.mat-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.mat-row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; padding: 3px 0; color: var(--muted);
+}
+.mat-val { font-weight: 600; color: var(--text); }
+.mat-add { display: flex; gap: 5px; margin-top: 7px; }
+.mat-add input {
+  flex: 1; padding: 4px 7px; border-radius: 5px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 11px; outline: none;
+}
+.mat-add button {
+  padding: 4px 8px; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-size: 10px; cursor: pointer;
+}
+
+/* save-as-template modal */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6); z-index: 200;
+  display: none; align-items: center; justify-content: center;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 12px; width: 460px; overflow: hidden;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  background: var(--surf2);
+}
+.modal-title { font-size: 14px; font-weight: 600; }
+.modal-close {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-body { padding: 18px; }
+.modal-foot {
+  padding: 12px 18px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.m-field { margin-bottom: 12px; }
+.m-field label {
+  display: block; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: 4px;
+}
+.m-field input, .m-field select, .m-field textarea {
+  width: 100%; padding: 7px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 12px; font-family: inherit; outline: none;
+}
+.m-field textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+.disc-checklist { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; margin-bottom: 12px; }
+.dcl-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.dcl-row:last-child { border-bottom: none; }
+.dcl-row input { width: 14px; height: 14px; cursor: pointer; }
+.strip-costs {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 7px; font-size: 12px; margin-bottom: 12px;
+}
+.strip-costs input { width: 14px; height: 14px; cursor: pointer; }
+.success-state { text-align: center; padding: 28px 20px; }
+.ss-icon  { font-size: 32px; margin-bottom: 10px; }
+.ss-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.ss-sub   { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+
+/* summary strip */
+.summary-strip {
+  display: flex; gap: 8px; padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surf2); flex-shrink: 0;
+}
+.sum-card {
+  background: var(--surface); border-radius: 7px;
+  padding: 8px 12px; flex: 1;
+}
+.sum-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+.sum-val { font-size: 17px; font-weight: 700; }
+.sum-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--muted); font-size: 13px; gap: 8px;
+}
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+  <!-- back bar -->
+  <div class="backbar">
+    <a id="back-link" href="/pipeline.html">← Pipeline</a>
+    <span>/</span>
+    <span id="breadcrumb-name">Proposal</span>
+  </div>
+
+  <!-- proposal header -->
+  <div class="prop-header">
+    <div class="ph-row">
+      <div>
+        <div class="prop-title" id="prop-title">Loading…</div>
+        <div class="prop-sub"  id="prop-sub"></div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn" onclick="openTemplateModal()">Save as template</button>
+        <button class="btn btn-teal" onclick="convertToProject()">Convert to project ↗</button>
+        <button class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
+      </div>
+    </div>
+    <div class="prop-tabs">
+      <div class="tab active" data-tab="wbs">WBS estimator</div>
+      <div class="tab" data-tab="risks">Risks &amp; assumptions</div>
+      <div class="tab" data-tab="sow">SOW document</div>
+    </div>
+  </div>
+
+  <!-- panels -->
+  <div class="panels" id="panels">
+
+    <!-- WBS -->
+    <div class="panel active" id="panel-wbs">
+      <!-- summary strip -->
+      <div class="summary-strip" id="wbs-summary">
+        <div class="sum-card"><div class="sum-lbl">Duration</div><div class="sum-val" id="s-dur">—</div><div class="sum-sub">calendar days</div></div>
+        <div class="sum-card"><div class="sum-lbl">Labor days</div><div class="sum-val" id="s-ldays">—</div><div class="sum-sub">all disciplines</div></div>
+        <div class="sum-card"><div class="sum-lbl">Hours</div><div class="sum-val" id="s-hrs">—</div><div class="sum-sub">estimated</div></div>
+        <div class="sum-card"><div class="sum-lbl">Labor cost</div><div class="sum-val" id="s-labor">—</div><div class="sum-sub">at role rates</div></div>
+        <div class="sum-card"><div class="sum-lbl">Total</div><div class="sum-val" id="s-total" style="color:var(--accent)">—</div><div class="sum-sub">labor + materials</div></div>
+      </div>
+
+      <div class="wbs-layout">
+        <!-- discipline sidebar -->
+        <div class="disc-sidebar">
+          <div class="template-bar">
+            <select id="tpl-select">
+              <option value="">Load template…</option>
+            </select>
+            <button onclick="loadTemplate()">Apply</button>
+          </div>
+          <div id="disc-tabs-list"></div>
+          <button class="disc-add-btn" onclick="addDiscipline()">+ Add discipline</button>
+        </div>
+
+        <!-- task grid -->
+        <div class="task-area" id="task-area">
+          <div class="loading-state"><div class="spinner"></div> Loading…</div>
+        </div>
+
+        <!-- cost panel -->
+        <div class="cost-panel">
+          <div class="cp-title">Live cost summary</div>
+          <div id="cp-disc-rows"></div>
+          <hr class="cp-div" />
+          <div class="cp-total" id="cp-labor-row">
+            <span style="color:var(--muted)">Labor subtotal</span>
+            <span id="cp-labor" style="font-weight:600">¥0</span>
+          </div>
+
+          <div class="mat-section">
+            <div class="cp-title" style="margin-bottom:8px">Materials</div>
+            <div id="mat-list"></div>
+            <div class="mat-add">
+              <input type="text" id="mat-name-input" placeholder="Item · ¥cost" />
+              <button onclick="addMaterial()">+ Add</button>
+            </div>
+          </div>
+
+          <hr class="cp-div" />
+          <div class="cp-total">
+            <span style="color:var(--muted)">Materials</span>
+            <span id="cp-mats" style="font-weight:600">¥0</span>
+          </div>
+
+          <div class="cp-grand">
+            <span class="cp-grand-label">Base estimate</span>
+            <span class="cp-grand-val" id="cp-total">¥0</span>
+          </div>
+
+          <div class="range-section" id="range-section" style="display:none">
+            <div class="range-lbl">Risk-adjusted range</div>
+            <div class="range-bar-wrap">
+              <div class="range-base" id="rb-base"></div>
+              <div class="range-cont" id="rb-cont"></div>
+              <div class="range-worst" id="rb-worst"></div>
+            </div>
+            <div class="range-labels"><span>Base</span><span>+ contingency</span><span>Worst</span></div>
+            <div class="range-vals">
+              <div class="rv"><div class="rv-val" style="color:var(--accent)" id="rv-base">—</div><div class="rv-lbl">Base</div></div>
+              <div class="rv"><div class="rv-val" style="color:var(--amber)" id="rv-cont">—</div><div class="rv-lbl">+ contingency</div></div>
+              <div class="rv"><div class="rv-val" style="color:var(--red)"   id="rv-worst">—</div><div class="rv-lbl">Worst case</div></div>
+            </div>
+          </div>
+
+          <div class="contingency-block" id="cont-block" style="display:none">
+            <div class="cb-top">
+              <span class="cb-lbl">Recommended contingency</span>
+              <span class="cb-val" id="cb-val">¥0</span>
+            </div>
+            <div class="cb-sub" id="cb-sub">Based on risk register</div>
+            <button class="cb-btn" onclick="addContingency()">Add to estimate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RISKS (link to risks page) -->
+    <div class="panel" id="panel-risks">
+      <div style="padding:32px 20px;text-align:center;color:var(--muted);font-size:13px">
+        <div style="font-size:32px;margin-bottom:12px">⚑</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">Risk &amp; assumption register</div>
+        <div style="margin-bottom:20px">Document risks and assumptions linked to this WBS.<br>PMI P×I scoring and EMV calculations applied automatically.</div>
+        <div id="risk-summary-here"></div>
+        <button class="btn btn-primary" onclick="location.href='/risk-register.html?proposal_id='+PROPOSAL_ID">
+          Open risk register →
+        </button>
+      </div>
+    </div>
+
+    <!-- SOW -->
+    <div class="panel" id="panel-sow">
+      <div style="padding:32px 20px;text-align:center;color:var(--muted);font-size:13px">
+        <div style="font-size:32px;margin-bottom:12px">📄</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">Statement of Work</div>
+        <div style="margin-bottom:20px">Build the formal SOW document from this WBS.<br>All sections auto-populated from the estimator and risk register.</div>
+        <button class="btn btn-primary" id="sow-btn" onclick="openSOW()">Open SOW builder →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SAVE AS TEMPLATE MODAL -->
+<div class="modal-bg" id="tpl-modal" onclick="closeTplModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <span class="modal-title">Save as template</span>
+      <button class="modal-close" onclick="document.getElementById('tpl-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="tpl-modal-body">
+      <div class="m-field">
+        <label>Template name *</label>
+        <input type="text" id="tpl-name" placeholder="e.g. Medical Device R&D — Endoscopic" />
+      </div>
+      <div class="m-field">
+        <label>Industry tag</label>
+        <select id="tpl-industry">
+          <option>Medical device</option>
+          <option>Industrial automation</option>
+          <option>Software platform</option>
+          <option>Aerospace</option>
+          <option>Embedded systems</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="m-field">
+        <label>Description</label>
+        <textarea id="tpl-desc" placeholder="What kind of project is this template suited for?"></textarea>
+      </div>
+      <div class="m-field"><label>Include disciplines</label></div>
+      <div class="disc-checklist" id="tpl-disc-checks"></div>
+      <div class="strip-costs">
+        <input type="checkbox" id="strip-costs" checked />
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:2px">Strip cost figures from template</div>
+          <div style="font-size:11px;color:var(--muted)">Saves structure, roles, levels — removes ¥ values so each project starts fresh</div>
+        </div>
+      </div>
+      <div class="m-field">
+        <label>Visibility</label>
+        <select id="tpl-visibility">
+          <option value="firm">Firm-wide — available to all PMs</option>
+          <option value="private">Private — only visible to me</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot" id="tpl-modal-foot">
+      <button class="btn" onclick="document.getElementById('tpl-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTemplate()">Save template</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+let PROPOSAL_ID  = params.get('id');
+const PROSPECT_ID = params.get('prospect_id');
+
+// ── rate table ─────────────────────────────────────────
+const RATES = {
+  'Mech Engineer':  { Junior:32, Mid:48, Senior:65, Principal:80 },
+  'Elec Engineer':  { Junior:34, Mid:50, Senior:68, Principal:82 },
+  'SW Engineer':    { Junior:36, Mid:54, Senior:72, Principal:88 },
+  'Systems Eng':    { Junior:35, Mid:52, Senior:70, Principal:85 },
+  'Tech Writer':    { Junior:24, Mid:34, Senior:45, Principal:55 },
+};
+
+const DISC_COLORS = ['#2a9d7a','#4f8ef7','#7f4fef','#d4901f','#c0407a','#2a7a9d','#9d402a'];
+
+let proposal     = null;
+let disciplines  = [];
+let wbsTasks     = [];
+let materials    = [];
+let hud_roles    = [];
+let templates    = [];
+let activeDiscIdx = 0;
+
+// ── init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (window.Sidebar) Sidebar.init('pipeline');
+  bindTabs();
+
+  if (PROPOSAL_ID) {
+    await loadProposal();
+  } else if (PROSPECT_ID) {
+    await createProposal();
+  } else {
+    document.getElementById('prop-title').textContent = 'No proposal selected';
+  }
+});
+
+async function loadProposal() {
+  try {
+    const [pros, discs, tasks, mats, roles, tpls, risks] = await Promise.all([
+      API.get(`proposals?id=eq.${PROPOSAL_ID}&select=*,prospects(title,companies(name))`),
+      API.get(`wbs_disciplines?proposal_id=eq.${PROPOSAL_ID}&order=sort_order`),
+      API.get(`wbs_tasks?proposal_id=eq.${PROPOSAL_ID}&order=sort_order`),
+      API.get(`wbs_materials?proposal_id=eq.${PROPOSAL_ID}&order=sort_order`),
+      API.get(`hud_roles?is_active=eq.true&order=name&select=id,name`),
+      API.get(`wbs_templates?order=name&select=id,name,industry_tag`),
+      API.get(`risk_items?proposal_id=eq.${PROPOSAL_ID}&select=id,item_type,emv_cost,assumption_emv_cost`),
+    ]);
+
+    proposal    = pros?.[0];
+    disciplines = discs || [];
+    wbsTasks    = tasks || [];
+    materials   = mats  || [];
+    hud_roles   = roles || [];
+    templates   = tpls  || [];
+
+    // assign colors to disciplines if missing
+    disciplines.forEach((d, i) => {
+      if (!d.color) d.color = DISC_COLORS[i % DISC_COLORS.length];
+    });
+
+    renderHeader();
+    renderDiscTabs();
+    renderTaskGrid();
+    renderCostPanel();
+    renderMaterialsList();
+    updateSummaryStrip();
+    populateTemplateSelect();
+    loadRiskSummary(risks || []);
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function createProposal() {
+  // create a new proposal shell linked to the prospect
+  try {
+    const prospect = await API.get(`prospects?id=eq.${PROSPECT_ID}&select=*,companies(name)`);
+    const p = prospect?.[0];
+    if (!p) return;
+
+    const result = await API.post('proposals', {
+      prospect_id: PROSPECT_ID,
+      firm_id:     p.firm_id,
+      title:       p.title + ' — Proposal v1.0',
+      status:      'draft',
+    });
+    PROPOSAL_ID = result?.[0]?.id;
+    if (PROPOSAL_ID) {
+      history.replaceState(null, '', '?id=' + PROPOSAL_ID);
+      await loadProposal();
+    }
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── header ─────────────────────────────────────────────
+function renderHeader() {
+  if (!proposal) return;
+  const p = proposal;
+  const co = p.prospects?.companies?.name || '';
+  document.getElementById('prop-title').textContent = p.title;
+  document.getElementById('prop-sub').textContent =
+    (p.prospects?.title || '') + (co ? ' · ' + co : '') + ' · v' + p.version;
+  document.getElementById('breadcrumb-name').textContent = p.title;
+  document.title = p.title + ' — ProjectHUD';
+
+  // back link
+  if (PROSPECT_ID || p.prospect_id) {
+    document.getElementById('back-link').href =
+      `/prospect-detail.html?id=${p.prospect_id || PROSPECT_ID}`;
+  }
+}
+
+// ── tabs ───────────────────────────────────────────────
+function bindTabs() {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+// ── discipline tabs ────────────────────────────────────
+function renderDiscTabs() {
+  const list = document.getElementById('disc-tabs-list');
+  const totalCost = getTotalLaborCost();
+
+  list.innerHTML = disciplines.map((d, i) => {
+    const tasks  = wbsTasks.filter(t => t.discipline_id === d.id);
+    const cost   = tasks.reduce((s, t) => s + (t.total_cost || 0), 0);
+    const pct    = totalCost > 0 ? (cost / totalCost) * 100 : 0;
+    return `
+      <div class="disc-tab ${i === activeDiscIdx ? 'active' : ''}"
+        onclick="switchDisc(${i})">
+        <div class="dt-name">${escHtml(d.name)}</div>
+        <div class="dt-meta">
+          <span>${tasks.length} tasks</span>
+          <span class="dt-cost">${fmtCost(cost)}</span>
+        </div>
+        <div class="dt-bar">
+          <div class="dt-fill" style="width:${pct.toFixed(0)}%;background:${d.color}"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function switchDisc(idx) {
+  activeDiscIdx = idx;
+  renderDiscTabs();
+  renderTaskGrid();
+}
+
+// ── task grid ──────────────────────────────────────────
+function renderTaskGrid() {
+  const area = document.getElementById('task-area');
+  if (disciplines.length === 0) {
+    area.innerHTML = `<div class="loading-state" style="height:auto;padding:40px">
+      <span style="color:var(--muted)">No disciplines yet. Add one to start building your WBS.</span>
+    </div>`;
+    return;
+  }
+
+  const disc  = disciplines[activeDiscIdx];
+  const tasks = wbsTasks.filter(t => t.discipline_id === disc?.id);
+  const risks = tasks.filter(t => t.is_risk_flag).length;
+  let totalHrs = 0, totalCost = 0;
+  tasks.forEach(t => { totalHrs += t.estimated_hours || 0; totalCost += t.total_cost || 0; });
+
+  area.innerHTML = `
+    <div class="task-panel-head">
+      <div class="tp-title">
+        <div class="disc-dot" style="background:${disc.color}"></div>
+        ${escHtml(disc.name)}
+        ${risks ? `<span class="risk-flag">${risks} risk${risks>1?'s':''}</span>` : ''}
+      </div>
+      <button class="btn" onclick="addTask()">+ Add task</button>
+    </div>
+    <div style="overflow-x:auto;flex:1">
+      <table class="task-tbl" style="min-width:700px">
+        <thead>
+          <tr>
+            <th class="col-task">Task</th>
+            <th class="col-phase">Phase</th>
+            <th class="col-role">Role</th>
+            <th class="col-level">Level</th>
+            <th class="col-dur">Dur (d)</th>
+            <th class="col-days">Days</th>
+            <th class="col-ppl">Ppl</th>
+            <th class="col-hrs">Hrs</th>
+            <th class="col-cost">Cost</th>
+            <th class="col-risk">⚑</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="task-tbody">
+          ${tasks.map((t, i) => renderTaskRow(t, i)).join('')}
+          ${tasks.length === 0
+            ? `<tr><td colspan="11" style="padding:16px;text-align:center;color:var(--muted);font-size:12px">
+                No tasks yet.
+                <span style="color:var(--accent);cursor:pointer" onclick="addTask()"> Add the first one →</span>
+               </td></tr>` : ''}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} subtotal</td>
+            <td></td>
+            <td class="hrs-cell">${totalHrs.toFixed(0)} hrs</td>
+            <td class="cost-cell" style="color:var(--accent)">${fmtCost(totalCost)}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="add-task-row">
+      <button class="add-task-btn" onclick="addTask()">+ Add task to ${escHtml(disc.name)}</button>
+    </div>`;
+}
+
+function renderTaskRow(t, idx) {
+  const hrs  = calcHrs(t.labor_days, t.headcount);
+  const cost = calcCost(t.labor_days, t.headcount, t.hud_role_name || getDefaultRole(), t.level || 'Mid');
+  const roleOpts = hud_roles.map(r =>
+    `<option value="${r.id}" ${r.name === (t.hud_role_name||getDefaultRole()) ? 'selected' : ''}>${escHtml(r.name)}</option>`
+  ).join('');
+
+  return `
+    <tr class="${t.is_risk_flag ? 'risk-row' : ''}" id="trow-${t.id}">
+      <td class="col-task">
+        <input type="text" value="${escHtml(t.name)}"
+          onchange="updateTask('${t.id}','name',this.value)" />
+      </td>
+      <td class="col-phase">
+        <select onchange="updateTask('${t.id}','phase',this.value)">
+          ${['Phase 1','Phase 2','Phase 3','Phase 4'].map(ph =>
+            `<option ${t.phase===ph?'selected':''}>${ph}</option>`).join('')}
+        </select>
+      </td>
+      <td class="col-role">
+        <select onchange="updateTaskRole('${t.id}',this)">
+          ${roleOpts}
+        </select>
+      </td>
+      <td class="col-level">
+        <select onchange="updateTask('${t.id}','level',this.value);recompute('${t.id}')">
+          ${['Junior','Mid','Senior','Principal'].map(l =>
+            `<option ${t.level===l?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </td>
+      <td class="col-dur">
+        <input type="number" value="${t.duration_days||1}" min="0.5" step="0.5"
+          onchange="updateTask('${t.id}','duration_days',+this.value)" />
+      </td>
+      <td class="col-days">
+        <input type="number" value="${t.labor_days||1}" min="0.5" step="0.5"
+          onchange="updateTask('${t.id}','labor_days',+this.value);recompute('${t.id}')" />
+      </td>
+      <td class="col-ppl">
+        <input type="number" value="${t.headcount||1}" min="1" step="1"
+          onchange="updateTask('${t.id}','headcount',+this.value);recompute('${t.id}')" />
+      </td>
+      <td class="hrs-cell">${hrs.toFixed(0)}</td>
+      <td class="cost-cell">${fmtCost(cost)}</td>
+      <td class="col-risk">
+        <span class="risk-icon" onclick="toggleRisk('${t.id}',this)"
+          style="color:${t.is_risk_flag ? 'var(--amber)' : 'var(--muted)'}">
+          ${t.is_risk_flag ? '⚑' : '⚐'}
+        </span>
+      </td>
+      <td class="col-del">
+        <span class="del-btn" onclick="deleteTask('${t.id}')">×</span>
+      </td>
+    </tr>`;
+}
+
+// ── task CRUD ──────────────────────────────────────────
+function getTaskById(id) { return wbsTasks.find(t => t.id === id); }
+
+function updateTask(id, field, val) {
+  const t = getTaskById(id);
+  if (t) t[field] = val;
+}
+
+function updateTaskRole(id, sel) {
+  const t = getTaskById(id);
+  if (!t) return;
+  t.hud_role_id   = sel.value;
+  t.hud_role_name = sel.options[sel.selectedIndex].text;
+  recompute(id);
+}
+
+function recompute(id) {
+  const t = getTaskById(id);
+  if (!t) return;
+  t.estimated_hours = calcHrs(t.labor_days, t.headcount);
+  t.total_cost      = calcCost(t.labor_days, t.headcount, t.hud_role_name || getDefaultRole(), t.level || 'Mid');
+  renderTaskGrid();
+  renderCostPanel();
+  updateSummaryStrip();
+}
+
+async function addTask() {
+  const disc = disciplines[activeDiscIdx];
+  if (!disc) return;
+  const newTask = {
+    discipline_id: disc.id,
+    proposal_id:   PROPOSAL_ID,
+    name:          'New task',
+    phase:         'Phase 1',
+    hud_role_id:   hud_roles[0]?.id,
+    hud_role_name: hud_roles[0]?.name || getDefaultRole(),
+    level:         'Mid',
+    duration_days: 1,
+    labor_days:    1,
+    headcount:     1,
+    sort_order:    wbsTasks.filter(t=>t.discipline_id===disc.id).length,
+    is_risk_flag:  false,
+  };
+  newTask.estimated_hours = calcHrs(newTask.labor_days, newTask.headcount);
+  newTask.total_cost      = calcCost(newTask.labor_days, newTask.headcount, newTask.hud_role_name, newTask.level);
+
+  try {
+    const result = await API.post('wbs_tasks', newTask);
+    newTask.id = result?.[0]?.id;
+    wbsTasks.push(newTask);
+    renderTaskGrid();
+    renderCostPanel();
+    updateSummaryStrip();
+  } catch(e) { console.error(e); }
+}
+
+async function deleteTask(id) {
+  try {
+    await API.del(`wbs_tasks?id=eq.${id}`);
+    wbsTasks = wbsTasks.filter(t => t.id !== id);
+    renderTaskGrid();
+    renderCostPanel();
+    updateSummaryStrip();
+  } catch(e) { console.error(e); }
+}
+
+async function toggleRisk(id, el) {
+  const t = getTaskById(id);
+  if (!t) return;
+  t.is_risk_flag = !t.is_risk_flag;
+  await API.patch(`wbs_tasks?id=eq.${id}`, { is_risk_flag: t.is_risk_flag });
+  renderTaskGrid();
+  renderDiscTabs();
+}
+
+// ── cost calculations ──────────────────────────────────
+function calcHrs(days, ppl)   { return (days||0) * (ppl||1) * 8; }
+function calcCost(days, ppl, roleName, level) {
+  const roleRates = Object.entries(RATES).find(([k]) =>
+    roleName && roleName.toLowerCase().includes(k.split(' ')[0].toLowerCase())
+  );
+  const rate = roleRates ? (roleRates[1][level] || roleRates[1]['Mid'] || 50) : 50;
+  return Math.round((days||0) * (ppl||1) * 8 * rate);
+}
+function getDefaultRole() { return hud_roles[0]?.name || 'Engineer'; }
+function getTotalLaborCost() { return wbsTasks.reduce((s,t) => s + (t.total_cost||0), 0); }
+function getTotalMaterialCost() { return materials.reduce((s,m) => s + (m.cost||0), 0); }
+function fmtCost(n) { return '¥' + Math.round(n||0).toLocaleString(); }
+
+// ── cost panel ─────────────────────────────────────────
+function renderCostPanel() {
+  const totalLabor = getTotalLaborCost();
+  const rows = document.getElementById('cp-disc-rows');
+  const maxCost = Math.max(...disciplines.map(d =>
+    wbsTasks.filter(t=>t.discipline_id===d.id).reduce((s,t)=>s+(t.total_cost||0),0)
+  ), 1);
+
+  rows.innerHTML = disciplines.map(d => {
+    const cost = wbsTasks.filter(t=>t.discipline_id===d.id).reduce((s,t)=>s+(t.total_cost||0),0);
+    const pct  = (cost / maxCost * 90).toFixed(0);
+    return `
+      <div class="cp-row">
+        <span class="cp-name"><span class="cp-dot" style="background:${d.color}"></span>${escHtml(d.name)}</span>
+        <span class="cp-val">${fmtCost(cost)}</span>
+      </div>
+      <div class="cp-bar-wrap"><div class="cp-bar" style="width:${pct}%;background:${d.color}"></div></div>`;
+  }).join('');
+
+  document.getElementById('cp-labor').textContent = fmtCost(totalLabor);
+  const totalMat  = getTotalMaterialCost();
+  const grandTotal = totalLabor + totalMat;
+  document.getElementById('cp-mats').textContent  = fmtCost(totalMat);
+  document.getElementById('cp-total').textContent = fmtCost(grandTotal);
+}
+
+// ── materials ──────────────────────────────────────────
+function renderMaterialsList() {
+  const list = document.getElementById('mat-list');
+  list.innerHTML = materials.map(m => `
+    <div class="mat-row">
+      <span>${escHtml(m.name)}</span>
+      <span class="mat-val">${fmtCost(m.cost)}</span>
+    </div>`).join('');
+}
+
+async function addMaterial() {
+  const inp = document.getElementById('mat-name-input');
+  const raw = inp.value.trim();
+  if (!raw) return;
+  // parse "Item name · ¥cost" or "Item name 12000"
+  const match = raw.match(/^(.+?)[·\s]+[¥$]?([\d,]+)\s*$/);
+  const name  = match ? match[1].trim() : raw;
+  const cost  = match ? +match[2].replace(/,/g,'') : 0;
+
+  try {
+    const result = await API.post('wbs_materials', { proposal_id: PROPOSAL_ID, name, cost });
+    materials.push({ id: result?.[0]?.id, name, cost });
+    inp.value = '';
+    renderMaterialsList();
+    renderCostPanel();
+    updateSummaryStrip();
+  } catch(e) { console.error(e); }
+}
+
+// ── summary strip ──────────────────────────────────────
+function updateSummaryStrip() {
+  const totalHrs   = wbsTasks.reduce((s,t) => s + (t.estimated_hours||0), 0);
+  const totalDays  = wbsTasks.reduce((s,t) => s + (t.labor_days||0), 0);
+  const totalDur   = disciplines.length > 0
+    ? Math.max(...disciplines.map(d =>
+        wbsTasks.filter(t=>t.discipline_id===d.id).reduce((s,t)=>s+(t.duration_days||0),0)
+      ), 0) : 0;
+  const labor      = getTotalLaborCost();
+  const grand      = labor + getTotalMaterialCost();
+
+  document.getElementById('s-dur').textContent   = totalDur.toFixed(0);
+  document.getElementById('s-ldays').textContent = totalDays.toFixed(0);
+  document.getElementById('s-hrs').textContent   = totalHrs.toFixed(0);
+  document.getElementById('s-labor').textContent = fmtCost(labor);
+  document.getElementById('s-total').textContent = fmtCost(grand);
+
+  // save totals to proposal
+  if (PROPOSAL_ID) {
+    API.patch(`proposals?id=eq.${PROPOSAL_ID}`, {
+      total_labor_cost:    labor,
+      total_material_cost: getTotalMaterialCost(),
+      total_cost:          grand,
+    }).catch(()=>{});
+  }
+}
+
+// ── risk summary ───────────────────────────────────────
+function loadRiskSummary(risks) {
+  if (!risks.length) return;
+  const totalEMV = risks.reduce((s,r) =>
+    s + (r.emv_cost||0) + (r.assumption_emv_cost||0), 0);
+  if (totalEMV <= 0) return;
+
+  const base    = getTotalLaborCost() + getTotalMaterialCost();
+  const cont    = Math.round(totalEMV);
+  const mgmt    = Math.round(base * 0.10);
+  const worst   = base + cont + mgmt;
+  const contPct = base > 0 ? (cont / worst * 100).toFixed(0) : 0;
+  const mgmtPct = base > 0 ? (mgmt / worst * 100).toFixed(0) : 0;
+  const basePct = (100 - +contPct - +mgmtPct).toFixed(0);
+
+  document.getElementById('range-section').style.display = 'block';
+  document.getElementById('cont-block').style.display   = 'block';
+  document.getElementById('rb-base').style.width   = basePct + '%';
+  document.getElementById('rb-cont').style.left    = basePct + '%';
+  document.getElementById('rb-cont').style.width   = contPct + '%';
+  document.getElementById('rb-worst').style.left   = (+basePct + +contPct) + '%';
+  document.getElementById('rb-worst').style.width  = mgmtPct + '%';
+  document.getElementById('rv-base').textContent  = fmtCost(base);
+  document.getElementById('rv-cont').textContent  = fmtCost(base + cont);
+  document.getElementById('rv-worst').textContent = fmtCost(worst);
+  document.getElementById('cb-val').textContent   = fmtCost(cont);
+  document.getElementById('cb-sub').textContent   =
+    `${risks.length} risk items · EMV-based (PMI standard)`;
+}
+
+async function addContingency() {
+  const risks = await API.get(`risk_items?proposal_id=eq.${PROPOSAL_ID}&select=emv_cost,assumption_emv_cost`);
+  const cont = (risks||[]).reduce((s,r)=>s+(r.emv_cost||0)+(r.assumption_emv_cost||0),0);
+  if (cont > 0 && PROPOSAL_ID) {
+    await API.patch(`proposals?id=eq.${PROPOSAL_ID}`, { contingency_reserve: Math.round(cont) });
+    alert(`Contingency reserve of ${fmtCost(cont)} added to proposal.`);
+  }
+}
+
+// ── templates ──────────────────────────────────────────
+function populateTemplateSelect() {
+  const sel = document.getElementById('tpl-select');
+  templates.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id;
+    o.textContent = t.name + (t.industry_tag ? ' · ' + t.industry_tag : '');
+    sel.appendChild(o);
+  });
+}
+
+async function loadTemplate() {
+  const tplId = document.getElementById('tpl-select').value;
+  if (!tplId) return;
+  if (!confirm('Load template? This will add disciplines and tasks to the current WBS.')) return;
+
+  try {
+    const [tplDiscs, tplTasks] = await Promise.all([
+      API.get(`wbs_template_disciplines?template_id=eq.${tplId}&order=sort_order`),
+      API.get(`wbs_template_tasks?select=*,wbs_template_disciplines!inner(template_id)&wbs_template_disciplines.template_id=eq.${tplId}&order=sort_order`),
+    ]);
+
+    for (const td of (tplDiscs||[])) {
+      const result = await API.post('wbs_disciplines', {
+        proposal_id:    PROPOSAL_ID,
+        name:           td.name,
+        color:          td.color || DISC_COLORS[disciplines.length % DISC_COLORS.length],
+        default_role_id: td.default_role_id,
+        sort_order:     disciplines.length,
+      });
+      const newDiscId = result?.[0]?.id;
+      if (!newDiscId) continue;
+      disciplines.push({ id: newDiscId, name: td.name, color: td.color || DISC_COLORS[disciplines.length % DISC_COLORS.length] });
+
+      const discTasks = (tplTasks||[]).filter(tt => tt.discipline_id === td.id);
+      for (const tt of discTasks) {
+        const role = hud_roles.find(r => r.id === tt.hud_role_id);
+        const newTask = {
+          discipline_id: newDiscId,
+          proposal_id:   PROPOSAL_ID,
+          name:          tt.name,
+          phase:         tt.phase || 'Phase 1',
+          hud_role_id:   tt.hud_role_id,
+          hud_role_name: role?.name || getDefaultRole(),
+          level:         tt.default_level || 'Mid',
+          duration_days: tt.duration_days || 1,
+          labor_days:    tt.labor_days || 1,
+          headcount:     tt.headcount || 1,
+          sort_order:    tt.sort_order || 0,
+          is_risk_flag:  tt.is_risk_flag || false,
+        };
+        newTask.estimated_hours = calcHrs(newTask.labor_days, newTask.headcount);
+        newTask.total_cost      = calcCost(newTask.labor_days, newTask.headcount, newTask.hud_role_name, newTask.level);
+        const tResult = await API.post('wbs_tasks', newTask);
+        newTask.id = tResult?.[0]?.id;
+        wbsTasks.push(newTask);
+      }
+    }
+
+    renderDiscTabs();
+    renderTaskGrid();
+    renderCostPanel();
+    updateSummaryStrip();
+  } catch(e) { console.error(e); alert('Failed to load template.'); }
+}
+
+// ── add discipline ─────────────────────────────────────
+async function addDiscipline() {
+  const name = prompt('Discipline name:');
+  if (!name?.trim()) return;
+  const color = DISC_COLORS[disciplines.length % DISC_COLORS.length];
+  try {
+    const result = await API.post('wbs_disciplines', {
+      proposal_id: PROPOSAL_ID,
+      name: name.trim(),
+      color,
+      sort_order: disciplines.length,
+    });
+    disciplines.push({ id: result?.[0]?.id, name: name.trim(), color });
+    activeDiscIdx = disciplines.length - 1;
+    renderDiscTabs();
+    renderTaskGrid();
+    renderCostPanel();
+  } catch(e) { console.error(e); }
+}
+
+// ── save as template ───────────────────────────────────
+function openTemplateModal() {
+  const checks = document.getElementById('tpl-disc-checks');
+  checks.innerHTML = disciplines.map(d => `
+    <div class="dcl-row">
+      <input type="checkbox" checked id="tplc-${d.id}" />
+      <div style="width:8px;height:8px;border-radius:50%;background:${d.color}"></div>
+      <label for="tplc-${d.id}" style="flex:1;cursor:pointer">${escHtml(d.name)}</label>
+      <span style="font-size:10px;color:var(--muted)">${wbsTasks.filter(t=>t.discipline_id===d.id).length} tasks</span>
+    </div>`).join('');
+  document.getElementById('tpl-name').value = (proposal?.title || 'WBS Template').replace(/— Proposal.*/,'').trim();
+  document.getElementById('tpl-modal').classList.add('open');
+}
+
+function closeTplModal(e) {
+  if (e.target === document.getElementById('tpl-modal'))
+    document.getElementById('tpl-modal').classList.remove('open');
+}
+
+async function saveTemplate() {
+  const name = document.getElementById('tpl-name').value.trim();
+  if (!name) { alert('Template name is required.'); return; }
+
+  const stripCosts  = document.getElementById('strip-costs').checked;
+  const visibility  = document.getElementById('tpl-visibility').value;
+  const industry    = document.getElementById('tpl-industry').value;
+  const description = document.getElementById('tpl-desc').value.trim();
+
+  try {
+    const tplResult = await API.post('wbs_templates', {
+      firm_id:     proposal.firm_id,
+      name, description, industry_tag: industry, visibility,
+    });
+    const tplId = tplResult?.[0]?.id;
+
+    const selectedDiscs = disciplines.filter(d =>
+      document.getElementById('tplc-' + d.id)?.checked
+    );
+
+    for (const d of selectedDiscs) {
+      const discResult = await API.post('wbs_template_disciplines', {
+        template_id:    tplId,
+        name:           d.name,
+        color:          d.color,
+        default_role_id: d.default_role_id,
+        sort_order:     d.sort_order || 0,
+      });
+      const tdId = discResult?.[0]?.id;
+
+      const tasks = wbsTasks.filter(t => t.discipline_id === d.id);
+      for (const t of tasks) {
+        await API.post('wbs_template_tasks', {
+          discipline_id:  tdId,
+          name:           t.name,
+          phase:          t.phase,
+          hud_role_id:    t.hud_role_id,
+          default_level:  t.level,
+          duration_days:  stripCosts ? t.duration_days : t.duration_days,
+          labor_days:     stripCosts ? t.labor_days    : t.labor_days,
+          headcount:      t.headcount,
+          sort_order:     t.sort_order || 0,
+          is_risk_flag:   t.is_risk_flag,
+        });
+      }
+    }
+
+    const body = document.getElementById('tpl-modal-body');
+    const foot = document.getElementById('tpl-modal-foot');
+    body.innerHTML = `
+      <div class="success-state">
+        <div class="ss-icon">✓</div>
+        <div class="ss-title">Template saved</div>
+        <div class="ss-sub">"${escHtml(name)}" is now available in the template picker.<br>
+          Industry: ${escHtml(industry)} · ${escHtml(capitalize(visibility))}</div>
+      </div>`;
+    foot.innerHTML = `<button class="btn btn-primary" onclick="document.getElementById('tpl-modal').classList.remove('open')">Done</button>`;
+
+    templates.push({ id: tplId, name, industry_tag: industry });
+    populateTemplateSelect();
+  } catch(e) { console.error(e); alert('Failed to save template.'); }
+}
+
+// ── convert to project ─────────────────────────────────
+async function convertToProject() {
+  if (!confirm('Convert this WBS to a project plan?\n\nThis will create a new project with tasks seeded from the WBS. The proposal remains unchanged.')) return;
+
+  try {
+    const p = proposal;
+    const projResult = await API.post('projects', {
+      firm_id:            p.firm_id,
+      company_id:         null,
+      source_proposal_id: PROPOSAL_ID,
+      name:               p.title.replace(/— Proposal.*/,'').trim(),
+      description:        'Seeded from WBS estimator',
+      status:             'planning',
+      expense_budget_baseline: p.total_cost,
+      contingency_reserve:     p.contingency_reserve,
+      management_reserve:      p.management_reserve,
+    });
+    const projId = projResult?.[0]?.id;
+
+    // create tasks from WBS tasks
+    for (const wt of wbsTasks) {
+      const disc = disciplines.find(d => d.id === wt.discipline_id);
+      await API.post('tasks', {
+        project_id:         projId,
+        firm_id:            p.firm_id,
+        source_wbs_task_id: wt.id,
+        name:               wt.name,
+        phase:              disc?.name || wt.phase || 'Phase 1',
+        hud_role_id:        wt.hud_role_id,
+        budget_hours:       wt.estimated_hours,
+        duration_days:      wt.duration_days,
+        status:             'not_started',
+        sequence_order:     wt.sort_order || 0,
+      });
+    }
+
+    // mark proposal as approved
+    await API.patch(`proposals?id=eq.${PROPOSAL_ID}`, {
+      status: 'approved',
+      approved_date: new Date().toLocaleDateString('en-CA'),
+    });
+
+    if (confirm('Project created successfully!\n\nOpen the project now?')) {
+      location.href = `/project-detail.html?id=${projId}`;
+    }
+  } catch(e) { console.error(e); alert('Failed to convert to project. Check console.'); }
+}
+
+// ── SOW / export ───────────────────────────────────────
+function openSOW() {
+  location.href = `/sow-builder.html?proposal_id=${PROPOSAL_ID}`;
+}
+
+function exportPDF() {
+  alert('PDF export will render the full proposal document. Feature coming in next build.');
+}
+
+// ── helpers ────────────────────────────────────────────
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

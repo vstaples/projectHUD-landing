@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pipeline — ProjectHUD</title>
+<style>
+/* ── reset & base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:        #0f1117;
+  --surface:   #181c27;
+  --surface2:  #1e2436;
+  --border:    rgba(255,255,255,.08);
+  --border2:   rgba(255,255,255,.14);
+  --text:      #e8eaf0;
+  --muted:     #7a8099;
+  --accent:    #4f8ef7;
+
+  --stage-prospect:   #3d4560;
+  --stage-qualifying: #2d5a8e;
+  --stage-discovery:  #1a6b5a;
+  --stage-proposal:   #6b4f1a;
+  --stage-review:     #6b2d5a;
+  --stage-approved:   #1a6b2d;
+  --stage-declined:   #6b1a1a;
+
+  --pri-low:    #3d5a3d;
+  --pri-med:    #6b5a1a;
+  --pri-high:   #6b1a1a;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── layout ───────────────────────────────────────────── */
+#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── top bar ──────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.topbar-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stat-chip strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text);
+}
+.btn:hover { background: #262d42; }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { opacity: .88; }
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  font-size: 12px;
+  color: var(--text);
+  width: 200px;
+}
+.search-box input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 12px;
+  width: 100%;
+}
+.search-box input::placeholder { color: var(--muted); }
+
+/* ── kanban board ─────────────────────────────────────── */
+.board-wrap {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.kb-col {
+  flex-shrink: 0;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 120px);
+}
+
+.kb-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.kb-stage-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kb-count {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.08);
+  color: var(--muted);
+}
+
+.kb-cards {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255,255,255,.02);
+  border: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  min-height: 80px;
+}
+
+.kb-cards::-webkit-scrollbar { width: 4px; }
+.kb-cards::-webkit-scrollbar-track { background: transparent; }
+.kb-cards::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* prospect card */
+.p-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: border-color .15s, transform .1s;
+  position: relative;
+}
+.p-card:hover {
+  border-color: var(--border2);
+  transform: translateY(-1px);
+}
+
+.p-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.p-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.p-card-co {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.pri-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.p-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.tag-med  { background: #1a3a5c; color: #7ab3f0; }
+.tag-ind  { background: #1a3a2a; color: #7af0a0; }
+.tag-soft { background: #2a1a5c; color: #a07af0; }
+.tag-aero { background: #1a2a3a; color: #7ad4f0; }
+.tag-other{ background: #2a2a2a; color: #a0a0a0; }
+
+.p-card-val {
+  font-size: 11px;
+  color: var(--muted);
+}
+.p-card-val span { color: var(--text); font-weight: 600; }
+
+.p-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+
+.assigned-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.av-xs {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2d3a5c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.followup-chip {
+  font-size: 10px;
+  color: var(--muted);
+}
+.followup-chip.overdue { color: #f07a7a; }
+.followup-chip.today   { color: #f0c47a; }
+
+/* action items badge */
+.ai-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(240,180,100,.15);
+  color: #f0b464;
+  border: 1px solid rgba(240,180,100,.25);
+}
+
+/* empty state */
+.kb-empty {
+  text-align: center;
+  padding: 20px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* add card button */
+.add-card-btn {
+  width: 100%;
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px dashed var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  text-align: center;
+}
+.add-card-btn:hover {
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+}
+
+/* ── loading / error states ───────────────────────────── */
+.board-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-right: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── new prospect slide-in ────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 100;
+  display: none;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+.overlay.open { display: flex; }
+
+.drawer {
+  width: 480px;
+  height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--border2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.drawer-title { font-size: 15px; font-weight: 600; }
+.drawer-close {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.drawer-close:hover { background: var(--surface2); color: var(--text); }
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.drawer-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* form fields */
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 5px;
+}
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+.field select option { background: #1e2436; }
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.sec-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin: 18px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* toggle pills */
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.pill.active {
+  border-color: var(--accent);
+  background: rgba(79,142,247,.15);
+  color: var(--accent);
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+  <!-- top bar -->
+  <div class="topbar">
+    <span class="topbar-title">Prospect pipeline</span>
+    <div class="topbar-stats" id="pipeline-stats">
+      <div class="stat-chip">
+        <strong id="stat-total">—</strong> prospects
+      </div>
+      <div class="stat-chip">
+        <strong id="stat-value">—</strong> total est. value
+      </div>
+      <div class="stat-chip" id="stat-overdue-wrap" style="display:none">
+        <strong id="stat-overdue" style="color:#f07a7a">—</strong> follow-ups overdue
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="search-box">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <circle cx="6.5" cy="6.5" r="5" stroke="#7a8099" stroke-width="1.5"/>
+          <path d="M10.5 10.5L14 14" stroke="#7a8099" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input id="search-input" placeholder="Search prospects..." />
+      </div>
+      <button class="btn btn-primary" onclick="openDrawer()">
+        + New prospect
+      </button>
+    </div>
+  </div>
+
+  <!-- board -->
+  <div id="board-wrap" class="board-wrap">
+    <div class="board-loading">
+      <div class="spinner"></div>
+      Loading pipeline…
+    </div>
+  </div>
+</div>
+
+<!-- new prospect drawer -->
+<div class="overlay" id="drawer-overlay" onclick="handleOverlayClick(event)">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">New prospect</span>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field">
+        <label>Company <span style="color:#f07a7a">*</span></label>
+        <select id="f-company">
+          <option value="">— Select or add company —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Initiative / project title <span style="color:#f07a7a">*</span></label>
+        <input id="f-title" type="text" placeholder="e.g. Endoscopic Platform Development" />
+      </div>
+
+      <div class="sec-label">Industry</div>
+      <div class="pill-group" id="industry-pills">
+        <button class="pill" data-val="Medical device">Medical device</button>
+        <button class="pill" data-val="Industrial">Industrial</button>
+        <button class="pill" data-val="Software">Software</button>
+        <button class="pill" data-val="Aerospace">Aerospace</button>
+        <button class="pill" data-val="Consumer">Consumer</button>
+        <button class="pill" data-val="Energy">Energy</button>
+        <button class="pill" data-val="Defense">Defense</button>
+        <button class="pill" data-val="Other">Other</button>
+      </div>
+
+      <div class="sec-label">How did they find us?</div>
+      <div class="pill-group" id="source-pills">
+        <button class="pill" data-val="Referral">Referral</button>
+        <button class="pill" data-val="LinkedIn">LinkedIn</button>
+        <button class="pill" data-val="Conference">Conference</button>
+        <button class="pill" data-val="Website">Website</button>
+        <button class="pill" data-val="Existing client">Existing client</button>
+        <button class="pill" data-val="Cold contact">Cold contact</button>
+        <button class="pill" data-val="Other">Other</button>
+      </div>
+
+      <div class="sec-label">Brief description</div>
+      <div class="field">
+        <textarea id="f-description" placeholder="What are they trying to build or solve?"></textarea>
+      </div>
+
+      <div class="sec-label">Budget & timeline</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Budget low (¥)</label>
+          <input id="f-budget-low" type="number" placeholder="0" />
+        </div>
+        <div class="field">
+          <label>Budget high (¥)</label>
+          <input id="f-budget-high" type="number" placeholder="0" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Timeline urgency</label>
+          <select id="f-urgency">
+            <option value="exploring">Exploring</option>
+            <option value="within_6_months">Within 6 months</option>
+            <option value="within_3_months">Within 3 months</option>
+            <option value="immediate">Immediate</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select id="f-priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec-label">Our team</div>
+      <div class="field">
+        <label>Assigned to <span style="color:#f07a7a">*</span></label>
+        <select id="f-assigned">
+          <option value="">— Select —</option>
+        </select>
+      </div>
+
+      <div class="sec-label">First follow-up</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Follow-up date <span style="color:#f07a7a">*</span></label>
+          <input id="f-followup" type="date" />
+        </div>
+        <div class="field">
+          <label>Type</label>
+          <select id="f-followup-type">
+            <option value="Phone call">Phone call</option>
+            <option value="Video call">Video call</option>
+            <option value="In-person meeting">In-person meeting</option>
+            <option value="Send info">Send info</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveProspect()">Save prospect</button>
+      <button class="btn" onclick="saveAndOpen()">Save &amp; open detail</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+// ── config ─────────────────────────────────────────────
+const STAGES = [
+  { key: 'prospect',   label: 'Prospect',   color: '#4f6080' },
+  { key: 'qualifying', label: 'Qualifying', color: '#3a7abf' },
+  { key: 'discovery',  label: 'Discovery',  color: '#2a9d7a' },
+  { key: 'proposal',   label: 'Proposal',   color: '#d4901f' },
+  { key: 'review',     label: 'Review',     color: '#c0407a' },
+  { key: 'approved',   label: 'Approved',   color: '#2a9d40' },
+];
+
+const INDUSTRY_TAGS = {
+  'Medical device': 'tag-med',
+  'Industrial':     'tag-ind',
+  'Software':       'tag-soft',
+  'Aerospace':      'tag-aero',
+};
+
+let allProspects = [];
+let companies    = [];
+let resources    = [];
+
+// ── init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (window.Sidebar) Sidebar.init('pipeline');
+  await loadData();
+  renderBoard(allProspects);
+  bindSearch();
+});
+
+async function loadData() {
+  try {
+    const [pros, comps, ress] = await Promise.all([
+      API.get('v_pipeline_summary?order=created_at.desc&limit=200'),
+      API.get('companies?order=name&select=id,name,industry'),
+      API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url'),
+    ]);
+    allProspects = pros || [];
+    companies    = comps || [];
+    resources    = ress || [];
+    populateFormSelects();
+    updateStats(allProspects);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('board-wrap').innerHTML =
+      `<div class="board-loading" style="color:#f07a7a">Failed to load pipeline. Check console.</div>`;
+  }
+}
+
+// ── stats strip ────────────────────────────────────────
+function updateStats(prospects) {
+  const total  = prospects.length;
+  const value  = prospects.reduce((s, p) => s + (p.est_value || 0), 0);
+  const today  = new Date().toLocaleDateString('en-CA');
+  const overdue = prospects.filter(p =>
+    p.next_follow_up_date && p.next_follow_up_date < today
+  ).length;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-value').textContent =
+    value > 0 ? '¥' + (value / 1000).toFixed(0) + 'k' : '—';
+
+  if (overdue > 0) {
+    document.getElementById('stat-overdue').textContent = overdue;
+    document.getElementById('stat-overdue-wrap').style.display = 'flex';
+  }
+}
+
+// ── board render ───────────────────────────────────────
+function renderBoard(prospects) {
+  const wrap = document.getElementById('board-wrap');
+  wrap.innerHTML = '';
+
+  STAGES.forEach(stage => {
+    const cards = prospects.filter(p => p.stage === stage.key);
+    const col   = document.createElement('div');
+    col.className = 'kb-col';
+    col.innerHTML = `
+      <div class="kb-col-head">
+        <div class="kb-stage-label">
+          <div class="stage-dot" style="background:${stage.color}"></div>
+          ${stage.label}
+        </div>
+        <span class="kb-count">${cards.length}</span>
+      </div>
+      <div class="kb-cards" id="col-${stage.key}">
+        ${cards.length === 0
+          ? `<div class="kb-empty">No prospects<br>in this stage</div>`
+          : cards.map(renderCard).join('')}
+      </div>
+      <button class="add-card-btn" onclick="openDrawerForStage('${stage.key}')">+ Add</button>
+    `;
+    wrap.appendChild(col);
+  });
+}
+
+function renderCard(p) {
+  const today = new Date().toLocaleDateString('en-CA');
+  const fu    = p.next_follow_up_date;
+  let fuClass = '', fuText = '—';
+  if (fu) {
+    fuText = new Date(fu + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    if (fu < today)       fuClass = 'overdue';
+    else if (fu === today) fuClass = 'today';
+  }
+
+  const initials = ((p.assigned_to_name || '').split(' ')
+    .map(w => w[0]).join('').toUpperCase().slice(0, 2)) || '—';
+
+  const tagClass = INDUSTRY_TAGS[p.company_industry] || 'tag-other';
+  const priColor = p.priority === 'high' ? '#f07a7a'
+                 : p.priority === 'medium' ? '#f0c47a' : '#7af0a0';
+
+  const aiCount = p.open_action_items > 0
+    ? `<div class="ai-badge">${p.open_action_items} action${p.open_action_items > 1 ? 's' : ''}</div>`
+    : '';
+
+  const val = p.est_value ? '¥' + (p.est_value / 1000).toFixed(0) + 'k' : '';
+
+  return `
+    <div class="p-card" onclick="openProspect('${p.id}')">
+      ${aiCount}
+      <div class="p-card-top">
+        <div class="p-card-name">${escHtml(p.title)}</div>
+        <div class="pri-dot" style="background:${priColor}" title="${p.priority} priority"></div>
+      </div>
+      <div class="p-card-co">${escHtml(p.company_name || '—')}</div>
+      <div class="p-card-meta">
+        ${p.company_industry
+          ? `<span class="tag ${tagClass}">${escHtml(p.company_industry)}</span>` : ''}
+        ${val ? `<span class="p-card-val"><span>${val}</span></span>` : ''}
+      </div>
+      <div class="p-card-foot">
+        <div class="assigned-chip">
+          <div class="av-xs">${initials}</div>
+          ${escHtml((p.assigned_to_name || '').split(' ')[0] || '—')}
+        </div>
+        <div class="followup-chip ${fuClass}">${fuText}</div>
+      </div>
+    </div>`;
+}
+
+// ── search ─────────────────────────────────────────────
+function bindSearch() {
+  document.getElementById('search-input').addEventListener('input', function () {
+    const q = this.value.toLowerCase();
+    const filtered = allProspects.filter(p =>
+      (p.title || '').toLowerCase().includes(q) ||
+      (p.company_name || '').toLowerCase().includes(q)
+    );
+    renderBoard(filtered);
+    updateStats(filtered);
+  });
+}
+
+// ── navigation ─────────────────────────────────────────
+function openProspect(id) {
+  window.location.href = `/prospect-detail.html?id=${id}`;
+}
+
+// ── drawer ─────────────────────────────────────────────
+let _drawerStage = 'prospect';
+let _saveAndNavigate = false;
+
+function openDrawer(stage) {
+  _drawerStage = stage || 'prospect';
+  _saveAndNavigate = false;
+  document.getElementById('drawer-overlay').classList.add('open');
+  // set default follow-up date to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('f-followup').value = tomorrow.toLocaleDateString('en-CA');
+}
+
+function openDrawerForStage(stage) {
+  openDrawer(stage);
+}
+
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  clearForm();
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('drawer-overlay')) closeDrawer();
+}
+
+function saveAndOpen() {
+  _saveAndNavigate = true;
+  saveProspect();
+}
+
+function populateFormSelects() {
+  // companies
+  const cSel = document.getElementById('f-company');
+  companies.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    cSel.appendChild(opt);
+  });
+
+  // resources
+  const rSel = document.getElementById('f-assigned');
+  resources.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = r.first_name + ' ' + r.last_name;
+    rSel.appendChild(opt);
+  });
+}
+
+// pill toggle
+document.querySelectorAll('.pill-group').forEach(group => {
+  group.querySelectorAll('.pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      group.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+  });
+});
+
+function getActivePill(groupId) {
+  const active = document.querySelector(`#${groupId} .pill.active`);
+  return active ? active.dataset.val : null;
+}
+
+async function saveProspect() {
+  const title      = document.getElementById('f-title').value.trim();
+  const company_id = document.getElementById('f-company').value;
+  const assigned   = document.getElementById('f-assigned').value;
+  const followup   = document.getElementById('f-followup').value;
+
+  if (!title || !company_id || !assigned || !followup) {
+    alert('Please fill in required fields: Company, Title, Assigned to, Follow-up date.');
+    return;
+  }
+
+  const payload = {
+    title,
+    company_id,
+    stage:               _drawerStage,
+    priority:            document.getElementById('f-priority').value,
+    industry_tag:        getActivePill('industry-pills'),
+    source:              getActivePill('source-pills'),
+    description:         document.getElementById('f-description').value.trim() || null,
+    budget_range_low:    +document.getElementById('f-budget-low').value || null,
+    budget_range_high:   +document.getElementById('f-budget-high').value || null,
+    timeline_urgency:    document.getElementById('f-urgency').value,
+    assigned_to:         assigned,
+    next_follow_up_date: followup,
+    next_follow_up_type: document.getElementById('f-followup-type').value,
+  };
+
+  try {
+    const result = await API.post('prospects', payload);
+    const newId  = result?.[0]?.id;
+    closeDrawer();
+    if (_saveAndNavigate && newId) {
+      window.location.href = `/prospect-detail.html?id=${newId}`;
+    } else {
+      await loadData();
+      renderBoard(allProspects);
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Failed to save prospect. Check console.');
+  }
+}
+
+function clearForm() {
+  ['f-title','f-description','f-budget-low','f-budget-high'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-company').value  = '';
+  document.getElementById('f-assigned').value = '';
+  document.getElementById('f-priority').value = 'medium';
+  document.getElementById('f-urgency').value  = 'exploring';
+  document.querySelectorAll('.pill.active').forEach(p => p.classList.remove('active'));
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
