@@ -1092,9 +1092,7 @@ async function loadAll() {
     document.getElementById('tbadge-sh').textContent       = stakeholders.length;
     document.getElementById('tbadge-ai').textContent       = allActionItems.filter(a => a.status === 'open').length;
     document.getElementById('tbadge-meet').textContent     = meetings.length;
-
-    // Turn meetings badge red if any action item (prospect OR meeting) is overdue
-    updateMeetingsBadge();
+    updateMeetingsBadge();  // Apply color immediately after setting text
 
   } catch(e) {
     console.error(e);
@@ -1167,7 +1165,9 @@ function renderHeader() {
 function renderOverview() {
   const p   = prospect;
   const today = new Date().toLocaleDateString('en-CA');
-  const openAI = allActionItems.filter(a => a.status === 'open').slice(0, 3);
+  // Overview shows meeting action items first (most recent/actionable), then prospect ones
+  const allOpen  = allActionItems.filter(a => a.status === 'open');
+  const openAI   = allOpen.slice(0, 3);
   const nextMeet = meetings.find(m => m.status === 'scheduled');
 
   document.getElementById('panel-overview').innerHTML = `
@@ -1224,10 +1224,10 @@ function renderOverview() {
                   color:${ai.status==='complete'?'#7af0a0':ai.due_date&&ai.due_date<today&&ai.status!=='complete'?'#f07a7a':'var(--amber)'}">${ai.status||'open'}</span>
               </div>
             </div>`).join('')}
-        ${openAI.length >= 3 && allActionItems.filter(a=>a.status==='open').length > 3
+        ${allOpen.length > 3
           ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px"
               onclick="switchTab('meetings')">
-              +${allActionItems.filter(a=>a.status==='open').length - 3} more →</div>`
+              +${allOpen.length - 3} more →</div>`
           : ''}
       </div>
       <div class="card">
@@ -1463,6 +1463,21 @@ function renderActions() {
 }
 
 // ── meetings ───────────────────────────────────────────
+function updateMeetingCardBadge(meetId) {
+  // Find the badge span inside the meeting card title and update it
+  const card = document.getElementById('mcard-' + meetId);
+  if (!card) return;
+  const badgeSpan = card.querySelector('.meet-title-text span[style*="border-radius:8px"]');
+  const newBadge  = meetingAIBadge(meetId);
+  if (badgeSpan) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = newBadge;
+    const newSpan = tmp.firstElementChild;
+    if (newSpan) badgeSpan.replaceWith(newSpan);
+    else if (!newBadge) badgeSpan.remove();
+  }
+}
+
 function updateMeetingsBadge() {
   const today = new Date().toLocaleDateString('en-CA');
   const hasOverdue = allActionItems.some(a =>
@@ -2609,7 +2624,7 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
       const due = dueSpan.dataset?.due || row?.dataset?.aiDue || '';
       const isOverdue = due && due < today2 && newStatus !== 'complete';
       dueSpan.classList.toggle('overdue', isOverdue);
-      dueSpan.style.color = isOverdue ? '#f07a7a' : '';
+      dueSpan.style.color = '';  // always clear inline — let CSS class control color
     }
 
     // Toggle status badge on the row
@@ -2637,6 +2652,10 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
     if (badge) badge.textContent = allActionItems.filter(a => a.status === 'open').length;
     // Refresh meetings badge overdue state
     updateMeetingsBadge();
+    // Update the meeting card header AI badge dynamically
+    if (meetId) updateMeetingCardBadge(meetId);
+    // Also refresh overview open action items count
+    renderOverview();
 
   } catch(e) {
     console.error('toggleMeetingAIStatus error:', e);
