@@ -2679,7 +2679,7 @@ async function saveTaskForm() {
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
           await API.post('task_skill_requirements', {
             task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
-            })..catch(function(e){ console.warn('skill req save:',e); });
+            }).catch(function(e){ console.warn('skill req save:',e); });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
