@@ -1451,7 +1451,13 @@ function renderMeetings() {
           </div>
 
           <div id="maction-wrap-${m.id}">
-            <div class="mb-label" style="margin-top:10px">Action items</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;margin-bottom:4px">
+              <div class="mb-label" style="margin-top:0">Action items</div>
+              <button class="btn" style="font-size:10px;padding:3px 8px;height:auto"
+                onclick="event.stopPropagation();openAddMeetingActionItem('${m.id}')">
+                + Add
+              </button>
+            </div>
             <div id="mactions-${m.id}">
               <div style="font-size:11px;color:var(--muted)">Loading…</div>
             </div>
@@ -1760,16 +1766,42 @@ async function saveActionItem() {
   if (!assigned) { alert('Assignee is required.'); return; }
   if (!due)      { alert('Due date is required.'); return; }
   try {
-    await API.post('prospect_action_items', {
-      prospect_id:  PROSPECT_ID,
-      description:  desc,
-      assigned_to:  assigned,
-      due_date:     due,
-      status:       'open',
-    });
-    closeDrawer('ai-overlay');
-    await loadAll();
-    switchTab('actions');
+    const targetMeetId = window._addAITargetMeetId;
+    if (targetMeetId) {
+      // Adding from inside a meeting card → post to meeting_action_items
+      await API.post('meeting_action_items', {
+        meeting_id:          targetMeetId,
+        description:         desc,
+        assigned_to_resource: assigned,
+        due_date:            due,
+        status:              'open',
+      });
+      window._addAITargetMeetId = null;
+      closeDrawer('ai-overlay');
+      // Re-expand the meeting card with fresh data
+      setTimeout(() => {
+        const card   = document.getElementById('mcard-' + targetMeetId);
+        const expand = document.getElementById('mexpand-' + targetMeetId);
+        if (card && expand) {
+          card.classList.add('open');
+          expand.style.display = 'block';
+          card.dataset.loaded = '1';
+          loadMeetingDetail(targetMeetId);
+        }
+      }, 150);
+    } else {
+      // Adding from Actions tab → post to prospect_action_items
+      await API.post('prospect_action_items', {
+        prospect_id:  PROSPECT_ID,
+        description:  desc,
+        assigned_to:  assigned,
+        due_date:     due,
+        status:       'open',
+      });
+      closeDrawer('ai-overlay');
+      await loadAll();
+      switchTab('actions');
+    }
   } catch(e) {
     console.error(e);
     alert('Failed to save action item.');
@@ -1779,6 +1811,28 @@ async function saveActionItem() {
 // ── action item edit ───────────────────────────────────
 let _attachedFiles = [];       // files staged in current edit session
 const _aiAttachments = {};    // { [aiId]: [{name, size, url, type}] } — persists across drawer opens
+
+function openAddMeetingActionItem(meetId) {
+  // Pre-populate the Add Action Item drawer and link it to this meeting
+  window._addAITargetMeetId = meetId;
+
+  // Populate resource dropdown
+  const sel = document.getElementById('ai-assignee-sel');
+  sel.innerHTML = '<option value="">— Assign to —</option>';
+  resources.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.first_name + ' ' + r.last_name;
+    sel.appendChild(o);
+  });
+
+  // Default due date 1 week out
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  document.getElementById('ai-due-input').value = d.toLocaleDateString('en-CA');
+  document.getElementById('ai-desc-input').value = '';
+  document.getElementById('ai-overlay').classList.add('open');
+}
 
 function openEditActionItemFromRow(row, sourceMeetId) {
   window._editAISourceMeetId = sourceMeetId || null;
