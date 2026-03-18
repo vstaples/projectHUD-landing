@@ -398,6 +398,49 @@ body {
 .adot-us   { width: 6px; height: 6px; border-radius: 50%; background: #7af0c0; }
 .adot-them { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 
+/* expandable meeting card */
+.meet-card { cursor: pointer; }
+.meet-card:hover { border-color: var(--border2); }
+.meet-expand {
+  display: none;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.meet-card.open .meet-expand { display: block; }
+.meet-chevron {
+  font-size: 10px; color: var(--muted);
+  transition: transform .2s;
+  margin-left: 6px;
+}
+.meet-card.open .meet-chevron { transform: rotate(180deg); }
+.agenda-list { margin-bottom: 10px; }
+.agenda-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.agenda-item:last-child { border-bottom: none; }
+.agenda-num {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  width: 16px; text-align: right; flex-shrink: 0; margin-top: 1px;
+}
+.minutes-block {
+  background: var(--surf2); border-radius: 7px;
+  padding: 10px 12px; margin-top: 8px;
+}
+.mb-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); margin-bottom: 6px;
+}
+.mb-section { margin-bottom: 8px; }
+.mb-section-lbl {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px;
+}
+.mb-section-text {
+  font-size: 12px; color: var(--text); line-height: 1.65;
+}
+
 /* ── proposal placeholder ─────────────────────────────── */
 .proposal-placeholder {
   text-align: center;
@@ -1114,27 +1157,124 @@ function renderActions() {
 // ── meetings ───────────────────────────────────────────
 function renderMeetings() {
   const panel = document.getElementById('panel-meetings');
+  if (meetings.length === 0) {
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-primary" onclick="openMeetingDrawer()">+ Schedule meeting</button>
+      </div>
+      <div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">No meetings scheduled yet.</div>`;
+    return;
+  }
+
   panel.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
       <button class="btn btn-primary" onclick="openMeetingDrawer()">+ Schedule meeting</button>
     </div>
-    ${meetings.length === 0
-      ? `<div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">No meetings scheduled yet.</div>`
-      : meetings.map(m => `
-        <div class="meet-card">
-          <div class="meet-head">
-            <div>
-              <div class="meet-title-text">${escHtml(m.title)}</div>
-              <div class="meet-sub-text">
-                ${fmtDateTime(m.meeting_date)} · ${m.duration_minutes} min · ${capitalize(m.format||'')}
-              </div>
+    ${meetings.map(m => `
+      <div class="meet-card" id="mcard-${m.id}" onclick="toggleMeetingCard('${m.id}')">
+        <div class="meet-head">
+          <div style="flex:1">
+            <div class="meet-title-text" style="display:flex;align-items:center;gap:4px">
+              ${escHtml(m.title)}
+              <span class="meet-chevron">▾</span>
             </div>
-            <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':'ms-done'}">
-              ${capitalize(m.status||'')}
-            </span>
+            <div class="meet-sub-text">
+              ${fmtDateTime(m.meeting_date)} · ${m.duration_minutes} min
+              ${m.location_or_link ? ' · 📍 ' + escHtml(m.location_or_link) : ''}
+            </div>
           </div>
-          ${m.location_or_link ? `<div style="font-size:11px;color:var(--muted)">📍 ${escHtml(m.location_or_link)}</div>` : ''}
-        </div>`).join('')}`;
+          <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':'ms-done'}">
+            ${capitalize(m.status||'')}
+          </span>
+        </div>
+        <div class="meet-expand" id="mexpand-${m.id}">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">
+            Agenda
+          </div>
+          <div class="agenda-list" id="magenda-${m.id}">
+            <div style="font-size:11px;color:var(--muted)">Loading…</div>
+          </div>
+          ${m.status !== 'scheduled' ? `
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">
+            Meeting minutes
+          </div>
+          <div id="mminutes-${m.id}">
+            <div style="font-size:11px;color:var(--muted)">Loading…</div>
+          </div>` : ''}
+        </div>
+      </div>`).join('')}`;
+}
+
+async function toggleMeetingCard(meetId) {
+  const card   = document.getElementById('mcard-' + meetId);
+  const expand = document.getElementById('mexpand-' + meetId);
+  if (!card || !expand) return;
+
+  const isOpen = card.classList.contains('open');
+  card.classList.toggle('open');
+
+  // Only load data on first open
+  if (!isOpen && !card.dataset.loaded) {
+    card.dataset.loaded = '1';
+    await loadMeetingDetail(meetId);
+  }
+}
+
+async function loadMeetingDetail(meetId) {
+  try {
+    // Load agenda items using actual column names
+    const [agendaItems, minutesList] = await Promise.all([
+      API.get(`meeting_agenda_items?meeting_id=eq.${meetId}&order=sequence_order`),
+      API.get(`meeting_minutes?meeting_id=eq.${meetId}&limit=1`),
+    ]);
+
+    // Render agenda
+    const agendaEl = document.getElementById('magenda-' + meetId);
+    if (agendaEl) {
+      agendaEl.innerHTML = agendaItems?.length
+        ? agendaItems.map(a => `
+            <div class="agenda-item">
+              <span class="agenda-num">${a.sequence_order}.</span>
+              <span style="color:var(--text)">${escHtml(a.title)}</span>
+              ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px;margin-left:auto">${escHtml(a.notes_captured)}</span>` : ''}
+            </div>`).join('')
+        : `<div style="font-size:11px;color:var(--muted)">No agenda items recorded.</div>`;
+    }
+
+    // Render minutes (using actual column names from existing schema)
+    const minutesEl = document.getElementById('mminutes-' + meetId);
+    if (minutesEl) {
+      const mins = minutesList?.[0];
+      if (!mins) {
+        minutesEl.innerHTML = `<div style="font-size:11px;color:var(--muted);font-style:italic">No minutes on file.</div>`;
+      } else {
+        minutesEl.innerHTML = `
+          <div class="minutes-block">
+            ${mins.summary ? `
+              <div class="mb-section">
+                <div class="mb-section-lbl">Summary</div>
+                <div class="mb-section-text">${escHtml(mins.summary)}</div>
+              </div>` : ''}
+            ${mins.discussion_notes ? `
+              <div class="mb-section">
+                <div class="mb-section-lbl">Discussion notes</div>
+                <div class="mb-section-text">${escHtml(mins.discussion_notes)}</div>
+              </div>` : ''}
+            ${mins.decisions_made ? `
+              <div class="mb-section">
+                <div class="mb-section-lbl">Decisions made</div>
+                <div class="mb-section-text">${escHtml(mins.decisions_made)}</div>
+              </div>` : ''}
+            <div style="font-size:10px;color:var(--muted);margin-top:6px">
+              Status: ${capitalize(mins.status||'')}
+              ${mins.submitted_at ? ' · Submitted ' + fmtDate(mins.submitted_at) : ''}
+            </div>
+          </div>`;
+      }
+    }
+  } catch(e) {
+    console.error('Failed to load meeting detail:', e);
+  }
 }
 
 // ── proposal tab check ─────────────────────────────────
