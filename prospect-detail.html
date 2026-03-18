@@ -1890,7 +1890,11 @@ async function saveEditActionItem() {
       // file names are recorded in description for now
     }
 
-    await API.patch(`prospect_action_items?id=eq.${id}`, payload);
+    const sourceMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
+    const patchTable = sourceMeetId ? 'meeting_action_items' : 'prospect_action_items';
+    // meeting_action_items has no completed_at column
+    if (patchTable === 'meeting_action_items') delete payload.completed_at;
+    await API.patch(`${patchTable}?id=eq.${id}`, payload);
     closeDrawer('ai-edit-overlay');
     const returnMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     await loadAll();
@@ -1919,7 +1923,9 @@ async function deleteActionItem() {
   const id = document.getElementById('ai-edit-id').value;
   if (!confirm('Delete this action item? This cannot be undone.')) return;
   try {
-    await API.del(`prospect_action_items?id=eq.${id}`);
+    const delMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
+    const delTable = delMeetId ? 'meeting_action_items' : 'prospect_action_items';
+    await API.del(`${delTable}?id=eq.${id}`);
     closeDrawer('ai-edit-overlay');
     const returnMeetId2 = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     await loadAll();
@@ -2209,10 +2215,12 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
   const tbl       = table || 'prospect_action_items';
   const newStatus = currentStatus === 'complete' ? 'open' : 'complete';
   try {
-    await API.patch(`${tbl}?id=eq.${id}`, {
-      status:       newStatus,
-      completed_at: newStatus === 'complete' ? new Date().toISOString() : null,
-    });
+    const patchBody = { status: newStatus };
+    // prospect_action_items has completed_at; meeting_action_items does not
+    if (tbl === 'prospect_action_items') {
+      patchBody.completed_at = newStatus === 'complete' ? new Date().toISOString() : null;
+    }
+    await API.patch(`${tbl}?id=eq.${id}`, patchBody);
 
     // Update visual immediately — no re-render needed
     el.style.background  = newStatus === 'complete' ? 'var(--green)' : 'transparent';
