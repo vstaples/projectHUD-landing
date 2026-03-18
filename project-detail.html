@@ -1178,7 +1178,7 @@ function renderHeader() {
   const done    = tasks.filter(t => t.status === 'complete').length;
   const total   = tasks.length;
   const pctDone = UI.pct(done, total);
-  const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete').length;
+  const overdue = tasks.filter(t => t.due_date && t.due_date.substring(0,10) < new Date().toLocaleDateString('en-CA') && t.status !== 'complete').length;
   const { cpi, spi, cpiNum, spiNum } = computeEVM();
   document.getElementById('hc-status').innerHTML = UI.badge(p.status);
   document.getElementById('hc-pct').textContent  = pctDone + '%';
@@ -1266,7 +1266,7 @@ function expandOverviewMilestones() {
 
 function taskRowHTML(t) {
   const now       = new Date();
-  const isOverdue = t.due_date && new Date(t.due_date) < now && t.status !== 'complete';
+  const isOverdue = t.due_date && t.due_date.substring(0,10) < now.toLocaleDateString('en-CA') && t.status !== 'complete';
   const asgn      = STATE.users.find(u => u.id === t.assigned_to);
   const due       = UI.dueDateLabel(t.due_date);
   const startStr  = t.start_date ? UI.fmtDateShort(t.start_date) : '—';
@@ -1288,8 +1288,8 @@ function taskRowHTML(t) {
 function renderOverviewTasks() {
   const now     = new Date();
   const active  = STATE.tasks.filter(t => t.status !== 'complete' && t.due_date);
-  const overdue = active.filter(t => new Date(t.due_date) < now).sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
-  const upcoming= active.filter(t => new Date(t.due_date) >= now).sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+  const overdue = active.filter(t => t.due_date.substring(0,10) < now.toLocaleDateString('en-CA')).sort((a,b) => a.due_date.localeCompare(b.due_date));
+  const upcoming= active.filter(t => t.due_date.substring(0,10) >= now.toLocaleDateString('en-CA')).sort((a,b) => a.due_date.localeCompare(b.due_date));
   const el = document.getElementById('overview-tasks');
   if (!active.length) { el.innerHTML = UI.allClear('ALL CLEAR', 'No upcoming tasks'); return; }
   const INITIAL = 5;
@@ -1327,7 +1327,7 @@ function renderPhaseProgress() {
     const pt = tasks.filter(t => t.phase === phase);
     const done = pt.filter(t => t.status === 'complete').length;
     const pct = UI.pct(done, pt.length);
-    const hasOverdue = pt.some(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete');
+    const hasOverdue = pt.some(t => t.due_date && t.due_date.substring(0,10) < new Date().toLocaleDateString('en-CA') && t.status !== 'complete');
     const color = pct === 100 ? 'var(--green)' : hasOverdue ? 'var(--amber)' : 'var(--cyan)';
     return `<div class="phase-progress-row"><div class="pp-header"><div class="pp-name">${phase}</div><div class="pp-stats">${done}/${pt.length} · ${pct}%</div></div>${UI.progressBar(pct, color)}</div>`;
   }).join('');
@@ -1341,7 +1341,7 @@ function renderOverviewEVM() {
     UI.gauge(spiNum,  2,   UI.indexColor(spiNum), 'SPI',    spi,          52);
   document.getElementById('overview-evm-vals').innerHTML = `
     <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">TASKS DONE</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--green);">${done}</span></div>
-    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--red);">${STATE.tasks.filter(t=>t.due_date&&new Date(t.due_date)<new Date()&&t.status!=='complete').length}</span></div>`;
+    <div class="evm-val"><span class="ev-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">AT RISK</span><span style="font-family:var(--font-hud);font-size:14.0px;font-weight:700;color:var(--red);">${STATE.tasks.filter(t=>t.due_date&&t.due_date.substring(0,10) < new Date().toLocaleDateString('en-CA')&&t.status!=='complete').length}</span></div>`;
 }
 
 function renderRecentJournal() {
@@ -1429,7 +1429,7 @@ function renderTasksTable() {
   if (filter === 'in_progress') tasks = tasks.filter(t => t.status === 'in_progress');
   else if (filter === 'not_started') tasks = tasks.filter(t => t.status === 'not_started' || t.status === 'ready');
   else if (filter === 'complete') tasks = tasks.filter(t => t.status === 'complete');
-  else if (filter === 'overdue') tasks = tasks.filter(t => t.due_date && new Date(t.due_date) < now && t.status !== 'complete');
+  else if (filter === 'overdue') tasks = tasks.filter(t => t.due_date && t.due_date.substring(0,10) < now.toLocaleDateString('en-CA') && t.status !== 'complete');
   const phases  = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
   const nophase = tasks.filter(t => !t.phase);
   const tbody = document.getElementById('tasks-tbody');
@@ -2546,7 +2546,7 @@ function openEditTaskPanel(taskId) {
   document.getElementById('tf-status').value      = t.status || 'not_started';
   document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
   document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
-  // Use saved duration_days as source of truth; only recalc if not set
+  // Use saved duration_days as source of truth
   if (t.duration_days) {
     document.getElementById('tf-duration').value = t.duration_days;
   } else if (t.start_date && t.due_date) {
@@ -2600,11 +2600,11 @@ async function saveTaskForm() {
     status:       document.getElementById('tf-status').value   || 'not_started',
     start_date:   document.getElementById('tf-start').value    || null,
     due_date:     (() => {
-      const dueVal = document.getElementById('tf-due').value;
-      if (dueVal) return dueVal;
-      const startVal = document.getElementById('tf-start').value;
+      const dv = document.getElementById('tf-due').value;
+      if (dv) return dv;
+      const sv = document.getElementById('tf-start').value;
       const dur = parseFloat(document.getElementById('tf-duration').value);
-      if (startVal && dur > 0) return _toInputDate(_addBusinessDays(new Date(startVal + 'T00:00:00'), dur));
+      if (sv && dur > 0) return _toInputDate(_addBusinessDays(new Date(sv + 'T00:00:00'), dur));
       return null;
     })(),
     duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
@@ -2736,7 +2736,6 @@ async function deleteTask(taskId) {
   _closeSlidePanel('confirm-panel');
   try {
     const _delTask = STATE.tasks.find(t => t.id === taskId);
-    // Delete dependent records first
     await API.del(`task_skill_requirements?task_id=eq.${taskId}`).catch(()=>{});
     await API.del(`task_resource_assignments?task_id=eq.${taskId}`).catch(()=>{});
     await API.del(`task_dependencies?successor_task_id=eq.${taskId}`).catch(()=>{});
@@ -2747,10 +2746,7 @@ async function deleteTask(taskId) {
     if (_delTask) _writeAudit('deleted', 'tasks', taskId, { name: _delTask.name, phase: _delTask.phase }, null);
     renderTasksTable();
     renderHeader();
-  } catch(err) {
-    console.error('Delete failed:', err);
-    alert('Delete failed: ' + (err.message||err));
-  }
+  } catch(err) { console.error('Delete failed:', err); alert('Delete failed: ' + (err.message||err)); }
 }
 
 function confirmDeletePhase(phaseLabel, phaseKey) {
@@ -2902,21 +2898,13 @@ const _origOpenEditTask = openEditTaskPanel;
 openEditTaskPanel = async function(taskId) {
   _origOpenEditTask(taskId);
   window._editingTaskId2 = taskId;
-  // Load fresh assignments from DB (STATE.taskAssignments may be stale for new tasks)
+  // Fetch fresh assignments from DB (STATE may be stale for new tasks)
   try {
-    const fresh = await API.get(
-      'task_resource_assignments?select=*&task_id=eq.' + taskId
-    ).catch(() => []);
-    window._tfAssignments = (fresh || []).map(a => ({...a}));
-    // Also update STATE cache
-    STATE.taskAssignments = [
-      ...(STATE.taskAssignments||[]).filter(a => a.task_id !== taskId),
-      ...(fresh||[])
-    ];
+    const fresh = await API.get('task_resource_assignments?select=*&task_id=eq.' + taskId).catch(()=>[]);
+    window._tfAssignments = (fresh||[]).map(a => ({...a}));
+    STATE.taskAssignments = [...(STATE.taskAssignments||[]).filter(a=>a.task_id!==taskId), ...(fresh||[])];
   } catch(e) {
-    // Fallback to STATE cache
-    const existing = (STATE.taskAssignments||[]).filter(a => a.task_id === taskId);
-    window._tfAssignments = existing.map(a => ({...a}));
+    window._tfAssignments = (STATE.taskAssignments||[]).filter(a=>a.task_id===taskId).map(a=>({...a}));
   }
   _renderAssignmentRows(window._tfAssignments);
 };
@@ -3008,10 +2996,10 @@ function _nextWeekday(date) {
 }
 
 function _toInputDate(d) {
-  const yr  = d.getFullYear();
-  const mo  = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return yr + '-' + mo + '-' + day;
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return yr + '-' + mo + '-' + dy;
 }
 function _fmtD(dateStr) {
   if (!dateStr) return '—';
@@ -4269,8 +4257,7 @@ function _p2PatchFunctions() {
       for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
         var s = window._tfTaskSkills[i];
         await API.post('task_skill_requirements', {
-          task_id:taskId, skill_id:s.skill_id,
-          is_required:true, proficiency_needed:'practitioner'
+          task_id:taskId, skill_id:s.skill_id
         }).catch(function(e){ console.warn('skill req save:',e); });
       }
     } catch(e) { console.warn('Phase2 save err:',e); }
