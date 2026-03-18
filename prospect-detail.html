@@ -953,6 +953,7 @@ const STAGE_COLORS = {
 let prospect = null;
 let activities = [], findings = [], actionItems = [], meetings = [], stakeholders = [];
 let resources = [], contacts = [];
+let _currentResource = null;  // resolved after loadAll
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -982,6 +983,24 @@ async function loadAll() {
     stakeholders= shs   || [];
     resources   = ress  || [];
     contacts    = stakeholders.map(s => s.contacts).filter(Boolean);
+
+    // Resolve current user to a resource record for reply attribution
+    if (!_currentResource) {
+      try {
+        const uid = await Auth.getCurrentUserId();
+        if (uid) {
+          // Match by user→resource_id link, or by email as fallback
+          const userRec = await API.get(`users?id=eq.${uid}&select=resource_id,email`);
+          const u = userRec?.[0];
+          if (u?.resource_id) {
+            _currentResource = resources.find(r => r.id === u.resource_id) || null;
+          }
+          if (!_currentResource && u?.email) {
+            _currentResource = resources.find(r => r.email === u.email) || null;
+          }
+        }
+      } catch(e) { /* non-fatal */ }
+    }
 
     if (!prospect) { location.href = '/pipeline.html'; return; }
 
@@ -1100,7 +1119,7 @@ function renderOverview() {
           ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
           : openAI.map(ai => `
             <div class="ai-row">
-              <div class="ai-check" onclick="toggleAI('${ai.id}',this)"></div>
+              <div class="ai-check" onclick="event.stopPropagation();toggleAI('${ai.id}',this)"></div>
               <div class="ai-text" style="font-size:12px">${escHtml(ai.description)}</div>
               <div class="ai-due ${ai.due_date && ai.due_date < today ? 'overdue' : ''}">
                 ${ai.due_date ? fmtDate(ai.due_date) : ''}
@@ -1284,7 +1303,7 @@ function renderActions() {
                 const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
                 return `
                 <tr style="border-bottom:1px solid var(--border);cursor:pointer"
-                  onclick="openEditActionItem('${ai.id}','${escHtml(ai.description)}','${ai.assigned_to||''}','${ai.due_date||''}','${ai.status||'open'}')">
+                  onclick="event.stopPropagation();openEditActionItem('${ai.id}','${escHtml(ai.description)}','${ai.assigned_to||''}','${ai.due_date||''}','${ai.status||'open'}')">
                   <td style="padding:10px 12px">
                     <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
                   </td>
@@ -1527,14 +1546,7 @@ async function loadMeetingDetail(meetId) {
             </div>
             <div class="reply-thread" id="rthread-${meetId}" style="display:none" onclick="event.stopPropagation()">
               <div id="rthread-entries-${meetId}"></div>
-              <div class="reply-compose" onclick="event.stopPropagation()">
-                <textarea id="rthread-input-${meetId}"
-                  placeholder="Ask a question, raise a concern, or note a follow-up…"
-                  rows="2"
-                  onkeydown="handleReplyKey(event,'${meetId}')"
-                  onclick="event.stopPropagation()"></textarea>
-                <button class="reply-send" onclick="event.stopPropagation();postReply('${meetId}')">Send</button>
-              </div>
+              <!-- main compose injected by renderMainCompose() -->
             </div>
           </div>`;
         // Load existing replies
@@ -2007,6 +2019,8 @@ function startProposal() {
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
 
 // ── meeting minutes reply thread ────────────────────────
+// Replies stored as prospect_activities notes tagged [meeting:ID]
+// Sub-replies tagged [meeting:ID][replyto:INDEX]
 const _replyCache = {};
 
 function toggleReplyThread(meetId) {
@@ -2014,16 +2028,16 @@ function toggleReplyThread(meetId) {
   if (!thread) return;
   const isOpen = thread.style.display !== 'none';
   thread.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) {
+  if (!isOpen) setTimeout(() => {
     const inp = document.getElementById('rthread-input-' + meetId);
-    if (inp) setTimeout(() => inp.focus(), 50);
-  }
+    if (inp) inp.focus();
+  }, 50);
 }
 
-function handleReplyKey(e, meetId) {
+function handleReplyKey(e, meetId, parentIdx) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
-    postReply(meetId);
+    postReply(meetId, parentIdx);
   }
 }
 
@@ -2038,55 +2052,154 @@ async function loadReplies(meetId) {
   } catch(e) { /* replies are optional */ }
 }
 
+function resolveName(resourceId) {
+  if (!resourceId) {
+    // Fallback: use currentResource if we know who posted
+    return _currentResource
+      ? _currentResource.first_name + ' ' + _currentResource.last_name
+      : 'Team member';
+  }
+  const r = resources.find(res => res.id === resourceId);
+  return r ? r.first_name + ' ' + r.last_name : 'Team member';
+}
+
 function renderReplies(meetId) {
   const el = document.getElementById('rthread-entries-' + meetId);
   if (!el) return;
-  const replies = _replyCache[meetId] || [];
-  if (!replies.length) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-style:italic">No replies yet. Start the conversation.</div>';
+  const all = _replyCache[meetId] || [];
+
+  // Separate top-level replies from sub-replies
+  const tops = all.filter(r => !r.summary.includes('[replyto:'));
+  const subs = all.filter(r =>  r.summary.includes('[replyto:'));
+
+  if (!tops.length) {
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-style:italic">
+        No comments yet. Start the conversation.
+      </div>`;
+    renderMainCompose(el, meetId);
     return;
   }
-  el.innerHTML = replies.map(r => {
-    const author = resources.find(res => res.id === r.created_by);
-    const name = author ? author.first_name + ' ' + author.last_name : 'Team member';
+
+  el.innerHTML = tops.map((r, idx) => {
+    const name     = resolveName(r.created_by);
     const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-    const text = (r.summary || '').split('[meeting:')[0].trim();
+    const text     = (r.summary || '').split('[meeting:')[0].trim();
+    const myIdx    = idx;
+    const subReplies = subs.filter(s => s.summary.includes('[replyto:' + myIdx + ']'));
+
+    const subHtml = subReplies.map(s => {
+      const sName = resolveName(s.created_by);
+      const sInit = sName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+      const sText = (s.summary || '').split('[meeting:')[0].trim();
+      return `
+        <div class="reply-entry" style="margin-top:8px;margin-left:30px">
+          <div class="reply-av" style="width:18px;height:18px;font-size:7px">${sInit}</div>
+          <div class="reply-bubble" style="border-radius:0 6px 6px 6px">
+            <div class="reply-meta">
+              <span style="font-weight:600;color:var(--text)">${escHtml(sName)}</span>
+              <span>${fmtDateTime(s.created_at)}</span>
+            </div>
+            <div class="reply-text">${escHtml(sText)}</div>
+          </div>
+        </div>`;
+    }).join('');
+
     return `
-      <div class="reply-entry">
+      <div class="reply-entry" id="reply-${meetId}-${idx}">
         <div class="reply-av">${initials}</div>
-        <div class="reply-bubble">
+        <div class="reply-bubble" style="flex:1">
           <div class="reply-meta">
             <span style="font-weight:600;color:var(--text)">${escHtml(name)}</span>
-            <span>${fmtDateTime(r.created_at)}</span>
+            <span style="display:flex;align-items:center;gap:8px">
+              ${fmtDateTime(r.created_at)}
+              <button style="background:none;border:none;color:var(--muted);font-size:10px;
+                cursor:pointer;padding:0" onclick="event.stopPropagation();toggleSubReply('${meetId}',${idx})">
+                ↩ Reply
+              </button>
+            </span>
           </div>
           <div class="reply-text">${escHtml(text)}</div>
+          ${subHtml}
+          <div id="subreply-compose-${meetId}-${idx}" style="display:none;margin-top:8px">
+            <div class="reply-compose" onclick="event.stopPropagation()">
+              <textarea placeholder="Reply to ${escHtml(name)}…" rows="2"
+                id="subreply-input-${meetId}-${idx}"
+                onkeydown="event.stopPropagation();handleReplyKey(event,'${meetId}',${idx})"
+                onclick="event.stopPropagation()"></textarea>
+              <button class="reply-send" onclick="event.stopPropagation();postReply('${meetId}',${idx})">Send</button>
+            </div>
+          </div>
         </div>
       </div>`;
   }).join('');
+
+  // Append main compose at bottom
+  const compose = document.createElement('div');
+  renderMainCompose(compose, meetId);
+  el.appendChild(compose);
 }
 
-async function postReply(meetId) {
-  const inp = document.getElementById('rthread-input-' + meetId);
+function renderMainCompose(container, meetId) {
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div class="reply-compose" style="margin-top:8px" onclick="event.stopPropagation()">
+      <textarea id="rthread-input-${meetId}"
+        placeholder="Add a comment… (Ctrl+Enter to send)"
+        rows="2"
+        onkeydown="event.stopPropagation();handleReplyKey(event,'${meetId}',null)"
+        onclick="event.stopPropagation()"></textarea>
+      <button class="reply-send" onclick="event.stopPropagation();postReply('${meetId}',null)">Send</button>
+    </div>`;
+  container.appendChild(div);
+}
+
+function toggleSubReply(meetId, idx) {
+  const el = document.getElementById('subreply-compose-' + meetId + '-' + idx);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) setTimeout(() => {
+    const inp = document.getElementById('subreply-input-' + meetId + '-' + idx);
+    if (inp) inp.focus();
+  }, 50);
+}
+
+async function postReply(meetId, parentIdx) {
+  const isSubReply = parentIdx !== null && parentIdx !== undefined;
+  const inpId = isSubReply
+    ? 'subreply-input-' + meetId + '-' + parentIdx
+    : 'rthread-input-' + meetId;
+  const inp = document.getElementById(inpId);
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
+
+  const resourceId = _currentResource ? _currentResource.id : null;
+  const tag = isSubReply
+    ? ' [meeting:' + meetId + '][replyto:' + parentIdx + ']'
+    : ' [meeting:' + meetId + ']';
+
   try {
     await API.post('prospect_activities', {
       prospect_id: PROSPECT_ID,
       type:        'note',
       date:        new Date().toISOString(),
-      summary:     text + ' [meeting:' + meetId + ']',
+      summary:     text + tag,
+      created_by:  resourceId,
     });
+
     if (!_replyCache[meetId]) _replyCache[meetId] = [];
     _replyCache[meetId].push({
-      summary:    text + ' [meeting:' + meetId + ']',
-      created_by: null,
+      summary:    text + tag,
+      created_by: resourceId,
       created_at: new Date().toISOString(),
     });
-    inp.value = '';
+
+    if (inp) inp.value = '';
     renderReplies(meetId);
   } catch(e) {
     console.error(e);
-    alert('Failed to post reply.');
+    alert('Failed to post comment.');
   }
 }
 
