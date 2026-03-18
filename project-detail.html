@@ -2542,13 +2542,16 @@ function openEditTaskPanel(taskId) {
   document.getElementById('tf-status').value      = t.status || 'not_started';
   document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
   document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
-  // Recalculate duration from actual dates if both present
-  if (t.start_date && t.due_date) {
+  // Use saved duration_days as source of truth
+  // Only recalculate from dates if duration_days is not set
+  if (t.duration_days) {
+    document.getElementById('tf-duration').value = t.duration_days;
+  } else if (t.start_date && t.due_date) {
     const s = new Date(t.start_date.substring(0,10) + 'T00:00:00');
     const e = new Date(t.due_date.substring(0,10)   + 'T00:00:00');
     document.getElementById('tf-duration').value = _businessDaysBetween(s, e);
   } else {
-    document.getElementById('tf-duration').value = t.duration_days || '';
+    document.getElementById('tf-duration').value = '';
   }
   document.getElementById('tf-effort').value      = t.effort_days   || '';
   document.getElementById('tf-pct').value         = t.pct_complete  || '0';
@@ -2593,7 +2596,17 @@ async function saveTaskForm() {
     phase,
     status:       document.getElementById('tf-status').value   || 'not_started',
     start_date:   document.getElementById('tf-start').value    || null,
-    due_date:     document.getElementById('tf-due').value      || null,
+    due_date:     (() => {
+      const dueVal = document.getElementById('tf-due').value;
+      if (dueVal) return dueVal;
+      // Auto-derive due from start + duration if not set
+      const startVal = document.getElementById('tf-start').value;
+      const dur = parseFloat(document.getElementById('tf-duration').value);
+      if (startVal && dur > 0) {
+        return _toInputDate(_addBusinessDays(new Date(startVal + 'T00:00:00'), dur));
+      }
+      return null;
+    })(),
     duration_days:parseFloat(document.getElementById('tf-duration').value) || null,
     effort_days:  parseFloat(document.getElementById('tf-effort').value)   || null,
     pct_complete: parseFloat(document.getElementById('tf-pct').value)      || 0,
