@@ -4285,7 +4285,11 @@ function _patchTaskFormFunctions() {
 </script>
 
 
+
+
 <script>
+// ── PHASE 2 (guarded — runs once only)
+if (!window._phase2Installed) { window._phase2Installed = true;
 // ── PHASE 2: Complexity + Skills + Role-Filtered Resources ───
 document.addEventListener('DOMContentLoaded', function() {
   _p2InjectForm();
@@ -4294,6 +4298,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ── INJECT FORM SECTIONS ─────────────────────────────────────
 function _p2InjectForm() {
+  if (document.getElementById('tf-complexity-section')) return; // already injected
   var body = document.getElementById('task-form-panel');
   if (!body) return;
   body = body.querySelector('.journal-panel-body');
@@ -4581,6 +4586,7 @@ function _p2PatchFunctions() {
   };
 
   console.log('[Phase2] all patches applied — complexity, skills, role filter');
+} // end guard
 }
 </script>
 
