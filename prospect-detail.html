@@ -1096,7 +1096,8 @@ async function loadAll() {
     document.getElementById('tbadge-sh').textContent       = stakeholders.length;
     document.getElementById('tbadge-ai').textContent       = allActionItems.filter(a => a.status === 'open').length;
     document.getElementById('tbadge-meet').textContent     = meetings.length;
-    updateMeetingsBadge();  // Apply color immediately after setting text
+    updateActionsBadge();
+    updateMeetingsBadge();
 
   } catch(e) {
     console.error(e);
@@ -1197,37 +1198,7 @@ function renderOverview() {
         <div class="card-title">Open action items</div>
         ${openAI.length === 0
           ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
-          : openAI.map(ai => `
-            <div class="ai-row" style="flex-direction:column;align-items:flex-start;gap:4px"
-              data-ai-id="${ai.id}"
-              data-ai-due="${ai.due_date||''}"
-              data-ai-status="${ai.status||'open'}">
-              <div style="display:flex;align-items:center;gap:8px;width:100%">
-                <div class="ai-check ${ai.status==='complete'?'done':''}"
-                  onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'${ai._table||'prospect_action_items'}',ai.meeting_id||null)">
-                  ${ai.status==='complete'?'✓':''}
-                </div>
-                <div class="ai-text" style="font-size:12px">${escHtml((ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim())}</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;padding-left:24px;flex-wrap:wrap">
-                ${(function(){
-                  const rid = ai.assigned_to_resource || ai.assigned_to;
-                  const res = rid ? resources.find(r => r.id === rid) : null;
-                  const name = res ? res.first_name + ' ' + res.last_name : null;
-                  const initials = name ? name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) : null;
-                  return name ? '<div style="display:flex;align-items:center;gap:4px">' +
-                    '<div style="width:16px;height:16px;border-radius:50%;background:rgba(79,142,247,.15);' +
-                    'color:var(--accent);font-size:7px;font-weight:700;display:flex;align-items:center;' +
-                    'justify-content:center;flex-shrink:0">' + initials + '</div>' +
-                    '<span style="font-size:10px;color:var(--muted)">' + escHtml(name) + '</span></div>' : '';
-                })()}
-                ${ai.due_date ? '<span class="ai-due' + (ai.due_date < today && ai.status !== 'complete' ? ' overdue' : '') + '" data-due="' + ai.due_date + '">' +
-                  'Due ' + fmtDate(ai.due_date) + '</span>' : ''}
-                <span style="font-size:10px;padding:1px 6px;border-radius:4px;
-                  background:${ai.status==='complete'?'rgba(42,157,64,.15)':ai.due_date&&ai.due_date<today&&ai.status!=='complete'?'rgba(192,64,74,.15)':'rgba(212,144,31,.12)'};
-                  color:${ai.status==='complete'?'#7af0a0':ai.due_date&&ai.due_date<today&&ai.status!=='complete'?'#f07a7a':'var(--amber)'}">${ai.status||'open'}</span>
-              </div>
-            </div>`).join('')}
+          : openAI.map(ai => renderAIRow(ai, ai._table, ai.meeting_id||null)).join('')}
         ${allOpen.length > 3
           ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px"
               onclick="switchTab('meetings')">
@@ -1392,6 +1363,93 @@ function renderRoleTag(role) {
 }
 
 // ── action items ───────────────────────────────────────
+// ── Shared action item row renderer ────────────────────────────────────────
+// Used by Overview, Actions tab, and meeting card expand for consistent UX.
+// table: 'meeting_action_items' | 'prospect_action_items'
+// meetId: string | null
+function renderAIRow(ai, table, meetId) {
+  const today    = new Date().toLocaleDateString('en-CA');
+  const done     = ai.status === 'complete';
+  const overdue  = !done && ai.due_date && ai.due_date < today;
+  const tbl      = table || ai._table || 'prospect_action_items';
+  const mid      = meetId || ai.meeting_id || '';
+  const rid      = ai.assigned_to_resource || ai.assigned_to || null;
+  const assignee = rid ? resources.find(r => r.id === rid) : null;
+  const name     = assignee ? assignee.first_name + ' ' + assignee.last_name : '—';
+  const initials = assignee
+    ? (assignee.first_name[0] + assignee.last_name[0]).toUpperCase() : '?';
+  const desc     = (ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim();
+  const hasAttach= (_aiAttachments[ai.id] && _aiAttachments[ai.id].length > 0)
+    || (ai.description && ai.description.includes('[attachments:'));
+  const commentCount = (_aiCommentCache[ai.id] || []).length;
+
+  return `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:9px 0;
+        border-bottom:1px solid var(--border)"
+        data-ai-id="${ai.id}"
+        data-ai-desc="${escHtml(desc)}"
+        data-ai-assigned="${rid||''}"
+        data-ai-due="${ai.due_date||''}"
+        data-ai-status="${ai.status||'open'}"
+        data-ai-table="${tbl}"
+        data-ai-meetid="${mid}">
+      <!-- Checkbox -->
+      <div style="width:16px;height:16px;border-radius:4px;flex-shrink:0;margin-top:2px;
+          border:1px solid ${done?'var(--green)':'var(--border2)'};
+          background:${done?'var(--green)':'transparent'};
+          display:flex;align-items:center;justify-content:center;
+          cursor:pointer;font-size:9px;color:#fff"
+          onclick="event.stopPropagation();toggleAIFromRow(this)">
+        ${done?'✓':''}
+      </div>
+      <!-- Body -->
+      <div style="flex:1;min-width:0;cursor:pointer"
+          onclick="event.stopPropagation();openEditActionItemFromRow(
+            this.closest('[data-ai-id]'),
+            this.closest('[data-ai-id]').dataset.aiMeetid||null)">
+        <div style="font-size:12px;line-height:1.45;margin-bottom:4px;
+            color:${done?'var(--muted)':'var(--text)'};
+            text-decoration:${done?'line-through':'none'}">
+          ${escHtml(desc)}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <!-- Assignee -->
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="width:16px;height:16px;border-radius:50%;flex-shrink:0;
+                background:rgba(79,142,247,.15);color:var(--accent);
+                font-size:7px;font-weight:700;
+                display:flex;align-items:center;justify-content:center">
+              ${initials}
+            </div>
+            <span style="font-size:10px;color:var(--muted)">${escHtml(name)}</span>
+          </div>
+          <!-- Due date -->
+          ${ai.due_date ? `<span class="ai-due${overdue?' overdue':''}" data-due="${ai.due_date}">
+            ${overdue?'⚠ ':''}Due ${fmtDate(ai.due_date)}
+          </span>` : ''}
+          <!-- Status badge -->
+          <span data-status-badge style="font-size:10px;padding:1px 6px;border-radius:4px;
+              background:${done?'rgba(42,157,64,.15)':overdue?'rgba(192,64,74,.12)':'rgba(212,144,31,.12)'};
+              color:${done?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
+            ${ai.status||'open'}
+          </span>
+          <!-- Attachments -->
+          ${hasAttach?`<span style="font-size:10px;cursor:pointer;padding:1px 6px;
+              border-radius:8px;background:rgba(255,255,255,.06);color:var(--muted)"
+              title="View attachments"
+              onclick="event.stopPropagation();showAttachments('${ai.id}')">
+            📎 ${(_aiAttachments[ai.id]||[]).length||''}
+          </span>`:''}
+          <!-- Comments -->
+          ${commentCount>0?`<span style="font-size:10px;padding:1px 6px;border-radius:8px;
+              background:rgba(79,142,247,.12);color:var(--accent)">
+            💬 ${commentCount}
+          </span>`:''}
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderActions() {
   const panel = document.getElementById('panel-actions');
   const today = new Date().toLocaleDateString('en-CA');
@@ -1399,76 +1457,10 @@ function renderActions() {
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
       <button class="btn btn-primary" onclick="openActionItemDrawer()">+ Add action item</button>
     </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead>
-          <tr style="background:var(--surf2)">
-            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">Item</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:120px">Assignee</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:80px">Due</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);width:70px">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${allActionItems.length === 0
+    <div class="card" style="padding:4px 12px">
+      ${allActionItems.length === 0
             ? `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">No action items</td></tr>`
-            : allActionItems.map(ai => {
-                // meeting_action_items uses assigned_to_resource; prospect uses assigned_to
-                const rid = ai.assigned_to_resource || ai.assigned_to || null;
-                const assignee = rid ? resources.find(r => r.id === rid) : null;
-                const assigneeName = assignee ? assignee.first_name + ' ' + assignee.last_name : '—';
-                const initials = assignee
-                  ? (assignee.first_name[0] + assignee.last_name[0]).toUpperCase() : '?';
-                const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
-                const tbl = ai._table || 'prospect_action_items';
-                const desc = (ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim();
-                return `
-                <tr style="border-bottom:1px solid var(--border)"
-                  data-ai-id="${ai.id}"
-                  data-ai-desc="${escHtml(desc)}"
-                  data-ai-assigned="${rid||''}"
-                  data-ai-due="${ai.due_date||''}"
-                  data-ai-status="${ai.status||'open'}"
-                  data-ai-meetid="${ai.meeting_id||''}"
-                  data-ai-table="${tbl}">
-                  <td style="padding:10px 12px;cursor:pointer"
-                    onclick="openEditActionItemFromRow(this.closest('tr'),this.closest('tr').dataset.aiMeetid||null)">
-                    <div style="display:flex;align-items:center;gap:8px">
-                      <div style="width:14px;height:14px;border-radius:3px;
-                        border:1px solid var(--border2);flex-shrink:0;cursor:pointer;
-                        display:flex;align-items:center;justify-content:center;
-                        background:${ai.status==='complete'?'var(--green)':'transparent'};
-                        border-color:${ai.status==='complete'?'var(--green)':'var(--border2)'};
-                        font-size:8px;color:#fff"
-                        onclick="event.stopPropagation();toggleAIFromRow(this)">
-                        ${ai.status==='complete'?'✓':''}
-                      </div>
-                      <div style="font-size:12px;color:var(--text)">${escHtml(desc)}</div>
-                    </div>
-                  </td>
-                  <td style="padding:10px 12px">
-                    <div style="display:flex;align-items:center;gap:6px">
-                      <div style="width:20px;height:20px;border-radius:50%;
-                        background:rgba(79,142,247,.15);color:var(--accent);
-                        font-size:8px;font-weight:700;display:flex;
-                        align-items:center;justify-content:center;flex-shrink:0">${initials}</div>
-                      <span style="font-size:11px;color:var(--muted)">${escHtml(assigneeName)}</span>
-                    </div>
-                  </td>
-                  <td style="padding:10px 12px;color:${overdue?'#f07a7a':'var(--muted)'}">
-                    ${ai.due_date ? fmtDate(ai.due_date) : '—'}
-                  </td>
-                  <td style="padding:10px 12px">
-                    <span data-status-badge style="font-size:10px;padding:2px 7px;border-radius:5px;
-                      background:${ai.status==='complete'?'rgba(42,157,64,.15)':overdue?'rgba(192,64,74,.12)':'rgba(212,144,31,.15)'};
-                      color:${ai.status==='complete'?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
-                      ${ai.status}
-                    </span>
-                  </td>
-                </tr>`;
-              }).join('')}
-        </tbody>
-      </table>
+            : allActionItems.map(ai => renderAIRow(ai, ai._table, ai.meeting_id||null)).join('')}
     </div>`;
 }
 
@@ -1486,6 +1478,15 @@ function updateMeetingCardBadge(meetId) {
     if (newSpan) badgeSpan.replaceWith(newSpan);
     else if (!newBadge) badgeSpan.remove();
   }
+}
+
+function updateActionsBadge() {
+  const today = new Date().toLocaleDateString('en-CA');
+  const hasOverdue = allActionItems.some(a =>
+    a.status !== 'complete' && a.due_date && a.due_date < today
+  );
+  const badge = document.getElementById('tbadge-ai');
+  if (badge) badge.classList.toggle('overdue', hasOverdue);
 }
 
 function updateMeetingsBadge() {
@@ -1668,65 +1669,9 @@ async function loadMeetingDetail(meetId) {
           });
           _meetingAICache[meetId] = actionItems || [];
         }
-        actionsEl.innerHTML = (actionItems||[]).map(ai => {
-          const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
-          const assigneeName = resMap[ai.assigned_to_resource] || '—';
-          const assigneeInitials = assigneeName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-          const done = ai.status === 'complete';
-          const hasAttach = (_aiAttachments[ai.id] && _aiAttachments[ai.id].length > 0)
-            || (ai.description && ai.description.includes('[attachments:'));
-          const commentCount = (_replyCache['ai-' + ai.id] || []).length;
-          return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;
-              border-bottom:1px solid var(--border)"
-              data-ai-id="${ai.id}"
-              data-ai-desc="${escHtml(ai.description)}"
-              data-ai-assigned="${ai.assigned_to_resource||''}"
-              data-ai-due="${ai.due_date||''}"
-              data-ai-status="${ai.status||'open'}">
-            <div style="width:16px;height:16px;border-radius:4px;border:1px solid var(--border2);
-              flex-shrink:0;margin-top:3px;display:flex;align-items:center;justify-content:center;
-              cursor:pointer;
-              background:${done?'var(--green)':'transparent'};
-              border-color:${done?'var(--green)':'var(--border2)'};
-              font-size:9px;color:#fff"
-              onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'meeting_action_items','${meetId}')">${done?'✓':''}</div>
-            <div style="flex:1;min-width:0;cursor:pointer"
-              onclick="event.stopPropagation();openEditActionItemFromRow(this.closest('[data-ai-id]'),'${meetId}')">
-              <div style="font-size:12px;color:${done?'var(--muted)':'var(--text)'};
-                text-decoration:${done?'line-through':'none'};line-height:1.4">
-                ${escHtml((ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim())}
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)">
-                  <div style="width:14px;height:14px;border-radius:50%;background:rgba(79,142,247,.2);
-                    color:var(--accent);font-size:7px;font-weight:700;display:flex;
-                    align-items:center;justify-content:center">${assigneeInitials}</div>
-                  ${escHtml(assigneeName)}
-                </div>
-                ${ai.due_date ? `<div style="font-size:10px;color:${overdue?'#f07a7a':'var(--muted)'}">
-                  ${overdue?'⚠ ':''}Due ${fmtDate(ai.due_date)}</div>` : ''}
-                <span data-status-badge
-                  style="font-size:10px;padding:1px 6px;border-radius:4px;
-                  background:${done?'rgba(42,157,64,.15)':overdue?'rgba(192,64,74,.15)':'rgba(212,144,31,.12)'};
-                  color:${done?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
-                  ${ai.status||'open'}
-                </span>
-                ${hasAttach ? `
-                  <span style="font-size:10px;cursor:pointer;
-                    padding:1px 6px;border-radius:8px;
-                    background:rgba(255,255,255,.06);color:var(--muted)"
-                    title="View attachments"
-                    onclick="event.stopPropagation();showAttachments('${ai.id}')">
-                    📎 ${(_aiAttachments[ai.id]||[]).length || ''}
-                  </span>` : ''}
-                ${commentCount > 0 ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;
-                  background:rgba(79,142,247,.12);color:var(--accent)">
-                  💬 ${commentCount}
-                </span>` : ''}
-              </div>
-            </div>
-          </div>`;
-        }).join('');
+        actionsEl.innerHTML = (actionItems||[]).map(ai =>
+          renderAIRow(ai, 'meeting_action_items', meetId)
+        ).join('');
       }
     }
 
@@ -2650,15 +2595,12 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
       const due = dueSpan.dataset?.due || row?.dataset?.aiDue || '';
       const isOverdue = due && due < today2 && newStatus !== 'complete';
       dueSpan.classList.toggle('overdue', isOverdue);
+      // Force color explicitly — CSS class alone can be overridden by inline styles
       dueSpan.style.color = isOverdue ? '#f07a7a' : 'var(--muted)';
+      // Update ⚠ prefix
+      const baseText = 'Due ' + (dueSpan.textContent.replace(/^[⚠\s]+/, '').replace(/^Due\s*/,'').trim() || dueSpan.dataset.due || '');
+      dueSpan.textContent = (isOverdue ? '⚠ ' : '') + 'Due ' + fmtDate(due);
     });
-    // Also handle meeting card rows that use inline color directly (no CSS class)
-    const inlineDue = row?.querySelector('[style*="Due "], [style*="due"]');
-    if (inlineDue && !inlineDue.dataset?.due) {
-      const due = row?.dataset?.aiDue || '';
-      const isOverdue = due && due < today2 && newStatus !== 'complete';
-      inlineDue.style.color = isOverdue ? '#f07a7a' : 'var(--muted)';
-    }
 
     // Toggle status badge on the row
     const statusBadge = row?.querySelector('[data-status-badge]');
@@ -2682,7 +2624,10 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
     const aai = allActionItems.find(a => a.id === id);
     if (aai) aai.status = newStatus;
     const badge = document.getElementById('tbadge-ai');
-    if (badge) badge.textContent = allActionItems.filter(a => a.status === 'open').length;
+    if (badge) {
+      badge.textContent = allActionItems.filter(a => a.status === 'open').length;
+      updateActionsBadge();
+    }
     // Refresh meetings badge overdue state
     updateMeetingsBadge();
     // Update the meeting card header AI badge dynamically
