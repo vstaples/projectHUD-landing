@@ -320,6 +320,9 @@ textarea.editor-area.lg { min-height: 120px; }
       <button class="btn" onclick="saveDraft()">Save draft</button>
       <button class="btn" onclick="openPreview()">Preview email</button>
       <button class="btn btn-primary" onclick="confirmSend()">Send minutes ✉</button>
+      <button class="btn" onclick="exitEditor()"
+        style="border-color:var(--border2);color:var(--muted);padding:7px 10px"
+        title="Close editor">✕</button>
     </div>
   </div>
 
@@ -529,6 +532,8 @@ async function loadAll() {
     // Set back link
     if (PROSPECT_ID) {
       document.getElementById('back-prospect').href =
+        '/prospect-detail.html?id=' + PROSPECT_ID;
+      document.getElementById('back-link').href =
         '/prospect-detail.html?id=' + PROSPECT_ID;
     }
 
@@ -962,6 +967,21 @@ async function sendMinutes() {
     alert('Failed to send minutes: ' + e.message);
     btn.textContent = 'Confirm & send';
     btn.disabled    = false;
+  }
+}
+
+// ── exit ──────────────────────────────────────────────
+async function exitEditor() {
+  // Autosave before leaving
+  if (document.getElementById('f-summary').value ||
+      document.getElementById('f-discussion').value ||
+      document.getElementById('f-decisions').value) {
+    await saveDraft();
+  }
+  if (PROSPECT_ID) {
+    location.href = '/prospect-detail.html?id=' + PROSPECT_ID;
+  } else {
+    history.back();
   }
 }
 
