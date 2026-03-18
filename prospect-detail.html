@@ -209,9 +209,9 @@ body {
   margin-bottom: 12px;
 }
 .card-title {
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .07em;
-  color: var(--muted); margin-bottom: 10px;
+  color: var(--text); margin-bottom: 10px;
 }
 
 /* overview grid */
@@ -857,6 +857,32 @@ body {
   </div>
 </div>
 
+<!-- BRIEF EDITOR DRAWER -->
+<div class="overlay" id="brief-overlay" onclick="handleOverlay(event,'brief-overlay')">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <span class="drawer-title">EDIT INITIAL BRIEF</span>
+      <button class="drawer-close" onclick="closeDrawer('brief-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field">
+        <label>DESCRIPTION</label>
+        <textarea id="brief-desc" rows="5"
+          placeholder="Describe the prospect, their needs, and context…"></textarea>
+      </div>
+      <div class="field">
+        <label>NEXT STEPS</label>
+        <textarea id="brief-next-steps" rows="4"
+          placeholder="What are the agreed next steps? One per line…"></textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveBrief()">Save</button>
+      <button class="btn" onclick="closeDrawer('brief-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT ACTION ITEM DRAWER -->
 <div class="overlay" id="ai-edit-overlay" onclick="handleOverlay(event,'ai-edit-overlay')">
   <div class="drawer" onclick="event.stopPropagation()">
@@ -1172,16 +1198,36 @@ function renderOverview() {
   const today = new Date().toLocaleDateString('en-CA');
   // Overview shows meeting action items first (most recent/actionable), then prospect ones
   const allOpen  = allActionItems.filter(a => a.status === 'open');
-  const openAI   = allOpen.slice(0, 3);
+  const openAI   = allOpen;  // Show all open items
   const nextMeet = meetings.find(m => m.status === 'scheduled');
 
   document.getElementById('panel-overview').innerHTML = `
     <div class="ov-grid">
       <div class="card">
-        <div class="card-title">Initial brief</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.7">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">Initial brief</div>
+          <button class="btn" style="font-size:10px;padding:3px 8px;height:auto"
+            onclick="openBriefEditor()">✎ Edit</button>
+        </div>
+        <div id="ov-brief-text" style="font-size:12px;color:var(--muted);line-height:1.7">
           ${escHtml(p.description || 'No description provided.')}
         </div>
+        ${p.next_steps ? `
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:.07em;color:var(--text);margin-bottom:6px">Next steps</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-line">
+            ${escHtml(p.next_steps)}
+          </div>
+        </div>` : `
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:.07em;color:var(--text);margin-bottom:6px">Next steps</div>
+          <div style="font-size:12px;color:var(--muted);font-style:italic">
+            No next steps recorded.
+            <span style="color:var(--accent);cursor:pointer" onclick="openBriefEditor()">Add one →</span>
+          </div>
+        </div>`}
       </div>
       <div class="card">
         <div class="card-title">Key signals</div>
@@ -1199,11 +1245,7 @@ function renderOverview() {
         ${openAI.length === 0
           ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
           : openAI.map(ai => renderAIRow(ai, ai._table, ai.meeting_id||null)).join('')}
-        ${allOpen.length > 3
-          ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px"
-              onclick="switchTab('meetings')">
-              +${allOpen.length - 3} more →</div>`
-          : ''}
+
       </div>
       <div class="card">
         <div class="card-title">Next meeting</div>
@@ -1868,6 +1910,29 @@ async function saveActionItem() {
 // ── action item edit ───────────────────────────────────
 let _attachedFiles = [];       // files staged in current edit session
 const _aiAttachments = {};    // { [aiId]: [{name, size, url, type}] } — persists across drawer opens
+
+function openBriefEditor() {
+  document.getElementById('brief-desc').value       = prospect?.description    || '';
+  document.getElementById('brief-next-steps').value = prospect?.next_steps     || '';
+  document.getElementById('brief-overlay').classList.add('open');
+}
+
+async function saveBrief() {
+  const desc      = document.getElementById('brief-desc').value.trim();
+  const nextSteps = document.getElementById('brief-next-steps').value.trim();
+  try {
+    await API.patch(`prospects?id=eq.${PROSPECT_ID}`, {
+      description: desc  || null,
+      next_steps:  nextSteps || null,
+    });
+    closeDrawer('brief-overlay');
+    await loadAll();
+    switchTab('overview');
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save. The next_steps column may not exist yet — run the migration first.');
+  }
+}
 
 function openAddMeetingActionItem(meetId) {
   // Pre-populate the Add Action Item drawer and link it to this meeting
