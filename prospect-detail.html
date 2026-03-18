@@ -1455,11 +1455,27 @@ function renderMeetings() {
     </div>
     ${meetings.map(m => `
       <div class="meet-card" id="mcard-${m.id}">
+        ${(function(){
+          const today   = new Date().toLocaleDateString('en-CA');
+          const mAIs    = meetingActionItems.filter(a => a.meeting_id === m.id);
+          const openAIs = mAIs.filter(a => a.status !== 'complete');
+          const overdue = openAIs.some(a => a.due_date && a.due_date < today);
+          const aiBadge = openAIs.length > 0 ? `
+            <span style="
+              font-size:10px;font-weight:700;
+              padding:2px 7px;border-radius:8px;
+              background:${overdue ? 'rgba(192,64,74,.2)' : 'rgba(255,255,255,.08)'};
+              color:${overdue ? '#f07a7a' : 'var(--muted)'};
+              white-space:nowrap">
+              ${openAIs.length} action item${openAIs.length!==1?'s':''}${overdue?' ⚠':''}
+            </span>` : '';
+          return `
         <div class="meet-head" onclick="toggleMeetingCard('${m.id}')" style="cursor:pointer">
           <div style="flex:1">
-            <div class="meet-title-text" style="display:flex;align-items:center;gap:4px">
+            <div class="meet-title-text" style="display:flex;align-items:center;gap:6px">
               ${escHtml(m.title)}
               <span class="meet-chevron">▾</span>
+              ${aiBadge}
             </div>
             <div class="meet-sub-text">
               ${fmtDateTime(m.meeting_date)} · ${m.duration_minutes} min
@@ -1476,7 +1492,8 @@ function renderMeetings() {
               ${capitalize(m.status||'')}
             </span>
           </div>
-        </div>
+        </div>`;
+        })()}
         <div class="meet-expand" id="mexpand-${m.id}" onclick="event.stopPropagation()">
 
           <div class="mb-label">Next meeting</div>
