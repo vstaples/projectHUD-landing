@@ -1317,7 +1317,7 @@ function renderActions() {
                         background:${ai.status==='complete'?'var(--green)':'transparent'};
                         border-color:${ai.status==='complete'?'var(--green)':'var(--border2)'};
                         font-size:8px;color:#fff"
-                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this)">
+                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this,'prospect_action_items',null)">
                         ${ai.status==='complete'?'✓':''}
                       </div>
                       <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
@@ -1486,7 +1486,17 @@ async function loadMeetingDetail(meetId) {
         actionsEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">No action items.</div>';
       } else {
         const today = new Date().toLocaleDateString('en-CA');
-        actionsEl.innerHTML = actionItems.map(ai => {
+        // Merge DB data with in-memory cache so toggled statuses survive re-renders
+        if (!_meetingAICache[meetId]) _meetingAICache[meetId] = actionItems || [];
+        else {
+          // Apply cached status overrides to fresh DB data
+          (actionItems||[]).forEach(ai => {
+            const cached = _meetingAICache[meetId].find(c => c.id === ai.id);
+            if (cached) ai.status = cached.status;
+          });
+          _meetingAICache[meetId] = actionItems || [];
+        }
+        actionsEl.innerHTML = (actionItems||[]).map(ai => {
           const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
           const assigneeName = resMap[ai.assigned_to_resource] || '—';
           const assigneeInitials = assigneeName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
@@ -1507,7 +1517,7 @@ async function loadMeetingDetail(meetId) {
               background:${done?'var(--green)':'transparent'};
               border-color:${done?'var(--green)':'var(--border2)'};
               font-size:9px;color:#fff"
-              onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this)">${done?'✓':''}</div>
+              onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}','${ai.status||'open'}',this,'meeting_action_items','${meetId}')">${done?'✓':''}</div>
             <div style="flex:1;min-width:0;cursor:pointer"
               onclick="event.stopPropagation();openEditActionItemFromRow(this.closest('[data-ai-id]'),'${meetId}')">
               <div style="font-size:12px;color:${done?'var(--muted)':'var(--text)'};
@@ -2190,30 +2200,45 @@ function startProposal() {
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
 
 // ── toggle action item status from checkbox ──────────────
-async function toggleMeetingAIStatus(id, currentStatus, el) {
+// _meetingAICache: { [meetId]: [{id, status, ...}] }
+// Keeps meeting_action_items state across re-renders
+const _meetingAICache = {};
+
+async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
+  // table: 'meeting_action_items' (from meeting card) or 'prospect_action_items' (actions tab)
+  const tbl       = table || 'prospect_action_items';
   const newStatus = currentStatus === 'complete' ? 'open' : 'complete';
   try {
-    await API.patch(`prospect_action_items?id=eq.${id}`, {
-      status: newStatus,
+    await API.patch(`${tbl}?id=eq.${id}`, {
+      status:       newStatus,
       completed_at: newStatus === 'complete' ? new Date().toISOString() : null,
     });
-    // Update checkbox visually immediately
-    el.style.background    = newStatus === 'complete' ? 'var(--green)' : 'transparent';
-    el.style.borderColor   = newStatus === 'complete' ? 'var(--green)' : 'rgba(255,255,255,.14)';
-    el.textContent         = newStatus === 'complete' ? '✓' : '';
-    el.dataset.aiStatus    = newStatus;
-    // Update parent row data attr
+
+    // Update visual immediately — no re-render needed
+    el.style.background  = newStatus === 'complete' ? 'var(--green)' : 'transparent';
+    el.style.borderColor = newStatus === 'complete' ? 'var(--green)' : 'rgba(255,255,255,.14)';
+    el.textContent       = newStatus === 'complete' ? '✓' : '';
+
     const row = el.closest('[data-ai-id]');
     if (row) row.dataset.aiStatus = newStatus;
-    // Update description strikethrough
+
     const descEl = row?.querySelector('[style*="text-decoration"]');
     if (descEl) {
       descEl.style.textDecoration = newStatus === 'complete' ? 'line-through' : 'none';
-      descEl.style.color = newStatus === 'complete' ? 'var(--muted)' : 'var(--text)';
+      descEl.style.color          = newStatus === 'complete' ? 'var(--muted)' : 'var(--text)';
     }
-    // Refresh badge counts
-    document.getElementById('tbadge-ai').textContent =
-      (actionItems.filter(a => a.status === 'open').length);
+
+    // Update in-memory caches so re-renders respect the new state
+    if (meetId && _meetingAICache[meetId]) {
+      const item = _meetingAICache[meetId].find(a => a.id === id);
+      if (item) item.status = newStatus;
+    }
+    // Also update prospect action items array for badge count
+    const pai = actionItems.find(a => a.id === id);
+    if (pai) pai.status = newStatus;
+    const badge = document.getElementById('tbadge-ai');
+    if (badge) badge.textContent = actionItems.filter(a => a.status === 'open').length;
+
   } catch(e) {
     console.error('toggleMeetingAIStatus error:', e);
   }
