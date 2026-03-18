@@ -2986,7 +2986,13 @@ function _nextWeekday(date) {
   return d;
 }
 
-function _toInputDate(d) { return d.toISOString().substring(0,10); }
+function _toInputDate(d) {
+  // Use local date components to avoid UTC timezone shift
+  const yr  = d.getFullYear();
+  const mo  = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return yr + '-' + mo + '-' + day;
+}
 function _fmtD(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
