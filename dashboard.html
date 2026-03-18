@@ -139,7 +139,7 @@ async function loadDashboard() {
     const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
     const atRiskTasks     = tasks.filter(t =>
       t.status === 'blocked' || t.status === 'overdue' ||
-      (t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete')
+      (t.due_date && t.due_date.substring(0,10) < new Date().toLocaleDateString('en-CA') && t.status !== 'complete')
     );
     const clientFirms = Object.fromEntries(firms.map(f => [f.id, f.name]));
     const projMap     = Object.fromEntries(projects.map(p => [p.id, p.name]));
@@ -166,7 +166,7 @@ async function loadDashboard() {
       projList.innerHTML = activeProjects.map(proj => {
         const pt      = tasks.filter(t => t.project_id === proj.id);
         const done    = pt.filter(t => t.status === 'complete').length;
-        const overdue = pt.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete').length;
+        const overdue = pt.filter(t => t.due_date && t.due_date.substring(0,10) < new Date().toLocaleDateString('en-CA') && t.status !== 'complete').length;
         const blocked = pt.filter(t => t.status === 'blocked').length;
         const pctDone = UI.pct(done, pt.length);
         const health  = blocked > 0 ? 'blocked' : overdue > 0 ? 'at-risk' : 'active';
@@ -180,7 +180,11 @@ async function loadDashboard() {
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
             <div><div class="proj-name">${proj.name}</div><div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div></div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-              ${UI.badge(health,hLabel)}
+              <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;padding:2px 8px;border:1px solid;${
+                health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
+                health==='at-risk' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
+                'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
+              }">${hLabel}</span>
               ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:11px;color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
             </div>
           </div>
