@@ -124,6 +124,8 @@
   .note { font-family: var(--font-mono); font-size: 10px; color: var(--text3); line-height: 1.6; }
   .note strong { color: var(--text2); }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -167,15 +169,16 @@
       <div class="card">
         <div class="card-title">▸ UPLOAD CSV FILE</div>
         <div class="dropzone" id="dropzone">
-          <input type="file" id="file-input" accept=".csv,.tsv,.txt">
+          <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xlsx,.xls">
           <div class="dz-icon">📋</div>
           <div class="dz-title">DROP CSV FILE HERE OR CLICK TO BROWSE</div>
-          <div class="dz-sub">Supports .csv · .tsv · Any column order · Any tool export</div>
+          <div class="dz-sub">Supports .csv · .tsv · .xlsx · .xls · Any column order · Any tool export</div>
           <div class="dz-file" id="dz-filename"></div>
         </div>
       </div>
 
       <div class="row">
+        <button class="hud-btn" onclick="goBack()" style="color:var(--text3);">✕ CANCEL</button>
         <div class="spacer"></div>
         <button class="hud-btn primary" id="btn-next-1" onclick="goToStep2()" disabled>NEXT: MAP COLUMNS →</button>
       </div>
@@ -198,6 +201,7 @@
       </div>
       <div class="row">
         <button class="hud-btn" onclick="goToStep(1)">← BACK</button>
+        <button class="hud-btn" onclick="goBack()" style="color:var(--text3);">✕ CANCEL</button>
         <div class="spacer"></div>
         <button class="hud-btn primary" onclick="goToStep3()">NEXT: VALIDATE →</button>
       </div>
@@ -221,6 +225,7 @@
       </div>
       <div class="row">
         <button class="hud-btn" onclick="goToStep(2)">← BACK</button>
+        <button class="hud-btn" onclick="goBack()" style="color:var(--text3);">✕ CANCEL</button>
         <div class="spacer"></div>
         <span id="val-err-msg" style="font-family:var(--font-mono);font-size:10px;color:var(--red);margin-right:12px;"></span>
         <button class="hud-btn success" id="btn-import" onclick="startImport()">⬆ IMPORT <span id="import-count"></span> TASKS</button>
@@ -341,20 +346,59 @@ function checkStep1() {
 }
 
 // ── FILE PARSING ─────────────────────────────────────────────────
+function goBack() {
+  const projId = new URLSearchParams(location.search).get('project_id');
+  window.location.href = projId ? '/project-detail.html?id=' + projId : '/projects.html';
+}
+
 function handleFile(file) {
   document.getElementById('dz-filename').textContent = `✓ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const text = e.target.result;
-    const delim = text.includes('\t') ? '\t' : ',';
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    _csvHeaders = parseCSVLine(lines[0], delim);
-    _csvRows = lines.slice(1).filter(l=>l.trim()).map(l => parseCSVLine(l, delim));
-    document.getElementById('mapper-file-name').textContent = file.name;
-    autoMap();
-    checkStep1();
-  };
-  reader.readAsText(file);
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    // Excel — use SheetJS
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        // Use first sheet
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!data.length) { alert('Empty spreadsheet'); return; }
+        _csvHeaders = data[0].map(h => String(h || '').trim());
+        _csvRows    = data.slice(1)
+          .filter(row => row.some(c => c !== '' && c !== null && c !== undefined))
+          .map(row => _csvHeaders.map((_, i) => {
+            const v = row[i];
+            if (v instanceof Date) {
+              // Format date as YYYY-MM-DD
+              return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+            }
+            return String(v ?? '').trim();
+          }));
+        document.getElementById('mapper-file-name').textContent = file.name;
+        autoMap();
+        checkStep1();
+      } catch(err) {
+        alert('Could not read Excel file: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // CSV / TSV / plain text
+    const reader = new FileReader();
+    reader.onload = e => {
+      const text = e.target.result;
+      const delim = text.includes('\t') ? '\t' : ',';
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      _csvHeaders = parseCSVLine(lines[0], delim);
+      _csvRows = lines.slice(1).filter(l=>l.trim()).map(l => parseCSVLine(l, delim));
+      document.getElementById('mapper-file-name').textContent = file.name;
+      autoMap();
+      checkStep1();
+    };
+    reader.readAsText(file);
+  }
 }
 
 function parseCSVLine(line, delim) {
@@ -747,6 +791,14 @@ function downloadTemplate() {
   a.download = 'projecthud-task-import-template.csv';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ── CANCEL ───────────────────────────────────────────────────────
+function cancelImport() {
+  const dest = _selectedProject
+    ? '/project-detail.html?id=' + _selectedProject.id
+    : '/projects.html';
+  window.location.href = dest;
 }
 
 // ── STEP NAVIGATION ───────────────────────────────────────────────
