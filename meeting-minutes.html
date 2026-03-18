@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meeting Minutes — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
+
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+}
+
+/* ── back bar ─────────────────────────────────────────── */
+.backbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px; height: 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+  font-size: 12px; color: var(--muted);
+}
+.backbar a { color: var(--muted); text-decoration: none; }
+.backbar a:hover { color: var(--text); }
+
+/* ── header ───────────────────────────────────────────── */
+.page-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.hdr-left { flex: 1; min-width: 0; }
+.meeting-title { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+.meeting-meta  { font-size: 12px; color: var(--muted); }
+.hdr-actions   { display: flex; gap: 8px; flex-shrink: 0; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  transition: background .15s; text-decoration: none;
+}
+.btn:hover { background: var(--surf3); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.btn-green  { background: rgba(42,157,64,.15); border-color: rgba(42,157,64,.4); color: #7af0a0; }
+.btn-green:hover { background: rgba(42,157,64,.25); }
+
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 600;
+}
+
+/* ── two-column layout ────────────────────────────────── */
+.editor-layout {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 320px;
+  overflow: hidden;
+}
+
+/* left — editor */
+.editor-pane {
+  overflow-y: auto; padding: 24px;
+  border-right: 1px solid var(--border);
+}
+.editor-pane::-webkit-scrollbar { width: 4px; }
+.editor-pane::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* right — sidebar */
+.meta-pane {
+  overflow-y: auto; padding: 20px;
+  background: var(--surf2);
+}
+.meta-pane::-webkit-scrollbar { width: 4px; }
+.meta-pane::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── editor sections ──────────────────────────────────── */
+.section {
+  margin-bottom: 24px;
+}
+.section-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.section-label span { font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 10px; }
+
+textarea.editor-area {
+  width: 100%; padding: 10px 12px;
+  border-radius: 7px; border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  font-size: 13px; font-family: inherit; line-height: 1.7;
+  outline: none; resize: vertical; min-height: 80px;
+  transition: border-color .15s;
+}
+textarea.editor-area:focus { border-color: var(--accent); }
+textarea.editor-area.lg { min-height: 120px; }
+
+.subject-input {
+  width: 100%; padding: 8px 12px;
+  border-radius: 7px; border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .15s;
+}
+.subject-input:focus { border-color: var(--accent); }
+
+/* action items list */
+.ai-list { display: flex; flex-direction: column; gap: 6px; }
+.ai-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; border-radius: 6px;
+  background: var(--surf2); border: 1px solid var(--border);
+  font-size: 12px;
+}
+.ai-item-check {
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid var(--border2); margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px;
+}
+.ai-item-check.done { background: var(--green); border-color: var(--green); color: #fff; }
+.ai-item-body { flex: 1; }
+.ai-item-desc { color: var(--text); line-height: 1.4; margin-bottom: 3px; }
+.ai-item-meta { font-size: 10px; color: var(--muted); display: flex; gap: 8px; }
+.overdue-tag  { color: #f07a7a; }
+
+/* next meeting date */
+.date-input {
+  padding: 7px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 12px; font-family: inherit;
+  outline: none; transition: border-color .15s;
+}
+.date-input:focus { border-color: var(--accent); }
+
+/* ── meta pane ────────────────────────────────────────── */
+.meta-section { margin-bottom: 20px; }
+.meta-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted);
+  margin-bottom: 8px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* attendee chips */
+.attendee-chip {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 0; border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.attendee-chip:last-child { border-bottom: none; }
+.att-av {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(79,142,247,.15); color: var(--accent);
+  font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.att-name  { flex: 1; color: var(--text); }
+.att-email { font-size: 10px; color: var(--muted); }
+.att-status {
+  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+}
+.att-attended { background: rgba(42,157,64,.15); color: #7af0a0; }
+.att-invited  { background: rgba(255,255,255,.07); color: var(--muted); }
+
+/* CC recipients */
+.cc-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.cc-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 5px;
+  background: var(--surf3); border: 1px solid var(--border);
+  font-size: 11px; color: var(--text);
+}
+.cc-chip span { flex: 1; }
+.cc-remove { cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; }
+.cc-remove:hover { color: var(--red); }
+.cc-add-row { display: flex; gap: 6px; }
+.cc-add-row input {
+  flex: 1; padding: 6px 8px; border-radius: 5px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 11px; outline: none;
+  font-family: inherit;
+}
+.cc-add-row input:focus { border-color: var(--accent); }
+.cc-add-btn {
+  padding: 6px 10px; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+}
+.cc-add-btn:hover { color: var(--text); }
+
+/* ── preview modal ────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65); z-index: 200;
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-bg.open { display: flex; }
+.preview-modal {
+  background: #fff; border-radius: 10px;
+  width: 100%; max-width: 680px; max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.preview-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+.preview-head-title { font-size: 14px; font-weight: 600; color: #111; }
+.preview-close {
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid #e5e7eb; background: #fff;
+  cursor: pointer; font-size: 16px; color: #666;
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-frame { flex: 1; overflow-y: auto; }
+.preview-actions {
+  padding: 12px 18px; border-top: 1px solid #e5e7eb;
+  display: flex; gap: 8px; background: #f9fafb;
+}
+.preview-btn {
+  padding: 7px 14px; border-radius: 6px; font-size: 12px;
+  font-weight: 500; cursor: pointer; border: 1px solid #e5e7eb;
+  background: #fff; color: #374151;
+}
+.preview-btn.primary {
+  background: #4f8ef7; border-color: #4f8ef7; color: #fff;
+}
+
+/* ── send confirmation ────────────────────────────────── */
+.send-confirm {
+  text-align: center; padding: 32px 24px;
+}
+.send-icon  { font-size: 36px; margin-bottom: 12px; }
+.send-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 6px; }
+.send-sub   { font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 20px; }
+
+/* loading */
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--muted); font-size: 13px; gap: 8px;
+}
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--border2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* autosave indicator */
+.autosave {
+  font-size: 10px; color: var(--muted); display: flex;
+  align-items: center; gap: 5px;
+}
+.autosave.saving { color: var(--amber); }
+.autosave.saved  { color: #7af0a0; }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+  <div class="backbar">
+    <a id="back-link" href="/pipeline.html">← Pipeline</a>
+    <span>/</span>
+    <a id="back-prospect" href="#">Prospect</a>
+    <span>/</span>
+    <span id="back-meeting">Meeting minutes</span>
+  </div>
+
+  <div class="page-header">
+    <div class="hdr-left">
+      <div class="meeting-title" id="hdr-title">Loading…</div>
+      <div class="meeting-meta"  id="hdr-meta"></div>
+    </div>
+    <div class="hdr-actions">
+      <div class="autosave" id="autosave-indicator"></div>
+      <span class="status-chip" id="status-chip"
+        style="background:rgba(255,255,255,.07);color:var(--muted)">Draft</span>
+      <button class="btn" onclick="saveDraft()">Save draft</button>
+      <button class="btn" onclick="openPreview()">Preview email</button>
+      <button class="btn btn-primary" onclick="confirmSend()">Send minutes ✉</button>
+    </div>
+  </div>
+
+  <div class="editor-layout">
+
+    <!-- LEFT: EDITOR -->
+    <div class="editor-pane">
+
+      <div class="section">
+        <div class="section-label">EMAIL SUBJECT</div>
+        <input type="text" class="subject-input" id="f-subject"
+          placeholder="Meeting minutes — [Meeting title] — [Date]" />
+      </div>
+
+      <div class="section">
+        <div class="section-label">
+          SUMMARY
+          <span>Brief overview of the meeting purpose and outcome</span>
+        </div>
+        <textarea class="editor-area lg" id="f-summary"
+          placeholder="Summarize what was accomplished and the overall outcome of this meeting…"></textarea>
+      </div>
+
+      <div class="section">
+        <div class="section-label">
+          DISCUSSION NOTES
+          <span>Key points raised, questions asked, topics covered</span>
+        </div>
+        <textarea class="editor-area lg" id="f-discussion"
+          placeholder="Document the key discussion points, questions raised, and topics covered…"></textarea>
+      </div>
+
+      <div class="section">
+        <div class="section-label">
+          DECISIONS &amp; NEXT STEPS
+          <span>Formal decisions made and commitments given</span>
+        </div>
+        <textarea class="editor-area" id="f-decisions"
+          placeholder="List the decisions made and next steps agreed upon…"></textarea>
+      </div>
+
+      <div class="section">
+        <div class="section-label">ACTION ITEMS</div>
+        <div class="ai-list" id="f-action-items">
+          <div class="loading-state" style="height:60px">
+            <div class="spinner"></div> Loading…
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">NEXT MEETING</div>
+        <input type="date" class="date-input" id="f-next-meeting" />
+        <span style="font-size:11px;color:var(--muted);margin-left:8px">
+          Leave blank if not yet scheduled
+        </span>
+      </div>
+
+      <div class="section">
+        <div class="section-label">
+          ADDITIONAL MESSAGE
+          <span>Personalised note prepended to the email body</span>
+        </div>
+        <textarea class="editor-area" id="f-message"
+          placeholder="Optional — e.g. 'Thank you all for a productive session. Please review the action items below…'"></textarea>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: META PANE -->
+    <div class="meta-pane">
+
+      <div class="meta-section">
+        <div class="meta-label">MEETING DETAILS</div>
+        <div id="meta-details" style="font-size:12px;color:var(--muted);line-height:1.8">
+          Loading…
+        </div>
+      </div>
+
+      <div class="meta-section">
+        <div class="meta-label">TO — ATTENDEES</div>
+        <div id="meta-attendees">
+          <div style="font-size:11px;color:var(--muted)">Loading…</div>
+        </div>
+      </div>
+
+      <div class="meta-section">
+        <div class="meta-label">CC — ADDITIONAL RECIPIENTS</div>
+        <div class="cc-list" id="cc-list"></div>
+        <div class="cc-add-row">
+          <input type="text" id="cc-input"
+            placeholder="Email or name…"
+            onkeydown="if(event.key==='Enter')addCC()" />
+          <button class="cc-add-btn" onclick="addCC()">+ Add</button>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px">
+          Add anyone not listed as an attendee
+        </div>
+      </div>
+
+      <div class="meta-section">
+        <div class="meta-label">SEND HISTORY</div>
+        <div id="meta-send-history" style="font-size:11px;color:var(--muted)">
+          Not yet sent
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- PREVIEW MODAL -->
+<div class="modal-bg" id="preview-modal" onclick="if(event.target===this)closePreview()">
+  <div class="preview-modal">
+    <div class="preview-head">
+      <div class="preview-head-title">Email preview</div>
+      <button class="preview-close" onclick="closePreview()">✕</button>
+    </div>
+    <div class="preview-frame" id="preview-frame"></div>
+    <div class="preview-actions">
+      <button class="preview-btn" onclick="closePreview()">Edit</button>
+      <button class="preview-btn primary" onclick="closePreview();confirmSend()">Send ✉</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEND CONFIRM MODAL -->
+<div class="modal-bg" id="send-modal" onclick="if(event.target===this)closeSendModal()">
+  <div class="preview-modal" style="max-width:480px">
+    <div class="preview-head">
+      <div class="preview-head-title">Send meeting minutes</div>
+      <button class="preview-close" onclick="closeSendModal()">✕</button>
+    </div>
+    <div id="send-modal-body" style="padding:24px">
+      <div style="font-size:13px;color:#374151;margin-bottom:16px;line-height:1.6">
+        This will send the meeting minutes to all attendees and CC recipients.
+        The minutes status will be marked as <strong>Sent</strong>.
+      </div>
+      <div style="font-size:12px;color:#666;margin-bottom:6px;font-weight:600">Recipients:</div>
+      <div id="send-recipients-list"
+        style="font-size:12px;color:#374151;line-height:1.8;
+          padding:10px;background:#f9fafb;border-radius:6px;margin-bottom:16px"></div>
+      <div style="font-size:11px;color:#999">
+        ℹ Email sending via Edge Function — will be dispatched when provider is connected.
+        The minutes are saved and marked sent regardless.
+      </div>
+    </div>
+    <div class="preview-actions">
+      <button class="preview-btn" onclick="closeSendModal()">Cancel</button>
+      <button class="preview-btn primary" id="send-confirm-btn" onclick="sendMinutes()">
+        Confirm &amp; send
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+const params      = new URLSearchParams(location.search);
+const MEETING_ID  = params.get('meeting_id');
+const PROSPECT_ID = params.get('prospect_id');
+
+let meeting       = null;
+let minutes       = null;
+let attendees     = [];
+let actionItems   = [];
+let resources     = [];
+let contacts      = [];
+let ccRecipients  = [];
+let _autosaveTimer = null;
+
+// ── init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!MEETING_ID) { location.href = '/pipeline.html'; return; }
+  if (window.Sidebar) Sidebar.init('pipeline');
+  await loadAll();
+  bindAutosave();
+});
+
+async function loadAll() {
+  try {
+    const [meetRes, minsRes, attRes, aiRes, resRes] = await Promise.all([
+      API.get(`v_meetings?id=eq.${MEETING_ID}&limit=1`),
+      API.get(`meeting_minutes?meeting_id=eq.${MEETING_ID}&limit=1`),
+      API.get(`meeting_attendees?meeting_id=eq.${MEETING_ID}&select=*,users(name,email)`),
+      API.get(`meeting_action_items?meeting_id=eq.${MEETING_ID}&order=created_at`),
+      API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,email`),
+    ]);
+
+    meeting     = meetRes?.[0];
+    minutes     = minsRes?.[0] || null;
+    attendees   = attRes  || [];
+    actionItems = aiRes   || [];
+    resources   = resRes  || [];
+
+    if (!meeting) { alert('Meeting not found.'); history.back(); return; }
+
+    renderHeader();
+    renderMeta();
+    renderAttendees();
+    renderActionItems();
+    populateForm();
+
+    // Set back link
+    if (PROSPECT_ID) {
+      document.getElementById('back-prospect').href =
+        '/prospect-detail.html?id=' + PROSPECT_ID;
+    }
+
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── header ─────────────────────────────────────────────
+function renderHeader() {
+  document.getElementById('hdr-title').textContent = meeting.title;
+  document.getElementById('hdr-meta').textContent  =
+    fmtDateTime(meeting.meeting_date) + ' · ' +
+    (meeting.duration_minutes || 60) + ' min' +
+    (meeting.location_or_link ? ' · ' + meeting.location_or_link : '');
+  document.title = 'Minutes — ' + meeting.title;
+  document.getElementById('back-meeting').textContent = 'Minutes — ' + meeting.title;
+
+  // Status chip
+  const chip = document.getElementById('status-chip');
+  const st   = minutes?.status || 'draft';
+  const colors = {
+    draft:     'rgba(255,255,255,.07):#7a8099',
+    submitted: 'rgba(212,144,31,.15):#d4901f',
+    sent:      'rgba(42,157,64,.15):#7af0a0',
+  };
+  const [bg, color] = (colors[st] || colors.draft).split(':');
+  chip.style.background = bg;
+  chip.style.color      = color;
+  chip.textContent      = capitalize(st);
+}
+
+// ── meta pane ──────────────────────────────────────────
+function renderMeta() {
+  document.getElementById('meta-details').innerHTML = `
+    <div><span style="color:var(--muted)">Date: </span>${fmtDateTime(meeting.meeting_date)}</div>
+    <div><span style="color:var(--muted)">Duration: </span>${meeting.duration_minutes || 60} min</div>
+    <div><span style="color:var(--muted)">Type: </span>${capitalize(meeting.meeting_type || '')}</div>
+    ${meeting.location_or_link ? `<div><span style="color:var(--muted)">Location: </span>${escHtml(meeting.location_or_link)}</div>` : ''}
+  `;
+
+  if (minutes?.sent_at) {
+    document.getElementById('meta-send-history').innerHTML =
+      `<div style="color:#7af0a0">✓ Sent ${fmtDateTime(minutes.sent_at)}</div>`;
+  }
+}
+
+function renderAttendees() {
+  const el = document.getElementById('meta-attendees');
+  if (!attendees.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted)">No attendees recorded.</div>';
+    return;
+  }
+  el.innerHTML = attendees.map(a => {
+    const name     = a.users?.name || resolveResourceName(a.stakeholder_id) || 'Attendee';
+    const email    = a.users?.email || '';
+    const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const st       = a.attendance_status || 'invited';
+    return `
+      <div class="attendee-chip">
+        <div class="att-av">${initials}</div>
+        <div>
+          <div class="att-name">${escHtml(name)}</div>
+          ${email ? `<div class="att-email">${escHtml(email)}</div>` : ''}
+        </div>
+        <span class="att-status ${st === 'attended' ? 'att-attended' : 'att-invited'}">
+          ${capitalize(st)}
+        </span>
+      </div>`;
+  }).join('');
+}
+
+function resolveResourceName(resourceId) {
+  if (!resourceId) return null;
+  const r = resources.find(x => x.id === resourceId);
+  return r ? r.first_name + ' ' + r.last_name : null;
+}
+
+function renderActionItems() {
+  const el = document.getElementById('f-action-items');
+  const today = new Date().toLocaleDateString('en-CA');
+  if (!actionItems.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted)">No action items recorded.</div>';
+    return;
+  }
+  el.innerHTML = actionItems.map(ai => {
+    const done    = ai.status === 'complete';
+    const overdue = !done && ai.due_date && ai.due_date < today;
+    const assignee= resolveResourceName(ai.assigned_to_resource) || '—';
+    return `
+      <div class="ai-item">
+        <div class="ai-item-check ${done ? 'done' : ''}">${done ? '✓' : ''}</div>
+        <div class="ai-item-body">
+          <div class="ai-item-desc" style="${done ? 'text-decoration:line-through;color:var(--muted)' : ''}">
+            ${escHtml(ai.description)}
+          </div>
+          <div class="ai-item-meta">
+            <span>${escHtml(assignee)}</span>
+            ${ai.due_date ? `<span class="${overdue ? 'overdue-tag' : ''}">
+              ${overdue ? '⚠ Overdue · ' : 'Due '}${fmtDate(ai.due_date)}
+            </span>` : ''}
+            <span style="color:${done?'#7af0a0':'var(--amber)'}">
+              ${ai.status || 'open'}
+            </span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── populate form from existing minutes ────────────────
+function populateForm() {
+  const m = minutes;
+  document.getElementById('f-summary').value    = m?.summary           || '';
+  document.getElementById('f-discussion').value = m?.discussion_notes  || '';
+  document.getElementById('f-decisions').value  = m?.decisions_made    || '';
+  document.getElementById('f-message').value    = m?.email_message     || '';
+  document.getElementById('f-next-meeting').value = m?.next_meeting_date || '';
+
+  // Subject
+  const dateStr = new Date(meeting.meeting_date).toLocaleDateString('en-US',
+    { month:'short', day:'numeric', year:'numeric' });
+  document.getElementById('f-subject').value = m?.email_subject ||
+    `Meeting minutes — ${meeting.title} — ${dateStr}`;
+
+  // CC recipients
+  ccRecipients = m?.cc_recipients || [];
+  renderCC();
+}
+
+// ── CC management ──────────────────────────────────────
+function renderCC() {
+  const el = document.getElementById('cc-list');
+  el.innerHTML = ccRecipients.map((cc, i) => `
+    <div class="cc-chip">
+      <span>${escHtml(cc)}</span>
+      <span class="cc-remove" onclick="removeCC(${i})">×</span>
+    </div>`).join('');
+}
+
+function addCC() {
+  const inp = document.getElementById('cc-input');
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!ccRecipients.includes(val)) {
+    ccRecipients.push(val);
+    renderCC();
+    scheduleAutosave();
+  }
+  inp.value = '';
+}
+
+function removeCC(i) {
+  ccRecipients.splice(i, 1);
+  renderCC();
+  scheduleAutosave();
+}
+
+// ── autosave ───────────────────────────────────────────
+function bindAutosave() {
+  ['f-summary','f-discussion','f-decisions','f-message','f-subject','f-next-meeting']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', scheduleAutosave);
+    });
+}
+
+function scheduleAutosave() {
+  clearTimeout(_autosaveTimer);
+  setAutosaveStatus('saving');
+  _autosaveTimer = setTimeout(saveDraft, 1500);
+}
+
+function setAutosaveStatus(state) {
+  const el = document.getElementById('autosave-indicator');
+  if (!el) return;
+  el.className = 'autosave ' + state;
+  el.textContent = state === 'saving' ? '● Saving…' : state === 'saved' ? '✓ Saved' : '';
+}
+
+// ── save draft ─────────────────────────────────────────
+async function saveDraft() {
+  clearTimeout(_autosaveTimer);
+  const payload = buildPayload('draft');
+  try {
+    if (minutes?.id) {
+      await API.patch(`meeting_minutes?id=eq.${minutes.id}`, payload);
+    } else {
+      const res = await API.post('meeting_minutes', {
+        ...payload,
+        meeting_id:  MEETING_ID,
+        recorded_by: null,
+      });
+      minutes = res?.[0] || { id: null };
+      if (res?.[0]?.id) minutes.id = res[0].id;
+    }
+    setAutosaveStatus('saved');
+    setTimeout(() => setAutosaveStatus(''), 3000);
+  } catch(e) {
+    console.error('Autosave failed:', e);
+    setAutosaveStatus('');
+  }
+}
+
+function buildPayload(status) {
+  return {
+    summary:           document.getElementById('f-summary').value    || null,
+    discussion_notes:  document.getElementById('f-discussion').value || null,
+    decisions_made:    document.getElementById('f-decisions').value  || null,
+    email_subject:     document.getElementById('f-subject').value    || null,
+    email_message:     document.getElementById('f-message').value    || null,
+    next_meeting_date: document.getElementById('f-next-meeting').value || null,
+    cc_recipients:     ccRecipients.length ? ccRecipients : null,
+    status,
+  };
+}
+
+// ── preview ────────────────────────────────────────────
+function openPreview() {
+  const html = buildEmailHTML();
+  const frame = document.getElementById('preview-frame');
+  frame.innerHTML = `<div style="padding:24px;font-family:sans-serif">${html}</div>`;
+  document.getElementById('preview-modal').classList.add('open');
+}
+
+function closePreview() {
+  document.getElementById('preview-modal').classList.remove('open');
+}
+
+function buildEmailHTML() {
+  const summary    = document.getElementById('f-summary').value;
+  const discussion = document.getElementById('f-discussion').value;
+  const decisions  = document.getElementById('f-decisions').value;
+  const message    = document.getElementById('f-message').value;
+  const nextMeet   = document.getElementById('f-next-meeting').value;
+  const today      = new Date().toLocaleDateString('en-CA');
+
+  const aiRows = actionItems.map(ai => {
+    const done    = ai.status === 'complete';
+    const overdue = !done && ai.due_date && ai.due_date < today;
+    const assignee = resolveResourceName(ai.assigned_to_resource) || '—';
+    return `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:${done?'#9ca3af':'#111'};
+          text-decoration:${done?'line-through':'none'}">${escHtml(ai.description)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;white-space:nowrap">
+          ${escHtml(assignee)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;white-space:nowrap;
+          color:${overdue?'#ef4444':'#6b7280'}">
+          ${ai.due_date ? (overdue?'⚠ ':'')+fmtDate(ai.due_date) : '—'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">
+          <span style="font-size:11px;padding:2px 7px;border-radius:4px;
+            background:${done?'#dcfce7':overdue?'#fee2e2':'#fef3c7'};
+            color:${done?'#166534':overdue?'#991b1b':'#92400e'}">
+            ${ai.status||'open'}</span></td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div style="max-width:640px;margin:0 auto;font-family:-apple-system,sans-serif;color:#111">
+      <!-- Header -->
+      <div style="background:#0f1117;padding:20px 24px;border-radius:8px 8px 0 0">
+        <div style="color:#4f8ef7;font-size:13px;font-weight:700;letter-spacing:.05em;margin-bottom:4px">
+          PROJECTHUD · MEETING MINUTES
+        </div>
+        <div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:4px">
+          ${escHtml(meeting.title)}
+        </div>
+        <div style="color:#9ca3af;font-size:12px">
+          ${fmtDateTime(meeting.meeting_date)} · ${meeting.duration_minutes||60} min
+          ${meeting.location_or_link ? ' · ' + escHtml(meeting.location_or_link) : ''}
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none">
+
+        ${message ? `
+        <div style="background:#f0f9ff;border-left:3px solid #4f8ef7;
+          padding:12px 16px;margin-bottom:20px;border-radius:0 6px 6px 0;
+          font-size:13px;color:#1e3a5f;line-height:1.6">
+          ${escHtml(message)}
+        </div>` : ''}
+
+        ${summary ? `
+        <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.06em;color:#6b7280;margin-bottom:8px">Summary</h3>
+        <p style="font-size:13px;line-height:1.7;color:#374151;margin-bottom:20px">
+          ${escHtml(summary)}</p>` : ''}
+
+        ${discussion ? `
+        <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.06em;color:#6b7280;margin-bottom:8px">Discussion notes</h3>
+        <p style="font-size:13px;line-height:1.7;color:#374151;margin-bottom:20px;
+          white-space:pre-line">${escHtml(discussion)}</p>` : ''}
+
+        ${decisions ? `
+        <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.06em;color:#6b7280;margin-bottom:8px">Decisions &amp; next steps</h3>
+        <p style="font-size:13px;line-height:1.7;color:#374151;margin-bottom:20px;
+          white-space:pre-line">${escHtml(decisions)}</p>` : ''}
+
+        ${actionItems.length ? `
+        <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.06em;color:#6b7280;margin-bottom:8px">Action items</h3>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">
+          <thead>
+            <tr style="background:#f9fafb">
+              <th style="text-align:left;padding:8px 12px;border-bottom:2px solid #e5e7eb;
+                font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Item</th>
+              <th style="text-align:left;padding:8px 12px;border-bottom:2px solid #e5e7eb;
+                font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;width:120px">Assigned</th>
+              <th style="text-align:left;padding:8px 12px;border-bottom:2px solid #e5e7eb;
+                font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;width:90px">Due</th>
+              <th style="text-align:left;padding:8px 12px;border-bottom:2px solid #e5e7eb;
+                font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;width:70px">Status</th>
+            </tr>
+          </thead>
+          <tbody>${aiRows}</tbody>
+        </table>` : ''}
+
+        ${nextMeet ? `
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;
+          padding:12px 16px;margin-bottom:20px">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;
+            letter-spacing:.05em;color:#6b7280">Next meeting: </span>
+          <span style="font-size:13px;font-weight:600;color:#111">${fmtDate(nextMeet)}</span>
+        </div>` : ''}
+
+      </div>
+
+      <!-- Footer -->
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-top:none;
+        border-radius:0 0 8px 8px;padding:14px 24px;
+        font-size:11px;color:#9ca3af;text-align:center">
+        Sent via ProjectHUD · If you have questions, reply to this email
+      </div>
+    </div>`;
+}
+
+// ── send confirmation ──────────────────────────────────
+function confirmSend() {
+  // Build recipient list
+  const toList = attendees
+    .map(a => a.users?.email)
+    .filter(Boolean);
+  const allRecipients = [...new Set([...toList, ...ccRecipients])];
+
+  document.getElementById('send-recipients-list').innerHTML =
+    allRecipients.length
+      ? allRecipients.map(e => `<div>• ${escHtml(e)}</div>`).join('')
+      : '<div style="color:#999">No email addresses found on attendees. Add recipients via CC.</div>';
+
+  document.getElementById('send-modal').classList.add('open');
+}
+
+function closeSendModal() {
+  document.getElementById('send-modal').classList.remove('open');
+}
+
+async function sendMinutes() {
+  const btn = document.getElementById('send-confirm-btn');
+  btn.textContent = 'Sending…';
+  btn.disabled    = true;
+
+  try {
+    // Save latest draft first
+    await saveDraft();
+
+    // Build the full email payload for the Edge Function
+    const emailPayload = {
+      minutes_id:   minutes?.id,
+      meeting_id:   MEETING_ID,
+      subject:      document.getElementById('f-subject').value,
+      html:         buildEmailHTML(),
+      to:           attendees.map(a => a.users?.email).filter(Boolean),
+      cc:           ccRecipients,
+      meeting_title: meeting.title,
+    };
+
+    // ── Edge Function call ─────────────────────────────
+    // Uncomment and configure when email provider is connected:
+    //
+    // const token = await Auth.getFreshToken();
+    // await fetch(`${PHUD.SUPABASE_URL}/functions/v1/send-meeting-minutes`, {
+    //   method: 'POST',
+    //   headers: {
+    //     'Authorization': `Bearer ${token}`,
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify(emailPayload),
+    // });
+
+    // For now — log the full payload so it's ready to wire
+    console.log('[send-meeting-minutes] Payload ready for Edge Function:', emailPayload);
+
+    // Mark as sent in DB
+    const sentPayload = {
+      status:  'submitted',
+      sent_at: new Date().toISOString(),
+    };
+    if (minutes?.id) {
+      await API.patch(`meeting_minutes?id=eq.${minutes.id}`, sentPayload);
+    }
+
+    // Show success
+    const body = document.getElementById('send-modal-body');
+    body.innerHTML = `
+      <div class="send-confirm">
+        <div class="send-icon">✉</div>
+        <div class="send-title" style="color:#111">Minutes sent</div>
+        <div class="send-sub">
+          The meeting minutes have been recorded as sent.<br>
+          Connect an email provider via Edge Function to deliver to recipients.
+        </div>
+        <div style="font-size:11px;color:#999;margin-bottom:16px">
+          Recipients: ${[...attendees.map(a=>a.users?.email).filter(Boolean),...ccRecipients].join(', ') || 'None'}
+        </div>
+      </div>`;
+    document.querySelector('#send-modal .preview-actions').innerHTML =
+      `<button class="preview-btn primary" onclick="closeSendModal();location.reload()">Done</button>`;
+
+    // Update status chip
+    const chip = document.getElementById('status-chip');
+    chip.textContent      = 'Submitted';
+    chip.style.background = 'rgba(42,157,64,.15)';
+    chip.style.color      = '#7af0a0';
+
+  } catch(e) {
+    console.error('Send failed:', e);
+    alert('Failed to send minutes: ' + e.message);
+    btn.textContent = 'Confirm & send';
+    btn.disabled    = false;
+  }
+}
+
+// ── helpers ────────────────────────────────────────────
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d.includes('T') ? d : d+'T00:00:00')
+    .toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function fmtDateTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-US',
+    {month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+</script>
+</body>
+</html>

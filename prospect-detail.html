@@ -1071,6 +1071,17 @@ async function loadAll() {
     document.getElementById('tbadge-ai').textContent       = actionItems.filter(a => a.status === 'open').length;
     document.getElementById('tbadge-meet').textContent     = meetings.length;
 
+    // Turn meetings badge red if any action item is overdue
+    const today = new Date().toLocaleDateString('en-CA');
+    const hasOverdue = actionItems.some(a =>
+      a.status !== 'complete' && a.due_date && a.due_date < today
+    );
+    const meetBadge = document.getElementById('tbadge-meet');
+    if (meetBadge) {
+      meetBadge.style.background = hasOverdue ? 'rgba(192,64,74,.25)' : '';
+      meetBadge.style.color      = hasOverdue ? '#f07a7a' : '';
+    }
+
   } catch(e) {
     console.error(e);
   }
@@ -1429,9 +1440,16 @@ function renderMeetings() {
               ${m.location_or_link ? ' · 📍 ' + escHtml(m.location_or_link) : ''}
             </div>
           </div>
-          <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':'ms-done'}">
-            ${capitalize(m.status||'')}
-          </span>
+          <div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">
+            ${m.status !== 'scheduled' ? `
+              <a href="/meeting-minutes.html?meeting_id=${m.id}&prospect_id=${PROSPECT_ID}"
+                class="btn" style="font-size:11px;padding:4px 10px;text-decoration:none">
+                ✎ Minutes
+              </a>` : ''}
+            <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':'ms-done'}">
+              ${capitalize(m.status||'')}
+            </span>
+          </div>
         </div>
         <div class="meet-expand" id="mexpand-${m.id}" onclick="event.stopPropagation()">
 
