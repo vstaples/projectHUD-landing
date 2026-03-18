@@ -2892,12 +2892,11 @@ openEditTaskPanel = async function(taskId) {
 // ── PATCH saveTaskForm to save role + assignments ──────────────
 const _origSaveTaskForm = saveTaskForm;
 saveTaskForm = async function() {
-  // Add role to payload by temporarily patching the form
-  // roleId is now per-assignment-row, not a single task-level field
-  // Call original save
+  // Capture taskId BEFORE save clears _editingTaskId via closeTaskFormPanel
+  const _roleTaskId = _editingTaskId;
   await _origSaveTaskForm();
-  // Save assignments — each row has its own role + resource
-  const taskId = _editingTaskId || STATE.tasks[STATE.tasks.length-1]?.id;
+  // For new tasks, use last task pushed to STATE
+  const taskId = _roleTaskId || STATE.tasks[STATE.tasks.length-1]?.id;
   if (!taskId) return;
   try {
     if (window._tfAssignments !== undefined) {
@@ -4211,31 +4210,15 @@ function _p2PatchFunctions() {
   // CRITICAL: uses the global `_editingTaskId` (not window._editingTaskId)
   var _origSave = window.saveTaskForm;
   window.saveTaskForm = async function() {
+    // Capture task ID BEFORE _origSave clears _editingTaskId via closeTaskFormPanel
+    var taskId = _editingTaskId;
     await _origSave();
-    // Resolve correct task ID — edit uses global _editingTaskId, add uses last task
-    var taskId = _editingTaskId || (STATE.tasks && STATE.tasks.length && STATE.tasks[STATE.tasks.length-1].id);
+    // For new tasks, _editingTaskId is null — use last task added to STATE
+    if (!taskId) taskId = STATE.tasks && STATE.tasks.length && STATE.tasks[STATE.tasks.length-1].id;
     if (!taskId) { console.warn('Phase2: no taskId after save'); return; }
     try {
-      // Save complexity rating
-      if (window._tfComplexity) {
-        var cpx = {
-          complexity_rating:      window._tfComplexity,
-          complexity_ai_inferred: window._tfComplexityAI||false,
-          complexity_reasoning:   window._tfComplexityReasoning||null
-        };
-        await API.patch('tasks?id=eq.' + taskId, cpx).catch(function(e){ console.warn('cpx save:',e); });
-        var t = STATE.tasks && STATE.tasks.find(function(x){ return x.id===taskId; });
-        if (t) Object.assign(t, cpx);
-      }
-      // Save skill requirements — wipe + re-insert
-      await API.del('task_skill_requirements?task_id=eq.' + taskId).catch(function(){});
-      for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
-        var s = window._tfTaskSkills[i];
-        await API.post('task_skill_requirements', {
-          task_id:taskId, skill_id:s.skill_id,
-          is_required:true, proficiency_needed:'practitioner'
-        }).catch(function(e){ console.warn('skill req save:',e); });
-      }
+      // Complexity + skills saved by inline code in saveTaskForm
+
     } catch(e) { console.warn('Phase2 save err:',e); }
     if (typeof renderTasksTable==='function') renderTasksTable();
   };
