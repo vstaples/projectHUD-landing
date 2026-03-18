@@ -767,9 +767,12 @@ body {
         <div class="field">
           <label>Format</label>
           <select id="meet-format">
-            <option value="video">Video call</option>
-            <option value="phone">Phone</option>
-            <option value="in_person">In-person</option>
+            <option value="ad_hoc">Ad hoc / discovery</option>
+            <option value="status">Status update</option>
+            <option value="kickoff">Kickoff</option>
+            <option value="design_review">Design review</option>
+            <option value="risk_review">Risk review</option>
+            <option value="closeout">Closeout</option>
           </select>
         </div>
       </div>
@@ -1188,19 +1191,29 @@ function renderMeetings() {
           </span>
         </div>
         <div class="meet-expand" id="mexpand-${m.id}">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">
-            Agenda
+
+          <div class="mb-label">Attendees</div>
+          <div id="mattendees-${m.id}" style="margin-bottom:12px">
+            <div style="font-size:11px;color:var(--muted)">Loading…</div>
           </div>
+
+          <div class="mb-label">Agenda</div>
           <div class="agenda-list" id="magenda-${m.id}">
             <div style="font-size:11px;color:var(--muted)">Loading…</div>
           </div>
-          ${m.status !== 'scheduled' ? `
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">
-            Meeting minutes
+
+          <div id="maction-wrap-${m.id}">
+            <div class="mb-label" style="margin-top:10px">Action items</div>
+            <div id="mactions-${m.id}">
+              <div style="font-size:11px;color:var(--muted)">Loading…</div>
+            </div>
           </div>
-          <div id="mminutes-${m.id}">
+
+          \${m.status !== 'scheduled' ? \`
+          <div class="mb-label" style="margin-top:10px">Meeting minutes</div>
+          <div id="mminutes-\${m.id}">
             <div style="font-size:11px;color:var(--muted)">Loading…</div>
-          </div>` : ''}
+          </div>\` : ''}
         </div>
       </div>`).join('')}`;
 }
@@ -1222,11 +1235,38 @@ async function toggleMeetingCard(meetId) {
 
 async function loadMeetingDetail(meetId) {
   try {
-    // Load agenda items using actual column names
-    const [agendaItems, minutesList] = await Promise.all([
+    const [agendaItems, minutesList, actionItems, attendees] = await Promise.all([
       API.get(`meeting_agenda_items?meeting_id=eq.${meetId}&order=sequence_order`),
       API.get(`meeting_minutes?meeting_id=eq.${meetId}&limit=1`),
+      API.get(`meeting_action_items?meeting_id=eq.${meetId}&order=created_at`),
+      API.get(`meeting_attendees?meeting_id=eq.${meetId}&select=*,users(name,email)`),
     ]);
+
+    // Render attendees
+    const attendeesEl = document.getElementById('mattendees-' + meetId);
+    if (attendeesEl) {
+      if (!attendees?.length) {
+        attendeesEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">No attendees recorded.</div>';
+      } else {
+        attendeesEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:5px">' +
+          attendees.map(a => {
+            const name = a.users?.name || a.users?.email || 'Attendee';
+            const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+            const status = a.attendance_status || 'invited';
+            const statusColor = status === 'attended' ? '#7af0c0'
+                              : status === 'accepted' ? 'var(--accent)'
+                              : status === 'declined' ? '#f07a7a' : 'var(--muted)';
+            return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;
+                border-radius:5px;border:1px solid var(--border);font-size:11px">
+              <div style="width:18px;height:18px;border-radius:50%;background:${statusColor}22;
+                color:${statusColor};font-size:8px;font-weight:700;display:flex;
+                align-items:center;justify-content:center">${initials}</div>
+              <span style="color:var(--text)">${escHtml(name)}</span>
+              <span style="color:${statusColor};font-size:10px">${status}</span>
+            </div>`;
+          }).join('') + '</div>';
+      }
+    }
 
     // Render agenda
     const agendaEl = document.getElementById('magenda-' + meetId);
@@ -1235,18 +1275,41 @@ async function loadMeetingDetail(meetId) {
         ? agendaItems.map(a => `
             <div class="agenda-item">
               <span class="agenda-num">${a.sequence_order}.</span>
-              <span style="color:var(--text)">${escHtml(a.title)}</span>
-              ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px;margin-left:auto">${escHtml(a.notes_captured)}</span>` : ''}
+              <span style="color:var(--text);flex:1">${escHtml(a.title)}</span>
+              ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px">${escHtml(a.notes_captured)}</span>` : ''}
             </div>`).join('')
-        : `<div style="font-size:11px;color:var(--muted)">No agenda items recorded.</div>`;
+        : '<div style="font-size:11px;color:var(--muted)">No agenda items recorded.</div>';
     }
 
-    // Render minutes (using actual column names from existing schema)
+    // Render action items
+    const actionsEl = document.getElementById('mactions-' + meetId);
+    if (actionsEl) {
+      if (!actionItems?.length) {
+        actionsEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">No action items.</div>';
+      } else {
+        const today = new Date().toLocaleDateString('en-CA');
+        actionsEl.innerHTML = actionItems.map(ai => {
+          const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
+          return `<div class="ai-row">
+            <div class="ai-check ${ai.status==='complete'?'done':''}">${ai.status==='complete'?'✓':''}</div>
+            <div class="ai-text">${escHtml(ai.description)}</div>
+            ${ai.due_date ? `<div class="ai-due ${overdue?'overdue':''}">${fmtDate(ai.due_date)}</div>` : ''}
+            <span style="font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px;
+              background:${ai.status==='complete'?'rgba(42,157,64,.15)':'rgba(212,144,31,.12)'};
+              color:${ai.status==='complete'?'#7af0a0':'var(--amber)'}">
+              ${ai.status||'open'}
+            </span>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    // Render minutes
     const minutesEl = document.getElementById('mminutes-' + meetId);
     if (minutesEl) {
       const mins = minutesList?.[0];
       if (!mins) {
-        minutesEl.innerHTML = `<div style="font-size:11px;color:var(--muted);font-style:italic">No minutes on file.</div>`;
+        minutesEl.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic">No minutes on file.</div>';
       } else {
         minutesEl.innerHTML = `
           <div class="minutes-block">
@@ -1262,10 +1325,10 @@ async function loadMeetingDetail(meetId) {
               </div>` : ''}
             ${mins.decisions_made ? `
               <div class="mb-section">
-                <div class="mb-section-lbl">Decisions made</div>
+                <div class="mb-section-lbl">Decisions &amp; next steps</div>
                 <div class="mb-section-text">${escHtml(mins.decisions_made)}</div>
               </div>` : ''}
-            <div style="font-size:10px;color:var(--muted);margin-top:6px">
+            <div style="font-size:10px;color:var(--muted);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
               Status: ${capitalize(mins.status||'')}
               ${mins.submitted_at ? ' · Submitted ' + fmtDate(mins.submitted_at) : ''}
             </div>
@@ -1513,15 +1576,26 @@ async function saveMeeting() {
   const meetingDatetime = date + 'T' + time + ':00';
 
   try {
+    // meeting_type must match enum: kickoff/status/design_review/risk_review/closeout/ad_hoc
+    const formatVal = document.getElementById('meet-format').value;
+    const meetingTypeMap = {
+      video:     'ad_hoc',
+      phone:     'ad_hoc',
+      in_person: 'ad_hoc',
+      kickoff:   'kickoff',
+      status:    'status',
+    };
     const payload = {
       firm_id:          prospect.firm_id,
+      project_id:       '00000000-0000-0000-0001-000000000001', // placeholder project — required NOT NULL
       prospect_id:      PROSPECT_ID,
       title,
       scheduled_date:   meetingDatetime,
       scheduled_duration_minutes: +document.getElementById('meet-dur').value || 60,
       location:         document.getElementById('meet-location').value || null,
       status:           'scheduled',
-      meeting_type:     document.getElementById('meet-format').value,
+      meeting_type:     meetingTypeMap[formatVal] || 'ad_hoc',
+      organizer_id:     '57b93738-6a2a-4098-ba12-bfffd1f7dd07',
     };
 
     const result  = await API.post('meetings', payload);
