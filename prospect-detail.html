@@ -1014,7 +1014,9 @@ async function loadAll() {
     checkProposalTab();
     populateMeetingSelects();
 
-    // Rebuild attachment metadata from tagged activity notes
+    // Rebuild attachment metadata from both storage formats:
+    // Format A (new): prospect_activity note tagged "[ai-attach:ID]"
+    // Format B (old): description contains "[attachments: filename, ...]"
     activities.filter(a => a.type === 'note' && a.summary && a.summary.includes('[ai-attach:'))
       .forEach(a => {
         const match = a.summary.match(/\[ai-attach:([^\]]+)\]/);
@@ -1023,14 +1025,26 @@ async function loadAll() {
           const names = a.summary.replace(/\[ai-attach:[^\]]+\]/, '').trim();
           if (names) {
             _aiAttachments[aiId] = names.split('|').map(name => ({
-              name: name.trim(),
-              size: 0,
-              url:  null,  // file content not available — metadata only
-              type: '',
+              name: name.trim(), size: 0, url: null, type: '',
             }));
           }
         }
       });
+
+    // Also parse Format B from action item descriptions
+    const allAIs = await API.get(
+      `prospect_action_items?prospect_id=eq.${PROSPECT_ID}&select=id,description`
+    ).catch(() => []);
+    (allAIs || []).forEach(ai => {
+      if (ai.description && ai.description.includes('[attachments:')) {
+        const match = ai.description.match(/\[attachments:\s*([^\]]+)\]/);
+        if (match && !_aiAttachments[ai.id]) {
+          _aiAttachments[ai.id] = match[1].split(',').map(name => ({
+            name: name.trim(), size: 0, url: null, type: '',
+          }));
+        }
+      }
+    });
 
     // badge counts
     document.getElementById('tbadge-activity').textContent = activities.length;
@@ -1540,7 +1554,7 @@ async function loadMeetingDetail(meetId) {
               onclick="event.stopPropagation();openEditActionItemFromRow(this.closest('[data-ai-id]'),'${meetId}')">
               <div style="font-size:12px;color:${done?'var(--muted)':'var(--text)'};
                 text-decoration:${done?'line-through':'none'};line-height:1.4">
-                ${escHtml(ai.description)}
+                ${escHtml((ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim())}
               </div>
               <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)">
@@ -1551,7 +1565,8 @@ async function loadMeetingDetail(meetId) {
                 </div>
                 ${ai.due_date ? `<div style="font-size:10px;color:${overdue?'#f07a7a':'var(--muted)'}">
                   ${overdue?'⚠ ':''}Due ${fmtDate(ai.due_date)}</div>` : ''}
-                <span style="font-size:10px;padding:1px 6px;border-radius:4px;
+                <span data-status-badge
+                  style="font-size:10px;padding:1px 6px;border-radius:4px;
                   background:${done?'rgba(42,157,64,.15)':overdue?'rgba(192,64,74,.15)':'rgba(212,144,31,.12)'};
                   color:${done?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
                   ${ai.status||'open'}
@@ -2285,7 +2300,16 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
     el.textContent       = newStatus === 'complete' ? '✓' : '';
 
     const row = el.closest('[data-ai-id]');
-    if (row) row.dataset.aiStatus = newStatus;
+    if (row) {
+      row.dataset.aiStatus = newStatus;
+      // Also update the status badge text in the row
+      const badge = row.querySelector('[data-status-badge]');
+      if (badge) {
+        badge.textContent = newStatus;
+        badge.style.background = newStatus === 'complete' ? 'rgba(42,157,64,.15)' : 'rgba(212,144,31,.12)';
+        badge.style.color      = newStatus === 'complete' ? '#7af0a0' : 'var(--amber)';
+      }
+    }
 
     const descEl = row?.querySelector('[style*="text-decoration"]');
     if (descEl) {
