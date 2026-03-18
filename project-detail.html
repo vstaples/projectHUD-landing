@@ -1523,18 +1523,16 @@ function renderTasksTable() {
         })()}
         <!-- BUDGET group -->
         ${(()=>{
-          // Derive labor rate from primary role assignment + hud_role_levels
-          const _ra = (STATE.taskAssignments||[]).find(a => a.task_id===t.id && a.is_primary);
-          const _res = _ra ? (STATE.resources||[]).find(r=>r.id===_ra.resource_id) : null;
-          const _roleId = _ra?.hud_role_id || t.hud_role_id;
-          const _level = _res?.level || 'staff';
-          const _rl = (STATE.hudRoleLevels||[]).find(l=>l.role_id===_roleId && l.level===_level);
-          const _rate = _rl?.overhead_rate_per_hour || t.labor_rate || 175;
-          const _budgHrs = parseFloat(t.budget_hours || t.effort_days || 0);
-          const _budgCost = _budgHrs * _rate;
-          const C='col-grp-budget';const S='font-family:var(--font-mono);font-size:11px;color:var(--text2);';
-          return '<td class="'+C+'" style="'+S+'">'+(_budgHrs?_budgHrs.toFixed(1)+'h':'—')+'</td>'+
-                 '<td class="'+C+'" style="'+S+'">'+(_budgCost?'$'+_budgCost.toFixed(0):'—')+'</td>'+
+          const _ra=(STATE.taskAssignments||[]).find(a=>a.task_id===t.id&&a.is_primary);
+          const _res=_ra?(STATE.resources||[]).find(r=>r.id===_ra.resource_id):null;
+          const _roleId=_ra?.hud_role_id||t.hud_role_id;
+          const _level=_res?.level||'staff';
+          const _rl=(STATE.hudRoleLevels||[]).find(l=>l.role_id===_roleId&&l.level===_level);
+          const _rate=_rl?.overhead_rate_per_hour||t.labor_rate||175;
+          const _bh=parseFloat(t.budget_hours||t.effort_days||0);
+          const C='col-grp-budget', S='font-family:var(--font-mono);font-size:11px;color:var(--text2);';
+          return '<td class="'+C+'" style="'+S+'">'+(_bh?_bh.toFixed(1)+'h':'—')+'</td>'+
+                 '<td class="'+C+'" style="'+S+'">'+(_bh?'$'+(_bh*_rate).toFixed(0):'—')+'</td>'+
                  '<td class="'+C+'" style="'+S+'">$'+_rate.toFixed(0)+'/h</td>';
         })()}
         <!-- EVM group -->
@@ -1901,10 +1899,10 @@ async function loadProjectDetail() {
       const [hudRoles, resources, taskAssignments, hudRoleLevels, hudSkills, hudSkillCats] = await Promise.all([
         API.get('hud_roles?select=id,name,abbreviation,category_id').catch(()=>[]),
         API.get('resources?select=id,first_name,last_name,title,hud_role_id,level,email').catch(()=>[]),
+        API.get(`task_resource_assignments?select=*&task_id=in.(${(tasks||[]).map(t=>t.id).join(',')})`.replace('in.()', 'in.(00000000-0000-0000-0000-000000000000)')).catch(()=>[]),
         API.get('hud_role_levels?select=role_id,level,overhead_rate_per_hour').catch(()=>[]),
         API.get('hud_skills?select=id,name,category_id&is_active=eq.true').catch(()=>[]),
         API.get('hud_skill_categories?select=id,name').catch(()=>[]),
-        API.get(`task_resource_assignments?select=*&task_id=in.(${(tasks||[]).map(t=>t.id).join(',')})`.replace('in.()', 'in.(00000000-0000-0000-0000-000000000000)')).catch(()=>[]),
       ]);
       STATE.hudRoles        = hudRoles||[];
       STATE.resources       = resources||[];
@@ -1912,7 +1910,7 @@ async function loadProjectDetail() {
       STATE.hudRoleLevels   = hudRoleLevels||[];
       STATE.hudSkills       = hudSkills||[];
       STATE.hudSkillCats    = hudSkillCats||[];
-    } catch(e) { STATE.hudRoles=[]; STATE.resources=[]; STATE.taskAssignments=[]; }
+    } catch(e) { STATE.hudRoles=[]; STATE.resources=[]; STATE.taskAssignments=[]; STATE.hudRoleLevels=[]; STATE.hudSkills=[]; STATE.hudSkillCats=[]; }
     // Store for back-navigation from other pages
     sessionStorage.setItem('lastProjectId', PROJECT_ID);
     localStorage.setItem('lastProjectId', PROJECT_ID);
@@ -2635,7 +2633,6 @@ async function saveTaskForm() {
     actual_finish: document.getElementById('tf-actual-finish').value          || null,
     actual_hours:  parseFloat(document.getElementById('tf-actual-hours').value) || null,
   };
-  // ── Auto-derive status from actuals + pct_complete ──────────────
   const _manualStatus = document.getElementById('tf-status').value;
   if (_manualStatus === 'not_started' || _manualStatus === 'in_progress') {
     if (payload.actual_finish || payload.pct_complete >= 100) {
@@ -2677,9 +2674,7 @@ async function saveTaskForm() {
         await API.del('task_skill_requirements?task_id=eq.' + _p2TaskId).catch(function(){});
         const _p2Skills = window._tfTaskSkills||[];
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
-          await API.post('task_skill_requirements', {
-            task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
-            }).catch(function(e){ console.warn('skill req save:',e); });
+          await API.post('task_skill_requirements', { task_id:_p2TaskId, skill_id:_s.skill_id }).catch(function(e){ console.warn('skill req save:',e); });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
@@ -2928,7 +2923,7 @@ openEditTaskPanel = async function(taskId) {
   window._editingTaskId2 = taskId;
   try {
     const fresh = await API.get('task_resource_assignments?select=*&task_id=eq.' + taskId).catch(()=>[]);
-    window._tfAssignments = (fresh||[]).map(a => ({...a}));
+    window._tfAssignments = (fresh||[]).map(a=>({...a}));
     STATE.taskAssignments = [...(STATE.taskAssignments||[]).filter(a=>a.task_id!==taskId), ...(fresh||[])];
   } catch(e) {
     window._tfAssignments = (STATE.taskAssignments||[]).filter(a=>a.task_id===taskId).map(a=>({...a}));
@@ -3023,10 +3018,8 @@ function _nextWeekday(date) {
 }
 
 function _toInputDate(d) {
-  const yr = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const dy = String(d.getDate()).padStart(2, '0');
-  return yr + '-' + mo + '-' + dy;
+  const yr=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dy=String(d.getDate()).padStart(2,'0');
+  return yr+'-'+mo+'-'+dy;
 }
 function _fmtD(dateStr) {
   if (!dateStr) return '—';
@@ -4283,10 +4276,7 @@ function _p2PatchFunctions() {
       await API.del('task_skill_requirements?task_id=eq.' + taskId).catch(function(){});
       for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
         var s = window._tfTaskSkills[i];
-        await API.post('task_skill_requirements', {
-          task_id:taskId, skill_id:s.skill_id,
-          is_required:true, proficiency_needed:'practitioner'
-        }).catch(function(e){ console.warn('skill req save:',e); });
+        await API.post('task_skill_requirements', { task_id:_p2TaskId, skill_id:_s.skill_id }).catch(function(e){ console.warn('skill req save:',e); });
       }
     } catch(e) { console.warn('Phase2 save err:',e); }
     if (typeof renderTasksTable==='function') renderTasksTable();
