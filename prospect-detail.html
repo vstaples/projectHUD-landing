@@ -1031,11 +1031,8 @@ async function loadAll() {
         }
       });
 
-    // Also parse Format B from action item descriptions
-    const allAIs = await API.get(
-      `prospect_action_items?prospect_id=eq.${PROSPECT_ID}&select=id,description`
-    ).catch(() => []);
-    (allAIs || []).forEach(ai => {
+    // Parse Format B from both prospect_action_items AND meeting_action_items
+    const parseAttachTag = (ai) => {
       if (ai.description && ai.description.includes('[attachments:')) {
         const match = ai.description.match(/\[attachments:\s*([^\]]+)\]/);
         if (match && !_aiAttachments[ai.id]) {
@@ -1044,7 +1041,14 @@ async function loadAll() {
           }));
         }
       }
-    });
+    };
+
+    const [allAIs, allMeetAIs] = await Promise.all([
+      API.get(`prospect_action_items?prospect_id=eq.${PROSPECT_ID}&select=id,description`).catch(() => []),
+      API.get(`meeting_action_items?select=id,description&meeting_id=in.(${meetings.map(m=>m.id).join(',')||'00000000-0000-0000-0000-000000000000'})`).catch(() => []),
+    ]);
+    (allAIs    || []).forEach(parseAttachTag);
+    (allMeetAIs|| []).forEach(parseAttachTag);
 
     // badge counts
     document.getElementById('tbadge-activity').textContent = activities.length;
