@@ -187,6 +187,10 @@ body {
   font-size: 10px; padding: 1px 5px; border-radius: 8px;
   background: rgba(255,255,255,.08); color: var(--muted);
 }
+.tab-badge.overdue {
+  background: rgba(192,64,74,.25) !important;
+  color: #f07a7a !important;
+}
 
 /* ── tab panels ───────────────────────────────────────── */
 .panels {
@@ -1485,8 +1489,10 @@ function updateMeetingsBadge() {
   );
   const meetBadge = document.getElementById('tbadge-meet');
   if (meetBadge) {
-    meetBadge.style.background = hasOverdue ? 'rgba(192,64,74,.25)' : '';
-    meetBadge.style.color      = hasOverdue ? '#f07a7a' : '';
+    meetBadge.classList.toggle('overdue', hasOverdue);
+    // Clear inline styles that may be overriding
+    meetBadge.style.background = '';
+    meetBadge.style.color      = '';
   }
 }
 
@@ -1812,15 +1818,12 @@ function bindTabs() {
 }
 
 function switchTab(name) {
-  // Re-fetch action items when switching to overview for live accuracy
-  if (name === 'overview') {
-    loadAll().then(() => {});
-    return;
-  }
   document.querySelectorAll('.tab').forEach(t =>
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.panel').forEach(p =>
     p.classList.toggle('active', p.id === 'panel-' + name));
+  // Re-fetch when switching to overview so action item statuses are live
+  if (name === 'overview') loadAll().then(() => {});
 }
 
 // ── drawers ────────────────────────────────────────────
