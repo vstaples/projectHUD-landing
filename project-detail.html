@@ -1403,9 +1403,12 @@ function _taskAssignedCell(t, asgn) {
         ? '<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);margin-left:2px;">' + a.allocation_pct + '%</span>'
         : '';
       const av = { name: name.trim(), id: res.id };
-      return '<span title="' + name.trim() + '">' + UI.avatar(av, 20) + '</span>' + pct;
+      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' +
+        UI.avatar(av, 20) +
+        '<span style="font-family:var(--font-ui);font-size:12px;">' + name.trim() + '</span>' +
+        '</span>' + pct;
     }).filter(Boolean);
-    return '<div style="display:flex;align-items:center;gap:4px;">' + parts.join('') + '</div>';
+    return '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + parts.join('') + '</div>';
   }
   // Fall back to legacy assigned_to
   if (asgn) {
@@ -1519,13 +1522,28 @@ function renderTasksTable() {
                  '<td class="col-grp-pert" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">'+(sd*sd).toFixed(2)+'</td>';
         })()}
         <!-- BUDGET group -->
-        <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.budget_hours ? parseFloat(t.budget_hours).toFixed(1)+'h' : '—'}</td>
-        <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.budget_cost ? '$'+parseFloat(t.budget_cost).toFixed(0) : '—'}</td>
-        <td class="col-grp-budget" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);">${t.labor_rate ? '$'+parseFloat(t.labor_rate).toFixed(0)+'/h' : '—'}</td>
+        ${(()=>{
+          // Derive labor rate from primary role assignment + hud_role_levels
+          const _ra = (STATE.taskAssignments||[]).find(a => a.task_id===t.id && a.is_primary);
+          const _res = _ra ? (STATE.resources||[]).find(r=>r.id===_ra.resource_id) : null;
+          const _roleId = _ra?.hud_role_id || t.hud_role_id;
+          const _level = _res?.level || 'staff';
+          const _rl = (STATE.hudRoleLevels||[]).find(l=>l.role_id===_roleId && l.level===_level);
+          const _rate = _rl?.overhead_rate_per_hour || t.labor_rate || 175;
+          const _budgHrs = parseFloat(t.budget_hours || t.effort_days || 0);
+          const _budgCost = _budgHrs * _rate;
+          const C='col-grp-budget';const S='font-family:var(--font-mono);font-size:11px;color:var(--text2);';
+          return '<td class="'+C+'" style="'+S+'">'+(_budgHrs?_budgHrs.toFixed(1)+'h':'—')+'</td>'+
+                 '<td class="'+C+'" style="'+S+'">'+(_budgCost?'$'+_budgCost.toFixed(0):'—')+'</td>'+
+                 '<td class="'+C+'" style="'+S+'">$'+_rate.toFixed(0)+'/h</td>';
+        })()}
         <!-- EVM group -->
         ${(()=>{
-          const RATE=175;
-          const bh=parseFloat(t.budget_hours||0), ah=parseFloat(t.actual_hours||0), pct=parseFloat(t.pct_complete||0)/100;
+          const _ra2=(STATE.taskAssignments||[]).find(a=>a.task_id===t.id&&a.is_primary);
+          const _res2=_ra2?(STATE.resources||[]).find(r=>r.id===_ra2.resource_id):null;
+          const _rl2=(STATE.hudRoleLevels||[]).find(l=>l.role_id===(_ra2?.hud_role_id||t.hud_role_id)&&l.level===(_res2?.level||'staff'));
+          const RATE=_rl2?.overhead_rate_per_hour||t.labor_rate||175;
+          const bh=parseFloat(t.budget_hours||t.effort_days||0), ah=parseFloat(t.actual_hours||0), pct=parseFloat(t.pct_complete||0)/100;
           const E="col-grp-evm", S="font-family:var(--font-mono);font-size:11px;";
           if (!bh) return ('<td class="'+E+'">—</td>').repeat(8);
           const bac=bh*RATE, ev=bac*pct, ac=ah*RATE;
@@ -1880,9 +1898,10 @@ async function loadProjectDetail() {
     STATE = { ...STATE, project, tasks, milestones, users, firms, risks, documents, journal, expenditures, deps };
     // Load supplemental resource/role data
     try {
-      const [hudRoles, resources, taskAssignments, hudSkills, hudSkillCats] = await Promise.all([
+      const [hudRoles, resources, taskAssignments, hudRoleLevels, hudSkills, hudSkillCats] = await Promise.all([
         API.get('hud_roles?select=id,name,abbreviation,category_id').catch(()=>[]),
         API.get('resources?select=id,first_name,last_name,title,hud_role_id,level,email').catch(()=>[]),
+        API.get('hud_role_levels?select=role_id,level,overhead_rate_per_hour').catch(()=>[]),
         API.get('hud_skills?select=id,name,category_id&is_active=eq.true').catch(()=>[]),
         API.get('hud_skill_categories?select=id,name').catch(()=>[]),
         API.get(`task_resource_assignments?select=*&task_id=in.(${(tasks||[]).map(t=>t.id).join(',')})`.replace('in.()', 'in.(00000000-0000-0000-0000-000000000000)')).catch(()=>[]),
@@ -1890,6 +1909,7 @@ async function loadProjectDetail() {
       STATE.hudRoles        = hudRoles||[];
       STATE.resources       = resources||[];
       STATE.taskAssignments = taskAssignments||[];
+      STATE.hudRoleLevels   = hudRoleLevels||[];
       STATE.hudSkills       = hudSkills||[];
       STATE.hudSkillCats    = hudSkillCats||[];
     } catch(e) { STATE.hudRoles=[]; STATE.resources=[]; STATE.taskAssignments=[]; }
@@ -2546,7 +2566,6 @@ function openEditTaskPanel(taskId) {
   document.getElementById('tf-status').value      = t.status || 'not_started';
   document.getElementById('tf-start').value       = t.start_date ? t.start_date.substring(0,10) : '';
   document.getElementById('tf-due').value         = t.due_date   ? t.due_date.substring(0,10)   : '';
-  // Use saved duration_days as source of truth
   if (t.duration_days) {
     document.getElementById('tf-duration').value = t.duration_days;
   } else if (t.start_date && t.due_date) {
@@ -2616,6 +2635,15 @@ async function saveTaskForm() {
     actual_finish: document.getElementById('tf-actual-finish').value          || null,
     actual_hours:  parseFloat(document.getElementById('tf-actual-hours').value) || null,
   };
+  // ── Auto-derive status from actuals + pct_complete ──────────────
+  const _manualStatus = document.getElementById('tf-status').value;
+  if (_manualStatus === 'not_started' || _manualStatus === 'in_progress') {
+    if (payload.actual_finish || payload.pct_complete >= 100) {
+      payload.status = 'complete';
+    } else if (payload.actual_start || payload.pct_complete > 0) {
+      payload.status = 'in_progress';
+    }
+  }
   try {
     if (_editingTaskId) {
       const oldTask = { ...STATE.tasks.find(t => t.id === _editingTaskId) } || {};
@@ -2651,7 +2679,7 @@ async function saveTaskForm() {
         for (var _p2i=0; _p2i<_p2Skills.length; _p2i++) {
           await API.post('task_skill_requirements', {
             task_id:_p2TaskId, skill_id:_p2Skills[_p2i].skill_id,
-            }).catch(function(e){ console.warn('skill req save:',e); });
+            })..catch(function(e){ console.warn('skill req save:',e); });
         }
       } catch(_p2e) { console.warn('Phase2 save err:',_p2e); }
     }
@@ -2898,7 +2926,6 @@ const _origOpenEditTask = openEditTaskPanel;
 openEditTaskPanel = async function(taskId) {
   _origOpenEditTask(taskId);
   window._editingTaskId2 = taskId;
-  // Fetch fresh assignments from DB (STATE may be stale for new tasks)
   try {
     const fresh = await API.get('task_resource_assignments?select=*&task_id=eq.' + taskId).catch(()=>[]);
     window._tfAssignments = (fresh||[]).map(a => ({...a}));
@@ -4257,7 +4284,8 @@ function _p2PatchFunctions() {
       for (var i = 0; i < (window._tfTaskSkills||[]).length; i++) {
         var s = window._tfTaskSkills[i];
         await API.post('task_skill_requirements', {
-          task_id:taskId, skill_id:s.skill_id
+          task_id:taskId, skill_id:s.skill_id,
+          is_required:true, proficiency_needed:'practitioner'
         }).catch(function(e){ console.warn('skill req save:',e); });
       }
     } catch(e) { console.warn('Phase2 save err:',e); }
