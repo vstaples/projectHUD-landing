@@ -4350,6 +4350,7 @@ function _p2PatchFunctions() {
   let _dropLine    = null;
   let _longTimer   = null;
   let _startY      = 0;
+  let _startX      = 0;
   let _dragging    = false;
 
   function dropLine() {
@@ -4364,7 +4365,8 @@ function _p2PatchFunctions() {
 
   // Find which task row is at clientY, returns {row, before:bool}
   function rowAtY(clientY) {
-    const rows = [...document.querySelectorAll('#tasks-tbody tr[data-task-id]')];
+    const rows = [...document.querySelectorAll('#tasks-tbody tr[data-task-id]')]
+      .filter(r => { const rc = r.getBoundingClientRect(); return rc.height > 0; });
     for (const r of rows) {
       const rect = r.getBoundingClientRect();
       if (clientY < rect.top + rect.height / 2) return { row: r, before: true };
@@ -4454,6 +4456,11 @@ function _p2PatchFunctions() {
   async function moveTask(drag, target, before) {
     // Rebuild phase task order
     const phase = drag.phase;
+    // Show saving indicator
+    const _saveInd = document.createElement('div');
+    _saveInd.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;font-family:var(--font-mono);font-size:10px;color:var(--cyan);background:var(--bg2);border:1px solid var(--border);padding:6px 12px;';
+    _saveInd.textContent = 'SAVING ORDER...';
+    document.body.appendChild(_saveInd);
     let arr = STATE.tasks.filter(t => t.phase === phase)
                           .slice().sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0));
     // Remove drag task
@@ -4463,12 +4470,14 @@ function _p2PatchFunctions() {
     arr.splice(at, 0, drag);
     // Assign new sequence_orders
     arr.forEach((t,i) => { t.sequence_order = (i + 1) * 10; });
-    // Re-render immediately (sorts by sequence_order now)
-    renderTasksTable();
-    // Persist
+    // Persist to DB first — re-render after so the final DB state is reflected
     for (const t of arr) {
-      await API.patch('tasks?id=eq.' + t.id, { sequence_order: t.sequence_order }).catch(() => {});
+      await API.patch('tasks?id=eq.' + t.id, { sequence_order: t.sequence_order })
+        .catch(e => console.warn('[Drag] patch failed:', t.id, e.message));
     }
+    // Re-render after DB confirms
+    renderTasksTable();
+    _saveInd.remove();
   }
 
   async function cloneTask(source, target, before) {
@@ -4514,7 +4523,7 @@ function _p2PatchFunctions() {
     tbody.addEventListener('mousedown', e => {
       const row = e.target.closest('tr[data-task-id]');
       if (!row || e.target.closest('button,input,select,a,.cp-flag')) return;
-      _startY = e.clientY;
+      _startY = e.clientY; _startX = e.clientX;
       _longTimer = setTimeout(() => startDrag(row, e.clientY, e.ctrlKey||e.metaKey), 600);
     });
     tbody.addEventListener('touchstart', e => {
@@ -4527,7 +4536,7 @@ function _p2PatchFunctions() {
 
   document.addEventListener('mousemove', e => {
     if (!_dragging) {
-      if (_longTimer && Math.abs(e.clientY - _startY) > 8) { clearTimeout(_longTimer); _longTimer = null; }
+      if (_longTimer && (Math.abs(e.clientY - _startY) > 20 || Math.abs(e.clientX - _startX) > 20)) { clearTimeout(_longTimer); _longTimer = null; }
       return;
     }
     e.preventDefault();
