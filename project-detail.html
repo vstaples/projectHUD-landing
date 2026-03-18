@@ -4365,21 +4365,48 @@ function _p2PatchFunctions() {
 
   // Find which task row is at clientY, returns {row, before:bool}
   function rowAtY(clientY, dragPhase) {
-    const allRows = [...document.querySelectorAll('#tasks-tbody tr[data-task-id]')]
-      .filter(r => { const rc = r.getBoundingClientRect(); return rc.height > 0; });
-    // Constrain to same-phase rows when a dragPhase is known
-    const rows = dragPhase
-      ? allRows.filter(r => {
-          const t = STATE.tasks.find(x => x.id === r.dataset.taskId);
-          return t && t.phase === dragPhase;
-        })
-      : allRows;
+    const tbody = document.getElementById('tasks-tbody');
+    if (!tbody) return null;
+
+    // All visible rows (tasks + phase headers)
+    const allRows = [...tbody.querySelectorAll('tr')]
+      .filter(r => r.getBoundingClientRect().height > 0);
+
+    // Find which row the cursor is physically over
+    let overRow = null;
+    for (const r of allRows) {
+      const rc = r.getBoundingClientRect();
+      if (clientY >= rc.top && clientY < rc.bottom) { overRow = r; break; }
+    }
+
+    // If over a phase-header and we have a dragPhase,
+    // the cursor is in the gap between two phases — return last task of dragPhase
+    if (overRow && overRow.dataset.phaseKey && dragPhase) {
+      const phaseRows = [...tbody.querySelectorAll('tr[data-task-id]')].filter(r => {
+        const t = STATE.tasks.find(x => x.id === r.dataset.taskId);
+        return t && t.phase === dragPhase;
+      });
+      const last = phaseRows[phaseRows.length - 1];
+      return last ? { row: last, before: false } : null;
+    }
+
+    // Normal case: constrain to same-phase task rows
+    const rows = [...tbody.querySelectorAll('tr[data-task-id]')].filter(r => {
+      const rc = r.getBoundingClientRect();
+      if (rc.height === 0) return false;
+      if (!dragPhase) return true;
+      const t = STATE.tasks.find(x => x.id === r.dataset.taskId);
+      return t && t.phase === dragPhase;
+    });
+
     if (!rows.length) return null;
+
     for (const r of rows) {
       const rect = r.getBoundingClientRect();
       if (clientY < rect.top + rect.height / 2) return { row: r, before: true };
     }
-    // Below all same-phase rows → drop after the last one in this phase
+
+    // Below all same-phase rows → after last
     return { row: rows[rows.length - 1], before: false };
   }
 
@@ -4416,7 +4443,8 @@ function _p2PatchFunctions() {
 
   function updateDropLine(clientY) {
     if (!_dragging) return;
-    const target = rowAtY(clientY);
+    const _dp = STATE.tasks.find(t => t.id === _dragTaskId)?.phase;
+    const target = rowAtY(clientY, _dp);
     if (!target) return;
     const dragTask   = STATE.tasks.find(t => t.id === _dragTaskId);
     const targetTask = STATE.tasks.find(t => t.id === target.row.dataset.taskId);
@@ -4448,9 +4476,9 @@ function _p2PatchFunctions() {
 
   async function finishDrag(clientY) {
     if (!_dragging) { cancelDrag(); return; }
-    const dragTask0 = STATE.tasks.find(t => t.id === _dragTaskId);
-    const target    = rowAtY(clientY, dragTask0?.phase);
-    const taskId    = _dragTaskId;
+    const _dp    = STATE.tasks.find(t => t.id === _dragTaskId)?.phase;
+    const target = rowAtY(clientY, _dp);
+    const taskId = _dragTaskId;
     const isClone   = _dragIsClone;
     cancelDrag();
     if (!target || !taskId) return;
@@ -4479,7 +4507,7 @@ function _p2PatchFunctions() {
     arr.splice(at, 0, drag);
     // Assign new sequence_orders
     arr.forEach((t,i) => { t.sequence_order = (i + 1) * 10; });
-    // Persist in parallel — all patches fire simultaneously, ~300ms vs 5s serial
+    // Persist all in parallel — single round-trip instead of serial
     await Promise.all(arr.map(t =>
       API.patch('tasks?id=eq.' + t.id, { sequence_order: t.sequence_order })
         .catch(e => console.warn('[Drag] patch failed:', t.id, e.message))
@@ -4571,7 +4599,7 @@ function _p2PatchFunctions() {
 
   // Cursor style hint
   const s = document.createElement('style');
-  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); } #tasks-tbody tr[data-task-id]:hover .drag-handle { opacity:0.5 !important; } #tasks-tbody tr[data-task-id].dragging .drag-handle { opacity:1 !important; }';
+  s.textContent = '#tasks-tbody tr[data-task-id] { cursor:default; } #tasks-tbody tr[data-task-id]:active { outline:1px solid rgba(0,210,255,.25); } #tasks-tbody tr[data-task-id]:hover .drag-handle { opacity:0.5 !important; }';
   document.head.appendChild(s);
 
   console.log('[DragReorder] ready');
