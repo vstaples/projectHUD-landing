@@ -44,6 +44,53 @@
 .wl-fill { height: 100%; transition: width 0.6s ease; }
 .wl-pct { font-family: var(--font-mono); font-size:11px; min-width: 28px; text-align: right; }
 @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+/* ── ADD PROJECT PANEL ── */
+.add-proj-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 1000; backdrop-filter: blur(2px);
+}
+.add-proj-overlay.open { display: flex; align-items: center; justify-content: center; }
+.add-proj-panel {
+  background: var(--bg1); border: 1px solid rgba(0,210,255,0.2);
+  width: 580px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+  position: relative;
+  box-shadow: 0 0 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,210,255,0.08);
+}
+.ap-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px; border-bottom: 1px solid var(--border);
+}
+.ap-title { font-family: var(--font-hud); font-size: 18px; font-weight: 700; color: var(--text0); letter-spacing: .04em; }
+.ap-close { background: none; border: none; color: var(--text3); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; transition: color .15s; }
+.ap-close:hover { color: var(--text0); }
+.ap-body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+.ap-field { display: flex; flex-direction: column; gap: 6px; }
+.ap-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ap-label { font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: .12em; }
+.ap-label span { color: var(--red); margin-left: 2px; }
+.ap-input, .ap-select, .ap-textarea {
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text1);
+  font-family: var(--font-ui); font-size: 13px; padding: 9px 12px; outline: none;
+  transition: border-color .15s; width: 100%;
+}
+.ap-input:focus, .ap-select:focus, .ap-textarea:focus { border-color: rgba(0,210,255,.45); }
+.ap-textarea { resize: vertical; min-height: 72px; }
+.ap-select { cursor: pointer; }
+.ap-section-label {
+  font-family: var(--font-mono); font-size: 9px; color: var(--text3); letter-spacing: .15em;
+  border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: -4px;
+}
+.ap-footer {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px; border-top: 1px solid var(--border);
+}
+.ap-btn-cancel { background: none; border: 1px solid var(--border); color: var(--text3); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; padding: 8px 20px; cursor: pointer; transition: all .15s; }
+.ap-btn-cancel:hover { border-color: var(--text2); color: var(--text1); }
+.ap-btn-save { background: rgba(0,210,255,.08); border: 1px solid rgba(0,210,255,.45); color: var(--cyan); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; padding: 8px 24px; cursor: pointer; transition: all .15s; }
+.ap-btn-save:hover { background: rgba(0,210,255,.15); }
+.ap-btn-save:disabled { opacity: .4; cursor: not-allowed; }
+.ap-error { font-family: var(--font-mono); font-size: 10px; color: var(--red); min-height: 16px; }
 </style>
 </head>
 <body>
@@ -80,7 +127,11 @@
             <div class="bracket-bl"></div><div class="bracket-br"></div>
             <div class="panel-header">
               <div class="panel-title">ACTIVE PROJECTS</div>
-              <div style="display:flex;gap:8px;align-items:center;"><span class="panel-count" id="proj-count">—</span><button class="panel-action">VIEW ALL →</button></div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span class="panel-count" id="proj-count">—</span>
+                <button class="panel-action" onclick="openAddProject()" style="color:var(--green);border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.06);">+ ADD PROJECT</button>
+                <button class="panel-action">VIEW ALL →</button>
+              </div>
             </div>
             <div id="projects-list"></div>
           </div>
@@ -268,6 +319,186 @@ async function loadDashboard() {
 }
 
 loadDashboard();
+
+// ── ADD PROJECT ────────────────────────────────────────────────────
+let _apFirms = [], _apInternalFirmId = null;
+
+async function openAddProject() {
+  const overlay = document.getElementById('add-proj-overlay');
+  overlay.classList.add('open');
+
+  // Load firms if not yet loaded
+  if (!_apFirms.length) {
+    try {
+      _apFirms = await API.getFirms().catch(() => []);
+      _apInternalFirmId = _apFirms.find(f => f.is_internal)?.id || null;
+    } catch(e) {}
+  }
+
+  // Populate client dropdown — exclude internal firm
+  const sel = document.getElementById('ap-client');
+  sel.innerHTML = '<option value="">— Select client —</option>' +
+    _apFirms
+      .filter(f => !f.is_internal)
+      .sort((a,b) => a.name.localeCompare(b.name))
+      .map(f => `<option value="${f.id}">${f.name}</option>`)
+      .join('');
+
+  // Default start date to today
+  const today = new Date();
+  const yr = today.getFullYear();
+  const mo = String(today.getMonth()+1).padStart(2,'0');
+  const dy = String(today.getDate()).padStart(2,'0');
+  document.getElementById('ap-start').value = `${yr}-${mo}-${dy}`;
+
+  // Clear fields
+  document.getElementById('ap-name').value    = '';
+  document.getElementById('ap-desc').value    = '';
+  document.getElementById('ap-phase').value   = '';
+  document.getElementById('ap-target').value  = '';
+  document.getElementById('ap-hours').value   = '';
+  document.getElementById('ap-expense').value = '';
+  document.getElementById('ap-status').value  = 'active';
+  document.getElementById('ap-error').textContent = '';
+  document.getElementById('ap-save-btn').disabled = false;
+  document.getElementById('ap-name').focus();
+}
+
+function closeAddProject() {
+  document.getElementById('add-proj-overlay').classList.remove('open');
+}
+
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAddProject();
+});
+
+async function saveNewProject() {
+  const name     = document.getElementById('ap-name').value.trim();
+  const clientId = document.getElementById('ap-client').value;
+  const errEl    = document.getElementById('ap-error');
+  const saveBtn  = document.getElementById('ap-save-btn');
+
+  errEl.textContent = '';
+
+  if (!name)     { errEl.textContent = 'Project name is required.'; document.getElementById('ap-name').focus(); return; }
+  if (!clientId) { errEl.textContent = 'Please select a client firm.'; document.getElementById('ap-client').focus(); return; }
+
+  const hours   = parseFloat(document.getElementById('ap-hours').value)   || null;
+  const expense = parseFloat(document.getElementById('ap-expense').value) || null;
+
+  const payload = {
+    firm_id:                  _apInternalFirmId || null,
+    client_id:                clientId,
+    name,
+    description:              document.getElementById('ap-desc').value.trim()   || null,
+    phase:                    document.getElementById('ap-phase').value.trim()  || null,
+    status:                   document.getElementById('ap-status').value,
+    start_date:               document.getElementById('ap-start').value         || null,
+    target_date:              document.getElementById('ap-target').value        || null,
+    budget_baseline_hours:    hours,
+    current_budget_hours:     hours,
+    expense_budget_baseline:  expense,
+    current_expense_budget:   expense,
+    budget_baseline_locked:   false,
+  };
+
+  saveBtn.textContent = 'CREATING...';
+  saveBtn.disabled    = true;
+
+  try {
+    const result = await API.post('projects', payload);
+    const created = Array.isArray(result) ? result[0] : result;
+    if (!created?.id) throw new Error('No project returned from server.');
+    closeAddProject();
+    // Navigate directly to the new project
+    window.location.href = '/project-detail.html?id=' + created.id;
+  } catch(e) {
+    errEl.textContent = 'Save failed: ' + (e.message || 'Unknown error');
+    saveBtn.textContent = 'CREATE PROJECT →';
+    saveBtn.disabled    = false;
+  }
+}
 </script>
+
+<!-- ── ADD PROJECT PANEL ───────────────────────────────────────── -->
+<div class="add-proj-overlay" id="add-proj-overlay" onclick="if(event.target===this)closeAddProject()">
+  <div class="add-proj-panel">
+    <div class="ap-header">
+      <div class="ap-title">ADD PROJECT</div>
+      <button class="ap-close" onclick="closeAddProject()">✕</button>
+    </div>
+    <div class="ap-body">
+
+      <div class="ap-section-label">PROJECT IDENTITY</div>
+
+      <div class="ap-field">
+        <label class="ap-label">PROJECT NAME <span>*</span></label>
+        <input class="ap-input" id="ap-name" type="text" placeholder="e.g. NovaBio — Quality System Implementation" maxlength="120">
+      </div>
+
+      <div class="ap-field">
+        <label class="ap-label">DESCRIPTION</label>
+        <textarea class="ap-textarea" id="ap-desc" placeholder="Brief scope summary..."></textarea>
+      </div>
+
+      <div class="ap-field-row">
+        <div class="ap-field">
+          <label class="ap-label">CLIENT / FIRM <span>*</span></label>
+          <select class="ap-select" id="ap-client">
+            <option value="">— Select client —</option>
+          </select>
+        </div>
+        <div class="ap-field">
+          <label class="ap-label">CURRENT PHASE</label>
+          <input class="ap-input" id="ap-phase" type="text" placeholder="e.g. Design Verification">
+        </div>
+      </div>
+
+      <div class="ap-section-label">SCHEDULE</div>
+
+      <div class="ap-field-row">
+        <div class="ap-field">
+          <label class="ap-label">START DATE</label>
+          <input class="ap-input" id="ap-start" type="date">
+        </div>
+        <div class="ap-field">
+          <label class="ap-label">TARGET DATE</label>
+          <input class="ap-input" id="ap-target" type="date">
+        </div>
+      </div>
+
+      <div class="ap-section-label">BUDGET</div>
+
+      <div class="ap-field-row">
+        <div class="ap-field">
+          <label class="ap-label">BUDGET HOURS</label>
+          <input class="ap-input" id="ap-hours" type="number" min="0" placeholder="e.g. 2400">
+        </div>
+        <div class="ap-field">
+          <label class="ap-label">EXPENSE BUDGET ($)</label>
+          <input class="ap-input" id="ap-expense" type="number" min="0" placeholder="e.g. 150000">
+        </div>
+      </div>
+
+      <div class="ap-field">
+        <label class="ap-label">STATUS</label>
+        <select class="ap-select" id="ap-status">
+          <option value="active">Active</option>
+          <option value="on_hold">On Hold</option>
+          <option value="planning">Planning</option>
+          <option value="complete">Complete</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      <div class="ap-error" id="ap-error"></div>
+    </div>
+    <div class="ap-footer">
+      <button class="ap-btn-cancel" onclick="closeAddProject()">CANCEL</button>
+      <button class="ap-btn-save" id="ap-save-btn" onclick="saveNewProject()">CREATE PROJECT →</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
