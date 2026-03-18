@@ -540,6 +540,7 @@
               <button class="col-toggle-btn" data-col="evm"     onclick="toggleColGroup('evm')">EVM</button>
               <button class="col-toggle-btn" onclick="resetTableView()" style="color:var(--text3);border-color:rgba(255,255,255,0.1);">&#8634; RESET</button>
             </div>
+            <button class="hud-btn" onclick="window.location.href='/import-tasks.html?project_id='+PROJECT_ID" style="border-color:rgba(0,229,160,0.3);color:var(--green);" title="Import tasks from CSV">&#8679; IMPORT</button>
             <button class="hud-btn" id="btn-link-tasks" onclick="openLinkPanel()" style="border-color:rgba(0,210,255,0.35);">&#9741; LINK</button>
             <button class="hud-btn" id="btn-edit-plan" onclick="togglePlanEditMode()">&#9998; EDIT PLAN</button>
             <div id="plan-edit-actions" style="display:none;display:flex;gap:4px;">
@@ -859,9 +860,6 @@ let STATE = {
   firms: [], journal: [], risks: [], documents: [],
   activeTab: 'overview', taskFilter: 'all',
 };
-
-// Derive display status from stored status + actuals — handles legacy tasks
-// where status wasn't auto-updated at save time
 function _effectiveStatus(t) {
   if (!t) return 'not_started';
   if (t.status === 'complete' || t.status === 'on_hold') return t.status;
@@ -1147,7 +1145,7 @@ document.addEventListener('mouseup', () => {
 function computeEVM() {
   const p     = STATE.project;
   const tasks = STATE.tasks;
-  const done  = tasks.filter(t => _effectiveStatus(t) === 'complete').length;
+  const done  = tasks.filter(t => t.status === 'complete').length;
   const total = tasks.length;
   const pctDone = UI.pct(done, total);
   const bac   = parseFloat(p.budget_baseline_hours || 0);
@@ -1276,7 +1274,7 @@ function expandOverviewMilestones() {
 
 function taskRowHTML(t) {
   const now       = new Date();
-  const isOverdue = t.due_date && t.due_date.substring(0,10) < now.toLocaleDateString('en-CA') && t.status !== 'complete';
+  const isOverdue = t.due_date && t.due_date.substring(0,10) < now.toLocaleDateString('en-CA') && _effectiveStatus(t) !== 'complete';
   const asgn      = STATE.users.find(u => u.id === t.assigned_to);
   const due       = UI.dueDateLabel(t.due_date);
   const startStr  = t.start_date ? UI.fmtDateShort(t.start_date) : '—';
@@ -2364,7 +2362,7 @@ function drawGanttChart() {
       // FLOAT — CPM Total Float (TF): thin gray line right of bar end
       // TF is in duration-days from computeCPMForGantt() stored in window._ganttCPM
       const cpmNode = window._ganttCPM?.nodes?.[t.id];
-      if (cpmNode && cpmNode.TF > 0 && _effectiveStatus(t) !== 'complete') {
+      if (cpmNode && cpmNode.TF > 0 && t.status !== 'complete') {
         const floatPx = cpmNode.TF * ppd;
         const fxE = Math.min(x2 + floatPx, CW);
         if (fxE > x2 + 2) {
