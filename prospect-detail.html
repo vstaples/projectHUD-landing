@@ -1640,9 +1640,12 @@ function renderStakeholders() {
             <div class="sh-role">${escHtml(c.title || '')}${c.email ? ' · ' + c.email : ''}</div>
           </div>
           <button class="btn" style="font-size:10px;padding:3px 8px;height:auto;flex-shrink:0"
-            onclick="openEditStakeholder('${link.id}','${escHtml(c.first_name + ' ' + c.last_name)}',
-              '${link.stakeholder_role||''}','${link.influence_score||5}',
-              '${escHtml(link.notes||'')}')">
+            data-sh-id="${link.id}"
+            data-sh-name="${escHtml(c.first_name + ' ' + c.last_name)}"
+            data-sh-role="${link.stakeholder_role||''}"
+            data-sh-influence="${link.influence_score||5}"
+            data-sh-notes="${escHtml(link.notes||'')}"
+            onclick="openEditStakeholderFromBtn(this)">
             ✎
           </button>
         </div>
@@ -2185,6 +2188,16 @@ async function saveActionItem() {
 let _attachedFiles = [];       // files staged in current edit session
 const _aiAttachments = {};    // { [aiId]: [{name, size, url, type}] } — persists across drawer opens
 
+function openEditStakeholderFromBtn(btn) {
+  openEditStakeholder(
+    btn.dataset.shId,
+    btn.dataset.shName,
+    btn.dataset.shRole,
+    btn.dataset.shInfluence,
+    btn.dataset.shNotes
+  );
+}
+
 function openEditStakeholder(linkId, name, role, influence, notes) {
   document.getElementById('sh-edit-id').value          = linkId;
   document.getElementById('sh-edit-name').value        = name;
@@ -2402,7 +2415,7 @@ function showFindingAttachments(fid) {
     popup.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
         '<div style="font-size:13px;font-weight:600;color:#e8eaf0">Attachments</div>' +
-        '<button onclick="document.getElementById('attach-popup').remove()" style="background:none;border:none;color:#7a8099;cursor:pointer;font-size:16px">✕</button>' +
+        '<button onclick="document.getElementById(\'attach-popup\').remove()" style="background:none;border:none;color:#7a8099;cursor:pointer;font-size:16px">✕</button>' +
       '</div>' +
       rows.join('') +
       '<div style="margin-top:10px;font-size:10px;color:#7a8099">Click a filename to open · ⬇ to download</div>';
