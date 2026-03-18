@@ -213,7 +213,7 @@ const Sidebar = (() => {
   async function init(activePage = '') {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
-    const showToolbar = activePage === 'dashboard.html';
+    const showToolbar = true;
     try {
       const [users, firms] = await Promise.all([API.getUsers(), API.getFirms()]);
       const userId      = await Auth.getCurrentUserId();
