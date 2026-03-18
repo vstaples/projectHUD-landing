@@ -1892,9 +1892,19 @@ async function saveEditActionItem() {
 
     const sourceMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     const patchTable = sourceMeetId ? 'meeting_action_items' : 'prospect_action_items';
-    // meeting_action_items has no completed_at column
-    if (patchTable === 'meeting_action_items') delete payload.completed_at;
-    await API.patch(`${patchTable}?id=eq.${id}`, payload);
+    let finalPayload;
+    if (patchTable === 'meeting_action_items') {
+      // meeting_action_items uses assigned_to_resource, has no completed_at
+      finalPayload = {
+        description:          payload.description,
+        assigned_to_resource: assigned,
+        due_date:             due || null,
+        status,
+      };
+    } else {
+      finalPayload = payload;
+    }
+    await API.patch(`${patchTable}?id=eq.${id}`, finalPayload);
     closeDrawer('ai-edit-overlay');
     const returnMeetId = document.getElementById('ai-edit-overlay').dataset.sourceMeetId;
     await loadAll();
