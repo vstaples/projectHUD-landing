@@ -1410,23 +1410,27 @@ function renderActions() {
           </tr>
         </thead>
         <tbody>
-          ${actionItems.length === 0
+          ${allActionItems.length === 0
             ? `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">No action items</td></tr>`
-            : actionItems.map(ai => {
-                const assignee = resources.find(r => r.id === ai.assigned_to) || null;
+            : allActionItems.map(ai => {
+                // meeting_action_items uses assigned_to_resource; prospect uses assigned_to
+                const rid = ai.assigned_to_resource || ai.assigned_to || null;
+                const assignee = rid ? resources.find(r => r.id === rid) : null;
                 const assigneeName = assignee ? assignee.first_name + ' ' + assignee.last_name : '—';
                 const initials = assignee
                   ? (assignee.first_name[0] + assignee.last_name[0]).toUpperCase() : '?';
                 const overdue = ai.due_date && ai.due_date < today && ai.status !== 'complete';
+                const tbl = ai._table || 'prospect_action_items';
+                const desc = (ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim();
                 return `
                 <tr style="border-bottom:1px solid var(--border)"
                   data-ai-id="${ai.id}"
-                  data-ai-desc="${escHtml(ai.description)}"
-                  data-ai-assigned="${ai.assigned_to||''}"
+                  data-ai-desc="${escHtml(desc)}"
+                  data-ai-assigned="${rid||''}"
                   data-ai-due="${ai.due_date||''}"
                   data-ai-status="${ai.status||'open'}">
                   <td style="padding:10px 12px;cursor:pointer"
-                    onclick="openEditActionItemFromRow(this.closest('tr'))">
+                    onclick="openEditActionItemFromRow(this.closest('tr'),${ai.meeting_id?'''+ai.meeting_id+''':'null'})">
                     <div style="display:flex;align-items:center;gap:8px">
                       <div style="width:14px;height:14px;border-radius:3px;
                         border:1px solid var(--border2);flex-shrink:0;cursor:pointer;
@@ -1434,10 +1438,10 @@ function renderActions() {
                         background:${ai.status==='complete'?'var(--green)':'transparent'};
                         border-color:${ai.status==='complete'?'var(--green)':'var(--border2)'};
                         font-size:8px;color:#fff"
-                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'prospect_action_items',null)">
+                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'${tbl}',${ai.meeting_id?'''+ai.meeting_id+''':'null'})">
                         ${ai.status==='complete'?'✓':''}
                       </div>
-                      <div style="font-size:12px;color:var(--text)">${escHtml(ai.description)}</div>
+                      <div style="font-size:12px;color:var(--text)">${escHtml(desc)}</div>
                     </div>
                   </td>
                   <td style="padding:10px 12px">
@@ -1449,13 +1453,13 @@ function renderActions() {
                       <span style="font-size:11px;color:var(--muted)">${escHtml(assigneeName)}</span>
                     </div>
                   </td>
-                  <td style="padding:10px 12px;color:${overdue ? '#f07a7a' : 'var(--muted)'}">
+                  <td style="padding:10px 12px;color:${overdue?'#f07a7a':'var(--muted)'}">
                     ${ai.due_date ? fmtDate(ai.due_date) : '—'}
                   </td>
                   <td style="padding:10px 12px">
-                    <span style="font-size:10px;padding:2px 7px;border-radius:5px;
-                      background:${ai.status==='open'?'rgba(212,144,31,.15)':'rgba(42,157,64,.15)'};
-                      color:${ai.status==='open'?'var(--amber)':'#7af0a0'}">
+                    <span data-status-badge style="font-size:10px;padding:2px 7px;border-radius:5px;
+                      background:${ai.status==='complete'?'rgba(42,157,64,.15)':overdue?'rgba(192,64,74,.12)':'rgba(212,144,31,.15)'};
+                      color:${ai.status==='complete'?'#7af0a0':overdue?'#f07a7a':'var(--amber)'}">
                       ${ai.status}
                     </span>
                   </td>
@@ -1484,15 +1488,16 @@ function updateMeetingCardBadge(meetId) {
 
 function updateMeetingsBadge() {
   const today = new Date().toLocaleDateString('en-CA');
-  const hasOverdue = allActionItems.some(a =>
+  // Check both meetingActionItems and actionItems directly (not allActionItems cache)
+  const allOpen = [...meetingActionItems, ...actionItems];
+  const hasOverdue = allOpen.some(a =>
     a.status !== 'complete' && a.due_date && a.due_date < today
   );
   const meetBadge = document.getElementById('tbadge-meet');
   if (meetBadge) {
     meetBadge.classList.toggle('overdue', hasOverdue);
-    // Clear inline styles that may be overriding
-    meetBadge.style.background = '';
-    meetBadge.style.color      = '';
+    meetBadge.style.removeProperty('background');
+    meetBadge.style.removeProperty('color');
   }
 }
 
