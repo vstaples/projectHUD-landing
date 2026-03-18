@@ -1812,6 +1812,11 @@ function bindTabs() {
 }
 
 function switchTab(name) {
+  // Re-fetch action items when switching to overview for live accuracy
+  if (name === 'overview') {
+    loadAll().then(() => {});
+    return;
+  }
   document.querySelectorAll('.tab').forEach(t =>
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.panel').forEach(p =>
@@ -2619,12 +2624,20 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
 
     // Toggle overdue warning on due date span
     const today2 = new Date().toLocaleDateString('en-CA');
-    const dueSpan = row?.querySelector('[data-due], .ai-due');
-    if (dueSpan) {
+    // Update ALL due date spans in this row
+    const dueSpans = row ? row.querySelectorAll('[data-due], .ai-due') : [];
+    dueSpans.forEach(dueSpan => {
       const due = dueSpan.dataset?.due || row?.dataset?.aiDue || '';
       const isOverdue = due && due < today2 && newStatus !== 'complete';
       dueSpan.classList.toggle('overdue', isOverdue);
-      dueSpan.style.color = '';  // always clear inline — let CSS class control color
+      dueSpan.style.color = isOverdue ? '#f07a7a' : 'var(--muted)';
+    });
+    // Also handle meeting card rows that use inline color directly (no CSS class)
+    const inlineDue = row?.querySelector('[style*="Due "], [style*="due"]');
+    if (inlineDue && !inlineDue.dataset?.due) {
+      const due = row?.dataset?.aiDue || '';
+      const isOverdue = due && due < today2 && newStatus !== 'complete';
+      inlineDue.style.color = isOverdue ? '#f07a7a' : 'var(--muted)';
     }
 
     // Toggle status badge on the row
