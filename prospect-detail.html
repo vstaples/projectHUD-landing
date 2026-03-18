@@ -1094,16 +1094,7 @@ async function loadAll() {
     document.getElementById('tbadge-meet').textContent     = meetings.length;
 
     // Turn meetings badge red if any action item (prospect OR meeting) is overdue
-    const today = new Date().toLocaleDateString('en-CA');
-    // Use allActionItems (already includes both tables) for overdue check
-    const hasOverdue = allActionItems.some(a =>
-      a.status !== 'complete' && a.due_date && a.due_date < today
-    );
-    const meetBadge = document.getElementById('tbadge-meet');
-    if (meetBadge) {
-      meetBadge.style.background = hasOverdue ? 'rgba(192,64,74,.25)' : '';
-      meetBadge.style.color      = hasOverdue ? '#f07a7a' : '';
-    }
+    updateMeetingsBadge();
 
   } catch(e) {
     console.error(e);
@@ -1203,10 +1194,13 @@ function renderOverview() {
         ${openAI.length === 0
           ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
           : openAI.map(ai => `
-            <div class="ai-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <div class="ai-row" style="flex-direction:column;align-items:flex-start;gap:4px"
+              data-ai-id="${ai.id}"
+              data-ai-due="${ai.due_date||''}"
+              data-ai-status="${ai.status||'open'}">
               <div style="display:flex;align-items:center;gap:8px;width:100%">
                 <div class="ai-check ${ai.status==='complete'?'done':''}"
-                  onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',ai.status||'open',this,'${ai._table||'prospect_action_items'}',ai.meeting_id||null)">
+                  onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'${ai._table||'prospect_action_items'}',ai.meeting_id||null)">
                   ${ai.status==='complete'?'✓':''}
                 </div>
                 <div class="ai-text" style="font-size:12px">${escHtml((ai.description||'').replace(/\[attachments:[^\]]*\]/g,'').trim())}</div>
@@ -1223,7 +1217,7 @@ function renderOverview() {
                     'justify-content:center;flex-shrink:0">' + initials + '</div>' +
                     '<span style="font-size:10px;color:var(--muted)">' + escHtml(name) + '</span></div>' : '';
                 })()}
-                ${ai.due_date ? '<span class="ai-due ' + (ai.due_date < today && ai.status !== 'complete' ? 'overdue' : '') + '">' +
+                ${ai.due_date ? '<span class="ai-due' + (ai.due_date < today && ai.status !== 'complete' ? ' overdue' : '') + '" data-due="' + ai.due_date + '">' +
                   'Due ' + fmtDate(ai.due_date) + '</span>' : ''}
                 <span style="font-size:10px;padding:1px 6px;border-radius:4px;
                   background:${ai.status==='complete'?'rgba(42,157,64,.15)':ai.due_date&&ai.due_date<today&&ai.status!=='complete'?'rgba(192,64,74,.15)':'rgba(212,144,31,.12)'};
@@ -1469,6 +1463,18 @@ function renderActions() {
 }
 
 // ── meetings ───────────────────────────────────────────
+function updateMeetingsBadge() {
+  const today = new Date().toLocaleDateString('en-CA');
+  const hasOverdue = allActionItems.some(a =>
+    a.status !== 'complete' && a.due_date && a.due_date < today
+  );
+  const meetBadge = document.getElementById('tbadge-meet');
+  if (meetBadge) {
+    meetBadge.style.background = hasOverdue ? 'rgba(192,64,74,.25)' : '';
+    meetBadge.style.color      = hasOverdue ? '#f07a7a' : '';
+  }
+}
+
 function renderMeetings() {
   const panel = document.getElementById('panel-meetings');
   if (meetings.length === 0) {
@@ -2598,9 +2604,9 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
 
     // Toggle overdue warning on due date span
     const today2 = new Date().toLocaleDateString('en-CA');
-    const dueSpan = row?.querySelector('.ai-due, [class*="ai-due"]');
+    const dueSpan = row?.querySelector('[data-due], .ai-due');
     if (dueSpan) {
-      const due = row?.dataset?.aiDue || '';
+      const due = dueSpan.dataset?.due || row?.dataset?.aiDue || '';
       const isOverdue = due && due < today2 && newStatus !== 'complete';
       dueSpan.classList.toggle('overdue', isOverdue);
       dueSpan.style.color = isOverdue ? '#f07a7a' : '';
@@ -2620,11 +2626,17 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
       const item = _meetingAICache[meetId].find(a => a.id === id);
       if (item) item.status = newStatus;
     }
-    // Also update prospect action items array for badge count
+    // Update both action item arrays and allActionItems
     const pai = actionItems.find(a => a.id === id);
     if (pai) pai.status = newStatus;
+    const mai = meetingActionItems.find(a => a.id === id);
+    if (mai) mai.status = newStatus;
+    const aai = allActionItems.find(a => a.id === id);
+    if (aai) aai.status = newStatus;
     const badge = document.getElementById('tbadge-ai');
-    if (badge) badge.textContent = actionItems.filter(a => a.status === 'open').length;
+    if (badge) badge.textContent = allActionItems.filter(a => a.status === 'open').length;
+    // Refresh meetings badge overdue state
+    updateMeetingsBadge();
 
   } catch(e) {
     console.error('toggleMeetingAIStatus error:', e);
