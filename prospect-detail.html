@@ -1230,7 +1230,7 @@ function renderOverview() {
                   color:${ai.status==='complete'?'#7af0a0':ai.due_date&&ai.due_date<today&&ai.status!=='complete'?'#f07a7a':'var(--amber)'}">${ai.status||'open'}</span>
               </div>
             </div>`).join('')}
-        ${allActionItems.filter(a=>a.status==='open').length > 3
+        ${openAI.length >= 3 && allActionItems.filter(a=>a.status==='open').length > 3
           ? `<div style="font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px"
               onclick="switchTab('meetings')">
               +${allActionItems.filter(a=>a.status==='open').length - 3} more →</div>`
@@ -2594,6 +2594,25 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
     if (descEl) {
       descEl.style.textDecoration = newStatus === 'complete' ? 'line-through' : 'none';
       descEl.style.color          = newStatus === 'complete' ? 'var(--muted)' : 'var(--text)';
+    }
+
+    // Toggle overdue warning on due date span
+    const today2 = new Date().toLocaleDateString('en-CA');
+    const dueSpan = row?.querySelector('.ai-due, [class*="ai-due"]');
+    if (dueSpan) {
+      const due = row?.dataset?.aiDue || '';
+      const isOverdue = due && due < today2 && newStatus !== 'complete';
+      dueSpan.classList.toggle('overdue', isOverdue);
+      dueSpan.style.color = isOverdue ? '#f07a7a' : '';
+    }
+
+    // Toggle status badge on the row
+    const statusBadge = row?.querySelector('[data-status-badge]');
+    if (statusBadge) {
+      statusBadge.textContent      = newStatus;
+      statusBadge.style.background = newStatus === 'complete'
+        ? 'rgba(42,157,64,.15)' : 'rgba(212,144,31,.12)';
+      statusBadge.style.color      = newStatus === 'complete' ? '#7af0a0' : 'var(--amber)';
     }
 
     // Update in-memory caches so re-renders respect the new state
