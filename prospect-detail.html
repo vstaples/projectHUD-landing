@@ -1428,9 +1428,11 @@ function renderActions() {
                   data-ai-desc="${escHtml(desc)}"
                   data-ai-assigned="${rid||''}"
                   data-ai-due="${ai.due_date||''}"
-                  data-ai-status="${ai.status||'open'}">
+                  data-ai-status="${ai.status||'open'}"
+                  data-ai-meetid="${ai.meeting_id||''}"
+                  data-ai-table="${tbl}">
                   <td style="padding:10px 12px;cursor:pointer"
-                    onclick="openEditActionItemFromRow(this.closest('tr'),${ai.meeting_id?'''+ai.meeting_id+''':'null'})">
+                    onclick="openEditActionItemFromRow(this.closest('tr'),this.closest('tr').dataset.aiMeetid||null)">
                     <div style="display:flex;align-items:center;gap:8px">
                       <div style="width:14px;height:14px;border-radius:3px;
                         border:1px solid var(--border2);flex-shrink:0;cursor:pointer;
@@ -1438,7 +1440,7 @@ function renderActions() {
                         background:${ai.status==='complete'?'var(--green)':'transparent'};
                         border-color:${ai.status==='complete'?'var(--green)':'var(--border2)'};
                         font-size:8px;color:#fff"
-                        onclick="event.stopPropagation();toggleMeetingAIStatus('${ai.id}',this.closest('[data-ai-id]').dataset.aiStatus||'open',this,'${tbl}',${ai.meeting_id?'''+ai.meeting_id+''':'null'})">
+                        onclick="event.stopPropagation();toggleAIFromRow(this)">
                         ${ai.status==='complete'?'✓':''}
                       </div>
                       <div style="font-size:12px;color:var(--text)">${escHtml(desc)}</div>
@@ -1942,6 +1944,16 @@ function openAddMeetingActionItem(meetId) {
   document.getElementById('ai-due-input').value = d.toLocaleDateString('en-CA');
   document.getElementById('ai-desc-input').value = '';
   document.getElementById('ai-overlay').classList.add('open');
+}
+
+function toggleAIFromRow(el) {
+  const row = el.closest('[data-ai-id]');
+  if (!row) return;
+  const id      = row.dataset.aiId;
+  const status  = row.dataset.aiStatus || 'open';
+  const tbl     = row.dataset.aiTable  || 'prospect_action_items';
+  const meetId  = row.dataset.aiMeetid || null;
+  toggleMeetingAIStatus(id, status, el, tbl, meetId || null);
 }
 
 function openEditActionItemFromRow(row, sourceMeetId) {
