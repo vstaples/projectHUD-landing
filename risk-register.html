@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Risk Register — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  display: flex; height: 100vh; overflow: hidden;
+}
+
+#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
+
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+}
+
+/* ── back bar ──────────────────────────────────────────── */
+.backbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px; height: 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+  font-size: 12px; color: var(--muted);
+}
+.backbar a { color: var(--muted); text-decoration: none; }
+.backbar a:hover { color: var(--text); }
+
+/* ── page header ───────────────────────────────────────── */
+.page-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  flex-shrink: 0;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 16px;
+}
+.hdr-left { flex: 1; min-width: 0; }
+.page-title { font-size: 16px; font-weight: 700; }
+.page-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.hdr-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+/* ── tabs ──────────────────────────────────────────────── */
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0 24px; flex-shrink: 0;
+}
+.tab {
+  padding: 10px 16px; font-size: 12px; font-weight: 500;
+  color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color .15s; user-select: none; white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge {
+  font-size: 10px; padding: 1px 5px; border-radius: 8px;
+  background: rgba(255,255,255,.08); color: var(--muted);
+  margin-left: 5px;
+}
+
+/* ── content area ──────────────────────────────────────── */
+.content {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+}
+.content::-webkit-scrollbar { width: 4px; }
+.content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── summary strip ─────────────────────────────────────── */
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.sum-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 16px;
+}
+.sum-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+.sum-value { font-size: 20px; font-weight: 700; }
+.sum-sub   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.red   { color: #f07a7a; }
+.amber { color: var(--amber); }
+.green { color: #7af0a0; }
+
+/* ── P×I matrix ────────────────────────────────────────── */
+.matrix-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-bottom: 20px;
+  overflow-x: auto;
+}
+.matrix-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); margin-bottom: 12px;
+}
+.pxi-matrix {
+  display: grid;
+  grid-template-columns: 40px repeat(5, 1fr);
+  gap: 3px; min-width: 340px;
+}
+.pxi-cell {
+  height: 36px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; cursor: default;
+  transition: transform .1s;
+}
+.pxi-cell.header { background: none; color: var(--muted); font-size: 9px; }
+.pxi-cell.has-risk { cursor: pointer; }
+.pxi-cell.has-risk:hover { transform: scale(1.08); }
+.pxi-legend { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.pxi-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+.pxi-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+/* ── risk cards ────────────────────────────────────────── */
+.risk-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 10px;
+  overflow: hidden; transition: border-color .15s;
+}
+.risk-card:hover { border-color: var(--border2); }
+.risk-card-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer;
+}
+.risk-score-badge {
+  width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800;
+}
+.rs-critical { background: rgba(192,64,74,.2);  color: #f07a7a; }
+.rs-high     { background: rgba(212,144,31,.2); color: var(--amber); }
+.rs-medium   { background: rgba(212,144,31,.1); color: #e0c070; }
+.rs-low      { background: rgba(42,157,64,.15); color: #7af0a0; }
+.risk-head-info { flex: 1; min-width: 0; }
+.risk-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.risk-meta  { display: flex; gap: 8px; flex-wrap: wrap; font-size: 10px; color: var(--muted); }
+.risk-chip  {
+  padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;
+}
+.rc-risk  { background: rgba(192,64,74,.12);  color: #f07a7a; }
+.rc-assump{ background: rgba(79,142,247,.12); color: var(--accent); }
+.risk-chevron { font-size: 10px; color: var(--muted); transition: transform .2s; }
+.risk-card.open .risk-chevron { transform: rotate(180deg); }
+.risk-card-body {
+  display: none; padding: 0 16px 16px;
+  border-top: 1px solid var(--border);
+}
+.risk-card.open .risk-card-body { display: block; }
+
+/* body sections */
+.rb-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-top: 12px;
+}
+@media (max-width: 600px) { .rb-grid { grid-template-columns: 1fr; } }
+.rb-section { }
+.rb-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); margin-bottom: 5px;
+}
+.rb-value { font-size: 12px; color: var(--text); line-height: 1.6; }
+.rb-value.empty { color: var(--muted); font-style: italic; }
+
+/* EMV row */
+.emv-row {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  background: var(--surf2); border-radius: 6px;
+  padding: 10px 12px; margin-top: 10px;
+}
+.emv-item { }
+.emv-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.emv-val   { font-size: 13px; font-weight: 700; }
+
+/* ── buttons ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  transition: background .15s; text-decoration: none;
+}
+.btn:hover { background: var(--surf3); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+/* ── status pill ────────────────────────────────────────── */
+.status-pill {
+  padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+}
+.sp-open      { background: rgba(212,144,31,.15); color: var(--amber); }
+.sp-mitigated { background: rgba(79,142,247,.15); color: var(--accent); }
+.sp-closed    { background: rgba(42,157,64,.15);  color: #7af0a0; }
+.sp-accepted  { background: rgba(255,255,255,.07);color: var(--muted); }
+
+/* ── drawer ─────────────────────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 100;
+  display: none; justify-content: flex-end;
+}
+.overlay.open { display: flex; }
+.drawer {
+  width: 520px; max-width: 95vw;
+  background: var(--surface); border-left: 1px solid var(--border2);
+  display: flex; flex-direction: column; height: 100%;
+  overflow: hidden;
+}
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.drawer-title {
+  font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.drawer-close {
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  cursor: pointer; font-size: 14px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.drawer-body {
+  flex: 1; overflow-y: auto; padding: 20px;
+}
+.drawer-body::-webkit-scrollbar { width: 4px; }
+.drawer-body::-webkit-scrollbar-thumb { background: var(--border2); }
+.drawer-foot {
+  display: flex; gap: 8px; padding: 14px 20px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.field { margin-bottom: 16px; }
+.field label {
+  display: block; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: 6px;
+}
+.field input, .field select, .field textarea {
+  width: 100%; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 12px; font-family: inherit;
+  outline: none; transition: border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--accent);
+}
+.field textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.slider-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.slider-row input[type=range] {
+  flex: 1; accent-color: var(--accent);
+  padding: 0; border: none; background: none;
+}
+.slider-val {
+  width: 32px; text-align: center; font-weight: 700;
+  color: var(--accent); font-size: 13px;
+}
+.sec-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted);
+  margin-bottom: 8px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* empty state */
+.empty-state {
+  text-align: center; padding: 48px 24px; color: var(--muted);
+}
+.empty-state .ei { font-size: 36px; margin-bottom: 12px; }
+.empty-state .et { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.empty-state .es { font-size: 12px; line-height: 1.6; }
+
+/* loading */
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--muted); font-size: 13px; gap: 8px;
+}
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--border2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+
+  <!-- Back bar -->
+  <div class="backbar">
+    <a id="back-proposal" href="#">← Proposal</a>
+    <span>/</span>
+    <span>Risk register</span>
+  </div>
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="hdr-left">
+      <div class="page-title" id="hdr-title">Risk &amp; Assumption Register</div>
+      <div class="page-sub" id="hdr-sub">Loading…</div>
+    </div>
+    <div class="hdr-actions">
+      <button class="btn btn-sm" onclick="exportPDF()">⬇ Export PDF</button>
+      <button class="btn btn-primary" onclick="openAddRisk('risk')">+ Add risk</button>
+      <button class="btn" onclick="openAddRisk('assumption')">+ Add assumption</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="all" onclick="switchTab('all')">
+      All <span class="tab-badge" id="tbadge-all">0</span>
+    </div>
+    <div class="tab" data-tab="risks" onclick="switchTab('risks')">
+      Risks <span class="tab-badge" id="tbadge-risks">0</span>
+    </div>
+    <div class="tab" data-tab="assumptions" onclick="switchTab('assumptions')">
+      Assumptions <span class="tab-badge" id="tbadge-assumptions">0</span>
+    </div>
+    <div class="tab" data-tab="matrix" onclick="switchTab('matrix')">P×I Matrix</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="main-content">
+    <div class="loading-state"><div class="spinner"></div> Loading…</div>
+  </div>
+
+</div>
+
+<!-- ADD / EDIT DRAWER -->
+<div class="overlay" id="risk-overlay" onclick="if(event.target===this)closeDrawer()">
+  <div class="drawer">
+    <div class="drawer-head">
+      <span class="drawer-title" id="drawer-title">ADD RISK</span>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-body">
+      <!-- populated dynamically -->
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveRisk()">Save</button>
+      <button class="btn" id="delete-btn" style="color:#f07a7a;border-color:rgba(192,64,74,.3);display:none"
+        onclick="deleteRisk()">Delete</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+const params      = new URLSearchParams(location.search);
+const PROPOSAL_ID = params.get('proposal_id');
+const PROSPECT_ID = params.get('prospect_id');
+
+let proposal  = null;
+let riskItems = [];
+let resources = [];
+let _editId   = null;
+let _editType = null;
+let _activeTab = 'all';
+
+// ── PMI P×I scoring ────────────────────────────────────────────────────────
+// Score = probability × impact (0–1 each), classified as:
+// Critical: ≥ 0.36  |  High: ≥ 0.16  |  Medium: ≥ 0.06  |  Low: < 0.06
+const PI_LEVELS = [0.1, 0.3, 0.5, 0.7, 0.9];
+const PI_LABELS = ['Very low','Low','Medium','High','Very high'];
+
+function scoreClass(score) {
+  if (score >= 0.36) return 'rs-critical';
+  if (score >= 0.16) return 'rs-high';
+  if (score >= 0.06) return 'rs-medium';
+  return 'rs-low';
+}
+function scoreLabel(score) {
+  if (score >= 0.36) return 'Critical';
+  if (score >= 0.16) return 'High';
+  if (score >= 0.06) return 'Medium';
+  return 'Low';
+}
+function cellColor(p, i) {
+  const s = p * i;
+  if (s >= 0.36) return 'rgba(192,64,74,.6)';
+  if (s >= 0.16) return 'rgba(212,144,31,.5)';
+  if (s >= 0.06) return 'rgba(212,144,31,.25)';
+  return 'rgba(42,157,64,.25)';
+}
+
+// ── init ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!PROPOSAL_ID) { alert('No proposal ID.'); return; }
+  if (window.Sidebar) Sidebar.init('pipeline');
+  await loadAll();
+});
+
+async function loadAll() {
+  try {
+    const [propRes, riskRes, resRes] = await Promise.all([
+      API.get(`proposals?id=eq.${PROPOSAL_ID}&select=id,title,prospect_id,status`),
+      API.get(`risk_items?proposal_id=eq.${PROPOSAL_ID}&order=created_at`),
+      API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name`),
+    ]);
+    proposal  = propRes?.[0];
+    riskItems = riskRes || [];
+    resources = resRes  || [];
+
+    if (!proposal) { alert('Proposal not found.'); return; }
+
+    renderHeader();
+    renderContent();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderHeader() {
+  document.getElementById('hdr-title').textContent = 'Risk & Assumption Register';
+  document.getElementById('hdr-sub').textContent   = proposal.title;
+  document.title = 'Risks — ' + proposal.title;
+
+  const pid = proposal.prospect_id || PROSPECT_ID;
+  if (pid) {
+    document.getElementById('back-proposal').href =
+      '/proposal-detail.html?id=' + PROPOSAL_ID + (pid ? '&prospect_id=' + pid : '');
+  }
+
+  // Badges
+  const risks  = riskItems.filter(r => r.item_type === 'risk');
+  const assps  = riskItems.filter(r => r.item_type === 'assumption');
+  document.getElementById('tbadge-all').textContent         = riskItems.length;
+  document.getElementById('tbadge-risks').textContent       = risks.length;
+  document.getElementById('tbadge-assumptions').textContent = assps.length;
+}
+
+// ── tab switching ───────────────────────────────────────────────────────────
+function switchTab(name) {
+  _activeTab = name;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === name));
+  renderContent();
+}
+
+// ── main render ─────────────────────────────────────────────────────────────
+function renderContent() {
+  const el = document.getElementById('main-content');
+  if (_activeTab === 'matrix') {
+    el.innerHTML = renderMatrix();
+    return;
+  }
+  const items = _activeTab === 'risks'
+    ? riskItems.filter(r => r.item_type === 'risk')
+    : _activeTab === 'assumptions'
+    ? riskItems.filter(r => r.item_type === 'assumption')
+    : riskItems;
+
+  el.innerHTML = renderSummaryStrip() + (
+    items.length === 0
+      ? `<div class="empty-state">
+           <div class="ei">${_activeTab === 'assumptions' ? '💡' : '⚑'}</div>
+           <div class="et">No ${_activeTab === 'assumptions' ? 'assumptions' : 'risks'} recorded</div>
+           <div class="es">Add items using the buttons above.</div>
+         </div>`
+      : items.map(r => renderRiskCard(r)).join('')
+  );
+}
+
+// ── summary strip ────────────────────────────────────────────────────────────
+function renderSummaryStrip() {
+  const risks  = riskItems.filter(r => r.item_type === 'risk');
+  const assps  = riskItems.filter(r => r.item_type === 'assumption');
+  const open   = riskItems.filter(r => r.status === 'open' || !r.status);
+  const totalEMV = risks.reduce((s, r) => s + (r.emv_cost || 0), 0)
+                 + assps.reduce((s, a) => s + (a.assumption_emv_cost || 0), 0);
+  const totalSched = risks.reduce((s, r) => s + (r.emv_schedule_days || 0), 0)
+                   + assps.reduce((s, a) => s + (a.assumption_emv_sched || 0), 0);
+  const critical = risks.filter(r => (r.risk_score||0) >= 0.36).length;
+
+  return `
+    <div class="summary-strip">
+      <div class="sum-card">
+        <div class="sum-label">Total risks</div>
+        <div class="sum-value">${risks.length}</div>
+        <div class="sum-sub">${critical > 0 ? `<span class="red">${critical} critical</span>` : 'None critical'}</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Assumptions</div>
+        <div class="sum-value">${assps.length}</div>
+        <div class="sum-sub">${assps.filter(a=>a.validated_status==='open').length} unvalidated</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Open items</div>
+        <div class="sum-value ${open.length > 0 ? 'amber' : 'green'}">${open.length}</div>
+        <div class="sum-sub">${riskItems.length - open.length} resolved</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Total EMV cost</div>
+        <div class="sum-value red">¥${totalEMV.toLocaleString()}</div>
+        <div class="sum-sub">Expected monetary value</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">EMV schedule</div>
+        <div class="sum-value amber">${totalSched.toFixed(1)} days</div>
+        <div class="sum-sub">Expected schedule impact</div>
+      </div>
+    </div>`;
+}
+
+// ── risk card ────────────────────────────────────────────────────────────────
+function renderRiskCard(r) {
+  const isRisk   = r.item_type === 'risk';
+  const score    = isRisk ? (r.risk_score || 0) : (r.prob_wrong || 0) * (1 - (r.confidence || 0.5));
+  const cls      = scoreClass(score);
+  const lbl      = scoreLabel(score);
+  const owner    = resources.find(x => x.id === r.risk_owner);
+  const ownerName= owner ? owner.first_name + ' ' + owner.last_name : '—';
+  const st       = r.status || r.validated_status || 'open';
+  const stCls    = {open:'sp-open', mitigated:'sp-mitigated', closed:'sp-closed', accepted:'sp-accepted'}[st] || 'sp-open';
+  const emvCost  = isRisk ? (r.emv_cost || 0) : (r.assumption_emv_cost || 0);
+  const emvSched = isRisk ? (r.emv_schedule_days || 0) : (r.assumption_emv_sched || 0);
+
+  return `
+    <div class="risk-card" id="rcard-${r.id}">
+      <div class="risk-card-head" onclick="toggleCard('${r.id}')">
+        <div class="risk-score-badge ${cls}">
+          ${(score * 100).toFixed(0)}%
+        </div>
+        <div class="risk-head-info">
+          <div class="risk-title">${escHtml(r.title)}</div>
+          <div class="risk-meta">
+            <span class="risk-chip ${isRisk ? 'rc-risk' : 'rc-assump'}">
+              ${isRisk ? '⚑ Risk' : '💡 Assumption'}
+            </span>
+            <span class="status-pill ${stCls}">${capitalize(st)}</span>
+            <span>${escHtml(r.discipline || '—')}</span>
+            <span>Owner: ${escHtml(ownerName)}</span>
+            ${emvCost > 0 ? `<span class="red">EMV ¥${emvCost.toLocaleString()}</span>` : ''}
+            ${emvSched > 0 ? `<span class="amber">${emvSched} days</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-sm" onclick="event.stopPropagation();openEditRisk('${r.id}')">✎</button>
+          <span class="risk-chevron">▾</span>
+        </div>
+      </div>
+      <div class="risk-card-body">
+        <div class="rb-grid">
+          <div class="rb-section" style="grid-column:1/-1">
+            <div class="rb-label">Description</div>
+            <div class="rb-value">${escHtml(r.description || '')}</div>
+          </div>
+          ${isRisk ? `
+          <div class="rb-section">
+            <div class="rb-label">Probability</div>
+            <div class="rb-value">${((r.probability||0)*100).toFixed(0)}% — ${PI_LABELS[Math.round((r.probability||0)*5)-1]||''}</div>
+          </div>
+          <div class="rb-section">
+            <div class="rb-label">Impact</div>
+            <div class="rb-value">${((r.impact||0)*100).toFixed(0)}% — ${PI_LABELS[Math.round((r.impact||0)*5)-1]||''}</div>
+          </div>
+          <div class="rb-section">
+            <div class="rb-label">Mitigation</div>
+            <div class="rb-value ${r.mitigation?'':'empty'}">${escHtml(r.mitigation || 'Not defined')}</div>
+          </div>
+          <div class="rb-section">
+            <div class="rb-label">Contingency plan</div>
+            <div class="rb-value ${r.contingency_plan?'':'empty'}">${escHtml(r.contingency_plan || 'Not defined')}</div>
+          </div>` : `
+          <div class="rb-section">
+            <div class="rb-label">Confidence level</div>
+            <div class="rb-value">${((r.confidence||0)*100).toFixed(0)}% confident</div>
+          </div>
+          <div class="rb-section">
+            <div class="rb-label">Probability wrong</div>
+            <div class="rb-value">${((r.prob_wrong||0)*100).toFixed(0)}%</div>
+          </div>
+          <div class="rb-section">
+            <div class="rb-label">Validation action</div>
+            <div class="rb-value ${r.validation_action?'':'empty'}">${escHtml(r.validation_action || 'Not defined')}</div>
+          </div>
+          <div class="rb-section">
+            <div class="rb-label">Confirm by</div>
+            <div class="rb-value ${r.must_confirm_by?'':'empty'}">${r.must_confirm_by ? fmtDate(r.must_confirm_by) : '—'}</div>
+          </div>`}
+        </div>
+        <div class="emv-row">
+          <div class="emv-item">
+            <div class="emv-label">EMV cost impact</div>
+            <div class="emv-val red">¥${emvCost.toLocaleString()}</div>
+          </div>
+          <div class="emv-item">
+            <div class="emv-label">EMV schedule impact</div>
+            <div class="emv-val amber">${emvSched.toFixed(1)} days</div>
+          </div>
+          ${isRisk ? `
+          <div class="emv-item">
+            <div class="emv-label">Cost if triggered</div>
+            <div class="emv-val">${r.cost_impact ? '¥' + Number(r.cost_impact).toLocaleString() : '—'}</div>
+          </div>
+          <div class="emv-item">
+            <div class="emv-label">Schedule if triggered</div>
+            <div class="emv-val">${r.schedule_impact_days ? r.schedule_impact_days + ' days' : '—'}</div>
+          </div>` : `
+          <div class="emv-item">
+            <div class="emv-label">Cost if wrong</div>
+            <div class="emv-val">${r.cost_delta_if_wrong ? '¥' + Number(r.cost_delta_if_wrong).toLocaleString() : '—'}</div>
+          </div>
+          <div class="emv-item">
+            <div class="emv-label">Schedule if wrong</div>
+            <div class="emv-val">${r.sched_delta_if_wrong ? r.sched_delta_if_wrong + ' days' : '—'}</div>
+          </div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleCard(id) {
+  document.getElementById('rcard-' + id)?.classList.toggle('open');
+}
+
+// ── P×I Matrix ──────────────────────────────────────────────────────────────
+function renderMatrix() {
+  const risks = riskItems.filter(r => r.item_type === 'risk');
+
+  // Build a map of P×I cell → risks
+  const cellMap = {};
+  risks.forEach(r => {
+    const pi = Math.round((r.probability||0) * 5) - 1;
+    const ii = Math.round((r.impact||0) * 5) - 1;
+    const key = pi + ':' + ii;
+    if (!cellMap[key]) cellMap[key] = [];
+    cellMap[key].push(r);
+  });
+
+  let cells = '<div class="pxi-cell header"></div>';
+  // Column headers (Impact)
+  PI_LABELS.forEach(l => {
+    cells += `<div class="pxi-cell header" style="font-size:8px;text-align:center">${l}</div>`;
+  });
+
+  // Rows (Probability, high to low)
+  for (let pi = 4; pi >= 0; pi--) {
+    cells += `<div class="pxi-cell header" style="font-size:8px;text-align:right;padding-right:4px">${PI_LABELS[pi]}</div>`;
+    for (let ii = 0; ii < 5; ii++) {
+      const key   = pi + ':' + ii;
+      const score = PI_LEVELS[pi] * PI_LEVELS[ii];
+      const color = cellColor(PI_LEVELS[pi], PI_LEVELS[ii]);
+      const items = cellMap[key] || [];
+      const tip   = items.map(r => r.title).join('\n');
+      cells += `<div class="pxi-cell ${items.length ? 'has-risk' : ''}"
+        style="background:${color};flex-direction:column;gap:2px"
+        ${tip ? `title="${escHtml(tip)}"` : ''}>
+        ${items.length ? `<span style="font-size:14px;font-weight:800">${items.length}</span>` : ''}
+        ${items.length ? `<span style="font-size:8px;opacity:.8">${items.length===1?items[0].title.slice(0,8)+'…':items.length+' risks'}</span>` : ''}
+      </div>`;
+    }
+  }
+
+  return `
+    ${renderSummaryStrip()}
+    <div class="matrix-wrap">
+      <div class="matrix-title">PMI P×I RISK MATRIX — rows = Probability, columns = Impact</div>
+      <div class="pxi-matrix">${cells}</div>
+      <div class="pxi-legend">
+        <div class="pxi-legend-item"><div class="pxi-dot" style="background:rgba(192,64,74,.6)"></div> Critical (≥36%)</div>
+        <div class="pxi-legend-item"><div class="pxi-dot" style="background:rgba(212,144,31,.5)"></div> High (≥16%)</div>
+        <div class="pxi-legend-item"><div class="pxi-dot" style="background:rgba(212,144,31,.25)"></div> Medium (≥6%)</div>
+        <div class="pxi-legend-item"><div class="pxi-dot" style="background:rgba(42,157,64,.25)"></div> Low (<6%)</div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">
+      Click a cell to view risks at that position
+    </div>`;
+}
+
+// ── Add / Edit drawer ────────────────────────────────────────────────────────
+function openAddRisk(type) {
+  _editId   = null;
+  _editType = type;
+  document.getElementById('drawer-title').textContent =
+    type === 'risk' ? 'ADD RISK' : 'ADD ASSUMPTION';
+  document.getElementById('delete-btn').style.display = 'none';
+  renderDrawerBody(type, null);
+  document.getElementById('risk-overlay').classList.add('open');
+}
+
+function openEditRisk(id) {
+  const r = riskItems.find(x => x.id === id);
+  if (!r) return;
+  _editId   = id;
+  _editType = r.item_type;
+  document.getElementById('drawer-title').textContent =
+    r.item_type === 'risk' ? 'EDIT RISK' : 'EDIT ASSUMPTION';
+  document.getElementById('delete-btn').style.display = '';
+  renderDrawerBody(r.item_type, r);
+  document.getElementById('risk-overlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('risk-overlay').classList.remove('open');
+}
+
+function renderDrawerBody(type, r) {
+  const ownerOptions = resources.map(res =>
+    `<option value="${res.id}" ${r?.risk_owner===res.id?'selected':''}>${res.first_name} ${res.last_name}</option>`
+  ).join('');
+
+  const isRisk = type === 'risk';
+  const statusOptions = isRisk
+    ? ['open','mitigated','closed','accepted']
+    : ['open','closed'];
+
+  document.getElementById('drawer-body').innerHTML = `
+    <div class="field">
+      <label>Title *</label>
+      <input type="text" id="d-title" value="${escHtml(r?.title||'')}"
+        placeholder="${isRisk ? 'Brief risk title' : 'Assumption statement'}" />
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="d-desc" rows="3"
+        placeholder="${isRisk ? 'Describe the risk in detail…' : 'What are you assuming to be true?'}">${escHtml(r?.description||'')}</textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Discipline</label>
+        <select id="d-discipline">
+          ${['Mechanical','Electrical','Software','System & Test','Documentation','Other']
+            .map(d => `<option ${r?.discipline===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="d-status">
+          ${statusOptions.map(s =>
+            `<option value="${s}" ${(r?.status||r?.validated_status||'open')===s?'selected':''}>${capitalize(s)}</option>`
+          ).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Risk owner</label>
+      <select id="d-owner">
+        <option value="">— Assign owner —</option>
+        ${ownerOptions}
+      </select>
+    </div>
+
+    ${isRisk ? `
+    <div class="sec-label" style="margin-top:4px">PROBABILITY × IMPACT</div>
+    <div class="field">
+      <label>Probability — <span id="prob-pct">${Math.round((r?.probability||0.3)*100)}%</span></label>
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">0%</span>
+        <input type="range" id="d-prob" min="0" max="100" step="10"
+          value="${Math.round((r?.probability||0.3)*100)}"
+          oninput="updateSlider('prob-pct',this.value+'%');calcScore()" />
+        <span style="font-size:10px;color:var(--muted)">100%</span>
+        <span class="slider-val" id="prob-val">${Math.round((r?.probability||0.3)*100)}%</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Impact — <span id="impact-pct">${Math.round((r?.impact||0.3)*100)}%</span></label>
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">0%</span>
+        <input type="range" id="d-impact" min="0" max="100" step="10"
+          value="${Math.round((r?.impact||0.3)*100)}"
+          oninput="updateSlider('impact-pct',this.value+'%');calcScore()" />
+        <span style="font-size:10px;color:var(--muted)">100%</span>
+        <span class="slider-val" id="impact-val">${Math.round((r?.impact||0.3)*100)}%</span>
+      </div>
+    </div>
+    <div id="score-display" style="display:flex;gap:12px;align-items:center;
+      background:var(--surf2);border-radius:6px;padding:10px 12px;margin-bottom:16px">
+      <div>
+        <div style="font-size:10px;color:var(--muted)">Risk score</div>
+        <div id="score-val" style="font-size:20px;font-weight:800"></div>
+      </div>
+      <div id="score-class" style="font-size:12px;font-weight:600"></div>
+    </div>
+    <div class="sec-label">FINANCIAL IMPACT</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Cost if triggered (¥)</label>
+        <input type="number" id="d-cost" value="${r?.cost_impact||''}" placeholder="0" />
+      </div>
+      <div class="field">
+        <label>Schedule if triggered (days)</label>
+        <input type="number" id="d-sched" value="${r?.schedule_impact_days||''}" placeholder="0" />
+      </div>
+    </div>
+    <div class="sec-label">RESPONSE</div>
+    <div class="field">
+      <label>Mitigation strategy</label>
+      <textarea id="d-mitigate" rows="2">${escHtml(r?.mitigation||'')}</textarea>
+    </div>
+    <div class="field">
+      <label>Contingency plan</label>
+      <textarea id="d-contingency" rows="2">${escHtml(r?.contingency_plan||'')}</textarea>
+    </div>
+    ` : `
+    <div class="sec-label" style="margin-top:4px">CONFIDENCE ASSESSMENT</div>
+    <div class="field">
+      <label>Confidence level — <span id="conf-pct">${Math.round((r?.confidence||0.5)*100)}%</span></label>
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">0%</span>
+        <input type="range" id="d-confidence" min="0" max="100" step="10"
+          value="${Math.round((r?.confidence||0.5)*100)}"
+          oninput="updateSlider('conf-pct',this.value+'%')" />
+        <span style="font-size:10px;color:var(--muted)">100%</span>
+        <span class="slider-val">${Math.round((r?.confidence||0.5)*100)}%</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Probability wrong — <span id="pw-pct">${Math.round((r?.prob_wrong||0.5)*100)}%</span></label>
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">0%</span>
+        <input type="range" id="d-probwrong" min="0" max="100" step="10"
+          value="${Math.round((r?.prob_wrong||0.5)*100)}"
+          oninput="updateSlider('pw-pct',this.value+'%')" />
+        <span style="font-size:10px;color:var(--muted)">100%</span>
+        <span class="slider-val">${Math.round((r?.prob_wrong||0.5)*100)}%</span>
+      </div>
+    </div>
+    <div class="sec-label">FINANCIAL IMPACT IF WRONG</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Cost delta (¥)</label>
+        <input type="number" id="d-costdelta" value="${r?.cost_delta_if_wrong||''}" placeholder="0" />
+      </div>
+      <div class="field">
+        <label>Schedule delta (days)</label>
+        <input type="number" id="d-scheddelta" value="${r?.sched_delta_if_wrong||''}" placeholder="0" />
+      </div>
+    </div>
+    <div class="sec-label">VALIDATION</div>
+    <div class="field">
+      <label>Validation action</label>
+      <textarea id="d-validate" rows="2">${escHtml(r?.validation_action||'')}</textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Must confirm by</label>
+        <input type="date" id="d-confirmby" value="${r?.must_confirm_by||''}" />
+      </div>
+      <div class="field">
+        <label>Confirm with</label>
+        <input type="text" id="d-confirmwith" value="${r?.confirm_with||''}"
+          placeholder="Contact ID or name" />
+      </div>
+    </div>
+    `}`;
+
+  // Update score display for risks
+  if (isRisk) calcScore();
+}
+
+function updateSlider(labelId, val) {
+  const el = document.getElementById(labelId);
+  if (el) el.textContent = val;
+}
+
+function calcScore() {
+  const prob   = (parseInt(document.getElementById('d-prob')?.value || 0)) / 100;
+  const impact = (parseInt(document.getElementById('d-impact')?.value || 0)) / 100;
+  const score  = prob * impact;
+  const cls    = scoreClass(score);
+  const lbl    = scoreLabel(score);
+  const colors = { 'rs-critical':'#f07a7a','rs-high':'var(--amber)',
+                   'rs-medium':'#e0c070','rs-low':'#7af0a0' };
+  const sv = document.getElementById('score-val');
+  const sc = document.getElementById('score-class');
+  if (sv) { sv.textContent = (score * 100).toFixed(0) + '%'; sv.style.color = colors[cls]; }
+  if (sc) { sc.textContent = lbl; sc.style.color = colors[cls]; }
+}
+
+// ── Save ─────────────────────────────────────────────────────────────────────
+async function saveRisk() {
+  const title = document.getElementById('d-title')?.value.trim();
+  if (!title) { alert('Title is required.'); return; }
+
+  const isRisk = _editType === 'risk';
+  const prob   = isRisk ? parseInt(document.getElementById('d-prob')?.value||0)/100 : null;
+  const impact = isRisk ? parseInt(document.getElementById('d-impact')?.value||0)/100 : null;
+  const confidence = !isRisk ? parseInt(document.getElementById('d-confidence')?.value||50)/100 : null;
+  const probWrong  = !isRisk ? parseInt(document.getElementById('d-probwrong')?.value||50)/100 : null;
+  const cost       = isRisk
+    ? parseFloat(document.getElementById('d-cost')?.value||0)
+    : parseFloat(document.getElementById('d-costdelta')?.value||0);
+  const sched      = isRisk
+    ? parseFloat(document.getElementById('d-sched')?.value||0)
+    : parseFloat(document.getElementById('d-scheddelta')?.value||0);
+
+  const payload = {
+    proposal_id:   PROPOSAL_ID,
+    firm_id:       null, // filled by RLS / trigger
+    item_type:     _editType,
+    title,
+    description:   document.getElementById('d-desc')?.value.trim() || null,
+    discipline:    document.getElementById('d-discipline')?.value || null,
+    risk_owner:    document.getElementById('d-owner')?.value || null,
+    ...(isRisk ? {
+      probability:          prob,
+      impact,
+      risk_score:           prob * impact,
+      cost_impact:          cost || null,
+      schedule_impact_days: sched || null,
+      emv_cost:             prob * impact * cost || null,
+      emv_schedule_days:    prob * sched || null,
+      mitigation:           document.getElementById('d-mitigate')?.value.trim() || null,
+      contingency_plan:     document.getElementById('d-contingency')?.value.trim() || null,
+      status:               document.getElementById('d-status')?.value || 'open',
+    } : {
+      confidence,
+      prob_wrong:            probWrong,
+      cost_delta_if_wrong:   cost || null,
+      sched_delta_if_wrong:  sched || null,
+      assumption_emv_cost:   probWrong * cost || null,
+      assumption_emv_sched:  probWrong * sched || null,
+      validation_action:     document.getElementById('d-validate')?.value.trim() || null,
+      must_confirm_by:       document.getElementById('d-confirmby')?.value || null,
+      validated_status:      document.getElementById('d-status')?.value || 'open',
+    }),
+  };
+
+  // firm_id — fetch from proposal
+  try {
+    if (!payload.firm_id) {
+      const p = await API.get(`proposals?id=eq.${PROPOSAL_ID}&select=firm_id`);
+      payload.firm_id = p?.[0]?.firm_id;
+    }
+  } catch(e) {}
+
+  try {
+    if (_editId) {
+      await API.patch(`risk_items?id=eq.${_editId}`, payload);
+    } else {
+      await API.post('risk_items', payload);
+    }
+    closeDrawer();
+    await loadAll();
+    renderContent();
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save: ' + e.message);
+  }
+}
+
+async function deleteRisk() {
+  if (!confirm('Delete this item? This cannot be undone.')) return;
+  try {
+    await API.del(`risk_items?id=eq.${_editId}`);
+    closeDrawer();
+    await loadAll();
+    renderContent();
+  } catch(e) {
+    alert('Failed to delete.');
+  }
+}
+
+// ── Export PDF (print-based) ──────────────────────────────────────────────────
+function exportPDF() {
+  window.print();
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d.includes('T') ? d : d+'T00:00:00')
+    .toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+</script>
+</body>
+</html>
