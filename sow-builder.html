@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SOW Builder — ProjectHUD</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w:  56px;
+  --bg:         #0f1117;
+  --surface:    #181c27;
+  --surf2:      #1e2436;
+  --surf3:      #232a3e;
+  --border:     rgba(255,255,255,.08);
+  --border2:    rgba(255,255,255,.14);
+  --text:       #e8eaf0;
+  --muted:      #7a8099;
+  --accent:     #4f8ef7;
+  --amber:      #d4901f;
+  --green:      #2a9d40;
+  --red:        #c0404a;
+
+  /* document colours */
+  --doc-bg:     #ffffff;
+  --doc-text:   #1a1a2e;
+  --doc-muted:  #5a5a7a;
+  --doc-border: #e0e0f0;
+  --doc-accent: #1a3a6e;
+  --doc-amber:  #b8860b;
+  --doc-red:    #8b0000;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  display: flex; height: 100vh; overflow: hidden;
+}
+
+#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
+
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+}
+
+/* ── top bar ───────────────────────────────────────────── */
+.topbar {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 12px;
+  padding: 0 20px; height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.topbar-left  { display: flex; align-items: center; gap: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.back-link { color: var(--muted); text-decoration: none; font-size: 12px; }
+.back-link:hover { color: var(--text); }
+.doc-title  { font-size: 13px; font-weight: 600; }
+.doc-sub    { font-size: 11px; color: var(--muted); }
+
+/* ── mode toggle ───────────────────────────────────────── */
+.mode-toggle {
+  display: flex; background: var(--surf2);
+  border: 1px solid var(--border2); border-radius: 8px;
+  padding: 3px; gap: 2px;
+}
+.mode-btn {
+  padding: 5px 14px; border-radius: 6px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  border: none; transition: all .2s; white-space: nowrap;
+}
+.mode-btn.active-internal {
+  background: var(--amber); color: #fff;
+}
+.mode-btn.active-client {
+  background: var(--accent); color: #fff;
+}
+.mode-btn:not([class*="active"]) {
+  background: transparent; color: var(--muted);
+}
+.mode-btn:not([class*="active"]):hover { color: var(--text); }
+
+.autosave { font-size: 10px; color: var(--muted); }
+.autosave.saving { color: var(--amber); }
+.autosave.saved  { color: #7af0a0; }
+
+/* ── layout ────────────────────────────────────────────── */
+.editor-layout {
+  flex: 1; display: grid;
+  grid-template-columns: 280px 1fr;
+  overflow: hidden;
+}
+
+/* ── left nav ──────────────────────────────────────────── */
+.section-nav {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 16px 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.section-nav::-webkit-scrollbar { width: 3px; }
+.section-nav::-webkit-scrollbar-thumb { background: var(--border2); }
+.nav-group-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--muted);
+  padding: 8px 16px 4px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; cursor: pointer; font-size: 12px;
+  color: var(--muted); border-left: 2px solid transparent;
+  transition: all .15s;
+}
+.nav-item:hover { color: var(--text); background: var(--surf2); }
+.nav-item.active {
+  color: var(--accent); border-left-color: var(--accent);
+  background: rgba(79,142,247,.06);
+}
+.nav-item.internal-only .nav-badge {
+  font-size: 8px; padding: 1px 5px; border-radius: 3px;
+  background: rgba(212,144,31,.2); color: var(--amber);
+}
+.nav-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border2); flex-shrink: 0;
+}
+.nav-item.active .nav-dot { background: var(--accent); }
+
+/* ── right: editor + preview ───────────────────────────── */
+.right-pane {
+  display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+}
+.edit-pane {
+  overflow-y: auto; padding: 24px;
+  border-right: 1px solid var(--border);
+}
+.edit-pane::-webkit-scrollbar { width: 4px; }
+.edit-pane::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.preview-pane {
+  overflow-y: auto; background: #e8e8f0;
+  padding: 24px; position: relative;
+}
+.preview-pane::-webkit-scrollbar { width: 4px; }
+.preview-pane::-webkit-scrollbar-thumb { background: #c0c0d0; border-radius: 2px; }
+
+/* ── edit pane fields ──────────────────────────────────── */
+.edit-section-title {
+  font-size: 15px; font-weight: 700; margin-bottom: 4px;
+}
+.edit-section-desc {
+  font-size: 11px; color: var(--muted); margin-bottom: 20px; line-height: 1.5;
+}
+.internal-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  background: rgba(212,144,31,.15); color: var(--amber);
+  margin-bottom: 12px;
+}
+.field { margin-bottom: 16px; }
+.field label {
+  display: block; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: 6px;
+}
+.field input, .field select, .field textarea {
+  width: 100%; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 12px; font-family: 'DM Sans', inherit;
+  outline: none; transition: border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--accent);
+}
+.field textarea { resize: vertical; min-height: 80px; line-height: 1.7; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* auto-populated indicator */
+.auto-populated {
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px;
+  font-size: 12px; color: var(--muted); line-height: 1.6;
+  max-height: 180px; overflow-y: auto; margin-bottom: 8px;
+}
+.auto-populated::-webkit-scrollbar { width: 3px; }
+.auto-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 4px; font-size: 10px;
+  background: rgba(79,142,247,.1); color: var(--accent);
+  margin: 2px; font-weight: 500;
+}
+.override-note {
+  font-size: 10px; color: var(--muted); margin-bottom: 8px;
+}
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  transition: background .15s; text-decoration: none;
+}
+.btn:hover { background: var(--surf3); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+/* ── document preview ──────────────────────────────────── */
+.doc-paper {
+  background: var(--doc-bg);
+  max-width: 680px; margin: 0 auto;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.18);
+  font-family: 'DM Sans', Georgia, serif;
+  color: var(--doc-text);
+  overflow: hidden;
+}
+
+/* print */
+@media print {
+  #sidebar-container, .topbar, .section-nav, .edit-pane,
+  .preview-pane > *:not(.doc-paper),
+  .print-hide { display: none !important; }
+  body, .main, .editor-layout, .right-pane, .preview-pane {
+    display: block !important; height: auto !important;
+    overflow: visible !important; background: white !important;
+  }
+  .doc-paper {
+    max-width: 100%; box-shadow: none;
+    border-radius: 0;
+  }
+  @page { margin: 25mm 20mm; }
+}
+
+/* doc sections */
+.doc-cover {
+  background: var(--doc-accent);
+  padding: 48px 40px 36px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.doc-cover::before {
+  content: '';
+  position: absolute; top: -40px; right: -40px;
+  width: 220px; height: 220px; border-radius: 50%;
+  background: rgba(255,255,255,.06);
+}
+.doc-cover-type {
+  font-size: 10px; font-weight: 700; letter-spacing: .15em;
+  text-transform: uppercase; opacity: .7; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.doc-cover-badge {
+  padding: 2px 8px; border-radius: 3px; font-size: 9px;
+}
+.badge-internal { background: rgba(212,144,31,.4); color: #ffd080; }
+.badge-client   { background: rgba(79,142,247,.4); color: #b0ccff; }
+.doc-cover-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 26px; line-height: 1.3; margin-bottom: 8px;
+}
+.doc-cover-prospect {
+  font-size: 14px; opacity: .8; margin-bottom: 24px;
+}
+.doc-cover-meta {
+  display: flex; gap: 24px; flex-wrap: wrap;
+}
+.doc-cover-meta-item { }
+.dcm-label { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .6; }
+.dcm-val   { font-size: 12px; font-weight: 600; margin-top: 2px; }
+
+.doc-body { padding: 32px 40px; }
+
+.doc-section { margin-bottom: 32px; page-break-inside: avoid; }
+.doc-section-heading {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 15px; color: var(--doc-accent);
+  border-bottom: 2px solid var(--doc-accent);
+  padding-bottom: 6px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.doc-section-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--doc-accent); color: white;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+}
+.doc-p {
+  font-size: 12px; line-height: 1.8; color: var(--doc-text);
+  margin-bottom: 10px; white-space: pre-line;
+}
+.doc-p.placeholder { color: var(--doc-muted); font-style: italic; }
+
+/* deliverables table */
+.doc-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+  margin-bottom: 12px;
+}
+.doc-table th {
+  background: var(--doc-accent); color: white;
+  padding: 7px 10px; text-align: left; font-weight: 600;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+}
+.doc-table td {
+  padding: 7px 10px; border-bottom: 1px solid var(--doc-border);
+  vertical-align: top;
+}
+.doc-table tr:last-child td { border-bottom: none; }
+.doc-table tr:nth-child(even) td { background: #f8f8fc; }
+.doc-disc-header td {
+  background: #eeeef8; font-weight: 600;
+  color: var(--doc-accent); font-size: 11px;
+  border-bottom: 1px solid var(--doc-border);
+}
+
+/* assumption list */
+.doc-assumption {
+  display: flex; gap: 10px; margin-bottom: 8px;
+  padding: 8px 10px; border-radius: 5px;
+  background: #f8f8fc; border-left: 3px solid #9090c0;
+}
+.doc-assumption.risk-flag {
+  background: #fff8f0; border-left-color: var(--doc-amber);
+}
+.doc-assp-icon { font-size: 14px; flex-shrink: 0; }
+.doc-assp-text { font-size: 11px; line-height: 1.6; }
+.doc-assp-label { font-weight: 600; margin-bottom: 2px; }
+.doc-assp-note  { color: var(--doc-muted); font-size: 10px; }
+
+/* payment schedule */
+.doc-payment-row {
+  display: flex; align-items: center;
+  padding: 8px 10px; border-bottom: 1px solid var(--doc-border);
+  font-size: 11px;
+}
+.doc-payment-row:last-child { border-bottom: none; }
+.doc-payment-pct {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--doc-accent); color: white;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-right: 12px;
+}
+.doc-payment-info { flex: 1; }
+.doc-payment-mil  { font-weight: 600; margin-bottom: 2px; }
+.doc-payment-amt  { font-size: 13px; font-weight: 700; color: var(--doc-accent); }
+
+/* signature block */
+.doc-sig-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+  margin-top: 16px;
+}
+.doc-sig-block { }
+.doc-sig-label { font-size: 10px; color: var(--doc-muted); text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 48px; }
+.doc-sig-line  { border-top: 1px solid var(--doc-text); padding-top: 6px; }
+.doc-sig-name  { font-weight: 600; font-size: 12px; }
+.doc-sig-title { font-size: 10px; color: var(--doc-muted); }
+.doc-sig-date  { font-size: 10px; color: var(--doc-muted); margin-top: 4px; }
+
+/* internal-only callout */
+.doc-internal-callout {
+  background: #fff8e6; border: 1px solid #e8c060;
+  border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;
+}
+.doc-internal-callout-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--doc-amber); margin-bottom: 6px;
+}
+.doc-internal-callout-text {
+  font-size: 11px; line-height: 1.7; color: var(--doc-text); white-space: pre-line;
+}
+
+/* go/no-go badge */
+.gng-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 13px;
+}
+.gng-go     { background: #e8f5e8; color: #1a6b1a; border: 1px solid #a0c8a0; }
+.gng-conditional { background: #fff8e6; color: #7a5800; border: 1px solid #d4b060; }
+.gng-nogo   { background: #fce8e8; color: #8b0000; border: 1px solid #d09090; }
+
+/* change order */
+.doc-co-step {
+  display: flex; gap: 12px; margin-bottom: 12px;
+}
+.doc-co-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--doc-accent); color: white;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.doc-co-text { font-size: 11px; line-height: 1.7; color: var(--doc-text); }
+
+/* acceptance criteria */
+.doc-ac-item {
+  display: flex; gap: 8px; margin-bottom: 6px;
+  font-size: 11px;
+}
+.doc-ac-check {
+  width: 14px; height: 14px; border: 1px solid var(--doc-border);
+  border-radius: 3px; flex-shrink: 0; margin-top: 2px;
+}
+
+/* footer */
+.doc-footer {
+  padding: 16px 40px;
+  border-top: 1px solid var(--doc-border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9px; color: var(--doc-muted);
+  background: #f8f8fc;
+}
+
+/* spinner */
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--border2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" id="back-link" href="#">← Proposal</a>
+      <div>
+        <div class="doc-title" id="topbar-title">SOW Builder</div>
+        <div class="doc-sub" id="topbar-sub">Loading…</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="autosave" id="autosave-indicator"></div>
+      <div class="mode-toggle">
+        <button class="mode-btn active-internal" id="btn-internal"
+          onclick="setMode('internal')">⚙ Internal view</button>
+        <button class="mode-btn" id="btn-client"
+          onclick="setMode('client')">📄 Client SOW</button>
+      </div>
+      <button class="btn btn-sm" onclick="window.print()">🖨 Print / PDF</button>
+      <button class="btn btn-primary btn-sm" onclick="saveAll()">Save</button>
+    </div>
+  </div>
+
+  <div class="editor-layout">
+
+    <!-- Left nav -->
+    <div class="section-nav" id="section-nav"></div>
+
+    <!-- Right: edit + preview -->
+    <div class="right-pane">
+
+      <!-- Edit pane -->
+      <div class="edit-pane" id="edit-pane">
+        <div style="display:flex;align-items:center;justify-content:center;height:200px;
+          color:var(--muted);gap:8px"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <!-- Live preview -->
+      <div class="preview-pane" id="preview-pane">
+        <div class="doc-paper" id="doc-paper">
+          <div style="padding:60px;text-align:center;color:#999">
+            Loading document…
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+const params      = new URLSearchParams(location.search);
+const PROPOSAL_ID = params.get('proposal_id');
+
+let proposal      = null;
+let prospect      = null;
+let disciplines   = [];
+let tasks         = [];
+let materials     = [];
+let riskItems     = [];
+let resources     = [];
+let _mode         = 'internal';   // 'internal' | 'client'
+let _activeSection = 'cover';
+let _autosaveTimer = null;
+
+// ── Editable fields stored in-memory (saved to sow_documents table or localStorage)
+let _doc = {
+  // Cover
+  version:         '1.0',
+  doc_date:        new Date().toLocaleDateString('en-CA'),
+  prepared_by:     '',
+  // Executive Summary
+  exec_summary:    '',
+  internal_assessment: '',
+  go_no_go:        'conditional',  // 'go' | 'conditional' | 'nogo'
+  go_rationale:    '',
+  // Scope
+  scope_intro:     '',
+  scope_exclusions:'',
+  // Timeline
+  start_date:      '',
+  end_date:        '',
+  timeline_notes:  '',
+  // Payment
+  payment_schedule:[
+    { milestone: 'Contract execution',      pct: 30, trigger: 'Upon signing' },
+    { milestone: 'Design review complete',  pct: 30, trigger: 'CDR approval' },
+    { milestone: 'Prototype delivery',      pct: 25, trigger: 'Acceptance test' },
+    { milestone: 'Final delivery & closure',pct: 15, trigger: 'Final acceptance' },
+  ],
+  // Change order
+  change_threshold: '5',
+  change_notice_days: '5',
+  // Acceptance
+  acceptance_criteria: '',
+  acceptance_period: '10',
+  // Signatures
+  client_name:    '',
+  client_title:   '',
+  provider_name:  'Apex Consulting Group',
+  provider_title: 'Principal Project Manager',
+};
+
+// ── Section definitions ───────────────────────────────────────────────────────
+const SECTIONS = [
+  { id:'cover',       label:'Cover page',         group:'Document',   internal: false },
+  { id:'exec',        label:'Executive summary',  group:'Document',   internal: false },
+  { id:'feasibility', label:'Feasibility analysis',group:'Document',  internal: true  },
+  { id:'scope',       label:'Scope of work',      group:'Deliverables',internal:false },
+  { id:'deliverables',label:'Deliverables',        group:'Deliverables',internal:false },
+  { id:'timeline',    label:'Timeline & milestones',group:'Deliverables',internal:false},
+  { id:'assumptions', label:'Assumptions & exclusions',group:'Risk',  internal:false },
+  { id:'payment',     label:'Payment schedule',   group:'Commercial', internal:false },
+  { id:'change',      label:'Change order process',group:'Commercial', internal:false },
+  { id:'acceptance',  label:'Acceptance criteria', group:'Commercial', internal:false },
+  { id:'signatures',  label:'Signatures',          group:'Execution',  internal:false },
+];
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!PROPOSAL_ID) { alert('No proposal ID.'); return; }
+  if (window.Sidebar) Sidebar.init('pipeline');
+  await loadAll();
+});
+
+async function loadAll() {
+  try {
+    const [propRes, discRes, taskRes, matRes, riskRes, resRes] = await Promise.all([
+      API.get(`proposals?id=eq.${PROPOSAL_ID}&select=*`),
+      API.get(`wbs_disciplines?proposal_id=eq.${PROPOSAL_ID}&order=sort_order`),
+      API.get(`wbs_tasks?proposal_id=eq.${PROPOSAL_ID}&order=sort_order&select=*,wbs_disciplines(name,color)`),
+      API.get(`wbs_materials?proposal_id=eq.${PROPOSAL_ID}&order=sort_order`),
+      API.get(`risk_items?proposal_id=eq.${PROPOSAL_ID}&order=created_at`),
+      API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name`),
+    ]);
+
+    proposal    = propRes?.[0];
+    disciplines = discRes  || [];
+    tasks       = taskRes  || [];
+    materials   = matRes   || [];
+    riskItems   = riskRes  || [];
+    resources   = resRes   || [];
+
+    if (!proposal) { alert('Proposal not found.'); return; }
+
+    // Load prospect for client name
+    if (proposal.prospect_id) {
+      const pr = await API.get(
+        `prospects?id=eq.${proposal.prospect_id}&select=title,companies(name)`
+      );
+      prospect = pr?.[0];
+    }
+
+    // Load any saved SOW data
+    try {
+      const saved = await API.get(`sow_documents?proposal_id=eq.${PROPOSAL_ID}&limit=1`);
+      if (saved?.[0]?.content) {
+        Object.assign(_doc, JSON.parse(saved[0].content));
+        _doc._sowId = saved[0].id;
+      }
+    } catch(e) { /* no saved SOW yet */ }
+
+    // Pre-fill from proposal data
+    if (!_doc.prepared_by && resources.length)
+      _doc.prepared_by = resources[0].first_name + ' ' + resources[0].last_name;
+    if (!_doc.client_name && prospect?.companies?.name)
+      _doc.client_name = prospect.companies.name;
+
+    // Update header
+    document.getElementById('topbar-title').textContent  = proposal.title;
+    document.getElementById('topbar-sub').textContent    = prospect?.companies?.name || '';
+    document.getElementById('back-link').href =
+      '/proposal-detail.html?id=' + PROPOSAL_ID;
+
+    renderNav();
+    renderEditPane(_activeSection);
+    renderDocument();
+
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function renderNav() {
+  const nav = document.getElementById('section-nav');
+  const groups = [...new Set(SECTIONS.map(s => s.group))];
+  nav.innerHTML = groups.map(g => {
+    const items = SECTIONS.filter(s => s.group === g);
+    return `
+      <div class="nav-group-label">${g}</div>
+      ${items.map(s => {
+        if (s.internal && _mode === 'client') return '';
+        return `
+          <div class="nav-item ${s.internal ? 'internal-only' : ''} ${_activeSection === s.id ? 'active' : ''}"
+            onclick="switchSection('${s.id}')">
+            <div class="nav-dot"></div>
+            <span>${s.label}</span>
+            ${s.internal ? '<span class="nav-badge">Internal</span>' : ''}
+          </div>`;
+      }).join('')}`;
+  }).join('');
+}
+
+function switchSection(id) {
+  _activeSection = id;
+  renderNav();
+  renderEditPane(id);
+  // Scroll preview to section
+  setTimeout(() => {
+    const el = document.getElementById('doc-sec-' + id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────────────────
+function setMode(mode) {
+  _mode = mode;
+  document.getElementById('btn-internal').className =
+    'mode-btn' + (mode === 'internal' ? ' active-internal' : '');
+  document.getElementById('btn-client').className =
+    'mode-btn' + (mode === 'client' ? ' active-client' : '');
+  if (_activeSection === 'feasibility' && mode === 'client') {
+    _activeSection = 'exec';
+  }
+  renderNav();
+  renderEditPane(_activeSection);
+  renderDocument();
+}
+
+// ── Edit pane ─────────────────────────────────────────────────────────────────
+function renderEditPane(id) {
+  const pane = document.getElementById('edit-pane');
+  const handlers = {
+    cover,       exec,       feasibility,
+    scope,       deliverables, timeline,
+    assumptions, payment,    change,
+    acceptance,  signatures,
+  };
+  pane.innerHTML = handlers[id] ? handlers[id]() : '<p>Section not found</p>';
+  pane.scrollTop = 0;
+}
+
+function inputBind(field, inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.addEventListener('input', () => {
+    _doc[field] = el.value;
+    renderDocument();
+    scheduleAutosave();
+  });
+}
+
+// ── Section editors ───────────────────────────────────────────────────────────
+function cover() {
+  setTimeout(() => {
+    inputBind('version','e-version');
+    inputBind('doc_date','e-date');
+    inputBind('prepared_by','e-prepby');
+    inputBind('client_name','e-clientname');
+    inputBind('provider_name','e-providername');
+  }, 0);
+  return `
+    <div class="edit-section-title">Cover page</div>
+    <div class="edit-section-desc">Sets the document identity and parties involved.</div>
+    <div class="field">
+      <label>Document version</label>
+      <input type="text" id="e-version" value="${escHtml(_doc.version)}" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="e-date" value="${_doc.doc_date}" />
+      </div>
+      <div class="field">
+        <label>Prepared by</label>
+        <input type="text" id="e-prepby" value="${escHtml(_doc.prepared_by)}" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Client / Company name</label>
+      <input type="text" id="e-clientname" value="${escHtml(_doc.client_name)}" />
+    </div>
+    <div class="field">
+      <label>Provider name</label>
+      <input type="text" id="e-providername" value="${escHtml(_doc.provider_name)}" />
+    </div>`;
+}
+
+function exec() {
+  setTimeout(() => {
+    inputBind('exec_summary','e-execsummary');
+  }, 0);
+  return `
+    <div class="edit-section-title">Executive summary</div>
+    <div class="edit-section-desc">High-level overview for decision-makers. Keep to 2–3 paragraphs.</div>
+    <div class="field">
+      <label>Summary</label>
+      <textarea id="e-execsummary" rows="8"
+        placeholder="Describe the engagement context, Apex Consulting's approach, and the expected outcome…">${escHtml(_doc.exec_summary)}</textarea>
+    </div>`;
+}
+
+function feasibility() {
+  setTimeout(() => {
+    inputBind('internal_assessment','e-assessment');
+    inputBind('go_rationale','e-rationale');
+    const gng = document.getElementById('e-gng');
+    if (gng) gng.addEventListener('change', () => {
+      _doc.go_no_go = gng.value;
+      renderDocument(); scheduleAutosave();
+    });
+  }, 0);
+  return `
+    <div class="edit-section-title">Feasibility analysis</div>
+    <div class="internal-badge">⚙ Internal only — not shown in client SOW</div>
+    <div class="edit-section-desc">Internal go/no-go assessment. This section is hidden in client view.</div>
+    <div class="field">
+      <label>Recommendation</label>
+      <select id="e-gng">
+        <option value="go"          ${_doc.go_no_go==='go'?'selected':''}>✅ Go — proceed</option>
+        <option value="conditional" ${_doc.go_no_go==='conditional'?'selected':''}>⚠ Conditional — proceed with caveats</option>
+        <option value="nogo"        ${_doc.go_no_go==='nogo'?'selected':''}>🛑 No-go — do not proceed</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Rationale</label>
+      <textarea id="e-rationale" rows="3"
+        placeholder="Why are we recommending this?">${escHtml(_doc.go_rationale)}</textarea>
+    </div>
+    <div class="field">
+      <label>Internal assessment</label>
+      <textarea id="e-assessment" rows="8"
+        placeholder="Technical feasibility, resource availability, margin analysis, competitive positioning, key risks…">${escHtml(_doc.internal_assessment)}</textarea>
+    </div>`;
+}
+
+function scope() {
+  setTimeout(() => {
+    inputBind('scope_intro','e-scopeintro');
+    inputBind('scope_exclusions','e-exclusions');
+  }, 0);
+  const discList = disciplines.map(d =>
+    `<span class="auto-chip">${escHtml(d.name)}</span>`).join(' ');
+  return `
+    <div class="edit-section-title">Scope of work</div>
+    <div class="edit-section-desc">Auto-populated from WBS disciplines. Add narrative context below.</div>
+    <div class="auto-populated">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">DISCIPLINES FROM WBS</div>
+      ${discList || '<span style="color:var(--muted);font-size:11px">No WBS disciplines found</span>'}
+    </div>
+    <div class="field">
+      <label>Scope narrative</label>
+      <textarea id="e-scopeintro" rows="5"
+        placeholder="Describe what is included in this engagement…">${escHtml(_doc.scope_intro)}</textarea>
+    </div>
+    <div class="field">
+      <label>Exclusions</label>
+      <textarea id="e-exclusions" rows="3"
+        placeholder="List what is explicitly out of scope…">${escHtml(_doc.scope_exclusions)}</textarea>
+    </div>`;
+}
+
+function deliverables() {
+  const taskCount = tasks.length;
+  return `
+    <div class="edit-section-title">Deliverables</div>
+    <div class="edit-section-desc">Auto-populated from ${taskCount} WBS tasks across ${disciplines.length} disciplines. Edit tasks in the proposal WBS.</div>
+    <div class="auto-populated" style="max-height:300px">
+      ${disciplines.map(d => {
+        const dt = tasks.filter(t => t.wbs_disciplines?.name === d.name || t.discipline_id === d.id);
+        return `<div style="font-weight:600;font-size:11px;color:var(--text);margin:6px 0 4px">${escHtml(d.name)}</div>` +
+          dt.map(t => `<div style="font-size:11px;color:var(--muted);padding:2px 0 2px 12px">• ${escHtml(t.name)}</div>`).join('');
+      }).join('')}
+    </div>
+    <div class="override-note">To modify deliverables, edit the WBS tasks in the proposal.</div>`;
+}
+
+function timeline() {
+  setTimeout(() => {
+    inputBind('start_date','e-startdate');
+    inputBind('end_date','e-enddate');
+    inputBind('timeline_notes','e-timelinenotes');
+  }, 0);
+  const totalDays = tasks.reduce((s, t) => s + (t.duration_days || 0), 0);
+  const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+  return `
+    <div class="edit-section-title">Timeline & milestones</div>
+    <div class="edit-section-desc">Set project dates. Phases auto-derived from WBS (${totalDays} total task-days across ${phases.length} phases).</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Estimated start date</label>
+        <input type="date" id="e-startdate" value="${_doc.start_date}" />
+      </div>
+      <div class="field">
+        <label>Estimated end date</label>
+        <input type="date" id="e-enddate" value="${_doc.end_date}" />
+      </div>
+    </div>
+    <div class="auto-populated">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">PHASES FROM WBS</div>
+      ${phases.map(p => `<span class="auto-chip">${escHtml(p)}</span>`).join(' ') || '<span style="color:var(--muted);font-size:11px">No phases defined</span>'}
+    </div>
+    <div class="field">
+      <label>Timeline notes</label>
+      <textarea id="e-timelinenotes" rows="3"
+        placeholder="Key scheduling assumptions, dependencies, or constraints…">${escHtml(_doc.timeline_notes)}</textarea>
+    </div>`;
+}
+
+function assumptions() {
+  const assmps = riskItems.filter(r => r.item_type === 'assumption');
+  const risks  = riskItems.filter(r => r.item_type === 'risk');
+  return `
+    <div class="edit-section-title">Assumptions & exclusions</div>
+    <div class="edit-section-desc">
+      ${assmps.length} assumptions and ${risks.length} risks auto-populated from risk register.
+      ${_mode === 'internal' ? 'Internal view shows full risk detail.' : 'Client view shows sanitized assumptions only.'}
+    </div>
+    <div class="auto-populated" style="max-height:280px">
+      ${assmps.length === 0
+        ? '<span style="color:var(--muted);font-size:11px">No assumptions in risk register</span>'
+        : assmps.map(a => `
+          <div style="padding:4px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:600;color:var(--text)">${escHtml(a.title)}</div>
+            <div style="font-size:10px;color:var(--muted)">${escHtml(a.description||'')}</div>
+          </div>`).join('')}
+    </div>
+    <div class="override-note">Manage assumptions in the Risk Register.</div>`;
+}
+
+function payment() {
+  const total = proposal?.total_cost || 0;
+  const rows  = _doc.payment_schedule;
+  setTimeout(() => {
+    document.getElementById('e-pay-threshold')?.addEventListener('input', e => {
+      _doc.change_threshold = e.target.value; renderDocument(); scheduleAutosave();
+    });
+  }, 0);
+  return `
+    <div class="edit-section-title">Payment schedule</div>
+    <div class="edit-section-desc">
+      Total engagement value: <strong>¥${total.toLocaleString()}</strong>
+    </div>
+    ${rows.map((r, i) => `
+      <div style="display:grid;grid-template-columns:1fr 60px;gap:8px;
+        background:var(--surf2);border-radius:6px;padding:10px;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">
+            ${r.milestone}
+          </div>
+          <div style="font-size:10px;color:var(--muted)">${r.trigger}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:700;color:var(--accent)">${r.pct}%</div>
+          <div style="font-size:10px;color:var(--muted)">¥${Math.round(total * r.pct / 100).toLocaleString()}</div>
+        </div>
+      </div>`).join('')}
+    <div class="override-note">Edit payment milestone amounts in proposal settings.</div>`;
+}
+
+function change() {
+  setTimeout(() => {
+    inputBind('change_threshold','e-threshold');
+    inputBind('change_notice_days','e-noticedays');
+  }, 0);
+  return `
+    <div class="edit-section-title">Change order process</div>
+    <div class="edit-section-desc">Define the formal process for scope changes.</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Change threshold (%)</label>
+        <input type="number" id="e-threshold" value="${_doc.change_threshold}"
+          min="1" max="50" placeholder="5" />
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">
+          Changes above this % of total value require formal CO
+        </div>
+      </div>
+      <div class="field">
+        <label>Notice period (days)</label>
+        <input type="number" id="e-noticedays" value="${_doc.change_notice_days}"
+          min="1" max="30" placeholder="5" />
+      </div>
+    </div>`;
+}
+
+function acceptance() {
+  setTimeout(() => {
+    inputBind('acceptance_criteria','e-ac');
+    inputBind('acceptance_period','e-acperiod');
+  }, 0);
+  return `
+    <div class="edit-section-title">Acceptance criteria</div>
+    <div class="edit-section-desc">Define what constitutes successful delivery.</div>
+    <div class="field">
+      <label>Criteria (one per line)</label>
+      <textarea id="e-ac" rows="8"
+        placeholder="All deliverables reviewed and approved by client technical lead&#10;All open defects resolved or accepted&#10;Final documentation package delivered&#10;Acceptance testing completed with pass rate ≥ 95%">${escHtml(_doc.acceptance_criteria)}</textarea>
+    </div>
+    <div class="field">
+      <label>Acceptance period (days)</label>
+      <input type="number" id="e-acperiod" value="${_doc.acceptance_period}" min="1" max="90" />
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">
+        Days client has to review and accept each deliverable
+      </div>
+    </div>`;
+}
+
+function signatures() {
+  setTimeout(() => {
+    ['client_name','client_title','provider_name','provider_title'].forEach(f => {
+      inputBind(f, 'e-' + f.replace('_','-'));
+    });
+  }, 0);
+  return `
+    <div class="edit-section-title">Signatures</div>
+    <div class="edit-section-desc">Authorized signatories for contract execution.</div>
+    <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;
+      text-transform:uppercase;letter-spacing:.06em">Client</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="e-client_name" value="${escHtml(_doc.client_name)}" />
+      </div>
+      <div class="field">
+        <label>Title</label>
+        <input type="text" id="e-client_title" value="${escHtml(_doc.client_title)}" />
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:600;color:var(--muted);margin:8px 0;
+      text-transform:uppercase;letter-spacing:.06em">Provider</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="e-provider_name" value="${escHtml(_doc.provider_name)}" />
+      </div>
+      <div class="field">
+        <label>Title</label>
+        <input type="text" id="e-provider_title" value="${escHtml(_doc.provider_title)}" />
+      </div>
+    </div>`;
+}
+
+// ── Document renderer ─────────────────────────────────────────────────────────
+function renderDocument() {
+  document.getElementById('doc-paper').innerHTML = buildDocument();
+}
+
+function buildDocument() {
+  const isInternal = _mode === 'internal';
+  const prospectName = prospect?.companies?.name || _doc.client_name || 'Client';
+  const total = proposal?.total_cost || 0;
+  const today = new Date().toLocaleDateString('en-US',
+    {year:'numeric',month:'long',day:'numeric'});
+
+  let html = '';
+
+  // ── COVER ──────────────────────────────────────────────────────────────────
+  html += `
+    <div class="doc-cover" id="doc-sec-cover">
+      <div class="doc-cover-type">
+        ${isInternal ? 'Feasibility Study &amp; Statement of Work' : 'Statement of Work'}
+        <span class="doc-cover-badge ${isInternal?'badge-internal':'badge-client'}">
+          ${isInternal ? 'INTERNAL DRAFT' : 'CLIENT DOCUMENT'}
+        </span>
+      </div>
+      <div class="doc-cover-title">${escHtml(proposal?.title || 'Engagement Title')}</div>
+      <div class="doc-cover-prospect">${escHtml(prospectName)}</div>
+      <div class="doc-cover-meta">
+        <div class="doc-cover-meta-item">
+          <div class="dcm-label">Version</div>
+          <div class="dcm-val">${escHtml(_doc.version)}</div>
+        </div>
+        <div class="doc-cover-meta-item">
+          <div class="dcm-label">Date</div>
+          <div class="dcm-val">${_doc.doc_date ? fmtDate(_doc.doc_date) : today}</div>
+        </div>
+        <div class="doc-cover-meta-item">
+          <div class="dcm-label">Prepared by</div>
+          <div class="dcm-val">${escHtml(_doc.prepared_by || '—')}</div>
+        </div>
+        <div class="doc-cover-meta-item">
+          <div class="dcm-label">Total value</div>
+          <div class="dcm-val">¥${total.toLocaleString()}</div>
+        </div>
+      </div>
+    </div>`;
+
+  html += '<div class="doc-body">';
+  let secNum = 1;
+
+  const section = (id, title, content) => `
+    <div class="doc-section" id="doc-sec-${id}">
+      <div class="doc-section-heading">
+        <div class="doc-section-num">${secNum++}</div>
+        ${title}
+      </div>
+      ${content}
+    </div>`;
+
+  // ── FEASIBILITY (internal only) ────────────────────────────────────────────
+  if (isInternal) {
+    const gngLabels = {go:'✅ Go', conditional:'⚠ Conditional go', nogo:'🛑 No-go'};
+    const gngCls    = {go:'gng-go', conditional:'gng-conditional', nogo:'gng-nogo'};
+    html += section('feasibility','Feasibility analysis', `
+      <div class="doc-internal-callout">
+        <div class="doc-internal-callout-label">⚙ Internal — not included in client SOW</div>
+        <div style="margin-bottom:10px">
+          <span class="gng-badge ${gngCls[_doc.go_no_go]||'gng-conditional'}">
+            ${gngLabels[_doc.go_no_go]||'⚠ Conditional go'}
+          </span>
+          ${_doc.go_rationale ? `<div style="margin-top:8px;font-size:11px;color:var(--doc-text)">${escHtml(_doc.go_rationale)}</div>` : ''}
+        </div>
+        <div class="doc-internal-callout-text">${_doc.internal_assessment || '<em style="color:#999">No internal assessment recorded.</em>'}</div>
+      </div>`);
+  }
+
+  // ── EXECUTIVE SUMMARY ──────────────────────────────────────────────────────
+  html += section('exec', 'Executive summary', `
+    <div class="doc-p ${_doc.exec_summary?'':'placeholder'}">
+      ${_doc.exec_summary ? escHtml(_doc.exec_summary) : 'Executive summary not yet written. Click "Executive summary" in the left panel to add.'}
+    </div>`);
+
+  // ── SCOPE ──────────────────────────────────────────────────────────────────
+  const discList = disciplines.map(d =>
+    `<li style="font-size:12px;margin-bottom:4px;color:var(--doc-text)">${escHtml(d.name)}</li>`
+  ).join('');
+  html += section('scope', 'Scope of work', `
+    ${_doc.scope_intro ? `<div class="doc-p">${escHtml(_doc.scope_intro)}</div>` : ''}
+    <div style="font-size:11px;font-weight:700;color:var(--doc-accent);margin-bottom:6px">
+      This engagement covers the following disciplines:
+    </div>
+    <ul style="padding-left:20px;margin-bottom:12px">${discList || '<li style="color:var(--doc-muted);font-size:12px">No disciplines defined in WBS</li>'}</ul>
+    ${_doc.scope_exclusions ? `
+      <div style="font-size:11px;font-weight:700;color:var(--doc-accent);margin-bottom:6px">
+        Exclusions (explicitly out of scope):
+      </div>
+      <div class="doc-p">${escHtml(_doc.scope_exclusions)}</div>` : ''}`);
+
+  // ── DELIVERABLES ────────────────────────────────────────────────────────────
+  let delivRows = '';
+  disciplines.forEach(d => {
+    const dt = tasks.filter(t => t.discipline_id === d.id);
+    if (!dt.length) return;
+    delivRows += `<tr class="doc-disc-header"><td colspan="3">${escHtml(d.name)}</td></tr>`;
+    dt.forEach(t => {
+      delivRows += `
+        <tr>
+          <td>${escHtml(t.name)}</td>
+          <td style="color:var(--doc-muted)">${escHtml(t.phase||'—')}</td>
+          <td style="text-align:right;white-space:nowrap;color:var(--doc-muted)">${t.duration_days || '—'} days</td>
+        </tr>`;
+    });
+  });
+  html += section('deliverables', 'Deliverables', `
+    <table class="doc-table">
+      <thead>
+        <tr><th>Deliverable</th><th>Phase</th><th style="text-align:right">Duration</th></tr>
+      </thead>
+      <tbody>${delivRows || '<tr><td colspan="3" style="color:var(--doc-muted);font-style:italic">No tasks defined in WBS</td></tr>'}</tbody>
+    </table>
+    ${materials.length > 0 ? `
+      <div style="font-size:11px;font-weight:700;color:var(--doc-accent);margin:10px 0 6px">
+        Materials &amp; equipment:
+      </div>
+      <table class="doc-table">
+        <tbody>
+          ${materials.map(m => `
+            <tr><td>${escHtml(m.name)}</td>
+            <td style="text-align:right">¥${Number(m.cost||0).toLocaleString()}</td></tr>`).join('')}
+        </tbody>
+      </table>` : ''}`);
+
+  // ── TIMELINE ───────────────────────────────────────────────────────────────
+  const phases = [...new Set(tasks.map(t => t.phase).filter(Boolean))];
+  const totalDays = tasks.reduce((s, t) => s + (parseFloat(t.duration_days)||0), 0);
+  html += section('timeline', 'Timeline &amp; milestones', `
+    ${(_doc.start_date || _doc.end_date) ? `
+      <div style="display:flex;gap:24px;margin-bottom:14px;background:#f8f8fc;
+        border-radius:6px;padding:10px 14px">
+        <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;
+          color:var(--doc-muted)">Start date</div>
+          <div style="font-weight:600;font-size:13px">${_doc.start_date ? fmtDate(_doc.start_date) : 'TBD'}</div></div>
+        <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;
+          color:var(--doc-muted)">Completion</div>
+          <div style="font-weight:600;font-size:13px">${_doc.end_date ? fmtDate(_doc.end_date) : 'TBD'}</div></div>
+        <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;
+          color:var(--doc-muted)">Total effort</div>
+          <div style="font-weight:600;font-size:13px">${totalDays} task-days</div></div>
+      </div>` : ''}
+    ${phases.length > 0 ? `
+      <table class="doc-table">
+        <thead><tr><th>Phase</th><th style="text-align:right">Tasks</th><th style="text-align:right">Days</th></tr></thead>
+        <tbody>${phases.map(p => {
+          const pt = tasks.filter(t => t.phase === p);
+          const pd = pt.reduce((s, t) => s + (parseFloat(t.duration_days)||0), 0);
+          return `<tr><td>${escHtml(p)}</td>
+            <td style="text-align:right">${pt.length}</td>
+            <td style="text-align:right">${pd}</td></tr>`;
+        }).join('')}</tbody>
+      </table>` : ''}
+    ${_doc.timeline_notes ? `<div class="doc-p" style="margin-top:10px">${escHtml(_doc.timeline_notes)}</div>` : ''}`);
+
+  // ── ASSUMPTIONS & EXCLUSIONS ───────────────────────────────────────────────
+  const assumptions = riskItems.filter(r => r.item_type === 'assumption');
+  const highRisks   = riskItems.filter(r => r.item_type === 'risk' && (r.risk_score||0) >= 0.16);
+  html += section('assumptions', 'Assumptions &amp; exclusions', `
+    ${assumptions.length > 0 ? `
+      <div style="font-size:11px;font-weight:700;color:var(--doc-accent);margin-bottom:8px">
+        This proposal is based on the following assumptions:
+      </div>
+      ${assumptions.map(a => `
+        <div class="doc-assumption">
+          <div class="doc-assp-icon">💡</div>
+          <div class="doc-assp-text">
+            <div class="doc-assp-label">${escHtml(a.title)}</div>
+            <div class="doc-assp-note">${escHtml(a.description||'')}</div>
+            ${isInternal ? `
+              <div style="margin-top:4px;font-size:10px;color:var(--doc-amber)">
+                EMV: ¥${(a.assumption_emv_cost||0).toLocaleString()} · ${(a.assumption_emv_sched||0)} days
+              </div>` : ''}
+          </div>
+        </div>`).join('')}` : ''}
+    ${isInternal && highRisks.length > 0 ? `
+      <div style="font-size:11px;font-weight:700;color:var(--doc-amber);
+        margin:14px 0 8px">⚠ High / critical risks (internal):</div>
+      ${highRisks.map(r => `
+        <div class="doc-assumption risk-flag">
+          <div class="doc-assp-icon">⚑</div>
+          <div class="doc-assp-text">
+            <div class="doc-assp-label">${escHtml(r.title)}</div>
+            <div class="doc-assp-note">${escHtml(r.description||'')}</div>
+            <div style="margin-top:4px;font-size:10px;color:var(--doc-amber)">
+              P×I: ${((r.risk_score||0)*100).toFixed(0)}% · EMV: ¥${(r.emv_cost||0).toLocaleString()}
+            </div>
+          </div>
+        </div>`).join('')}` : ''}`);
+
+  // ── PAYMENT ────────────────────────────────────────────────────────────────
+  html += section('payment', 'Payment schedule', `
+    <div style="background:#f8f8fc;border-radius:8px;overflow:hidden;border:1px solid var(--doc-border)">
+      ${_doc.payment_schedule.map(r => `
+        <div class="doc-payment-row">
+          <div class="doc-payment-pct">${r.pct}%</div>
+          <div class="doc-payment-info">
+            <div class="doc-payment-mil">${escHtml(r.milestone)}</div>
+            <div style="font-size:10px;color:var(--doc-muted)">${escHtml(r.trigger)}</div>
+          </div>
+          <div class="doc-payment-amt">¥${Math.round(total * r.pct / 100).toLocaleString()}</div>
+        </div>`).join('')}
+    </div>
+    <div style="text-align:right;font-size:12px;font-weight:700;
+      color:var(--doc-accent);margin-top:8px;padding-top:8px;
+      border-top:2px solid var(--doc-accent)">
+      Total: ¥${total.toLocaleString()}
+    </div>`);
+
+  // ── CHANGE ORDER ───────────────────────────────────────────────────────────
+  const threshold = parseFloat(_doc.change_threshold)||5;
+  const thresholdAmt = Math.round(total * threshold / 100);
+  html += section('change', 'Change order process', `
+    <div class="doc-p">
+      Any change to the agreed scope, schedule, or deliverables that exceeds
+      <strong>${threshold}%</strong> of the total engagement value
+      (¥${thresholdAmt.toLocaleString()}) requires a formal Change Order.
+    </div>
+    ${[
+      'Client submits a written Change Request describing the requested modification.',
+      `Apex Consulting reviews and provides a Change Order quotation within ${_doc.change_notice_days} business days.`,
+      'Client approves or rejects the Change Order in writing.',
+      'Work on the change commences only upon written approval.',
+      'Approved Change Orders are incorporated into the revised SOW.',
+    ].map((s, i) => `
+      <div class="doc-co-step">
+        <div class="doc-co-num">${i+1}</div>
+        <div class="doc-co-text">${s}</div>
+      </div>`).join('')}`);
+
+  // ── ACCEPTANCE CRITERIA ────────────────────────────────────────────────────
+  const acLines = (_doc.acceptance_criteria || '').split('\n').filter(Boolean);
+  html += section('acceptance', 'Acceptance criteria', `
+    <div class="doc-p">
+      Client shall review each deliverable within <strong>${_doc.acceptance_period} calendar days</strong>
+      of delivery. Acceptance shall be deemed granted if no written objection is received within this period.
+    </div>
+    ${acLines.length > 0 ? `
+      <div style="font-size:11px;font-weight:700;color:var(--doc-accent);margin:10px 0 8px">
+        Acceptance conditions:
+      </div>
+      ${acLines.map(line => `
+        <div class="doc-ac-item">
+          <div class="doc-ac-check"></div>
+          <div style="font-size:11px;color:var(--doc-text)">${escHtml(line)}</div>
+        </div>`).join('')}` : ''}`);
+
+  // ── SIGNATURES ─────────────────────────────────────────────────────────────
+  html += section('signatures', 'Signatures', `
+    <div class="doc-p">
+      By signing below, both parties agree to the terms set forth in this Statement of Work.
+    </div>
+    <div class="doc-sig-grid">
+      <div class="doc-sig-block">
+        <div class="doc-sig-label">Client — ${escHtml(_doc.client_name || 'Client Organization')}</div>
+        <div class="doc-sig-line">
+          <div class="doc-sig-name">${escHtml(_doc.client_name || '________________________')}</div>
+          <div class="doc-sig-title">${escHtml(_doc.client_title || 'Authorized Representative')}</div>
+          <div class="doc-sig-date">Date: ________________________</div>
+        </div>
+      </div>
+      <div class="doc-sig-block">
+        <div class="doc-sig-label">Provider — ${escHtml(_doc.provider_name || 'Apex Consulting Group')}</div>
+        <div class="doc-sig-line">
+          <div class="doc-sig-name">${escHtml(_doc.provider_name || '________________________')}</div>
+          <div class="doc-sig-title">${escHtml(_doc.provider_title || 'Principal Project Manager')}</div>
+          <div class="doc-sig-date">Date: ________________________</div>
+        </div>
+      </div>
+    </div>`);
+
+  html += '</div>';
+
+  // Footer
+  html += `
+    <div class="doc-footer">
+      <span>${escHtml(isInternal ? 'INTERNAL DRAFT — CONFIDENTIAL' : proposal?.title || '')}</span>
+      <span>${escHtml(_doc.provider_name)} · v${escHtml(_doc.version)} · ${_doc.doc_date ? fmtDate(_doc.doc_date) : today}</span>
+    </div>`;
+
+  return html;
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+let _autosaveTimer = null;
+
+function scheduleAutosave() {
+  clearTimeout(_autosaveTimer);
+  setAutosave('saving');
+  _autosaveTimer = setTimeout(saveAll, 2000);
+}
+
+function setAutosave(state) {
+  const el = document.getElementById('autosave-indicator');
+  if (!el) return;
+  el.className = 'autosave ' + state;
+  el.textContent = state === 'saving' ? '● Saving…' : state === 'saved' ? '✓ Saved' : '';
+}
+
+async function saveAll() {
+  clearTimeout(_autosaveTimer);
+  const payload = { proposal_id: PROPOSAL_ID, content: JSON.stringify(_doc) };
+  try {
+    if (_doc._sowId) {
+      await API.patch(`sow_documents?id=eq.${_doc._sowId}`, payload);
+    } else {
+      // Try to get firm_id from proposal
+      const fp = await API.get(`proposals?id=eq.${PROPOSAL_ID}&select=firm_id`);
+      payload.firm_id = fp?.[0]?.firm_id;
+      payload.title   = proposal?.title + ' — SOW';
+      payload.status  = 'draft';
+      const res = await API.post('sow_documents', payload);
+      if (res?.[0]?.id) _doc._sowId = res[0].id;
+    }
+    setAutosave('saved');
+    setTimeout(() => setAutosave(''), 3000);
+  } catch(e) {
+    console.error('Save failed:', e);
+    setAutosave('');
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d.includes('T') ? d : d + 'T00:00:00')
+    .toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+}
+</script>
+</body>
+</html>
