@@ -119,6 +119,8 @@
         <div class="kpi-card" style="border-top-color:var(--red);--kpi-glow:rgba(255,71,87,0.05);"><div class="kpi-icon">⚑</div><div class="kpi-value" id="kpi-alerts" style="color:var(--red)">—</div><div class="kpi-label">At-Risk Tasks</div><div class="kpi-sub" id="kpi-alerts-sub">Loading...</div></div>
         <div class="kpi-card" style="border-top-color:var(--green);--kpi-glow:rgba(0,229,160,0.05);"><div class="kpi-icon">✓</div><div class="kpi-value" id="kpi-complete" style="color:var(--green)">—</div><div class="kpi-label">Tasks Complete</div><div class="kpi-sub" id="kpi-complete-sub">Loading...</div></div>
         <div class="kpi-card" style="border-top-color:var(--amber);--kpi-glow:rgba(255,170,0,0.05);"><div class="kpi-icon">◎</div><div class="kpi-value" id="kpi-risks" style="color:var(--amber)">—</div><div class="kpi-label">Open Risks</div><div class="kpi-sub" id="kpi-risks-sub">Loading...</div></div>
+        <div class="kpi-card" style="border-top-color:#5b8fff;--kpi-glow:rgba(91,143,255,0.05);"><div class="kpi-icon">$</div><div class="kpi-value" id="kpi-budget" style="color:#5b8fff">—</div><div class="kpi-label">Labor Budget</div><div class="kpi-sub" id="kpi-budget-sub">Loading...</div></div>
+        <div class="kpi-card" style="border-top-color:var(--amber);--kpi-glow:rgba(255,170,0,0.05);"><div class="kpi-icon">△</div><div class="kpi-value" id="kpi-variance" style="color:var(--amber)">—</div><div class="kpi-label">Schedule Risk</div><div class="kpi-sub" id="kpi-variance-sub">Loading...</div></div>
       </div>
 
       <div class="dashboard-grid">
@@ -165,6 +167,13 @@
   </div>
 </div>
 
+<!-- Build version -->
+<div id="build-version" style="position:fixed;bottom:8px;left:60px;
+  font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.08em;
+  color:rgba(255,255,255,.2);z-index:10;pointer-events:none;user-select:none">
+  ProjectHUD v<span id="version-num">—</span>
+</div>
+
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -178,14 +187,110 @@ document.getElementById('page-date').textContent =
 
 Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
 Sidebar.init('dashboard.html');
+// Set build version from config
+document.addEventListener('DOMContentLoaded', () => {
+  const vEl = document.getElementById('version-num');
+  if (vEl && typeof PHUD !== 'undefined') vEl.textContent = PHUD.VERSION || '1.0.0';
+});
 
 async function loadDashboard() {
   try {
-    const [projects, tasks, users, firms] = await Promise.all([
-      API.getProjects(), API.getTasks(), API.getUsers(), API.getFirms()
+    const [projects, tasks, users, firms, timeEntries] = await Promise.all([
+      API.getProjects(), API.getTasks(), API.getUsers(), API.getFirms(),
+      API.get('time_entries?select=project_id,hours,is_billable,date&limit=1000').catch(()=>[])
     ]);
 
     const activeProjects  = projects.filter(p => p.status === 'active');
+
+    // ── EVM + TEAC forecast per project ───────────────────────────────────────
+    function calcProjectEVM(proj, projTasks, projEntries) {
+      const today      = new Date().toLocaleDateString('en-CA');
+      const bac        = parseFloat(proj.budget_baseline_hours || 0);
+      const actualHrs  = (projEntries||[]).reduce((s,e) => s + parseFloat(e.hours||0), 0);
+      const totalEffort= projTasks.reduce((s,t) => s + parseFloat(t.effort_days||1), 0);
+      const earnedEffort= projTasks.reduce((s,t) =>
+        s + (parseFloat(t.pct_complete||0) * parseFloat(t.effort_days||1)), 0);
+      const evPct      = totalEffort > 0 ? earnedEffort / totalEffort : 0;
+      const ev         = bac > 0 ? evPct * bac : earnedEffort;
+
+      // Planned value
+      const startDate  = proj.start_date;
+      const targetDate = proj.target_date;
+      const daysTotal  = (startDate && targetDate)
+        ? Math.max(1, Math.round((new Date(targetDate+'T00:00:00') - new Date(startDate+'T00:00:00')) / 86400000)) : 0;
+      const daysElapsed= startDate
+        ? Math.max(0, Math.round((new Date(today) - new Date(startDate+'T00:00:00')) / 86400000)) : 0;
+      const schedPct   = daysTotal > 0 ? Math.min(1, daysElapsed / daysTotal) : 0;
+      const pv         = bac > 0 ? schedPct * bac : schedPct * totalEffort;
+
+      const cpi  = actualHrs > 0 ? ev / actualHrs  : null;
+      const spi  = pv > 0        ? ev / pv          : null;
+      const eac  = (cpi && cpi > 0 && bac > 0) ? bac / cpi : null;
+      const cv   = eac ? eac - bac : null;  // cost variance (positive = overrun)
+
+      // TEAC — Time Estimate at Completion (EVM-based schedule forecast)
+      // Uses Earned Schedule concept: TEAC = Planned Duration / SPI
+      let teac = null, teacDate = null, slipDays = null;
+      if (spi && spi > 0 && daysTotal > 0 && startDate) {
+        const teacDays = Math.round(daysTotal / spi);
+        const teacMs   = new Date(startDate+'T00:00:00').getTime() + teacDays * 86400000;
+        teacDate       = new Date(teacMs).toLocaleDateString('en-CA');
+        teac           = teacDays;
+        if (targetDate) {
+          slipDays = Math.round((new Date(teacDate+'T00:00:00') - new Date(targetDate+'T00:00:00')) / 86400000);
+        }
+      }
+
+      // Three-scenario confidence bands
+      // P25 (optimistic): SPI recovers to 1.0 for remaining work
+      // P50 (most likely): current SPI continues
+      // P80 (pessimistic): SPI degrades by 15%
+      let p25Date = null, p50Date = null, p80Date = null;
+      if (spi && daysTotal > 0 && startDate) {
+        const daysRemaining = daysTotal - daysElapsed;
+        const p25Days = Math.round(daysElapsed + daysRemaining / 1.0);
+        const p50Days = Math.round(daysTotal / spi);
+        const p80Days = Math.round(daysTotal / (spi * 0.85));
+        const ms = (d) => new Date(startDate+'T00:00:00').getTime() + d * 86400000;
+        p25Date = new Date(ms(p25Days)).toLocaleDateString('en-CA');
+        p50Date = new Date(ms(p50Days)).toLocaleDateString('en-CA');
+        p80Date = new Date(ms(p80Days)).toLocaleDateString('en-CA');
+      }
+
+      // TCPI — To Complete Performance Index
+      // What efficiency must the team sustain to hit the BAC target?
+      const workRemaining = bac - ev;
+      const fundsRemaining = bac - actualHrs;
+      const tcpi = (fundsRemaining > 0) ? workRemaining / fundsRemaining : null;
+
+      // Expense actuals
+      const expBudget  = parseFloat(proj.expense_budget_baseline || 0);
+      const billableHrs= (projEntries||[]).filter(e => e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+      // Estimate accrued labor cost: billable hours × assumed $150/hr blended rate
+      // TODO: tie to actual_rate from resources when available
+      const accrLaborCost = billableHrs * 150;
+
+      // Why at risk — plain-English diagnosis
+      const overdueTasks = projTasks.filter(t =>
+        t.due_date && t.due_date < today && t.status !== 'complete').length;
+      const blockedTasks = projTasks.filter(t => t.status === 'blocked').length;
+      let diagnosis = '';
+      if (blockedTasks > 0 && spi && spi < 1)
+        diagnosis = `${blockedTasks} blocked task${blockedTasks!==1?'s':''} + schedule running at ${(spi*100).toFixed(0)}% efficiency`;
+      else if (overdueTasks > 0 && spi && spi < 1)
+        diagnosis = `${overdueTasks} overdue task${overdueTasks!==1?'s':''} driving SPI = ${spi?.toFixed(2)||'—'} — resourcing issue`;
+      else if (cpi && cpi < 0.95)
+        diagnosis = `Cost overrun: CPI = ${cpi.toFixed(2)} — consuming ${((1/cpi-1)*100).toFixed(0)}% more effort than planned`;
+      else if (spi && spi < 0.95)
+        diagnosis = `Schedule slipping: SPI = ${spi.toFixed(2)} — ${Math.round((1-spi)*100)}% behind planned progress`;
+      else
+        diagnosis = 'On track — no significant variance detected';
+
+      return { evPct, ev, pv, bac, actualHrs, cpi, spi, eac, cv, tcpi,
+               teacDate, slipDays, p25Date, p50Date, p80Date,
+               expBudget, accrLaborCost, diagnosis,
+               overdueTasks, blockedTasks };
+    }
     const completeTasks   = tasks.filter(t => t.status === 'complete');
     const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
     const atRiskTasks     = tasks.filter(t =>
@@ -214,39 +319,164 @@ async function loadDashboard() {
     if (activeProjects.length === 0) {
       projList.innerHTML = UI.allClear('NO ACTIVE PROJECTS','Create a project to begin tracking');
     } else {
+      // Compute EVM for all projects upfront for KPI aggregation
+      const projEVMs = {};
+      activeProjects.forEach(proj => {
+        const pt = tasks.filter(t => t.project_id === proj.id);
+        const pe = (timeEntries||[]).filter(e => e.project_id === proj.id);
+        projEVMs[proj.id] = calcProjectEVM(proj, pt, pe);
+      });
+
+      // Budget KPI — total labor budget vs accrued hours
+      const totalBACHrs   = activeProjects.reduce((s,p) => s + parseFloat(p.budget_baseline_hours||0), 0);
+      const totalActualHrs= activeProjects.reduce((s,p) => s + (projEVMs[p.id]?.actualHrs||0), 0);
+      const budgetPct     = totalBACHrs > 0 ? Math.round((totalActualHrs / totalBACHrs) * 100) : 0;
+      document.getElementById('kpi-budget').textContent    = totalBACHrs.toFixed(0) + 'h';
+      document.getElementById('kpi-budget-sub').textContent= `${totalActualHrs.toFixed(0)}h used · ${budgetPct}% consumed`;
+
+      // Schedule risk KPI — worst slip across all projects
+      const slips     = activeProjects.map(p => projEVMs[p.id]?.slipDays||0).filter(s => s > 0);
+      const maxSlip   = slips.length > 0 ? Math.max(...slips) : 0;
+      const atRiskCount2 = activeProjects.filter(p => (projEVMs[p.id]?.slipDays||0) > 0).length;
+      const varEl     = document.getElementById('kpi-variance');
+      varEl.textContent = maxSlip > 0 ? '+' + maxSlip + 'd' : '0d';
+      varEl.style.color = maxSlip > 14 ? 'var(--red)' : maxSlip > 0 ? 'var(--amber)' : 'var(--green)';
+      document.getElementById('kpi-variance-sub').textContent =
+        atRiskCount2 > 0 ? `${atRiskCount2} project${atRiskCount2!==1?'s':''} forecasting slip` : 'All on schedule';
+
       projList.innerHTML = activeProjects.map(proj => {
         const pt      = tasks.filter(t => t.project_id === proj.id);
         const done    = pt.filter(t => t.status === 'complete').length;
-        const overdue = pt.filter(t => t.due_date && t.due_date.substring(0,10) < new Date().toLocaleDateString('en-CA') && t.status !== 'complete').length;
-        const blocked = pt.filter(t => t.status === 'blocked').length;
+        const evm     = projEVMs[proj.id];
         const pctDone = UI.pct(done, pt.length);
-        const health  = blocked > 0 ? 'blocked' : overdue > 0 ? 'at-risk' : 'active';
-        const hLabel  = blocked > 0 ? 'BLOCKED' : overdue > 0 ? 'AT RISK' : 'ACTIVE';
+        const health  = evm.blockedTasks > 0 ? 'blocked' : evm.overdueTasks > 0 ? 'at-risk' : 'active';
+        const hLabel  = evm.blockedTasks > 0 ? 'BLOCKED' : evm.overdueTasks > 0 ? 'AT RISK' : 'ACTIVE';
         const client  = proj.client_id ? clientFirms[proj.client_id] || '—' : 'Internal';
+        const fill    = pctDone === 100 ? 'var(--green)' : evm.overdueTasks > 0 ? 'var(--amber)' : 'var(--cyan)';
+        const cpi     = evm.cpi  ? evm.cpi.toFixed(2)  : '—';
+        const spi     = evm.spi  ? evm.spi.toFixed(2)  : '—';
+        const tcpi    = evm.tcpi ? evm.tcpi.toFixed(2) : '—';
         const dLeft   = proj.target_date ? UI.daysUntil(proj.target_date) : null;
-        const fill    = pctDone === 100 ? 'var(--green)' : overdue > 0 ? 'var(--amber)' : 'var(--cyan)';
-        const cpi     = parseFloat((0.90 + Math.random()*0.18).toFixed(2));
-        const spi     = parseFloat((0.87 + Math.random()*0.18).toFixed(2));
-        return `<div class="project-card ${health} fade-in" onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
+
+        // Forecast section — only shown when meaningful data exists
+        const forecastHTML = evm.p50Date ? (() => {
+          const fmtShort = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
+          const slipColor = !evm.slipDays || evm.slipDays <= 0 ? 'var(--green)'
+                          : evm.slipDays <= 14 ? 'var(--amber)' : 'var(--red)';
+          const slipLabel = !evm.slipDays || evm.slipDays <= 0
+            ? '✓ On track'
+            : `+${evm.slipDays}d forecast slip`;
+          const tcpiColor = !evm.tcpi ? 'var(--text3)'
+                          : evm.tcpi <= 1.05 ? 'var(--green)'
+                          : evm.tcpi <= 1.15 ? 'var(--amber)' : 'var(--red)';
+          const tcpiNote  = !evm.tcpi ? '' : evm.tcpi > 1.15
+            ? ' — recovery unlikely without intervention'
+            : evm.tcpi > 1.05 ? ' — challenging but achievable' : ' — achievable';
+
+          return `
+          <div style="margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.03);
+              border:1px solid rgba(255,255,255,.06);border-radius:5px;">
+
+            <!-- Target + forecast dates row -->
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+              <div style="font-family:var(--font-mono);font-size:10px;">
+                <span style="color:var(--text3);letter-spacing:.08em;">TARGET </span>
+                <span style="color:var(--text1)">${fmtShort(proj.target_date)}</span>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:10px;color:${slipColor};">
+                <span style="letter-spacing:.08em;">FORECAST </span>
+                <span style="font-weight:700">${fmtShort(evm.p50Date)}</span>
+                <span style="margin-left:6px;font-size:9px;">${slipLabel}</span>
+              </div>
+              ${evm.tcpi ? `<div style="font-family:var(--font-mono);font-size:10px;margin-left:auto">
+                <span style="color:var(--text3);letter-spacing:.08em;">TCPI </span>
+                <span style="color:${tcpiColor};font-weight:700">${tcpi}</span>
+                <span style="color:var(--text3);font-size:9px">${tcpiNote}</span>
+              </div>` : ''}
+            </div>
+
+            <!-- P25/P50/P80 confidence band -->
+            <div style="display:flex;align-items:center;gap:0;margin-bottom:8px;
+                font-family:var(--font-mono);font-size:9px;letter-spacing:.06em">
+              <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
+                  border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
+                P25 ${fmtShort(evm.p25Date)}</span>
+              <span style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
+                  border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2)">
+                ▼ P50 ${fmtShort(evm.p50Date)}</span>
+              <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
+                  background:rgba(255,170,0,.06);
+                  border:1px solid rgba(255,170,0,.2);border-radius:0 3px 3px 0">
+                P80 ${fmtShort(evm.p80Date)}</span>
+            </div>
+
+            <!-- Plain-English diagnosis -->
+            <div style="font-size:10px;color:var(--text3);line-height:1.5">
+              ◈ ${evm.diagnosis}
+            </div>
+
+            ${evm.expBudget > 0 ? `
+            <!-- Budget row -->
+            <div style="display:flex;gap:16px;margin-top:8px;padding-top:8px;
+                border-top:1px solid rgba(255,255,255,.05);font-family:var(--font-mono);font-size:10px">
+              <div>
+                <span style="color:var(--text3);letter-spacing:.08em">LABOR BUDGET </span>
+                <span style="color:var(--text1)">${(proj.budget_baseline_hours||0).toFixed(0)}h</span>
+                <span style="color:var(--text3)"> / </span>
+                <span style="color:${evm.actualHrs > (proj.budget_baseline_hours||0)*0.8 ? 'var(--amber)' : 'var(--cyan)'}">
+                  ${evm.actualHrs.toFixed(0)}h used</span>
+              </div>
+              <div>
+                <span style="color:var(--text3);letter-spacing:.08em">EXPENSE BUDGET </span>
+                <span style="color:var(--text1)">$${(evm.expBudget/1000).toFixed(0)}K</span>
+              </div>
+              ${evm.eac && proj.budget_baseline_hours ? `<div style="margin-left:auto">
+                <span style="color:var(--text3);letter-spacing:.08em">EAC </span>
+                <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
+                  ${evm.eac.toFixed(0)}h ${evm.cv>0?'▲+'+evm.cv.toFixed(0)+'h overrun':'▼ under'}</span>
+              </div>` : ''}
+            </div>` : ''}
+          </div>`;
+        })() : '';
+
+        return `<div class="project-card ${health} fade-in"
+            onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
+
+          <!-- Header row: name + AT RISK badge anchored right -->
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
-            <div><div class="proj-name">${proj.name}</div><div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div></div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-              <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;padding:2px 8px;border:1px solid;${
+            <div>
+              <div class="proj-name">${proj.name}</div>
+              <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+              <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+                  padding:2px 8px;border:1px solid;${
                 health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
-                health==='at-risk' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
+                health==='at-risk' ? 'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);' :
                 'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
               }">${hLabel}</span>
-              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:11px;color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
+              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:10px;
+                color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
             </div>
           </div>
+
           ${UI.progressBar(pctDone,fill)}
+
+          <!-- EVM stats row -->
           <div class="proj-stats">
-            <div class="proj-stat"><span class="stat-label">% COMPLETE</span><span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
-            <div class="proj-stat"><span class="stat-label">CPI</span><span class="stat-value" style="color:${UI.indexColor(cpi)}">${cpi}</span></div>
-            <div class="proj-stat"><span class="stat-label">SPI</span><span class="stat-value" style="color:${UI.indexColor(spi)}">${spi}</span></div>
-            <div class="proj-stat"><span class="stat-label">TASKS</span><span class="stat-value">${done}/${pt.length}</span></div>
-            ${overdue>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span><span class="stat-value" style="color:var(--red)">${overdue}</span></div>`:''}
+            <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
+              <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
+            <div class="proj-stat"><span class="stat-label">CPI</span>
+              <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
+            <div class="proj-stat"><span class="stat-label">SPI</span>
+              <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
+            <div class="proj-stat"><span class="stat-label">TASKS</span>
+              <span class="stat-value">${done}/${pt.length}</span></div>
+            ${evm.overdueTasks>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span>
+              <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
           </div>
+
+          ${forecastHTML}
         </div>`;
       }).join('');
     }

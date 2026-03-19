@@ -31,6 +31,17 @@ function fmtDateTime(d) {
   });
 }
 
+function fmtDateShort(d) {
+  // Returns compact date: "Mar 19" or "Mar 19, '26" if not current year
+  if (!d) return '';
+  const date = new Date(d.includes('T') ? d : d + 'T00:00:00');
+  const currentYear = new Date().getFullYear();
+  if (date.getFullYear() === currentYear) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+}
+
 function fmtRelativeDate(d) {
   // Returns "Today", "Yesterday", "3 days ago", etc.
   if (!d) return '';
@@ -349,7 +360,7 @@ function renderLoadingState(message = 'Loading…') {
 window.HUD = window.HUD || {};
 window.HUD.UI = {
   escHtml, capitalize,
-  fmtDate, fmtDateTime, fmtRelativeDate, todayISO,
+  fmtDate, fmtDateTime, fmtDateShort, fmtRelativeDate, todayISO,
   fileIcon,
   openDrawer, closeDrawer, handleOverlay,
   showToast,
@@ -377,6 +388,7 @@ window.UI = {
   // Format helpers — used directly in dashboard template literals
   fmtDate,
   fmtDateTime,
+  fmtDateShort,
   fmtRelativeDate,
   capitalize,
   escHtml,
