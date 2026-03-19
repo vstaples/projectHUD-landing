@@ -843,6 +843,7 @@
 <script src="/js/ui.js"></script>
 <script src="/js/ticker.js"></script>
 <script src="/js/sidebar.js"></script>
+<script src="/js/project-drawer.js"></script>
 <script src="/js/journal-replies.js"></script>
 <script src="/js/hud-recorder.js"></script>
 <script>
@@ -2474,41 +2475,95 @@ function _clearErr(id) { const e=document.getElementById(id); if(e){e.style.disp
 function _showErr(id,msg) { const e=document.getElementById(id); if(e){e.textContent=msg;e.style.display='block';} }
 
 // ── EDIT PROJECT (name / client / description) ─────────────────
-function openEditProjectPanel() {
-  const p = STATE.project;
+async function openEditProjectPanel() {
+  const p     = STATE.project;
   const firms = STATE.firms || [];
-  document.getElementById('epf-name').value        = p.name || '';
-  document.getElementById('epf-description').value = p.description || '';
-  // Populate client select
+
+  // Populate client dropdown
   const sel = document.getElementById('epf-client');
   sel.innerHTML = '<option value="">— Select client —</option>' +
-    firms.map(f => `<option value="${f.id}" ${f.id===p.client_id?'selected':''}>${f.name}</option>`).join('');
+    firms.filter(f => !f.is_internal)
+      .sort((a,b) => a.name.localeCompare(b.name))
+      .map(f => `<option value="${f.id}" ${f.id===p.client_id?'selected':''}>${f.name}</option>`).join('');
+
+  // Populate PM dropdown — PM/PGM roles only
+  try {
+    const pmRoles = await API.get(
+      'hud_roles?is_active=eq.true&select=id&or=(abbreviation.eq.PM,abbreviation.eq.PGM,name.ilike.*Project Manager*,name.ilike.*Program Manager*)'
+    ).catch(() => []);
+    const ids = pmRoles.map(r => r.id);
+    let pmResources = [];
+    if (ids.length) {
+      pmResources = await API.get(
+        `resources?is_active=eq.true&hud_role_id=in.(${ids.join(',')})&order=last_name&select=id,first_name,last_name,title`
+      ).catch(() => []);
+    }
+    if (!pmResources.length) {
+      pmResources = await API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name').catch(() => []);
+    }
+    document.getElementById('epf-pm').innerHTML =
+      '<option value="">— Select PM —</option>' +
+      pmResources.map(r =>
+        `<option value="${r.id}" ${r.id===p.pm_resource_id?'selected':''}>${r.first_name} ${r.last_name}${r.title?' · '+r.title:''}</option>`
+      ).join('');
+  } catch(e) { /* non-fatal */ }
+
+  // Pre-fill fields
+  document.getElementById('epf-name').value        = p.name || '';
+  document.getElementById('epf-description').value = p.description || '';
+  document.getElementById('epf-phase').value       = p.phase || '';
+  document.getElementById('epf-start').value       = p.start_date || '';
+  document.getElementById('epf-target').value      = p.target_date || '';
+  document.getElementById('epf-hours').value       = p.budget_baseline_hours || '';
+  document.getElementById('epf-materials').value   = p.materials_budget || '';
+  document.getElementById('epf-expense').value     = p.expense_budget_baseline || '';
+  document.getElementById('epf-status').value      = p.status || 'active';
+
   _clearErr('epf-error');
   _openSlidePanel('edit-project-panel');
 }
 function closeEditProjectPanel() { _closeSlidePanel('edit-project-panel'); }
 
 async function saveEditProject() {
-  const name = document.getElementById('epf-name').value.trim();
-  const desc = document.getElementById('epf-description').value.trim();
+  const name     = document.getElementById('epf-name').value.trim();
+  const desc     = document.getElementById('epf-description').value.trim();
   const clientId = document.getElementById('epf-client').value;
+  const pmId     = document.getElementById('epf-pm').value        || null;
+  const phase    = document.getElementById('epf-phase').value.trim()   || null;
+  const start    = document.getElementById('epf-start').value          || null;
+  const target   = document.getElementById('epf-target').value         || null;
+  const hours    = parseFloat(document.getElementById('epf-hours').value)     || null;
+  const mats     = parseFloat(document.getElementById('epf-materials').value) || null;
+  const expense  = parseFloat(document.getElementById('epf-expense').value)   || null;
+  const status   = document.getElementById('epf-status').value;
+
   if (!name) { _showErr('epf-error','Project name is required'); return; }
   const btn = document.getElementById('epf-save-btn');
   btn.textContent = 'SAVING...'; btn.disabled = true;
   try {
-    const payload = { name, description: desc };
+    const payload = {
+      name, description: desc, phase, status,
+      start_date: start, target_date: target,
+      budget_baseline_hours:   hours,
+      current_budget_hours:    hours,
+      materials_budget:        mats,
+      expense_budget_baseline: expense,
+      current_expense_budget:  expense,
+      pm_resource_id:          pmId,
+    };
     if (clientId) payload.client_id = clientId;
     await API.patch(`projects?id=eq.${STATE.project.id}`, payload);
-    STATE.project.name        = name;
-    STATE.project.description = desc;
-    if (clientId) STATE.project.client_id = clientId;
-    _writeAudit('updated', 'projects', STATE.project.id, { name: _projNameBefore }, { name: STATE.project.name, description: STATE.project.description });
+    // Update local state
+    Object.assign(STATE.project, payload);
+    _writeAudit('updated', 'projects', STATE.project.id,
+      { name: _projNameBefore },
+      { name, description: desc, pm_resource_id: pmId });
     renderHeader();
     closeEditProjectPanel();
   } catch(err) {
     _showErr('epf-error', err.message || 'Save failed');
   } finally {
-    btn.textContent = 'SAVE'; btn.disabled = false;
+    btn.textContent = 'SAVE CHANGES'; btn.disabled = false;
   }
 }
 
@@ -3813,32 +3868,96 @@ async function submitJournalEntry(taskId) {
 </script>
 
 <!-- ── EDIT PROJECT PANEL ──────────────────────────────────── -->
-<div class="journal-panel" id="edit-project-panel" style="width:440px;right:-460px;" data-width="-460px">
+<div class="journal-panel" id="edit-project-panel" style="width:480px;right:-500px;" data-width="-500px">
   <div class="journal-panel-header">
     <div>
       <div class="journal-panel-title">EDIT PROJECT</div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;">Update project title, client &amp; description</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px;">Update project title, client &amp; budget</div>
     </div>
     <button class="journal-panel-close" onclick="closeEditProjectPanel()">✕</button>
   </div>
   <div class="journal-panel-body" style="padding:18px;">
+
     <div style="margin-bottom:14px;">
       <label class="exp-label">PROJECT NAME <span style="color:var(--red);">*</span></label>
       <input id="epf-name" class="hud-input" style="width:100%;" placeholder="Project name" />
     </div>
-    <div style="margin-bottom:14px;">
-      <label class="exp-label">CLIENT</label>
-      <select id="epf-client" class="hud-select" style="width:100%;"></select>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div>
+        <label class="exp-label">CLIENT</label>
+        <select id="epf-client" class="hud-select" style="width:100%;"></select>
+      </div>
+      <div>
+        <label class="exp-label">PHASE</label>
+        <input id="epf-phase" class="hud-input" style="width:100%;" placeholder="e.g. Design Verification" />
+      </div>
     </div>
-    <div style="margin-bottom:18px;">
+
+    <div style="margin-bottom:14px;">
+      <label class="exp-label">PROJECT MANAGER</label>
+      <select id="epf-pm" class="hud-select" style="width:100%;">
+        <option value="">— Select PM —</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:14px;">
       <label class="exp-label">DESCRIPTION</label>
-      <textarea id="epf-description" class="hud-input" rows="4"
+      <textarea id="epf-description" class="hud-input" rows="3"
         style="resize:vertical;font-family:var(--font-mono);font-size:11px;line-height:1.6;width:100%;"
         placeholder="Project description..."></textarea>
     </div>
+
+    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--text3);
+        text-transform:uppercase;margin-bottom:10px;padding-bottom:4px;
+        border-bottom:1px solid rgba(255,255,255,.06);">Schedule</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div>
+        <label class="exp-label">START DATE</label>
+        <input id="epf-start" class="hud-input" type="date" style="width:100%;" />
+      </div>
+      <div>
+        <label class="exp-label">TARGET DATE</label>
+        <input id="epf-target" class="hud-input" type="date" style="width:100%;" />
+      </div>
+    </div>
+
+    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--text3);
+        text-transform:uppercase;margin-bottom:10px;padding-bottom:4px;
+        border-bottom:1px solid rgba(255,255,255,.06);">Budget</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div>
+        <label class="exp-label">LABOR BUDGET (hours)</label>
+        <input id="epf-hours" class="hud-input" type="number" min="0" style="width:100%;" placeholder="e.g. 2400" />
+      </div>
+      <div>
+        <label class="exp-label">MATERIALS BUDGET ($)</label>
+        <input id="epf-materials" class="hud-input" type="number" min="0" style="width:100%;" placeholder="e.g. 50000" />
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div>
+        <label class="exp-label">EXPENSE BUDGET ($)</label>
+        <input id="epf-expense" class="hud-input" type="number" min="0" style="width:100%;" placeholder="e.g. 150000" />
+      </div>
+      <div>
+        <label class="exp-label">STATUS</label>
+        <select id="epf-status" class="hud-select" style="width:100%;">
+          <option value="active">Active</option>
+          <option value="planning">Planning</option>
+          <option value="on_hold">On Hold</option>
+          <option value="complete">Complete</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+    </div>
+
     <div id="epf-error" style="display:none;font-family:var(--font-mono);font-size:11px;color:var(--red);background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);padding:8px 12px;margin-bottom:12px;"></div>
     <div style="display:flex;gap:10px;">
-      <button class="hud-btn primary" id="epf-save-btn" onclick="saveEditProject()" style="flex:1;">SAVE</button>
+      <button class="hud-btn primary" id="epf-save-btn" onclick="saveEditProject()" style="flex:1;">SAVE CHANGES</button>
       <button class="hud-btn" onclick="closeEditProjectPanel()">CANCEL</button>
     </div>
   </div>

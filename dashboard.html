@@ -138,7 +138,7 @@
               <div class="panel-title">ACTIVE PROJECTS</div>
               <div style="display:flex;gap:8px;align-items:center;">
                 <span class="panel-count" id="proj-count">—</span>
-                <button class="panel-action" onclick="openAddProject()" style="color:var(--green);border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.06);">+ ADD PROJECT</button>
+                <button class="panel-action" onclick="ProjectDrawer.openAdd()" style="color:var(--green);border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.06);">+ ADD PROJECT</button>
                 <button class="panel-action">VIEW ALL →</button>
               </div>
             </div>
@@ -187,6 +187,7 @@
 <script src="/js/ui.js"></script>
 <script src="/js/ticker.js"></script>
 <script src="/js/sidebar.js"></script>
+<script src="/js/project-drawer.js"></script>
 <script src="/js/hud-recorder.js"></script>
 <script>
 document.getElementById('page-date').textContent =
@@ -579,9 +580,22 @@ async function loadDrawerData() {
     _apInternalFirmId = _apFirms.find(f => f.is_internal)?.id || null;
   }
   if (!_apResources.length) {
-    _apResources = await API.get(
-      'resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,title'
+    // Load only PM/Program Manager roles
+    const pmRoles = await API.get(
+      'hud_roles?is_active=eq.true&select=id&or=(abbreviation.eq.PM,abbreviation.eq.PGM,name.ilike.*Project Manager*,name.ilike.*Program Manager*)'
     ).catch(() => []);
+    const pmRoleIds = pmRoles.map(r => r.id);
+    if (pmRoleIds.length > 0) {
+      _apResources = await API.get(
+        `resources?is_active=eq.true&hud_role_id=in.(${pmRoleIds.join(',')})&order=last_name&select=id,first_name,last_name,title,hud_role_id`
+      ).catch(() => []);
+    }
+    // Fallback: if no PM roles found, load all resources
+    if (!_apResources.length) {
+      _apResources = await API.get(
+        'resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,title'
+      ).catch(() => []);
+    }
   }
   // Client dropdown
   const sel = document.getElementById('ap-client');
@@ -605,8 +619,9 @@ async function openAddProject() {
   await loadDrawerData();
 
   // Set mode: ADD
-  document.getElementById('ap-title').textContent = 'ADD PROJECT';
-  document.getElementById('ap-edit-id').value     = '';
+  document.getElementById('ap-title').textContent    = 'ADD PROJECT';
+  document.getElementById('ap-subtitle').textContent = 'Set project title, client & budget';
+  document.getElementById('ap-edit-id').value        = '';
   document.getElementById('ap-save-btn').textContent = 'CREATE PROJECT →';
 
   // Default start date to today
@@ -638,6 +653,7 @@ async function openEditProject(projId) {
 
   // Set mode: EDIT
   document.getElementById('ap-title').textContent    = 'EDIT PROJECT';
+  document.getElementById('ap-subtitle').textContent = 'Update project title, client & budget';
   document.getElementById('ap-edit-id').value        = projId;
   document.getElementById('ap-save-btn').textContent = 'SAVE CHANGES →';
   document.getElementById('ap-error').textContent    = '';
@@ -742,6 +758,8 @@ async function saveNewProject() {
     <div class="ap-header">
       <input type="hidden" id="ap-edit-id" />
       <div class="ap-title" id="ap-title">ADD PROJECT</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          margin-top:2px" id="ap-subtitle">Set project title, client &amp; budget</div>
       <button class="ap-close" onclick="closeAddProject()">✕</button>
     </div>
     <div class="ap-body">
