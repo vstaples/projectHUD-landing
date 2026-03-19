@@ -7,6 +7,13 @@
 <link rel="stylesheet" href="/css/hud.css">
 <style>
 .dashboard-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+/* Override kpi-row for 7 cards on one row */
+.kpi-row { grid-template-columns: repeat(7, 1fr) !important; gap: 8px !important; }
+.kpi-card { padding: 10px 12px !important; }
+.kpi-card .kpi-icon { font-size: 24px !important; top: 8px !important; right: 10px !important; }
+.kpi-value { font-size: 26px !important; }
+.kpi-label { font-size: 10px !important; letter-spacing: .06em !important; margin-top: 2px !important; }
+.kpi-sub { font-size: 10px !important; margin-top: 2px !important; }
 .project-card { padding: 14px 16px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; cursor: pointer; transition: background 0.12s, border-left-color 0.12s; }
 .project-card:last-child { border-bottom: none; }
 .project-card:hover { background: var(--bg4); border-left-color: var(--cyan); }
@@ -357,6 +364,13 @@ async function loadDashboard() {
         const spi     = evm.spi  ? evm.spi.toFixed(2)  : '—';
         const tcpi    = evm.tcpi ? evm.tcpi.toFixed(2) : '—';
         const dLeft   = proj.target_date ? UI.daysUntil(proj.target_date) : null;
+
+        // PM initials — resolve pm_resource_id against users
+        const _pmUser = proj.pm_resource_id
+          ? (users||[]).find(u => u.id === proj.pm_resource_id) : null;
+        const pmName  = _pmUser
+          ? (_pmUser.name||'').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,3)
+          : '';
 
 
 
