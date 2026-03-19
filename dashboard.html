@@ -408,7 +408,7 @@ async function loadDashboard() {
           </div>
 
           <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
-          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,200px);
+          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
               align-items:center;gap:8px;margin-bottom:7px;">
             <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
             <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
@@ -437,7 +437,7 @@ async function loadDashboard() {
 
           <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
           <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
-              align-items:center;gap:8px;margin-top:6px;">
+              align-items:flex-start;gap:8px;margin-top:6px;">
 
             <!-- LEFT: EVM metrics — grid col, same width as client text above -->
             <div class="proj-stats" style="margin-top:0;flex-wrap:wrap;">
@@ -454,7 +454,7 @@ async function loadDashboard() {
             </div>
 
             <!-- CENTER: grid center column — same column as LABOR/EXPENSE above, auto-aligned -->
-            <div style="display:flex;justify-content:center;align-items:center;">
+            <div style="display:flex;justify-content:center;align-items:flex-start;padding-top:3px;">
               ${evm.p25Date ? `
               <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);
                   font-size:11px;letter-spacing:.05em;white-space:nowrap;">
@@ -472,7 +472,7 @@ async function loadDashboard() {
             </div>
 
             <!-- RIGHT: grid right column — aligns with days-remaining column above -->
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;padding-top:3px;">
               <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
                   font-size:11px;white-space:nowrap;">
                 ${proj.target_date?`<span>
