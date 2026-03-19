@@ -405,7 +405,7 @@ async function loadDashboard() {
       document.getElementById('kpi-variance-sub').textContent =
         atRiskCount2 > 0 ? `${atRiskCount2} project${atRiskCount2!==1?'s':''} forecasting slip` : 'All on schedule';
 
-      projList.innerHTML = activeProjects.map(proj => {
+      projList.innerHTML = (() => { if (window._htReg) window._htReg = []; return ''; })() + activeProjects.map(proj => {
         const pt      = tasks.filter(t => t.project_id === proj.id);
         const done    = pt.filter(t => t.status === 'complete').length;
         const evm     = projEVMs[proj.id];
@@ -925,10 +925,10 @@ async function saveNewProject() {
 
   function showTip(el, e) {
     clearTimeout(_hideTimer);
-    const payload = el.dataset.htip;
-    if (!payload) return;
-    let def;
-    try { def = JSON.parse(payload); } catch(ex) { return; }
+    const key = el.dataset.htip;
+    if (key == null || key === '') return;
+    const def = window._htReg && window._htReg[key];
+    if (!def) return;
 
     tTitle.textContent   = def.title  || '';
     tValue.textContent   = def.value  || '';
@@ -999,8 +999,10 @@ async function saveNewProject() {
   });
 
   // ── Tooltip payload builder ───────────────────────────────────────────
-  // Called from card template — builds data-htip JSON for each element.
-  // All values are pre-computed by calcProjectEVM before the card renders.
+  // Methods push a def object into window._htReg and return the index.
+  // data-htip="N" on the element; tooltip engine reads _htReg[N].
+  window._htReg = [];
+  function _reg(def) { window._htReg.push(def); return window._htReg.length - 1; }
   window.HUDTip = {
     // AT RISK / BLOCKED / ACTIVE badge
     badge(health, evm, dLeft, targetDate) {
@@ -1016,7 +1018,7 @@ async function saveNewProject() {
       rows.push({ k: 'SPI', v: evm.spi != null ? evm.spi.toFixed(2) : '—', color: evm.spi != null ? (evm.spi >= 1 ? 'var(--green)' : evm.spi >= 0.9 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)' });
       rows.push({ k: 'CPI', v: evm.cpi != null ? evm.cpi.toFixed(2) : '—', color: evm.cpi != null ? (evm.cpi >= 1 ? 'var(--green)' : evm.cpi >= 0.9 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)' });
       if (dLeft !== null) rows.push({ k: 'DAYS TO TARGET', v: dLeft < 0 ? Math.abs(dLeft) + 'd PAST DUE' : dLeft + 'd', color: dLeft < 0 ? 'var(--red)' : dLeft < 30 ? 'var(--amber)' : 'var(--text1)' });
-      return JSON.stringify({ title, color, rows, interp: evm.diagnosis });
+      return _reg({ title, color, rows, interp: evm.diagnosis });
     },
 
     // % COMPLETE
@@ -1026,7 +1028,7 @@ async function saveNewProject() {
         { k: 'EARNED VALUE %',  v: (evm.evPct * 100).toFixed(1) + '%', color: 'var(--cyan)' },
         { k: 'SCHEDULE ELAPSED', v: evm.pv != null && evm.bac > 0 ? (evm.pv / evm.bac * 100).toFixed(1) + '%' : '—' },
       ];
-      return JSON.stringify({ title: '% COMPLETE', value: pctDone + '%', color: 'var(--cyan)', formula: 'Task-weighted % = Σ(pct × effort) ÷ Σ(effort)', rows, interp: pctDone + '% of planned work earned based on task completion and effort weighting.' });
+      return _reg({ title: '% COMPLETE', value: pctDone + '%', color: 'var(--cyan)', formula: 'Task-weighted % = Σ(pct × effort) ÷ Σ(effort)', rows, interp: pctDone + '% of planned work earned based on task completion and effort weighting.' });
     },
 
     // CPI
@@ -1042,7 +1044,7 @@ async function saveNewProject() {
         cpiVal >= 1 ? `CPI ${v}: earning more value than hours consumed. Project is cost-efficient.` :
         cpiVal >= 0.9 ? `CPI ${v}: slightly under efficiency target. Monitor closely.` :
         `CPI ${v}: cost overrun — consuming ${((1/cpiVal - 1)*100).toFixed(0)}% more effort than planned.`;
-      return JSON.stringify({ title: 'CPI — Cost Perf. Index', value: v, color, formula: 'CPI = EV ÷ AC  (earned value ÷ actual hours)', rows, interp });
+      return _reg({ title: 'CPI — Cost Perf. Index', value: v, color, formula: 'CPI = EV ÷ AC  (earned value ÷ actual hours)', rows, interp });
     },
 
     // SPI
@@ -1060,7 +1062,7 @@ async function saveNewProject() {
         spiVal >= 1 ? `SPI ${v}: ahead of schedule — completing more work than planned for this point in time.` :
         spiVal >= 0.9 ? `SPI ${v}: slightly behind planned pace. ${Math.round((1-spiVal)*100)}% less work earned than planned.` :
         `SPI ${v}: significantly behind schedule. ${Math.round((1-spiVal)*100)}% less work earned than planned.`;
-      return JSON.stringify({ title: 'SPI — Schedule Perf. Index', value: v, color, formula: 'SPI = EV ÷ PV  (earned value ÷ planned value)', rows, interp });
+      return _reg({ title: 'SPI — Schedule Perf. Index', value: v, color, formula: 'SPI = EV ÷ PV  (earned value ÷ planned value)', rows, interp });
     },
 
     // TASKS
@@ -1072,7 +1074,7 @@ async function saveNewProject() {
         { k: 'BLOCKED',      v: evm.blockedTasks, color: evm.blockedTasks > 0 ? 'var(--red)' : 'var(--text1)' },
         { k: 'TOTAL',        v: total },
       ];
-      return JSON.stringify({ title: 'TASKS', value: done + '/' + total, color: 'var(--text1)', rows, interp: done + ' of ' + total + ' tasks complete (' + Math.round(done/Math.max(total,1)*100) + '%).' });
+      return _reg({ title: 'TASKS', value: done + '/' + total, color: 'var(--text1)', rows, interp: done + ' of ' + total + ' tasks complete (' + Math.round(done/Math.max(total,1)*100) + '%).' });
     },
 
     // OVERDUE
@@ -1082,7 +1084,7 @@ async function saveNewProject() {
         { k: 'BLOCKED TASKS',  v: evm.blockedTasks, color: evm.blockedTasks > 0 ? 'var(--red)' : 'var(--text3)' },
         { k: 'SPI IMPACT',     v: evm.spi != null ? evm.spi.toFixed(2) : '—', color: evm.spi != null && evm.spi < 1 ? 'var(--amber)' : 'var(--green)' },
       ];
-      return JSON.stringify({ title: 'OVERDUE', value: count, color: 'var(--red)', rows, interp: evm.diagnosis });
+      return _reg({ title: 'OVERDUE', value: count, color: 'var(--red)', rows, interp: evm.diagnosis });
     },
 
     // LABOR budget
@@ -1094,7 +1096,7 @@ async function saveNewProject() {
         { k: 'USED',      v: used.toFixed(0) + 'h (' + pct + '%)', color },
         { k: 'REMAINING', v: remaining.toFixed(0) + 'h', color: remaining < 0 ? 'var(--red)' : 'var(--text1)' },
       ];
-      return JSON.stringify({ title: 'LABOR BUDGET', value: pct + '%', color, rows, interp: remaining >= 0 ? (budget - used).toFixed(0) + ' hours remaining in labor budget.' : Math.abs(remaining).toFixed(0) + ' hours over labor budget.' });
+      return _reg({ title: 'LABOR BUDGET', value: pct + '%', color, rows, interp: remaining >= 0 ? (budget - used).toFixed(0) + ' hours remaining in labor budget.' : Math.abs(remaining).toFixed(0) + ' hours over labor budget.' });
     },
 
     // EXPENSE budget
@@ -1106,7 +1108,7 @@ async function saveNewProject() {
         { k: 'USED',      v: '$' + (used/1000).toFixed(1) + 'K (' + pct + '%)', color },
         { k: 'REMAINING', v: '$' + (remaining/1000).toFixed(1) + 'K', color: remaining < 0 ? 'var(--red)' : 'var(--text1)' },
       ];
-      return JSON.stringify({ title: 'EXPENSE BUDGET', value: pct + '%', color, rows, interp: 'Expense actuals estimated from billable hours × $150 blended rate.' });
+      return _reg({ title: 'EXPENSE BUDGET', value: pct + '%', color, rows, interp: 'Expense actuals estimated from billable hours × $150 blended rate.' });
     },
 
     // P25
@@ -1120,7 +1122,7 @@ async function saveNewProject() {
         { k: 'TARGET DATE',  v: target },
         { k: 'VS TARGET',    v: slipP25 != null ? (slipP25 <= 0 ? Math.abs(slipP25) + 'd early ✓' : '+' + slipP25 + 'd late') : '—', color: slipP25 != null && slipP25 <= 0 ? 'var(--green)' : 'var(--amber)' },
       ];
-      return JSON.stringify({ title: 'P25 — OPTIMISTIC', value: UI.fmtDateShort(date), color: 'var(--green)', formula: 'Remaining work completes at SPI = 1.0', rows, interp: 'Best-case scenario: team recovers to full efficiency for all remaining work.' });
+      return _reg({ title: 'P25 — OPTIMISTIC', value: UI.fmtDateShort(date), color: 'var(--green)', formula: 'Remaining work completes at SPI = 1.0', rows, interp: 'Best-case scenario: team recovers to full efficiency for all remaining work.' });
     },
 
     // P50
@@ -1135,7 +1137,7 @@ async function saveNewProject() {
         { k: 'TARGET DATE',  v: target },
         { k: 'VS TARGET',    v: slipP50 != null ? (slipP50 <= 0 ? Math.abs(slipP50) + 'd early ✓' : '+' + slipP50 + 'd late') : '—', color: slipP50 != null && slipP50 <= 0 ? 'var(--green)' : slipP50 != null && slipP50 <= 14 ? 'var(--amber)' : 'var(--red)' },
       ];
-      return JSON.stringify({ title: 'P50 — MOST LIKELY', value: UI.fmtDateShort(date), color, formula: 'TEAC = Planned Duration ÷ SPI  (PMI Earned Schedule)', rows, interp: 'Base forecast assuming current schedule performance continues unchanged.' });
+      return _reg({ title: 'P50 — MOST LIKELY', value: UI.fmtDateShort(date), color, formula: 'TEAC = Planned Duration ÷ SPI  (PMI Earned Schedule)', rows, interp: 'Base forecast assuming current schedule performance continues unchanged.' });
     },
 
     // P80
@@ -1151,7 +1153,7 @@ async function saveNewProject() {
         { k: 'TARGET DATE',   v: target },
         { k: 'VS TARGET',     v: slipP80 != null ? (slipP80 <= 0 ? Math.abs(slipP80) + 'd early' : '+' + slipP80 + 'd late') : '—', color: slipP80 != null && slipP80 > 0 ? 'var(--red)' : 'var(--amber)' },
       ];
-      return JSON.stringify({ title: 'P80 — PESSIMISTIC', value: UI.fmtDateShort(date), color, formula: 'TEAC = Planned Duration ÷ (SPI × 0.85)', rows, interp: 'Stress-test scenario: if conditions worsen 15% from current pace, this is the projected outcome.' });
+      return _reg({ title: 'P80 — PESSIMISTIC', value: UI.fmtDateShort(date), color, formula: 'TEAC = Planned Duration ÷ (SPI × 0.85)', rows, interp: 'Stress-test scenario: if conditions worsen 15% from current pace, this is the projected outcome.' });
     },
 
     // TARGET date
@@ -1160,7 +1162,7 @@ async function saveNewProject() {
         { k: 'TARGET DATE', v: UI.fmtDateShort(targetDate), color: 'var(--text1)' },
         { k: 'DAYS REMAINING', v: dLeft !== null ? (dLeft < 0 ? Math.abs(dLeft) + 'd PAST DUE' : dLeft + 'd') : '—', color: dLeft !== null && dLeft < 0 ? 'var(--red)' : dLeft !== null && dLeft < 30 ? 'var(--amber)' : 'var(--text1)' },
       ];
-      return JSON.stringify({ title: 'TARGET DATE', color: 'var(--text2)', rows, interp: 'Planned project completion date from the project record.' });
+      return _reg({ title: 'TARGET DATE', color: 'var(--text2)', rows, interp: 'Planned project completion date from the project record.' });
     },
 
     // FORECAST (P50)
@@ -1171,7 +1173,7 @@ async function saveNewProject() {
         { k: 'TARGET DATE',   v: targetDate ? UI.fmtDateShort(targetDate) : '—' },
         { k: 'VARIANCE',      v: slipDays != null ? (slipDays <= 0 ? Math.abs(slipDays) + 'd early ✓' : '+' + slipDays + 'd late') : '—', color },
       ];
-      return JSON.stringify({ title: 'FORECAST FINISH', value: slipDays != null && slipDays > 0 ? '+' + slipDays + 'd' : '✓', color, formula: 'P50: current SPI continues to completion', rows, interp: 'Most-likely finish date based on current schedule performance index.' });
+      return _reg({ title: 'FORECAST FINISH', value: slipDays != null && slipDays > 0 ? '+' + slipDays + 'd' : '✓', color, formula: 'P50: current SPI continues to completion', rows, interp: 'Most-likely finish date based on current schedule performance index.' });
     },
 
     // TCPI
@@ -1187,19 +1189,19 @@ async function saveNewProject() {
         tcpiVal <= 1.0 ? `TCPI ${v}: required efficiency is achievable. Team can finish within budget at current pace.` :
         tcpiVal <= 1.1 ? `TCPI ${v}: team must work slightly more efficiently than current CPI to stay within budget.` :
         `TCPI ${v}: recovery is aggressive — team must work ${((tcpiVal-1)*100).toFixed(0)}% more efficiently than current pace to hit BAC.`;
-      return JSON.stringify({ title: 'TCPI — To-Complete Perf. Index', value: v, color, formula: 'TCPI = (BAC − EV) ÷ (BAC − AC)', rows, interp });
+      return _reg({ title: 'TCPI — To-Complete Perf. Index', value: v, color, formula: 'TCPI = (BAC − EV) ÷ (BAC − AC)', rows, interp });
     },
 
     // EAC
     eac(eacVal, bac, cv) {
-      if (!eacVal || !bac) return JSON.stringify({ title: 'EAC — Estimate at Completion', color: 'var(--text3)', rows: [], interp: 'Cannot compute — missing baseline hours or no hours logged.' });
+      if (!eacVal || !bac) return _reg({ title: 'EAC — Estimate at Completion', color: 'var(--text3)', rows: [], interp: 'Cannot compute — missing baseline hours or no hours logged.' });
       const color = cv > 0 ? 'var(--red)' : 'var(--green)';
       const rows = [
         { k: 'EAC', v: eacVal.toFixed(0) + 'h', color },
         { k: 'BAC', v: bac.toFixed(0) + 'h' },
         { k: 'VARIANCE (CV)', v: cv > 0 ? '+' + cv.toFixed(0) + 'h OVER' : Math.abs(cv).toFixed(0) + 'h UNDER', color },
       ];
-      return JSON.stringify({ title: 'EAC — Estimate at Completion', value: eacVal.toFixed(0) + 'h', color, formula: 'EAC = BAC ÷ CPI', rows, interp: cv > 0 ? `Project is forecast to overrun by ${cv.toFixed(0)} hours at current cost performance.` : `Project is tracking ${Math.abs(cv).toFixed(0)} hours under the budget baseline.` });
+      return _reg({ title: 'EAC — Estimate at Completion', value: eacVal.toFixed(0) + 'h', color, formula: 'EAC = BAC ÷ CPI', rows, interp: cv > 0 ? `Project is forecast to overrun by ${cv.toFixed(0)} hours at current cost performance.` : `Project is tracking ${Math.abs(cv).toFixed(0)} hours under the budget baseline.` });
     },
   };
 })();
