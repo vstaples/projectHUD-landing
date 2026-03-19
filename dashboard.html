@@ -477,7 +477,7 @@ async function loadDashboard() {
           </div>
 
           <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
-          <div style="display:grid;grid-template-columns:var(--col-left,310px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
               align-items:center;gap:8px;margin-bottom:7px;">
             <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
             <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
@@ -505,86 +505,21 @@ async function loadDashboard() {
           ${UI.progressBar(pctDone,fill)}
 
           <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
-          <div style="display:grid;grid-template-columns:var(--col-left,310px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
               align-items:flex-start;gap:8px;margin-top:6px;">
 
-            <!-- LEFT: Option A — 4 half-arc gauges + TASKS/OVERDUE text -->
-            <div style="display:flex;align-items:flex-end;gap:8px;margin-top:0;">
-
-              ${/* WORK % gauge */(()=>{
-                const _ratio = Math.min(1, pctDone / 100);
-                const _fill  = (_ratio * 69.1).toFixed(1);
-                const _color = 'var(--cyan)';
-                return `<div data-htip="${HUDTip.pct(pctDone,done,pt.length,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
-                  <svg width="54" height="34" viewBox="0 0 56 36">
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
-                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${pctDone}%</text>
-                  </svg>
-                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">WORK %</span>
-                </div>`;
-              })()}
-
-              ${/* CPI gauge */(()=>{
-                const _v     = evm.cpi;
-                const _ratio = _v != null ? Math.min(1, _v / 1.5) : 0;
-                const _fill  = (_ratio * 69.1).toFixed(1);
-                const _color = UI.indexColor(_v);
-                const _label = cpi;
-                return `<div data-htip="${HUDTip.cpi(evm.cpi,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
-                  <svg width="54" height="34" viewBox="0 0 56 36">
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
-                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${_label}</text>
-                  </svg>
-                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">CPI</span>
-                </div>`;
-              })()}
-
-              ${/* SPI gauge */(()=>{
-                const _v     = evm.spi;
-                const _ratio = _v != null ? Math.min(1, _v / 1.5) : 0;
-                const _fill  = (_ratio * 69.1).toFixed(1);
-                const _color = UI.indexColor(_v);
-                const _label = spi;
-                return `<div data-htip="${HUDTip.spi(evm.spi,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
-                  <svg width="54" height="34" viewBox="0 0 56 36">
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
-                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${_label}</text>
-                  </svg>
-                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">SPI</span>
-                </div>`;
-              })()}
-
-              ${/* TCPI gauge */(()=>{
-                if (!evm.tcpi) return '';
-                const _v     = evm.tcpi;
-                const _ratio = Math.min(1, _v / 1.5);
-                const _fill  = (_ratio * 69.1).toFixed(1);
-                const _color = UI.indexColor(_v);
-                return `<div data-htip="${HUDTip.tcpi(evm.tcpi,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
-                  <svg width="54" height="34" viewBox="0 0 56 36">
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
-                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
-                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${tcpi}</text>
-                  </svg>
-                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">TCPI</span>
-                </div>`;
-              })()}
-
-              <!-- TASKS + OVERDUE as text alongside gauges -->
-              <div style="display:flex;flex-direction:row;gap:12px;align-items:flex-start;padding-bottom:6px;margin-left:4px;">
-                <div data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="display:flex;flex-direction:column;gap:2px;cursor:help;">
-                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.1em;">TASKS</span>
-                  <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text1)">${done}/${pt.length}</span>
-                </div>
-                ${evm.overdueTasks>0?`<div data-htip="${HUDTip.overdue(evm.overdueTasks,evm)}" style="display:flex;flex-direction:column;gap:2px;cursor:help;">
-                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.1em;">OVERDUE</span>
-                  <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--red)">${evm.overdueTasks}</span>
-                </div>`:''}
-              </div>
-
+            <!-- LEFT: EVM metrics — plain text stats -->
+            <div class="proj-stats" style="margin-top:0;flex-wrap:nowrap;gap:12px;">
+              <div class="proj-stat" data-htip="${HUDTip.pct(pctDone,done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">% COMPLETE</span>
+                <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
+              <div class="proj-stat" data-htip="${HUDTip.cpi(evm.cpi,evm)}" style="cursor:help;"><span class="stat-label">CPI</span>
+                <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
+              <div class="proj-stat" data-htip="${HUDTip.spi(evm.spi,evm)}" style="cursor:help;"><span class="stat-label">SPI</span>
+                <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
+              <div class="proj-stat" data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">TASKS</span>
+                <span class="stat-value">${done}/${pt.length}</span></div>
+              ${evm.overdueTasks>0?`<div class="proj-stat" data-htip="${HUDTip.overdue(evm.overdueTasks,evm)}" style="cursor:help;"><span class="stat-label">OVERDUE</span>
+                <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
             </div>
 
             <!-- CENTER: grid center column — same column as LABOR/EXPENSE above, auto-aligned -->
@@ -1393,102 +1328,104 @@ function openGaugePopup(projId) {
 }
 
 function buildSpeedometer(g) {
-  const W=150, H=110, CX=75, CY=90, R=62, SW=14;
-  // Arc goes from 210° to 330° (i.e. left of bottom to right of bottom = 240° sweep, classic speedometer)
-  const START_DEG = 210, END_DEG = 330, SWEEP = 240;
+  // Excel-style: full semicircle (180°), raised border ring, colored zones, tick marks, red needle
+  // Geometry: semicircle from 180° (left) to 0° (right), pivot at bottom-center
+  const W=160, H=105, CX=80, CY=95;
+  const RO=72, RI=50; // outer and inner radius of zone band
+  const START=Math.PI, END=0; // left→right sweep
 
-  function degToRad(d) { return d * Math.PI / 180; }
-  function ptOnArc(deg) {
-    const a = degToRad(deg);
-    return { x: CX + R*Math.cos(a), y: CY + R*Math.sin(a) };
+  function pt(r,a){ return {x:(CX+r*Math.cos(a)).toFixed(2), y:(CY+r*Math.sin(a)).toFixed(2)}; }
+
+  function sectorPath(a1, a2, ro, ri) {
+    // Filled sector between two angles, two radii
+    const p1o=pt(ro,a1), p2o=pt(ro,a2), p1i=pt(ri,a1), p2i=pt(ri,a2);
+    const large = Math.abs(a2-a1) > Math.PI ? 1 : 0;
+    return `M${p1o.x},${p1o.y} A${ro},${ro},0,${large},1,${p2o.x},${p2o.y} L${p2i.x},${p2i.y} A${ri},${ri},0,${large},0,${p1i.x},${p1i.y} Z`;
   }
 
-  // Zone arcs (for index gauges: 0–0.9 red, 0.9–1.0 amber, 1.0–max green)
-  function arcD(fromDeg, toDeg) {
-    const p1 = ptOnArc(fromDeg), p2 = ptOnArc(toDeg);
-    const large = Math.abs(toDeg - fromDeg) > 180 ? 1 : 0;
-    return `M${p1.x.toFixed(2)},${p1.y.toFixed(2)} A${R},${R},0,${large},1,${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
-  }
-
-  // Map value to angle
   function valToAngle(v, max) {
-    const ratio = Math.min(1, Math.max(0, v / max));
-    return START_DEG + ratio * SWEEP;
+    // Maps 0→max to π→0 (left to right)
+    const ratio = Math.min(1, Math.max(0, v/max));
+    return Math.PI - ratio * Math.PI;
   }
 
-  let zoneArcs = '';
+  // ── Zone sectors ─────────────────────────────────────────────────────────
+  let zones = '';
   if (!g.isIndex) {
-    // WORK%: single cyan arc full range
-    zoneArcs = `<path d="${arcD(START_DEG, END_DEG)}" fill="none" stroke="rgba(0,210,255,0.25)" stroke-width="${SW}" stroke-linecap="round"/>`;
+    // WORK %: red 0-40, amber 40-70, green 70-100
+    const a40 = valToAngle(40,100), a70 = valToAngle(70,100);
+    zones  = `<path d="${sectorPath(Math.PI,a40,RO,RI)}" fill="#c0353a"/>`;
+    zones += `<path d="${sectorPath(a40,a70,RO,RI)}" fill="#c8860a"/>`;
+    zones += `<path d="${sectorPath(a70,0,RO,RI)}" fill="#0a7a3e"/>`;
   } else {
-    // Index: three zones
-    const redEnd   = valToAngle(0.9, g.max);
-    const amberEnd = valToAngle(1.0, g.max);
-    zoneArcs = `
-      <path d="${arcD(START_DEG, redEnd)}"   fill="none" stroke="rgba(255,71,87,0.35)"   stroke-width="${SW}" stroke-linecap="round"/>
-      <path d="${arcD(redEnd, amberEnd)}"     fill="none" stroke="rgba(255,170,0,0.45)"   stroke-width="${SW}" stroke-linecap="round"/>
-      <path d="${arcD(amberEnd, END_DEG)}"    fill="none" stroke="rgba(0,229,160,0.35)"   stroke-width="${SW}" stroke-linecap="round"/>`;
+    // CPI/SPI/TCPI: red 0-0.9, amber 0.9-1.0, green 1.0-1.5
+    const a09 = valToAngle(0.9,g.max), a10 = valToAngle(1.0,g.max);
+    zones  = `<path d="${sectorPath(Math.PI,a09,RO,RI)}" fill="#c0353a"/>`;
+    zones += `<path d="${sectorPath(a09,a10,RO,RI)}" fill="#c8860a"/>`;
+    zones += `<path d="${sectorPath(a10,0,RO,RI)}" fill="#0a7a3e"/>`;
   }
 
-  // Tick marks at key values
-  function tick(v, max, long) {
-    const ang = degToRad(valToAngle(v, max));
-    const r1 = R - SW/2 - 2, r2 = r1 - (long ? 10 : 5);
-    const x1 = CX + r1*Math.cos(ang), y1 = CY + r1*Math.sin(ang);
-    const x2 = CX + r2*Math.cos(ang), y2 = CY + r2*Math.sin(ang);
-    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(255,255,255,.35)" stroke-width="${long?1.5:0.75}"/>`;
-  }
+  // ── Raised outer border ring ──────────────────────────────────────────────
+  const border = `
+    <path d="${sectorPath(Math.PI,0,RO+6,RO)}" fill="#3a4a5c"/>
+    <path d="${sectorPath(Math.PI,0,RO+8,RO+6)}" fill="#1a2535"/>
+    <path d="${sectorPath(Math.PI,0,RI,RI-4)}" fill="#1a2535"/>
+    <path d="${sectorPath(Math.PI,0,RI-4,RI-6)}" fill="#3a4a5c"/>`;
 
+  // ── Tick marks ────────────────────────────────────────────────────────────
   let ticks = '';
-  if (g.isIndex) {
-    [0, 0.5, 0.9, 1.0, 1.25, 1.5].forEach(v => {
-      ticks += tick(v, g.max, [0, 1.0, 1.5].includes(v));
-    });
-  } else {
-    [0, 25, 50, 75, 100].forEach(v => ticks += tick(v, g.max, v%50===0));
-  }
+  const tickVals = g.isIndex
+    ? [{v:0,l:'0'},{v:0.5,l:'.5'},{v:0.9,l:'.9'},{v:1.0,l:'1.0'},{v:1.25,l:'1.25'},{v:1.5,l:'1.5'}]
+    : [{v:0,l:'0'},{v:25,l:'25'},{v:50,l:'50'},{v:75,l:'75'},{v:100,l:'100'}];
 
-  // Tick labels
-  function tickLabel(v, max, label) {
-    const ang = degToRad(valToAngle(v, max));
-    const lr = R - SW/2 - 18;
-    const x = CX + lr*Math.cos(ang), y = CY + lr*Math.sin(ang);
-    return `<text x="${x.toFixed(1)}" y="${(y+4).toFixed(1)}" text-anchor="middle" fill="rgba(255,255,255,.3)" font-family="Courier New" font-size="8">${label}</text>`;
-  }
+  tickVals.forEach(({v,l}) => {
+    const a = valToAngle(v, g.max);
+    const isMajor = g.isIndex ? [0,1.0,1.5].includes(v) : [0,50,100].includes(v);
+    const r1 = RI-6, r2 = isMajor ? r1-10 : r1-5;
+    const p1=pt(r1,a), p2=pt(r2,a);
+    ticks += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="rgba(255,255,255,.55)" stroke-width="${isMajor?1.5:0.75}"/>`;
+    if (isMajor) {
+      const pl=pt(r2-9,a);
+      ticks += `<text x="${pl.x}" y="${(parseFloat(pl.y)+3).toFixed(1)}" text-anchor="middle" fill="rgba(255,255,255,.6)" font-family="Courier New" font-size="8" font-weight="700">${l}</text>`;
+    }
+  });
 
-  let tickLabels = '';
-  if (g.isIndex) {
-    tickLabels = tickLabel(0,g.max,'0') + tickLabel(1.0,g.max,'1.0') + tickLabel(1.5,g.max,'1.5');
-  } else {
-    tickLabels = tickLabel(0,g.max,'0') + tickLabel(50,g.max,'50') + tickLabel(100,g.max,'100');
-  }
-
-  // Needle
+  // ── Red needle ────────────────────────────────────────────────────────────
   let needle = '';
   if (!g.noData && g.value != null) {
-    const ang    = degToRad(valToAngle(g.value, g.max));
-    const tipR   = R - SW/2 - 4;
-    const tipX   = CX + tipR*Math.cos(ang), tipY = CY + tipR*Math.sin(ang);
-    const baseR  = 5;
-    const b1X    = CX + baseR*Math.cos(ang + Math.PI/2), b1Y = CY + baseR*Math.sin(ang + Math.PI/2);
-    const b2X    = CX + baseR*Math.cos(ang - Math.PI/2), b2Y = CY + baseR*Math.sin(ang - Math.PI/2);
-    needle = `<polygon points="${tipX.toFixed(1)},${tipY.toFixed(1)} ${b1X.toFixed(1)},${b1Y.toFixed(1)} ${b2X.toFixed(1)},${b2Y.toFixed(1)}" fill="white" opacity="0.95"/>`;
+    const clampedV = Math.min(g.max, Math.max(0, g.value));
+    const a = valToAngle(clampedV, g.max);
+    const tipLen = RI - 8, baseLen = 10;
+    const tx = CX + tipLen*Math.cos(a), ty = CY + tipLen*Math.sin(a);
+    const bx = CX - baseLen*Math.cos(a), by = CY - baseLen*Math.sin(a);
+    const wx = 4*Math.cos(a+Math.PI/2), wy = 4*Math.sin(a+Math.PI/2);
+    needle = `
+      <polygon points="${tx.toFixed(1)},${ty.toFixed(1)} ${(bx+wx).toFixed(1)},${(by+wy).toFixed(1)} ${(bx-wx).toFixed(1)},${(by-wy).toFixed(1)}"
+        fill="#e03030" stroke="#ff6060" stroke-width="0.5"/>
+      <circle cx="${CX}" cy="${CY}" r="6" fill="#2a3545" stroke="#4a6080" stroke-width="1.5"/>
+      <circle cx="${CX}" cy="${CY}" r="3" fill="#e03030"/>`;
   }
 
+  // ── Value display in center bottom ────────────────────────────────────────
   const displayVal = g.noData ? '—' : g.display;
   const valColor   = g.noData ? 'rgba(255,255,255,.3)' : g.color;
 
-  return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="overflow:visible;">
-      ${zoneArcs}
+  // White value box at bottom
+  const valueBox = `
+    <rect x="${CX-22}" y="${CY+2}" width="44" height="18" rx="3"
+      fill="#0d1520" stroke="rgba(255,255,255,.2)" stroke-width="0.75"/>
+    <text x="${CX}" y="${CY+14}" text-anchor="middle" fill="${valColor}"
+      font-family="Courier New" font-size="11" font-weight="700">${displayVal}</text>`;
+
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      ${border}
+      ${zones}
       ${ticks}
-      ${tickLabels}
       ${needle}
-      <circle cx="${CX}" cy="${CY}" r="5" fill="white" opacity="0.5"/>
-      <text x="${CX}" y="${CY-16}" text-anchor="middle" fill="${valColor}"
-        font-family="Courier New" font-size="16" font-weight="700">${displayVal}</text>
+      ${valueBox}
     </svg>
-    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.12em;">${g.label}</span>
+    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:-4px;">${g.label}</span>
   </div>`;
 }
 </script>
