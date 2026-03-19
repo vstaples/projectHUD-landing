@@ -386,6 +386,65 @@ window.UI = {
 
   // Toast
   toast: showToast,
+
+  // ── Dashboard-specific helpers ─────────────────────────────────────────────
+
+  // "All clear" empty state card
+  allClear(title, message) {
+    return `<div style="text-align:center;padding:32px 16px;color:var(--text3,#7a8099)">
+      <div style="font-size:28px;margin-bottom:8px">✓</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;
+        color:var(--text2,#b0b8c8);margin-bottom:4px">${escHtml(title)}</div>
+      <div style="font-size:11px">${escHtml(message)}</div>
+    </div>`;
+  },
+
+  // Percentage calculation — safe division, returns integer 0–100
+  pct(done, total) {
+    if (!total || total === 0) return 0;
+    return Math.round((done / total) * 100);
+  },
+
+  // Days until a date — returns integer (negative = overdue)
+  daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const target = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+    const today  = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((target - today) / 86400000);
+  },
+
+  // Progress bar HTML
+  progressBar(pct, fillColor = 'var(--accent,#4f8ef7)', height = 4) {
+    const capped = Math.min(100, Math.max(0, pct));
+    return `<div style="width:100%;background:rgba(255,255,255,.08);
+        border-radius:${height}px;height:${height}px;margin:8px 0;overflow:hidden">
+      <div style="width:${capped}%;height:100%;border-radius:${height}px;
+        background:${fillColor};transition:width .4s ease"></div>
+    </div>`;
+  },
+
+  // CPI / SPI index color — green ≥ 1.0, amber 0.9–1.0, red < 0.9
+  indexColor(value) {
+    const v = parseFloat(value);
+    if (isNaN(v))  return 'var(--text3,#7a8099)';
+    if (v >= 1.0)  return 'var(--green,#2a9d40)';
+    if (v >= 0.9)  return 'var(--amber,#d4901f)';
+    return 'var(--red,#c0404a)';
+  },
+
+  // Overdue flag — true if date string is before today and status not complete
+  isOverdue(dateStr, status) {
+    if (!dateStr || status === 'complete') return false;
+    return dateStr.substring(0, 10) < new Date().toLocaleDateString('en-CA');
+  },
+
+  // Health label from project/task metrics
+  healthLabel(overdue, blocked) {
+    if (blocked > 0) return { health: 'blocked', label: 'BLOCKED' };
+    if (overdue > 0) return { health: 'at-risk',  label: 'AT RISK' };
+    return             { health: 'active',   label: 'ACTIVE' };
+  },
 };
 
 // Also expose top-level for backward compatibility with existing pages
