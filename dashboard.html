@@ -403,7 +403,7 @@ async function loadDashboard() {
           <!-- ROW 2: Client · LABOR · EXPENSE (centered, inline) · Days remaining -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;">
             <div class="proj-client" style="flex-shrink:0">${client}${proj.phase?' · '+proj.phase:''}</div>
-            <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);font-size:10px;flex:1;justify-content:center;">
+            <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);font-size:11px;flex:1;justify-content:center;">
               ${laborBudget > 0 ? `<span>
                 <span style="color:var(--text3);letter-spacing:.07em">LABOR </span>
                 <span style="color:var(--text1)">${laborBudget.toFixed(0)}h</span>
@@ -424,27 +424,26 @@ async function loadDashboard() {
           <!-- ROW 3: Progress bar full width -->
           ${UI.progressBar(pctDone,fill)}
 
-          <!-- ROW 3b: P25/P50/P80 centered · PM right-justified -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;margin-bottom:2px;">
-            <div style="flex:1"></div>
-            <div style="flex:0 0 auto;display:flex;align-items:center;gap:0;
-                font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;">
-              ${evm.p25Date ? `
-              <span style="color:var(--green);padding:2px 6px;background:rgba(0,229,160,.08);
+          <!-- ROW 3b: P25/P50/P80 absolutely centered · PM right -->
+          <div style="position:relative;display:flex;align-items:center;
+              justify-content:center;margin-top:5px;margin-bottom:4px;min-height:22px;">
+            ${evm.p25Date ? `
+            <div style="display:flex;align-items:center;gap:0;
+                font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;">
+              <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
                   border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px;white-space:nowrap">
                 P25 ${UI.fmtDateShort(evm.p25Date)}</span>
-              <span style="color:var(--cyan);padding:2px 6px;background:rgba(0,210,255,.08);
+              <span style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
                   border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2);white-space:nowrap">
-                ▼P50 ${UI.fmtDateShort(evm.p50Date)}</span>
-              <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 6px;
+                ▼ P50 ${UI.fmtDateShort(evm.p50Date)}</span>
+              <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
                   background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);
                   border-radius:0 3px 3px 0;white-space:nowrap">
-                P80 ${UI.fmtDateShort(evm.p80Date)}</span>` : ''}
-            </div>
-            <div style="flex:1;display:flex;justify-content:flex-end;">
-              ${pmName ? `<span style="font-family:var(--font-mono);font-size:10px;
-                color:var(--text3)">PM: <span style="color:var(--text1)">${pmName}</span></span>` : ''}
-            </div>
+                P80 ${UI.fmtDateShort(evm.p80Date)}</span>
+            </div>` : ''}
+            ${pmName ? `
+            <span style="position:absolute;right:0;font-family:var(--font-mono);font-size:10px;
+              color:var(--text3);letter-spacing:.06em">PM: <span style="color:var(--text1)">${pmName}</span></span>` : ''}
           </div>
 
           <!-- ROW 4: EVM stats (left) · TARGET · FORECAST · TCPI · EAC (right) -->
@@ -463,7 +462,7 @@ async function loadDashboard() {
             </div>
             ${evm.p50Date ? `
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-              <div style="display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:10px;">
+              <div style="display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:11px;">
                 <span>
                   <span style="color:var(--text3);letter-spacing:.08em">TARGET </span>
                   <span style="color:var(--text1)">${UI.fmtDateShort(proj.target_date)}</span>
@@ -476,11 +475,11 @@ async function loadDashboard() {
                     ${!evm.slipDays||evm.slipDays<=0?' ✓ On track':' +'+evm.slipDays+'d'}</span>
                 </span>
               </div>
-              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
                 ${evm.tcpi?`<span>TCPI <span style="color:${UI.indexColor(evm.tcpi)};font-weight:700">${tcpi}</span></span>`:''}
                 ${evm.eac&&proj.budget_baseline_hours?`<span>EAC <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
                   ${evm.eac.toFixed(0)}h${evm.cv>0?' +'+evm.cv.toFixed(0)+'h':''}</span></span>`:''}
-                <span style="font-size:10px;color:var(--text3);font-style:italic">${evm.diagnosis}</span>
+                <span style="font-size:11px;color:var(--text3);font-style:italic">${evm.diagnosis}</span>
               </div>
             </div>` : ''}
           </div>
