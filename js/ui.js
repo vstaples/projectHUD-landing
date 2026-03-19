@@ -445,6 +445,86 @@ window.UI = {
     if (overdue > 0) return { health: 'at-risk',  label: 'AT RISK' };
     return             { health: 'active',   label: 'ACTIVE' };
   },
+
+  // Due date label — returns { text, color } for task rows
+  // e.g. "TODAY", "2d", "OVERDUE 5d", "Mar 21"
+  dueDateLabel(dateStr) {
+    if (!dateStr) return { text: '—', color: 'var(--text3,#7a8099)' };
+    const days = this.daysUntil(dateStr);
+    if (days === 0)  return { text: 'TODAY',          color: 'var(--amber,#d4901f)' };
+    if (days === 1)  return { text: 'TOMORROW',       color: 'var(--amber,#d4901f)' };
+    if (days > 1 && days <= 7)
+                     return { text: days + 'd',        color: 'var(--cyan,#00d2ff)' };
+    if (days > 7)    return { text: fmtDate(dateStr),  color: 'var(--text3,#7a8099)' };
+    // Overdue (days < 0)
+    return           { text: 'OVERDUE ' + Math.abs(days) + 'd', color: 'var(--red,#c0404a)' };
+  },
+
+  // Task status dot — small colored circle indicator
+  taskDot(status) {
+    const colors = {
+      complete:    'var(--green,#2a9d40)',
+      in_progress: 'var(--cyan,#00d2ff)',
+      blocked:     'var(--red,#c0404a)',
+      overdue:     'var(--red,#c0404a)',
+      ready:       'var(--amber,#d4901f)',
+      not_started: 'rgba(255,255,255,.2)',
+    };
+    const color = colors[status] || 'rgba(255,255,255,.2)';
+    return `<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+      background:${color};
+      box-shadow:${color !== 'rgba(255,255,255,.2)' ? '0 0 6px ' + color : 'none'}">
+    </div>`;
+  },
+
+  // Status badge pill — monospace, compact, dashboard style
+  badge(status) {
+    const map = {
+      complete:    ['DONE',        'var(--green,#2a9d40)',   'rgba(0,229,160,.1)',  'rgba(0,229,160,.3)'],
+      in_progress: ['IN PROGRESS', 'var(--cyan,#00d2ff)',    'rgba(0,210,255,.08)', 'rgba(0,210,255,.3)'],
+      blocked:     ['BLOCKED',     'var(--red,#c0404a)',     'rgba(255,71,87,.08)', 'rgba(255,71,87,.35)'],
+      overdue:     ['OVERDUE',     'var(--red,#c0404a)',     'rgba(255,71,87,.08)', 'rgba(255,71,87,.35)'],
+      ready:       ['READY',       'var(--amber,#d4901f)',   'rgba(255,170,0,.08)', 'rgba(255,170,0,.3)'],
+      not_started: ['NOT STARTED', 'var(--text3,#7a8099)',  'rgba(255,255,255,.04)','rgba(255,255,255,.1)'],
+    };
+    const [label, color, bg, border] = map[status] || map.not_started;
+    return `<span style="font-family:var(--font-mono,monospace);font-size:9px;
+      letter-spacing:.1em;padding:2px 7px;
+      color:${color};background:${bg};border:1px solid ${border};
+      white-space:nowrap;flex-shrink:0">${label}</span>`;
+  },
+
+  // Circular SVG gauge — used for EVM widgets (WORK %, CPI, SPI)
+  // value: current value, max: scale max, color: stroke color,
+  // label: text below, display: center text
+  gauge(value, max, color, label, display) {
+    const pct    = Math.min(1, Math.max(0, value / max));
+    const r      = 28;
+    const cx     = 36;
+    const cy     = 36;
+    const circ   = 2 * Math.PI * r;
+    const dash   = pct * circ;
+    const gap    = circ - dash;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <!-- Track -->
+        <circle cx="${cx}" cy="${cy}" r="${r}"
+          fill="none" stroke="rgba(255,255,255,.07)" stroke-width="5"/>
+        <!-- Fill — starts at 12 o'clock (rotate -90deg) -->
+        <circle cx="${cx}" cy="${cy}" r="${r}"
+          fill="none" stroke="${color}" stroke-width="5"
+          stroke-linecap="round"
+          stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+          transform="rotate(-90 ${cx} ${cy})"/>
+        <!-- Center value -->
+        <text x="${cx}" y="${cy + 5}" text-anchor="middle"
+          font-family="var(--font-mono,monospace)" font-size="13"
+          font-weight="700" fill="${color}">${escHtml(String(display))}</text>
+      </svg>
+      <div style="font-family:var(--font-mono,monospace);font-size:9px;
+        letter-spacing:.12em;color:var(--text3,#7a8099)">${escHtml(label)}</div>
+    </div>`;
+  },
 };
 
 // Also expose top-level for backward compatibility with existing pages
