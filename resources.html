@@ -735,10 +735,15 @@ function renderNeedsResources() {
     });
 
   // ── Milestone health ─────────────────────────────────────────────────────────
-  const troubledMilestones = milestones.filter(m =>
-    m.status === 'at_risk' || m.status === 'missed' ||
-    (m.target_date && m.target_date < today && m.status !== 'complete')
-  );
+  // Only flag milestones explicitly marked at_risk/missed, OR overdue after 2025
+  // (guards against legacy WBS phase rows seeded with 2020 dates)
+  const troubledMilestones = milestones.filter(m => {
+    if (m.status === 'at_risk' || m.status === 'missed') return true;
+    if (m.target_date && m.target_date < today && m.status !== 'complete') {
+      return parseInt(m.target_date.substring(0,4)) >= 2025;
+    }
+    return false;
+  });
 
   // ── If nothing is troubled — show healthy state ───────────────────────────
   if (!troubledTasks.length && !troubledMilestones.length) {
@@ -952,41 +957,98 @@ function renderNeedsResources() {
   const topNeeded = Object.entries(skillDemand)
     .sort(([,a],[,b]) => b-a).slice(0,3).map(([k]) => k);
 
+  // ── Per-project failure breakdown for executive summary ────────────────────
+  const projectSummaryRows = Object.entries(byProject).map(([pid, ptasks]) => {
+    const proj     = projects.find(p => p.id === pid);
+    const overdue  = ptasks.filter(t => t._class.severity === 'overdue' || t._class.severity === 'critical');
+    const blocked  = ptasks.filter(t => t._class.severity === 'blocked');
+    const atRisk   = ptasks.filter(t => t._class.severity === 'at-risk' || t._class.severity === 'stalled');
+
+    // What phases are in trouble?
+    const failingPhases = [...new Set(ptasks.map(t => t.phase||'').filter(Boolean))];
+
+    // What skills do the troubled tasks need? (derive from rescuers with skill matches)
+    const neededSkills = [];
+    ptasks.forEach(t => {
+      const { candidates } = findRescueCandidates(t);
+      candidates.filter(c => c.matchedSkills.length > 0 && (c.matchedSkills[0].proficiency === 'authority' || c.matchedSkills[0].proficiency === 'expert'))
+        .forEach(c => c.matchedSkills.forEach(s => {
+          if (!neededSkills.find(ns => ns.name === s.name)) neededSkills.push(s);
+        }));
+    });
+
+    return `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:10px 12px;font-size:12px;font-weight:600;vertical-align:top">
+          ${escHtml(proj?.name||'Unknown')}
+        </td>
+        <td style="padding:10px 12px;vertical-align:top">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            ${overdue.length ? `<span style="font-size:11px;color:#f07a7a;font-weight:600">
+              ⚠ ${overdue.length} overdue</span>` : ''}
+            ${blocked.length ? `<span style="font-size:11px;color:#f07a7a">
+              ✖ ${blocked.length} blocked</span>` : ''}
+            ${atRisk.length  ? `<span style="font-size:11px;color:var(--amber)">
+              ⚑ ${atRisk.length} at risk (14d)</span>` : ''}
+          </div>
+        </td>
+        <td style="padding:10px 12px;vertical-align:top;font-size:11px;color:var(--muted)">
+          ${failingPhases.slice(0,3).map(p => `<div>${escHtml(p)}</div>`).join('')}
+          ${failingPhases.length > 3 ? `<div style="color:var(--muted)">+${failingPhases.length-3} more phases</div>` : ''}
+        </td>
+        <td style="padding:10px 12px;vertical-align:top">
+          ${neededSkills.length > 0
+            ? neededSkills.slice(0,3).map(s => `
+                <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+                  <span style="font-size:11px;color:var(--text)">${escHtml(s.name)}</span>
+                  ${profBadge(s.proficiency)}
+                </div>`).join('')
+            : `<span style="font-size:10px;color:var(--muted);font-style:italic">Derive from task detail</span>`}
+        </td>
+        <td style="padding:10px 12px;vertical-align:top;font-size:11px;color:#7af0a0">
+          ${intel.filter(i => i.freePct >= 20 && i.mySkills.length > 0).length} available
+        </td>
+      </tr>`;
+  }).join('');
+
   const strip = `
-    <div style="background:rgba(192,64,74,.06);border:1px solid rgba(192,64,74,.2);
-        border-radius:8px;padding:16px 20px;margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
-          letter-spacing:.08em;color:#f07a7a;margin-bottom:12px">
-        ⚠ Project rescue needed — ${troubledTasks.length} task${troubledTasks.length!==1?'s':''} failing across ${Object.keys(byProject).length} project${Object.keys(byProject).length!==1?'s':''}
+    <div style="background:var(--surface);border:1px solid var(--border);
+        border-radius:8px;overflow:hidden;margin-bottom:24px">
+
+      <!-- Header -->
+      <div style="background:rgba(192,64,74,.08);border-bottom:1px solid rgba(192,64,74,.2);
+          padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#f07a7a;margin-bottom:2px">
+            ⚠ Resource rescue required across ${Object.keys(byProject).length} project${Object.keys(byProject).length!==1?'s':''}
+          </div>
+          <div style="font-size:11px;color:var(--muted)">
+            ${criticalCount > 0 ? `${criticalCount} task${criticalCount!==1?'s':''} overdue now · ` : ''}
+            ${blockedCount > 0 ? `${blockedCount} blocked · ` : ''}
+            ${atRiskCount > 0 ? `${atRiskCount} at risk in 14 days · ` : ''}
+            ${rescuersAvail} available rescuers on bench
+          </div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px">
-        <div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Overdue now</div>
-          <div style="font-size:22px;font-weight:700;color:#f07a7a">${criticalCount}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Blocked</div>
-          <div style="font-size:22px;font-weight:700;color:#f07a7a">${blockedCount}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">At risk (14d)</div>
-          <div style="font-size:22px;font-weight:700;color:var(--amber)">${atRiskCount}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Available rescuers</div>
-          <div style="font-size:22px;font-weight:700;color:#7af0a0">${rescuersAvail}</div>
-        </div>
-        ${troubledMilestones.length > 0 ? `<div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Milestones at risk</div>
-          <div style="font-size:22px;font-weight:700;color:var(--amber)">${troubledMilestones.length}</div>
-        </div>` : ''}
-      </div>
-      ${topNeeded.length > 0 ? `
-        <div style="font-size:11px;color:var(--muted)">
-          Skills most in demand across failing tasks:
-          ${topNeeded.map(s => `<span style="margin-left:6px;padding:2px 8px;border-radius:3px;
-            background:rgba(255,255,255,.06);color:var(--text);font-size:11px">${escHtml(s)}</span>`).join('')}
-        </div>` : ''}
+
+      <!-- Per-project breakdown table -->
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);background:var(--surf2)">
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;
+                text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:22%">Project</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;
+                text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:18%">Status</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;
+                text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:25%">Failing phases</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;
+                text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:25%">Skills needed</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;
+                text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:10%">Bench</th>
+          </tr>
+        </thead>
+        <tbody>${projectSummaryRows}</tbody>
+      </table>
     </div>`;
 
   // ── Milestone warnings ───────────────────────────────────────────────────────
@@ -1018,12 +1080,19 @@ function renderNeedsResources() {
     const overdueHere = ptasks.filter(t => t._class.severity === 'overdue' || t._class.severity === 'critical').length;
     return `
       <div style="margin-bottom:20px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-          <div style="font-size:13px;font-weight:700">${escHtml(proj?.name||'Unknown project')}</div>
-          <span style="font-size:10px;padding:2px 8px;border-radius:4px;
-            background:rgba(192,64,74,.1);color:#f07a7a">${ptasks.length} failing</span>
-          ${overdueHere > 0 ? `<span style="font-size:10px;padding:2px 8px;border-radius:4px;
-            background:rgba(192,64,74,.15);color:#f07a7a;font-weight:700">${overdueHere} overdue</span>` : ''}
+        <div style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <div style="font-size:14px;font-weight:700">${escHtml(proj?.name||'Unknown project')}</div>
+            ${overdueHere > 0 ? `<span style="font-size:10px;padding:2px 8px;border-radius:4px;
+              background:rgba(192,64,74,.15);color:#f07a7a;font-weight:700">⚠ ${overdueHere} overdue now</span>` : ''}
+            ${ptasks.filter(t=>t._class.severity==='blocked').length > 0 ? `<span style="font-size:10px;padding:2px 8px;border-radius:4px;
+              background:rgba(192,64,74,.1);color:#f07a7a">✖ ${ptasks.filter(t=>t._class.severity==='blocked').length} blocked</span>` : ''}
+            ${ptasks.filter(t=>t._class.severity==='at-risk'||t._class.severity==='stalled').length > 0 ? `<span style="font-size:10px;padding:2px 8px;border-radius:4px;
+              background:rgba(212,144,31,.12);color:var(--amber)">⚑ ${ptasks.filter(t=>t._class.severity==='at-risk'||t._class.severity==='stalled').length} at risk</span>` : ''}
+          </div>
+          <div style="font-size:11px;color:var(--muted)">
+            Scroll down for task detail and rescue candidates ↓
+          </div>
         </div>
         ${ptasks.map(renderTaskCard).join('')}
       </div>`;
