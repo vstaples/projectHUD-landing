@@ -96,6 +96,9 @@ body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var
   border-radius:8px; padding:14px; transition:border-color .15s; cursor:pointer;
 }
 .resource-card:hover { border-color:var(--border2); }
+.resource-card.over  { border-left:3px solid #f07a7a; }
+.resource-card.at-risk { border-left:3px solid var(--amber); }
+.resource-card.free  { border-left:3px solid #7af0a0; }
 .rc-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .rc-av {
   width:40px; height:40px; border-radius:50%; flex-shrink:0;
@@ -473,103 +476,209 @@ function renderContent() {
 }
 
 // ── ROSTER ────────────────────────────────────────────────────────────────────
-function renderRoster() {
-  const avatarColors = ['#1a3a6e','#2a7a4e','#6a2a6e','#4a2a1e','#1a5a4e','#5a3a1e'];
-
-  if (!resources.length) return `<div class="empty-state">
-    <div class="ei">👥</div><div class="et">No team members</div>
-    <div class="es">Add resources to get started</div></div>`;
-
+function computeResourceIntelligence() {
   const today = new Date().toLocaleDateString('en-CA');
+  return resources.map(r => {
+    const avail = parseFloat(r.availability_pct || 100);
 
-  // Summary strip
-  const activeCount  = resources.filter(r => r.is_active).length;
-  const overAllocated = resources.filter(r => {
-    const allocs = allocations.filter(a => a.resource_id === r.id &&
-      a.start_date <= today && a.end_date >= today);
-    const total = allocs.reduce((s, a) => s + parseFloat(a.allocation_pct || 0), 0);
-    return total > (parseFloat(r.availability_pct || 100));
-  }).length;
-  const totalBillable = timeEntries.filter(t => t.is_billable).reduce((s, t) => s + parseFloat(t.hours || 0), 0);
-
-  const strip = `<div class="summary-strip">
-    <div class="sum-card"><div class="sum-label">Team size</div>
-      <div class="sum-value">${activeCount}</div>
-      <div class="sum-sub">active resources</div></div>
-    <div class="sum-card"><div class="sum-label">Roles</div>
-      <div class="sum-value">${hudRoles.length}</div>
-      <div class="sum-sub">defined roles</div></div>
-    <div class="sum-card"><div class="sum-label">Over-allocated</div>
-      <div class="sum-value" style="color:${overAllocated>0?'#f07a7a':'#7af0a0'}">${overAllocated}</div>
-      <div class="sum-sub">resources</div></div>
-    <div class="sum-card"><div class="sum-label">Billable hours</div>
-      <div class="sum-value" style="color:var(--accent)">${totalBillable.toFixed(0)}</div>
-      <div class="sum-sub">total logged</div></div>
-  </div>`;
-
-  const cards = resources.map((r, i) => {
-    const role      = hudRoles.find(h => h.id === r.hud_role_id);
-    const initials  = ((r.first_name?.[0] || '') + (r.last_name?.[0] || '')).toUpperCase();
-    const bgColor   = avatarColors[i % avatarColors.length];
-    const avail     = parseFloat(r.availability_pct || 100);
-
-    // Current allocation
-    const curAllocs = allocations.filter(a => a.resource_id === r.id &&
-      a.start_date <= today && a.end_date >= today);
-    const allocPct  = curAllocs.reduce((s, a) => s + parseFloat(a.allocation_pct || 0), 0);
-    const freeCapacity = Math.max(0, avail - allocPct);
+    // Current allocations
+    const curAllocs = allocations.filter(a =>
+      a.resource_id === r.id && a.start_date <= today && a.end_date >= today);
+    const allocPct  = curAllocs.reduce((s,a) => s + parseFloat(a.allocation_pct||0), 0);
+    const freePct   = Math.max(0, avail - allocPct);
     const isOver    = allocPct > avail;
-    const fillColor = isOver ? 'var(--red)' : allocPct > avail * 0.8 ? 'var(--amber)' : 'var(--green)';
 
-    // Recent hours
-    const recentHrs = timeEntries
-      .filter(t => t.user_id === r.user_id)
-      .slice(0, 10)
-      .reduce((s, t) => s + parseFloat(t.hours || 0), 0);
+    // Assigned tasks
+    const myTasks   = tasks.filter(t => t.assigned_to === r.user_id);
+    const overdueTasks = myTasks.filter(t =>
+      t.due_date && t.due_date < today && t.status !== 'complete');
+    const activeTasks  = myTasks.filter(t =>
+      t.status === 'in_progress' || t.status === 'ready');
+
+    // Hours logged
+    const myEntries = timeEntries.filter(t => t.user_id === r.user_id);
+    const billableHrs   = myEntries.filter(e => e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+    const nonBillableHrs= myEntries.filter(e=>!e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+    const totalHrs  = billableHrs + nonBillableHrs;
+    const billPct   = totalHrs > 0 ? Math.round((billableHrs/totalHrs)*100) : 0;
+
+    // Skills
+    const mySkills  = resourceSkills.filter(s => s.resource_id === r.id);
 
     // Active projects
-    const activeProj = [...new Set(curAllocs.map(a => a.project_id))]
-      .map(pid => projects.find(p => p.id === pid)?.name)
+    const activeProjects = [...new Set(curAllocs.map(a=>a.project_id))]
+      .map(pid => projects.find(p=>p.id===pid))
       .filter(Boolean);
 
-    return `<div class="resource-card" onclick="openResourceDetail('${r.id}')">
+    // Health status
+    let health, healthLabel, healthColor;
+    if (isOver)             { health='over';    healthLabel='⚠ Over-allocated'; healthColor='#f07a7a'; }
+    else if (overdueTasks.length>0) { health='at-risk'; healthLabel='⚑ Has overdue tasks'; healthColor='var(--amber)'; }
+    else if (freePct >= 50) { health='free';    healthLabel='✓ Available';       healthColor='#7af0a0'; }
+    else                    { health='busy';    healthLabel='● Busy';             healthColor='var(--accent)'; }
+
+    return { r, avail, allocPct, freePct, isOver, curAllocs, myTasks,
+             overdueTasks, activeTasks, billableHrs, nonBillableHrs,
+             totalHrs, billPct, mySkills, activeProjects,
+             health, healthLabel, healthColor };
+  });
+}
+
+function renderRoster() {
+  const avatarColors = ['#1a3a6e','#2a7a4e','#6a2a6e','#4a2a1e','#1a5a4e','#5a3a1e'];
+  if (!resources.length) return `<div class="empty-state">
+    <div class="ei">👥</div><div class="et">No team members</div></div>`;
+
+  const intel     = computeResourceIntelligence();
+  const today     = new Date().toLocaleDateString('en-CA');
+  const activeCount   = resources.filter(r=>r.is_active).length;
+  const overCount     = intel.filter(i=>i.isOver).length;
+  const freeCount     = intel.filter(i=>i.health==='free').length;
+  const atRiskCount   = intel.filter(i=>i.overdueTasks.length>0).length;
+  const totalBillable = intel.reduce((s,i)=>s+i.billableHrs,0);
+  const totalLogged   = intel.reduce((s,i)=>s+i.totalHrs,0);
+  const firmBillPct   = totalLogged>0?Math.round((totalBillable/totalLogged)*100):0;
+
+  const strip = `<div class="summary-strip">
+    <div class="sum-card">
+      <div class="sum-label">Team size</div>
+      <div class="sum-value">${activeCount}</div>
+      <div class="sum-sub">active resources</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Available now</div>
+      <div class="sum-value" style="color:#7af0a0">${freeCount}</div>
+      <div class="sum-sub">≥50% capacity free</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Over-allocated</div>
+      <div class="sum-value" style="color:${overCount>0?'#f07a7a':'#7af0a0'}">${overCount}</div>
+      <div class="sum-sub">${overCount>0?'Needs attention':'All clear'}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Overdue tasks</div>
+      <div class="sum-value" style="color:${atRiskCount>0?'var(--amber)':'#7af0a0'}">${atRiskCount}</div>
+      <div class="sum-sub">resources affected</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Billable hours</div>
+      <div class="sum-value" style="color:var(--accent)">${totalBillable.toFixed(0)}</div>
+      <div class="sum-sub">${firmBillPct}% of ${totalLogged.toFixed(0)}h total</div>
+    </div>
+  </div>
+  ${overCount>0 ? renderIntelligenceAlerts(intel) : ''}`;
+
+  const cards = intel.map((info, i) => {
+    const { r, avail, allocPct, freePct, isOver, curAllocs,
+            myTasks, overdueTasks, activeTasks,
+            billableHrs, totalHrs, billPct,
+            mySkills, activeProjects, health, healthLabel, healthColor } = info;
+    const role     = hudRoles.find(h => h.id === r.hud_role_id);
+    const initials = ((r.first_name?.[0]||'')+(r.last_name?.[0]||'')).toUpperCase();
+    const bgColor  = avatarColors[i % avatarColors.length];
+    const fillColor = isOver ? 'var(--red)' : allocPct > avail*0.8 ? 'var(--amber)' : 'var(--green)';
+    const topSkills = mySkills.slice(0,3).map(s=>s.skill_name).filter(Boolean);
+
+    return `<div class="resource-card ${health}" onclick="openResourceDetail('${r.id}')">
       <div class="rc-head">
         <div class="rc-av" style="background:${bgColor}22;color:${bgColor}">${initials}</div>
         <div style="flex:1;min-width:0">
-          <div class="rc-name">${escHtml(r.first_name || '')} ${escHtml(r.last_name || '')}</div>
-          <div class="rc-role">${escHtml(r.title || role?.name || '—')}
-            ${r.location ? ' · ' + escHtml(r.location) : ''}</div>
+          <div class="rc-name">${escHtml(r.first_name||'')} ${escHtml(r.last_name||'')}</div>
+          <div class="rc-role">${escHtml(r.title||role?.name||'—')}${r.location?' · '+escHtml(r.location):''}</div>
         </div>
-        <button class="btn btn-sm" onclick="event.stopPropagation();openAddAllocation('${r.id}')"
-          style="flex-shrink:0">+ Allocate</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span style="font-size:10px;font-weight:600;color:${healthColor}">${healthLabel}</span>
+          <button class="btn btn-sm" onclick="event.stopPropagation();openAddAllocation('${r.id}')">+ Allocate</button>
+        </div>
       </div>
+
       <div class="rc-meta">
-        ${r.level ? `<span class="rc-chip">${capitalize(r.level)}</span>` : ''}
-        ${role ? `<span class="rc-chip amber">${escHtml(role.abbreviation || role.name)}</span>` : ''}
-        ${isOver
-          ? `<span class="rc-chip red">Over-allocated</span>`
-          : freeCapacity > 20
-          ? `<span class="rc-chip green">${freeCapacity.toFixed(0)}% free</span>`
-          : `<span class="rc-chip amber">${freeCapacity.toFixed(0)}% free</span>`}
-        ${recentHrs > 0 ? `<span class="rc-chip">${recentHrs.toFixed(1)}h logged</span>` : ''}
+        ${r.level?`<span class="rc-chip">${capitalize(r.level)}</span>`:''}
+        ${role?`<span class="rc-chip amber">${escHtml(role.abbreviation||role.name)}</span>`:''}
+        <span class="rc-chip ${freePct>=50?'green':freePct>0?'amber':'red'}">${freePct.toFixed(0)}% free</span>
+        ${overdueTasks.length>0?`<span class="rc-chip red">⚠ ${overdueTasks.length} overdue</span>`:''}
+        ${activeTasks.length>0?`<span class="rc-chip">${activeTasks.length} active tasks</span>`:''}
       </div>
-      ${activeProj.length > 0 ? `
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
-          ${activeProj.map(p => `<span style="margin-right:6px">📁 ${escHtml(p)}</span>`).join('')}
-        </div>` : ''}
+
+      ${activeProjects.length>0?`
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px">
+          ${activeProjects.map(p=>`<span style="background:var(--surf3);padding:1px 6px;border-radius:4px">
+            📁 ${escHtml(p.name)}</span>`).join('')}
+        </div>` : '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-style:italic">No active allocations</div>'}
+
+      ${topSkills.length>0?`
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">
+          🔧 ${topSkills.map(s=>`<span style="margin-right:4px">${escHtml(s)}</span>`).join('')}
+        </div>`:''}
+
       <div class="rc-avail">
         <div class="rc-avail-label">
-          <span>Allocation ${allocPct.toFixed(0)}% of ${avail.toFixed(0)}% available</span>
-          <span style="color:${isOver?'#f07a7a':'var(--muted)'}">${isOver?'⚠ Over':'OK'}</span>
+          <span>${allocPct.toFixed(0)}% allocated of ${avail.toFixed(0)}% available</span>
+          <span style="color:var(--muted)">${totalHrs>0?totalHrs.toFixed(0)+'h logged · '+billPct+'% billable':''}</span>
         </div>
-        <div class="avail-bar">
-          <div class="avail-fill" style="width:${Math.min(100,(allocPct/avail)*100).toFixed(0)}%;background:${fillColor}"></div>
+        <div class="avail-bar" style="height:6px">
+          <div class="avail-fill" style="width:${Math.min(100,allocPct/avail*100).toFixed(0)}%;background:${fillColor}"></div>
         </div>
       </div>
     </div>`;
   }).join('');
 
   return strip + `<div class="roster-grid">${cards}</div>`;
+}
+
+// ── Intelligence alerts banner ────────────────────────────────────────────────
+function renderIntelligenceAlerts(intel) {
+  const overItems = intel.filter(i=>i.isOver);
+  const atRisk    = intel.filter(i=>i.overdueTasks.length>0);
+  const freeItems = intel.filter(i=>i.health==='free' && i.mySkills.length>0);
+
+  let alerts = [];
+
+  overItems.forEach(info => {
+    const excess = (info.allocPct - info.avail).toFixed(0);
+    const projNames = info.curAllocs.map(a=>projects.find(p=>p.id===a.project_id)?.name||'?').join(', ');
+    // Find a free resource with matching skills
+    const mySkillNames = info.mySkills.map(s=>s.skill_name);
+    const candidates = intel.filter(other =>
+      other.r.id !== info.r.id &&
+      other.freePct >= 20 &&
+      other.mySkills.some(s => mySkillNames.includes(s.skill_name))
+    ).slice(0,2);
+    const suggestion = candidates.length>0
+      ? ` Consider offloading to: ${candidates.map(c=>`${c.r.first_name} ${c.r.last_name} (${c.freePct.toFixed(0)}% free)`).join(', ')}.`
+      : '';
+    alerts.push({
+      type: 'error',
+      icon: '⚠',
+      title: `${info.r.first_name} ${info.r.last_name} is over-allocated by ${excess}%`,
+      body:  `Assigned to: ${projNames}.${suggestion}`
+    });
+  });
+
+  atRisk.forEach(info => {
+    alerts.push({
+      type: 'warning',
+      icon: '⚑',
+      title: `${info.r.first_name} ${info.r.last_name} has ${info.overdueTasks.length} overdue task${info.overdueTasks.length!==1?'s':''}`,
+      body:  info.overdueTasks.slice(0,2).map(t=>t.name).join(', ') + (info.overdueTasks.length>2?'…':'')
+    });
+  });
+
+  if (!alerts.length) return '';
+  const colors = { error:['rgba(192,64,74,.15)','#f07a7a'], warning:['rgba(212,144,31,.12)','var(--amber)'] };
+  return `<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:6px">
+    ${alerts.map(a => {
+      const [bg,color] = colors[a.type];
+      return `<div style="background:${bg};border:1px solid ${color}33;border-radius:8px;
+          padding:10px 14px;display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">${a.icon}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:${color};margin-bottom:2px">${escHtml(a.title)}</div>
+          <div style="font-size:11px;color:var(--muted)">${escHtml(a.body)}</div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 // ── CAPACITY HEATMAP ─────────────────────────────────────────────────────────
@@ -816,7 +925,26 @@ function renderUtilization() {
       </div>`;
     }).join('');
 
-  return strip + `<div class="util-grid">
+  return strip + `
+  <div style="margin-bottom:20px;background:var(--surface);border:1px solid var(--border);
+    border-radius:8px;padding:16px">
+    <div style="display:flex;justify-content:space-between;font-size:11px;
+      color:var(--muted);margin-bottom:8px">
+      <span style="font-weight:600;color:var(--text)">Firm-wide billable ratio</span>
+      <span style="font-weight:700;color:${billablePct>=70?'#7af0a0':billablePct>=50?'var(--accent)':'var(--amber)'}">
+        ${billablePct}% billable</span>
+    </div>
+    <div style="height:12px;background:rgba(255,255,255,.06);border-radius:6px;overflow:hidden;display:flex">
+      <div style="width:${billablePct}%;background:#7af0a0;transition:width .5s;border-radius:6px 0 0 6px"></div>
+      <div style="flex:1;background:rgba(212,144,31,.4)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px">
+      <span style="color:#7af0a0">■ Billable: ${totalBillable.toFixed(1)}h</span>
+      <span style="color:var(--amber)">■ Non-billable: ${totalNonBillable.toFixed(1)}h</span>
+      <span>Total logged: ${totalHours.toFixed(1)}h</span>
+    </div>
+  </div>
+  <div class="util-grid">
     <div class="util-card">
       <div class="util-card-title">Hours by person</div>
       ${utilRows || '<div style="color:var(--muted);font-size:12px">No time logged yet</div>'}
