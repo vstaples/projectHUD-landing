@@ -202,9 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadDashboard() {
   try {
-    const [projects, tasks, users, firms, timeEntries] = await Promise.all([
+    const [projects, tasks, users, firms, timeEntries, resources] = await Promise.all([
       API.getProjects(), API.getTasks(), API.getUsers(), API.getFirms(),
-      API.get('time_entries?select=project_id,hours,is_billable,date&limit=1000').catch(()=>[])
+      API.get('time_entries?select=project_id,hours,is_billable,date&limit=1000').catch(()=>[]),
+      API.get('resources?select=id,first_name,last_name,user_id&is_active=eq.true').catch(()=>[])
     ]);
 
     const activeProjects  = projects.filter(p => p.status === 'active');
@@ -309,7 +310,11 @@ async function loadDashboard() {
 
     // KPI cards
     document.getElementById('kpi-active').textContent    = activeProjects.length;
-    document.getElementById('kpi-active-sub').textContent = `${projects.length} total projects`;
+    const planningCount = projects.filter(p => p.status === 'planning').length;
+    document.getElementById('kpi-active-sub').textContent =
+      planningCount > 0
+        ? `${projects.length} total · ${planningCount} in planning`
+        : `${projects.length} total projects`;
     document.getElementById('kpi-actions').textContent   = 0;
     document.getElementById('kpi-actions-sub').textContent = '0 overdue · view →';
     document.getElementById('kpi-alerts').textContent    = atRiskTasks.length;
@@ -365,11 +370,11 @@ async function loadDashboard() {
         const tcpi    = evm.tcpi ? evm.tcpi.toFixed(2) : '—';
         const dLeft   = proj.target_date ? UI.daysUntil(proj.target_date) : null;
 
-        // PM initials — resolve pm_resource_id against users
-        const _pmUser = proj.pm_resource_id
-          ? (users||[]).find(u => u.id === proj.pm_resource_id) : null;
-        const pmName  = _pmUser
-          ? (_pmUser.name||'').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,3)
+        // PM initials — pm_resource_id matches resources.id
+        const _pmRes = proj.pm_resource_id
+          ? (resources||[]).find(r => r.id === proj.pm_resource_id) : null;
+        const pmName = _pmRes
+          ? ((_pmRes.first_name||'')[0] + (_pmRes.last_name||'')[0]).toUpperCase()
           : '';
         // Budget % calculations
         const laborBudget  = parseFloat(proj.budget_baseline_hours || 0);
@@ -416,11 +421,15 @@ async function loadDashboard() {
               color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
           </div>
 
-          <!-- ROW 3: Progress bar (left) · P25/P50/P80 (right, inline) · PM -->
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div style="flex:1">${UI.progressBar(pctDone,fill)}</div>
-            ${evm.p25Date ? `
-            <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;flex-shrink:0;">
+          <!-- ROW 3: Progress bar full width -->
+          ${UI.progressBar(pctDone,fill)}
+
+          <!-- ROW 3b: P25/P50/P80 centered · PM right-justified -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;margin-bottom:2px;">
+            <div style="flex:1"></div>
+            <div style="flex:0 0 auto;display:flex;align-items:center;gap:0;
+                font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;">
+              ${evm.p25Date ? `
               <span style="color:var(--green);padding:2px 6px;background:rgba(0,229,160,.08);
                   border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px;white-space:nowrap">
                 P25 ${UI.fmtDateShort(evm.p25Date)}</span>
@@ -428,11 +437,14 @@ async function loadDashboard() {
                   border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2);white-space:nowrap">
                 ▼P50 ${UI.fmtDateShort(evm.p50Date)}</span>
               <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 6px;
-                  background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);border-radius:0 3px 3px 0;white-space:nowrap">
-                P80 ${UI.fmtDateShort(evm.p80Date)}</span>
-            </div>` : ''}
-            ${pmName ? `<span style="font-family:var(--font-mono);font-size:10px;
-              color:var(--text3);flex-shrink:0;margin-left:4px">PM: <span style="color:var(--text1)">${pmName}</span></span>` : ''}
+                  background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);
+                  border-radius:0 3px 3px 0;white-space:nowrap">
+                P80 ${UI.fmtDateShort(evm.p80Date)}</span>` : ''}
+            </div>
+            <div style="flex:1;display:flex;justify-content:flex-end;">
+              ${pmName ? `<span style="font-family:var(--font-mono);font-size:10px;
+                color:var(--text3)">PM: <span style="color:var(--text1)">${pmName}</span></span>` : ''}
+            </div>
           </div>
 
           <!-- ROW 4: EVM stats (left) · TARGET · FORECAST · TCPI · EAC (right) -->
