@@ -399,6 +399,36 @@ window.UI = {
   // Toast
   toast: showToast,
 
+  // ── STATUS_CONFIG — milestone/task status display config ─────────────────
+  STATUS_CONFIG: {
+    complete:    { color: 'var(--green,#2a9d40)',  label: 'COMPLETE',     icon: '✓' },
+    in_progress: { color: 'var(--cyan,#00d2ff)',   label: 'IN PROGRESS',  icon: '◑' },
+    not_started: { color: 'var(--text3,#7a8099)',  label: 'NOT STARTED',  icon: '○' },
+    at_risk:     { color: 'var(--amber,#d4901f)',  label: 'AT RISK',      icon: '⚑' },
+    missed:      { color: 'var(--red,#c0404a)',    label: 'MISSED',       icon: '✕' },
+    blocked:     { color: 'var(--red,#c0404a)',    label: 'BLOCKED',      icon: '✖' },
+    overdue:     { color: 'var(--red,#c0404a)',    label: 'OVERDUE',      icon: '⚠' },
+    ready:       { color: 'var(--accent,#4f8ef7)', label: 'READY',        icon: '▶' },
+  },
+
+  // ── Currency formatter ───────────────────────────────────────────────────
+  fmtCurrency(value, decimals = 0) {
+    if (value == null || isNaN(value)) return '$0';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(value);
+  },
+
+  // ── Hours formatter ──────────────────────────────────────────────────────
+  fmtHours(hours) {
+    if (hours == null || isNaN(hours)) return '0h';
+    const h = parseFloat(hours);
+    if (h >= 1000) return (h / 1000).toFixed(1) + 'K h';
+    return h % 1 === 0 ? h + 'h' : h.toFixed(1) + 'h';
+  },
+
   // ── Dashboard-specific helpers ─────────────────────────────────────────────
 
   // "All clear" empty state card

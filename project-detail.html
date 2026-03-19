@@ -1225,19 +1225,19 @@ function renderHeader() {
 }
 
 function milestoneRowHTML(m) {
+  if (!m) return '';
   const cfg    = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
-  const slipped = m.current_target_date && m.initial_target_date &&
-    m.current_target_date !== m.initial_target_date;
+  const slipped = !!(m.current_target_date && m.initial_target_date && m.current_target_date !== m.initial_target_date);
   return `<div class="milestone-row">
     <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
     <div class="ms-info">
-      <div class="ms-name">${m.description}</div>
+      <div class="ms-name">${m.name || m.description || "—"}</div>
       <div class="ms-phase">${m.phase || '—'}</div>
     </div>
     ${slipped ? `<span class="ms-slip">↑ SLIPPED</span>` : ''}
     <div style="text-align:right;flex-shrink:0;">
       ${UI.badge(m.status)}
-      <div class="ms-date" style="margin-top:3px;">${UI.fmtDateShort(m.current_target_date)}</div>
+      <div class="ms-date" style="margin-top:3px;">${UI.fmtDateShort(m.target_date || m.current_target_date)}</div>
     </div>
   </div>`;
 }
@@ -1250,7 +1250,7 @@ function renderOverviewMilestones() {
   const visible = all.slice(0, INITIAL);
   const hidden  = all.slice(INITIAL);
   const overdueCount = hidden.filter(m =>
-    m.status !== 'complete' && m.current_target_date && UI.daysUntil(m.current_target_date) < 0
+    m.status !== 'complete' && (m.target_date || m.current_target_date) && UI.daysUntil(m.target_date || m.current_target_date) < 0
   ).length;
   let html = visible.map(milestoneRowHTML).join('');
   if (hidden.length > 0) {
@@ -1620,16 +1620,16 @@ function renderMilestones() {
   if (!STATE.milestones.length) { el.innerHTML = UI.allClear('NO MILESTONES', 'No milestones defined'); return; }
   el.innerHTML = STATE.milestones.map((m, i) => {
     const cfg = UI.STATUS_CONFIG[m.status] || UI.STATUS_CONFIG.not_started;
-    const slipped = m.current_target_date && m.initial_target_date && m.current_target_date !== m.initial_target_date;
-    const dLeft = m.current_target_date ? UI.daysUntil(m.current_target_date) : null;
+    const slipped = !!(m.current_target_date && m.initial_target_date && m.current_target_date !== m.initial_target_date);
+    const dLeft = (m.target_date || m.current_target_date) ? UI.daysUntil(m.target_date || m.current_target_date) : null;
     return `<div class="milestone-row">
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);min-width:20px;">${i+1}</div>
       <div class="ms-diamond" style="border-color:${cfg.color};background:${m.status==='complete'?cfg.color:'transparent'};"></div>
-      <div class="ms-info"><div class="ms-name">${m.description}</div><div class="ms-phase">${m.phase || '—'}${m.responsible ? ' · Responsible: ' + (STATE.users.find(u=>u.id===m.responsible)?.name||'—') : ''}</div></div>
+      <div class="ms-info"><div class="ms-name">${m.name || m.description || "—"}</div><div class="ms-phase">${m.phase || '—'}${m.responsible ? ' · Responsible: ' + (STATE.users.find(u=>u.id===m.responsible)?.name||'—') : ''}</div></div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
         ${UI.badge(m.status)}
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">Initial: ${UI.fmtDateShort(m.initial_target_date)}</div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:${slipped?'var(--amber)':'var(--text2)'};">${slipped?'↑ ':''} Current: ${UI.fmtDateShort(m.current_target_date)}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:${slipped?'var(--amber)':'var(--text2)'};">${slipped?'↑ ':''} Current: ${UI.fmtDateShort(m.target_date || m.current_target_date)}</div>
         ${dLeft !== null && m.status !== 'complete' ? `<div style="font-family:var(--font-mono);font-size:11px;color:${dLeft<0?'var(--red)':dLeft<14?'var(--amber)':'var(--text3)'};">${dLeft<0?Math.abs(dLeft)+'d LATE':dLeft+'d LEFT'}</div>` : ''}
       </div>
     </div>`;
@@ -2147,7 +2147,7 @@ function renderGanttTab() {
   const pD  = s => { const d = new Date(s + 'T00:00:00'); d.setHours(0,0,0,0); return d; };
   const today = new Date(); today.setHours(0,0,0,0);
   const allD = tasks.flatMap(t => [pD(t.start_date), pD(t.due_date)]);
-  miles.forEach(m => { const d = m.current_target_date || m.due_date; if (d) allD.push(pD(d)); });
+  miles.forEach(m => { const d = m.target_date || m.current_target_date || m.due_date; if (d) allD.push(pD(d)); });
   const mn  = new Date(Math.min(...allD) - 7  * MS);
   const mx  = new Date(Math.max(...allD) + 14 * MS);
   // Reset pan when date range changes (e.g. after date propagation)
@@ -2403,8 +2403,8 @@ function drawGanttChart() {
   });
 
   // Milestones
-  miles.filter(m=>m.due_date||m.current_target_date).forEach(m => {
-    const md=m.current_target_date||m.due_date, mx2=dX(pD(md))-IW;
+  miles.filter(m=>m.due_date||m.target_date || m.current_target_date).forEach(m => {
+    const md=m.target_date || m.current_target_date||m.due_date, mx2=dX(pD(md))-IW;
     const dc=m.status==='complete'?'#00e5a0':pD(md)<today?'#ff4757':'#ffaa00';
     const sz=7, my=HH+2;
     cc.fillStyle=dc; cc.globalAlpha=0.85;
