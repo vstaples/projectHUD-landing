@@ -555,7 +555,7 @@ async function loadDashboard() {
               })()}
 
               <!-- TASKS + OVERDUE as text alongside gauges -->
-              <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:6px;margin-left:4px;">
+              <div style="display:flex;flex-direction:row;gap:12px;align-items:flex-start;padding-bottom:6px;margin-left:4px;">
                 <div data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="display:flex;flex-direction:column;gap:2px;cursor:help;">
                   <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.1em;">TASKS</span>
                   <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text1)">${done}/${pt.length}</span>
