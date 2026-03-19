@@ -55,7 +55,7 @@
 /* ── HUD TOOLTIP ── */
 #hud-tooltip {
   position: fixed; z-index: 9000; pointer-events: none;
-  width: 300px;
+  width: 340px;
   background: var(--bg1);
   border: 1px solid rgba(0,210,255,0.22);
   box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,210,255,0.06);
@@ -65,35 +65,35 @@
 }
 #hud-tooltip.visible { opacity: 1; display: block; }
 .htip-header {
-  padding: 9px 12px 8px;
+  padding: 10px 14px 9px;
   border-bottom: 1px solid rgba(0,210,255,0.12);
   background: rgba(0,210,255,0.04);
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .htip-title {
-  font-family: var(--font-hud); font-size: 12px; font-weight: 700;
+  font-family: var(--font-hud); font-size: 14px; font-weight: 700;
   color: var(--text0); letter-spacing: .07em;
 }
 .htip-value {
-  font-family: var(--font-hud); font-size: 14px; font-weight: 700;
+  font-family: var(--font-hud); font-size: 18px; font-weight: 700;
   flex-shrink: 0;
 }
 .htip-formula {
-  font-size: 10px; color: var(--cyan); letter-spacing: .05em;
-  padding: 6px 12px; background: rgba(0,210,255,0.05);
+  font-size: 12px; color: var(--cyan); letter-spacing: .04em;
+  padding: 7px 14px; background: rgba(0,210,255,0.05);
   border-bottom: 1px solid rgba(0,210,255,0.08);
 }
-.htip-body { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+.htip-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; }
 .htip-row {
   display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 10px; gap: 8px;
+  font-size: 12px; gap: 8px;
 }
 .htip-row .htip-k { color: var(--text3); letter-spacing: .08em; }
 .htip-row .htip-v { color: var(--text1); font-weight: 600; text-align: right; }
 .htip-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
 .htip-interp {
-  font-size: 10px; color: var(--text2); line-height: 1.6;
-  padding: 6px 12px 8px; border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 12px; color: var(--text2); line-height: 1.6;
+  padding: 8px 14px 10px; border-top: 1px solid rgba(255,255,255,0.06);
   font-family: var(--font-body, 'DM Sans', sans-serif);
   font-style: italic;
 }
