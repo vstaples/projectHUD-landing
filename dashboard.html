@@ -100,6 +100,20 @@
 [data-htip] { cursor: default; }
 [data-htip]:hover { opacity: 0.85; }
 
+/* ── BURN RATIO INDICATOR ── */
+.burn-indicator { display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;cursor:help; }
+.burn-circle {
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  position:relative;
+  box-shadow:0 2px 4px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.2),inset 0 -1px 2px rgba(0,0,0,.4);
+}
+.burn-circle::after {
+  content:'';position:absolute;inset:3px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.35),transparent 65%);
+  pointer-events:none;
+}
+.burn-label { font-family:var(--font-mono);font-size:8px;letter-spacing:.08em;color:var(--text3);text-align:center; }
+
 /* ── ADD PROJECT PANEL ── */
 .add-proj-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -463,6 +477,23 @@ async function loadDashboard() {
           done, total: pt.length,
           bac: evm.bac, ev: evm.ev, pv: evm.pv, actualHrs: evm.actualHrs,
         };
+        const _burnRatio  = pctDone > 0 ? laborPct / pctDone : null;
+        const _burnColor  = _burnRatio===null?'#556070':_burnRatio<0.8?'#00c87a':_burnRatio<1.2?'#d4901f':'#e03535';
+        const _burnBg     = _burnRatio===null?'rgba(85,96,112,.2)':_burnRatio<0.8?'rgba(0,200,122,.18)':_burnRatio<1.2?'rgba(212,144,31,.18)':'rgba(224,53,53,.18)';
+        const _burnBorder = _burnRatio===null?'rgba(85,96,112,.4)':_burnRatio<0.8?'rgba(0,200,122,.5)':_burnRatio<1.2?'rgba(212,144,31,.5)':'rgba(224,53,53,.5)';
+        const _burnInterp = _burnRatio===null?'No hours logged — ratio unavailable.'
+          :_burnRatio<0.8?`Efficient: spending ${laborPct}% of budget to complete ${pctDone}% of work.`
+          :_burnRatio<1.2?`On track: budget consumption aligned with work progress.`
+          :`Over-burning: ${laborPct}% budget consumed for only ${pctDone}% work complete.`;
+        const _burnRows = _burnRatio===null?[{k:'STATUS',v:'No work logged yet'}]:[
+          {k:'LABOR CONSUMED',v:laborPct+'%'},{k:'WORK COMPLETE',v:pctDone+'%'},
+          {k:'BURN RATIO',v:_burnRatio.toFixed(2)},{k:'---'},{k:'< 0.8',v:'Efficient (green)'},{k:'0.8–1.2',v:'On track (amber)'},{k:'> 1.2',v:'Over-burn (red)'}];
+        window._htReg = window._htReg||[];
+        const _burnTipIdx = window._htReg.push({
+          title:'BURN RATIO',value:_burnRatio!==null?_burnRatio.toFixed(2):'—',color:_burnColor,
+          formula:'% Labor Consumed ÷ % Work Complete',rows:_burnRows,interp:_burnInterp
+        })-1;
+
         return `<div class="project-card ${health} fade-in"
             onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
 
@@ -479,14 +510,30 @@ async function loadDashboard() {
                   border:1px solid rgba(0,210,255,.25);background:rgba(0,210,255,.06);
                   color:var(--cyan);cursor:pointer;border-radius:3px;flex-shrink:0">◉ GAUGES</button>
             </div>
-            <span data-htip="${HUDTip.badge(health,evm,dLeft,proj.target_date)}"
-                onclick="event.stopPropagation()"
-                style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-                padding:2px 8px;border:1px solid;flex-shrink:0;cursor:help;${
-              health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
-              health==='at-risk' ? 'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);' :
-              'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
-            }">${hLabel}</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div class="burn-indicator" data-htip="${_burnTipIdx}" onclick="event.stopPropagation()">
+                <div class="burn-circle" style="background:${_burnBg};border:1.5px solid ${_burnBorder};">
+                  <svg width="16" height="16" viewBox="0 0 16 16" style="position:relative;z-index:1;overflow:visible;">
+                    ${_burnRatio===null
+                      ? `<text x="8" y="11" text-anchor="middle" fill="#556070" font-family="Arial" font-size="9" font-weight="700">—</text>`
+                      : _burnRatio<0.8
+                        ? `<polyline points="8,12 8,4 5,7" fill="none" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="4" x2="11" y2="7" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round"/>`
+                        : _burnRatio<1.2
+                          ? `<circle cx="8" cy="8" r="4" fill="${_burnColor}" opacity="0.9"/>`
+                          : `<polyline points="8,4 8,12 5,9" fill="none" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="12" x2="11" y2="9" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round"/>`
+                    }
+                  </svg>
+                </div>
+                <span class="burn-label" style="color:${_burnColor};">BURN</span>
+              </div>
+              <span data-htip="${HUDTip.badge(health,evm,dLeft,proj.target_date)}"
+                  onclick="event.stopPropagation()"
+                  style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;padding:2px 8px;border:1px solid;flex-shrink:0;cursor:help;${
+                health==='blocked'?'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);':
+                health==='at-risk'?'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);':
+                'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
+              }">${hLabel}</span>
+            </div>
           </div>
 
           <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
