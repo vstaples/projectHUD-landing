@@ -358,125 +358,110 @@ async function loadDashboard() {
         const tcpi    = evm.tcpi ? evm.tcpi.toFixed(2) : '—';
         const dLeft   = proj.target_date ? UI.daysUntil(proj.target_date) : null;
 
-        // Forecast section — only shown when meaningful data exists
-        const forecastHTML = evm.p50Date ? (() => {
-          const fmtShort = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
-          const slipColor = !evm.slipDays || evm.slipDays <= 0 ? 'var(--green)'
-                          : evm.slipDays <= 14 ? 'var(--amber)' : 'var(--red)';
-          const slipLabel = !evm.slipDays || evm.slipDays <= 0
-            ? '✓ On track'
-            : `+${evm.slipDays}d forecast slip`;
-          const tcpiColor = !evm.tcpi ? 'var(--text3)'
-                          : evm.tcpi <= 1.05 ? 'var(--green)'
-                          : evm.tcpi <= 1.15 ? 'var(--amber)' : 'var(--red)';
-          const tcpiNote  = !evm.tcpi ? '' : evm.tcpi > 1.15
-            ? ' — recovery unlikely without intervention'
-            : evm.tcpi > 1.05 ? ' — challenging but achievable' : ' — achievable';
 
-          return `
-          <div style="margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.03);
-              border:1px solid rgba(255,255,255,.06);border-radius:5px;">
-
-            <!-- Target + forecast dates row -->
-            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px">
-              <div style="font-family:var(--font-mono);font-size:10px;">
-                <span style="color:var(--text3);letter-spacing:.08em;">TARGET </span>
-                <span style="color:var(--text1)">${fmtShort(proj.target_date)}</span>
-              </div>
-              <div style="font-family:var(--font-mono);font-size:10px;color:${slipColor};">
-                <span style="letter-spacing:.08em;">FORECAST </span>
-                <span style="font-weight:700">${fmtShort(evm.p50Date)}</span>
-                <span style="margin-left:6px;font-size:9px;">${slipLabel}</span>
-              </div>
-              ${evm.tcpi ? `<div style="font-family:var(--font-mono);font-size:10px;margin-left:auto">
-                <span style="color:var(--text3);letter-spacing:.08em;">TCPI </span>
-                <span style="color:${tcpiColor};font-weight:700">${tcpi}</span>
-                <span style="color:var(--text3);font-size:9px">${tcpiNote}</span>
-              </div>` : ''}
-            </div>
-
-            <!-- P25/P50/P80 confidence band -->
-            <div style="display:flex;align-items:center;gap:0;margin-bottom:8px;
-                font-family:var(--font-mono);font-size:9px;letter-spacing:.06em">
-              <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
-                  border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
-                P25 ${fmtShort(evm.p25Date)}</span>
-              <span style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
-                  border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2)">
-                ▼ P50 ${fmtShort(evm.p50Date)}</span>
-              <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
-                  background:rgba(255,170,0,.06);
-                  border:1px solid rgba(255,170,0,.2);border-radius:0 3px 3px 0">
-                P80 ${fmtShort(evm.p80Date)}</span>
-            </div>
-
-            <!-- Plain-English diagnosis -->
-            <div style="font-size:10px;color:var(--text3);line-height:1.5">
-              ◈ ${evm.diagnosis}
-            </div>
-
-            ${evm.expBudget > 0 ? `
-            <!-- Budget row -->
-            <div style="display:flex;gap:16px;margin-top:8px;padding-top:8px;
-                border-top:1px solid rgba(255,255,255,.05);font-family:var(--font-mono);font-size:10px">
-              <div>
-                <span style="color:var(--text3);letter-spacing:.08em">LABOR BUDGET </span>
-                <span style="color:var(--text1)">${(proj.budget_baseline_hours||0).toFixed(0)}h</span>
-                <span style="color:var(--text3)"> / </span>
-                <span style="color:${evm.actualHrs > (proj.budget_baseline_hours||0)*0.8 ? 'var(--amber)' : 'var(--cyan)'}">
-                  ${evm.actualHrs.toFixed(0)}h used</span>
-              </div>
-              <div>
-                <span style="color:var(--text3);letter-spacing:.08em">EXPENSE BUDGET </span>
-                <span style="color:var(--text1)">$${(evm.expBudget/1000).toFixed(0)}K</span>
-              </div>
-              ${evm.eac && proj.budget_baseline_hours ? `<div style="margin-left:auto">
-                <span style="color:var(--text3);letter-spacing:.08em">EAC </span>
-                <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
-                  ${evm.eac.toFixed(0)}h ${evm.cv>0?'▲+'+evm.cv.toFixed(0)+'h overrun':'▼ under'}</span>
-              </div>` : ''}
-            </div>` : ''}
-          </div>`;
-        })() : '';
 
         return `<div class="project-card ${health} fade-in"
             onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
 
-          <!-- Header row: name + AT RISK badge anchored right -->
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
-            <div>
-              <div class="proj-name">${proj.name}</div>
-              <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
-            </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-              <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-                  padding:2px 8px;border:1px solid;${
-                health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
-                health==='at-risk' ? 'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);' :
-                'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
-              }">${hLabel}</span>
-              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:10px;
-                color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
-            </div>
+          <!-- ROW 1: Project name (left) · AT RISK badge (far right) -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:2px;">
+            <div class="proj-name">${proj.name}</div>
+            <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+                padding:2px 8px;border:1px solid;flex-shrink:0;${
+              health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
+              health==='at-risk' ? 'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);' :
+              'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
+            }">${hLabel}</span>
           </div>
 
+          <!-- ROW 2: Client/phase (left) · days remaining (far right) -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
+            ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:10px;
+              color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
+          </div>
+
+          <!-- ROW 3: Progress bar -->
           ${UI.progressBar(pctDone,fill)}
 
-          <!-- EVM stats row -->
-          <div class="proj-stats">
-            <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
-              <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
-            <div class="proj-stat"><span class="stat-label">CPI</span>
-              <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
-            <div class="proj-stat"><span class="stat-label">SPI</span>
-              <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
-            <div class="proj-stat"><span class="stat-label">TASKS</span>
-              <span class="stat-value">${done}/${pt.length}</span></div>
-            ${evm.overdueTasks>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span>
-              <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
+          <!-- ROW 4: EVM stats (left) · Target/Forecast/PM (right) -->
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-top:6px;">
+
+            <!-- Left: EVM metrics -->
+            <div class="proj-stats" style="margin-top:0;flex-shrink:0">
+              <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
+                <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
+              <div class="proj-stat"><span class="stat-label">CPI</span>
+                <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
+              <div class="proj-stat"><span class="stat-label">SPI</span>
+                <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
+              <div class="proj-stat"><span class="stat-label">TASKS</span>
+                <span class="stat-value">${done}/${pt.length}</span></div>
+              ${evm.overdueTasks>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span>
+                <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
+            </div>
+
+            <!-- Right: Target · Forecast · PM -->
+            ${evm.p50Date ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+              <div style="display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:10px;">
+                <span>
+                  <span style="color:var(--text3);letter-spacing:.08em">TARGET </span>
+                  <span style="color:var(--text1)">${UI.fmtDateShort(proj.target_date)}</span>
+                </span>
+                <span>
+                  <span style="color:var(--text3);letter-spacing:.08em">FORECAST </span>
+                  <span style="color:${!evm.slipDays||evm.slipDays<=0?'var(--green)':evm.slipDays<=14?'var(--amber)':'var(--red)'}">
+                    ${UI.fmtDateShort(evm.p50Date)}</span>
+                  <span style="color:${!evm.slipDays||evm.slipDays<=0?'var(--green)':'var(--amber)'}">
+                    ${!evm.slipDays||evm.slipDays<=0?' ✓ On track':' +'+evm.slipDays+'d slip'}</span>
+                </span>
+                ${pmName?`<span style="color:var(--text3)">PM: <span style="color:var(--text1)">${pmName}</span></span>`:''}
+              </div>
+            </div>` : ''}
           </div>
 
-          ${forecastHTML}
+          <!-- ROW 5: Confidence bands (left) · Budget + TCPI + EAC (right) -->
+          ${evm.p25Date ? `<div style="display:flex;align-items:center;justify-content:space-between;
+              gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05);">
+
+            <!-- Confidence band -->
+            <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);font-size:9px;letter-spacing:.05em;flex-shrink:0">
+              <span style="color:var(--green);padding:2px 7px;background:rgba(0,229,160,.08);
+                  border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
+                P25 ${UI.fmtDateShort(evm.p25Date)}</span>
+              <span style="color:var(--cyan);padding:2px 7px;background:rgba(0,210,255,.08);
+                  border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2)">
+                ▼ P50 ${UI.fmtDateShort(evm.p50Date)}</span>
+              <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 7px;
+                  background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);border-radius:0 3px 3px 0">
+                P80 ${UI.fmtDateShort(evm.p80Date)}</span>
+            </div>
+
+            <!-- Budget · TCPI · EAC -->
+            <div style="display:flex;align-items:center;gap:14px;font-family:var(--font-mono);
+                font-size:10px;color:var(--text3);flex-shrink:0">
+              ${proj.budget_baseline_hours?`<span>
+                <span style="letter-spacing:.06em">LABOR BUDGET </span>
+                <span style="color:var(--text1)">${(proj.budget_baseline_hours||0).toFixed(0)}h</span>
+                <span> / </span>
+                <span style="color:${evm.actualHrs>(proj.budget_baseline_hours||0)*0.8?'var(--amber)':'var(--cyan)'}">
+                  ${evm.actualHrs.toFixed(0)}h used</span>
+              </span>`:''}
+              ${evm.expBudget>0?`<span>
+                <span style="letter-spacing:.06em">EXPENSE BUDGET </span>
+                <span style="color:var(--text1)">$${(evm.expBudget/1000).toFixed(0)}K</span>
+              </span>`:''}
+              ${evm.tcpi?`<span>
+                <span style="letter-spacing:.06em">TCPI </span>
+                <span style="color:${UI.indexColor(evm.tcpi)};font-weight:700">${tcpi}</span>
+              </span>`:''}
+              ${evm.eac&&proj.budget_baseline_hours?`<span>
+                <span style="letter-spacing:.06em">EAC </span>
+                <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
+                  ${evm.eac.toFixed(0)}h${evm.cv>0?' +'+evm.cv.toFixed(0):''}</span>
+              </span>`:''}
+            </div>
+          </div>` : ''}
         </div>`;
       }).join('');
     }
