@@ -741,7 +741,7 @@ body {
       <div class="tab" data-tab="stakeholders">Stakeholders <span class="tab-badge" id="tbadge-sh">0</span></div>
       <div class="tab" data-tab="findings">Findings <span class="tab-badge" id="tbadge-findings">0</span></div>
       <div class="tab" data-tab="meetings">Meetings <span class="tab-badge" id="tbadge-meet">0</span></div>
-      <div class="tab" data-tab="proposal" style="color:var(--muted)">Proposal</div>
+      <div class="tab" data-tab="proposal" style="color:var(--muted)">Proposals <span class="tab-badge" id="tbadge-proposal" style="display:none">0</span></div>
       <div class="tab" data-tab="actions">Action items <span class="tab-badge" id="tbadge-ai">0</span></div>
       <div class="tab" data-tab="activity">Activity log <span class="tab-badge" id="tbadge-activity">0</span></div>
     </div>
@@ -787,7 +787,7 @@ body {
         <div class="pp-title">No proposal started yet</div>
         <div class="pp-sub">Proposals are typically started during or after the Discovery stage.<br>
         The WBS estimator and SOW builder live here once initiated.</div>
-        <button class="btn btn-primary" onclick="startProposal()">Start WBS estimator</button>
+        <button class="btn btn-primary" onclick="openAddProposal()">+ Add proposal</button>
       </div>
     </div>
 
@@ -2127,22 +2127,202 @@ async function loadMeetingDetail(meetId) {
   }
 }
 
-// ── proposal tab check ─────────────────────────────────
+// ── proposals tab ──────────────────────────────────────
+let _proposals      = [];
+const _proposalComments   = {};
+const _proposalAttachments = {};
+
 async function checkProposalTab() {
-  const proposals = await API.get(`proposals?prospect_id=eq.${PROSPECT_ID}&select=id,title,status`);
-  if (proposals?.length > 0) {
-    const p = proposals[0];
-    document.getElementById('panel-proposal').innerHTML = `
-      <div class="card">
-        <div class="card-title">Linked proposal</div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px">${escHtml(p.title)}</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Status: ${capitalize(p.status)}</div>
-        <button class="btn btn-primary"
-          onclick="location.href='/proposal-detail.html?id=${p.id}'">
-          Open proposal →
-        </button>
-      </div>`;
+  _proposals = await API.get(
+    `proposals?prospect_id=eq.${PROSPECT_ID}&select=id,title,status,version,total_cost,created_at&order=created_at.desc`
+  ) || [];
+
+  // Update badge
+  const badge = document.getElementById('tbadge-proposal');
+  const tab   = document.querySelector('[data-tab="proposal"]');
+  if (badge) {
+    badge.textContent    = _proposals.length || '';
+    badge.style.display  = _proposals.length ? '' : 'none';
   }
+  if (tab) tab.style.color = '';
+
+  // Load proposal comments from activities
+  const acts = await API.get(
+    `prospect_activities?prospect_id=eq.${PROSPECT_ID}&type=eq.note&order=created_at`
+  ).catch(() => []);
+  _proposals.forEach(p => {
+    const tag = '[proposal-comment:' + p.id + ']';
+    _proposalComments[p.id] = (acts||[])
+      .filter(a => a.summary?.includes(tag))
+      .map(a => ({
+        text: a.summary.split(tag)[0].trim(),
+        created_by: a.created_by,
+        created_at: a.created_at,
+      }));
+  });
+
+  renderProposals();
+}
+
+function renderProposals() {
+  const panel = document.getElementById('panel-proposal');
+  if (!panel) return;
+
+  if (!_proposals.length) {
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-primary" onclick="openAddProposal()">+ Add proposal</button>
+      </div>
+      <div class="proposal-placeholder">
+        <div class="pp-icon">📋</div>
+        <div class="pp-title">No proposals yet</div>
+        <div class="pp-sub">Start with a WBS estimator to build your first proposal.</div>
+      </div>`;
+    return;
+  }
+
+  const cards = _proposals.map(p => {
+    const comments = _proposalComments[p.id] || [];
+    const hasAttach = (_proposalAttachments[p.id]?.length > 0);
+    const statusColor = {
+      draft:    'rgba(255,255,255,.07):#7a8099',
+      review:   'rgba(212,144,31,.15):#d4901f',
+      approved: 'rgba(42,157,64,.15):#7af0a0',
+      rejected: 'rgba(192,64,74,.15):#f07a7a',
+    }[p.status] || 'rgba(255,255,255,.07):#7a8099';
+    const [bg, color] = statusColor.split(':');
+    return `
+      <div class="finding-card" style="margin-bottom:12px">
+        <div class="finding-card-head">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">
+              ${escHtml(p.title)}
+            </div>
+            <div class="finding-card-meta">
+              <span style="padding:1px 7px;border-radius:4px;font-weight:600;
+                background:${bg};color:${color}">${capitalize(p.status||'draft')}</span>
+              <span>v${escHtml(p.version||'1.0')}</span>
+              ${p.total_cost ? `<span>¥${Number(p.total_cost).toLocaleString()}</span>` : ''}
+              <span>${fmtDate(p.created_at)}</span>
+              ${hasAttach ? `<span style="cursor:pointer;color:var(--accent)"
+                onclick="showProposalAttachments('${p.id}')">📎 ${_proposalAttachments[p.id].length}</span>` : ''}
+              ${comments.length > 0 ? `<span>💬 ${comments.length}</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="finding-btn"
+              onclick="location.href='/proposal-detail.html?id=${p.id}'">
+              Open WBS →
+            </button>
+          </div>
+        </div>
+        <div class="finding-actions">
+          <button class="finding-btn"
+            onclick="location.href='/proposal-detail.html?id=${p.id}'">
+            📊 WBS Estimator
+          </button>
+          <button class="finding-btn"
+            onclick="openRiskRegister('${p.id}')">
+            ⚠ Risk register
+          </button>
+          <button class="finding-btn"
+            onclick="openSOWBuilder('${p.id}')">
+            📄 SOW document
+          </button>
+          <button class="finding-btn"
+            onclick="attachToProposal('${p.id}')">
+            📎 Attach
+          </button>
+          <button class="finding-btn"
+            onclick="toggleProposalComments('${p.id}')">
+            💬 ${comments.length > 0 ? comments.length + ' comment' + (comments.length!==1?'s':'') : 'Comment'}
+          </button>
+        </div>
+        <div id="pcomments-${p.id}" style="display:${comments.length>0?'block':'none'}">
+          <div class="finding-comments">
+            <div id="pcomment-list-${p.id}">
+              ${renderProposalCommentList(p.id)}
+            </div>
+            <div class="finding-compose">
+              <textarea id="pcompose-${p.id}"
+                placeholder="Add a comment… (Ctrl+Enter to post)" rows="2"
+                onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();postProposalComment('${p.id}')}"></textarea>
+              <button onclick="postProposalComment('${p.id}')">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn btn-primary" onclick="openAddProposal()">+ Add proposal</button>
+    </div>
+    ${cards}`;
+}
+
+function renderProposalCommentList(pid) {
+  const comments = _proposalComments[pid] || [];
+  if (!comments.length) return '<div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:6px">No comments yet.</div>';
+  return comments.map(c => {
+    const ca = resources.find(r => r.id === c.created_by);
+    const cn = ca ? ca.first_name + ' ' + ca.last_name : 'Team';
+    const ci = cn.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    return '<div class="finding-comment">' +
+      '<div class="fc-av">' + ci + '</div>' +
+      '<div class="fc-bubble">' +
+        '<div class="fc-meta"><span style="font-weight:600;color:var(--text)">' + escHtml(cn) + '</span>' +
+        '<span>' + fmtDateTime(c.created_at) + '</span></div>' +
+        '<div class="fc-text">' + escHtml(c.text) + '</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function toggleProposalComments(pid) {
+  const el = document.getElementById('pcomments-' + pid);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function postProposalComment(pid) {
+  const inp  = document.getElementById('pcompose-' + pid);
+  const text = inp?.value.trim();
+  if (!text) return;
+  const resourceId = _currentResource?.id || null;
+  const tag = '[proposal-comment:' + pid + ']';
+  try {
+    await API.post('prospect_activities', {
+      prospect_id: PROSPECT_ID, type: 'note',
+      date: new Date().toISOString(),
+      summary: text + ' ' + tag,
+      ...(resourceId ? { created_by: resourceId } : {}),
+    });
+    if (!_proposalComments[pid]) _proposalComments[pid] = [];
+    _proposalComments[pid].push({ text, created_by: resourceId, created_at: new Date().toISOString() });
+    if (inp) inp.value = '';
+    const listEl = document.getElementById('pcomment-list-' + pid);
+    if (listEl) listEl.innerHTML = renderProposalCommentList(pid);
+  } catch(e) { alert('Failed to post comment.'); }
+}
+
+function attachToProposal(pid) {
+  alert('File attachment for proposals — coming in next build once storage path is configured.');
+}
+
+function showProposalAttachments(pid) {
+  const files = _proposalAttachments[pid] || [];
+  if (!files.length) { alert('No attachments yet.'); return; }
+}
+
+function openAddProposal() {
+  location.href = '/proposal-detail.html?prospect_id=' + PROSPECT_ID;
+}
+
+function openRiskRegister(proposalId) {
+  location.href = '/risk-register.html?proposal_id=' + proposalId + '&prospect_id=' + PROSPECT_ID;
+}
+
+function openSOWBuilder(proposalId) {
+  location.href = '/sow-builder.html?proposal_id=' + proposalId + '&prospect_id=' + PROSPECT_ID;
 }
 
 // ── tabs ───────────────────────────────────────────────
