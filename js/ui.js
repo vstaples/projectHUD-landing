@@ -358,5 +358,35 @@ window.HUD.UI = {
   renderEmptyState, renderLoadingState,
 };
 
+// ── window.UI alias ───────────────────────────────────────────────────────────
+// dashboard.html, sidebar.js, and any pre-core pages reference `UI.xxx`.
+// Expose a legacy-compatible UI object so those pages don't break.
+
+window.UI = {
+  // Initials from a full name string — used by sidebar avatar
+  initials(name) {
+    return (name || '?')
+      .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  },
+
+  // Avatar HTML — used by dashboard user cards
+  avatar(name, size = 32) {
+    return renderAvatar(name, size);
+  },
+
+  // Format helpers — used directly in dashboard template literals
+  fmtDate,
+  fmtDateTime,
+  fmtRelativeDate,
+  capitalize,
+  escHtml,
+
+  // Status badge
+  statusBadge: renderStatusBadge,
+
+  // Toast
+  toast: showToast,
+};
+
 // Also expose top-level for backward compatibility with existing pages
 // (existing pages call escHtml(), fmtDate() etc. directly — no breaking change)
