@@ -517,7 +517,18 @@ body {
 <div class="main">
   <!-- top bar -->
   <div class="topbar">
-    <span class="topbar-title">Prospect pipeline</span>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="/index.html"
+        style="display:inline-flex;align-items:center;gap:5px;
+          padding:5px 10px;border-radius:6px;border:1px solid var(--border2);
+          background:var(--surf2);color:var(--muted);font-size:11px;
+          text-decoration:none;transition:all .15s"
+        onmouseover="this.style.color='var(--text)'"
+        onmouseout="this.style.color='var(--muted)'">
+        ← Dashboard
+      </a>
+      <span class="topbar-title">Prospect pipeline</span>
+    </div>
     <div class="topbar-stats" id="pipeline-stats">
       <div class="stat-chip">
         <strong id="stat-total">—</strong> prospects

@@ -174,7 +174,7 @@ body {
 .disc-dot { width: 10px; height: 10px; border-radius: 2px; }
 .risk-flag {
   font-size: 10px; padding: 2px 7px; border-radius: 5px;
-  background: rgba(212,144,31,.15); color: var(--amber);
+  background: rgba(192,64,74,.15); color: #f07a7a;
 }
 
 table.task-tbl { width: 100%; border-collapse: collapse; }
@@ -189,7 +189,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
   vertical-align: middle;
 }
 .task-tbl tr:hover td { background: rgba(255,255,255,.02); }
-.task-tbl tr.risk-row td { background: rgba(212,144,31,.04); }
+.task-tbl tr.risk-row td { background: rgba(192,64,74,.04); }
 .task-tbl tfoot td {
   background: var(--surf2); font-weight: 600;
   font-size: 11px; color: var(--muted); padding: 7px 8px;
@@ -438,8 +438,6 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
     </div>
     <div class="prop-tabs">
       <div class="tab active" data-tab="wbs">WBS estimator</div>
-      <div class="tab" data-tab="risks">Risks &amp; assumptions</div>
-      <div class="tab" data-tab="sow">SOW document</div>
     </div>
   </div>
 
@@ -883,7 +881,7 @@ function renderTaskRow(t, idx) {
       <td class="cost-cell">${fmtCost(cost)}</td>
       <td class="col-risk">
         <span class="risk-icon" onclick="toggleRisk('${t.id}',this)"
-          style="color:${t.is_risk_flag ? 'var(--amber)' : 'var(--muted)'}">
+          style="color:${t.is_risk_flag ? '#f07a7a' : 'var(--muted)'}">
           ${t.is_risk_flag ? '⚑' : '⚐'}
         </span>
       </td>
