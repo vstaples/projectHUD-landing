@@ -141,6 +141,7 @@ const Sidebar = (() => {
       { href: '/dashboard.html',  icon: '◈', label: 'Dashboard', section: 'main'  },
       { href: '/pipeline.html',   icon: '▥', label: 'Pipeline',  section: 'main'  },
       { href: '/gantt.html',      icon: '▤', label: 'Gantt',     section: 'main'  },
+      { href: '/resources.html',  icon: '◎', label: 'Resources', section: 'main'  },
       { href: '/audit-log.html',  icon: '▦', label: 'Audit Log', section: 'admin' },
       { href: '/users.html',      icon: '◑', label: 'User Mgmt', section: 'admin' },
     ];

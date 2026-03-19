@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resource Management — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+  --purple:  #7c4dff;
+}
+
+body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; }
+#sidebar-container { width:var(--sidebar-w); flex-shrink:0; }
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── Top bar ── */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:0 20px; height:52px;
+  border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0;
+}
+.topbar-left { display:flex; align-items:center; gap:12px; }
+.back-link { color:var(--muted); text-decoration:none; font-size:12px; }
+.back-link:hover { color:var(--text); }
+.page-title { font-size:15px; font-weight:700; }
+
+/* ── Tabs ── */
+.tabs {
+  display:flex; border-bottom:1px solid var(--border);
+  background:var(--surface); padding:0 20px; flex-shrink:0;
+}
+.tab {
+  padding:10px 16px; font-size:12px; font-weight:500;
+  color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;
+  transition:color .15s; user-select:none; white-space:nowrap;
+}
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-badge {
+  font-size:10px; padding:1px 5px; border-radius:8px;
+  background:rgba(255,255,255,.08); color:var(--muted); margin-left:5px;
+}
+
+/* ── Content ── */
+.content { flex:1; overflow-y:auto; padding:20px 24px; }
+.content::-webkit-scrollbar { width:4px; }
+.content::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* ── Buttons ── */
+.btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500;
+  cursor:pointer; border:1px solid var(--border2);
+  background:var(--surf2); color:var(--text); transition:background .15s;
+  text-decoration:none;
+}
+.btn:hover { background:var(--surf3); }
+.btn-primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn-primary:hover { opacity:.88; }
+.btn-sm { padding:4px 10px; font-size:11px; }
+
+/* ── Summary strip ── */
+.summary-strip {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:12px; margin-bottom:20px;
+}
+.sum-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:12px 16px;
+}
+.sum-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:4px; }
+.sum-value { font-size:22px; font-weight:700; }
+.sum-sub   { font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* ── Roster cards ── */
+.roster-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px;
+}
+.resource-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:14px; transition:border-color .15s; cursor:pointer;
+}
+.resource-card:hover { border-color:var(--border2); }
+.rc-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.rc-av {
+  width:40px; height:40px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:700;
+}
+.rc-name   { font-size:13px; font-weight:600; margin-bottom:2px; }
+.rc-role   { font-size:11px; color:var(--muted); }
+.rc-meta   { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.rc-chip   {
+  font-size:10px; padding:2px 7px; border-radius:4px; font-weight:600;
+  background:rgba(79,142,247,.12); color:var(--accent);
+}
+.rc-chip.amber { background:rgba(212,144,31,.12); color:var(--amber); }
+.rc-chip.green { background:rgba(42,157,64,.12);  color:#7af0a0; }
+.rc-chip.red   { background:rgba(192,64,74,.12);  color:#f07a7a; }
+.rc-avail { margin-top:8px; }
+.rc-avail-label { font-size:10px; color:var(--muted); margin-bottom:4px; display:flex; justify-content:space-between; }
+.avail-bar { height:4px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; }
+.avail-fill { height:100%; border-radius:2px; transition:width .4s; }
+.rc-actions { display:flex; gap:6px; margin-top:10px; }
+
+/* ── Capacity heatmap ── */
+.heatmap-wrap { overflow-x:auto; }
+.heatmap-table { width:100%; border-collapse:collapse; font-size:11px; min-width:700px; }
+.heatmap-table th {
+  padding:6px 8px; text-align:center; font-size:9px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+  border-bottom:1px solid var(--border); white-space:nowrap;
+}
+.heatmap-table th.name-col { text-align:left; min-width:140px; }
+.heatmap-table td { padding:5px 4px; text-align:center; border-bottom:1px solid var(--border); }
+.heatmap-table td.name-cell {
+  text-align:left; padding:8px 10px;
+  font-weight:500; white-space:nowrap;
+}
+.heat-cell {
+  width:44px; height:28px; border-radius:4px; display:inline-flex;
+  align-items:center; justify-content:center;
+  font-size:10px; font-weight:600; cursor:default;
+}
+.heat-free     { background:rgba(42,157,64,.12);  color:#7af0a0; }
+.heat-ok       { background:rgba(79,142,247,.12); color:var(--accent); }
+.heat-busy     { background:rgba(212,144,31,.15); color:var(--amber); }
+.heat-over     { background:rgba(192,64,74,.18);  color:#f07a7a; }
+.heat-off      { background:rgba(255,255,255,.03);color:var(--muted); }
+
+/* ── Week nav ── */
+.week-nav {
+  display:flex; align-items:center; gap:8px;
+  margin-bottom:14px;
+}
+.week-nav button {
+  background:var(--surf2); border:1px solid var(--border2); color:var(--text);
+  border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px;
+}
+.week-nav button:hover { background:var(--surf3); }
+.week-label { font-size:13px; font-weight:600; min-width:200px; text-align:center; }
+
+/* ── Allocation matrix ── */
+.alloc-table { width:100%; border-collapse:collapse; font-size:12px; }
+.alloc-table th {
+  padding:8px 12px; text-align:left; font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+  border-bottom:1px solid var(--border); background:var(--surf2);
+}
+.alloc-table td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.alloc-bar-wrap { display:flex; align-items:center; gap:8px; }
+.alloc-bar { flex:1; height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+.alloc-fill { height:100%; border-radius:3px; }
+.alloc-pct { font-size:11px; font-weight:700; min-width:36px; }
+
+/* ── Utilization ── */
+.util-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+@media (max-width:700px) { .util-grid { grid-template-columns:1fr; } }
+.util-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:16px;
+}
+.util-card-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:12px; }
+.util-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.util-name { font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.util-bar-wrap { width:120px; flex-shrink:0; }
+.util-bar { height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+.util-fill { height:100%; border-radius:3px; }
+.util-num { font-size:11px; font-weight:700; min-width:40px; text-align:right; }
+
+/* ── Time log ── */
+.tlog-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.tlog-filters select, .tlog-filters input {
+  padding:6px 10px; border-radius:6px; border:1px solid var(--border2);
+  background:var(--surf2); color:var(--text); font-size:12px; outline:none;
+}
+.tlog-table { width:100%; border-collapse:collapse; font-size:12px; }
+.tlog-table th {
+  padding:8px 12px; text-align:left; font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+  border-bottom:1px solid var(--border); background:var(--surf2);
+}
+.tlog-table td { padding:9px 12px; border-bottom:1px solid var(--border); }
+.billable-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; }
+
+/* ── Skills browser ── */
+.skills-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.skill-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:12px 14px;
+}
+.skill-name { font-size:13px; font-weight:600; margin-bottom:6px; }
+.skill-people { display:flex; flex-wrap:wrap; gap:4px; }
+.skill-person {
+  font-size:10px; padding:2px 7px; border-radius:10px;
+  background:var(--surf2); color:var(--muted); border:1px solid var(--border);
+}
+.skill-person.expert { background:rgba(42,157,64,.1); color:#7af0a0; border-color:rgba(42,157,64,.2); }
+.skill-person.proficient { background:rgba(79,142,247,.1); color:var(--accent); border-color:rgba(79,142,247,.2); }
+
+/* ── Drawer ── */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; display:none; justify-content:flex-end; }
+.overlay.open { display:flex; }
+.drawer { width:480px; max-width:95vw; background:var(--surface); border-left:1px solid var(--border2); display:flex; flex-direction:column; height:100%; overflow:hidden; }
+.drawer-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.drawer-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.drawer-close { width:28px; height:28px; border-radius:6px; border:1px solid var(--border2); background:var(--surf2); cursor:pointer; font-size:14px; color:var(--muted); display:flex; align-items:center; justify-content:center; }
+.drawer-body { flex:1; overflow-y:auto; padding:20px; }
+.drawer-foot { display:flex; gap:8px; padding:14px 20px; border-top:1px solid var(--border); flex-shrink:0; }
+.field { margin-bottom:16px; }
+.field label { display:block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:6px; }
+.field input, .field select, .field textarea {
+  width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border2);
+  background:var(--surf2); color:var(--text); font-size:12px; font-family:inherit;
+  outline:none; transition:border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color:var(--accent); }
+.field textarea { resize:vertical; min-height:60px; }
+.field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.sec-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+
+/* ── Loading/empty ── */
+.loading-state { display:flex; align-items:center; justify-content:center; height:200px; color:var(--muted); font-size:13px; gap:8px; }
+.spinner { width:16px; height:16px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.empty-state { text-align:center; padding:48px 24px; color:var(--muted); }
+.empty-state .ei { font-size:36px; margin-bottom:12px; }
+.empty-state .et { font-size:14px; font-weight:600; color:var(--text); margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"></div>
+
+<div class="main">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/index.html" class="back-link">← Dashboard</a>
+      <span class="page-title">Resource Management</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" onclick="exportCSV()">⬇ Export</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddAllocation()">+ Allocate</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="roster"     onclick="switchTab('roster')">Team roster <span class="tab-badge" id="tbadge-roster">0</span></div>
+    <div class="tab"        data-tab="capacity"   onclick="switchTab('capacity')">Capacity heatmap</div>
+    <div class="tab"        data-tab="allocation" onclick="switchTab('allocation')">Allocation matrix</div>
+    <div class="tab"        data-tab="utilization"onclick="switchTab('utilization')">Utilization</div>
+    <div class="tab"        data-tab="timelog"    onclick="switchTab('timelog')">Time log <span class="tab-badge" id="tbadge-time">0</span></div>
+    <div class="tab"        data-tab="skills"     onclick="switchTab('skills')">Skills browser</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="main-content">
+    <div class="loading-state"><div class="spinner"></div> Loading…</div>
+  </div>
+</div>
+
+<!-- ADD / EDIT ALLOCATION DRAWER -->
+<div class="overlay" id="alloc-overlay" onclick="if(event.target===this)closeDrawer('alloc-overlay')">
+  <div class="drawer">
+    <div class="drawer-head">
+      <span class="drawer-title" id="alloc-drawer-title">ADD ALLOCATION</span>
+      <button class="drawer-close" onclick="closeDrawer('alloc-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="alloc-edit-id" />
+      <div class="field">
+        <label>Resource *</label>
+        <select id="alloc-resource"></select>
+      </div>
+      <div class="field">
+        <label>Project *</label>
+        <select id="alloc-project"></select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Start date *</label>
+          <input type="date" id="alloc-start" />
+        </div>
+        <div class="field">
+          <label>End date *</label>
+          <input type="date" id="alloc-end" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Allocation % — <span id="alloc-pct-val" style="color:var(--accent);font-weight:700">100%</span></label>
+        <input type="range" id="alloc-pct" min="10" max="100" step="10" value="100"
+          style="width:100%;accent-color:var(--accent)"
+          oninput="document.getElementById('alloc-pct-val').textContent=this.value+'%'" />
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
+          <span>10%</span><span>50%</span><span>100%</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="alloc-notes" rows="2" placeholder="Optional context…"></textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveAllocation()">Save</button>
+      <button class="btn" id="alloc-delete-btn" style="color:#f07a7a;border-color:rgba(192,64,74,.3);display:none" onclick="deleteAllocation()">Remove</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer('alloc-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG TIME DRAWER -->
+<div class="overlay" id="time-overlay" onclick="if(event.target===this)closeDrawer('time-overlay')">
+  <div class="drawer">
+    <div class="drawer-head">
+      <span class="drawer-title">LOG TIME</span>
+      <button class="drawer-close" onclick="closeDrawer('time-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="time-edit-id" />
+      <div class="field">
+        <label>Resource *</label>
+        <select id="time-resource"></select>
+      </div>
+      <div class="field">
+        <label>Project *</label>
+        <select id="time-project" onchange="loadProjectTasks()"></select>
+      </div>
+      <div class="field">
+        <label>Task (optional)</label>
+        <select id="time-task"><option value="">— No specific task —</option></select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Date *</label>
+          <input type="date" id="time-date" value="" />
+        </div>
+        <div class="field">
+          <label>Hours *</label>
+          <input type="number" id="time-hours" min="0.25" max="24" step="0.25" placeholder="0.00" />
+        </div>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="time-billable" style="width:auto;accent-color:var(--accent)" />
+        <label for="time-billable" style="display:inline;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text)">
+          Billable time
+        </label>
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="time-notes" rows="2" placeholder="What was worked on…"></textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" onclick="saveTimeEntry()">Save</button>
+      <button class="btn" id="time-delete-btn" style="color:#f07a7a;border-color:rgba(192,64,74,.3);display:none" onclick="deleteTimeEntry()">Delete</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer('time-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let resources    = [];
+let projects     = [];
+let allocations  = [];
+let timeEntries  = [];
+let skills       = [];
+let resourceSkills = [];
+let hudRoles     = [];
+let tasks        = [];
+let _activeTab   = 'roster';
+let _weekOffset  = 0;    // weeks from today for capacity view
+let _viewMode    = 'week'; // 'week' | 'month'
+let _timeFilters = { resource: '', project: '', from: '', to: '' };
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (window.Sidebar) Sidebar.init('resources');
+  await loadAll();
+});
+
+async function loadAll() {
+  try {
+    const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes] = await Promise.all([
+      API.get('resources?is_active=eq.true&order=last_name&select=*'),
+      API.get('projects?status=eq.active&order=name&select=id,name,status,firm_id'),
+      API.get('resource_allocations?order=start_date&select=*'),
+      API.get('time_entries?order=date.desc&limit=500&select=*'),
+      API.get('hud_roles?is_active=eq.true&order=sort_order&select=id,name,abbreviation'),
+      API.get('resource_skills?select=*'),
+      API.get('tasks?status=neq.complete&select=id,name,project_id,assigned_to,due_date,effort_days,status'),
+    ]);
+
+    resources      = resRes   || [];
+    projects       = projRes  || [];
+    allocations    = allocRes || [];
+    timeEntries    = timeRes  || [];
+    hudRoles       = rolesRes || [];
+    resourceSkills = rsRes    || [];
+    tasks          = taskRes  || [];
+
+    // Update badges
+    document.getElementById('tbadge-roster').textContent = resources.length;
+    document.getElementById('tbadge-time').textContent   = timeEntries.length;
+
+    // Populate drawer selects
+    populateDrawerSelects();
+
+    renderContent();
+  } catch(e) {
+    console.error('loadAll error:', e);
+    document.getElementById('main-content').innerHTML =
+      `<div class="empty-state"><div class="ei">⚠</div><div class="et">Failed to load</div><div>${e.message}</div></div>`;
+  }
+}
+
+function populateDrawerSelects() {
+  const resOpts = resources.map(r =>
+    `<option value="${r.id}">${r.first_name} ${r.last_name}</option>`).join('');
+  const projOpts = projects.map(p =>
+    `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+
+  ['alloc-resource','time-resource'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<option value="">— Select —</option>` + resOpts;
+  });
+  ['alloc-project','time-project'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<option value="">— Select —</option>` + projOpts;
+  });
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  _activeTab = name;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === name));
+  renderContent();
+}
+
+function renderContent() {
+  const el = document.getElementById('main-content');
+  switch(_activeTab) {
+    case 'roster':      el.innerHTML = renderRoster();      break;
+    case 'capacity':    el.innerHTML = renderCapacity();    break;
+    case 'allocation':  el.innerHTML = renderAllocation();  break;
+    case 'utilization': el.innerHTML = renderUtilization(); break;
+    case 'timelog':     el.innerHTML = renderTimeLog();     break;
+    case 'skills':      el.innerHTML = renderSkills();      break;
+  }
+}
+
+// ── ROSTER ────────────────────────────────────────────────────────────────────
+function renderRoster() {
+  const avatarColors = ['#1a3a6e','#2a7a4e','#6a2a6e','#4a2a1e','#1a5a4e','#5a3a1e'];
+
+  if (!resources.length) return `<div class="empty-state">
+    <div class="ei">👥</div><div class="et">No team members</div>
+    <div class="es">Add resources to get started</div></div>`;
+
+  const today = new Date().toLocaleDateString('en-CA');
+
+  // Summary strip
+  const activeCount  = resources.filter(r => r.is_active).length;
+  const overAllocated = resources.filter(r => {
+    const allocs = allocations.filter(a => a.resource_id === r.id &&
+      a.start_date <= today && a.end_date >= today);
+    const total = allocs.reduce((s, a) => s + parseFloat(a.allocation_pct || 0), 0);
+    return total > (parseFloat(r.availability_pct || 100));
+  }).length;
+  const totalBillable = timeEntries.filter(t => t.is_billable).reduce((s, t) => s + parseFloat(t.hours || 0), 0);
+
+  const strip = `<div class="summary-strip">
+    <div class="sum-card"><div class="sum-label">Team size</div>
+      <div class="sum-value">${activeCount}</div>
+      <div class="sum-sub">active resources</div></div>
+    <div class="sum-card"><div class="sum-label">Roles</div>
+      <div class="sum-value">${hudRoles.length}</div>
+      <div class="sum-sub">defined roles</div></div>
+    <div class="sum-card"><div class="sum-label">Over-allocated</div>
+      <div class="sum-value" style="color:${overAllocated>0?'#f07a7a':'#7af0a0'}">${overAllocated}</div>
+      <div class="sum-sub">resources</div></div>
+    <div class="sum-card"><div class="sum-label">Billable hours</div>
+      <div class="sum-value" style="color:var(--accent)">${totalBillable.toFixed(0)}</div>
+      <div class="sum-sub">total logged</div></div>
+  </div>`;
+
+  const cards = resources.map((r, i) => {
+    const role      = hudRoles.find(h => h.id === r.hud_role_id);
+    const initials  = ((r.first_name?.[0] || '') + (r.last_name?.[0] || '')).toUpperCase();
+    const bgColor   = avatarColors[i % avatarColors.length];
+    const avail     = parseFloat(r.availability_pct || 100);
+
+    // Current allocation
+    const curAllocs = allocations.filter(a => a.resource_id === r.id &&
+      a.start_date <= today && a.end_date >= today);
+    const allocPct  = curAllocs.reduce((s, a) => s + parseFloat(a.allocation_pct || 0), 0);
+    const freeCapacity = Math.max(0, avail - allocPct);
+    const isOver    = allocPct > avail;
+    const fillColor = isOver ? 'var(--red)' : allocPct > avail * 0.8 ? 'var(--amber)' : 'var(--green)';
+
+    // Recent hours
+    const recentHrs = timeEntries
+      .filter(t => t.user_id === r.user_id)
+      .slice(0, 10)
+      .reduce((s, t) => s + parseFloat(t.hours || 0), 0);
+
+    // Active projects
+    const activeProj = [...new Set(curAllocs.map(a => a.project_id))]
+      .map(pid => projects.find(p => p.id === pid)?.name)
+      .filter(Boolean);
+
+    return `<div class="resource-card" onclick="openResourceDetail('${r.id}')">
+      <div class="rc-head">
+        <div class="rc-av" style="background:${bgColor}22;color:${bgColor}">${initials}</div>
+        <div style="flex:1;min-width:0">
+          <div class="rc-name">${escHtml(r.first_name || '')} ${escHtml(r.last_name || '')}</div>
+          <div class="rc-role">${escHtml(r.title || role?.name || '—')}
+            ${r.location ? ' · ' + escHtml(r.location) : ''}</div>
+        </div>
+        <button class="btn btn-sm" onclick="event.stopPropagation();openAddAllocation('${r.id}')"
+          style="flex-shrink:0">+ Allocate</button>
+      </div>
+      <div class="rc-meta">
+        ${r.level ? `<span class="rc-chip">${capitalize(r.level)}</span>` : ''}
+        ${role ? `<span class="rc-chip amber">${escHtml(role.abbreviation || role.name)}</span>` : ''}
+        ${isOver
+          ? `<span class="rc-chip red">Over-allocated</span>`
+          : freeCapacity > 20
+          ? `<span class="rc-chip green">${freeCapacity.toFixed(0)}% free</span>`
+          : `<span class="rc-chip amber">${freeCapacity.toFixed(0)}% free</span>`}
+        ${recentHrs > 0 ? `<span class="rc-chip">${recentHrs.toFixed(1)}h logged</span>` : ''}
+      </div>
+      ${activeProj.length > 0 ? `
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+          ${activeProj.map(p => `<span style="margin-right:6px">📁 ${escHtml(p)}</span>`).join('')}
+        </div>` : ''}
+      <div class="rc-avail">
+        <div class="rc-avail-label">
+          <span>Allocation ${allocPct.toFixed(0)}% of ${avail.toFixed(0)}% available</span>
+          <span style="color:${isOver?'#f07a7a':'var(--muted)'}">${isOver?'⚠ Over':'OK'}</span>
+        </div>
+        <div class="avail-bar">
+          <div class="avail-fill" style="width:${Math.min(100,(allocPct/avail)*100).toFixed(0)}%;background:${fillColor}"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return strip + `<div class="roster-grid">${cards}</div>`;
+}
+
+// ── CAPACITY HEATMAP ─────────────────────────────────────────────────────────
+function renderCapacity() {
+  // Build week columns: 8 weeks starting from (today + _weekOffset * 7)
+  const weeks = buildWeekColumns(8);
+  const today = new Date().toLocaleDateString('en-CA');
+
+  const controls = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="week-nav">
+        <button onclick="_weekOffset-=4;renderContent()">◂◂</button>
+        <button onclick="_weekOffset--;renderContent()">◂</button>
+        <span class="week-label">${fmtDate(weeks[0].start)} — ${fmtDate(weeks[weeks.length-1].end)}</span>
+        <button onclick="_weekOffset++;renderContent()">▸</button>
+        <button onclick="_weekOffset+=4;renderContent()">▸▸</button>
+        <button onclick="_weekOffset=0;renderContent()" style="margin-left:4px;font-size:10px">Today</button>
+      </div>
+      <div style="display:flex;gap:6px;font-size:11px;flex-wrap:wrap">
+        <span style="color:#7af0a0">■ Under 50%</span>
+        <span style="color:var(--accent)">■ 50–80%</span>
+        <span style="color:var(--amber)">■ 80–100%</span>
+        <span style="color:#f07a7a">■ Over 100%</span>
+      </div>
+    </div>`;
+
+  const headers = weeks.map(w => {
+    const isCurrentWeek = w.start <= today && w.end >= today;
+    return `<th style="${isCurrentWeek?'color:var(--accent)':''}">${w.label}</th>`;
+  }).join('');
+
+  const rows = resources.map(r => {
+    const avail = parseFloat(r.availability_pct || 100);
+    const cells = weeks.map(w => {
+      // Sum allocations overlapping this week
+      const overlapping = allocations.filter(a =>
+        a.resource_id === r.id &&
+        a.start_date <= w.end && a.end_date >= w.start
+      );
+      const total = overlapping.reduce((s, a) => s + parseFloat(a.allocation_pct || 0), 0);
+      const utilPct = avail > 0 ? (total / avail) * 100 : 0;
+
+      let cls, label;
+      if (total === 0)           { cls = 'heat-free'; label = '—'; }
+      else if (utilPct <= 50)    { cls = 'heat-free'; label = total.toFixed(0) + '%'; }
+      else if (utilPct <= 80)    { cls = 'heat-ok';   label = total.toFixed(0) + '%'; }
+      else if (utilPct <= 100)   { cls = 'heat-busy'; label = total.toFixed(0) + '%'; }
+      else                       { cls = 'heat-over'; label = total.toFixed(0) + '%'; }
+
+      const projNames = overlapping
+        .map(a => projects.find(p => p.id === a.project_id)?.name || '?')
+        .join(', ');
+      return `<td><div class="heat-cell ${cls}" title="${escHtml(projNames || 'Unallocated')}">${label}</div></td>`;
+    }).join('');
+
+    const initials = ((r.first_name?.[0]||'')+(r.last_name?.[0]||'')).toUpperCase();
+    return `<tr>
+      <td class="name-cell">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(79,142,247,.15);
+            color:var(--accent);font-size:9px;font-weight:700;display:flex;
+            align-items:center;justify-content:center;flex-shrink:0">${initials}</div>
+          <div>
+            <div style="font-size:12px">${escHtml(r.first_name||'')} ${escHtml(r.last_name||'')}</div>
+            <div style="font-size:10px;color:var(--muted)">${r.availability_pct||100}% avail</div>
+          </div>
+        </div>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  return controls + `<div class="heatmap-wrap">
+    <table class="heatmap-table">
+      <thead><tr><th class="name-col">Resource</th>${headers}</tr></thead>
+      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">No resources</td></tr>'}</tbody>
+    </table>
+  </div>`;
+}
+
+function buildWeekColumns(count) {
+  const weeks = [];
+  const base  = new Date();
+  base.setDate(base.getDate() + _weekOffset * 7);
+  // Snap to Monday
+  const day = base.getDay();
+  base.setDate(base.getDate() - (day === 0 ? 6 : day - 1));
+
+  for (let i = 0; i < count; i++) {
+    const start = new Date(base);
+    start.setDate(start.getDate() + i * 7);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    weeks.push({
+      start: start.toLocaleDateString('en-CA'),
+      end:   end.toLocaleDateString('en-CA'),
+      label: (start.getMonth()+1) + '/' + start.getDate(),
+    });
+  }
+  return weeks;
+}
+
+// ── ALLOCATION MATRIX ─────────────────────────────────────────────────────────
+function renderAllocation() {
+  if (!allocations.length) return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-primary" onclick="openAddAllocation()">+ Add allocation</button>
+  </div>
+  <div class="empty-state"><div class="ei">📋</div>
+    <div class="et">No allocations recorded</div>
+    <div>Use the button above to allocate team members to projects.</div></div>`;
+
+  const today = new Date().toLocaleDateString('en-CA');
+
+  const rows = allocations
+    .sort((a, b) => a.start_date.localeCompare(b.start_date))
+    .map(a => {
+      const res  = resources.find(r => r.id === a.resource_id);
+      const proj = projects.find(p => p.id === a.project_id);
+      const pct  = parseFloat(a.allocation_pct || 0);
+      const isActive = a.start_date <= today && a.end_date >= today;
+      const isPast   = a.end_date < today;
+      const fillColor = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--accent)';
+
+      return `<tr style="opacity:${isPast?0.5:1}">
+        <td>
+          <div style="font-size:12px;font-weight:500">
+            ${escHtml(res ? res.first_name+' '+res.last_name : '—')}
+          </div>
+          <div style="font-size:10px;color:var(--muted)">${escHtml(res?.title||'')}</div>
+        </td>
+        <td>
+          <div style="font-size:12px">${escHtml(proj?.name || '—')}</div>
+        </td>
+        <td>
+          <div class="alloc-bar-wrap">
+            <div class="alloc-bar">
+              <div class="alloc-fill" style="width:${pct}%;background:${fillColor}"></div>
+            </div>
+            <span class="alloc-pct" style="color:${fillColor}">${pct.toFixed(0)}%</span>
+          </div>
+        </td>
+        <td style="font-size:11px;color:var(--muted)">
+          ${fmtDate(a.start_date)} — ${fmtDate(a.end_date)}
+        </td>
+        <td>
+          ${isActive
+            ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(42,157,64,.12);color:#7af0a0">Active</span>'
+            : isPast
+            ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.06);color:var(--muted)">Past</span>'
+            : '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(79,142,247,.12);color:var(--accent)">Upcoming</span>'}
+        </td>
+        <td>
+          <button class="btn btn-sm" onclick="openEditAllocation('${a.id}')">✎</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-primary" onclick="openAddAllocation()">+ Add allocation</button>
+  </div>
+  <table class="alloc-table">
+    <thead><tr>
+      <th>Resource</th><th>Project</th><th style="width:180px">Allocation</th>
+      <th>Period</th><th>Status</th><th style="width:60px"></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── UTILIZATION ───────────────────────────────────────────────────────────────
+function renderUtilization() {
+  // Group time entries by resource and billable flag
+  const byResource = {};
+  timeEntries.forEach(t => {
+    if (!byResource[t.user_id]) byResource[t.user_id] = { billable: 0, nonBillable: 0 };
+    if (t.is_billable) byResource[t.user_id].billable     += parseFloat(t.hours || 0);
+    else               byResource[t.user_id].nonBillable  += parseFloat(t.hours || 0);
+  });
+
+  const totalBillable    = timeEntries.filter(t => t.is_billable).reduce((s,t)=>s+parseFloat(t.hours||0),0);
+  const totalNonBillable = timeEntries.filter(t =>!t.is_billable).reduce((s,t)=>s+parseFloat(t.hours||0),0);
+  const totalHours       = totalBillable + totalNonBillable;
+  const billablePct      = totalHours > 0 ? Math.round((totalBillable / totalHours) * 100) : 0;
+
+  const strip = `<div class="summary-strip">
+    <div class="sum-card"><div class="sum-label">Total hours</div>
+      <div class="sum-value">${totalHours.toFixed(0)}</div><div class="sum-sub">all time</div></div>
+    <div class="sum-card"><div class="sum-label">Billable</div>
+      <div class="sum-value" style="color:#7af0a0">${totalBillable.toFixed(0)}</div>
+      <div class="sum-sub">${billablePct}% of total</div></div>
+    <div class="sum-card"><div class="sum-label">Non-billable</div>
+      <div class="sum-value" style="color:var(--amber)">${totalNonBillable.toFixed(0)}</div>
+      <div class="sum-sub">${100-billablePct}% of total</div></div>
+    <div class="sum-card"><div class="sum-label">Active staff</div>
+      <div class="sum-value">${Object.keys(byResource).length}</div>
+      <div class="sum-sub">have logged time</div></div>
+  </div>`;
+
+  const resRows = resources
+    .filter(r => byResource[r.user_id])
+    .map(r => {
+      const d = byResource[r.user_id] || { billable: 0, nonBillable: 0 };
+      const total = d.billable + d.nonBillable;
+      const bPct  = total > 0 ? Math.round((d.billable / total) * 100) : 0;
+      return { r, d, total, bPct };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  const maxHours = resRows[0]?.total || 1;
+
+  const utilRows = resRows.map(({ r, d, total, bPct }) => `
+    <div class="util-row">
+      <div class="util-name">${escHtml(r.first_name||'')} ${escHtml(r.last_name||'')}</div>
+      <div class="util-bar-wrap">
+        <div class="util-bar" style="height:8px;border-radius:4px">
+          <div class="util-fill" style="width:${(total/maxHours*100).toFixed(0)}%;
+            background:linear-gradient(90deg,var(--accent),#7af0a0)"></div>
+        </div>
+      </div>
+      <div class="util-num" style="color:var(--accent)">${total.toFixed(0)}h</div>
+      <div style="font-size:10px;color:var(--muted);min-width:50px;text-align:right">${bPct}% bill.</div>
+    </div>`).join('');
+
+  // By project
+  const byProject = {};
+  timeEntries.forEach(t => {
+    if (!byProject[t.project_id]) byProject[t.project_id] = 0;
+    byProject[t.project_id] += parseFloat(t.hours || 0);
+  });
+  const maxProj = Math.max(...Object.values(byProject), 1);
+  const projRows = Object.entries(byProject)
+    .sort(([,a],[,b]) => b - a)
+    .slice(0, 8)
+    .map(([pid, hrs]) => {
+      const proj = projects.find(p => p.id === pid);
+      return `<div class="util-row">
+        <div class="util-name">${escHtml(proj?.name || 'Unknown project')}</div>
+        <div class="util-bar-wrap">
+          <div class="util-bar" style="height:8px;border-radius:4px">
+            <div class="util-fill" style="width:${(hrs/maxProj*100).toFixed(0)}%;background:var(--amber)"></div>
+          </div>
+        </div>
+        <div class="util-num" style="color:var(--amber)">${hrs.toFixed(0)}h</div>
+      </div>`;
+    }).join('');
+
+  return strip + `<div class="util-grid">
+    <div class="util-card">
+      <div class="util-card-title">Hours by person</div>
+      ${utilRows || '<div style="color:var(--muted);font-size:12px">No time logged yet</div>'}
+    </div>
+    <div class="util-card">
+      <div class="util-card-title">Hours by project</div>
+      ${projRows || '<div style="color:var(--muted);font-size:12px">No time logged yet</div>'}
+    </div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:8px">
+    <button class="btn btn-primary" onclick="openLogTime()">+ Log time</button>
+  </div>`;
+}
+
+// ── TIME LOG ──────────────────────────────────────────────────────────────────
+function renderTimeLog() {
+  const resFilter  = document.getElementById('tlog-res-filter')?.value  || _timeFilters.resource;
+  const projFilter = document.getElementById('tlog-proj-filter')?.value || _timeFilters.project;
+  const fromFilter = document.getElementById('tlog-from')?.value || _timeFilters.from;
+  const toFilter   = document.getElementById('tlog-to')?.value   || _timeFilters.to;
+
+  let entries = [...timeEntries];
+  if (resFilter)  entries = entries.filter(e => e.user_id    === resFilter);
+  if (projFilter) entries = entries.filter(e => e.project_id === projFilter);
+  if (fromFilter) entries = entries.filter(e => e.date >= fromFilter);
+  if (toFilter)   entries = entries.filter(e => e.date <= toFilter);
+
+  const totalFiltered = entries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+
+  const rows = entries.slice(0, 100).map(e => {
+    const res  = resources.find(r => r.user_id === e.user_id);
+    const proj = projects.find(p => p.id === e.project_id);
+    const task = tasks.find(t => t.id === e.task_id);
+    return `<tr>
+      <td>${fmtDate(e.date)}</td>
+      <td>${escHtml(res ? res.first_name+' '+res.last_name : '—')}</td>
+      <td>${escHtml(proj?.name || '—')}</td>
+      <td style="color:var(--muted);font-size:11px">${escHtml(task?.name || '—')}</td>
+      <td style="font-weight:600;color:var(--accent)">${parseFloat(e.hours||0).toFixed(2)}</td>
+      <td>
+        <span class="billable-dot" style="background:${e.is_billable?'#7af0a0':'var(--muted)'}"></span>
+        <span style="font-size:11px;color:${e.is_billable?'#7af0a0':'var(--muted)'}">
+          ${e.is_billable?'Billable':'Non-bill.'}
+        </span>
+      </td>
+      <td style="font-size:11px;color:var(--muted)">${escHtml(e.notes||'')}</td>
+      <td>
+        <button class="btn btn-sm" onclick="openEditTimeEntry('${e.id}')">✎</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const resOpts  = resources.map(r => `<option value="${r.user_id}" ${r.user_id===resFilter?'selected':''}>${r.first_name} ${r.last_name}</option>`).join('');
+  const projOpts = projects.map(p => `<option value="${p.id}" ${p.id===projFilter?'selected':''}>${escHtml(p.name)}</option>`).join('');
+
+  return `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <div class="tlog-filters">
+      <select id="tlog-res-filter" onchange="_timeFilters.resource=this.value;renderContent()">
+        <option value="">All resources</option>${resOpts}
+      </select>
+      <select id="tlog-proj-filter" onchange="_timeFilters.project=this.value;renderContent()">
+        <option value="">All projects</option>${projOpts}
+      </select>
+      <input type="date" id="tlog-from" value="${fromFilter}" onchange="_timeFilters.from=this.value;renderContent()" title="From date" />
+      <input type="date" id="tlog-to"   value="${toFilter}"   onchange="_timeFilters.to=this.value;renderContent()" title="To date" />
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px;color:var(--muted)">
+        ${entries.length} entries · <strong style="color:var(--accent)">${totalFiltered.toFixed(2)}h</strong>
+      </span>
+      <button class="btn btn-primary btn-sm" onclick="openLogTime()">+ Log time</button>
+    </div>
+  </div>
+  <table class="tlog-table">
+    <thead><tr>
+      <th>Date</th><th>Resource</th><th>Project</th><th>Task</th>
+      <th>Hours</th><th>Type</th><th>Notes</th><th style="width:50px"></th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">No entries match filters</td></tr>`}</tbody>
+  </table>`;
+}
+
+// ── SKILLS BROWSER ────────────────────────────────────────────────────────────
+function renderSkills() {
+  // Build skill → people map from resource_skills
+  const skillMap = {};
+  resourceSkills.forEach(rs => {
+    const res = resources.find(r => r.id === rs.resource_id);
+    if (!res) return;
+    const key = rs.skill_id || 'unknown';
+    if (!skillMap[key]) skillMap[key] = { id: key, name: rs.skill_id || 'Unknown', people: [] };
+    skillMap[key].people.push({
+      name:        `${res.first_name||''} ${res.last_name||''}`.trim(),
+      proficiency: rs.proficiency,
+      years:       rs.years_experience,
+    });
+  });
+
+  if (!Object.keys(skillMap).length) return `<div class="empty-state">
+    <div class="ei">🔧</div><div class="et">No skills recorded</div>
+    <div>Skills are added to resources via the resource profile.</div></div>`;
+
+  const cards = Object.values(skillMap).map(s => {
+    const people = s.people.map(p => {
+      const cls = p.proficiency === 'expert' ? 'expert'
+                : p.proficiency === 'proficient' ? 'proficient' : '';
+      const label = [p.name, p.proficiency, p.years ? p.years+'yr' : null]
+        .filter(Boolean).join(' · ');
+      return `<span class="skill-person ${cls}">${escHtml(label)}</span>`;
+    }).join('');
+    return `<div class="skill-card">
+      <div class="skill-name">${escHtml(s.name)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${s.people.length} team member${s.people.length!==1?'s':''}</div>
+      <div class="skill-people">${people}</div>
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-bottom:14px">
+    <input type="text" placeholder="Search skills…" id="skill-search"
+      style="padding:7px 12px;border-radius:6px;border:1px solid var(--border2);
+        background:var(--surf2);color:var(--text);font-size:12px;width:260px;outline:none"
+      oninput="filterSkills(this.value)" />
+  </div>
+  <div class="skills-grid" id="skills-grid">${cards}</div>`;
+}
+
+function filterSkills(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('#skills-grid .skill-card').forEach(card => {
+    card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ── ALLOCATION DRAWER ─────────────────────────────────────────────────────────
+function openAddAllocation(presetResourceId = null) {
+  document.getElementById('alloc-drawer-title').textContent = 'ADD ALLOCATION';
+  document.getElementById('alloc-edit-id').value = '';
+  document.getElementById('alloc-resource').value = presetResourceId || '';
+  document.getElementById('alloc-project').value  = '';
+  document.getElementById('alloc-pct').value       = 100;
+  document.getElementById('alloc-pct-val').textContent = '100%';
+  // Default: today → +30 days
+  const today = new Date().toLocaleDateString('en-CA');
+  const end   = new Date(); end.setDate(end.getDate() + 30);
+  document.getElementById('alloc-start').value = today;
+  document.getElementById('alloc-end').value   = end.toLocaleDateString('en-CA');
+  document.getElementById('alloc-notes').value  = '';
+  document.getElementById('alloc-delete-btn').style.display = 'none';
+  document.getElementById('alloc-overlay').classList.add('open');
+}
+
+function openEditAllocation(id) {
+  const a = allocations.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('alloc-drawer-title').textContent  = 'EDIT ALLOCATION';
+  document.getElementById('alloc-edit-id').value             = id;
+  document.getElementById('alloc-resource').value            = a.resource_id;
+  document.getElementById('alloc-project').value             = a.project_id;
+  document.getElementById('alloc-pct').value                 = a.allocation_pct;
+  document.getElementById('alloc-pct-val').textContent       = a.allocation_pct + '%';
+  document.getElementById('alloc-start').value               = a.start_date;
+  document.getElementById('alloc-end').value                 = a.end_date;
+  document.getElementById('alloc-notes').value               = a.notes || '';
+  document.getElementById('alloc-delete-btn').style.display  = '';
+  document.getElementById('alloc-overlay').classList.add('open');
+}
+
+async function saveAllocation() {
+  const id  = document.getElementById('alloc-edit-id').value;
+  const rid = document.getElementById('alloc-resource').value;
+  const pid = document.getElementById('alloc-project').value;
+  const pct = document.getElementById('alloc-pct').value;
+  const s   = document.getElementById('alloc-start').value;
+  const e   = document.getElementById('alloc-end').value;
+
+  if (!rid || !pid || !s || !e) { alert('Resource, project, start, and end date are required.'); return; }
+  if (s > e) { alert('Start date must be before end date.'); return; }
+
+  // Resolve firm_id from resource
+  const res = resources.find(r => r.id === rid);
+  const payload = {
+    resource_id:    rid,
+    project_id:     pid,
+    firm_id:        res?.firm_id,
+    start_date:     s,
+    end_date:       e,
+    allocation_pct: parseInt(pct),
+    notes:          document.getElementById('alloc-notes').value.trim() || null,
+  };
+
+  try {
+    if (id) {
+      await API.patch(`resource_allocations?id=eq.${id}`, payload);
+    } else {
+      await API.post('resource_allocations', payload);
+    }
+    closeDrawer('alloc-overlay');
+    await loadAll();
+    renderContent();
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save allocation: ' + e.message);
+  }
+}
+
+async function deleteAllocation() {
+  const id = document.getElementById('alloc-edit-id').value;
+  if (!id || !confirm('Remove this allocation?')) return;
+  try {
+    await API.del(`resource_allocations?id=eq.${id}`);
+    closeDrawer('alloc-overlay');
+    await loadAll();
+    renderContent();
+  } catch(e) { alert('Failed to remove.'); }
+}
+
+// ── TIME ENTRY DRAWER ─────────────────────────────────────────────────────────
+function openLogTime(presetUserId = null) {
+  document.getElementById('time-edit-id').value    = '';
+  document.getElementById('time-resource').value   = presetUserId || '';
+  document.getElementById('time-project').value    = '';
+  document.getElementById('time-task').innerHTML   = '<option value="">— No specific task —</option>';
+  document.getElementById('time-date').value       = new Date().toLocaleDateString('en-CA');
+  document.getElementById('time-hours').value      = '';
+  document.getElementById('time-billable').checked = true;
+  document.getElementById('time-notes').value      = '';
+  document.getElementById('time-delete-btn').style.display = 'none';
+  document.getElementById('time-overlay').classList.add('open');
+}
+
+function openEditTimeEntry(id) {
+  const e = timeEntries.find(x => x.id === id);
+  if (!e) return;
+  const res = resources.find(r => r.user_id === e.user_id);
+  document.getElementById('time-edit-id').value    = id;
+  document.getElementById('time-resource').value   = res?.id || '';
+  document.getElementById('time-project').value    = e.project_id;
+  document.getElementById('time-date').value       = e.date;
+  document.getElementById('time-hours').value      = e.hours;
+  document.getElementById('time-billable').checked = e.is_billable;
+  document.getElementById('time-notes').value      = e.notes || '';
+  document.getElementById('time-delete-btn').style.display = '';
+  loadProjectTasks();
+  setTimeout(() => { document.getElementById('time-task').value = e.task_id || ''; }, 200);
+  document.getElementById('time-overlay').classList.add('open');
+}
+
+async function loadProjectTasks() {
+  const pid = document.getElementById('time-project').value;
+  const sel = document.getElementById('time-task');
+  if (!pid) { sel.innerHTML = '<option value="">— No specific task —</option>'; return; }
+  try {
+    const t = await API.get(`tasks?project_id=eq.${pid}&status=neq.complete&order=name&select=id,name`);
+    sel.innerHTML = '<option value="">— No specific task —</option>' +
+      (t || []).map(x => `<option value="${x.id}">${escHtml(x.name)}</option>`).join('');
+  } catch(e) { /* non-fatal */ }
+}
+
+async function saveTimeEntry() {
+  const id        = document.getElementById('time-edit-id').value;
+  const resId     = document.getElementById('time-resource').value;
+  const projId    = document.getElementById('time-project').value;
+  const taskId    = document.getElementById('time-task').value;
+  const date      = document.getElementById('time-date').value;
+  const hours     = parseFloat(document.getElementById('time-hours').value);
+  const billable  = document.getElementById('time-billable').checked;
+  const notes     = document.getElementById('time-notes').value.trim();
+
+  if (!resId || !projId || !date || !hours || hours <= 0) {
+    alert('Resource, project, date, and hours are required.'); return;
+  }
+
+  const res = resources.find(r => r.id === resId);
+  const payload = {
+    user_id:     res?.user_id,
+    project_id:  projId,
+    task_id:     taskId || null,
+    firm_id:     res?.firm_id,
+    date,
+    hours,
+    is_billable: billable,
+    notes:       notes || null,
+  };
+
+  try {
+    if (id) {
+      await API.patch(`time_entries?id=eq.${id}`, payload);
+    } else {
+      await API.post('time_entries', payload);
+    }
+    closeDrawer('time-overlay');
+    await loadAll();
+    renderContent();
+  } catch(e) {
+    console.error(e);
+    alert('Failed to save time entry: ' + e.message);
+  }
+}
+
+async function deleteTimeEntry() {
+  const id = document.getElementById('time-edit-id').value;
+  if (!id || !confirm('Delete this time entry?')) return;
+  try {
+    await API.del(`time_entries?id=eq.${id}`);
+    closeDrawer('time-overlay');
+    await loadAll();
+    renderContent();
+  } catch(e) { alert('Failed to delete.'); }
+}
+
+// ── Resource detail placeholder ───────────────────────────────────────────────
+function openResourceDetail(id) {
+  const r = resources.find(x => x.id === id);
+  if (!r) return;
+  // For now open allocation view filtered to this resource
+  _activeTab = 'allocation';
+  switchTab('allocation');
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const rows = [['Name','Title','Level','Availability %','Current Allocation %','Billable Hours']];
+  const today = new Date().toLocaleDateString('en-CA');
+  resources.forEach(r => {
+    const allocs = allocations.filter(a => a.resource_id===r.id && a.start_date<=today && a.end_date>=today);
+    const allocPct = allocs.reduce((s,a)=>s+parseFloat(a.allocation_pct||0),0);
+    const billHrs  = timeEntries.filter(t=>t.user_id===r.user_id&&t.is_billable).reduce((s,t)=>s+parseFloat(t.hours||0),0);
+    rows.push([
+      `${r.first_name||''} ${r.last_name||''}`.trim(),
+      r.title || '',
+      r.level || '',
+      r.availability_pct || 100,
+      allocPct.toFixed(0),
+      billHrs.toFixed(2),
+    ]);
+  });
+  const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'resources_' + new Date().toLocaleDateString('en-CA') + '.csv';
+  a.click();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function escHtml(s)    { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : ''; }
+function fmtDate(d)    { if(!d)return''; return new Date(d.includes('T')?d:d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function closeDrawer(id) { document.getElementById(id)?.classList.remove('open'); }
+</script>
+</body>
+</html>
