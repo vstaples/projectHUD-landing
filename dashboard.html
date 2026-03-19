@@ -22,7 +22,7 @@
 .project-card.active  { border-left-color: rgba(0,229,160,0.4); }
 .proj-name   { font-family: var(--font-ui); font-size:15.0px; font-weight: 600; color: var(--text0); line-height: 1.2; }
 .proj-client { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
-.proj-stats  { display: flex; gap: 16px; font-family: var(--font-mono); font-size:11px; margin-top: 10px; }
+.proj-stats  { display: flex; gap: 12px; font-family: var(--font-mono); font-size:11px; margin-top: 10px; }
 .proj-stat   { display: flex; flex-direction: column; gap: 2px; }
 .proj-stat .stat-label { color: var(--text3); font-size:11px; letter-spacing: 0.1em; }
 .proj-stat .stat-value { color: var(--text1); font-weight: 600; }
@@ -408,7 +408,7 @@ async function loadDashboard() {
           </div>
 
           <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
-          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
               align-items:center;gap:8px;margin-bottom:7px;">
             <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
             <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
@@ -436,11 +436,11 @@ async function loadDashboard() {
           ${UI.progressBar(pctDone,fill)}
 
           <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
-          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
               align-items:flex-start;gap:8px;margin-top:6px;">
 
             <!-- LEFT: EVM metrics — grid col, same width as client text above -->
-            <div class="proj-stats" style="margin-top:0;flex-wrap:wrap;">
+            <div class="proj-stats" style="margin-top:0;flex-wrap:nowrap;gap:12px;">
               <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
                 <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
               <div class="proj-stat"><span class="stat-label">CPI</span>
