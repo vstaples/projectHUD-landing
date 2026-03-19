@@ -386,7 +386,7 @@ let resources    = [];
 let projects     = [];
 let allocations  = [];
 let timeEntries  = [];
-let skills       = [];
+let skills       = [];  // unused — skill_name stored directly on resource_skills
 let resourceSkills = [];
 let hudRoles     = [];
 let tasks        = [];
@@ -403,6 +403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAll() {
   try {
+    const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes] = await Promise.all([
     const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes] = await Promise.all([
       API.get('resources?is_active=eq.true&order=last_name&select=*'),
       API.get('projects?status=eq.active&order=name&select=id,name,status,firm_id'),
@@ -901,13 +902,15 @@ function renderTimeLog() {
 
 // ── SKILLS BROWSER ────────────────────────────────────────────────────────────
 function renderSkills() {
-  // Build skill → people map from resource_skills
+  // skill_name is stored directly on resource_skills — no separate lookup table
   const skillMap = {};
   resourceSkills.forEach(rs => {
     const res = resources.find(r => r.id === rs.resource_id);
     if (!res) return;
-    const key = rs.skill_id || 'unknown';
-    if (!skillMap[key]) skillMap[key] = { id: key, name: rs.skill_id || 'Unknown', people: [] };
+    const skillName = rs.skill_name || 'Unknown skill';
+    if (!skillName) return;
+    const key = skillName;
+    if (!skillMap[key]) skillMap[key] = { name: skillName, people: [] };
     skillMap[key].people.push({
       name:        `${res.first_name||''} ${res.last_name||''}`.trim(),
       proficiency: rs.proficiency,
@@ -919,17 +922,30 @@ function renderSkills() {
     <div class="ei">🔧</div><div class="et">No skills recorded</div>
     <div>Skills are added to resources via the resource profile.</div></div>`;
 
-  const cards = Object.values(skillMap).map(s => {
+  // Sort by skill name
+  const sortedSkills = Object.values(skillMap).sort((a,b) => a.name.localeCompare(b.name));
+
+  const cards = sortedSkills.map(s => {
     const people = s.people.map(p => {
-      const cls = p.proficiency === 'expert' ? 'expert'
+      const cls = p.proficiency === 'expert'     ? 'expert'
                 : p.proficiency === 'proficient' ? 'proficient' : '';
-      const label = [p.name, p.proficiency, p.years ? p.years+'yr' : null]
-        .filter(Boolean).join(' · ');
-      return `<span class="skill-person ${cls}">${escHtml(label)}</span>`;
+      const yrs  = p.years ? p.years + 'yr' : null;
+      const label = [p.name, p.proficiency, yrs].filter(Boolean).join(' · ');
+      return `<span class="skill-person ${cls}" title="${escHtml(label)}">${escHtml(label)}</span>`;
     }).join('');
+    const catBadge = s.category
+      ? `<span style="font-size:9px;padding:1px 6px;border-radius:3px;
+          background:rgba(79,142,247,.1);color:var(--accent);font-weight:600;
+          text-transform:uppercase;letter-spacing:.06em">${escHtml(s.category)}</span>`
+      : '';
     return `<div class="skill-card">
-      <div class="skill-name">${escHtml(s.name)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${s.people.length} team member${s.people.length!==1?'s':''}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px">
+        <div class="skill-name">${escHtml(s.name)}</div>
+        ${catBadge}
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">
+        ${s.people.length} team member${s.people.length!==1?'s':''}
+      </div>
       <div class="skill-people">${people}</div>
     </div>`;
   }).join('');
