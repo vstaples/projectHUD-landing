@@ -1233,7 +1233,7 @@ async function saveNewProject() {
   background:rgba(0,0,0,0.75);backdrop-filter:blur(3px);
   align-items:center;justify-content:center;" onclick="closeGaugePopup(event)">
   <div id="gauge-panel" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.25);
-    width:680px;max-width:96vw;position:relative;
+    width:620px;max-width:96vw;position:relative;
     box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(0,210,255,0.08);"
     onclick="event.stopPropagation()">
 
@@ -1255,7 +1255,7 @@ async function saveNewProject() {
     </div>
 
     <!-- Gauge grid -->
-    <div id="gp-gauges" style="display:grid;grid-template-columns:repeat(4,1fr);
+    <div id="gp-gauges" style="display:grid;grid-template-columns:repeat(2,1fr);
       gap:0;padding:24px 16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);"></div>
 
     <!-- Stats row -->
@@ -1292,9 +1292,9 @@ function openGaugePopup(projId) {
   // Build gauge SVGs
   const gauges = [
     { label:'WORK %',  value: d.pctDone,  max:100, isIndex:false, noData: false,             display: d.pctDone+'%',  color:'var(--cyan)' },
-    { label:'CPI',     value: d.cpi,      max:1.5, isIndex:true,  noData: d.cpi==null||d.cpi>2.5, display: d.cpiStr,  color: UI.indexColor(d.cpi) },
-    { label:'SPI',     value: d.spi,      max:1.5, isIndex:true,  noData: d.spi==null||d.spi>2.5, display: d.spiStr,  color: UI.indexColor(d.spi) },
-    { label:'TCPI',    value: d.tcpi,     max:1.5, isIndex:true,  noData: d.tcpi==null,           display: d.tcpiStr, color: UI.indexColor(d.tcpi) },
+    { label:'CPI',     value: d.cpi,      max:2.0, isIndex:true,  noData: d.cpi==null||d.cpi>3.0, display: d.cpiStr,  color: UI.indexColor(d.cpi) },
+    { label:'SPI',     value: d.spi,      max:2.0, isIndex:true,  noData: d.spi==null||d.spi>3.0, display: d.spiStr,  color: UI.indexColor(d.spi) },
+    { label:'TCPI',    value: d.tcpi,     max:2.0, isIndex:true,  noData: d.tcpi==null,           display: d.tcpiStr, color: UI.indexColor(d.tcpi) },
   ];
 
   document.getElementById('gp-gauges').innerHTML = gauges.map(g => buildSpeedometer(g)).join('');
@@ -1346,8 +1346,11 @@ function buildSpeedometer(g) {
     for(let i=0;i<steps;i++){
       const v1=max*i/steps, v2=max*(i+1)/steps, t=i/(steps-1);
       let r,gv,b;
-      if(t<0.5){ r=220; gv=Math.round(40+t*2*160); b=30; }
-      else { r=Math.round(220-(t-0.5)*2*170); gv=200; b=30+Math.round((t-0.5)*2*50); }
+      // Anchor transitions to PMI zone boundaries: red 0–0.9, amber 0.9–1.0, green 1.0–2.0
+      // On 0–2.0 scale: t=0.45=0.9/2, t=0.50=1.0/2
+      if(t<0.45){ r=220; gv=Math.round(40+t/0.45*160); b=30; }
+      else if(t<0.50){ const s=(t-0.45)/0.05; r=220; gv=200; b=30; }
+      else { r=Math.round(220-(t-0.50)/0.50*170); gv=200; b=30+Math.round((t-0.50)/0.50*50); }
       const fill=`rgb(${r},${gv},${b})`;
       const a1=v2a(v1,max),a2=v2a(v2,max);
       const p1o=pt(RO,a1),p2o=pt(RO,a2),p1i=pt(RI,a1),p2i=pt(RI,a2);
@@ -1384,7 +1387,7 @@ function buildSpeedometer(g) {
   const tickStep = isIndex ? null : 10; // handled separately for index
 
   function indexTicks(max) {
-    const vals = [{v:0,l:'0'},{v:0.5,l:'.5'},{v:1.0,l:'1.0'},{v:1.25,l:'1.25'},{v:1.5,l:'1.5'}];
+    const vals = [{v:0,l:'0'},{v:0.5,l:'.5'},{v:1.0,l:'1.0'},{v:1.5,l:'1.5'},{v:2.0,l:'2.0'}];
     let out='';
     vals.forEach(({v,l}) => {
       const a=v2a(v,max);
