@@ -265,7 +265,8 @@ body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var
 
   <!-- Tabs -->
   <div class="tabs">
-    <div class="tab active" data-tab="roster"     onclick="switchTab('roster')">Team roster <span class="tab-badge" id="tbadge-roster">0</span></div>
+    <div class="tab"        data-tab="roster"     onclick="switchTab('roster')">Team roster <span class="tab-badge" id="tbadge-roster">0</span></div>
+    <div class="tab active" data-tab="needs"      onclick="switchTab('needs')">Needs resources <span class="tab-badge" id="tbadge-needs" style="background:rgba(192,64,74,.2);color:#f07a7a">0</span></div>
     <div class="tab"        data-tab="capacity"   onclick="switchTab('capacity')">Capacity heatmap</div>
     <div class="tab"        data-tab="allocation" onclick="switchTab('allocation')">Allocation matrix</div>
     <div class="tab"        data-tab="utilization"onclick="switchTab('utilization')">Utilization</div>
@@ -393,7 +394,8 @@ let skills       = [];  // unused — skill_name stored directly on resource_ski
 let resourceSkills = [];
 let hudRoles     = [];
 let tasks        = [];
-let _activeTab   = 'roster';
+let milestones   = [];
+let _activeTab   = 'needs';
 let _weekOffset  = 0;    // weeks from today for capacity view
 let _viewMode    = 'week'; // 'week' | 'month'
 let _timeFilters = { resource: '', project: '', from: '', to: '' };
@@ -406,14 +408,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAll() {
   try {
-    const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes] = await Promise.all([
+    const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes, milRes] = await Promise.all([
       API.get('resources?is_active=eq.true&order=last_name&select=*'),
       API.get('projects?status=eq.active&order=name&select=id,name,status,firm_id'),
       API.get('resource_allocations?order=start_date&select=*'),
       API.get('time_entries?order=date.desc&limit=500&select=*'),
       API.get('hud_roles?is_active=eq.true&order=sort_order&select=id,name,abbreviation'),
       API.get('resource_skills?select=resource_id,skill_id,skill_name,proficiency,years_experience&limit=500'),
-      API.get('tasks?status=neq.complete&select=id,name,project_id,assigned_to,due_date,effort_days,status'),
+      API.get('tasks?status=neq.complete&select=id,name,project_id,assigned_to,due_date,effort_days,status,phase,hud_role_id&limit=500'),
+      API.get('milestones?select=id,project_id,name,status,target_date&order=target_date'),
     ]);
 
     resources      = resRes   || [];
@@ -423,10 +426,14 @@ async function loadAll() {
     hudRoles       = rolesRes || [];
     resourceSkills = rsRes    || [];
     tasks          = taskRes  || [];
+    milestones     = milRes   || [];
 
     // Update badges
     document.getElementById('tbadge-roster').textContent = resources.length;
     document.getElementById('tbadge-time').textContent   = timeEntries.length;
+    const unassigned = (taskRes||[]).filter(t => !t.assigned_to);
+    const needsBadge = document.getElementById('tbadge-needs');
+    if (needsBadge) needsBadge.textContent = unassigned.length;
 
     // Populate drawer selects
     populateDrawerSelects();
@@ -466,12 +473,13 @@ function switchTab(name) {
 function renderContent() {
   const el = document.getElementById('main-content');
   switch(_activeTab) {
-    case 'roster':      el.innerHTML = renderRoster();      break;
-    case 'capacity':    el.innerHTML = renderCapacity();    break;
-    case 'allocation':  el.innerHTML = renderAllocation();  break;
-    case 'utilization': el.innerHTML = renderUtilization(); break;
-    case 'timelog':     el.innerHTML = renderTimeLog();     break;
-    case 'skills':      el.innerHTML = renderSkills();      break;
+    case 'roster':      el.innerHTML = renderRoster();           break;
+    case 'needs':       el.innerHTML = renderNeedsResources();   break;
+    case 'capacity':    el.innerHTML = renderCapacity();         break;
+    case 'allocation':  el.innerHTML = renderAllocation();       break;
+    case 'utilization': el.innerHTML = renderUtilization();      break;
+    case 'timelog':     el.innerHTML = renderTimeLog();          break;
+    case 'skills':      el.innerHTML = renderSkills();           break;
   }
 }
 
@@ -680,6 +688,367 @@ function renderIntelligenceAlerts(intel) {
     }).join('')}
   </div>`;
 }
+
+// ── RESCUE INTELLIGENCE ENGINE ───────────────────────────────────────────────
+// The PM's question: "My projects are in trouble. Who can save them?"
+// Not about free seats — about finding the RIGHT skills at the RIGHT depth
+// to rescue tasks that are failing, overdue, or at risk.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderNeedsResources() {
+  const today   = new Date().toLocaleDateString('en-CA');
+  const soon    = new Date();
+  soon.setDate(soon.getDate() + 14);
+  const soonStr = soon.toLocaleDateString('en-CA');
+  const intel   = computeResourceIntelligence();
+
+  // ── Classify every troubled task ────────────────────────────────────────────
+  // A task is "in trouble" if it is:
+  //   OVERDUE   — past due date, not complete
+  //   AT RISK   — due within 14 days, not started or <30% complete
+  //   BLOCKED   — status = blocked
+  //   STALLED   — in_progress but no pct_complete progress and due soon
+
+  function classifyTask(t) {
+    const pastDue  = t.due_date && t.due_date < today  && t.status !== 'complete';
+    const dueSoon  = t.due_date && t.due_date <= soonStr && t.due_date >= today;
+    const blocked  = t.status === 'blocked';
+    const stalled  = t.status === 'in_progress' && (!t.pct_complete || t.pct_complete < 0.2) && dueSoon;
+    const notStarted = t.status === 'not_started' && dueSoon;
+
+    if (pastDue && blocked) return { severity: 'critical', label: 'BLOCKED + OVERDUE', color: '#f07a7a' };
+    if (pastDue)            return { severity: 'overdue',  label: 'OVERDUE',           color: '#f07a7a' };
+    if (blocked)            return { severity: 'blocked',  label: 'BLOCKED',           color: '#f07a7a' };
+    if (stalled)            return { severity: 'stalled',  label: 'STALLED',           color: 'var(--amber)' };
+    if (notStarted)         return { severity: 'at-risk',  label: 'AT RISK',           color: 'var(--amber)' };
+    return null;
+  }
+
+  // ── Build troubled task list ─────────────────────────────────────────────────
+  const troubledTasks = tasks
+    .map(t => ({ ...t, _class: classifyTask(t) }))
+    .filter(t => t._class !== null)
+    .sort((a, b) => {
+      const order = { critical:0, overdue:1, blocked:2, stalled:3, 'at-risk':4 };
+      return (order[a._class.severity]||5) - (order[b._class.severity]||5)
+        || (a.due_date||'').localeCompare(b.due_date||'');
+    });
+
+  // ── Milestone health ─────────────────────────────────────────────────────────
+  const troubledMilestones = milestones.filter(m =>
+    m.status === 'at_risk' || m.status === 'missed' ||
+    (m.target_date && m.target_date < today && m.status !== 'complete')
+  );
+
+  // ── If nothing is troubled — show healthy state ───────────────────────────
+  if (!troubledTasks.length && !troubledMilestones.length) {
+    return `<div style="text-align:center;padding:60px 24px">
+      <div style="font-size:48px;margin-bottom:16px">✓</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Projects are on track</div>
+      <div style="font-size:12px;color:var(--muted);max-width:360px;margin:0 auto;line-height:1.7">
+        No overdue, blocked, or at-risk tasks found.<br>
+        Check back here when project KPIs start showing stress.
+      </div>
+    </div>`;
+  }
+
+  // ── Find rescue candidates for a task ────────────────────────────────────────
+  // Logic: match on phase keywords AND proficiency depth
+  // Authority > Expert > Proficient — we want depth, not just coverage
+
+  function findRescueCandidates(task) {
+    const assignedUserId = task.assigned_to;
+    const assignedRes    = resources.find(r => r.user_id === assignedUserId || r.id === assignedUserId);
+
+    // Extract skill keywords from phase and task name
+    const phaseWords = (task.phase||'').toLowerCase().split(/[\s:,]+/).filter(w => w.length > 3);
+    const nameWords  = (task.name||'').toLowerCase().split(/[\s:,]+/).filter(w => w.length > 3);
+    const keywords   = [...new Set([...phaseWords, ...nameWords])];
+
+    // Score each resource
+    const candidates = intel
+      .filter(info => {
+        // Don't suggest the current assignee
+        if (info.r.id === assignedRes?.id) return false;
+        // Must have meaningful free capacity
+        return info.freePct >= 15;
+      })
+      .map(info => {
+        let score = 0;
+        let matchedSkills = [];
+
+        // Score skills by proficiency and keyword match
+        const profScore = { authority: 40, expert: 30, proficient: 15, practitioner: 8, aware: 2 };
+        info.mySkills.forEach(s => {
+          const sName = (s.skill_name||'').toLowerCase();
+          const keywordMatch = keywords.some(kw => sName.includes(kw) || kw.includes(sName.split(' ')[0]));
+          if (keywordMatch) {
+            const pts = profScore[s.proficiency] || 0;
+            score += pts;
+            if (pts >= 15) matchedSkills.push({ name: s.skill_name, proficiency: s.proficiency });
+          }
+        });
+
+        // Role match bonus
+        if (task.hud_role_id && info.r.hud_role_id === task.hud_role_id) score += 25;
+
+        // Availability multiplier — more free = slightly better, but skill depth dominates
+        score += Math.min(info.freePct * 0.2, 20);
+
+        return { ...info, score, matchedSkills };
+      })
+      .filter(c => c.score > 0 || c.freePct >= 50)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+
+    return { candidates, assignedRes };
+  }
+
+  // ── Proficiency badge ─────────────────────────────────────────────────────────
+  function profBadge(proficiency) {
+    const colors = {
+      authority:   ['rgba(255,170,0,.15)',  'var(--amber)',   '★ Authority'],
+      expert:      ['rgba(42,157,64,.12)',  '#7af0a0',        '◆ Expert'],
+      proficient:  ['rgba(79,142,247,.12)', 'var(--accent)',  '● Proficient'],
+      practitioner:['rgba(255,255,255,.08)','var(--muted)',   '○ Practitioner'],
+      aware:       ['rgba(255,255,255,.05)','var(--muted)',   '· Aware'],
+    };
+    const [bg, color, label] = colors[proficiency] || colors.aware;
+    return `<span style="font-size:9px;padding:1px 6px;border-radius:3px;
+      background:${bg};color:${color};font-weight:600">${label}</span>`;
+  }
+
+  // ── Render a single troubled task card ───────────────────────────────────────
+  function renderTaskCard(task) {
+    const cls    = task._class;
+    const proj   = projects.find(p => p.id === task.project_id);
+    const role   = hudRoles.find(r => r.id === task.hud_role_id);
+    const { candidates, assignedRes } = findRescueCandidates(task);
+    const daysOverdue = task.due_date
+      ? Math.round((new Date(today) - new Date(task.due_date)) / 86400000)
+      : 0;
+
+    const assigneeInfo = assignedRes
+      ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+          <span>Currently: <strong style="color:var(--text)">${escHtml(assignedRes.first_name)} ${escHtml(assignedRes.last_name)}</strong></span>
+          ${assignedRes.title ? `<span>· ${escHtml(assignedRes.title)}</span>` : ''}
+          <span style="color:${computeResourceIntelligence().find(i=>i.r.id===assignedRes.id)?.isOver ? '#f07a7a' : 'var(--muted)'}">
+            · ${(computeResourceIntelligence().find(i=>i.r.id===assignedRes.id)?.allocPct||0).toFixed(0)}% allocated
+          </span>
+        </div>`
+      : `<div style="font-size:11px;color:#f07a7a">⚠ No resource assigned</div>`;
+
+    const candidateCards = candidates.length > 0
+      ? candidates.map(c => {
+          const initials = (c.r.first_name[0]||'')+(c.r.last_name[0]||'');
+          const isStrong = c.score >= 30;
+          return `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
+                border-radius:6px;border:1px solid ${isStrong ? 'rgba(79,142,247,.3)' : 'var(--border)'};
+                background:${isStrong ? 'rgba(79,142,247,.04)' : 'var(--surf2)'};
+                cursor:pointer;transition:border-color .15s"
+                onclick="confirmRescueAssign('${task.id}','${c.r.id}','${escHtml(task.name)}','${escHtml(c.r.first_name+' '+c.r.last_name)}')"
+                title="Click to add ${escHtml(c.r.first_name)} to this task">
+              <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
+                  background:${isStrong ? 'rgba(79,142,247,.15)' : 'rgba(255,255,255,.06)'};
+                  color:${isStrong ? 'var(--accent)' : 'var(--muted)'};
+                  font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">
+                ${initials}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:600;margin-bottom:3px">
+                  ${escHtml(c.r.first_name)} ${escHtml(c.r.last_name)}
+                  ${isStrong ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">✓ Skill match</span>' : ''}
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:5px">
+                  ${escHtml(c.r.title||'')} · <span style="color:${c.freePct>=50?'#7af0a0':'var(--amber)'}">
+                  ${c.freePct.toFixed(0)}% available</span>
+                </div>
+                ${c.matchedSkills.length > 0
+                  ? `<div style="display:flex;gap:4px;flex-wrap:wrap">
+                      ${c.matchedSkills.slice(0,3).map(s =>
+                        `<span style="display:flex;align-items:center;gap:3px">
+                          <span style="font-size:10px;color:var(--text)">${escHtml(s.name)}</span>
+                          ${profBadge(s.proficiency)}
+                        </span>`
+                      ).join('')}
+                    </div>`
+                  : `<div style="font-size:10px;color:var(--muted);font-style:italic">
+                      No specific skill match — available capacity only
+                    </div>`}
+              </div>
+            </div>`;
+        }).join('')
+      : `<div style="padding:12px;background:var(--surf2);border-radius:6px;
+            border:1px solid var(--border);font-size:11px;color:var(--muted);text-align:center">
+          No available resources with matching skills found.<br>
+          <span style="color:var(--accent);cursor:pointer" onclick="switchTab('skills')">
+            View skills browser →
+          </span>
+        </div>`;
+
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);
+          border-left:3px solid ${cls.color};border-radius:8px;padding:16px;margin-bottom:12px">
+
+        <!-- Task header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+              <span style="font-size:9px;font-weight:700;letter-spacing:.08em;padding:2px 7px;
+                border-radius:3px;background:${cls.color}22;color:${cls.color}">${cls.label}</span>
+              ${daysOverdue > 0 ? `<span style="font-size:10px;color:#f07a7a;font-weight:600">${daysOverdue}d overdue</span>` : ''}
+              ${task.due_date ? `<span style="font-size:10px;color:var(--muted)">Due ${fmtDate(task.due_date)}</span>` : ''}
+              ${proj ? `<span style="font-size:10px;padding:1px 6px;border-radius:3px;
+                background:var(--surf3);color:var(--muted)">📁 ${escHtml(proj.name)}</span>` : ''}
+            </div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:4px">${escHtml(task.name)}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${task.phase ? `<span style="font-size:10px;color:var(--muted)">${escHtml(task.phase)}</span>` : ''}
+              ${role ? `<span style="font-size:10px;padding:1px 6px;border-radius:3px;
+                background:rgba(79,142,247,.1);color:var(--accent)">${escHtml(role.name)}</span>` : ''}
+              ${task.effort_days ? `<span style="font-size:10px;color:var(--muted)">${task.effort_days}d effort</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Current assignee status -->
+        <div style="margin-bottom:12px;padding:8px 10px;background:var(--surf2);
+            border-radius:6px;border:1px solid var(--border)">
+          ${assigneeInfo}
+        </div>
+
+        <!-- Rescue candidates -->
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;
+            letter-spacing:.07em;color:var(--muted);margin-bottom:8px">
+          ⚡ Available rescuers — ranked by skill depth + capacity
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${candidateCards}
+        </div>
+      </div>`;
+  }
+
+  // ── Group by project for layout ──────────────────────────────────────────────
+  const byProject = {};
+  troubledTasks.forEach(t => {
+    if (!byProject[t.project_id]) byProject[t.project_id] = [];
+    byProject[t.project_id].push(t);
+  });
+
+  // ── Summary strip ────────────────────────────────────────────────────────────
+  const criticalCount  = troubledTasks.filter(t => t._class.severity === 'critical' || t._class.severity === 'overdue').length;
+  const blockedCount   = troubledTasks.filter(t => t._class.severity === 'blocked').length;
+  const atRiskCount    = troubledTasks.filter(t => t._class.severity === 'at-risk' || t._class.severity === 'stalled').length;
+  const rescuersAvail  = intel.filter(i => i.freePct >= 20 && i.mySkills.length > 0).length;
+
+  // What skills are most needed across all troubled tasks
+  const skillDemand = {};
+  troubledTasks.forEach(t => {
+    const words = [...(t.phase||'').split(/[\s:]+/), ...(t.name||'').split(/[\s:]+/)]
+      .filter(w => w.length > 4);
+    words.forEach(w => { skillDemand[w] = (skillDemand[w]||0) + 1; });
+  });
+  const topNeeded = Object.entries(skillDemand)
+    .sort(([,a],[,b]) => b-a).slice(0,3).map(([k]) => k);
+
+  const strip = `
+    <div style="background:rgba(192,64,74,.06);border:1px solid rgba(192,64,74,.2);
+        border-radius:8px;padding:16px 20px;margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.08em;color:#f07a7a;margin-bottom:12px">
+        ⚠ Project rescue needed — ${troubledTasks.length} task${troubledTasks.length!==1?'s':''} failing across ${Object.keys(byProject).length} project${Object.keys(byProject).length!==1?'s':''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Overdue now</div>
+          <div style="font-size:22px;font-weight:700;color:#f07a7a">${criticalCount}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Blocked</div>
+          <div style="font-size:22px;font-weight:700;color:#f07a7a">${blockedCount}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">At risk (14d)</div>
+          <div style="font-size:22px;font-weight:700;color:var(--amber)">${atRiskCount}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Available rescuers</div>
+          <div style="font-size:22px;font-weight:700;color:#7af0a0">${rescuersAvail}</div>
+        </div>
+        ${troubledMilestones.length > 0 ? `<div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Milestones at risk</div>
+          <div style="font-size:22px;font-weight:700;color:var(--amber)">${troubledMilestones.length}</div>
+        </div>` : ''}
+      </div>
+      ${topNeeded.length > 0 ? `
+        <div style="font-size:11px;color:var(--muted)">
+          Skills most in demand across failing tasks:
+          ${topNeeded.map(s => `<span style="margin-left:6px;padding:2px 8px;border-radius:3px;
+            background:rgba(255,255,255,.06);color:var(--text);font-size:11px">${escHtml(s)}</span>`).join('')}
+        </div>` : ''}
+    </div>`;
+
+  // ── Milestone warnings ───────────────────────────────────────────────────────
+  const milestoneWarnings = troubledMilestones.length > 0
+    ? `<div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+            letter-spacing:.06em;color:var(--amber);margin-bottom:8px">Milestones at risk</div>
+        ${troubledMilestones.map(m => {
+          const proj = projects.find(p => p.id === m.project_id);
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;
+              background:rgba(212,144,31,.06);border:1px solid rgba(212,144,31,.2);
+              border-radius:6px;margin-bottom:6px;font-size:12px">
+            <span style="font-size:16px">⚑</span>
+            <div style="flex:1">
+              <span style="font-weight:600">${escHtml(m.name)}</span>
+              <span style="color:var(--muted);margin-left:8px">${escHtml(proj?.name||'')}</span>
+            </div>
+            <span style="font-size:10px;padding:2px 6px;border-radius:3px;
+              background:rgba(212,144,31,.15);color:var(--amber)">${capitalize(m.status.replace('_',' '))}</span>
+            <span style="font-size:10px;color:var(--muted)">${fmtDate(m.target_date)}</span>
+          </div>`;
+        }).join('')}
+      </div>`
+    : '';
+
+  // ── Project sections ─────────────────────────────────────────────────────────
+  const sections = Object.entries(byProject).map(([pid, ptasks]) => {
+    const proj = projects.find(p => p.id === pid);
+    const overdueHere = ptasks.filter(t => t._class.severity === 'overdue' || t._class.severity === 'critical').length;
+    return `
+      <div style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700">${escHtml(proj?.name||'Unknown project')}</div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:4px;
+            background:rgba(192,64,74,.1);color:#f07a7a">${ptasks.length} failing</span>
+          ${overdueHere > 0 ? `<span style="font-size:10px;padding:2px 8px;border-radius:4px;
+            background:rgba(192,64,74,.15);color:#f07a7a;font-weight:700">${overdueHere} overdue</span>` : ''}
+        </div>
+        ${ptasks.map(renderTaskCard).join('')}
+      </div>`;
+  }).join('');
+
+  return strip + milestoneWarnings + sections;
+}
+
+// ── Rescue assignment action ──────────────────────────────────────────────────
+async function confirmRescueAssign(taskId, resourceId, taskName, resourceName) {
+  const msg = `Add ${resourceName} to "${taskName}"?
+
+This will assign them to the task. You can also add a formal allocation from the Allocation Matrix tab.`;
+  if (!confirm(msg)) return;
+  try {
+    const res    = resources.find(r => r.id === resourceId);
+    const userId = res?.user_id || resourceId;
+    await API.patch(`tasks?id=eq.${taskId}`, { assigned_to: userId });
+    showToast(`✓ ${resourceName} added to task`, 'success');
+    await loadAll();
+  } catch(e) {
+    showToast('Assignment failed: ' + e.message, 'error');
+  }
+}
+
 
 // ── CAPACITY HEATMAP ─────────────────────────────────────────────────────────
 function renderCapacity() {
