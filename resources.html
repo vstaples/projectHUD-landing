@@ -254,7 +254,7 @@ body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var
   <!-- Top bar -->
   <div class="topbar">
     <div class="topbar-left">
-      <a href="/index.html" class="back-link">← Dashboard</a>
+      <a href="/dashboard.html" class="back-link">← Dashboard</a>
       <span class="page-title">Resource Management</span>
     </div>
     <div style="display:flex;gap:8px">
@@ -265,8 +265,8 @@ body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var
 
   <!-- Tabs -->
   <div class="tabs">
-    <div class="tab"        data-tab="roster"     onclick="switchTab('roster')">Team roster <span class="tab-badge" id="tbadge-roster">0</span></div>
     <div class="tab active" data-tab="needs"      onclick="switchTab('needs')">Resource mapping <span class="tab-badge" id="tbadge-needs" style="background:rgba(192,64,74,.2);color:#f07a7a">0</span></div>
+    <div class="tab"        data-tab="roster"     onclick="switchTab('roster')">Team roster <span class="tab-badge" id="tbadge-roster">0</span></div>
     <div class="tab"        data-tab="capacity"   onclick="switchTab('capacity')">Capacity heatmap</div>
     <div class="tab"        data-tab="allocation" onclick="switchTab('allocation')">Allocation matrix</div>
     <div class="tab"        data-tab="utilization"onclick="switchTab('utilization')">Utilization</div>
@@ -765,7 +765,7 @@ function evmVerdict(evm) {
   return   { label: 'NO DATA',  color: 'var(--muted)', bg: 'rgba(255,255,255,.03)' };
 }
 
-// ── Rescue candidates for a task ──────────────────────────────────────────────
+// ── Resource candidates for a task ──────────────────────────────────────────────
 // Includes over-allocated resources — the PM decides via permission override
 function findRescueCandidates(task, includeOverAllocated = true) {
   const intel  = computeResourceIntelligence();
@@ -861,12 +861,12 @@ function renderNeedsResources() {
         <div style="font-size:10px;color:var(--muted)">need immediate action</div>
       </div>
       <div style="background:var(--surface);border:1px solid rgba(192,64,74,.2);border-radius:8px;padding:12px 14px">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">No resource owner</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Unassigned tasks</div>
         <div style="font-size:26px;font-weight:700;color:var(--amber)">${totalNoOwner}</div>
         <div style="font-size:10px;color:var(--muted)">tasks unassigned</div>
       </div>
       <div style="background:var(--surface);border:1px solid rgba(42,157,64,.2);border-radius:8px;padding:12px 14px">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Expert rescuers</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Available resources</div>
         <div style="font-size:26px;font-weight:700;color:#7af0a0">${freeExperts}</div>
         <div style="font-size:10px;color:var(--muted)">authority/expert · ≥20% free</div>
       </div>
@@ -1059,7 +1059,7 @@ function renderProjectStaffingPanel(proj, evm) {
           ${candidates.length > 0
             ? `<div style="font-size:9px;font-weight:700;text-transform:uppercase;
                 letter-spacing:.06em;color:var(--muted);margin-bottom:5px">
-                Rescue candidates
+                Resource candidates
               </div>
               <div style="display:flex;flex-direction:column;gap:4px">${candidateList}</div>`
             : `<div style="font-size:10px;color:var(--muted);font-style:italic">
@@ -1097,7 +1097,7 @@ function renderProjectStaffingPanel(proj, evm) {
             <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:700;
                 text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Current owner</th>
             <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:700;
-                text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Rescue candidates</th>
+                text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Resource candidates</th>
           </tr>
         </thead>
         <tbody>${taskRows}</tbody>
