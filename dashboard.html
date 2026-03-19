@@ -436,7 +436,7 @@ async function loadDashboard() {
           ${UI.progressBar(pctDone,fill)}
 
           <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
-          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,200px);
+          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
               align-items:center;gap:8px;margin-top:6px;">
 
             <!-- LEFT: EVM metrics — grid col, same width as client text above -->
@@ -472,8 +472,9 @@ async function loadDashboard() {
             </div>
 
             <!-- RIGHT: grid right column — aligns with days-remaining column above -->
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;">
+              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
+                  font-size:11px;white-space:nowrap;">
                 ${proj.target_date?`<span>
                   <span style="color:var(--text3);letter-spacing:.08em">TARGET </span>
                   <span style="color:var(--text1)">${UI.fmtDateShort(proj.target_date)}</span>
@@ -487,11 +488,13 @@ async function loadDashboard() {
                 </span>`:''}
                 ${pmName?`<span style="color:var(--text3)">PM: <span style="color:var(--text1)">${pmName}</span></span>`:''}
               </div>
-              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
+                  font-size:11px;color:var(--text3);white-space:nowrap;">
                 ${evm.tcpi?`<span>TCPI <span style="color:${UI.indexColor(evm.tcpi)};font-weight:700">${tcpi}</span></span>`:''}
                 ${evm.eac&&proj.budget_baseline_hours?`<span>EAC <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
                   ${evm.eac.toFixed(0)}h${evm.cv>0?' +'+evm.cv.toFixed(0)+'h':''}</span></span>`:''}
-                <span style="font-style:italic">${evm.diagnosis}</span>
+                <span style="font-style:italic;overflow:hidden;text-overflow:ellipsis;max-width:260px;display:inline-block;vertical-align:bottom">
+                  ${evm.diagnosis}</span>
               </div>
             </div>
 
