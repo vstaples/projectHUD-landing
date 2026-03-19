@@ -286,6 +286,76 @@ textarea.editor-area.lg { min-height: 120px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── agenda discussion notes ───────────────────────────── */
+.agenda-disc-item {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.agenda-disc-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; cursor: pointer;
+  background: var(--surf2);
+  transition: background .15s;
+  user-select: none;
+}
+.agenda-disc-head:hover { background: var(--surf3); }
+.agenda-disc-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(79,142,247,.15); color: var(--accent);
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.agenda-disc-title { flex: 1; font-size: 12px; color: var(--text); }
+.agenda-disc-chevron {
+  font-size: 10px; color: var(--muted);
+  transition: transform .2s;
+}
+.agenda-disc-item.open .agenda-disc-chevron { transform: rotate(180deg); }
+.agenda-disc-body {
+  display: none; padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surf2);
+}
+.agenda-disc-item.open .agenda-disc-body { display: block; }
+.agenda-disc-body textarea {
+  width: 100%; padding: 8px 10px;
+  border-radius: 6px; border: 1px solid var(--border2);
+  background: var(--surface); color: var(--text);
+  font-size: 12px; font-family: inherit; line-height: 1.6;
+  outline: none; resize: vertical; min-height: 60px;
+  transition: border-color .15s;
+}
+.agenda-disc-body textarea:focus { border-color: var(--accent); }
+.agenda-disc-note-count {
+  font-size: 10px; color: var(--muted); white-space: nowrap;
+}
+.agenda-disc-note-count.has-notes { color: var(--accent); }
+
+/* ── inline add action item ────────────────────────────── */
+.ai-add-row-inline {
+  display: grid;
+  grid-template-columns: 1fr 160px 120px auto;
+  gap: 8px; align-items: center;
+  padding: 10px 0; border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.ai-add-input {
+  padding: 7px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--surf2);
+  color: var(--text); font-size: 12px; font-family: inherit;
+  outline: none; transition: border-color .15s;
+}
+.ai-add-input:focus { border-color: var(--accent); }
+.ai-add-btn {
+  padding: 7px 12px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--accent);
+  color: #fff; font-size: 12px; cursor: pointer;
+  white-space: nowrap;
+}
+.ai-add-btn:hover { opacity: .88; }
+
 /* autosave indicator */
 .autosave {
   font-size: 10px; color: var(--muted); display: flex;
@@ -349,10 +419,18 @@ textarea.editor-area.lg { min-height: 120px; }
       <div class="section">
         <div class="section-label">
           DISCUSSION NOTES
-          <span>Key points raised, questions asked, topics covered</span>
+          <span>Expand each agenda item to add notes</span>
         </div>
-        <textarea class="editor-area lg" id="f-discussion"
-          placeholder="Document the key discussion points, questions raised, and topics covered…"></textarea>
+        <!-- Agenda-driven discussion notes -->
+        <div id="f-agenda-notes"></div>
+        <!-- Free-form overflow for anything not on the agenda -->
+        <div style="margin-top:8px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;
+            text-transform:uppercase;letter-spacing:.05em">Additional notes</div>
+          <textarea class="editor-area" id="f-discussion"
+            placeholder="Any discussion points not tied to a specific agenda item…"
+            rows="3"></textarea>
+        </div>
       </div>
 
       <div class="section">
@@ -365,11 +443,25 @@ textarea.editor-area.lg { min-height: 120px; }
       </div>
 
       <div class="section">
-        <div class="section-label">ACTION ITEMS</div>
+        <div class="section-label">
+          ACTION ITEMS
+          <span id="ai-count-label"></span>
+        </div>
         <div class="ai-list" id="f-action-items">
           <div class="loading-state" style="height:60px">
             <div class="spinner"></div> Loading…
           </div>
+        </div>
+        <!-- Inline add row -->
+        <div class="ai-add-row-inline" id="ai-add-row">
+          <input type="text" class="ai-add-input" id="new-ai-desc"
+            placeholder="New action item…"
+            onkeydown="if(event.key==='Enter')addActionItemInline()" />
+          <select class="ai-add-input" id="new-ai-assignee">
+            <option value="">— Assign to —</option>
+          </select>
+          <input type="date" class="ai-add-input" id="new-ai-due" />
+          <button class="ai-add-btn" onclick="addActionItemInline()">+ Add</button>
         </div>
       </div>
 
@@ -496,6 +588,8 @@ let resources     = [];
 let contacts      = [];
 let ccRecipients  = [];
 let _autosaveTimer = null;
+let _agendaNotes  = {};   // { [agendaItemId]: string } — per-item discussion notes
+let _agendaItems  = [];   // agenda items loaded with meeting
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -507,19 +601,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAll() {
   try {
-    const [meetRes, minsRes, attRes, aiRes, resRes] = await Promise.all([
+    const [meetRes, minsRes, attRes, aiRes, resRes, agendaRes] = await Promise.all([
       API.get(`v_meetings?id=eq.${MEETING_ID}&limit=1`),
       API.get(`meeting_minutes?meeting_id=eq.${MEETING_ID}&limit=1`),
       API.get(`meeting_attendees?meeting_id=eq.${MEETING_ID}&select=*,users(name,email)`),
       API.get(`meeting_action_items?meeting_id=eq.${MEETING_ID}&order=created_at`),
       API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,email`),
+      API.get(`v_meeting_agenda_items?meeting_id=eq.${MEETING_ID}&order=sort_order`),
     ]);
 
-    meeting     = meetRes?.[0];
-    minutes     = minsRes?.[0] || null;
-    attendees   = attRes  || [];
-    actionItems = aiRes   || [];
-    resources   = resRes  || [];
+    meeting      = meetRes?.[0];
+    minutes      = minsRes?.[0] || null;
+    attendees    = attRes   || [];
+    actionItems  = aiRes    || [];
+    resources    = resRes   || [];
+    _agendaItems = agendaRes|| [];
+
+    // Restore per-item notes from saved discussion_notes JSON if present
+    if (minutes?.discussion_notes) {
+      try {
+        const parsed = JSON.parse(minutes.discussion_notes);
+        if (parsed && typeof parsed === 'object' && parsed.__agenda) {
+          _agendaNotes = parsed.__agenda || {};
+          // Free-form notes stored separately
+        }
+      } catch(e) {
+        // Plain text — legacy format, leave in free-form textarea
+      }
+    }
 
     if (!meeting) { alert('Meeting not found.'); history.back(); return; }
 
@@ -527,6 +636,7 @@ async function loadAll() {
     renderMeta();
     renderAttendees();
     renderActionItems();
+    renderAgendaNotes();
     populateForm();
 
     // Set back link
@@ -615,8 +725,31 @@ function resolveResourceName(resourceId) {
 function renderActionItems() {
   const el = document.getElementById('f-action-items');
   const today = new Date().toLocaleDateString('en-CA');
+
+  // Populate assignee dropdown
+  const assigneeSel = document.getElementById('new-ai-assignee');
+  if (assigneeSel && assigneeSel.options.length <= 1) {
+    resources.forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.id;
+      o.textContent = r.first_name + ' ' + r.last_name;
+      assigneeSel.appendChild(o);
+    });
+  }
+  // Default due date 1 week out
+  const newDue = document.getElementById('new-ai-due');
+  if (newDue && !newDue.value) {
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    newDue.value = d.toLocaleDateString('en-CA');
+  }
+
+  const countLabel = document.getElementById('ai-count-label');
+  if (countLabel) countLabel.textContent = actionItems.length
+    ? actionItems.length + ' item' + (actionItems.length !== 1 ? 's' : '')
+    : '';
+
   if (!actionItems.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--muted)">No action items recorded.</div>';
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No action items yet — add one below.</div>';
     return;
   }
   el.innerHTML = actionItems.map(ai => {
@@ -644,11 +777,114 @@ function renderActionItems() {
   }).join('');
 }
 
+// ── agenda discussion notes ───────────────────────────────
+function renderAgendaNotes() {
+  const el = document.getElementById('f-agenda-notes');
+  if (!el) return;
+  if (!_agendaItems.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">' +
+      'No agenda items on file for this meeting.</div>';
+    return;
+  }
+  el.innerHTML = _agendaItems.map((item, idx) => {
+    const notes = _agendaNotes[item.id] || '';
+    const hasNotes = notes.trim().length > 0;
+    return `
+      <div class="agenda-disc-item${hasNotes?' open':''}" id="adisc-${item.id}">
+        <div class="agenda-disc-head" onclick="toggleAgendaDisc('${item.id}')">
+          <div class="agenda-disc-num">${idx + 1}</div>
+          <div class="agenda-disc-title">${escHtml(item.title || item.notes_captured || '')}</div>
+          <span class="agenda-disc-note-count ${hasNotes?'has-notes':''}">
+            ${hasNotes ? '✎ Notes' : '+ Add notes'}
+          </span>
+          <span class="agenda-disc-chevron">▾</span>
+        </div>
+        <div class="agenda-disc-body">
+          <textarea placeholder="Notes for this agenda item…"
+            id="adisc-ta-${item.id}"
+            oninput="onAgendaNoteInput('${item.id}',this.value)"
+            onkeydown="scheduleAutosave()">${escHtml(notes)}</textarea>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleAgendaDisc(itemId) {
+  const el = document.getElementById('adisc-' + itemId);
+  if (!el) return;
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) {
+    const ta = document.getElementById('adisc-ta-' + itemId);
+    if (ta) setTimeout(() => ta.focus(), 50);
+  }
+}
+
+function onAgendaNoteInput(itemId, value) {
+  _agendaNotes[itemId] = value;
+  // Update indicator
+  const count = document.querySelector(`#adisc-${itemId} .agenda-disc-note-count`);
+  if (count) {
+    const hasNotes = value.trim().length > 0;
+    count.className = 'agenda-disc-note-count' + (hasNotes?' has-notes':'');
+    count.textContent = hasNotes ? '✎ Notes' : '+ Add notes';
+  }
+}
+
+function buildDiscussionNotes() {
+  const freeform = document.getElementById('f-discussion')?.value || '';
+  const hasAgendaNotes = Object.values(_agendaNotes).some(v => v.trim());
+  if (!hasAgendaNotes && !freeform) return null;
+  if (!hasAgendaNotes) return freeform; // plain text for backwards compat
+  // Store as JSON with both agenda notes and freeform
+  return JSON.stringify({ __agenda: _agendaNotes, __freeform: freeform });
+}
+
+// ── inline add action item ─────────────────────────────────────────────
+async function addActionItemInline() {
+  const desc     = document.getElementById('new-ai-desc')?.value.trim();
+  const assignee = document.getElementById('new-ai-assignee')?.value;
+  const due      = document.getElementById('new-ai-due')?.value;
+  if (!desc)     { alert('Description is required.'); return; }
+  if (!assignee) { alert('Please assign to a team member.'); return; }
+  try {
+    await API.post('meeting_action_items', {
+      meeting_id:           MEETING_ID,
+      description:          desc,
+      assigned_to_resource: assignee,
+      due_date:             due || null,
+      status:               'open',
+    });
+    // Clear inputs
+    document.getElementById('new-ai-desc').value     = '';
+    document.getElementById('new-ai-assignee').value = '';
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    document.getElementById('new-ai-due').value = d.toLocaleDateString('en-CA');
+    // Reload action items
+    const aiRes = await API.get(`meeting_action_items?meeting_id=eq.${MEETING_ID}&order=created_at`);
+    actionItems = aiRes || [];
+    renderActionItems();
+  } catch(e) {
+    console.error(e);
+    alert('Failed to add action item.');
+  }
+}
+
 // ── populate form from existing minutes ────────────────
 function populateForm() {
   const m = minutes;
   document.getElementById('f-summary').value    = m?.summary           || '';
-  document.getElementById('f-discussion').value = m?.discussion_notes  || '';
+  // Populate free-form discussion (or legacy plain text)
+  let freeformNotes = m?.discussion_notes || '';
+  if (freeformNotes) {
+    try {
+      const parsed = JSON.parse(freeformNotes);
+      if (parsed?.__agenda) {
+        _agendaNotes = parsed.__agenda || {};
+        freeformNotes = parsed.__freeform || '';
+      }
+    } catch(e) { /* plain text */ }
+  }
+  document.getElementById('f-discussion').value = freeformNotes;
   document.getElementById('f-decisions').value  = m?.decisions_made    || '';
   document.getElementById('f-message').value    = m?.email_message     || '';
   document.getElementById('f-next-meeting').value = m?.next_meeting_date || '';
@@ -699,6 +935,7 @@ function bindAutosave() {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', scheduleAutosave);
     });
+  // Agenda note textareas are bound inline via oninput
 }
 
 function scheduleAutosave() {
@@ -741,7 +978,7 @@ async function saveDraft() {
 function buildPayload(status) {
   return {
     summary:           document.getElementById('f-summary').value    || null,
-    discussion_notes:  document.getElementById('f-discussion').value || null,
+    discussion_notes:  buildDiscussionNotes(),
     decisions_made:    document.getElementById('f-decisions').value  || null,
     email_subject:     document.getElementById('f-subject').value    || null,
     email_message:     document.getElementById('f-message').value    || null,
@@ -979,7 +1216,7 @@ async function exitEditor() {
     await saveDraft();
   }
   if (PROSPECT_ID) {
-    location.href = '/prospect-detail.html?id=' + PROSPECT_ID;
+    location.href = '/prospect-detail.html?id=' + PROSPECT_ID + '&tab=meetings';
   } else {
     history.back();
   }
