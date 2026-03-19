@@ -404,7 +404,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadAll() {
   try {
     const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes] = await Promise.all([
-    const [resRes, projRes, allocRes, timeRes, rolesRes, rsRes, taskRes] = await Promise.all([
       API.get('resources?is_active=eq.true&order=last_name&select=*'),
       API.get('projects?status=eq.active&order=name&select=id,name,status,firm_id'),
       API.get('resource_allocations?order=start_date&select=*'),
