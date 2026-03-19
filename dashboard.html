@@ -438,6 +438,15 @@ async function loadDashboard() {
 
         // Store gauge payload for this project
         window._gaugeReg = window._gaugeReg || {};
+        // Expense / capital budget figures
+        const _expBudget  = parseFloat(proj.expense_budget_baseline || 0);
+        const _expUsed    = evm.accrLaborCost || 0;
+        const _expPct     = _expBudget > 0 ? Math.round((_expUsed/_expBudget)*100) : 0;
+        const _matBudget  = parseFloat(proj.materials_budget || 0);
+        const _totalBudgetHrs = parseFloat(proj.budget_baseline_hours || 0);
+        const _totalBudgetPct = _totalBudgetHrs > 0 ? Math.round((evm.actualHrs/_totalBudgetHrs)*100) : 0;
+        // Schedule variance in days
+        const _svDays = evm.slipDays || 0;
         window._gaugeReg[proj.id] = {
           name: proj.name,
           health, hLabel, diagnosis: evm.diagnosis,
@@ -446,8 +455,11 @@ async function loadDashboard() {
           cpiStr: cpi, spiStr: spi, tcpiStr: tcpi,
           overdueTasks: evm.overdueTasks, blockedTasks: evm.blockedTasks,
           p50Date: evm.p50Date, targetDate: proj.target_date,
-          slipDays: evm.slipDays, dLeft,
+          slipDays: evm.slipDays, svDays: _svDays, dLeft,
           laborBudget, laborUsed, laborPct,
+          expBudget: _expBudget, expUsed: _expUsed, expPct: _expPct,
+          totalBudgetHrs: _totalBudgetHrs, totalBudgetPct: _totalBudgetPct,
+          matBudget: _matBudget,
           done, total: pt.length,
           bac: evm.bac, ev: evm.ev, pv: evm.pv, actualHrs: evm.actualHrs,
         };
@@ -1233,7 +1245,7 @@ async function saveNewProject() {
   background:rgba(0,0,0,0.75);backdrop-filter:blur(3px);
   align-items:center;justify-content:center;" onclick="closeGaugePopup(event)">
   <div id="gauge-panel" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.25);
-    width:620px;max-width:96vw;position:relative;
+    width:1120px;max-width:98vw;position:relative;
     box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(0,210,255,0.08);"
     onclick="event.stopPropagation()">
 
@@ -1255,7 +1267,7 @@ async function saveNewProject() {
     </div>
 
     <!-- Gauge grid -->
-    <div id="gp-gauges" style="display:grid;grid-template-columns:repeat(2,1fr);
+    <div id="gp-gauges" style="display:grid;grid-template-columns:repeat(4,1fr);
       gap:0;padding:24px 16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);"></div>
 
     <!-- Stats row -->
@@ -1285,46 +1297,66 @@ function openGaugePopup(projId) {
   document.getElementById('gp-diagnosis').textContent = d.diagnosis;
   const badge = document.getElementById('gp-badge');
   badge.textContent = d.hLabel;
-  badge.style.color         = d.health==='blocked' ? 'var(--red)' : d.health==='at-risk' ? 'var(--amber)' : 'var(--green)';
-  badge.style.borderColor   = d.health==='blocked' ? 'rgba(255,71,87,.4)' : d.health==='at-risk' ? 'rgba(255,170,0,.4)' : 'rgba(0,229,160,.4)';
-  badge.style.background    = d.health==='blocked' ? 'rgba(255,71,87,.08)' : d.health==='at-risk' ? 'rgba(255,170,0,.06)' : 'rgba(0,229,160,.08)';
+  badge.style.color       = d.health==='blocked' ? 'var(--red)' : d.health==='at-risk' ? 'var(--amber)' : 'var(--green)';
+  badge.style.borderColor = d.health==='blocked' ? 'rgba(255,71,87,.4)' : d.health==='at-risk' ? 'rgba(255,170,0,.4)' : 'rgba(0,229,160,.4)';
+  badge.style.background  = d.health==='blocked' ? 'rgba(255,71,87,.08)' : d.health==='at-risk' ? 'rgba(255,170,0,.06)' : 'rgba(0,229,160,.08)';
 
-  // Build gauge SVGs
+  // CPI outlier guard — CPI > 3.0 means no real hours logged yet
+  const cpiNoData = d.cpi == null || d.cpi > 3.0;
+  const cpiDisplay = cpiNoData ? '— (no hours)' : d.cpiStr;
+
+  // Schedule Variance in days (#8 — your call: SV days)
+  const svNoData = d.slipDays == null;
+  const svVal    = svNoData ? 0 : Math.min(60, Math.max(-30, d.slipDays)); // clamp -30→+60
+  const svMax    = 60; // 0=on schedule (midpoint if we center), but for a gauge: 0→60 slip
+  // For SV gauge: use 0-100 scale where 50=on schedule, >50=slip, <50=ahead
+  const svGaugeVal  = svNoData ? 50 : Math.min(100, Math.max(0, 50 + (d.slipDays||0)));
+  const svDisplay   = svNoData ? '—' : (d.slipDays<=0 ? (d.slipDays===0?'0d':d.slipDays+'d') : '+'+d.slipDays+'d');
+  const svColor     = !d.slipDays||d.slipDays<=0 ? 'var(--green)' : d.slipDays<=14 ? 'var(--amber)' : 'var(--red)';
+
+  // 8 gauges: 4×2 grid
   const gauges = [
-    { label:'WORK %',  value: d.pctDone,  max:100, isIndex:false, noData: false,             display: d.pctDone+'%',  color:'var(--cyan)' },
-    { label:'CPI',     value: d.cpi,      max:2.0, isIndex:true,  noData: d.cpi==null||d.cpi>3.0, display: d.cpiStr,  color: UI.indexColor(d.cpi) },
-    { label:'SPI',     value: d.spi,      max:2.0, isIndex:true,  noData: d.spi==null||d.spi>3.0, display: d.spiStr,  color: UI.indexColor(d.spi) },
-    { label:'TCPI',    value: d.tcpi,     max:2.0, isIndex:true,  noData: d.tcpi==null,           display: d.tcpiStr, color: UI.indexColor(d.tcpi) },
+    // Row 1: Budget gauges
+    { label:'TOTAL BUDGET %',   value: d.totalBudgetPct, max:100, isIndex:false, noData: d.totalBudgetHrs===0, display: d.totalBudgetPct+'%',  color:'var(--cyan)' },
+    { label:'LABOR BUDGET %',   value: d.laborPct,       max:100, isIndex:false, noData: d.laborBudget===0,   display: d.laborPct+'%',          color: d.laborPct>90?'var(--red)':d.laborPct>75?'var(--amber)':'var(--cyan)' },
+    { label:'EXPENSE BUDGET %', value: d.expPct,         max:100, isIndex:false, noData: d.expBudget===0,     display: d.expPct+'%',            color: d.expPct>90?'var(--red)':d.expPct>75?'var(--amber)':'var(--cyan)' },
+    { label:'WORK COMPLETE %',  value: d.pctDone,        max:100, isIndex:false, noData: false,               display: d.pctDone+'%',           color:'var(--cyan)' },
+    // Row 2: Performance indices
+    { label:'CPI',  value: cpiNoData?0:d.cpi,  max:2.0, isIndex:true,  noData: cpiNoData,      display: cpiDisplay,  color: UI.indexColor(d.cpi) },
+    { label:'SPI',  value: d.spi,               max:2.0, isIndex:true,  noData: d.spi==null||d.spi>3.0, display: d.spiStr,   color: UI.indexColor(d.spi) },
+    { label:'TCPI', value: d.tcpi,              max:2.0, isIndex:true,  noData: d.tcpi==null,   display: d.tcpiStr,   color: UI.indexColor(d.tcpi) },
+    { label:'SCHEDULE VAR',     value: svGaugeVal,       max:100, isIndex:false, noData: svNoData,            display: svDisplay,               color: svColor,  svMode:true },
   ];
 
   document.getElementById('gp-gauges').innerHTML = gauges.map(g => buildSpeedometer(g)).join('');
-  // Init Gauge.js canvases after DOM insertion
-  setTimeout(initGaugePopupGauges, 20);
 
-  // Stats
+  // Stats row — compact, all key numbers
   const stats = [
-    { k:'% COMPLETE', v: d.pctDone+'%',         c:'var(--cyan)' },
-    { k:'CPI',        v: d.cpiStr||'—',          c: UI.indexColor(d.cpi) },
-    { k:'SPI',        v: d.spiStr||'—',          c: UI.indexColor(d.spi) },
-    { k:'TCPI',       v: d.tcpiStr||'—',         c: UI.indexColor(d.tcpi) },
-    { k:'TASKS',      v: d.done+'/'+d.total,     c:'var(--text1)' },
+    { k:'WORK %',    v: d.pctDone+'%',          c:'var(--cyan)' },
+    { k:'LABOR %',   v: d.laborPct+'%',          c: d.laborPct>80?'var(--amber)':'var(--cyan)' },
+    { k:'CPI',       v: cpiNoData?'—':d.cpiStr,  c: UI.indexColor(d.cpi) },
+    { k:'SPI',       v: d.spiStr||'—',           c: UI.indexColor(d.spi) },
+    { k:'TCPI',      v: d.tcpiStr||'—',          c: UI.indexColor(d.tcpi) },
+    { k:'TASKS',     v: d.done+'/'+d.total,      c:'var(--text1)' },
+    { k:'OVERDUE',   v: d.overdueTasks||0,       c: d.overdueTasks>0?'var(--red)':'var(--text3)' },
+    { k:'SCHEDULE',  v: svDisplay,               c: svColor },
   ];
-  if (d.overdueTasks > 0) stats.push({ k:'OVERDUE', v: d.overdueTasks, c:'var(--red)' });
-  if (d.blockedTasks > 0) stats.push({ k:'BLOCKED', v: d.blockedTasks, c:'var(--red)' });
 
+  document.getElementById('gp-stats').style.gridTemplateColumns = 'repeat(8,1fr)';
   document.getElementById('gp-stats').innerHTML = stats.map(s => `
-    <div style="display:flex;flex-direction:column;gap:4px;padding:0 12px;border-right:1px solid rgba(255,255,255,.06);">
+    <div style="display:flex;flex-direction:column;gap:4px;padding:0 10px;border-right:1px solid rgba(255,255,255,.06);">
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.1em;">${s.k}</span>
-      <span style="font-family:var(--font-hud);font-size:22px;font-weight:700;color:${s.c}">${s.v}</span>
+      <span style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:${s.c}">${s.v}</span>
     </div>`).join('');
 
-  // Forecast
+  // Forecast row
   const fItems = [];
   if (d.targetDate) fItems.push(`<span><span style="color:var(--text3)">TARGET </span><span style="color:var(--text1)">${UI.fmtDateShort(d.targetDate)}</span></span>`);
   if (d.p50Date)    fItems.push(`<span><span style="color:var(--text3)">FORECAST (P50) </span><span style="color:${!d.slipDays||d.slipDays<=0?'var(--green)':d.slipDays<=14?'var(--amber)':'var(--red)'}">${UI.fmtDateShort(d.p50Date)}</span></span>`);
   if (d.dLeft!=null)fItems.push(`<span><span style="color:var(--text3)">DAYS REMAINING </span><span style="color:${d.dLeft<30?'var(--amber)':'var(--text1)'}">${d.dLeft}d</span></span>`);
-  if (d.slipDays!=null) fItems.push(`<span><span style="color:var(--text3)">SCHEDULE VARIANCE </span><span style="color:${d.slipDays<=0?'var(--green)':d.slipDays<=14?'var(--amber)':'var(--red)'}">${d.slipDays<=0?'✓ On track':'+'+d.slipDays+'d slip'}</span></span>`);
+  if (!svNoData)    fItems.push(`<span><span style="color:var(--text3)">SCHEDULE VARIANCE </span><span style="color:${svColor}">${d.slipDays<=0?'✓ On track':'+'+d.slipDays+'d slip'}</span></span>`);
   if (d.laborBudget>0) fItems.push(`<span><span style="color:var(--text3)">LABOR </span><span style="color:${d.laborPct>80?'var(--amber)':'var(--cyan)'}">${d.laborPct}% of ${d.laborBudget.toFixed(0)}h</span></span>`);
+  if (cpiNoData) fItems.push(`<span style="color:var(--amber);font-style:italic;">CPI unavailable — no hours logged yet</span>`);
   document.getElementById('gp-forecast').innerHTML = fItems.join('');
 
   document.getElementById('gauge-overlay').style.display = 'flex';
@@ -1418,10 +1450,10 @@ function buildSpeedometer(g) {
       ${ticks}
       ${needle}
       <circle cx="${CX}" cy="${CY}" r="6" fill="#cc2020" stroke="#ff6060" stroke-width="1"/>
-      <rect x="${CX-20}" y="${CY+6}" width="40" height="15" rx="7" fill="white"/>
-      <text x="${CX}" y="${CY+17}" text-anchor="middle" fill="${valColor}" font-family="Courier New" font-size="9" font-weight="700">${displayVal}</text>
+      <rect x="${CX-26}" y="${CY+5}" width="52" height="18" rx="9" fill="white"/>
+      <text x="${CX}" y="${CY+18}" text-anchor="middle" fill="${valColor}" font-family="Courier New" font-size="12" font-weight="700">${displayVal}</text>
     </svg>
-    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:-4px;">${g.label}</span>
+    <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:white;letter-spacing:.08em;margin-top:-2px;text-align:left;width:100%;padding-left:8px;">${g.label}</span>
   </div>`;
 }
 
