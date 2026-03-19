@@ -467,10 +467,10 @@ textarea.editor-area.lg { min-height: 120px; }
 
       <div class="section">
         <div class="section-label">NEXT MEETING</div>
-        <input type="date" class="date-input" id="f-next-meeting" />
-        <span style="font-size:11px;color:var(--muted);margin-left:8px">
-          Leave blank if not yet scheduled
-        </span>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <input type="datetime-local" class="date-input" id="f-next-meeting" />
+          <span style="font-size:11px;color:var(--muted)">Leave blank if not yet scheduled</span>
+        </div>
       </div>
 
       <div class="section">
@@ -887,7 +887,20 @@ function populateForm() {
   document.getElementById('f-discussion').value = freeformNotes;
   document.getElementById('f-decisions').value  = m?.decisions_made    || '';
   document.getElementById('f-message').value    = m?.email_message     || '';
-  document.getElementById('f-next-meeting').value = m?.next_meeting_date || '';
+  // datetime-local input needs format: YYYY-MM-DDTHH:mm
+  if (m?.next_meeting_date) {
+    try {
+      const dt = new Date(m.next_meeting_date);
+      const pad = n => String(n).padStart(2,'0');
+      document.getElementById('f-next-meeting').value =
+        dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate()) +
+        'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes());
+    } catch(e) {
+      document.getElementById('f-next-meeting').value = m.next_meeting_date.slice(0,16);
+    }
+  } else {
+    document.getElementById('f-next-meeting').value = '';
+  }
 
   // Subject
   const dateStr = new Date(meeting.meeting_date).toLocaleDateString('en-US',

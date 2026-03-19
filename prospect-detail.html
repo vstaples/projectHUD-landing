@@ -739,7 +739,7 @@ body {
     <div class="ph-tabs" id="ph-tabs">
       <div class="tab active" data-tab="overview">Overview</div>
       <div class="tab" data-tab="stakeholders">Stakeholders <span class="tab-badge" id="tbadge-sh">0</span></div>
-      <div class="tab" data-tab="findings">Findings</div>
+      <div class="tab" data-tab="findings">Findings <span class="tab-badge" id="tbadge-findings">0</span></div>
       <div class="tab" data-tab="meetings">Meetings <span class="tab-badge" id="tbadge-meet">0</span></div>
       <div class="tab" data-tab="proposal" style="color:var(--muted)">Proposal</div>
       <div class="tab" data-tab="actions">Action items <span class="tab-badge" id="tbadge-ai">0</span></div>
@@ -1342,6 +1342,7 @@ async function loadAll() {
 
     // badge counts
     document.getElementById('tbadge-activity').textContent = activities.length;
+    document.getElementById('tbadge-findings').textContent  = findings.length;
     document.getElementById('tbadge-sh').textContent       = stakeholders.length;
     document.getElementById('tbadge-ai').textContent       = allActionItems.filter(a => a.status === 'open').length;
     document.getElementById('tbadge-meet').textContent     = meetings.length;
