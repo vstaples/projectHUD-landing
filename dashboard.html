@@ -494,9 +494,9 @@ async function loadDashboard() {
               <div class="proj-stat" data-htip="${HUDTip.pct(pctDone,done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">% COMPLETE</span>
                 <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
               <div class="proj-stat" data-htip="${HUDTip.cpi(evm.cpi,evm)}" style="cursor:help;"><span class="stat-label">CPI</span>
-                <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
+                <span class="stat-value" style="color:${UI.indexColor(evm.cpi)};display:flex;align-items:center;"><svg width="20" height="12" viewBox="0 0 56 34" style="vertical-align:middle;margin-right:3px;"><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6" stroke-linecap="round"/><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="${UI.indexColor(evm.cpi)}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Math.min(1,Math.max(0,(evm.cpi!=null?evm.cpi/1.5:0)))*69.1} 69.1"/></svg>${cpi}</span></div>
               <div class="proj-stat" data-htip="${HUDTip.spi(evm.spi,evm)}" style="cursor:help;"><span class="stat-label">SPI</span>
-                <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
+                <span class="stat-value" style="color:${UI.indexColor(evm.spi)};display:flex;align-items:center;"><svg width="20" height="12" viewBox="0 0 56 34" style="vertical-align:middle;margin-right:3px;"><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6" stroke-linecap="round"/><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="${UI.indexColor(evm.spi)}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Math.min(1,Math.max(0,(evm.spi!=null?evm.spi/1.5:0)))*69.1} 69.1"/></svg>${spi}</span></div>
               <div class="proj-stat" data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">TASKS</span>
                 <span class="stat-value">${done}/${pt.length}</span></div>
               ${evm.overdueTasks>0?`<div class="proj-stat" data-htip="${HUDTip.overdue(evm.overdueTasks,evm)}" style="cursor:help;"><span class="stat-label">OVERDUE</span>
