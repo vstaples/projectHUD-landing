@@ -389,9 +389,15 @@ async function loadDashboard() {
         return `<div class="project-card ${health} fade-in"
             onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
 
-          <!-- ROW 1: Name · AT RISK -->
+          <!-- ROW 1: Name · Edit · AT RISK -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:2px;">
-            <div class="proj-name">${proj.name}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="proj-name">${proj.name}</div>
+              <button onclick="event.stopPropagation();openEditProject('${proj.id}')"
+                style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;
+                  border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);
+                  color:var(--text3);cursor:pointer;border-radius:3px;flex-shrink:0">✎ EDIT</button>
+            </div>
             <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
                 padding:2px 8px;border:1px solid;flex-shrink:0;${
               health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
@@ -400,10 +406,12 @@ async function loadDashboard() {
             }">${hLabel}</span>
           </div>
 
-          <!-- ROW 2: Client · LABOR · EXPENSE (centered, inline) · Days remaining -->
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;">
-            <div class="proj-client" style="flex-shrink:0">${client}${proj.phase?' · '+proj.phase:''}</div>
-            <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);font-size:11px;flex:1;justify-content:center;">
+          <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
+          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,200px);
+              align-items:center;gap:8px;margin-bottom:7px;">
+            <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
+            <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
+                font-size:11px;justify-content:center;">
               ${laborBudget > 0 ? `<span>
                 <span style="color:var(--text3);letter-spacing:.07em">LABOR </span>
                 <span style="color:var(--text1)">${laborBudget.toFixed(0)}h</span>
@@ -417,18 +425,21 @@ async function loadDashboard() {
                 <span style="color:${expPct>80?'var(--amber)':'var(--cyan)'}">\$${(expUsed/1000).toFixed(1)}K used (${expPct}%)</span>
               </span>` : ''}
             </div>
-            ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:10px;flex-shrink:0;
-              color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
+            <div style="text-align:right">
+              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:10px;
+                color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
+            </div>
           </div>
 
           <!-- ROW 3: Progress bar full width -->
           ${UI.progressBar(pctDone,fill)}
 
-          <!-- ROW 4: position:relative so band can be absolutely centered at card midpoint -->
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;position:relative;">
+          <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
+          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,200px);
+              align-items:center;gap:8px;margin-top:6px;">
 
-            <!-- LEFT: EVM metrics — flex-shrink:0 matches client text column above -->
-            <div class="proj-stats" style="margin-top:0;flex-shrink:0">
+            <!-- LEFT: EVM metrics — grid col, same width as client text above -->
+            <div class="proj-stats" style="margin-top:0;flex-wrap:wrap;">
               <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
                 <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
               <div class="proj-stat"><span class="stat-label">CPI</span>
@@ -441,13 +452,11 @@ async function loadDashboard() {
                 <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
             </div>
 
-            <!-- CENTER: positioned absolutely relative to the card (position:relative parent) -->
-            <!-- left:55% matches the measured center of the LABOR/EXPENSE row above -->
-            <div style="flex:1;">
+            <!-- CENTER: grid center column — same column as LABOR/EXPENSE above, auto-aligned -->
+            <div style="display:flex;justify-content:center;align-items:center;">
               ${evm.p25Date ? `
-              <div style="position:absolute;left:55%;top:50%;transform:translate(-50%,-50%);
-                  display:flex;align-items:center;gap:0;font-family:var(--font-mono);
-                  font-size:11px;letter-spacing:.05em;white-space:nowrap;z-index:1;">
+              <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);
+                  font-size:11px;letter-spacing:.05em;white-space:nowrap;">
                 <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
                     border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
                   P25 ${UI.fmtDateShort(evm.p25Date)}</span>
@@ -461,8 +470,8 @@ async function loadDashboard() {
               </div>` : ''}
             </div>
 
-            <!-- RIGHT: flex-shrink:0 — matches days-remaining column above -->
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">
+            <!-- RIGHT: grid right column — aligns with days-remaining column above -->
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
               <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;">
                 ${proj.target_date?`<span>
                   <span style="color:var(--text3);letter-spacing:.08em">TARGET </span>
@@ -562,19 +571,19 @@ loadDashboard();
 // ── ADD PROJECT ────────────────────────────────────────────────────
 let _apFirms = [], _apInternalFirmId = null;
 
-async function openAddProject() {
-  const overlay = document.getElementById('add-proj-overlay');
-  overlay.classList.add('open');
+let _apResources = [];
 
-  // Load firms if not yet loaded
+async function loadDrawerData() {
   if (!_apFirms.length) {
-    try {
-      _apFirms = await API.getFirms().catch(() => []);
-      _apInternalFirmId = _apFirms.find(f => f.is_internal)?.id || null;
-    } catch(e) {}
+    _apFirms = await API.getFirms().catch(() => []);
+    _apInternalFirmId = _apFirms.find(f => f.is_internal)?.id || null;
   }
-
-  // Populate client dropdown — exclude internal firm
+  if (!_apResources.length) {
+    _apResources = await API.get(
+      'resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,title'
+    ).catch(() => []);
+  }
+  // Client dropdown
   const sel = document.getElementById('ap-client');
   sel.innerHTML = '<option value="">— Select client —</option>' +
     _apFirms
@@ -582,6 +591,23 @@ async function openAddProject() {
       .sort((a,b) => a.name.localeCompare(b.name))
       .map(f => `<option value="${f.id}">${f.name}</option>`)
       .join('');
+  // PM dropdown
+  const pmSel = document.getElementById('ap-pm');
+  pmSel.innerHTML = '<option value="">— Select PM —</option>' +
+    _apResources
+      .map(r => `<option value="${r.id}">${r.first_name} ${r.last_name}${r.title?' · '+r.title:''}</option>`)
+      .join('');
+}
+
+async function openAddProject() {
+  const overlay = document.getElementById('add-proj-overlay');
+  overlay.classList.add('open');
+  await loadDrawerData();
+
+  // Set mode: ADD
+  document.getElementById('ap-title').textContent = 'ADD PROJECT';
+  document.getElementById('ap-edit-id').value     = '';
+  document.getElementById('ap-save-btn').textContent = 'CREATE PROJECT →';
 
   // Default start date to today
   const today = new Date();
@@ -591,16 +617,55 @@ async function openAddProject() {
   document.getElementById('ap-start').value = `${yr}-${mo}-${dy}`;
 
   // Clear fields
-  document.getElementById('ap-name').value    = '';
-  document.getElementById('ap-desc').value    = '';
-  document.getElementById('ap-phase').value   = '';
-  document.getElementById('ap-target').value  = '';
-  document.getElementById('ap-hours').value   = '';
-  document.getElementById('ap-expense').value = '';
-  document.getElementById('ap-status').value  = 'active';
+  document.getElementById('ap-name').value      = '';
+  document.getElementById('ap-desc').value      = '';
+  document.getElementById('ap-phase').value     = '';
+  document.getElementById('ap-target').value    = '';
+  document.getElementById('ap-hours').value     = '';
+  document.getElementById('ap-materials').value = '';
+  document.getElementById('ap-expense').value   = '';
+  document.getElementById('ap-pm').value        = '';
+  document.getElementById('ap-status').value    = 'active';
   document.getElementById('ap-error').textContent = '';
   document.getElementById('ap-save-btn').disabled = false;
   document.getElementById('ap-name').focus();
+}
+
+async function openEditProject(projId) {
+  const overlay = document.getElementById('add-proj-overlay');
+  overlay.classList.add('open');
+  await loadDrawerData();
+
+  // Set mode: EDIT
+  document.getElementById('ap-title').textContent    = 'EDIT PROJECT';
+  document.getElementById('ap-edit-id').value        = projId;
+  document.getElementById('ap-save-btn').textContent = 'SAVE CHANGES →';
+  document.getElementById('ap-error').textContent    = '';
+  document.getElementById('ap-save-btn').disabled    = false;
+
+  // Load project data
+  try {
+    const rows = await API.get(`projects?id=eq.${projId}&select=*`);
+    const proj = rows?.[0];
+    if (!proj) throw new Error('Project not found');
+
+    document.getElementById('ap-name').value      = proj.name || '';
+    document.getElementById('ap-desc').value      = proj.description || '';
+    document.getElementById('ap-phase').value     = proj.phase || '';
+    document.getElementById('ap-start').value     = proj.start_date || '';
+    document.getElementById('ap-target').value    = proj.target_date || '';
+    document.getElementById('ap-hours').value     = proj.budget_baseline_hours || '';
+    document.getElementById('ap-materials').value = proj.materials_budget || '';
+    document.getElementById('ap-expense').value   = proj.expense_budget_baseline || '';
+    document.getElementById('ap-status').value    = proj.status || 'active';
+    document.getElementById('ap-pm').value        = proj.pm_resource_id || '';
+    // Set client after dropdown is populated
+    setTimeout(() => {
+      document.getElementById('ap-client').value = proj.client_id || '';
+    }, 50);
+  } catch(e) {
+    document.getElementById('ap-error').textContent = 'Failed to load project: ' + e.message;
+  }
 }
 
 function closeAddProject() {
@@ -613,6 +678,8 @@ document.addEventListener('keydown', e => {
 });
 
 async function saveNewProject() {
+  const editId   = document.getElementById('ap-edit-id').value;
+  const isEdit   = !!editId;
   const name     = document.getElementById('ap-name').value.trim();
   const clientId = document.getElementById('ap-client').value;
   const errEl    = document.getElementById('ap-error');
@@ -620,15 +687,17 @@ async function saveNewProject() {
 
   errEl.textContent = '';
 
-  if (!name)     { errEl.textContent = 'Project name is required.'; document.getElementById('ap-name').focus(); return; }
-  if (!clientId) { errEl.textContent = 'Please select a client firm.'; document.getElementById('ap-client').focus(); return; }
+  if (!name) { errEl.textContent = 'Project name is required.'; document.getElementById('ap-name').focus(); return; }
+  if (!isEdit && !clientId) { errEl.textContent = 'Please select a client firm.'; document.getElementById('ap-client').focus(); return; }
 
-  const hours   = parseFloat(document.getElementById('ap-hours').value)   || null;
-  const expense = parseFloat(document.getElementById('ap-expense').value) || null;
+  const hours     = parseFloat(document.getElementById('ap-hours').value)     || null;
+  const materials = parseFloat(document.getElementById('ap-materials').value) || null;
+  const expense   = parseFloat(document.getElementById('ap-expense').value)   || null;
+  const pmId      = document.getElementById('ap-pm').value                    || null;
 
   const payload = {
     firm_id:                  _apInternalFirmId || null,
-    client_id:                clientId,
+    client_id:                clientId || undefined,
     name,
     description:              document.getElementById('ap-desc').value.trim()   || null,
     phase:                    document.getElementById('ap-phase').value.trim()  || null,
@@ -637,24 +706,31 @@ async function saveNewProject() {
     target_date:              document.getElementById('ap-target').value        || null,
     budget_baseline_hours:    hours,
     current_budget_hours:     hours,
+    materials_budget:         materials,
     expense_budget_baseline:  expense,
     current_expense_budget:   expense,
     budget_baseline_locked:   false,
+    pm_resource_id:           pmId,
   };
 
-  saveBtn.textContent = 'CREATING...';
+  saveBtn.textContent = isEdit ? 'SAVING...' : 'CREATING...';
   saveBtn.disabled    = true;
 
   try {
-    const result = await API.post('projects', payload);
-    const created = Array.isArray(result) ? result[0] : result;
-    if (!created?.id) throw new Error('No project returned from server.');
-    closeAddProject();
-    // Navigate directly to the new project
-    window.location.href = '/project-detail.html?id=' + created.id;
+    if (isEdit) {
+      await API.patch(`projects?id=eq.${editId}`, payload);
+      closeAddProject();
+      await loadDashboard();
+    } else {
+      const result = await API.post('projects', payload);
+      const created = Array.isArray(result) ? result[0] : result;
+      if (!created?.id) throw new Error('No project returned from server.');
+      closeAddProject();
+      window.location.href = '/project-detail.html?id=' + created.id;
+    }
   } catch(e) {
     errEl.textContent = 'Save failed: ' + (e.message || 'Unknown error');
-    saveBtn.textContent = 'CREATE PROJECT →';
+    saveBtn.textContent = isEdit ? 'SAVE CHANGES →' : 'CREATE PROJECT →';
     saveBtn.disabled    = false;
   }
 }
@@ -664,7 +740,8 @@ async function saveNewProject() {
 <div class="add-proj-overlay" id="add-proj-overlay" onclick="if(event.target===this)closeAddProject()">
   <div class="add-proj-panel">
     <div class="ap-header">
-      <div class="ap-title">ADD PROJECT</div>
+      <input type="hidden" id="ap-edit-id" />
+      <div class="ap-title" id="ap-title">ADD PROJECT</div>
       <button class="ap-close" onclick="closeAddProject()">✕</button>
     </div>
     <div class="ap-body">
@@ -711,12 +788,25 @@ async function saveNewProject() {
 
       <div class="ap-field-row">
         <div class="ap-field">
-          <label class="ap-label">BUDGET HOURS</label>
+          <label class="ap-label">LABOR BUDGET (hours)</label>
           <input class="ap-input" id="ap-hours" type="number" min="0" placeholder="e.g. 2400">
         </div>
         <div class="ap-field">
+          <label class="ap-label">MATERIALS BUDGET ($)</label>
+          <input class="ap-input" id="ap-materials" type="number" min="0" placeholder="e.g. 50000">
+        </div>
+      </div>
+
+      <div class="ap-field-row">
+        <div class="ap-field">
           <label class="ap-label">EXPENSE BUDGET ($)</label>
           <input class="ap-input" id="ap-expense" type="number" min="0" placeholder="e.g. 150000">
+        </div>
+        <div class="ap-field">
+          <label class="ap-label">PM RESOURCE</label>
+          <select class="ap-select" id="ap-pm">
+            <option value="">— Select PM —</option>
+          </select>
         </div>
       </div>
 
