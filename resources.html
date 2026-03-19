@@ -412,7 +412,7 @@ async function loadAll() {
       API.get('resource_allocations?order=start_date&select=*'),
       API.get('time_entries?order=date.desc&limit=500&select=*'),
       API.get('hud_roles?is_active=eq.true&order=sort_order&select=id,name,abbreviation'),
-      API.get('resource_skills?select=resource_id,skill_id,skill_name,proficiency,years_experience'),
+      API.get('resource_skills?select=resource_id,skill_id,skill_name,proficiency,years_experience&limit=500'),
       API.get('tasks?status=neq.complete&select=id,name,project_id,assigned_to,due_date,effort_days,status'),
     ]);
 
