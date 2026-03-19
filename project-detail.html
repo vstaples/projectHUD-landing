@@ -1411,15 +1411,14 @@ function _taskAssignedCell(t, asgn) {
       const pct  = a.allocation_pct && a.allocation_pct < 100
         ? '<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);margin-left:2px;">' + a.allocation_pct + '%</span>'
         : '';
-      const av = { name: name.trim(), id: res.id };
-      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' + UI.avatar(av, 20) + '<span style="font-family:var(--font-ui);font-size:12px;">' + name.trim() + '</span></span>' + pct;
+      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' + UI.avatar(name.trim(), 20) + '<span style="font-family:var(--font-ui);font-size:12px;">' + name.trim() + '</span></span>' + pct;
     }).filter(Boolean);
     return '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + parts.join('') + '</div>';
   }
   // Fall back to legacy assigned_to
   if (asgn) {
     return '<div style="display:flex;align-items:center;gap:6px;">' +
-      UI.avatar(asgn, 20) +
+      UI.avatar(asgn.name, 20) +
       '<span style="font-family:var(--font-ui);font-size:12px;">' + asgn.name + '</span>' +
       '</div>';
   }
