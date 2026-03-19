@@ -472,6 +472,7 @@ body {
   font-size: 10px; padding: 2px 8px; border-radius: 6px;
 }
 .ms-upcoming { background: rgba(79,142,247,.15); color: var(--accent); }
+.ms-active   { background: rgba(212,144,31,.15);  color: var(--amber); }
 .ms-done     { background: rgba(255,255,255,.07); color: var(--muted); }
 .attend-row  { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
 .attend-chip {
@@ -1808,6 +1809,51 @@ function updateActionsBadge() {
   if (badge) badge.classList.toggle('overdue', hasOverdue);
 }
 
+function toggleMeetStatusPicker(meetId, el) {
+  const picker = document.getElementById('mstatus-picker-' + meetId);
+  if (!picker) return;
+  const isOpen = picker.style.display !== 'none';
+  // Close all other pickers first
+  document.querySelectorAll('[id^="mstatus-picker-"]').forEach(p => p.style.display = 'none');
+  picker.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener('click', function closePicker(e) {
+        if (!picker.contains(e.target) && e.target !== el) {
+          picker.style.display = 'none';
+          document.removeEventListener('click', closePicker);
+        }
+      });
+    }, 50);
+  }
+}
+
+async function updateMeetingStatus(meetId, newStatus) {
+  // Close picker
+  const picker = document.getElementById('mstatus-picker-' + meetId);
+  if (picker) picker.style.display = 'none';
+
+  try {
+    await API.patch(`meetings?id=eq.${meetId}`, { status: newStatus });
+    // Update in-memory meetings array
+    const m = meetings.find(x => x.id === meetId);
+    if (m) m.status = newStatus;
+    // Re-render just the status chip
+    const chip = document.querySelector(`.meet-status[onclick*="${meetId}"]`);
+    if (chip) {
+      chip.className = 'meet-status ' + (
+        newStatus === 'scheduled'   ? 'ms-upcoming' :
+        newStatus === 'in_progress' ? 'ms-active'   : 'ms-done'
+      );
+      chip.childNodes[0].textContent = capitalize(newStatus) + ' ▾';
+    }
+  } catch(e) {
+    console.error(e);
+    alert('Failed to update meeting status.');
+  }
+}
+
 function updateMeetingsBadge() {
   const today = new Date().toLocaleDateString('en-CA');
   // Check both meetingActionItems and actionItems directly (not allActionItems cache)
@@ -1853,14 +1899,31 @@ function renderMeetings() {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">
-            ${m.status !== 'scheduled' ? `
-              <a href="/meeting-minutes.html?meeting_id=${m.id}&prospect_id=${PROSPECT_ID}"
-                class="btn" style="font-size:11px;padding:4px 10px;text-decoration:none">
-                ✎ Minutes
-              </a>` : ''}
-            <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':'ms-done'}">
-              ${capitalize(m.status||'')}
-            </span>
+            <a href="/meeting-minutes.html?meeting_id=${m.id}&prospect_id=${PROSPECT_ID}"
+              class="btn" style="font-size:11px;padding:4px 10px;text-decoration:none">
+              ✎ Minutes
+            </a>
+            <div class="meet-status-wrap" style="position:relative">
+              <span class="meet-status ${m.status==='scheduled'?'ms-upcoming':m.status==='in_progress'?'ms-active':'ms-done'}"
+                style="cursor:pointer;user-select:none"
+                onclick="toggleMeetStatusPicker('${m.id}',this)"
+                title="Change status">
+                ${capitalize(m.status||'')} ▾
+              </span>
+              <div id="mstatus-picker-${m.id}" style="display:none;position:absolute;right:0;top:110%;
+                background:var(--surf2);border:1px solid var(--border2);border-radius:7px;
+                padding:4px;z-index:50;min-width:130px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+                ${['scheduled','in_progress','completed','cancelled'].map(s => `
+                  <div style="padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer;
+                    color:${s===m.status?'var(--accent)':'var(--text)'};
+                    background:${s===m.status?'rgba(79,142,247,.1)':'transparent'}"
+                    onmouseover="this.style.background='var(--surf3)'"
+                    onmouseout="this.style.background='${s===m.status?'rgba(79,142,247,.1)':'transparent'}'"
+                    onclick="updateMeetingStatus('${m.id}','${s}')">
+                    ${s==='scheduled'?'📅 Scheduled':s==='in_progress'?'▶ In progress':s==='completed'?'✓ Completed':'✕ Cancelled'}
+                  </div>`).join('')}
+              </div>
+            </div>
           </div>
         </div>
         <div class="meet-expand" id="mexpand-${m.id}" onclick="event.stopPropagation()">
