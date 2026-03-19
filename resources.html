@@ -409,7 +409,7 @@ async function loadAll() {
       API.get('resource_allocations?order=start_date&select=*'),
       API.get('time_entries?order=date.desc&limit=500&select=*'),
       API.get('hud_roles?is_active=eq.true&order=sort_order&select=id,name,abbreviation'),
-      API.get('resource_skills?select=*'),
+      API.get('resource_skills?select=resource_id,skill_id,skill_name,proficiency,years_experience'),
       API.get('tasks?status=neq.complete&select=id,name,project_id,assigned_to,due_date,effort_days,status'),
     ]);
 
@@ -922,12 +922,23 @@ function renderSkills() {
     <div>Skills are added to resources via the resource profile.</div></div>`;
 
   // Sort by skill name
+  // De-duplicate people within each skill (same person can appear via multiple entries)
+  Object.values(skillMap).forEach(s => {
+    const seen = new Set();
+    s.people = s.people.filter(p => {
+      if (seen.has(p.name)) return false;
+      seen.add(p.name);
+      return true;
+    });
+  });
   const sortedSkills = Object.values(skillMap).sort((a,b) => a.name.localeCompare(b.name));
 
   const cards = sortedSkills.map(s => {
     const people = s.people.map(p => {
-      const cls = p.proficiency === 'expert'     ? 'expert'
-                : p.proficiency === 'proficient' ? 'proficient' : '';
+      const cls = p.proficiency === 'authority'   ? 'expert'
+                : p.proficiency === 'expert'     ? 'expert'
+                : p.proficiency === 'proficient' ? 'proficient'
+                : p.proficiency === 'practitioner' ? 'proficient' : '';
       const yrs  = p.years ? p.years + 'yr' : null;
       const label = [p.name, p.proficiency, yrs].filter(Boolean).join(' · ');
       return `<span class="skill-person ${cls}" title="${escHtml(label)}">${escHtml(label)}</span>`;
