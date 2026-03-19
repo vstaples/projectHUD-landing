@@ -424,9 +424,8 @@ async function loadDashboard() {
           <!-- ROW 3: Progress bar full width -->
           ${UI.progressBar(pctDone,fill)}
 
-          <!-- ROW 4: mirrors Row 2 column structure exactly for vertical alignment -->
-          <!-- [EVM stats · flex-shrink:0] [P25/P50/P80 · flex:1 center] [TARGET/FORECAST/PM · flex-shrink:0] -->
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <!-- ROW 4: position:relative so band can be absolutely centered at card midpoint -->
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;position:relative;">
 
             <!-- LEFT: EVM metrics — flex-shrink:0 matches client text column above -->
             <div class="proj-stats" style="margin-top:0;flex-shrink:0">
@@ -442,22 +441,24 @@ async function loadDashboard() {
                 <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
             </div>
 
-            <!-- CENTER: flex:1 + justify-content:center — same column as LABOR/EXPENSE above -->
-            <div style="flex:1;display:flex;align-items:center;justify-content:center;">
-              <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);
-                  font-size:11px;letter-spacing:.05em;">
-                ${evm.p25Date ? `
+            <!-- CENTER: positioned absolutely relative to the card (position:relative parent) -->
+            <!-- left:55% matches the measured center of the LABOR/EXPENSE row above -->
+            <div style="flex:1;">
+              ${evm.p25Date ? `
+              <div style="position:absolute;left:55%;top:50%;transform:translate(-50%,-50%);
+                  display:flex;align-items:center;gap:0;font-family:var(--font-mono);
+                  font-size:11px;letter-spacing:.05em;white-space:nowrap;z-index:1;">
                 <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
-                    border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px;white-space:nowrap">
+                    border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
                   P25 ${UI.fmtDateShort(evm.p25Date)}</span>
                 <span style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
-                    border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2);white-space:nowrap">
+                    border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2)">
                   ▼ P50 ${UI.fmtDateShort(evm.p50Date)}</span>
                 <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
                     background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);
-                    border-radius:0 3px 3px 0;white-space:nowrap">
-                  P80 ${UI.fmtDateShort(evm.p80Date)}</span>` : ''}
-              </div>
+                    border-radius:0 3px 3px 0">
+                  P80 ${UI.fmtDateShort(evm.p80Date)}</span>
+              </div>` : ''}
             </div>
 
             <!-- RIGHT: flex-shrink:0 — matches days-remaining column above -->
