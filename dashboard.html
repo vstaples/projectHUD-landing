@@ -458,7 +458,7 @@ async function loadDashboard() {
           </div>
 
           <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
-          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,310px) 1fr var(--col-right,340px);
               align-items:center;gap:8px;margin-bottom:7px;">
             <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
             <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
@@ -486,21 +486,86 @@ async function loadDashboard() {
           ${UI.progressBar(pctDone,fill)}
 
           <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
-          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,310px) 1fr var(--col-right,340px);
               align-items:flex-start;gap:8px;margin-top:6px;">
 
-            <!-- LEFT: EVM metrics — grid col, same width as client text above -->
-            <div class="proj-stats" style="margin-top:0;flex-wrap:nowrap;gap:12px;">
-              <div class="proj-stat" data-htip="${HUDTip.pct(pctDone,done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">% COMPLETE</span>
-                <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
-              <div class="proj-stat" data-htip="${HUDTip.cpi(evm.cpi,evm)}" style="cursor:help;"><span class="stat-label">CPI</span>
-                <span class="stat-value" style="color:${UI.indexColor(evm.cpi)};display:flex;align-items:center;"><svg width="20" height="12" viewBox="0 0 56 34" style="vertical-align:middle;margin-right:3px;"><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6" stroke-linecap="round"/><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="${UI.indexColor(evm.cpi)}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Math.min(1,Math.max(0,(evm.cpi!=null?evm.cpi/1.5:0)))*69.1} 69.1"/></svg>${cpi}</span></div>
-              <div class="proj-stat" data-htip="${HUDTip.spi(evm.spi,evm)}" style="cursor:help;"><span class="stat-label">SPI</span>
-                <span class="stat-value" style="color:${UI.indexColor(evm.spi)};display:flex;align-items:center;"><svg width="20" height="12" viewBox="0 0 56 34" style="vertical-align:middle;margin-right:3px;"><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6" stroke-linecap="round"/><path d="M6,30 A22,22,0,0,1,50,30" fill="none" stroke="${UI.indexColor(evm.spi)}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Math.min(1,Math.max(0,(evm.spi!=null?evm.spi/1.5:0)))*69.1} 69.1"/></svg>${spi}</span></div>
-              <div class="proj-stat" data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">TASKS</span>
-                <span class="stat-value">${done}/${pt.length}</span></div>
-              ${evm.overdueTasks>0?`<div class="proj-stat" data-htip="${HUDTip.overdue(evm.overdueTasks,evm)}" style="cursor:help;"><span class="stat-label">OVERDUE</span>
-                <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
+            <!-- LEFT: Option A — 4 half-arc gauges + TASKS/OVERDUE text -->
+            <div style="display:flex;align-items:flex-end;gap:8px;margin-top:0;">
+
+              ${/* WORK % gauge */(()=>{
+                const _ratio = Math.min(1, pctDone / 100);
+                const _fill  = (_ratio * 69.1).toFixed(1);
+                const _color = 'var(--cyan)';
+                return `<div data-htip="${HUDTip.pct(pctDone,done,pt.length,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
+                  <svg width="54" height="34" viewBox="0 0 56 36">
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
+                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${pctDone}%</text>
+                  </svg>
+                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">WORK %</span>
+                </div>`;
+              })()}
+
+              ${/* CPI gauge */(()=>{
+                const _v     = evm.cpi;
+                const _ratio = _v != null ? Math.min(1, _v / 1.5) : 0;
+                const _fill  = (_ratio * 69.1).toFixed(1);
+                const _color = UI.indexColor(_v);
+                const _label = cpi;
+                return `<div data-htip="${HUDTip.cpi(evm.cpi,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
+                  <svg width="54" height="34" viewBox="0 0 56 36">
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
+                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${_label}</text>
+                  </svg>
+                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">CPI</span>
+                </div>`;
+              })()}
+
+              ${/* SPI gauge */(()=>{
+                const _v     = evm.spi;
+                const _ratio = _v != null ? Math.min(1, _v / 1.5) : 0;
+                const _fill  = (_ratio * 69.1).toFixed(1);
+                const _color = UI.indexColor(_v);
+                const _label = spi;
+                return `<div data-htip="${HUDTip.spi(evm.spi,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
+                  <svg width="54" height="34" viewBox="0 0 56 36">
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
+                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${_label}</text>
+                  </svg>
+                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">SPI</span>
+                </div>`;
+              })()}
+
+              ${/* TCPI gauge */(()=>{
+                if (!evm.tcpi) return '';
+                const _v     = evm.tcpi;
+                const _ratio = Math.min(1, _v / 1.5);
+                const _fill  = (_ratio * 69.1).toFixed(1);
+                const _color = UI.indexColor(_v);
+                return `<div data-htip="${HUDTip.tcpi(evm.tcpi,evm)}" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:help;">
+                  <svg width="54" height="34" viewBox="0 0 56 36">
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M6,32 A22,22,0,0,1,50,32" fill="none" stroke="${_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${_fill} 69.1"/>
+                    <text x="28" y="28" text-anchor="middle" fill="${_color}" font-family="var(--font-mono)" font-size="10" font-weight="700">${tcpi}</text>
+                  </svg>
+                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">TCPI</span>
+                </div>`;
+              })()}
+
+              <!-- TASKS + OVERDUE as text alongside gauges -->
+              <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:6px;margin-left:4px;">
+                <div data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="display:flex;flex-direction:column;gap:2px;cursor:help;">
+                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.1em;">TASKS</span>
+                  <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text1)">${done}/${pt.length}</span>
+                </div>
+                ${evm.overdueTasks>0?`<div data-htip="${HUDTip.overdue(evm.overdueTasks,evm)}" style="display:flex;flex-direction:column;gap:2px;cursor:help;">
+                  <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.1em;">OVERDUE</span>
+                  <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--red)">${evm.overdueTasks}</span>
+                </div>`:''}
+              </div>
+
             </div>
 
             <!-- CENTER: grid center column — same column as LABOR/EXPENSE above, auto-aligned -->
