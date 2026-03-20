@@ -331,6 +331,37 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .pri-btn.low    { color:var(--muted); border-color:var(--border); background:transparent; }
 .pri-unset { font-size:9px; color:var(--text3); font-style:italic; letter-spacing:.04em; }
 
+/* exception status buttons */
+.status-btn { font-size:9px; font-weight:700; letter-spacing:.06em; padding:2px 7px;
+  border-radius:3px; border:1px solid; cursor:pointer; font-family:var(--font-ui);
+  transition:all .15s; opacity:.4; }
+.status-btn:hover { opacity:.8; }
+.status-btn.active { opacity:1; }
+.status-btn.unattended { color:var(--muted); border-color:var(--border); background:transparent; }
+.status-btn.in_progress { color:var(--cyan); border-color:rgba(0,210,255,.35); background:rgba(0,210,255,.07); }
+.status-btn.resolved    { color:var(--green); border-color:rgba(42,157,64,.35); background:rgba(42,157,64,.07); }
+
+/* kanban */
+.kanban-wrap { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; align-items:start; }
+.kanban-col { background:var(--surf2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.kanban-col-header {
+  padding:10px 14px; font-size:10px; font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; }
+.kanban-col-header.unattended { color:var(--muted); border-top:2px solid var(--muted); }
+.kanban-col-header.in_progress { color:var(--cyan); border-top:2px solid var(--cyan); }
+.kanban-col-header.resolved { color:var(--green); border-top:2px solid var(--green); }
+.kanban-proj-group { padding:8px 10px 4px; border-bottom:1px solid rgba(255,255,255,.04); }
+.kanban-proj-label { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:6px; }
+.kanban-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:5px;
+  padding:8px 10px; margin-bottom:6px; cursor:pointer; transition:border-color .15s; }
+.kanban-card:hover { border-color:var(--border2); }
+.kanban-card-name { font-size:11px; font-weight:600; color:var(--text); margin-bottom:3px; line-height:1.35; }
+.kanban-card-meta { font-size:10px; color:var(--muted); display:flex; gap:8px; flex-wrap:wrap; }
+.kanban-empty { padding:20px 14px; font-size:11px; color:var(--muted); font-style:italic; text-align:center; }
+
 /* dependency rows */
 .dep-row { display:flex; align-items:center; gap:8px; padding:5px 0;
   border-bottom:1px solid rgba(255,255,255,.04); font-size:11px; }
@@ -529,6 +560,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
       EXCEPTIONS <span id="exc-count" style="font-size:9px;background:rgba(192,64,74,.2);color:#f07a7a;
         padding:1px 5px;border-radius:3px;margin-left:4px;display:none">0</span>
     </button>
+    <button class="view-btn" onclick="switchView('kanban')" id="vbtn-kanban">KANBAN</button>
     <button class="view-btn" onclick="switchView('team')" id="vbtn-team">TEAM</button>
     <button class="view-btn" onclick="switchView('actionitems')" id="vbtn-actionitems">
       ACTION ITEMS <span id="ai-count" style="font-size:9px;background:rgba(79,142,247,.2);color:var(--accent);
@@ -993,8 +1025,8 @@ function switchView(view) {
     _renderingActionItems = false;
   }
   _currentView = view;
-  ['portfolio','exceptions','team','actionitems'].forEach(v => {
-    document.getElementById('vbtn-' + v).classList.toggle('active', v === view);
+  ['portfolio','exceptions','kanban','team','actionitems'].forEach(v => {
+    document.getElementById('vbtn-' + v)?.classList.toggle('active', v === view);
   });
   renderView(view);
 }
@@ -1003,6 +1035,7 @@ function renderView(view) {
   const el = document.getElementById('content');
   if      (view === 'portfolio')   renderPortfolio(el);
   else if (view === 'exceptions')  renderExceptions(el);
+  else if (view === 'kanban')      renderKanban(el);
   else if (view === 'team')        renderTeam(el);
   else if (view === 'actionitems') renderActionItems(el);
 }
@@ -1296,7 +1329,12 @@ function buildExceptions() {
   const projName = (id) => _projects.find(p=>p.id===id)?.name || '—';
 
   // 1. Overdue tasks — group by project + phase
-  const overdueTasks = _tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'complete');
+  // Resolved tasks are hidden from the triage list (visible in Kanban)
+  const overdueTasks = _tasks.filter(t =>
+    t.due_date && t.due_date < today &&
+    t.status !== 'complete' &&
+    t.exception_status !== 'resolved'
+  );
   
   // Group by project
   const tasksByProj = {};
@@ -1330,6 +1368,7 @@ function buildExceptions() {
         hasRequest,
         cls,
         exception_priority: t.exception_priority || null,
+        exception_status:   t.exception_status   || 'unattended',
         suggestion: suggestNextAction(t, cls, assigneeAlloc, hasRequest),
       };
     });
@@ -1490,6 +1529,11 @@ function renderExceptions(el) {
             <button class="pri-btn high${t.exception_priority==='high'?' active':''}" onclick="setPriority('${t.id}','high',this,event)">HIGH</button>
             <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}" onclick="setPriority('${t.id}','medium',this,event)">MED</button>
             <button class="pri-btn low${t.exception_priority==='low'?' active':''}" onclick="setPriority('${t.id}','low',this,event)">LOW</button>
+            <span style="width:1px;height:12px;background:var(--border);margin:0 4px"></span>
+            <span style="font-size:9px;font-weight:400;letter-spacing:.06em;margin-right:2px;color:var(--border2)">STATUS</span>
+            <button class="status-btn unattended${(t.exception_status||'unattended')==='unattended'?' active':''}" onclick="setExceptionStatus('${t.id}','unattended',this,event)">UNATTENDED</button>
+            <button class="status-btn in_progress${t.exception_status==='in_progress'?' active':''}" onclick="setExceptionStatus('${t.id}','in_progress',this,event)">IN PROGRESS</button>
+            <button class="status-btn resolved${t.exception_status==='resolved'?' active':''}" onclick="setExceptionStatus('${t.id}','resolved',this,event)">RESOLVED</button>
           </div>
         </div>
         <div id="exc-${idx}-${t.id?.substring(0,8)}" style="display:none;padding:10px 14px 10px 56px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)">
@@ -1701,9 +1745,38 @@ function renderTaskDetail(t) {
       </div>`;
     });
   } else {
-    html += `<div style="font-size:11px;color:var(--muted);margin-top:4px">${escHtml(t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq))}</div>`;
+    html += `<div style="display:flex;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)">
+      <span style="font-size:14px;flex-shrink:0">💡</span>
+      <div style="font-size:11px;color:var(--muted)">${escHtml(t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq))}</div>
+    </div>`;
   }
   html += `</div>`;
+
+  // ── RECOMMENDED ACTION ─────────────────────────────────────────────────────
+  const suggestion = t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq);
+  const excStatus  = t.exception_status || 'unattended';
+  html += `<div style="margin-bottom:10px;padding:10px 12px;
+      background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15);border-radius:6px;">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--cyan);margin-bottom:6px;">💡 Recommended Action</div>
+    <div style="font-size:11px;color:var(--text);line-height:1.55;margin-bottom:8px">${escHtml(suggestion)}</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${excStatus !== 'in_progress' && excStatus !== 'resolved' ? `
+      <button class="case-action-btn" style="background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.3);color:var(--cyan)"
+          onclick="event.stopPropagation();setExceptionStatusFromDetail('${t.id}','in_progress',this)">
+        ✓ Approve — Set In Progress
+      </button>` : ''}
+      ${excStatus !== 'resolved' ? `
+      <button class="case-action-btn" style="background:rgba(42,157,64,.1);border-color:rgba(42,157,64,.3);color:var(--green)"
+          onclick="event.stopPropagation();setExceptionStatusFromDetail('${t.id}','resolved',this)">
+        ✓ Mark Resolved
+      </button>` : `<span style="font-size:11px;color:var(--green)">✓ Resolved</span>`}
+      <span id="exc-status-indicator-${t.id?.replace(/-/g,'').substring(0,8)}"
+          style="font-size:10px;color:${excStatus==='resolved'?'var(--green)':excStatus==='in_progress'?'var(--cyan)':'var(--muted)'}">
+        ${excStatus==='resolved'?'Resolved':excStatus==='in_progress'?'In Progress':'Unattended'}
+      </span>
+    </div>
+  </div>`;
 
   // ── INPUTS & OUTPUTS PANE ──────────────────────────────────────────────────
   const inputs  = taskDeliverables.filter(d => d.direction === 'input');
@@ -2200,6 +2273,256 @@ async function setPriority(taskId, priority, btnEl, event) {
     showToast(`Priority set to ${priority.toUpperCase()}`, 'success');
   } catch(e) {
     showToast('Error setting priority: ' + e.message, 'error');
+  }
+}
+
+// ── Set exception status — persists to DB, updates local state + DOM ─────────
+async function setExceptionStatus(taskId, status, btnEl, event) {
+  if (event) event.stopPropagation();
+  try {
+    await API.patch(`tasks?id=eq.${taskId}`, { exception_status: status });
+    const t = _tasks.find(t => t.id === taskId);
+    if (t) t.exception_status = status;
+
+    // Update button states in-place
+    const allBtns = btnEl.parentElement.querySelectorAll('.status-btn');
+    allBtns.forEach(b => b.classList.toggle('active', b.classList.contains(status)));
+
+    // Log to CoC
+    const labels = { unattended:'UNATTENDED', in_progress:'IN PROGRESS', resolved:'RESOLVED' };
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: t?.project_id || null,
+      entity_type: 'task', entity_id: taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type: 'note',
+      notes: `Exception status set to ${labels[status] || status.toUpperCase()}`,
+      occurred_at: new Date().toISOString(),
+    });
+
+    // If resolved — remove the row/card from the exceptions list in-place
+    if (status === 'resolved') {
+      // Find and fade-remove the containing exception card or group item
+      const card = btnEl.closest('.exception-card, .exc-group-item');
+      if (card) {
+        // If group item — also remove its detail pane sibling
+        const sibling = card.nextElementSibling;
+        if (sibling && !sibling.classList.contains('exc-group-item')) sibling.remove();
+        card.style.transition = 'opacity .3s';
+        card.style.opacity = '0';
+        setTimeout(() => {
+          card.remove();
+          // Update exc-count badge
+          const excEl = document.getElementById('exc-count');
+          const remaining = document.querySelectorAll('.exception-card, .exc-group-item').length;
+          if (excEl) { excEl.textContent = remaining; if (!remaining) excEl.style.display = 'none'; }
+        }, 300);
+      }
+    }
+
+    showToast(`Status → ${labels[status] || status}`, 'success');
+  } catch(e) {
+    showToast('Error setting status: ' + e.message, 'error');
+  }
+}
+
+// ── Set exception status from detail pane buttons ─────────────────────────────
+// Called from the Recommended Action card inside renderTaskDetail.
+// Updates DB + local state, then refreshes the recommendation panel in-place.
+async function setExceptionStatusFromDetail(taskId, status, btnEl) {
+  try {
+    await API.patch(`tasks?id=eq.${taskId}`, { exception_status: status });
+    const t = _tasks.find(t => t.id === taskId);
+    if (t) t.exception_status = status;
+
+    // Log to CoC
+    const labels = { unattended:'UNATTENDED', in_progress:'IN PROGRESS', resolved:'RESOLVED' };
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: t?.project_id || null,
+      entity_type: 'task', entity_id: taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type: status === 'resolved' ? 'resolution' : 'acknowledgment',
+      notes: `Exception status set to ${labels[status] || status.toUpperCase()}`,
+      occurred_at: new Date().toISOString(),
+    });
+
+    // Update the status indicator text in the recommendation panel
+    const shortId = taskId.replace(/-/g,'').substring(0,8);
+    const indicator = document.getElementById('exc-status-indicator-' + shortId);
+    if (indicator) {
+      indicator.textContent = labels[status];
+      indicator.style.color = status === 'resolved' ? 'var(--green)' : status === 'in_progress' ? 'var(--cyan)' : 'var(--muted)';
+    }
+
+    // Re-render the recommendation panel to show/hide buttons correctly
+    const panel = btnEl.closest('[style*="Recommended Action"]') ||
+                  btnEl.parentElement?.closest('div[style*="cyan"]');
+    if (panel) {
+      // Rebuild just the buttons row
+      const btnRow = btnEl.parentElement;
+      if (btnRow) {
+        btnRow.innerHTML = `
+          ${status !== 'in_progress' && status !== 'resolved' ? `
+          <button class="case-action-btn" style="background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.3);color:var(--cyan)"
+              onclick="event.stopPropagation();setExceptionStatusFromDetail('${taskId}','in_progress',this)">
+            ✓ Approve — Set In Progress
+          </button>` : ''}
+          ${status !== 'resolved' ? `
+          <button class="case-action-btn" style="background:rgba(42,157,64,.1);border-color:rgba(42,157,64,.3);color:var(--green)"
+              onclick="event.stopPropagation();setExceptionStatusFromDetail('${taskId}','resolved',this)">
+            ✓ Mark Resolved
+          </button>` : `<span style="font-size:11px;color:var(--green)">✓ Resolved</span>`}
+          <span id="exc-status-indicator-${shortId}"
+              style="font-size:10px;color:${status==='resolved'?'var(--green)':status==='in_progress'?'var(--cyan)':'var(--muted)'}">
+            ${labels[status]}
+          </span>`;
+      }
+    }
+
+    // If resolved — also remove from the exceptions triage list
+    if (status === 'resolved') {
+      const caseId = 'case-' + shortId;
+      // Find the parent exception card by traversing up from the open detail pane
+      const excCard = document.querySelector(`.exception-card:has(#${caseId}), .exc-group-item:has(#exc-${shortId})`);
+      if (excCard) {
+        excCard.style.transition = 'opacity .3s';
+        excCard.style.opacity = '0';
+        setTimeout(() => excCard.remove(), 300);
+      }
+      // Update row-level status buttons if visible
+      document.querySelectorAll('.status-btn').forEach(b => {
+        const row = b.closest('[data-task-id]') || b.closest('.exc-group-item');
+        if (!row) return;
+        const rowId = row.dataset?.taskId || row.querySelector('[onclick*="' + taskId.substring(0,8) + '"]')?.getAttribute('onclick')?.match(/[0-9a-f-]{36}/)?.[0];
+        if (rowId === taskId) b.classList.toggle('active', b.classList.contains(status));
+      });
+    }
+
+    // Refresh CoC if open
+    const cocContent = document.getElementById('case-' + shortId + '-hist-content');
+    if (cocContent) await _refreshCoCContent(taskId, cocContent);
+
+    showToast(`Status → ${labels[status]}`, 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Kanban view ────────────────────────────────────────────────────────────────
+function renderKanban(el) {
+  const today   = new Date().toLocaleDateString('en-CA');
+  const columns = ['unattended', 'in_progress', 'resolved'];
+  const colMeta = {
+    unattended:  { label: 'Unattended', icon: '○' },
+    in_progress: { label: 'In Progress', icon: '◑' },
+    resolved:    { label: 'Resolved',    icon: '●' },
+  };
+
+  // All overdue tasks (including resolved — they live here now)
+  const overdueTasks = _tasks.filter(t =>
+    t.due_date && t.due_date < today && t.status !== 'complete'
+  );
+
+  if (!overdueTasks.length) {
+    el.innerHTML = `<div class="empty"><div class="icon">✓</div>
+      <div class="title">No exceptions</div>
+      <div>All tasks on track.</div></div>`;
+    return;
+  }
+
+  // Group by status → project
+  const byStatus = { unattended: {}, in_progress: {}, resolved: {} };
+  overdueTasks.forEach(t => {
+    const s = t.exception_status || 'unattended';
+    if (!byStatus[s]) byStatus[s] = {};
+    const pid = t.project_id || 'unknown';
+    if (!byStatus[s][pid]) byStatus[s][pid] = [];
+    byStatus[s][pid].push(t);
+  });
+
+  let html = `<div class="kanban-wrap">`;
+
+  columns.forEach(col => {
+    const projGroups = byStatus[col] || {};
+    const totalCount = Object.values(projGroups).reduce((s, arr) => s + arr.length, 0);
+    const meta = colMeta[col];
+
+    html += `<div class="kanban-col">
+      <div class="kanban-col-header ${col}">
+        <span>${meta.icon} ${meta.label}</span>
+        <span style="font-size:10px;opacity:.6">${totalCount}</span>
+      </div>`;
+
+    if (!totalCount) {
+      html += `<div class="kanban-empty">No exceptions</div>`;
+    } else {
+      Object.entries(projGroups).forEach(([projId, tasks]) => {
+        const projName = _projects.find(p => p.id === projId)?.name || '—';
+        html += `<div class="kanban-proj-group">
+          <div class="kanban-proj-label">${escHtml(projName)}</div>`;
+
+        tasks.forEach(t => {
+          const assignee = resolveAssignee(t.assigned_to);
+          const aName    = assignee ? assignee.first_name + ' ' + assignee.last_name : '—';
+          const daysOver = Math.round((new Date(today) - new Date(t.due_date + 'T00:00:00')) / 86400000);
+          const cls      = classifyTask(t);
+          const clsColor = cls === 'blocked' ? '#f07a7a' : 'var(--amber)';
+          const priColor = { high:'#f07a7a', medium:'var(--amber)', low:'var(--muted)' };
+          const pc       = priColor[t.exception_priority] || 'rgba(255,255,255,.2)';
+
+          html += `<div class="kanban-card"
+              onclick="switchView('exceptions');setTimeout(()=>{
+                const card=document.querySelector('.exception-card,[id*=\\'${t.id?.substring(0,8)}\\']');
+                if(card)card.scrollIntoView({behavior:'smooth',block:'center'});
+              },300)">
+            <div class="kanban-card-name" style="color:${clsColor}">${escHtml(t.name)}</div>
+            <div class="kanban-card-meta">
+              <span>${daysOver}d overdue</span>
+              <span>${escHtml(t.phase || '—')}</span>
+              <span>${escHtml(aName)}</span>
+              ${t.exception_priority ? `<span style="color:${pc}">${t.exception_priority.toUpperCase()}</span>` : ''}
+            </div>
+            <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap" onclick="event.stopPropagation()">
+              ${columns.filter(c => c !== col).map(c => `
+                <button class="status-btn ${c}${false?' active':''}"
+                    style="opacity:.7;font-size:8px;padding:2px 6px"
+                    onclick="setKanbanStatus('${t.id}','${c}',this)">
+                  → ${colMeta[c].label}
+                </button>`).join('')}
+            </div>
+          </div>`;
+        });
+
+        html += `</div>`;
+      });
+    }
+
+    html += `</div>`;
+  });
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// Move a card between Kanban columns — patches DB, updates local state, re-renders
+async function setKanbanStatus(taskId, status, btnEl) {
+  try {
+    await API.patch(`tasks?id=eq.${taskId}`, { exception_status: status });
+    const t = _tasks.find(t => t.id === taskId);
+    if (t) t.exception_status = status;
+    const labels = { unattended:'UNATTENDED', in_progress:'IN PROGRESS', resolved:'RESOLVED' };
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: t?.project_id || null,
+      entity_type: 'task', entity_id: taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type: status === 'resolved' ? 'resolution' : 'acknowledgment',
+      notes: `Exception status set to ${labels[status]}`,
+      occurred_at: new Date().toISOString(),
+    });
+    // Re-render Kanban in-place
+    renderKanban(document.getElementById('content'));
+    showToast(`Moved → ${labels[status]}`, 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
   }
 }
 
