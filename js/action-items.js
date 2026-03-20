@@ -298,7 +298,8 @@ function open(config) {
   setTimeout(() => document.getElementById('aim-desc')?.focus(), 50);
 
   // Wire save button — keep all save logic here, no inline onclick with escaping nightmares
-  document.getElementById('aim-save-btn').addEventListener('click', async () => {
+  document.getElementById('aim-save-btn').addEventListener('click', async function _aimSave() {
+    document.getElementById('aim-save-btn').removeEventListener('click', _aimSave);
     const desc       = document.getElementById('aim-desc')?.value?.trim();
     const responsible = document.getElementById('aim-responsible')?.value;
     const targetDate = document.getElementById('aim-target')?.value;
