@@ -320,6 +320,17 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
   background:rgba(192,64,74,.08); border:1px solid rgba(192,64,74,.2); padding:1px 5px;
   border-radius:3px; margin-left:4px; }
 
+/* Priority buttons */
+.pri-btn { font-size:9px; font-weight:700; letter-spacing:.08em; padding:2px 7px;
+  border-radius:3px; border:1px solid; cursor:pointer; font-family:var(--font-ui);
+  transition:all .15s; opacity:.45; }
+.pri-btn:hover { opacity:.8; }
+.pri-btn.active { opacity:1; }
+.pri-btn.high   { color:#f07a7a; border-color:rgba(192,64,74,.4); background:rgba(192,64,74,.08); }
+.pri-btn.medium { color:var(--amber); border-color:rgba(212,144,31,.4); background:rgba(212,144,31,.08); }
+.pri-btn.low    { color:var(--muted); border-color:var(--border); background:transparent; }
+.pri-unset { font-size:9px; color:var(--text3); font-style:italic; letter-spacing:.04em; }
+
 /* dependency rows */
 .dep-row { display:flex; align-items:center; gap:8px; padding:5px 0;
   border-bottom:1px solid rgba(255,255,255,.04); font-size:11px; }
@@ -796,6 +807,7 @@ let _milestones  = [];
 let _allocations  = [];
 let _deliverables  = [];  // task_deliverables — inputs/outputs per task
 let _dependencies  = [];  // task_dependencies — predecessor/successor links
+let _users         = [];  // users table — tasks.assigned_to references users.id
 let _resources   = [];
 let _requests    = [];
 let _timeEntries = [];
@@ -876,7 +888,7 @@ function calcEVM(proj, projTasks, projEntries) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadAll() {
   try {
-    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables, deps] = await Promise.all([
+    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables, deps, users] = await Promise.all([
       API.getProjects().catch(()=>[]),
       API.getTasks().catch(()=>[]),
       API.get('milestones?select=*&order=target_date.asc').catch(()=>[]),
@@ -886,6 +898,7 @@ async function loadAll() {
       API.get('time_entries?select=*').catch(()=>[]),
       API.get('task_deliverables?select=*&order=direction.asc,sequence_order.asc').catch(()=>[]),
       API.get('task_dependencies?select=*').catch(()=>[]),
+      API.get('users?is_active=eq.true&select=id,name,email,title,resource_id').catch(()=>[]),
     ]);
 
     _projects      = projects     || [];
@@ -897,6 +910,7 @@ async function loadAll() {
     _timeEntries   = times        || [];
     _deliverables  = deliverables || [];
     _dependencies  = deps         || [];
+    _users         = users        || [];
 
     // Compute EVM for all projects
     _projects.forEach(p => {
@@ -1064,7 +1078,7 @@ function renderPortfolio(el) {
 
 function renderProjectCard(p) {
   const evm     = _evms[p.id] || {};
-  const pm      = _resources.find(r => r.id === p.pm_resource_id);
+  const pm      = resolveAssignee(p.pm_resource_id) || _resources.find(r => r.id === p.pm_resource_id);
   const pmInit  = pm ? (pm.first_name[0]+pm.last_name[0]).toUpperCase() : '??';
   const pmName  = pm ? pm.first_name + ' ' + pm.last_name : '—';
   const openReq = _requests.filter(r => r.project_id === p.id).length;
@@ -1201,6 +1215,21 @@ function getBlockingDeliverables(taskId) {
   });
 }
 
+// ── Resolve assignee — tasks.assigned_to may point to users.id or resources.id ──
+function resolveAssignee(assignedToId) {
+  if (!assignedToId) return null;
+  // Try resources first
+  const res = _resources.find(r => r.id === assignedToId);
+  if (res) return { id: res.id, first_name: res.first_name, last_name: res.last_name, title: res.title, source: 'resource' };
+  // Fall back to users table
+  const usr = _users.find(u => u.id === assignedToId);
+  if (usr) {
+    const parts = (usr.name || '').split(' ');
+    return { id: usr.id, first_name: parts[0]||'', last_name: parts.slice(1).join(' ')||'', title: usr.title||'', source: 'user' };
+  }
+  return null;
+}
+
 function classifyTask(t) {
   // Three-way classification: late | blocked | technical
   if (t.status === 'blocked') return 'technical';
@@ -1219,7 +1248,8 @@ function classificationLabel(cls) {
 }
 
 function suggestNextAction(t, cls, assigneeAlloc, hasRequest) {
-  const name = _resources.find(r=>r.id===t.assigned_to)?.first_name || 'The assignee';
+  const resolved = resolveAssignee(t.assigned_to);
+  const name = resolved?.first_name || 'The assignee';
   if (cls === 'technical') return 'Initiate a root cause investigation. Assign a technical lead to diagnose and document the failure mode before assigning additional effort.';
   // Check for specific blocking inputs
   const blockedInputs = getBlockingDeliverables(t.id);
@@ -1260,7 +1290,7 @@ function buildExceptions() {
     // Enrich each task with assignee + allocation + classification
     const enriched = tasks.map(t => {
       const daysOver = Math.round((new Date(today) - new Date(t.due_date+'T00:00:00')) / 86400000);
-      const assignee = _resources.find(r => r.id === t.assigned_to);
+      const assignee = resolveAssignee(t.assigned_to);
       const assigneeAlloc = _allocations.filter(a => a.resource_id === t.assigned_to)
         .reduce((s,a) => s + (a.allocation_pct||0), 0);
       const hasRequest = _requests.some(r =>
@@ -1274,8 +1304,17 @@ function buildExceptions() {
         assigneeAlloc,
         hasRequest,
         cls,
+        exception_priority: t.exception_priority || null,
         suggestion: suggestNextAction(t, cls, assigneeAlloc, hasRequest),
       };
+    });
+
+    // Sort: unset (null) first → HIGH → MEDIUM → LOW
+    const priOrder = { high:1, medium:2, low:3 };
+    enriched.sort((a,b) => {
+      const ap = a.exception_priority ? (priOrder[a.exception_priority]||9) : 0;
+      const bp = b.exception_priority ? (priOrder[b.exception_priority]||9) : 0;
+      return ap - bp;
     });
 
     if (tasks.length === 1) {
@@ -1421,7 +1460,12 @@ function renderExceptions(el) {
               onmouseleave="hideTaskTip()">${t.cls === 'blocked' ? '🔴' : '⚠'} ${escHtml(t.name)}</span>
             <span style="color:var(--muted);margin-left:8px">${t.daysOver}d overdue · ${escHtml(t.phase||'—')} · ${t.assignee ? t.assignee.first_name+' '+t.assignee.last_name : '—'}</span>
           </div>
-          <span style="color:var(--muted);font-size:10px">${t.assigneeAlloc}% alloc</span>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
+            ${!t.exception_priority ? '<span class="pri-unset">unset</span>' : ''}
+            <button class="pri-btn high${t.exception_priority==='high'?' active':''}" onclick="setPriority('${t.id}','high',this)">HIGH</button>
+            <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}" onclick="setPriority('${t.id}','medium',this)">MED</button>
+            <button class="pri-btn low${t.exception_priority==='low'?' active':''}" onclick="setPriority('${t.id}','low',this)">LOW</button>
+          </div>
         </div>
         <div id="exc-${idx}-${t.id?.substring(0,8)}" style="display:none;padding:10px 14px 10px 56px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)">
           ${renderTaskDetail(t)}
@@ -1685,7 +1729,7 @@ function renderTaskDetail(t) {
     upstream.forEach(dep => {
       const pt = _tasks.find(t2 => t2.id === dep.predecessor_task_id);
       if (!pt) return;
-      const pAssignee = _resources.find(r => r.id === pt.assigned_to);
+      const pAssignee = resolveAssignee(pt.assigned_to);
       const pPct = Math.round((pt.pct_complete||0) * (pt.pct_complete <= 1 ? 100 : 1));
       const pColor = pt.status === 'complete' ? 'var(--green)' : pt.status === 'blocked' ? '#f07a7a' : pt.due_date && pt.due_date < new Date().toLocaleDateString('en-CA') ? 'var(--amber)' : 'var(--muted)';
       html += `<div class="dep-row">
@@ -1968,6 +2012,58 @@ async function confirmResourcePicker() {
     _patchTaskDisplayInPlace(_rpTaskId, primaryId, names);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Set exception priority — persists to DB, updates local state + DOM ──────────
+async function setPriority(taskId, priority, btnEl) {
+  try {
+    await API.patch(`tasks?id=eq.${taskId}`, { exception_priority: priority });
+    // Update local task state
+    const t = _tasks.find(t => t.id === taskId);
+    if (t) t.exception_priority = priority;
+
+    // Update button states in this row — find all pri-btns in the same row
+    const row = btnEl.closest('.exc-group-item, .exc-detail-cell, div');
+    const allBtns = btnEl.parentElement.querySelectorAll('.pri-btn');
+    allBtns.forEach(b => {
+      b.classList.toggle('active', b.classList.contains(priority));
+    });
+    // Hide the "unset" label if present
+    const unsetSpan = btnEl.parentElement.querySelector('.pri-unset');
+    if (unsetSpan) unsetSpan.remove();
+
+    // Log to CoC
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: t?.project_id||null,
+      entity_type:'task', entity_id:taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type:'note',
+      notes: `Priority set to ${priority.toUpperCase()}`,
+      occurred_at: new Date().toISOString(),
+    });
+
+    // Re-sort the group visually — move rows within parent
+    const groupBody = btnEl.closest('.exc-group-body');
+    if (groupBody) {
+      const items = [...groupBody.querySelectorAll('.exc-group-item')];
+      const priOrder = { high:1, medium:2, low:3 };
+      const getItemPri = el => {
+        const active = el.querySelector('.pri-btn.active');
+        if (!active) return 0; // unset = top
+        return priOrder[active.classList[1]] || 99;
+      };
+      items.sort((a,b) => getItemPri(a) - getItemPri(b));
+      items.forEach(item => {
+        const detail = item.nextElementSibling;
+        groupBody.appendChild(item);
+        if (detail && !detail.classList.contains('exc-group-item')) groupBody.appendChild(detail);
+      });
+    }
+
+    showToast(`Priority set to ${priority.toUpperCase()}`, 'success');
+  } catch(e) {
+    showToast('Error setting priority: ' + e.message, 'error');
   }
 }
 
@@ -2297,13 +2393,13 @@ function showTaskTip(taskId, anchorEl, event) {
 
     let rows = phaseTasks.map(t => {
       const isCurrent = t.id === taskId;
-      const assignee = _resources.find(r=>r.id===t.assigned_to);
+      const assignee = resolveAssignee(t.assigned_to);
       const aName = assignee ? assignee.first_name+' '+assignee.last_name : '—';
       const sc = statusColor[t.status] || 'var(--muted)';
       const pct = Math.round((t.pct_complete||0) * (t.pct_complete<=1?100:1));
       const depCount = _dependencies.filter(d=>d.predecessor_task_id===t.id||d.successor_task_id===t.id).length;
       return `<div class="task-tip-row${isCurrent?' current':''}">
-        <div style="color:${isCurrent?'var(--text0)':'var(--text)'};font-weight:${isCurrent?700:400}">${escHtml(t.name?.substring(0,38)||'—')}</div>
+        <div style="color:${isCurrent?'#ffd700':'var(--text)'};font-weight:${isCurrent?700:400}">${escHtml(t.name?.substring(0,38)||'—')}</div>
         <div style="color:var(--muted);font-size:10px">${escHtml(aName.substring(0,18))}</div>
         <div style="color:${sc};font-size:10px">${t.status?.replace('_',' ')||'—'} ${pct>0?pct+'%':''}</div>
         <div style="color:var(--muted);font-size:10px">${depCount>0?depCount+' dep':''}</div>
@@ -2347,6 +2443,24 @@ function toggleExcCard(id) {
     detail.style.display = isOpen ? 'none' : 'block';
   }
   if (arrow) arrow.classList.toggle('open', !isOpen);
+
+  // When opening: auto-open Chain of Custody pane
+  if (!isOpen) {
+    // Extract taskId from the detail container — find the loadAndToggleHistory button
+    const histBtn = detail.querySelector?.('[onclick*="loadAndToggleHistory"]');
+    if (histBtn) {
+      const match = histBtn.getAttribute('onclick')?.match(/loadAndToggleHistory\('([^']+)'/);
+      if (match) {
+        const taskId = match[1];
+        const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
+        const histPaneId = caseId + '-hist';
+        const histBody = document.getElementById(histPaneId);
+        if (histBody && !histBody.classList.contains('open')) {
+          loadAndToggleHistory(taskId, histPaneId, null);
+        }
+      }
+    }
+  }
 }
 
 function toggleExcGroup(id) {
