@@ -207,26 +207,61 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 /* ── Exceptions view ── */
 .exception-list { display:flex; flex-direction:column; gap:8px; }
 .exception-card { background:var(--surface); border:1px solid var(--border); border-radius:6px;
-                  padding:12px 16px; display:flex; align-items:center; gap:14px; }
+             overflow:hidden; cursor:pointer; transition:border-color .15s; }
+.exception-card:hover { border-color:var(--border2); }
 .exception-card.sev-critical { border-left:3px solid var(--red); }
 .exception-card.sev-high     { border-left:3px solid var(--amber); }
 .exception-card.sev-medium   { border-left:3px solid var(--accent); }
-.exc-icon { width:32px; height:32px; border-radius:50%; display:flex; align-items:center;
-            justify-content:center; font-size:14px; flex-shrink:0; }
-.exc-icon.task     { background:rgba(212,144,31,.1); }
-.exc-icon.request  { background:rgba(192,64,74,.1); }
-.exc-icon.milestone{ background:rgba(124,77,255,.1); }
-.exc-icon.budget   { background:rgba(79,142,247,.1); }
-.exc-body { flex:1; min-width:0; }
-.exc-title { font-size:13px; font-weight:600; color:var(--text); }
-.exc-sub   { font-size:11px; color:var(--muted); margin-top:2px; }
-.exc-proj  { font-size:10px; font-family:var(--font-mono); color:var(--accent);
-             margin-top:3px; }
-.exc-age   { font-size:10px; font-family:var(--font-mono); color:var(--muted);
-             flex-shrink:0; text-align:right; }
-.exc-section-header { font-size:10px; font-weight:700; letter-spacing:.1em;
-                      text-transform:uppercase; color:var(--muted); padding:8px 0 4px;
-                      border-bottom:1px solid var(--border); margin-bottom:8px; }
+.exc-card-header { padding:11px 14px; display:flex; align-items:center; gap:12px; }
+.exc-icon { width:30px; height:30px; border-radius:50%; display:flex; align-items:center;
+            justify-content:center; font-size:13px; flex-shrink:0; }
+.exc-icon.task      { background:rgba(212,144,31,.12); color:var(--amber); }
+.exc-icon.blocked   { background:rgba(192,64,74,.15);  color:#f07a7a; }
+.exc-icon.request   { background:rgba(192,64,74,.12);  color:#f07a7a; }
+.exc-icon.milestone { background:rgba(124,77,255,.12); color:#a78bfa; }
+.exc-icon.budget    { background:rgba(79,142,247,.12);  color:var(--accent); }
+.exc-body  { flex:1; min-width:0; }
+.exc-title { font-size:12px; font-weight:700; color:var(--text); }
+.exc-sub   { font-size:11px; color:var(--muted); margin-top:2px; line-height:1.4; }
+.exc-proj  { font-size:10px; font-family:var(--font-mono); color:var(--accent); margin-top:3px; }
+.exc-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+.exc-age   { font-size:10px; font-family:var(--font-mono); color:var(--muted); }
+.exc-expand-btn { font-size:10px; color:var(--muted); transition:transform .2s; display:inline-block; }
+.exc-expand-btn.open { transform:rotate(180deg); }
+.exc-detail { display:none; padding:0 14px 12px 56px; border-top:1px solid var(--border); }
+.exc-detail.open { display:block; }
+.exc-detail-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }
+.exc-detail-cell { background:var(--surf2); border:1px solid var(--border); border-radius:4px; padding:8px 10px; }
+.exc-detail-label { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+.exc-detail-val   { font-size:12px; font-weight:600; color:var(--text); }
+.exc-detail-sub   { font-size:10px; color:var(--muted); margin-top:1px; }
+.exc-classification { display:inline-flex; align-items:center; gap:5px; font-size:9px;
+  font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:2px 8px;
+  border-radius:3px; border:1px solid; margin-bottom:8px; }
+.exc-classification.late     { color:var(--amber); border-color:rgba(212,144,31,.3); background:rgba(212,144,31,.06); }
+.exc-classification.blocked  { color:#f07a7a; border-color:rgba(192,64,74,.3); background:rgba(192,64,74,.06); }
+.exc-classification.technical{ color:#a78bfa; border-color:rgba(124,77,255,.3); background:rgba(124,77,255,.06); }
+.exc-suggestion { background:rgba(0,210,255,.04); border:1px solid rgba(0,210,255,.15);
+  border-radius:4px; padding:8px 10px; font-size:11px; line-height:1.6; color:var(--text); }
+.exc-suggestion-label { font-size:9px; font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--cyan); margin-bottom:4px; }
+.exc-group-card { background:var(--surface); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.exc-group-card.sev-critical { border-left:3px solid var(--red); }
+.exc-group-card.sev-high     { border-left:3px solid var(--amber); }
+.exc-group-header { padding:11px 14px; display:flex; align-items:center; gap:12px; cursor:pointer; }
+.exc-group-header:hover { background:rgba(255,255,255,.02); }
+.exc-group-body { display:none; border-top:1px solid var(--border); }
+.exc-group-body.open { display:block; }
+.exc-group-item { padding:8px 14px 8px 56px; border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+.exc-group-item:hover { background:rgba(255,255,255,.02); }
+.exc-group-item:last-child { border-bottom:none; }
+.exc-section-header { font-size:9px; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; padding:10px 0 5px;
+  border-bottom:1px solid var(--border); margin-bottom:8px; }
+.exc-section-header.critical { color:var(--red); }
+.exc-section-header.high     { color:var(--amber); }
+.exc-section-header.medium   { color:var(--accent); }
 
 /* ── Team view ── */
 .team-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:12px; }
@@ -996,36 +1031,118 @@ function renderProjectCard(p) {
 }
 
 // ── Exceptions view ───────────────────────────────────────────────────────────
+function classifyTask(t) {
+  // Three-way classification: late | blocked | technical
+  if (t.status === 'blocked') return 'blocked';
+  // Check if any open resource request exists for this task
+  const hasRequest = _requests.some(r => r.task_id === t.id || 
+    (r.project_id === t.project_id && r.requested_resource_id === t.assigned_to));
+  if (hasRequest) return 'blocked'; // resource constraint is the identified blocker
+  return 'late'; // default: late but potentially unblocked
+}
+
+function classificationLabel(cls) {
+  return { late: 'LATE — UNBLOCKED', blocked: 'BLOCKED — RESOURCE CONSTRAINT', technical: 'BLOCKED — TECHNICAL' }[cls] || 'LATE';
+}
+
+function suggestNextAction(t, cls, assigneeAlloc, hasRequest) {
+  const name = _resources.find(r=>r.id===t.assigned_to)?.first_name || 'The assignee';
+  if (cls === 'technical') return `Initiate a root cause investigation. Assign a technical lead to diagnose and document the failure mode before assigning additional effort.`;
+  if (cls === 'blocked' && hasRequest) return `A resource request is already open. Review it in the Requests page — approve or counter to unblock this task.`;
+  if (assigneeAlloc > 100) return `${name} is at ${assigneeAlloc}% total allocation — over-committed. Consider raising a resource request or redistributing their workload before expecting progress.`;
+  if (assigneeAlloc > 80) return `${name} is at ${assigneeAlloc}% allocation across projects. Review their current task priorities and confirm this task is their active focus.`;
+  return `Check in directly with ${name} to understand the specific blocker. If it is an input dependency or external factor, classify this task as Blocked to trigger the correct triage path.`;
+}
+
 function buildExceptions() {
-  const today   = new Date().toLocaleDateString('en-CA');
-  const in7     = new Date(Date.now() + 7*86400000).toLocaleDateString('en-CA');
-  const items   = [];
+  const today    = new Date().toLocaleDateString('en-CA');
+  const items    = [];
   const projName = (id) => _projects.find(p=>p.id===id)?.name || '—';
 
-  // 1. Overdue tasks
-  _tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'complete').forEach(t => {
-    const daysOver = Math.round((new Date(today) - new Date(t.due_date+'T00:00:00')) / 86400000);
-    items.push({
-      type: 'task', sev: daysOver > 7 ? 'critical' : 'high',
-      title: `Overdue: ${t.name}`,
-      sub: `${daysOver} day${daysOver!==1?'s':''} past due date · ${t.status.replace('_',' ')}`,
-      proj: projName(t.project_id),
-      projId: t.project_id,
-      age: daysOver + 'd overdue',
-      sortKey: -daysOver,
+  // 1. Overdue tasks — group by project + phase
+  const overdueTasks = _tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'complete');
+  
+  // Group by project
+  const tasksByProj = {};
+  overdueTasks.forEach(t => {
+    const key = t.project_id;
+    if (!tasksByProj[key]) tasksByProj[key] = [];
+    tasksByProj[key].push(t);
+  });
+
+  Object.entries(tasksByProj).forEach(([projId, tasks]) => {
+    const proj = _projects.find(p => p.id === projId);
+    const maxDays = Math.max(...tasks.map(t =>
+      Math.round((new Date(today) - new Date(t.due_date+'T00:00:00')) / 86400000)));
+    const sev = maxDays > 7 ? 'critical' : 'high';
+
+    // Enrich each task with assignee + allocation + classification
+    const enriched = tasks.map(t => {
+      const daysOver = Math.round((new Date(today) - new Date(t.due_date+'T00:00:00')) / 86400000);
+      const assignee = _resources.find(r => r.id === t.assigned_to);
+      const assigneeAlloc = _allocations.filter(a => a.resource_id === t.assigned_to)
+        .reduce((s,a) => s + (a.allocation_pct||0), 0);
+      const hasRequest = _requests.some(r =>
+        r.task_id === t.id ||
+        (r.project_id === t.project_id && r.requested_resource_id === t.assigned_to));
+      const cls = classifyTask(t);
+      return {
+        ...t,
+        daysOver,
+        assignee,
+        assigneeAlloc,
+        hasRequest,
+        cls,
+        suggestion: suggestNextAction(t, cls, assigneeAlloc, hasRequest),
+      };
     });
+
+    if (tasks.length === 1) {
+      // Single task — show as individual card
+      const t = enriched[0];
+      items.push({
+        type: t.cls === 'blocked' ? 'blocked' : 'task',
+        sev,
+        title: `${t.cls === 'blocked' ? '🔴 Blocked' : '⚠ Overdue'}: ${t.name}`,
+        sub: `${t.daysOver} day${t.daysOver!==1?'s':''} past due · ${t.phase||'—'} · ${t.status.replace('_',' ')}`,
+        proj: proj?.name || '—',
+        projId,
+        age: t.daysOver + 'd',
+        sortKey: -t.daysOver,
+        taskData: t,
+        grouped: false,
+      });
+    } else {
+      // Multiple tasks from same project — group them
+      const blockedCount = enriched.filter(t => t.cls === 'blocked').length;
+      const phases = [...new Set(enriched.map(t => t.phase).filter(Boolean))];
+      items.push({
+        type: 'task',
+        sev,
+        title: `${tasks.length} overdue tasks${blockedCount > 0 ? ` (${blockedCount} blocked)` : ''}`,
+        sub: `${projName(projId)} · ${phases.slice(0,2).join(', ')}${phases.length > 2 ? ` +${phases.length-2} more` : ''}`,
+        proj: proj?.name || '—',
+        projId,
+        age: `up to ${maxDays}d`,
+        sortKey: -maxDays,
+        taskData: null,
+        grouped: true,
+        groupTasks: enriched,
+      });
+    }
   });
 
   // 2. At-risk milestones
   _milestones.filter(m => m.status === 'at_risk' || m.status === 'blocked').forEach(m => {
     items.push({
       type: 'milestone', sev: m.status === 'blocked' ? 'critical' : 'high',
-      title: `${m.status === 'blocked' ? 'Blocked' : 'At risk'}: ${m.name}`,
+      title: `${m.status === 'blocked' ? '🔴 Blocked' : '◈ At risk'}: ${m.name}`,
       sub: `Milestone target ${fmtDate(m.target_date)}`,
       proj: projName(m.project_id),
       projId: m.project_id,
       age: fmtDate(m.target_date),
       sortKey: m.target_date,
+      grouped: false,
     });
   });
 
@@ -1042,10 +1159,12 @@ function buildExceptions() {
       projId: r.project_id,
       age: hoursOpen + 'h open',
       sortKey: -hoursOpen,
+      grouped: false,
+      requestData: r,
     });
   });
 
-  // 4. Budget warnings (> 80% consumed)
+  // 4. Budget warnings
   _projects.filter(p => p.status === 'active').forEach(p => {
     const evm = _evms[p.id];
     if (!evm || !evm.bac || evm.bac === 0) return;
@@ -1059,6 +1178,7 @@ function buildExceptions() {
         projId: p.id,
         age: `CPI ${evm.cpi?.toFixed(2)||'—'}`,
         sortKey: -pctUsed,
+        grouped: false,
       });
     }
   });
@@ -1081,32 +1201,158 @@ function renderExceptions(el) {
     return;
   }
 
-  const typeIcon  = { task:'⚠', request:'⬡', milestone:'◈', budget:'$' };
-  const typeLabel = { task:'TASK', request:'RESOURCE REQUEST', milestone:'MILESTONE', budget:'BUDGET' };
+  const typeIcon  = { task:'⚠', blocked:'🔴', request:'⬡', milestone:'◈', budget:'$' };
+  const typeLabel = { task:'OVERDUE TASK', blocked:'BLOCKED TASK', request:'RESOURCE REQUEST', milestone:'MILESTONE', budget:'BUDGET' };
 
   let html = `<div class="exception-list">`;
   let lastSev = null;
 
-  items.forEach(item => {
+  items.forEach((item, idx) => {
     if (item.sev !== lastSev) {
       const labels = { critical:'🚨 CRITICAL', high:'⚠ HIGH PRIORITY', medium:'ℹ MEDIUM' };
-      html += `<div class="exc-section-header">${labels[item.sev]||item.sev.toUpperCase()}</div>`;
+      html += `<div class="exc-section-header ${item.sev}">${labels[item.sev]||item.sev.toUpperCase()}</div>`;
       lastSev = item.sev;
     }
-    html += `
-    <div class="exception-card sev-${item.sev}" onclick="goToProject('${item.projId}')">
-      <div class="exc-icon ${item.type}">${typeIcon[item.type]}</div>
-      <div class="exc-body">
-        <div class="exc-title">${escHtml(item.title)}</div>
-        <div class="exc-sub">${escHtml(item.sub)}</div>
-        <div class="exc-proj">${escHtml(item.proj)} · ${typeLabel[item.type]}</div>
-      </div>
-      <div class="exc-age">${escHtml(item.age)}</div>
-    </div>`;
+
+    if (item.grouped) {
+      // ── Grouped card ────────────────────────────────────────────────────
+      const gid = 'grp-' + idx;
+      html += `
+      <div class="exc-group-card sev-${item.sev}" style="margin-bottom:6px">
+        <div class="exc-group-header" onclick="toggleExcGroup('${gid}')">
+          <div class="exc-icon task" style="flex-shrink:0">${typeIcon.task}</div>
+          <div class="exc-body">
+            <div class="exc-title">${escHtml(item.title)}</div>
+            <div class="exc-sub">${escHtml(item.sub)}</div>
+          </div>
+          <div class="exc-right">
+            <div class="exc-age">${escHtml(item.age)}</div>
+            <div class="exc-expand-btn" id="${gid}-arrow">▼</div>
+          </div>
+        </div>
+        <div class="exc-group-body" id="${gid}">`;
+      item.groupTasks.forEach(t => {
+        const clsColor = t.cls === 'blocked' ? '#f07a7a' : 'var(--amber)';
+        html += `<div class="exc-group-item" onclick="event.stopPropagation();toggleExcCard('exc-${idx}-${t.id?.substring(0,8)}')">
+          <div style="flex:1;min-width:0">
+            <span style="font-weight:600;color:${clsColor}">${t.cls === 'blocked' ? '🔴' : '⚠'} ${escHtml(t.name)}</span>
+            <span style="color:var(--muted);margin-left:8px">${t.daysOver}d overdue · ${escHtml(t.phase||'—')} · ${t.assignee ? t.assignee.first_name+' '+t.assignee.last_name : '—'}</span>
+          </div>
+          <span style="color:var(--muted);font-size:10px">${t.assigneeAlloc}% alloc</span>
+        </div>
+        <div id="exc-${idx}-${t.id?.substring(0,8)}" style="display:none;padding:10px 14px 10px 56px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)">
+          ${renderTaskDetail(t)}
+        </div>`;
+      });
+      html += `</div></div>`;
+
+    } else if (item.taskData) {
+      // ── Single expandable task card ──────────────────────────────────────
+      const eid = 'exc-' + idx;
+      const t = item.taskData;
+      html += `
+      <div class="exception-card sev-${item.sev}" style="margin-bottom:6px" onclick="toggleExcCard('${eid}')">
+        <div class="exc-card-header">
+          <div class="exc-icon ${item.type}">${typeIcon[item.type]||'⚠'}</div>
+          <div class="exc-body">
+            <div class="exc-title">${escHtml(item.title)}</div>
+            <div class="exc-sub">${escHtml(item.sub)}</div>
+            <div class="exc-proj">${escHtml(item.proj)}</div>
+          </div>
+          <div class="exc-right">
+            <div class="exc-age">${escHtml(item.age)}</div>
+            <div class="exc-expand-btn" id="${eid}-arrow">▼</div>
+          </div>
+        </div>
+        <div class="exc-detail" id="${eid}">
+          ${renderTaskDetail(t)}
+        </div>
+      </div>`;
+
+    } else {
+      // ── Standard card (milestone, request, budget) ───────────────────────
+      const icon = typeIcon[item.type] || '⚠';
+      html += `
+      <div class="exception-card sev-${item.sev}" style="margin-bottom:6px" onclick="goToProject('${item.projId}')">
+        <div class="exc-card-header">
+          <div class="exc-icon ${item.type}">${icon}</div>
+          <div class="exc-body">
+            <div class="exc-title">${escHtml(item.title)}</div>
+            <div class="exc-sub">${escHtml(item.sub)}</div>
+            <div class="exc-proj">${escHtml(item.proj)} · ${typeLabel[item.type]||item.type.toUpperCase()}</div>
+          </div>
+          <div class="exc-right">
+            <div class="exc-age">${escHtml(item.age)}</div>
+            <div style="font-size:10px;color:var(--muted)">→</div>
+          </div>
+        </div>
+      </div>`;
+    }
   });
 
   html += '</div>';
   el.innerHTML = html;
+}
+
+function renderTaskDetail(t) {
+  const cls = t.cls || classifyTask(t);
+  const clsColor = cls === 'blocked' ? '#f07a7a' : cls === 'technical' ? '#a78bfa' : 'var(--amber)';
+  const allocColor = t.assigneeAlloc > 100 ? 'var(--red)' : t.assigneeAlloc > 80 ? 'var(--amber)' : 'var(--green)';
+  const proj = _projects.find(p => p.id === t.project_id);
+  const openReq = _requests.find(r => r.task_id === t.id ||
+    (r.project_id === t.project_id && r.requested_resource_id === t.assigned_to));
+
+  return `
+    <div class="exc-classification ${cls}">${classificationLabel(cls)}</div>
+    <div class="exc-detail-grid">
+      <div class="exc-detail-cell">
+        <div class="exc-detail-label">Assignee</div>
+        <div class="exc-detail-val">${t.assignee ? escHtml(t.assignee.first_name+' '+t.assignee.last_name) : '— Unassigned'}</div>
+        <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER' : ''}</div>
+      </div>
+      <div class="exc-detail-cell">
+        <div class="exc-detail-label">Phase</div>
+        <div class="exc-detail-val">${escHtml(t.phase||'—')}</div>
+        <div class="exc-detail-sub">${escHtml(proj?.name||'—')}</div>
+      </div>
+      <div class="exc-detail-cell">
+        <div class="exc-detail-label">Days Overdue</div>
+        <div class="exc-detail-val" style="color:${clsColor}">${t.daysOver} day${t.daysOver!==1?'s':''}</div>
+        <div class="exc-detail-sub">Due ${fmtDate(t.due_date)}</div>
+      </div>
+    </div>
+    ${openReq ? `<div style="font-size:11px;color:var(--accent);margin-bottom:8px;padding:5px 8px;
+        background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);border-radius:4px">
+        ⬡ Resource request already open — ${openReq.urgency?.toUpperCase()} · ${openReq.status}
+        <a href="/resource-requests.html" onclick="event.stopPropagation()" 
+           style="color:var(--cyan);margin-left:8px;text-decoration:none">View →</a>
+      </div>` : ''}
+    <div class="exc-suggestion">
+      <div class="exc-suggestion-label">Suggested Next Action</div>
+      ${escHtml(t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq))}
+    </div>`;
+}
+
+function toggleExcCard(id) {
+  const detail = document.getElementById(id);
+  const arrow  = document.getElementById(id + '-arrow');
+  if (!detail) return;
+  const isOpen = detail.classList.contains('open') || detail.style.display === 'block';
+  if (detail.classList.contains('exc-detail')) {
+    detail.classList.toggle('open', !isOpen);
+  } else {
+    detail.style.display = isOpen ? 'none' : 'block';
+  }
+  if (arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+function toggleExcGroup(id) {
+  const body  = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (arrow) arrow.classList.toggle('open', !isOpen);
 }
 
 // ── Team view ─────────────────────────────────────────────────────────────────
