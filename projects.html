@@ -294,6 +294,69 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .empty .icon { font-size:36px; margin-bottom:12px; }
 .empty .title { font-size:14px; font-weight:700; color:var(--text); margin-bottom:6px; }
 
+/* ── Case file panes ── */
+.case-pane { border-top:1px solid var(--border); }
+.case-pane-header { display:flex; align-items:center; justify-content:space-between;
+  padding:8px 14px 8px 0; cursor:pointer; user-select:none; }
+.case-pane-header:hover .case-pane-title { color:var(--text0); }
+.case-pane-title { font-size:9px; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.case-pane-title .pane-icon { font-size:11px; }
+.case-pane-arrow { font-size:10px; color:var(--muted); transition:transform .2s; }
+.case-pane-arrow.open { transform:rotate(180deg); }
+.case-pane-body { padding:0 0 12px 0; display:none; }
+.case-pane-body.open { display:block; }
+
+/* deliverable rows */
+.deliv-row { display:flex; align-items:flex-start; gap:10px; padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.04); }
+.deliv-row:last-child { border-bottom:none; }
+.deliv-state-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.deliv-name { font-size:11px; font-weight:600; color:var(--text); flex:1; min-width:0; }
+.deliv-meta { font-size:10px; color:var(--muted); margin-top:2px; line-height:1.4; }
+.deliv-state-badge { font-size:9px; font-weight:700; letter-spacing:.06em; padding:1px 6px;
+  border-radius:3px; border:1px solid; flex-shrink:0; text-transform:uppercase; }
+.deliv-blocking { font-size:9px; color:#f07a7a; font-weight:700; letter-spacing:.06em;
+  background:rgba(192,64,74,.08); border:1px solid rgba(192,64,74,.2); padding:1px 5px;
+  border-radius:3px; margin-left:4px; }
+
+/* dependency rows */
+.dep-row { display:flex; align-items:center; gap:8px; padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.04); font-size:11px; }
+.dep-row:last-child { border-bottom:none; }
+.dep-dir { font-size:9px; font-weight:700; letter-spacing:.06em; padding:1px 5px;
+  border-radius:3px; flex-shrink:0; }
+.dep-dir.upstream   { background:rgba(212,144,31,.1); color:var(--amber); border:1px solid rgba(212,144,31,.25); }
+.dep-dir.downstream { background:rgba(79,142,247,.1); color:var(--accent); border:1px solid rgba(79,142,247,.25); }
+.dep-name { flex:1; min-width:0; font-weight:600; color:var(--text); }
+.dep-status { font-size:9px; color:var(--muted); }
+.dep-pct { font-family:var(--font-mono); font-size:10px; color:var(--muted); flex-shrink:0; }
+
+/* history rows */
+.hist-row { display:flex; gap:10px; padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.04); }
+.hist-row:last-child { border-bottom:none; }
+.hist-time { font-family:var(--font-mono); font-size:9px; color:var(--muted);
+  flex-shrink:0; width:90px; padding-top:2px; }
+.hist-actor { font-size:10px; font-weight:700; color:var(--text); flex-shrink:0; width:90px; }
+.hist-body { flex:1; min-width:0; font-size:10px; color:var(--text); line-height:1.5; }
+.hist-type { font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:2px; }
+
+/* assignee selector */
+.assignee-select { background:var(--surf2); border:1px solid var(--border2); color:var(--text);
+  font-size:11px; padding:4px 8px; border-radius:4px; font-family:var(--font-ui); width:100%;
+  cursor:pointer; }
+.assignee-select:focus { outline:none; border-color:var(--cyan); }
+
+/* action buttons */
+.case-action-btn { background:rgba(0,210,255,.06); border:1px solid rgba(0,210,255,.2);
+  color:var(--cyan); font-size:10px; font-weight:700; letter-spacing:.06em; padding:5px 10px;
+  border-radius:4px; cursor:pointer; font-family:var(--font-ui); transition:all .15s; }
+.case-action-btn:hover { background:rgba(0,210,255,.12); }
+.case-action-btn.amber { background:rgba(212,144,31,.06); border-color:rgba(212,144,31,.2); color:var(--amber); }
+.case-action-btn.red   { background:rgba(192,64,74,.06);  border-color:rgba(192,64,74,.2);  color:#f07a7a; }
+
 /* ── Loading ── */
 .loading { display:flex; align-items:center; justify-content:center; flex:1;
            font-family:var(--font-mono); font-size:12px; color:var(--muted);
@@ -642,7 +705,8 @@ let _projects    = [];
 let _tasks       = [];
 let _milestones  = [];
 let _allocations  = [];
-let _deliverables = [];   // task_deliverables — inputs not yet at required state
+let _deliverables  = [];  // task_deliverables — inputs/outputs per task
+let _dependencies  = [];  // task_dependencies — predecessor/successor links
 let _resources   = [];
 let _requests    = [];
 let _timeEntries = [];
@@ -723,25 +787,27 @@ function calcEVM(proj, projTasks, projEntries) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadAll() {
   try {
-    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables] = await Promise.all([
+    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables, deps] = await Promise.all([
       API.getProjects().catch(()=>[]),
       API.getTasks().catch(()=>[]),
       API.get('milestones?select=*&order=target_date.asc').catch(()=>[]),
       API.get('resource_allocations?select=*').catch(()=>[]),
-    API.get('task_deliverables?direction=eq.input&select=*').catch(()=>[]),
-      API.get('resources?is_active=eq.true&select=id,first_name,last_name,title,email,bio,level,availability_pct').catch(()=>[]),
+      API.get('resources?is_active=eq.true&select=id,first_name,last_name,title,email,bio,notes,level,availability_pct,department,location,avatar_url,hud_role_id').catch(()=>[]),
       API.get('resource_requests?status=in.(pending,acknowledged,countered,escalated,delegated)&select=*').catch(()=>[]),
       API.get('time_entries?select=*').catch(()=>[]),
+      API.get('task_deliverables?select=*&order=direction.asc,sequence_order.asc').catch(()=>[]),
+      API.get('task_dependencies?select=*').catch(()=>[]),
     ]);
 
-    _projects    = projects    || [];
-    _tasks       = tasks       || [];
-    _milestones  = milestones  || [];
-    _allocations  = allocations  || [];
-  _deliverables = deliverables || [];
-    _resources   = resources   || [];
-    _requests    = requests    || [];
-    _timeEntries = times       || [];
+    _projects      = projects     || [];
+    _tasks         = tasks        || [];
+    _milestones    = milestones   || [];
+    _allocations   = allocations  || [];
+    _resources     = resources    || [];
+    _requests      = requests     || [];
+    _timeEntries   = times        || [];
+    _deliverables  = deliverables || [];
+    _dependencies  = deps         || [];
 
     // Compute EVM for all projects
     _projects.forEach(p => {
@@ -1320,66 +1386,394 @@ function renderExceptions(el) {
   el.innerHTML = html;
 }
 
+// ── Deliverable state helpers ─────────────────────────────────────────────────
+function delivStateColor(state, minState) {
+  const stateRank = {not_started:0,draft:1,in_progress:1,under_review:2,approved:3,released:4,superseded:0};
+  const minRank   = {completed:2, approved:3, released:4};
+  const sr = stateRank[state] || 0;
+  const mr = minRank[minState] || 0;
+  if (sr >= mr) return 'var(--green)';
+  if (sr === mr - 1) return 'var(--amber)';
+  return '#f07a7a';
+}
+function delivStateLabel(state) {
+  return { not_started:'Not Started', draft:'Draft', in_progress:'In Progress',
+    under_review:'Under Review', approved:'Approved', released:'Released', superseded:'Superseded' }[state] || state;
+}
+function isDelivBlocking(d) {
+  const stateRank = {not_started:0,draft:1,in_progress:1,under_review:2,approved:3,released:4};
+  const minRank   = {completed:2, approved:3, released:4};
+  return d.is_required && (stateRank[d.current_state]||0) < (minRank[d.minimum_state]||0);
+}
+
+// ── Root cause analysis ───────────────────────────────────────────────────────
+function analyzeRootCause(t, taskDeliverables, taskDeps) {
+  const reasons = [];
+  const upstream = taskDeps.filter(d => d.successor_task_id === t.id);
+  const blockingInputs = taskDeliverables.filter(d => d.direction === 'input' && isDelivBlocking(d));
+
+  if (!t.assigned_to) reasons.push({ code:'unassigned', label:'Unassigned', detail:'No resource is responsible for this task. It cannot progress without an assignee.', icon:'👤' });
+  if (blockingInputs.length > 0) {
+    const names = blockingInputs.map(d => d.name).join(', ');
+    reasons.push({ code:'inputs', label:'Required Inputs Not Ready', detail:`${blockingInputs.length} required input${blockingInputs.length!==1?'s are':' is'} not in the minimum required state: ${names}.`, icon:'📄' });
+  }
+  if (upstream.length > 0) {
+    const incompleteUp = upstream.map(d => _tasks.find(t2 => t2.id === d.predecessor_task_id)).filter(t2 => t2 && t2.status !== 'complete');
+    if (incompleteUp.length > 0) {
+      const names = incompleteUp.map(t2 => t2.name).join(', ');
+      reasons.push({ code:'upstream', label:'Upstream Tasks Incomplete', detail:`${incompleteUp.length} predecessor task${incompleteUp.length!==1?'s are':' is'} not complete: ${names}.`, icon:'⬆' });
+    }
+  }
+  if (reasons.length === 0 && t.status === 'not_started') reasons.push({ code:'not_started', label:'Not Yet Started', detail:'Task is assigned but work has not begun. Check assignee availability and competing priorities.', icon:'⏸' });
+  if (reasons.length === 0 && t.status === 'in_progress') reasons.push({ code:'in_progress', label:'In Progress — Missed Due Date', detail:`Task is ${Math.round((t.pct_complete||0) * (t.pct_complete <= 1 ? 100 : 1))}% complete but passed its due date. Assess remaining effort vs. available capacity.`, icon:'⏱' });
+  return reasons;
+}
+
+// ── Criticality assessment ────────────────────────────────────────────────────
+function assessCriticality(t) {
+  // Downstream milestone proximity
+  const today = new Date().toLocaleDateString('en-CA');
+  const downstreamMilestones = _milestones.filter(m =>
+    m.project_id === t.project_id &&
+    m.target_date >= today &&
+    ['not_started','in_progress','at_risk'].includes(m.status)
+  ).sort((a,b) => a.target_date.localeCompare(b.target_date));
+
+  const nearestMs = downstreamMilestones[0];
+  const daysToMs  = nearestMs ? Math.round((new Date(nearestMs.target_date+'T00:00:00') - new Date()) / 86400000) : null;
+
+  // Fan-out — how many tasks does this unblock
+  const fanOut = _dependencies.filter(d => d.predecessor_task_id === t.id).length;
+
+  if (daysToMs !== null && daysToMs <= 14) return { level:'HIGH', color:'#f07a7a', reason:`On critical path to ${nearestMs.name} in ${daysToMs} day${daysToMs!==1?'s':''}` };
+  if (daysToMs !== null && daysToMs <= 30) return { level:'MEDIUM', color:'var(--amber)', reason:`Milestone ${nearestMs.name} in ${daysToMs} days` };
+  if (fanOut >= 3) return { level:'MEDIUM', color:'var(--amber)', reason:`Blocks ${fanOut} downstream tasks` };
+  return { level:'LOW', color:'var(--muted)', reason: daysToMs ? `Next milestone in ${daysToMs} days` : 'No immediate milestone dependency' };
+}
+
+// ── Full case file renderer ───────────────────────────────────────────────────
 function renderTaskDetail(t) {
+  const caseId = 'case-' + (t.id||'').replace(/-/g,'').substring(0,12);
   const cls = t.cls || classifyTask(t);
   const clsColor = cls === 'blocked' ? '#f07a7a' : cls === 'technical' ? '#a78bfa' : 'var(--amber)';
   const allocColor = t.assigneeAlloc > 100 ? 'var(--red)' : t.assigneeAlloc > 80 ? 'var(--amber)' : 'var(--green)';
   const proj = _projects.find(p => p.id === t.project_id);
   const openReq = _requests.find(r => r.task_id === t.id ||
     (r.project_id === t.project_id && r.requested_resource_id === t.assigned_to));
-  const blockedInputs = getBlockingDeliverables(t.id);
 
-  return `
+  // Task-specific deliverables and dependencies
+  const taskDeliverables = _deliverables.filter(d => d.task_id === t.id);
+  const taskDeps = _dependencies.filter(d => d.predecessor_task_id === t.id || d.successor_task_id === t.id);
+  const rootCauses = analyzeRootCause(t, taskDeliverables, taskDeps);
+  const criticality = assessCriticality(t);
+  const pctDisplay = Math.round((t.pct_complete||0) * (t.pct_complete <= 1 ? 100 : 1));
+
+  // ── SITUATION PANEL ────────────────────────────────────────────────────────
+  const assigneeOptions = _resources.map(r =>
+    `<option value="${r.id}" ${t.assigned_to === r.id ? 'selected' : ''}>${escHtml(r.first_name+' '+r.last_name)} — ${(_allocations.filter(a=>a.resource_id===r.id).reduce((s,a)=>s+(a.allocation_pct||0),0))}% alloc</option>`
+  ).join('');
+
+  let html = `
     <div class="exc-classification ${cls}">${classificationLabel(cls)}</div>
+
     <div class="exc-detail-grid">
       <div class="exc-detail-cell">
         <div class="exc-detail-label">Assignee</div>
-        <div class="exc-detail-val">${t.assignee ? escHtml(t.assignee.first_name+' '+t.assignee.last_name) : '— Unassigned'}</div>
-        <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER' : ''}</div>
+        ${t.assigned_to && t.assignee
+          ? `<div class="exc-detail-val">${escHtml(t.assignee.first_name+' '+t.assignee.last_name)}</div>
+             <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER-ALLOCATED' : ''}</div>`
+          : `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>`
+        }
+        <select class="assignee-select" style="margin-top:6px" onchange="assignTask('${t.id}',this.value,event)" onclick="event.stopPropagation()">
+          <option value="">— Assign resource —</option>
+          ${assigneeOptions}
+        </select>
       </div>
       <div class="exc-detail-cell">
         <div class="exc-detail-label">Phase</div>
         <div class="exc-detail-val">${escHtml(t.phase||'—')}</div>
         <div class="exc-detail-sub">${escHtml(proj?.name||'—')}</div>
+        <div class="exc-detail-sub" style="margin-top:4px">${pctDisplay}% complete</div>
       </div>
       <div class="exc-detail-cell">
-        <div class="exc-detail-label">Days Overdue</div>
-        <div class="exc-detail-val" style="color:${clsColor}">${t.daysOver} day${t.daysOver!==1?'s':''}</div>
-        <div class="exc-detail-sub">Due ${fmtDate(t.due_date)}</div>
+        <div class="exc-detail-label">Criticality</div>
+        <div class="exc-detail-val" style="color:${criticality.color}">${criticality.level}</div>
+        <div class="exc-detail-sub">${escHtml(criticality.reason)}</div>
       </div>
     </div>
+
     ${openReq ? `<div style="font-size:11px;color:var(--accent);margin-bottom:8px;padding:5px 8px;
         background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);border-radius:4px">
-        ⬡ Resource request already open — ${openReq.urgency?.toUpperCase()} · ${openReq.status}
+        ⬡ Resource request already open — ${(openReq.urgency||'unknown').toUpperCase()} · ${openReq.status}
         <a href="/resource-requests.html" onclick="event.stopPropagation()"
            style="color:var(--cyan);margin-left:8px;text-decoration:none">View →</a>
-      </div>` : ''}
-    ${blockedInputs.length > 0 ? `<div style="margin-bottom:8px">
-      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#f07a7a;margin-bottom:5px">
-        BLOCKED INPUTS — ${blockedInputs.length} required input${blockedInputs.length!==1?'s':''} not ready
+      </div>` : ''}`;
+
+  // ── ROOT CAUSE PANEL ───────────────────────────────────────────────────────
+  html += `<div class="exc-suggestion" style="margin-bottom:10px">
+    <div class="exc-suggestion-label">Why Is This Overdue?</div>`;
+  if (rootCauses.length > 0) {
+    rootCauses.forEach(rc => {
+      html += `<div style="display:flex;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)">
+        <span style="font-size:14px;flex-shrink:0">${rc.icon}</span>
+        <div><div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:2px">${escHtml(rc.label)}</div>
+        <div style="font-size:11px;color:var(--muted)">${escHtml(rc.detail)}</div></div>
+      </div>`;
+    });
+  } else {
+    html += `<div style="font-size:11px;color:var(--muted);margin-top:4px">${escHtml(t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq))}</div>`;
+  }
+  html += `</div>`;
+
+  // ── INPUTS & OUTPUTS PANE ──────────────────────────────────────────────────
+  const inputs  = taskDeliverables.filter(d => d.direction === 'input');
+  const outputs = taskDeliverables.filter(d => d.direction === 'output');
+  const blockingCount = inputs.filter(d => isDelivBlocking(d)).length;
+
+  html += `<div class="case-pane">
+    <div class="case-pane-header" onclick="toggleCasePane('${caseId}-io',event)">
+      <div class="case-pane-title">
+        <span class="pane-icon">📄</span> Inputs &amp; Outputs
+        ${blockingCount > 0 ? `<span style="color:#f07a7a;font-size:9px">(${blockingCount} blocking)</span>` : ''}
+        ${inputs.length === 0 && outputs.length === 0 ? '<span style="color:var(--text3)">None defined</span>' : `<span style="color:var(--text3)">${inputs.length} in · ${outputs.length} out</span>`}
       </div>
-      ${blockedInputs.map(d => {
-        const stateColor = { not_started:'var(--muted)', draft:'var(--amber)', under_review:'var(--amber)', approved:'var(--green)' }[d.current_state] || 'var(--muted)';
-        const typeLabel  = { drawing:'Drawing', specification:'Spec', test_report:'Test Report', approval:'Approval', material_cert:'Material Cert', procedure:'Procedure', analysis:'Analysis', model:'Model', prototype:'Prototype', other:'Document' }[d.deliverable_type] || d.deliverable_type;
-        return `<div style="display:flex;align-items:center;justify-content:space-between;
-            padding:5px 8px;margin-bottom:3px;background:rgba(192,64,74,.06);
-            border:1px solid rgba(192,64,74,.2);border-radius:4px;font-size:11px">
-          <div>
-            <span style="font-weight:600;color:var(--text)">${escHtml(d.name)}</span>
-            <span style="color:var(--muted);margin-left:6px">${typeLabel}</span>
-          </div>
-          <div style="text-align:right;flex-shrink:0;margin-left:10px">
-            <span style="color:${stateColor}">${d.current_state.replace(/_/g,' ')}</span>
-            <span style="color:var(--text3);margin:0 4px">→ needs</span>
-            <span style="color:var(--text)">${d.minimum_state}</span>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>` : ''}
-    <div class="exc-suggestion">
-      <div class="exc-suggestion-label">Suggested Next Action</div>
-      ${escHtml(t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq))}
-    </div>`;
+      <div class="case-pane-arrow" id="${caseId}-io-arrow">▼</div>
+    </div>
+    <div class="case-pane-body" id="${caseId}-io">`;
+
+  if (inputs.length > 0) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Required Inputs</div>`;
+    inputs.forEach(d => {
+      const color = delivStateColor(d.current_state, d.minimum_state);
+      const blocking = isDelivBlocking(d);
+      html += `<div class="deliv-row">
+        <div class="deliv-state-dot" style="background:${color}"></div>
+        <div style="flex:1;min-width:0">
+          <div class="deliv-name">${escHtml(d.name)}${blocking ? '<span class="deliv-blocking">BLOCKING</span>' : ''}</div>
+          <div class="deliv-meta">${escHtml(d.deliverable_type||'—')} · Current: <strong style="color:${color}">${delivStateLabel(d.current_state)}</strong> · Required: ${d.minimum_state||'—'}
+          ${d.source_external ? ` · Source: ${escHtml(d.source_external)}` : ''}
+          ${!d.is_required ? ' · <em>Optional</em>' : ''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  if (outputs.length > 0) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:${inputs.length?'12px':'0'} 0 6px">Outputs This Task Produces</div>`;
+    outputs.forEach(d => {
+      const color = d.current_state === 'released' ? 'var(--green)' : d.current_state === 'not_started' ? 'var(--muted)' : 'var(--amber)';
+      html += `<div class="deliv-row">
+        <div class="deliv-state-dot" style="background:${color}"></div>
+        <div style="flex:1;min-width:0">
+          <div class="deliv-name">${escHtml(d.name)}</div>
+          <div class="deliv-meta">${escHtml(d.deliverable_type||'—')} · ${delivStateLabel(d.current_state)}${d.is_required ? ' · Required for downstream' : ''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  if (inputs.length === 0 && outputs.length === 0) {
+    html += `<div style="font-size:11px;color:var(--text3);padding:6px 0">No inputs or outputs defined for this task yet.</div>`;
+  }
+  html += `</div></div>`;
+
+  // ── DEPENDENCIES PANE ──────────────────────────────────────────────────────
+  const upstream   = taskDeps.filter(d => d.successor_task_id === t.id);
+  const downstream = taskDeps.filter(d => d.predecessor_task_id === t.id);
+
+  html += `<div class="case-pane">
+    <div class="case-pane-header" onclick="toggleCasePane('${caseId}-deps',event)">
+      <div class="case-pane-title">
+        <span class="pane-icon">🔗</span> Dependencies
+        <span style="color:var(--text3)">${upstream.length} upstream · ${downstream.length} downstream</span>
+      </div>
+      <div class="case-pane-arrow" id="${caseId}-deps-arrow">▼</div>
+    </div>
+    <div class="case-pane-body" id="${caseId}-deps">`;
+
+  if (upstream.length > 0) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Upstream — must complete before this task</div>`;
+    upstream.forEach(dep => {
+      const pt = _tasks.find(t2 => t2.id === dep.predecessor_task_id);
+      if (!pt) return;
+      const pAssignee = _resources.find(r => r.id === pt.assigned_to);
+      const pPct = Math.round((pt.pct_complete||0) * (pt.pct_complete <= 1 ? 100 : 1));
+      const pColor = pt.status === 'complete' ? 'var(--green)' : pt.status === 'blocked' ? '#f07a7a' : pt.due_date && pt.due_date < new Date().toLocaleDateString('en-CA') ? 'var(--amber)' : 'var(--muted)';
+      html += `<div class="dep-row">
+        <span class="dep-dir upstream">↑ UP</span>
+        <div class="dep-name">${escHtml(pt.name?.substring(0,35)||'—')}</div>
+        <div class="dep-status" style="color:${pColor}">${escHtml(pt.status?.replace('_',' ')||'—')}</div>
+        <div class="dep-pct" style="color:${pColor}">${pPct}%</div>
+        <div style="font-size:10px;color:var(--muted);flex-shrink:0">${pAssignee ? escHtml(pAssignee.first_name+' '+pAssignee.last_name) : 'Unassigned'}</div>
+      </div>`;
+    });
+  }
+  if (downstream.length > 0) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:${upstream.length?'10px':'0'} 0 6px">Downstream — tasks this unblocks</div>`;
+    downstream.forEach(dep => {
+      const st = _tasks.find(t2 => t2.id === dep.successor_task_id);
+      if (!st) return;
+      const sPct = Math.round((st.pct_complete||0) * (st.pct_complete <= 1 ? 100 : 1));
+      html += `<div class="dep-row">
+        <span class="dep-dir downstream">↓ DOWN</span>
+        <div class="dep-name">${escHtml(st.name?.substring(0,35)||'—')}</div>
+        <div class="dep-status">${escHtml(st.status?.replace('_',' ')||'—')}</div>
+        <div class="dep-pct">${sPct}%</div>
+      </div>`;
+    });
+  }
+  if (upstream.length === 0 && downstream.length === 0) {
+    html += `<div style="font-size:11px;color:var(--text3);padding:6px 0">No dependencies recorded for this task.</div>`;
+  }
+  html += `</div></div>`;
+
+  // ── ACTIONS PANE ───────────────────────────────────────────────────────────
+  html += `<div class="case-pane">
+    <div class="case-pane-header" onclick="toggleCasePane('${caseId}-actions',event)">
+      <div class="case-pane-title"><span class="pane-icon">⚡</span> Actions</div>
+      <div class="case-pane-arrow" id="${caseId}-actions-arrow">▼</div>
+    </div>
+    <div class="case-pane-body" id="${caseId}-actions">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:6px">
+        ${!openReq ? `<button class="case-action-btn" onclick="raiseResourceRequest('${t.id}','${t.project_id}',event)">⬡ Raise Resource Request</button>` : ''}
+        <button class="case-action-btn amber" onclick="logAnnotation('${t.id}','note',event)">📝 Add Note to Record</button>
+        ${blockingInputs && blockingInputs.length > 0 ? `<button class="case-action-btn amber" onclick="logAnnotation('${t.id}','block_discovery',event)">📄 Flag Input as Blocking</button>` : ''}
+        <button class="case-action-btn" onclick="logAnnotation('${t.id}','acknowledgment',event)">✓ Acknowledge &amp; Record Intent</button>
+        <button class="case-action-btn red" onclick="logAnnotation('${t.id}','escalation',event)">↑ Escalate</button>
+      </div>
+    </div>
+  </div>`;
+
+  // ── HISTORY (Chain of Custody) PANE ───────────────────────────────────────
+  html += `<div class="case-pane">
+    <div class="case-pane-header" onclick="loadAndToggleHistory('${t.id}','${caseId}-hist',event)">
+      <div class="case-pane-title"><span class="pane-icon">📋</span> Chain of Custody</div>
+      <div class="case-pane-arrow" id="${caseId}-hist-arrow">▼</div>
+    </div>
+    <div class="case-pane-body" id="${caseId}-hist">
+      <div id="${caseId}-hist-content" style="font-size:11px;color:var(--text3);padding:6px 0">Loading history...</div>
+    </div>
+  </div>`;
+
+  return html;
+}
+
+// ── Case pane toggle ──────────────────────────────────────────────────────────
+function toggleCasePane(id, event) {
+  if (event) event.stopPropagation();
+  const body  = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (!body) return;
+  const open = body.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open', open);
+}
+
+// ── Load and toggle history ───────────────────────────────────────────────────
+async function loadAndToggleHistory(taskId, paneId, event) {
+  if (event) event.stopPropagation();
+  const body    = document.getElementById(paneId);
+  const arrow   = document.getElementById(paneId + '-arrow');
+  const content = document.getElementById(paneId + '-content');
+  if (!body) return;
+
+  const open = body.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open', open);
+  if (!open || !content) return;
+
+  content.textContent = 'Loading...';
+  try {
+    const annotations = await API.get(
+      `exception_annotations?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
+    ).catch(()=>[]);
+
+    if (!annotations || annotations.length === 0) {
+      content.innerHTML = '<div style="color:var(--text3);font-style:italic;padding:4px 0">No history recorded yet. Actions taken from this card will appear here.</div>';
+      return;
+    }
+
+    const typeLabel = { block_discovery:'Block Discovered', block_classification:'Classified', acknowledgment:'Acknowledged', intended_action:'Intent Recorded', intervention:'Intervention', escalation:'Escalated', note:'Note', resolution:'Resolved', unblocked:'Unblocked' };
+    const typeColor = { block_discovery:'#f07a7a', escalation:'#f07a7a', acknowledgment:'var(--cyan)', resolution:'var(--green)', unblocked:'var(--green)', note:'var(--muted)', intervention:'var(--amber)' };
+
+    content.innerHTML = annotations.map(a => {
+      const actor = _resources.find(r => r.id === a.actor_resource_id);
+      const actorName = actor ? actor.first_name + ' ' + actor.last_name : 'System';
+      const color = typeColor[a.action_type] || 'var(--muted)';
+      const label = typeLabel[a.action_type] || a.action_type;
+      const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      return `<div class="hist-row">
+        <div class="hist-time">${ts}</div>
+        <div style="flex:1;min-width:0">
+          <div class="hist-type" style="color:${color}">${label}</div>
+          <div class="hist-actor">${escHtml(actorName)}</div>
+          ${a.notes ? `<div class="hist-body">${escHtml(a.notes)}</div>` : ''}
+          ${a.intended_action ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>` : ''}
+          ${a.outcome ? `<div class="hist-body" style="color:var(--green)">Outcome: ${escHtml(a.outcome)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    content.textContent = 'Error loading history: ' + e.message;
+  }
+}
+
+// ── Assign task ───────────────────────────────────────────────────────────────
+async function assignTask(taskId, resourceId, event) {
+  if (event) event.stopPropagation();
+  if (!resourceId) return;
+  try {
+    await API.patch(`tasks?id=eq.${taskId}`, { assigned_to: resourceId });
+    // Log annotation
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: null, entity_type: 'task', entity_id: taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID, action_type: 'intervention',
+      notes: 'Task assigned to ' + (_resources.find(r=>r.id===resourceId)?.first_name||resourceId) + ' via Exception Triage',
+      occurred_at: new Date().toISOString(),
+    });
+    // Update local state
+    const t = _tasks.find(t => t.id === taskId);
+    if (t) t.assigned_to = resourceId;
+    showToast('Task assigned — recorded in chain of custody', 'success');
+    // Refresh exceptions view
+    renderView('exceptions');
+  } catch(e) {
+    showToast('Error assigning task: ' + e.message, 'error');
+  }
+}
+
+// ── Log annotation ────────────────────────────────────────────────────────────
+async function logAnnotation(taskId, actionType, event) {
+  if (event) event.stopPropagation();
+  const labels = { note:'Add note', acknowledgment:'Record your understanding and intended action', block_discovery:'Describe the blocking condition', escalation:'Describe why you are escalating' };
+  const prompt = labels[actionType] || 'Add notes';
+  const notes = window.prompt(prompt + ':');
+  if (!notes || !notes.trim()) return;
+
+  let intendedAction = null;
+  if (actionType === 'acknowledgment') {
+    intendedAction = window.prompt('What do you intend to do? (e.g. "Raise resource request", "Reschedule", "Escalate to Vaughn")');
+  }
+
+  try {
+    const task = _tasks.find(t => t.id === taskId);
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID,
+      project_id: task?.project_id || null,
+      entity_type: 'task',
+      entity_id: taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type: actionType,
+      notes: notes.trim(),
+      intended_action: intendedAction || null,
+      occurred_at: new Date().toISOString(),
+    });
+    showToast('Recorded in chain of custody', 'success');
+  } catch(e) {
+    showToast('Error recording: ' + e.message, 'error');
+  }
+}
+
+// ── Raise resource request shortcut ──────────────────────────────────────────
+function raiseResourceRequest(taskId, projectId, event) {
+  if (event) event.stopPropagation();
+  window.location.href = `/resources.html?raise=1&task_id=${taskId}&project_id=${projectId}`;
 }
 
 function toggleExcCard(id) {
@@ -1491,6 +1885,10 @@ function showToast(msg, type='info') {
   el.style.borderColor = type === 'info' ? 'rgba(79,142,247,.4)' : 'rgba(42,157,64,.4)';
   setTimeout(() => el.classList.remove('show'), 3000);
 }
+
+// ── Constants (hardcoded until auth is wired) ─────────────────────────────────
+const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
+const CURRENT_USER_RESOURCE_ID = 'e1000001-0000-0000-0000-000000000001'; // Vaughn
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadAll();
