@@ -668,7 +668,9 @@ function calcEVM(proj, projTasks, projEntries) {
   return { evPct, ev, pv, bac, actualHrs, cpi, spi, eac, tcpi,
            teacDate, slipDays, p25Date, p50Date, p80Date,
            diagnosis, overdueTasks, blockedTasks, inProgressCnt, completeCnt,
-           totalTasks: projTasks.length };
+           totalTasks: projTasks.length,
+           totalEffortDays: Math.round(totalEffort),
+           earnedEffortDays: Math.round(earnedEff * 10) / 10 };
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -936,7 +938,8 @@ function renderProjectCard(p) {
     <div class="proj-progress">
       <div style="display:flex;justify-content:space-between;font-size:10px;
           color:var(--muted);margin-bottom:5px">
-        <span>${pct}% complete</span>
+        <span data-tip="Effort-weighted schedule progress: ${evm.earnedEffortDays||0} of ${evm.totalEffortDays||0} planned effort-days earned across ${evm.completeCnt||0} complete + ${evm.inProgressCnt||0} in-progress tasks of ${evm.totalTasks||0} total"
+          style="cursor:default">${pct}% complete</span>
         <span>${evm.actualHrs ? Math.round(evm.actualHrs) : 0}h used of ${evm.bac || '—'}h budget</span>
       </div>
       <div class="progress-bar-bg">
