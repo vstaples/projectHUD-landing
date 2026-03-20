@@ -1834,27 +1834,124 @@ async function toggleActionsPane(paneId, taskId, event) {
 
 function _renderActionItemsList(listEl, items, taskId) {
   if (!items || items.length === 0) {
-    listEl.innerHTML = '<div style="font-size:10px;color:var(--text3);font-style:italic;padding:4px 0">No action items yet.</div>';
+    listEl.innerHTML = '<div style="font-size:10px;color:var(--muted);font-style:italic;padding:4px 0">No action items yet.</div>';
     return;
   }
   const priColor = { critical:'#f07a7a', high:'#f07a7a', medium:'var(--amber)', low:'var(--muted)' };
-  const statusColor = { open:'var(--amber)', in_progress:'var(--cyan)', completed:'var(--green)', cancelled:'var(--muted)' };
+  const today = new Date().toLocaleDateString('en-CA');
   listEl.innerHTML = items.map(item => {
+    const done    = item.status === 'completed';
     const assignee = resolveAssignee(item.responsible);
-    const aName = assignee ? assignee.first_name+' '+assignee.last_name : '—';
-    const pc = priColor[item.priority] || 'var(--muted)';
-    const sc = statusColor[item.status] || 'var(--muted)';
-    const due = item.target_date ? fmtDate(item.target_date) : '—';
-    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-      <div style="width:6px;height:6px;border-radius:50%;background:${pc};flex-shrink:0;margin-top:4px"></div>
+    const aName    = assignee ? assignee.first_name+' '+assignee.last_name : '—';
+    const initials = assignee ? (assignee.first_name[0]||'')+(assignee.last_name[0]||'') : '?';
+    const pc       = priColor[item.priority] || 'var(--muted)';
+    const overdue  = !done && item.target_date && item.target_date < today;
+    const due      = item.target_date ? fmtDate(item.target_date) : null;
+
+    // Status badge colours
+    const badgeBg  = done ? 'rgba(42,157,64,.15)' : overdue ? 'rgba(192,64,74,.12)' : 'rgba(212,144,31,.12)';
+    const badgeClr = done ? '#7af0a0'              : overdue ? '#f07a7a'              : 'var(--amber)';
+
+    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;
+        border-bottom:1px solid rgba(255,255,255,.04)"
+        data-ai-id="${item.id}"
+        data-ai-status="${item.status||'open'}">
+
+      <!-- Checkbox -->
+      <div style="width:15px;height:15px;border-radius:4px;flex-shrink:0;margin-top:2px;
+          border:1px solid ${done?'var(--green)':'rgba(255,255,255,.14)'};
+          background:${done?'var(--green)':'transparent'};
+          display:flex;align-items:center;justify-content:center;
+          cursor:pointer;font-size:9px;color:#fff"
+          onclick="event.stopPropagation();_toggleActionItem(this)">
+        ${done?'✓':''}
+      </div>
+
+      <!-- Body -->
       <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:600;color:var(--text)">${escHtml(item.description)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px">
-          ${escHtml(aName)} · Due ${due} · <span style="color:${sc}">${item.status?.replace('_',' ')||'open'}</span>
+        <div style="font-size:11px;font-weight:500;line-height:1.45;margin-bottom:4px;
+            color:${done?'var(--muted)':'var(--text)'};
+            text-decoration:${done?'line-through':'none'}">
+          ${escHtml(item.description)}
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <!-- Priority dot + assignee -->
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="width:5px;height:5px;border-radius:50%;background:${pc};flex-shrink:0"></div>
+            <div style="width:15px;height:15px;border-radius:50%;flex-shrink:0;
+                background:rgba(79,142,247,.15);color:var(--accent);
+                font-size:7px;font-weight:700;
+                display:flex;align-items:center;justify-content:center">
+              ${escHtml(initials)}
+            </div>
+            <span style="font-size:10px;color:var(--muted)">${escHtml(aName)}</span>
+          </div>
+          <!-- Due date -->
+          ${due ? `<span style="font-size:10px;color:${overdue?'#f07a7a':'var(--muted)'}"
+              data-due="${item.target_date}">
+            ${overdue?'⚠ ':''}Due ${due}
+          </span>` : ''}
+          <!-- Status badge -->
+          <span data-status-badge
+              style="font-size:10px;padding:1px 6px;border-radius:4px;
+              background:${badgeBg};color:${badgeClr}">
+            ${(item.status||'open').replace('_',' ')}
+          </span>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+// Toggle action item status — PATCHes action_items.status, updates DOM in-place, no re-render
+async function _toggleActionItem(checkboxEl) {
+  const row       = checkboxEl.closest('[data-ai-id]');
+  if (!row) return;
+  const id        = row.dataset.aiId;
+  const curStatus = row.dataset.aiStatus || 'open';
+  const newStatus = curStatus === 'completed' ? 'open' : 'completed';
+
+  try {
+    await API.patch(`action_items?id=eq.${id}`, { status: newStatus });
+
+    // Update row data attribute
+    row.dataset.aiStatus = newStatus;
+    const done = newStatus === 'completed';
+
+    // Update checkbox appearance
+    checkboxEl.style.background  = done ? 'var(--green)' : 'transparent';
+    checkboxEl.style.borderColor = done ? 'var(--green)' : 'rgba(255,255,255,.14)';
+    checkboxEl.textContent       = done ? '✓' : '';
+
+    // Update description line-through + colour
+    const descEl = row.querySelector('[style*="text-decoration"]');
+    if (descEl) {
+      descEl.style.textDecoration = done ? 'line-through' : 'none';
+      descEl.style.color          = done ? 'var(--muted)' : 'var(--text)';
+    }
+
+    // Update status badge
+    const badge = row.querySelector('[data-status-badge]');
+    if (badge) {
+      badge.textContent       = done ? 'completed' : 'open';
+      badge.style.background  = done ? 'rgba(42,157,64,.15)' : 'rgba(212,144,31,.12)';
+      badge.style.color       = done ? '#7af0a0'              : 'var(--amber)';
+    }
+
+    // Update overdue warning on due-date span
+    const today = new Date().toLocaleDateString('en-CA');
+    const dueSpan = row.querySelector('[data-due]');
+    if (dueSpan) {
+      const due = dueSpan.dataset.due;
+      const isOverdue = due && due < today && !done;
+      dueSpan.style.color = isOverdue ? '#f07a7a' : 'var(--muted)';
+      dueSpan.textContent = (isOverdue ? '⚠ ' : '') + 'Due ' + fmtDate(due);
+    }
+
+  } catch(e) {
+    console.error('_toggleActionItem error:', e);
+    showToast('Could not update action item status', 'error');
+  }
 }
 
 // After saving an action item, refresh the list in the open pane
