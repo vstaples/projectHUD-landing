@@ -572,6 +572,29 @@ function renderRequestCard(req, isSent = false) {
 
   const cardId = 'card-' + req.id.replace(/-/g,'');
 
+  // Compute "Impact If Approved" as plain text — shown below The Ask
+  const _ra       = (_allocations || []).filter(a => a.resource_id === req.requested_resource_id);
+  const _cur      = _ra.reduce(function(s, a) { return s + (a.allocation_pct || 0); }, 0);
+  const _new      = _cur + (req.allocation_pct || 0);
+  const _over     = _new > 100;
+  const _col      = _over ? 'var(--red)' : _new >= 100 ? 'var(--amber)' : '#7af0a0';
+  const _projs    = _ra.map(function(a) {
+    var p = _projects.find(function(x) { return x.id === a.project_id; });
+    return p ? p.name : '?';
+  }).join(' and ');
+  const _resName  = resource ? resource.first_name + ' ' + resource.last_name : '—';
+  const _line1    = 'If approved: ' + _resName + ' moves from ' + _cur + '% → ' + _new + '% total allocation';
+  const _line2    = _over
+    ? '⚠ Over-allocated by ' + (_new - 100) + '% — existing commitments on ' + _projs + ' remain unchanged'
+    : _new === 100
+      ? _resName + ' will be fully committed across all projects'
+      : 'Within available capacity (' + _new + '% of 100%)';
+  const impactIfApproved = '<div style="margin-top:8px;font-size:11px;line-height:1.8">'
+    + '<span style="color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">IMPACT IF APPROVED</span><br>'
+    + '<span style="color:' + _col + '">' + _line1 + '</span><br>'
+    + '<span style="color:' + (_over ? '#f07a7a' : 'var(--muted)') + (_over ? ';font-weight:600' : '') + '">' + _line2 + '</span>'
+    + '</div>';
+
   return `
   <div class="request-card tier-${tier}" id="${cardId}" onclick="toggleCard('${req.id}')">
     <div class="card-header" style="position:relative">
@@ -636,29 +659,7 @@ function renderRequestCard(req, isSent = false) {
         <div class="ctx-label" style="margin-top:10px">The ask</div>
         <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
 
-        ${(() => {
-          // Compute impact inline from already-loaded allocation data
-          const resId     = req.requested_resource_id;
-          const resource  = _resources.find(r => r.id === resId);
-          const resName   = resource ? resource.first_name + ' ' + resource.last_name : '—';
-          const resAllocs = _allocations ? _allocations.filter(a => a.resource_id === resId) : [];
-          const current   = resAllocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
-          const newTotal  = current + (req.allocation_pct || 0);
-          const over      = newTotal > 100;
-          const proj      = _projects.find(p => p.id === req.project_id);
-          const color     = over ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
-          const line1     = \`If approved: \${resName} moves from \${current}% → \${newTotal}% total allocation\`;
-          const line2     = over
-            ? \`⚠ Over-allocated by \${newTotal - 100}% — existing commitments on \${resAllocs.map(a => _projects.find(p=>p.id===a.project_id)?.name||'?').join(' and ')} remain unchanged\`
-            : newTotal === 100
-              ? \`\${resName} will be fully committed across all projects\`
-              : \`Within available capacity\`;
-          return \`<div style="margin-top:8px;font-size:11px;line-height:1.7">
-            <span style="color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">IMPACT IF APPROVED</span><br>
-            <span style="color:\${color}">\${line1}</span><br>
-            <span style="color:\${over?'#f07a7a':'var(--muted)'};\${over?'font-weight:600':''}">\${line2}</span>
-          </div>\`;
-        })()}
+        ${impactIfApproved}
       </div>
 
 
@@ -779,6 +780,24 @@ function renderResolvedCard(req) {
   const events = _events[req.id] || [];
   const bodyId = 'body-res-' + req.id.replace(/-/g,'');
 
+  // Compute "Impact If Approved" for resolved card
+  const _ra2      = (_allocations || []).filter(a => a.resource_id === req.requested_resource_id);
+  const _cur2     = _ra2.reduce(function(s, a) { return s + (a.allocation_pct || 0); }, 0);
+  const _new2     = _cur2 + (req.allocation_pct || 0);
+  const _over2    = _new2 > 100;
+  const _col2     = _over2 ? 'var(--red)' : _new2 >= 100 ? 'var(--amber)' : '#7af0a0';
+  const _projs2   = _ra2.map(function(a) { var p = _projects.find(function(x) { return x.id === a.project_id; }); return p ? p.name : '?'; }).join(' and ');
+  const _rn2      = requested ? requested.first_name + ' ' + requested.last_name : '—';
+  const _l12      = 'If approved: ' + _rn2 + ' moved from ' + _cur2 + '% \u2192 ' + _new2 + '% total allocation';
+  const _l22      = _over2
+    ? '\u26a0 Over-allocated by ' + (_new2 - 100) + '% \u2014 existing commitments on ' + _projs2 + ' remained unchanged'
+    : _new2 === 100 ? _rn2 + ' was fully committed across all projects' : 'Was within available capacity';
+  const impactIfApproved = '<div style="margin-top:8px;font-size:11px;line-height:1.8">'
+    + '<span style="color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">IMPACT IF APPROVED</span><br>'
+    + '<span style="color:' + _col2 + '">' + _l12 + '</span><br>'
+    + '<span style="color:' + (_over2 ? '#f07a7a' : 'var(--muted)') + (_over2 ? ';font-weight:600' : '') + '">' + _l22 + '</span>'
+    + '</div>';
+
   return `
   <div class="resolved-card" style="cursor:pointer;padding:0;border-radius:8px;overflow:hidden;"
       onclick="toggleResolvedCard('${bodyId}')">
@@ -825,29 +844,7 @@ function renderResolvedCard(req) {
         <div class="ctx-label" style="margin-top:10px">The ask</div>
         <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
 
-        ${(() => {
-          // Compute impact inline from already-loaded allocation data
-          const resId     = req.requested_resource_id;
-          const resource  = _resources.find(r => r.id === resId);
-          const resName   = resource ? resource.first_name + ' ' + resource.last_name : '—';
-          const resAllocs = _allocations ? _allocations.filter(a => a.resource_id === resId) : [];
-          const current   = resAllocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
-          const newTotal  = current + (req.allocation_pct || 0);
-          const over      = newTotal > 100;
-          const proj      = _projects.find(p => p.id === req.project_id);
-          const color     = over ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
-          const line1     = \`If approved: \${resName} moves from \${current}% → \${newTotal}% total allocation\`;
-          const line2     = over
-            ? \`⚠ Over-allocated by \${newTotal - 100}% — existing commitments on \${resAllocs.map(a => _projects.find(p=>p.id===a.project_id)?.name||'?').join(' and ')} remain unchanged\`
-            : newTotal === 100
-              ? \`\${resName} will be fully committed across all projects\`
-              : \`Within available capacity\`;
-          return \`<div style="margin-top:8px;font-size:11px;line-height:1.7">
-            <span style="color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">IMPACT IF APPROVED</span><br>
-            <span style="color:\${color}">\${line1}</span><br>
-            <span style="color:\${over?'#f07a7a':'var(--muted)'};\${over?'font-weight:600':''}">\${line2}</span>
-          </div>\`;
-        })()}
+        ${impactIfApproved}
       </div>
 
       <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
