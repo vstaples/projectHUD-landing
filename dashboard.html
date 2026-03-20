@@ -1411,7 +1411,7 @@ function openGaugePopup(projId) {
 }
 
 function buildSpeedometer(g) {
-  const W=260, H=148, CX=130, CY=112, RO=88, RI=64, BEZ_O=100, BEZ_I=97;
+  const W=260, H=142, CX=130, CY=112, RO=88, RI=64, BEZ_O=100, BEZ_I=97;
 
   function pt(r,a){ return {x:+(CX+r*Math.cos(a)).toFixed(2), y:+(CY-r*Math.sin(a)).toFixed(2)}; }
   function v2a(v,max){ return Math.PI*(1-Math.min(1,Math.max(0,v/max))); }
@@ -1485,21 +1485,27 @@ function buildSpeedometer(g) {
 
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;overflow:hidden;">
     <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <defs>
+        <clipPath id="semiclip-${g.label.replace(/\s/g,'_')}">
+          <rect x="0" y="0" width="${W}" height="${CY}"/>
+        </clipPath>
+      </defs>
       <rect width="${W}" height="${H}" fill="#0d1520"/>
-      ${ring(BEZ_O,BEZ_I,'#1a50c0')}
-      ${ring(BEZ_I,BEZ_I-3,'#0a3090')}
-      ${ring(BEZ_I-3,RO+1,'#0d1a30')}
-      ${gradZones(max)}
-      ${ring(RI,RI-2,'#0a1428')}
-      ${ring(RI-2,RI-18,'#141f35')}
-      ${ring(RI-18,RI-20,'#0a1428')}
-      <path d="M${pt(RI-20,Math.PI).x},${pt(RI-20,Math.PI).y} A${RI-20},${RI-20},0,0,0,${pt(RI-20,0).x},${pt(RI-20,0).y} L${CX+(RI-20)},${CY} L${CX-(RI-20)},${CY} Z" fill="#141f35"/>
-      <line x1="${CX-(RI-20)}" y1="${CY}" x2="${CX+(RI-20)}" y2="${CY}" stroke="#0a1428" stroke-width="1"/>
-      ${ticks}
-      ${needle}
+      <g clip-path="url(#semiclip-${g.label.replace(/\s/g,'_')})">
+        ${ring(BEZ_O,BEZ_I,'#1a50c0')}
+        ${ring(BEZ_I,BEZ_I-3,'#0a3090')}
+        ${ring(BEZ_I-3,RO+1,'#0d1a30')}
+        ${gradZones(max)}
+        ${ring(RI,RI-2,'#0a1428')}
+        ${ring(RI-2,RI-18,'#141f35')}
+        ${ring(RI-18,RI-20,'#0a1428')}
+        <rect x="0" y="${CY-1}" width="${W}" height="3" fill="#0d1520"/>
+        ${ticks}
+        ${needle}
+      </g>
       <circle cx="${CX}" cy="${CY}" r="6" fill="#cc2020" stroke="#ff6060" stroke-width="1"/>
-      <rect x="${CX-28}" y="${CY+10}" width="56" height="22" rx="11" fill="white" stroke="rgba(0,0,0,.15)" stroke-width="0.5"/>
-      <text x="${CX}" y="${CY+25}" text-anchor="middle" fill="${valColor}" font-family="Arial, sans-serif" font-size="13" font-weight="900">${displayVal}</text>
+      <rect x="${CX-28}" y="${CY+6}" width="56" height="22" rx="11" fill="white" stroke="rgba(0,0,0,.15)" stroke-width="0.5"/>
+      <text x="${CX}" y="${CY+21}" text-anchor="middle" fill="${valColor}" font-family="Arial, sans-serif" font-size="13" font-weight="900">${displayVal}</text>
     </svg>
     <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:white;letter-spacing:.08em;margin-top:-2px;text-align:center;">${g.label}</span>
   </div>`;
