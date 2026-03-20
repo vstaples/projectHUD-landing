@@ -88,7 +88,8 @@ function renderList(listEl, items, resolveFn, contextFn) {
     return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;
         border-bottom:1px solid rgba(255,255,255,.04)"
         data-ai-id="${_esc(item.id)}"
-        data-ai-status="${_esc(item.status||'open')}">
+        data-ai-status="${_esc(item.status||'open')}"
+        data-ai-table="${_esc(item._table||'action_items')}">
       <!-- Checkbox -->
       <div style="width:15px;height:15px;border-radius:4px;flex-shrink:0;margin-top:2px;
           border:1px solid ${done?'var(--green,#2a9d40)':'rgba(255,255,255,.14)'};
@@ -100,10 +101,20 @@ function renderList(listEl, items, resolveFn, contextFn) {
       </div>
       <!-- Body -->
       <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:500;line-height:1.45;margin-bottom:${context?'2px':'4px'};
-            color:${done?'var(--muted,#7a8099)':'var(--text,#e8eaf0)'};
-            text-decoration:${done?'line-through':'none'}">
-          ${_esc(item.description)}
+        <!-- Title line: description + trashcan -->
+        <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:${context?'2px':'4px'}">
+          <div style="flex:1;font-size:11px;font-weight:500;line-height:1.45;
+              color:${done?'var(--muted,#7a8099)':'var(--text,#e8eaf0)'};
+              text-decoration:${done?'line-through':'none'}">
+            ${_esc(item.description)}
+          </div>
+          <div title="Delete action item"
+              onclick="event.stopPropagation();HUD.ActionItems.deleteById('${_esc(item.id)}',this)"
+              style="flex-shrink:0;margin-top:1px;cursor:pointer;font-size:12px;
+              color:rgba(255,255,255,.2);line-height:1;padding:1px 2px;border-radius:3px;
+              transition:color .15s;"
+              onmouseenter="this.style.color='#f07a7a'"
+              onmouseleave="this.style.color='rgba(255,255,255,.2)'">🗑</div>
         </div>
         ${context}
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
@@ -578,6 +589,26 @@ async function deleteItem() {
   }
 }
 
+// Direct delete from trashcan icon — no drawer required.
+// trashEl is the icon element; used to find and fade-remove the row in-place.
+async function deleteById(id, trashEl) {
+  if (!confirm('Delete this action item? This cannot be undone.')) return;
+  const row = trashEl?.closest('[data-ai-id]');
+  const tbl = row?.dataset?.aiTable || 'action_items';
+  try {
+    await API.del(`${tbl}?id=eq.${id}`);
+    // Remove the row from the DOM in-place — no re-render
+    if (row) {
+      row.style.transition = 'opacity .2s';
+      row.style.opacity    = '0';
+      setTimeout(() => row.remove(), 200);
+    }
+    _toast('Action item deleted.', 'success');
+  } catch(e) {
+    _toast('Failed to delete action item.', 'error');
+  }
+}
+
 // ── Attachment helpers (used by edit drawer) ──────────────────────────────────
 
 function getStagedFiles() { return _attachedFiles; }
@@ -654,6 +685,7 @@ window.HUD.ActionItems = {
   renderList,
   toggleFromRow,
   toggleStatus,
+  deleteById,
   openEditFromRow,
   openEditDrawer,
   saveEdit,
