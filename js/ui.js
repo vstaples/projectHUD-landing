@@ -170,7 +170,13 @@ function showToast(message, type = 'info', duration = 3000) {
 // ── User avatar renderer ──────────────────────────────────────────────────────
 
 function renderAvatar(name, size = 24, bgColor = 'rgba(79,142,247,.15)', textColor = 'var(--accent)') {
-  const initials = (name || '?')
+  // Normalize: accept object or string
+  let n = name;
+  if (n && typeof n === 'object') {
+    n = (n.first_name && n.last_name) ? n.first_name + ' ' + n.last_name
+      : (n.name || n.full_name || n.email || '?');
+  }
+  const initials = (typeof n === 'string' ? n : '?')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   return `<div style="width:${size}px;height:${size}px;border-radius:50%;
     background:${bgColor};color:${textColor};
@@ -381,8 +387,16 @@ window.UI = {
   },
 
   // Avatar HTML — used by dashboard user cards
+  // Defensive: accepts a string name, a resource object {first_name,last_name},
+  // or a user object {name} — extracts the display name in all cases
   avatar(name, size = 32) {
-    return renderAvatar(name, size);
+    let n = name;
+    if (n && typeof n === 'object') {
+      n = (n.first_name && n.last_name)
+        ? n.first_name + ' ' + n.last_name
+        : (n.name || n.full_name || n.email || '?');
+    }
+    return renderAvatar(n, size);
   },
 
   // Format helpers — used directly in dashboard template literals
