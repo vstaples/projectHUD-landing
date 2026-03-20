@@ -939,7 +939,7 @@ function renderProjectCard(p) {
       <div style="display:flex;justify-content:space-between;font-size:10px;
           color:var(--muted);margin-bottom:5px">
         <span data-tip="Effort-weighted schedule progress: ${evm.earnedEffortDays||0} of ${evm.totalEffortDays||0} planned effort-days earned across ${evm.completeCnt||0} complete + ${evm.inProgressCnt||0} in-progress tasks of ${evm.totalTasks||0} total"
-          style="cursor:default">${pct}% complete</span>
+          style="cursor:default">${pct}% Planned Work Complete</span>
         <span>${evm.actualHrs ? Math.round(evm.actualHrs) : 0}h used of ${evm.bac || '—'}h budget</span>
       </div>
       <div class="progress-bar-bg">
@@ -1042,7 +1042,7 @@ function buildExceptions() {
       items.push({
         type: 'budget', sev: pctUsed >= 0.95 ? 'critical' : 'high',
         title: `Budget warning: ${(pctUsed*100).toFixed(0)}% hours consumed`,
-        sub: `${Math.round(evm.actualHrs)}h used of ${evm.bac}h budget · ${Math.round(evm.evPct*100)}% complete`,
+        sub: `${Math.round(evm.actualHrs)}h used of ${evm.bac}h budget · ${Math.round(evm.evPct*100)}% planned work complete`,
         proj: p.name,
         projId: p.id,
         age: `CPI ${evm.cpi?.toFixed(2)||'—'}`,
