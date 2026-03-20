@@ -238,7 +238,7 @@ textarea.resp-input:focus, select.resp-input:focus, input.resp-input:focus {
         IN PROGRESS <span class="tab-count amber" id="cnt-inprogress">0</span>
       </button>
       <button class="tab-btn" onclick="switchView('resolved')" id="tab-resolved">
-        RESOLVED <span class="tab-count green" id="cnt-resolved">0</span>
+        APPROVED <span class="tab-count green" id="cnt-resolved">0</span>
       </button>
       <button class="tab-btn" onclick="switchView('sent')" id="tab-sent">
         MY REQUESTS <span class="tab-count" id="cnt-sent">0</span>
@@ -264,6 +264,14 @@ textarea.resp-input:focus, select.resp-input:focus, input.resp-input:focus {
     </div>
     <div class="drawer-body">
       <input type="hidden" id="counter-req-id" />
+
+      <!-- Prior counter history — most recent at top -->
+      <div id="counter-history" style="display:none;margin-bottom:16px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+            color:var(--amber);margin-bottom:8px">Prior counter-proposals — most recent first</div>
+        <div id="counter-history-items"></div>
+      </div>
+
       <div class="field">
         <label>Alternative Resource</label>
         <select id="counter-resource">
@@ -281,14 +289,13 @@ textarea.resp-input:focus, select.resp-input:focus, input.resp-input:focus {
         </div>
       </div>
       <div class="field">
-        <label>Your Proposal &amp; Reasoning <span style="color:#f07a7a">*</span></label>
+        <label>Your Response &amp; Reasoning <span style="color:#f07a7a">*</span></label>
         <textarea id="counter-notes" rows="4"
-          placeholder="Explain your counter-proposal. e.g. 'Alan can support for 25% time starting next Monday rather than immediately — this avoids disrupting his current critical path work on the seals mitigation task.'"></textarea>
+          placeholder="Respond to the prior counter or propose new terms. e.g. 'Alan can support for 25% time starting next Monday rather than immediately — this avoids disrupting his current critical path work on the seals mitigation task.'"></textarea>
         <div class="char-count" id="counter-char">0 / 500</div>
       </div>
       <div style="font-size:11px;color:var(--muted);padding:10px 12px;background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.1);border-radius:6px">
-        💡 Your counter-proposal will be sent to the PM immediately. They can accept it or continue the conversation.
-        This exchange is permanently recorded in the chain of custody.
+        💡 Your response will be sent immediately. This exchange is permanently recorded in the chain of custody.
       </div>
     </div>
     <div class="drawer-foot">
@@ -403,7 +410,7 @@ function renderAll() {
   document.getElementById('cnt-sent').textContent       = sent.length;
 
   document.getElementById('header-meta').textContent =
-    `${_requests.length} total · ${pending.length} awaiting decision · ${inprogress.length} in negotiation`;
+    `${_requests.length} total · ${pending.length} awaiting decision · ${inprogress.length} in negotiation · ${resolved.length} approved/denied`;
 
   renderView('pending',    pending);
   renderView('inprogress', inprogress);
@@ -524,18 +531,47 @@ function renderRequestCard(req, isSent = false) {
       <div class="ctx-label">What has been tried</div>
       <div class="ctx-text" style="color:var(--muted)">${escHtml(req.attempts_made)}</div>` : ''}
 
+      <!-- Counter notes visible on in-progress cards -->
+      ${req.counter_notes ? `
+      <div class="ctx-label" style="margin-top:12px">Counter-proposal on record</div>
+      <div style="padding:10px 12px;background:rgba(212,144,31,.06);border:1px solid rgba(212,144,31,.2);
+          border-radius:6px;font-size:12px;color:var(--amber);font-style:italic;line-height:1.6">
+        "${escHtml(req.counter_notes)}"
+      </div>` : ''}
+
       <!-- Chain of custody -->
       <div class="ctx-label" style="margin-top:16px">Chain of custody</div>
       <div class="chain">
-        ${events.map(e => `
+        ${events.map(e => {
+          // Extract actor name
+          const actorRes = _resources.find(r => r.id === e.actor_resource_id);
+          const actorName = actorRes
+            ? actorRes.first_name + ' ' + actorRes.last_name
+            : e.actor_role === 'system' ? 'System' : e.actor_role || 'Unknown';
+          // Pull counter_notes out of event_data if present
+          let eventData = null;
+          try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
+          const counterNotes = eventData?.counter_notes;
+          const elapsedSince = events.indexOf(e) > 0
+            ? (() => {
+                const prev = events[events.indexOf(e)-1];
+                const hrs = Math.round((new Date(e.occurred_at) - new Date(prev.occurred_at)) / 3600000);
+                return hrs > 0 ? `<span style="color:var(--muted);font-size:9px"> (+${hrs}h)</span>` : '';
+              })()
+            : '';
+          return `
           <div class="chain-event">
-            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('escalat')?'escalated':''}"></div>
+            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('deni')||e.event_type.includes('escalat')?'escalated':''}"></div>
             <div class="chain-time">${fmtDateTime(e.occurred_at)}</div>
             <div style="flex:1;color:${e.actor_role==='system'?'var(--muted)':'var(--text)'}">
               <span style="font-weight:600">${formatEventType(e.event_type)}</span>
-              ${e.notes ? ` — <span style="color:var(--muted)">${escHtml(e.notes)}</span>` : ''}
+              <span style="font-size:10px;color:var(--muted);margin-left:4px">— ${escHtml(actorName)}</span>
+              ${elapsedSince}
+              ${e.notes && !counterNotes ? ` <div style="color:var(--muted);font-size:11px;margin-top:2px">${escHtml(e.notes)}</div>` : ''}
+              ${counterNotes ? `<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"${escHtml(counterNotes)}"</div>` : ''}
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
         ${events.length === 0 ? '<div style="font-size:11px;color:var(--muted)">No events yet</div>' : ''}
       </div>
 
@@ -645,15 +681,27 @@ function renderResolvedCard(req) {
       <div class="ctx-text impact">${escHtml(req.impact_statement)}</div>` : ''}
       <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
       <div class="chain">
-        ${events.map(e => `
+        ${events.map(e => {
+          const actorRes = _resources.find(r => r.id === e.actor_resource_id);
+          const actorName = actorRes ? actorRes.first_name + ' ' + actorRes.last_name
+                          : e.actor_role === 'system' ? 'System' : e.actor_role || 'Unknown';
+          let eventData = null;
+          try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
+          const counterNotes = eventData?.counter_notes;
+          const denialReason = eventData?.denial_reason;
+          return `
           <div class="chain-event">
-            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('deni')?'escalated':''}"></div>
+            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('deni')||e.event_type.includes('escalat')?'escalated':''}"></div>
             <div class="chain-time">${fmtDateTime(e.occurred_at)}</div>
             <div style="flex:1;color:${e.actor_role==='system'?'var(--muted)':'var(--text)'}">
               <span style="font-weight:600">${formatEventType(e.event_type)}</span>
-              ${e.notes?` — <span style="color:var(--muted)">${escHtml(e.notes)}</span>`:''}
+              <span style="font-size:10px;color:var(--muted);margin-left:4px">— ${escHtml(actorName)}</span>
+              ${e.notes && !counterNotes && !denialReason ? `<div style="color:var(--muted);font-size:11px;margin-top:2px">${escHtml(e.notes)}</div>` : ''}
+              ${counterNotes ? `<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"${escHtml(counterNotes)}"</div>` : ''}
+              ${denialReason ? `<div style="color:#f07a7a;font-size:11px;font-style:italic;margin-top:4px">"${escHtml(denialReason)}"</div>` : ''}
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
         ${events.length===0?'<div style="font-size:11px;color:var(--muted)">No events recorded</div>':''}
       </div>
     </div>
@@ -793,6 +841,45 @@ function openCounter(reqId) {
       .filter(r => r.id !== req?.requested_resource_id)
       .map(r => `<option value="${r.id}">${r.first_name} ${r.last_name}${r.title?' · '+r.title:''}</option>`)
       .join('');
+
+  // Build prior counter history — most recent first
+  const events      = (_events[reqId] || []).filter(e => e.event_type === 'countered');
+  const historyEl   = document.getElementById('counter-history');
+  const historyItems = document.getElementById('counter-history-items');
+
+  if (events.length > 0) {
+    const reversed = [...events].reverse();
+    historyItems.innerHTML = reversed.map((e, i) => {
+      const actorRes  = _resources.find(r => r.id === e.actor_resource_id);
+      const actorName = actorRes ? actorRes.first_name + ' ' + actorRes.last_name : e.actor_role || '—';
+      let eventData = null;
+      try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
+      const notes = eventData?.counter_notes || e.notes || '—';
+
+      // Elapsed time since PREVIOUS counter (for response time visibility)
+      const prevEvent = reversed[i+1];
+      const elapsed = prevEvent
+        ? (() => {
+            const hrs = Math.round((new Date(e.occurred_at) - new Date(prevEvent.occurred_at)) / 3600000);
+            return hrs > 0 ? ` · responded in ${hrs}h` : '';
+          })()
+        : '';
+
+      return `<div style="padding:10px 12px;background:${i===0?'rgba(212,144,31,.08)':'rgba(255,255,255,.03)'};
+          border:1px solid ${i===0?'rgba(212,144,31,.25)':'rgba(255,255,255,.08)'};
+          border-radius:6px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:700;color:${i===0?'var(--amber)':'var(--muted)'}">
+            ${i===0?'⬆ Most recent':'Earlier counter'} — ${escHtml(actorName)}</span>
+          <span style="font-size:9px;color:var(--muted)">${fmtDateTime(e.occurred_at)}${elapsed}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text);font-style:italic;line-height:1.6">"${escHtml(notes)}"</div>
+      </div>`;
+    }).join('');
+    historyEl.style.display = 'block';
+  } else {
+    historyEl.style.display = 'none';
+  }
 
   document.getElementById('counter-overlay').classList.add('open');
 }
