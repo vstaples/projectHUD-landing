@@ -530,6 +530,10 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
         padding:1px 5px;border-radius:3px;margin-left:4px;display:none">0</span>
     </button>
     <button class="view-btn" onclick="switchView('team')" id="vbtn-team">TEAM</button>
+    <button class="view-btn" onclick="switchView('actionitems')" id="vbtn-actionitems">
+      ACTION ITEMS <span id="ai-count" style="font-size:9px;background:rgba(79,142,247,.2);color:var(--accent);
+        padding:1px 5px;border-radius:3px;margin-left:4px;display:none">0</span>
+    </button>
   </div>
 
   <!-- Content -->
@@ -985,7 +989,7 @@ function renderHorizon() {
 // ── View switcher ─────────────────────────────────────────────────────────────
 function switchView(view) {
   _currentView = view;
-  ['portfolio','exceptions','team'].forEach(v => {
+  ['portfolio','exceptions','team','actionitems'].forEach(v => {
     document.getElementById('vbtn-' + v).classList.toggle('active', v === view);
   });
   renderView(view);
@@ -993,9 +997,10 @@ function switchView(view) {
 
 function renderView(view) {
   const el = document.getElementById('content');
-  if      (view === 'portfolio')  renderPortfolio(el);
-  else if (view === 'exceptions') renderExceptions(el);
-  else if (view === 'team')       renderTeam(el);
+  if      (view === 'portfolio')   renderPortfolio(el);
+  else if (view === 'exceptions')  renderExceptions(el);
+  else if (view === 'team')        renderTeam(el);
+  else if (view === 'actionitems') renderActionItems(el);
 }
 
 // ── Portfolio view ─────────────────────────────────────────────────────────────
@@ -1078,6 +1083,18 @@ function renderPortfolio(el) {
     excEl.textContent = excCount;
     excEl.style.display = 'inline';
   }
+
+  // Update action items badge — count open items across active projects
+  (async () => {
+    try {
+      const activeIds = _projects.filter(p => ['active','planning'].includes(p.status)).map(p => `"${p.id}"`).join(',');
+      if (!activeIds) return;
+      const aiItems = await API.get(`action_items?project_id=in.(${activeIds})&select=id,status`).catch(()=>[]);
+      const openAI  = (aiItems||[]).filter(a => a.status !== 'complete' && a.status !== 'cancelled').length;
+      const aiBadge = document.getElementById('ai-count');
+      if (aiBadge && openAI > 0) { aiBadge.textContent = openAI; aiBadge.style.display = 'inline'; }
+    } catch(e) {}
+  })();
 }
 
 function renderProjectCard(p) {
@@ -2750,7 +2767,117 @@ function renderTeam(el) {
   el.innerHTML = cards || '<div class="empty"><div class="title">No resources found</div></div>';
 }
 
-// ── Navigation ─────────────────────────────────────────────────────────────────
+// ── Action Items view ──────────────────────────────────────────────────────────
+async function renderActionItems(el) {
+  el.innerHTML = '<div class="loading">LOADING ACTION ITEMS...</div>';
+
+  // Load all action items across all active projects
+  const activeProjects = _projects.filter(p => ['active','planning'].includes(p.status));
+  if (!activeProjects.length) {
+    el.innerHTML = '<div class="empty"><div class="title">No active projects</div></div>';
+    return;
+  }
+
+  const projectIds = activeProjects.map(p => `"${p.id}"`).join(',');
+  let items = [];
+  try {
+    items = await API.get(
+      `action_items?project_id=in.(${projectIds})&order=target_date.asc,created_at.desc&select=id,project_id,description,responsible,target_date,status,priority`
+    );
+  } catch(e) {
+    el.innerHTML = '<div class="empty"><div class="title">Could not load action items</div></div>';
+    return;
+  }
+
+  // Update badge
+  const openCount = items.filter(a => a.status !== 'complete' && a.status !== 'cancelled').length;
+  const badge = document.getElementById('ai-count');
+  if (badge) {
+    badge.textContent = openCount;
+    badge.style.display = openCount > 0 ? '' : 'none';
+  }
+
+  // Resolve current user for Add modal
+  const currentUser = _users.find(u =>
+    u.resource_id === CURRENT_USER_RESOURCE_ID || u.name?.toLowerCase().includes('vaughn')
+  );
+  const submittedBy = currentUser?.id || _users[0]?.id;
+
+  // Group by project
+  const byProject = {};
+  activeProjects.forEach(p => { byProject[p.id] = []; });
+  items.forEach(a => { if (byProject[a.project_id]) byProject[a.project_id].push(a); });
+
+  // Build people list — only valid users (action_items.responsible FK → users.id)
+  const people = _users.map(u => ({ group: 'Project Team', id: u.id, label: u.name, sub: u.title||'' }));
+
+  let html = '';
+
+  activeProjects.forEach(proj => {
+    const projItems = byProject[proj.id] || [];
+    const projOpen  = projItems.filter(a => a.status !== 'complete' && a.status !== 'cancelled').length;
+    const projOverdue = projItems.some(a =>
+      a.status !== 'complete' && a.target_date && a.target_date < new Date().toLocaleDateString('en-CA')
+    );
+
+    html += `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
+        margin-bottom:16px;overflow:hidden;">
+
+      <!-- Project header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:10px 16px;border-bottom:1px solid var(--border);
+          background:var(--surf2);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.04em">
+            ${escHtml(proj.name)}
+          </div>
+          ${projOpen > 0 ? `<span style="font-size:10px;padding:1px 7px;border-radius:10px;
+              background:${projOverdue?'rgba(192,64,74,.15)':'rgba(79,142,247,.12)'};
+              color:${projOverdue?'#f07a7a':'var(--accent)'}">
+            ${projOpen} open${projOverdue?' · overdue':''}
+          </span>` : `<span style="font-size:10px;color:var(--green)">✓ all complete</span>`}
+        </div>
+        <button onclick="(function(){
+          const proj=_projects.find(p=>p.id==='${proj.id}');
+          HUD.ActionItems.open({
+            table:'action_items', firmId:FIRM_ID,
+            projectId:'${proj.id}',
+            projectName:proj?.name||null,
+            submittedBy:'${submittedBy}',
+            people:_users.map(u=>({group:'Project Team',id:u.id,label:u.name,sub:u.title||''})),
+            resolveResponsible:(id)=>_users.find(u=>u.id===id)?id:(_users.find(u=>u.resource_id===id)?.id||null),
+            onSave:()=>switchView('actionitems'),
+          });
+        })()"
+            style="font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;
+            border:1px solid rgba(79,142,247,.35);background:rgba(79,142,247,.08);
+            color:var(--accent);font-family:inherit;">
+          + Add action item
+        </button>
+      </div>
+
+      <!-- Items list -->
+      <div style="padding:4px 16px 8px;" id="ai-list-${proj.id}">
+        ${projItems.length === 0
+          ? `<div style="padding:14px 0;font-size:11px;color:var(--muted);font-style:italic">No action items yet.</div>`
+          : '<!-- rendered by HUD.ActionItems.renderList -->'
+        }
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html || '<div class="empty"><div class="title">No action items</div></div>';
+
+  // Now render each project's list using the shared module
+  activeProjects.forEach(proj => {
+    const listEl = document.getElementById('ai-list-' + proj.id);
+    const projItems = byProject[proj.id] || [];
+    if (listEl && projItems.length > 0) {
+      HUD.ActionItems.renderList(listEl, projItems, resolveAssignee);
+    }
+  });
+}
 function goToProject(projectId) {
   window.location.href = `/project-detail.html?id=${projectId}`;
 }
