@@ -1359,7 +1359,12 @@ function openGaugePopup(projId) {
   const svMax    = 60; // 0=on schedule (midpoint if we center), but for a gauge: 0→60 slip
   // For SV gauge: use 0-100 scale where 50=on schedule, >50=slip, <50=ahead
   const svGaugeVal  = svNoData ? 50 : Math.min(100, Math.max(0, 50 - (d.slipDays||0)));
-  const svDisplay   = svNoData ? '—' : (d.slipDays<=0 ? (d.slipDays===0?'0d':d.slipDays+'d') : '+'+d.slipDays+'d');
+  // Display matches gauge visual: right/green=ahead, left/red=behind
+  // slipDays<0 = ahead → show as +Nd (good); slipDays>0 = behind → show as -Nd (bad)
+  const svDisplay = svNoData ? '—'
+    : d.slipDays === 0 ? 'ON TRK'
+    : d.slipDays < 0   ? '+' + Math.abs(d.slipDays) + 'd'
+    : '-' + d.slipDays + 'd';
   const svColor     = !d.slipDays||d.slipDays<=0 ? 'var(--green)' : d.slipDays<=14 ? 'var(--amber)' : 'var(--red)';
 
   // 8 gauges: 4×2 grid
