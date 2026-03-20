@@ -2320,21 +2320,14 @@ function openAddActionItem(taskId, projectId, event) {
   );
   const submittedBy = currentUser?.id || _users[0]?.id;
 
-  // Build people list: Project Team (users) first, then resources grouped by dept
-  const people = [];
-  _users.forEach(u => people.push({ group: 'Project Team', id: u.id, label: u.name, sub: u.title||'' }));
-  _resources.forEach(r => people.push({
-    group: r.department || 'Other',
-    id:    r.id,
-    label: r.first_name + ' ' + r.last_name,
-    sub:   r.title || r.level || '',
+  // action_items.responsible is a FK to users.id — only the 4 Apex users are valid.
+  // Resources without a user account cannot be responsible for an action item.
+  const people = _users.map(u => ({
+    group: 'Project Team',
+    id:    u.id,
+    label: u.name,
+    sub:   u.title || '',
   }));
-  // Sort groups: Project Team first, rest alphabetical
-  people.sort((a, b) => {
-    if (a.group === 'Project Team') return -1;
-    if (b.group === 'Project Team') return  1;
-    return a.group.localeCompare(b.group) || a.label.localeCompare(b.label);
-  });
 
   HUD.ActionItems.open({
     table:       'action_items',
