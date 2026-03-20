@@ -29,7 +29,7 @@
 body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text);
        display:flex !important; flex-direction:row !important; height:100vh; overflow:hidden; }
 #sidebar-container { width:var(--sidebar-w); flex-shrink:0; }
-.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.main { flex:1 !important; display:flex !important; flex-direction:column; overflow:hidden; min-width:0; }
 
 /* Page header */
 .page-header { padding:16px 24px 12px; border-bottom:1px solid var(--border);
@@ -234,15 +234,19 @@ textarea.resp-input:focus, select.resp-input:focus, input.resp-input:focus {
       <button class="tab-btn active" onclick="switchView('pending')" id="tab-pending">
         PENDING <span class="tab-count" id="cnt-pending">0</span>
       </button>
+      <button class="tab-btn" onclick="switchView('inprogress')" id="tab-inprogress">
+        IN PROGRESS <span class="tab-count amber" id="cnt-inprogress">0</span>
+      </button>
       <button class="tab-btn" onclick="switchView('resolved')" id="tab-resolved">
         RESOLVED <span class="tab-count green" id="cnt-resolved">0</span>
       </button>
       <button class="tab-btn" onclick="switchView('sent')" id="tab-sent">
-        MY REQUESTS <span class="tab-count amber" id="cnt-sent">0</span>
+        MY REQUESTS <span class="tab-count" id="cnt-sent">0</span>
       </button>
     </div>
 
     <div id="view-pending"></div>
+    <div id="view-inprogress" style="display:none"></div>
     <div id="view-resolved" style="display:none"></div>
     <div id="view-sent" style="display:none"></div>
   </div>
@@ -385,29 +389,36 @@ async function loadAll() {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderAll() {
-  const pending   = _requests.filter(r => ['pending','acknowledged','escalated'].includes(r.status));
-  const resolved  = _requests.filter(r => ['approved','denied','countered','withdrawn','expired'].includes(r.status));
-  const sent      = _requests.filter(r => r.requesting_resource_id === CURRENT_USER_RESOURCE_ID);
+  // Pending = awaiting first decision
+  const pending    = _requests.filter(r => r.status === 'pending');
+  // In progress = active negotiation (countered, acknowledged, escalated, delegated)
+  const inprogress = _requests.filter(r => ['countered','acknowledged','escalated','delegated'].includes(r.status));
+  // Resolved = truly closed (approved, denied, withdrawn, expired)
+  const resolved   = _requests.filter(r => ['approved','denied','withdrawn','expired'].includes(r.status));
+  const sent       = _requests.filter(r => r.requesting_resource_id === CURRENT_USER_RESOURCE_ID);
 
-  document.getElementById('cnt-pending').textContent  = pending.length;
-  document.getElementById('cnt-resolved').textContent = resolved.length;
-  document.getElementById('cnt-sent').textContent     = sent.length;
+  document.getElementById('cnt-pending').textContent    = pending.length;
+  document.getElementById('cnt-inprogress').textContent = inprogress.length;
+  document.getElementById('cnt-resolved').textContent   = resolved.length;
+  document.getElementById('cnt-sent').textContent       = sent.length;
 
   document.getElementById('header-meta').textContent =
-    `${_requests.length} total request${_requests.length!==1?'s':''} · ${pending.length} awaiting decision`;
+    `${_requests.length} total · ${pending.length} awaiting decision · ${inprogress.length} in negotiation`;
 
-  renderView('pending',  pending);
-  renderView('resolved', resolved);
-  renderView('sent',     sent);
+  renderView('pending',    pending);
+  renderView('inprogress', inprogress);
+  renderView('resolved',   resolved);
+  renderView('sent',       sent);
 }
 
 function renderView(view, reqs) {
   const el = document.getElementById('view-' + view);
   if (!reqs.length) {
     const labels = {
-      pending:  { icon:'✓', title:'All clear', sub:'No pending requests requiring your decision.' },
-      resolved: { icon:'📋', title:'No resolved requests yet', sub:'Approved and denied requests will appear here.' },
-      sent:     { icon:'📤', title:'No requests sent', sub:'Requests you submit will appear here with live chain status.' },
+      pending:    { icon:'✓', title:'All clear', sub:'No pending requests requiring your decision.' },
+      inprogress: { icon:'↕', title:'No active negotiations', sub:'Countered and acknowledged requests appear here until resolved.' },
+      resolved:   { icon:'📋', title:'No resolved requests yet', sub:'Approved and denied requests will appear here.' },
+      sent:       { icon:'📤', title:'No requests sent', sub:'Requests you submit will appear here with live chain status.' },
     };
     const l = labels[view];
     el.innerHTML = `<div class="empty-state">
@@ -579,34 +590,80 @@ function renderRequestCard(req, isSent = false) {
   </div>`;
 }
 
-// ── Resolved card ─────────────────────────────────────────────────────────────
+// ── Resolved card — fully expandable with chain of custody ──────────────────
 function renderResolvedCard(req) {
-  const requested = _resources.find(r => r.id === req.requested_resource_id);
-  const project   = _projects.find(p => p.id === req.project_id);
-  const resName   = requested ? `${requested.first_name} ${requested.last_name}` : '—';
+  const requesting = _resources.find(r => r.id === req.requesting_resource_id);
+  const requested  = _resources.find(r => r.id === req.requested_resource_id);
+  const project    = _projects.find(p => p.id === req.project_id);
+  const resName    = requested  ? `${requested.first_name} ${requested.last_name}`  : '—';
+  const reqName    = requesting ? `${requesting.first_name} ${requesting.last_name}` : '—';
+  const resInit    = requested  ? (requested.first_name[0]+requested.last_name[0]).toUpperCase() : '?';
 
   const statusColors = {
     approved:  '#7af0a0',
     denied:    '#f07a7a',
-    countered: 'var(--amber)',
     withdrawn: 'var(--muted)',
     expired:   'var(--muted)',
   };
   const sc = statusColors[req.status] || 'var(--muted)';
+  const events = _events[req.id] || [];
+  const bodyId = 'body-res-' + req.id.replace(/-/g,'');
 
   return `
-  <div class="resolved-card">
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:700">${escHtml(resName)}</div>
-        <div style="font-size:11px;color:var(--muted)">${escHtml(project?.name||'—')} · ${fmtDate(req.submitted_at)}</div>
-        ${req.denial_reason ? `<div style="font-size:11px;color:#f07a7a;margin-top:4px">
-          Denial reason: <em>"${escHtml(req.denial_reason)}"</em></div>` : ''}
+  <div class="resolved-card" style="cursor:pointer;padding:0;border-radius:8px;overflow:hidden;"
+      onclick="toggleResolvedCard('${bodyId}')">
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;">
+      <div class="avatar" style="background:rgba(255,255,255,.05);color:var(--muted)">${resInit}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:700">${escHtml(resName)}</span>
+          <span class="urgency ${req.urgency}">${req.urgency.toUpperCase()}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+          Requested by ${escHtml(reqName)} · ${escHtml(project?.name||'—')} · ${fmtDate(req.submitted_at)}
+        </div>
+        ${req.denial_reason ? `<div style="font-size:11px;color:#f07a7a;margin-top:4px;font-style:italic">
+          Denial: "${escHtml(req.denial_reason)}"</div>` : ''}
+        ${req.resolution_notes ? `<div style="font-size:11px;color:#7af0a0;margin-top:4px;font-style:italic">
+          "${escHtml(req.resolution_notes)}"</div>` : ''}
       </div>
-      <span style="font-size:10px;font-weight:700;color:${sc};letter-spacing:.06em;text-transform:uppercase">
-        ${req.status}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        <span style="font-size:10px;font-weight:700;color:${sc};letter-spacing:.06em;
+            text-transform:uppercase;padding:2px 8px;border-radius:3px;
+            border:1px solid ${sc}20;background:${sc}10">${req.status}</span>
+        <span style="font-size:10px;color:var(--muted)">${fmtDate(req.resolved_at||req.submitted_at)}</span>
+      </div>
+    </div>
+
+    <!-- Expandable body -->
+    <div id="${bodyId}" style="display:none;border-top:1px solid var(--border);
+        padding:14px 16px;" onclick="event.stopPropagation()">
+      <div class="ctx-label">What was failing and why</div>
+      <div class="ctx-text">${escHtml(req.context)}</div>
+      ${req.impact_statement ? `
+      <div class="ctx-label">Impact stated</div>
+      <div class="ctx-text impact">${escHtml(req.impact_statement)}</div>` : ''}
+      <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
+      <div class="chain">
+        ${events.map(e => `
+          <div class="chain-event">
+            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('deni')?'escalated':''}"></div>
+            <div class="chain-time">${fmtDateTime(e.occurred_at)}</div>
+            <div style="flex:1;color:${e.actor_role==='system'?'var(--muted)':'var(--text)'}">
+              <span style="font-weight:600">${formatEventType(e.event_type)}</span>
+              ${e.notes?` — <span style="color:var(--muted)">${escHtml(e.notes)}</span>`:''}
+            </div>
+          </div>`).join('')}
+        ${events.length===0?'<div style="font-size:11px;color:var(--muted)">No events recorded</div>':''}
+      </div>
     </div>
   </div>`;
+}
+
+function toggleResolvedCard(bodyId) {
+  const el = document.getElementById(bodyId);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 // ── Card toggle ───────────────────────────────────────────────────────────────
@@ -886,7 +943,7 @@ function closeResponsePanel(reqId) {
 
 function switchView(view) {
   _currentView = view;
-  ['pending','resolved','sent'].forEach(v => {
+  ['pending','inprogress','resolved','sent'].forEach(v => {
     document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
     document.getElementById('tab-' + v).classList.toggle('active', v === view);
   });
