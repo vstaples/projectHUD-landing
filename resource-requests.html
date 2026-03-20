@@ -143,6 +143,7 @@ body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var
 .request-card.tier-2 { border-left:3px solid #f07a7a; }
 .request-card.tier-3 { border-left:3px solid var(--red); animation:heartbeat-red 2s ease-in-out infinite; }
 .request-card.tier-0 { border-left:3px solid var(--accent); }
+.request-card.seen { border-left-color:var(--cyan); opacity:.95; }
 
 @keyframes heartbeat-red {
   0%   { box-shadow:0 0 0 0 rgba(192,64,74,.4); }
@@ -477,9 +478,10 @@ async function loadAll() {
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderAll() {
   // Pending = awaiting first decision
-  const pending    = _requests.filter(r => r.status === 'pending');
-  // In progress = active negotiation (countered, acknowledged, escalated, delegated)
-  const inprogress = _requests.filter(r => ['countered','acknowledged','escalated','delegated'].includes(r.status));
+  // 'acknowledged' = seen but no decision yet — stays in PENDING list
+  const pending    = _requests.filter(r => ['pending','acknowledged'].includes(r.status));
+  // In progress = active negotiation (countered, escalated, delegated) — acknowledged stays in PENDING
+  const inprogress = _requests.filter(r => ['countered','escalated','delegated'].includes(r.status));
   // Resolved = truly closed (approved, denied, withdrawn, expired)
   const resolved   = _requests.filter(r => ['approved','denied','withdrawn','expired'].includes(r.status));
   const sent       = _requests.filter(r => r.requesting_resource_id === CURRENT_USER_RESOURCE_ID);
@@ -503,7 +505,7 @@ function renderView(view, reqs) {
   if (!reqs.length) {
     const labels = {
       pending:    { icon:'✓', title:'All clear', sub:'No pending requests requiring your decision.' },
-      inprogress: { icon:'↕', title:'No active negotiations', sub:'Countered and acknowledged requests appear here until resolved.' },
+      inprogress: { icon:'↕', title:'No active negotiations', sub:'Countered and delegated requests appear here until resolved.' },
       resolved:   { icon:'📋', title:'No resolved requests yet', sub:'Approved and denied requests will appear here.' },
       sent:       { icon:'📤', title:'No requests sent', sub:'Requests you submit will appear here with live chain status.' },
     };
@@ -569,13 +571,15 @@ function renderRequestCard(req, isSent = false) {
 
   return `
   <div class="request-card tier-${tier}" id="${cardId}" onclick="toggleCard('${req.id}')">
-    <div class="card-header">
+    <div class="card-header" style="position:relative">
       <div class="avatar">${resInit}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:700">${escHtml(resName)}</span>
           <span class="urgency ${req.urgency}">${req.urgency.toUpperCase()}</span>
           <span style="font-size:10px;color:var(--muted)">${escHtml(resTitle)}</span>
+          ${req.status === 'acknowledged' ? `<span style="font-size:9px;font-weight:700;letter-spacing:.08em;
+            color:var(--cyan);border:1px solid rgba(0,210,255,.25);padding:1px 6px;border-radius:3px">SEEN</span>` : ''}
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">
           ${isSent ? `Approver: ${escHtml(aprName)} · ` : `Requested by: ${escHtml(reqName)} · `}
@@ -584,9 +588,18 @@ function renderRequestCard(req, isSent = false) {
           ${task?.name  ? ` · <span style="color:var(--text)">${escHtml(task.name)}</span>` : ''}
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-        <span class="elapsed tier-${tier}">${elapsed}</span>
-        <span style="font-size:9px;color:${tier>=2?'#f07a7a':tier===1?'var(--amber)':'var(--muted)'}">${tierLabel}</span>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="elapsed tier-${tier}">${elapsed}</span>
+          <span style="font-size:9px;color:${tier>=2?'#f07a7a':tier===1?'var(--amber)':'var(--muted)'}">${tierLabel}</span>
+        </div>
+        ${!isSent ? `<button onclick="event.stopPropagation();collapseCard('${req.id}')"
+          style="width:22px;height:22px;border-radius:50%;border:1px solid var(--border2);
+          background:var(--surf2);color:var(--muted);cursor:pointer;font-size:12px;
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          transition:all .15s;line-height:1" title="Close without deciding"
+          onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text)'"
+          onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">✕</button>` : ''}
       </div>
     </div>
 
@@ -837,7 +850,47 @@ function toggleResolvedCard(bodyId) {
 function toggleCard(reqId) {
   const body = document.getElementById('body-' + reqId.replace(/-/g,''));
   if (!body) return;
+  const wasOpen = body.classList.contains('open');
   body.classList.toggle('open');
+
+  // When opening: log "viewed" + set status to acknowledged if still pending
+  if (!wasOpen) {
+    const req = _requests.find(r => r.id === reqId);
+    if (req && req.status === 'pending') {
+      // Update status to acknowledged (seen)
+      API.patch(`resource_requests?id=eq.${reqId}`, {
+        status: 'acknowledged'
+      }).then(() => {
+        req.status = 'acknowledged'; // update local state
+        // Re-render just the card header to show SEEN badge
+        const card = document.getElementById('card-' + reqId.replace(/-/g,''));
+        if (card) card.classList.add('seen');
+      }).catch(() => {});
+
+      // Log viewed event in chain of custody
+      API.post('resource_request_events', {
+        firm_id:           FIRM_ID,
+        request_id:        reqId,
+        actor_resource_id: CURRENT_USER_RESOURCE_ID,
+        actor_role:        'approver',
+        event_type:        'viewed',
+        heartbeat_tier:    0,
+        notes:             'Request opened and reviewed by approver',
+        occurred_at:       new Date().toISOString(),
+      }).then(() => {
+        // Reload events for this card to show the viewed entry
+        API.get(`resource_request_events?request_id=eq.${reqId}&order=occurred_at.asc&select=*`)
+          .then(evts => { _events[reqId] = evts || []; })
+          .catch(() => {});
+      }).catch(() => {});
+    }
+  }
+}
+
+function collapseCard(reqId) {
+  const body = document.getElementById('body-' + reqId.replace(/-/g,''));
+  if (body) body.classList.remove('open');
+  closeResponsePanel(reqId);
 }
 
 // ── Approve ───────────────────────────────────────────────────────────────────
@@ -951,12 +1004,27 @@ async function submitApprove(reqId) {
       approval_impact_snapshot: impactSnapshot,
     });
 
+    // Also update the viewed/acknowledged event if it exists — mark it resolved
+    const existingEvents = _events[reqId] || [];
+    const viewedEvent = existingEvents.find(e => e.event_type === 'viewed');
+    if (viewedEvent) {
+      API.patch(`resource_request_events?id=eq.${viewedEvent.id}`, {
+        notes: 'Request opened, reviewed, and approved'
+      }).catch(() => {});
+    }
+
     // Log event
     await API.post('resource_request_events', {
       firm_id: FIRM_ID, request_id: reqId,
       actor_resource_id: CURRENT_USER_RESOURCE_ID,
       actor_role: 'approver', event_type: 'approved',
-      notes: note || `Approved — ${_resources.find(r=>r.id===req.requested_resource_id)?.first_name} allocated to project`,
+      notes: (() => {
+        const resFirst = _resources.find(r=>r.id===req.requested_resource_id)?.first_name || '—';
+        const parts = [`Approved — ${resFirst} allocated to project`];
+        if (impactSnapshot) parts.push(impactSnapshot);
+        if (note) parts.push(`Note: ${note}`);
+        return parts.join(' · ');
+      })(),
       event_data: {
         impact_snapshot:  impactSnapshot,
         approval_note:    note || null,
