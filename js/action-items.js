@@ -614,6 +614,10 @@ async function deleteById(id, trashEl) {
       row.style.transition = 'opacity .2s';
       row.style.opacity    = '0';
       setTimeout(() => row.remove(), 200);
+      // Clear the loaded flag on the parent list so the next open re-fetches
+      // from the DB rather than serving a stale cached render
+      const parentList = row.closest('[id$="-action-items-list"]');
+      if (parentList) parentList.dataset.loaded = '';
     }
 
     // Decrement ai-count badge in-place
