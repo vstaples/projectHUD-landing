@@ -2345,6 +2345,16 @@ function openAddActionItem(taskId, projectId, event) {
     projectName: proj?.name    || null,
     submittedBy,
     people,
+    // action_items.responsible is a FK to users.id — map resource IDs to user IDs
+    resolveResponsible: (selectedId) => {
+      // Already a user? Pass through directly
+      if (_users.find(u => u.id === selectedId)) return selectedId;
+      // It's a resource ID — find the matching user via resource_id field
+      const matchedUser = _users.find(u => u.resource_id === selectedId);
+      if (matchedUser) return matchedUser.id;
+      // Resource exists but has no user account — block and surface clear message
+      return null;
+    },
     onSave: async (saved) => {
       await _refreshActionItemsList(taskId);
       // Refresh CoC if open

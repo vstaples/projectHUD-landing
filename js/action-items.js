@@ -155,6 +155,7 @@ function open(config) {
     defaultDueDays = 7,
     onSave,
     onCoCLog,
+    resolveResponsible = null,  // optional fn(selectedId) → usersId | null
   } = config;
 
   // Remove any stale modal
@@ -312,6 +313,16 @@ function open(config) {
     if (!responsible){ _toast('Please assign to someone', 'warning'); return; }
     if (!targetDate) { _toast('Due date is required', 'warning'); return; }
 
+    // Resolve responsible to a users.id — action_items.responsible is a FK to users
+    let responsibleId = responsible;
+    if (resolveResponsible) {
+      responsibleId = resolveResponsible(responsible);
+      if (!responsibleId) {
+        _toast('This person does not have a ProjectHUD user account and cannot be assigned as responsible. Please select a project team member.', 'warning');
+        return;
+      }
+    }
+
     const btn = document.getElementById('aim-save-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
@@ -321,7 +332,7 @@ function open(config) {
         project_id:    projectId || null,
         submitted_by:  submittedBy || null,
         description:   desc,
-        responsible:   responsible,
+        responsible:   responsibleId,
         target_date:   targetDate,
         assigned_date: _today(),
         priority,
