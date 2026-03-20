@@ -22,7 +22,7 @@
 .project-card.active  { border-left-color: rgba(0,229,160,0.4); }
 .proj-name   { font-family: var(--font-ui); font-size:15.0px; font-weight: 600; color: var(--text0); line-height: 1.2; }
 .proj-client { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
-.proj-stats  { display: flex; gap: 12px; font-family: var(--font-mono); font-size:11px; margin-top: 10px; }
+.proj-stats  { display: flex; gap: 16px; font-family: var(--font-mono); font-size:11px; margin-top: 10px; }
 .proj-stat   { display: flex; flex-direction: column; gap: 2px; }
 .proj-stat .stat-label { color: var(--text3); font-size:11px; letter-spacing: 0.1em; }
 .proj-stat .stat-value { color: var(--text1); font-weight: 600; }
@@ -51,68 +51,6 @@
 .wl-fill { height: 100%; transition: width 0.6s ease; }
 .wl-pct { font-family: var(--font-mono); font-size:11px; min-width: 28px; text-align: right; }
 @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
-
-/* ── HUD TOOLTIP ── */
-#hud-tooltip {
-  position: fixed; z-index: 9000; pointer-events: none;
-  width: 340px;
-  background: var(--bg1);
-  border: 1px solid rgba(0,210,255,0.22);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,210,255,0.06);
-  font-family: var(--font-mono);
-  opacity: 0; transition: opacity 0.12s ease;
-  display: none;
-}
-#hud-tooltip.visible { opacity: 1; display: block; }
-.htip-header {
-  padding: 10px 14px 9px;
-  border-bottom: 1px solid rgba(0,210,255,0.12);
-  background: rgba(0,210,255,0.04);
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-}
-.htip-title {
-  font-family: var(--font-hud); font-size: 14px; font-weight: 700;
-  color: var(--text0); letter-spacing: .07em;
-}
-.htip-value {
-  font-family: var(--font-hud); font-size: 18px; font-weight: 700;
-  flex-shrink: 0;
-}
-.htip-formula {
-  font-size: 12px; color: var(--cyan); letter-spacing: .04em;
-  padding: 7px 14px; background: rgba(0,210,255,0.05);
-  border-bottom: 1px solid rgba(0,210,255,0.08);
-}
-.htip-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; }
-.htip-row {
-  display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 12px; gap: 8px;
-}
-.htip-row .htip-k { color: var(--text3); letter-spacing: .08em; }
-.htip-row .htip-v { color: var(--text1); font-weight: 600; text-align: right; }
-.htip-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
-.htip-interp {
-  font-size: 12px; color: var(--text2); line-height: 1.6;
-  padding: 8px 14px 10px; border-top: 1px solid rgba(255,255,255,0.06);
-  font-family: var(--font-body, 'DM Sans', sans-serif);
-  font-style: italic;
-}
-[data-htip] { cursor: default; }
-[data-htip]:hover { opacity: 0.85; }
-
-/* ── BURN RATIO INDICATOR ── */
-.burn-indicator { display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;cursor:help; }
-.burn-circle {
-  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  position:relative;
-  box-shadow:0 2px 4px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.2),inset 0 -1px 2px rgba(0,0,0,.4);
-}
-.burn-circle::after {
-  content:'';position:absolute;inset:3px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.35),transparent 65%);
-  pointer-events:none;
-}
-.burn-label { font-family:var(--font-mono);font-size:8px;letter-spacing:.08em;color:var(--text3);text-align:center; }
 
 /* ── ADD PROJECT PANEL ── */
 .add-proj-overlay {
@@ -201,7 +139,7 @@
               <div style="display:flex;gap:8px;align-items:center;">
                 <span class="panel-count" id="proj-count">—</span>
                 <button class="panel-action" onclick="ProjectDrawer.openAdd()" style="color:var(--green);border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.06);">+ ADD PROJECT</button>
-                <button class="panel-action">VIEW ALL →</button>
+                <button class="panel-action" onclick="window.location.href='/projects.html'">VIEW ALL →</button>
               </div>
             </div>
             <div id="projects-list"></div>
@@ -243,7 +181,6 @@
   ProjectHUD v<span id="version-num">—</span>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gauge.js/1.3.7/gauge.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -347,10 +284,10 @@ async function loadDashboard() {
         t.due_date && t.due_date < today && t.status !== 'complete').length;
       const blockedTasks = projTasks.filter(t => t.status === 'blocked').length;
       let diagnosis = '';
-      if (blockedTasks > 0)
-        diagnosis = `${blockedTasks} blocked task${blockedTasks!==1?'s':''} — immediate attention required`;
-      else if (overdueTasks > 0)
-        diagnosis = `${overdueTasks} overdue task${overdueTasks!==1?'s':''} — SPI ${spi?.toFixed(2)||'—'} ${spi&&spi>=1?' (schedule ahead despite overdue items)':' — resourcing issue'}`;
+      if (blockedTasks > 0 && spi && spi < 1)
+        diagnosis = `${blockedTasks} blocked task${blockedTasks!==1?'s':''} + schedule running at ${(spi*100).toFixed(0)}% efficiency`;
+      else if (overdueTasks > 0 && spi && spi < 1)
+        diagnosis = `${overdueTasks} overdue task${overdueTasks!==1?'s':''} driving SPI = ${spi?.toFixed(2)||'—'} — resourcing issue`;
       else if (cpi && cpi < 0.95)
         diagnosis = `Cost overrun: CPI = ${cpi.toFixed(2)} — consuming ${((1/cpi-1)*100).toFixed(0)}% more effort than planned`;
       else if (spi && spi < 0.95)
@@ -420,7 +357,7 @@ async function loadDashboard() {
       document.getElementById('kpi-variance-sub').textContent =
         atRiskCount2 > 0 ? `${atRiskCount2} project${atRiskCount2!==1?'s':''} forecasting slip` : 'All on schedule';
 
-      projList.innerHTML = (() => { if (window._htReg) window._htReg = []; window._gaugeReg = {}; return ''; })() + activeProjects.map(proj => {
+      projList.innerHTML = activeProjects.map(proj => {
         const pt      = tasks.filter(t => t.project_id === proj.id);
         const done    = pt.filter(t => t.status === 'complete').length;
         const evm     = projEVMs[proj.id];
@@ -450,50 +387,6 @@ async function loadDashboard() {
 
 
 
-        // Store gauge payload for this project
-        window._gaugeReg = window._gaugeReg || {};
-        // Expense / capital budget figures
-        const _expBudget  = parseFloat(proj.expense_budget_baseline || 0);
-        const _expUsed    = evm.accrLaborCost || 0;
-        const _expPct     = _expBudget > 0 ? Math.round((_expUsed/_expBudget)*100) : 0;
-        const _matBudget  = parseFloat(proj.materials_budget || 0);
-        const _totalBudgetHrs = parseFloat(proj.budget_baseline_hours || 0);
-        const _totalBudgetPct = _totalBudgetHrs > 0 ? Math.round((evm.actualHrs/_totalBudgetHrs)*100) : 0;
-        // Schedule variance in days
-        const _svDays = evm.slipDays || 0;
-        window._gaugeReg[proj.id] = {
-          name: proj.name,
-          health, hLabel, diagnosis: evm.diagnosis,
-          pctDone,
-          cpi: evm.cpi, spi: evm.spi, tcpi: evm.tcpi,
-          cpiStr: cpi, spiStr: spi, tcpiStr: tcpi,
-          overdueTasks: evm.overdueTasks, blockedTasks: evm.blockedTasks,
-          p50Date: evm.p50Date, targetDate: proj.target_date,
-          slipDays: evm.slipDays, svDays: _svDays, dLeft,
-          laborBudget, laborUsed, laborPct,
-          expBudget: _expBudget, expUsed: _expUsed, expPct: _expPct,
-          totalBudgetHrs: _totalBudgetHrs, totalBudgetPct: _totalBudgetPct,
-          matBudget: _matBudget,
-          done, total: pt.length,
-          bac: evm.bac, ev: evm.ev, pv: evm.pv, actualHrs: evm.actualHrs,
-        };
-        const _burnRatio  = pctDone > 0 ? laborPct / pctDone : null;
-        const _burnColor  = _burnRatio===null?'#556070':_burnRatio<0.8?'#00c87a':_burnRatio<1.2?'#d4901f':'#e03535';
-        const _burnBg     = _burnRatio===null?'rgba(85,96,112,.2)':_burnRatio<0.8?'rgba(0,200,122,.18)':_burnRatio<1.2?'rgba(212,144,31,.18)':'rgba(224,53,53,.18)';
-        const _burnBorder = _burnRatio===null?'rgba(85,96,112,.4)':_burnRatio<0.8?'rgba(0,200,122,.5)':_burnRatio<1.2?'rgba(212,144,31,.5)':'rgba(224,53,53,.5)';
-        const _burnInterp = _burnRatio===null?'No hours logged — ratio unavailable.'
-          :_burnRatio<0.8?`Efficient: spending ${laborPct}% of budget to complete ${pctDone}% of work.`
-          :_burnRatio<1.2?`On track: budget consumption aligned with work progress.`
-          :`Over-burning: ${laborPct}% budget consumed for only ${pctDone}% work complete.`;
-        const _burnRows = _burnRatio===null?[{k:'STATUS',v:'No work logged yet'}]:[
-          {k:'LABOR CONSUMED',v:laborPct+'%'},{k:'WORK COMPLETE',v:pctDone+'%'},
-          {k:'BURN RATIO',v:_burnRatio.toFixed(2)},{k:'---'},{k:'< 0.8',v:'Efficient (green)'},{k:'0.8–1.2',v:'On track (amber)'},{k:'> 1.2',v:'Over-burn (red)'}];
-        window._htReg = window._htReg||[];
-        const _burnTipIdx = window._htReg.push({
-          title:'BURN RATIO',value:_burnRatio!==null?_burnRatio.toFixed(2):'—',color:_burnColor,
-          formula:'% Labor Consumed ÷ % Work Complete',rows:_burnRows,interp:_burnInterp
-        })-1;
-
         return `<div class="project-card ${health} fade-in"
             onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
 
@@ -505,50 +398,28 @@ async function loadDashboard() {
                 style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;
                   border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);
                   color:var(--text3);cursor:pointer;border-radius:3px;flex-shrink:0">✎ EDIT</button>
-              <button onclick="event.stopPropagation();openGaugePopup('${proj.id}')"
-                style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;
-                  border:1px solid rgba(0,210,255,.25);background:rgba(0,210,255,.06);
-                  color:var(--cyan);cursor:pointer;border-radius:3px;flex-shrink:0">◉ GAUGES</button>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-              <div class="burn-indicator" data-htip="${_burnTipIdx}" onclick="event.stopPropagation()">
-                <div class="burn-circle" style="background:${_burnBg};border:1.5px solid ${_burnBorder};">
-                  <svg width="16" height="16" viewBox="0 0 16 16" style="position:relative;z-index:1;overflow:visible;">
-                    ${_burnRatio===null
-                      ? `<text x="8" y="11" text-anchor="middle" fill="#556070" font-family="Arial" font-size="9" font-weight="700">—</text>`
-                      : _burnRatio<0.8
-                        ? `<polyline points="8,12 8,4 5,7" fill="none" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="4" x2="11" y2="7" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round"/>`
-                        : _burnRatio<1.2
-                          ? `<circle cx="8" cy="8" r="4" fill="${_burnColor}" opacity="0.9"/>`
-                          : `<polyline points="8,4 8,12 5,9" fill="none" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="12" x2="11" y2="9" stroke="${_burnColor}" stroke-width="2" stroke-linecap="round"/>`
-                    }
-                  </svg>
-                </div>
-                <span class="burn-label" style="color:${_burnColor};">BURN</span>
-              </div>
-              <span data-htip="${HUDTip.badge(health,evm,dLeft,proj.target_date)}"
-                  onclick="event.stopPropagation()"
-                  style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;padding:2px 8px;border:1px solid;flex-shrink:0;cursor:help;${
-                health==='blocked'?'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);':
-                health==='at-risk'?'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);':
-                'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
-              }">${hLabel}</span>
-            </div>
+            <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+                padding:2px 8px;border:1px solid;flex-shrink:0;${
+              health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
+              health==='at-risk' ? 'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);' :
+              'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
+            }">${hLabel}</span>
           </div>
 
           <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
-          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
+          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,200px);
               align-items:center;gap:8px;margin-bottom:7px;">
             <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
             <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
                 font-size:11px;justify-content:center;">
-              ${laborBudget > 0 ? `<span data-htip="${HUDTip.labor(laborBudget,laborUsed,laborPct)}" style="cursor:help;">
+              ${laborBudget > 0 ? `<span>
                 <span style="color:var(--text3);letter-spacing:.07em">LABOR </span>
                 <span style="color:var(--text1)">${laborBudget.toFixed(0)}h</span>
                 <span style="color:var(--text3)"> · </span>
                 <span style="color:${laborPct>80?'var(--amber)':'var(--cyan)'}">${laborUsed.toFixed(0)}h used (${laborPct}%)</span>
               </span>` : ''}
-              ${expBudget > 0 ? `<span data-htip="${HUDTip.expense(expBudget,expUsed,expPct)}" style="cursor:help;">
+              ${expBudget > 0 ? `<span>
                 <span style="color:var(--text3);letter-spacing:.07em">EXPENSE </span>
                 <span style="color:var(--text1)">$${(expBudget/1000).toFixed(0)}K</span>
                 <span style="color:var(--text3)"> · </span>
@@ -565,50 +436,50 @@ async function loadDashboard() {
           ${UI.progressBar(pctDone,fill)}
 
           <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
-          <div style="display:grid;grid-template-columns:var(--col-left,270px) 1fr var(--col-right,340px);
-              align-items:flex-start;gap:8px;margin-top:6px;">
+          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
+              align-items:center;gap:8px;margin-top:6px;">
 
-            <!-- LEFT: EVM metrics — plain text stats -->
-            <div class="proj-stats" style="margin-top:0;flex-wrap:nowrap;gap:12px;">
-              <div class="proj-stat" data-htip="${HUDTip.pct(pctDone,done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">% COMPLETE</span>
+            <!-- LEFT: EVM metrics — grid col, same width as client text above -->
+            <div class="proj-stats" style="margin-top:0;flex-wrap:wrap;">
+              <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
                 <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
-              <div class="proj-stat" data-htip="${HUDTip.cpi(evm.cpi,evm)}" style="cursor:help;"><span class="stat-label">CPI</span>
+              <div class="proj-stat"><span class="stat-label">CPI</span>
                 <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
-              <div class="proj-stat" data-htip="${HUDTip.spi(evm.spi,evm)}" style="cursor:help;"><span class="stat-label">SPI</span>
+              <div class="proj-stat"><span class="stat-label">SPI</span>
                 <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
-              <div class="proj-stat" data-htip="${HUDTip.tasks(done,pt.length,evm)}" style="cursor:help;"><span class="stat-label">TASKS</span>
+              <div class="proj-stat"><span class="stat-label">TASKS</span>
                 <span class="stat-value">${done}/${pt.length}</span></div>
-              ${evm.overdueTasks>0?`<div class="proj-stat" data-htip="${HUDTip.overdue(evm.overdueTasks,evm)}" style="cursor:help;"><span class="stat-label">OVERDUE</span>
+              ${evm.overdueTasks>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span>
                 <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
             </div>
 
             <!-- CENTER: grid center column — same column as LABOR/EXPENSE above, auto-aligned -->
-            <div style="display:flex;justify-content:center;align-items:flex-start;padding-top:3px;">
+            <div style="display:flex;justify-content:center;align-items:center;">
               ${evm.p25Date ? `
               <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);
                   font-size:11px;letter-spacing:.05em;white-space:nowrap;">
-                <span data-htip="${HUDTip.p25(evm.p25Date,proj.target_date,evm)}" style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
-                    border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px;cursor:help;">
+                <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
+                    border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
                   P25 ${UI.fmtDateShort(evm.p25Date)}</span>
-                <span data-htip="${HUDTip.p50(evm.p50Date,proj.target_date,evm.spi,evm)}" style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
-                    border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2);cursor:help;">
+                <span style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
+                    border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2)">
                   ▼ P50 ${UI.fmtDateShort(evm.p50Date)}</span>
-                <span data-htip="${HUDTip.p80(evm.p80Date,proj.target_date,evm.spi,evm)}" style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
+                <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
                     background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);
-                    border-radius:0 3px 3px 0;cursor:help;">
+                    border-radius:0 3px 3px 0">
                   P80 ${UI.fmtDateShort(evm.p80Date)}</span>
               </div>` : ''}
             </div>
 
             <!-- RIGHT: grid right column — aligns with days-remaining column above -->
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;padding-top:3px;">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;">
               <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
                   font-size:11px;white-space:nowrap;">
-                ${proj.target_date?`<span data-htip="${HUDTip.target(proj.target_date,dLeft)}" style="cursor:help;">
+                ${proj.target_date?`<span>
                   <span style="color:var(--text3);letter-spacing:.08em">TARGET </span>
                   <span style="color:var(--text1)">${UI.fmtDateShort(proj.target_date)}</span>
                 </span>`:''}
-                ${evm.p50Date?`<span data-htip="${HUDTip.forecast(evm.p50Date,evm.slipDays,proj.target_date)}" style="cursor:help;">
+                ${evm.p50Date?`<span>
                   <span style="color:var(--text3);letter-spacing:.08em">FORECAST </span>
                   <span style="color:${!evm.slipDays||evm.slipDays<=0?'var(--green)':evm.slipDays<=14?'var(--amber)':'var(--red)'}">
                     ${UI.fmtDateShort(evm.p50Date)}</span>
@@ -619,8 +490,8 @@ async function loadDashboard() {
               </div>
               <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
                   font-size:11px;color:var(--text3);white-space:nowrap;">
-                ${evm.tcpi?`<span data-htip="${HUDTip.tcpi(evm.tcpi,evm)}" style="cursor:help;">TCPI <span style="color:${UI.indexColor(evm.tcpi)};font-weight:700">${tcpi}</span></span>`:''}
-                ${evm.eac&&proj.budget_baseline_hours?`<span data-htip="${HUDTip.eac(evm.eac,evm.bac,evm.cv)}" style="cursor:help;">EAC <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
+                ${evm.tcpi?`<span>TCPI <span style="color:${UI.indexColor(evm.tcpi)};font-weight:700">${tcpi}</span></span>`:''}
+                ${evm.eac&&proj.budget_baseline_hours?`<span>EAC <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
                   ${evm.eac.toFixed(0)}h${evm.cv>0?' +'+evm.cv.toFixed(0)+'h':''}</span></span>`:''}
                 <span style="font-style:italic;overflow:hidden;text-overflow:ellipsis;max-width:260px;display:inline-block;vertical-align:bottom">
                   ${evm.diagnosis}</span>
@@ -979,630 +850,5 @@ async function saveNewProject() {
     </div>
   </div>
 </div>
-<!-- ── HUD TOOLTIP SINGLETON ──────────────────────────────────────────── -->
-<div id="hud-tooltip">
-  <div class="htip-header">
-    <span class="htip-title" id="htip-title">—</span>
-    <span class="htip-value" id="htip-value"></span>
-  </div>
-  <div class="htip-formula" id="htip-formula" style="display:none"></div>
-  <div class="htip-body" id="htip-body"></div>
-  <div class="htip-interp" id="htip-interp" style="display:none"></div>
-</div>
-
-<script>
-(function() {
-  // ── Singleton tooltip engine ──────────────────────────────────────────
-  const TIP  = document.getElementById('hud-tooltip');
-  const tTitle   = document.getElementById('htip-title');
-  const tValue   = document.getElementById('htip-value');
-  const tFormula = document.getElementById('htip-formula');
-  const tBody    = document.getElementById('htip-body');
-  const tInterp  = document.getElementById('htip-interp');
-
-  let _hideTimer = null;
-
-  function showTip(el, e) {
-    clearTimeout(_hideTimer);
-    const key = el.dataset.htip;
-    if (key == null || key === '') return;
-    const def = window._htReg && window._htReg[key];
-    if (!def) return;
-
-    tTitle.textContent   = def.title  || '';
-    tValue.textContent   = def.value  || '';
-    tValue.style.color   = def.color  || 'var(--text1)';
-
-    if (def.formula) {
-      tFormula.textContent = def.formula;
-      tFormula.style.display = '';
-    } else {
-      tFormula.style.display = 'none';
-    }
-
-    tBody.innerHTML = '';
-    if (def.rows && def.rows.length) {
-      def.rows.forEach((r, i) => {
-        if (r === '---') {
-          tBody.insertAdjacentHTML('beforeend', '<div class="htip-divider"></div>');
-          return;
-        }
-        const div = document.createElement('div');
-        div.className = 'htip-row';
-        const vc = r.color || 'var(--text1)';
-        div.innerHTML = `<span class="htip-k">${r.k}</span><span class="htip-v" style="color:${vc}">${r.v}</span>`;
-        tBody.appendChild(div);
-      });
-    }
-
-    if (def.interp) {
-      tInterp.textContent = def.interp;
-      tInterp.style.display = '';
-    } else {
-      tInterp.style.display = 'none';
-    }
-
-    TIP.style.display = 'block';
-    positionTip(e);
-    // Trigger transition
-    requestAnimationFrame(() => TIP.classList.add('visible'));
-  }
-
-  function hideTip() {
-    _hideTimer = setTimeout(() => {
-      TIP.classList.remove('visible');
-      setTimeout(() => { if (!TIP.classList.contains('visible')) TIP.style.display = 'none'; }, 130);
-    }, 80);
-  }
-
-  function positionTip(e) {
-    const W = window.innerWidth, H = window.innerHeight;
-    const tw = TIP.offsetWidth || 300, th = TIP.offsetHeight || 180;
-    let x = e.clientX + 14, y = e.clientY + 14;
-    if (x + tw > W - 8) x = e.clientX - tw - 10;
-    if (y + th > H - 8) y = e.clientY - th - 10;
-    TIP.style.left = x + 'px';
-    TIP.style.top  = y + 'px';
-  }
-
-  document.addEventListener('mouseover', e => {
-    const el = e.target.closest('[data-htip]');
-    if (el) showTip(el, e);
-  });
-  document.addEventListener('mouseout', e => {
-    const el = e.target.closest('[data-htip]');
-    if (el) hideTip();
-  });
-  document.addEventListener('mousemove', e => {
-    if (TIP.classList.contains('visible')) positionTip(e);
-  });
-
-  // ── Tooltip payload builder ───────────────────────────────────────────
-  // Methods push a def object into window._htReg and return the index.
-  // data-htip="N" on the element; tooltip engine reads _htReg[N].
-  window._htReg = [];
-  function _reg(def) { window._htReg.push(def); return window._htReg.length - 1; }
-  window.HUDTip = {
-    // AT RISK / BLOCKED / ACTIVE badge
-    badge(health, evm, dLeft, targetDate) {
-      const isRisk    = health === 'at-risk';
-      const isBlocked = health === 'blocked';
-      const title     = isBlocked ? 'BLOCKED' : isRisk ? 'AT RISK' : 'ACTIVE';
-      const color     = isBlocked ? 'var(--red)' : isRisk ? 'var(--amber)' : 'var(--green)';
-      const rows = [];
-      if (evm.blockedTasks > 0)
-        rows.push({ k: 'BLOCKED TASKS', v: evm.blockedTasks, color: 'var(--red)' });
-      if (evm.overdueTasks > 0)
-        rows.push({ k: 'OVERDUE TASKS', v: evm.overdueTasks, color: 'var(--amber)' });
-      rows.push({ k: 'SPI', v: evm.spi != null ? evm.spi.toFixed(2) : '—', color: evm.spi != null ? (evm.spi >= 1 ? 'var(--green)' : evm.spi >= 0.9 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)' });
-      rows.push({ k: 'CPI', v: evm.cpi != null ? evm.cpi.toFixed(2) : '—', color: evm.cpi != null ? (evm.cpi >= 1 ? 'var(--green)' : evm.cpi >= 0.9 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)' });
-      if (dLeft !== null) rows.push({ k: 'DAYS TO TARGET', v: dLeft < 0 ? Math.abs(dLeft) + 'd PAST DUE' : dLeft + 'd', color: dLeft < 0 ? 'var(--red)' : dLeft < 30 ? 'var(--amber)' : 'var(--text1)' });
-      return _reg({ title, color, rows, interp: evm.diagnosis });
-    },
-
-    // % COMPLETE
-    pct(pctDone, done, total, evm) {
-      const rows = [
-        { k: 'TASKS COMPLETE',  v: done + ' of ' + total },
-        { k: 'EARNED VALUE %',  v: (evm.evPct * 100).toFixed(1) + '%', color: 'var(--cyan)' },
-        { k: 'SCHEDULE ELAPSED', v: evm.pv != null && evm.bac > 0 ? (evm.pv / evm.bac * 100).toFixed(1) + '%' : '—' },
-      ];
-      return _reg({ title: '% COMPLETE', value: pctDone + '%', color: 'var(--cyan)', formula: 'Task-weighted % = Σ(pct × effort) ÷ Σ(effort)', rows, interp: pctDone + '% of planned work earned based on task completion and effort weighting.' });
-    },
-
-    // CPI
-    cpi(cpiVal, evm) {
-      const v = cpiVal != null ? cpiVal.toFixed(2) : '—';
-      const color = cpiVal != null ? (cpiVal >= 1 ? 'var(--green)' : cpiVal >= 0.9 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)';
-      const rows = [
-        { k: 'EARNED VALUE',  v: evm.bac > 0 ? (evm.ev / evm.bac * 100).toFixed(1) + '% of BAC' : evm.ev.toFixed(1) + 'h' },
-        { k: 'ACTUAL HOURS',  v: evm.actualHrs.toFixed(1) + 'h' },
-        { k: 'BAC (hrs)',     v: evm.bac > 0 ? evm.bac.toFixed(0) + 'h' : '—' },
-      ];
-      const interp = cpiVal == null ? 'No hours logged yet — CPI cannot be computed.' :
-        cpiVal >= 1 ? `CPI ${v}: earning more value than hours consumed. Project is cost-efficient.` :
-        cpiVal >= 0.9 ? `CPI ${v}: slightly under efficiency target. Monitor closely.` :
-        `CPI ${v}: cost overrun — consuming ${((1/cpiVal - 1)*100).toFixed(0)}% more effort than planned.`;
-      return _reg({ title: 'CPI — Cost Perf. Index', value: v, color, formula: 'CPI = EV ÷ AC  (earned value ÷ actual hours)', rows, interp });
-    },
-
-    // SPI
-    spi(spiVal, evm) {
-      const v = spiVal != null ? spiVal.toFixed(2) : '—';
-      const color = spiVal != null ? (spiVal >= 1 ? 'var(--green)' : spiVal >= 0.9 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)';
-      const schedPct = evm.bac > 0 && evm.pv != null ? (evm.pv / evm.bac * 100).toFixed(1) : '—';
-      const earnPct  = evm.bac > 0 ? (evm.ev / evm.bac * 100).toFixed(1) : '—';
-      const rows = [
-        { k: 'WORK EARNED',    v: earnPct + '%',  color: 'var(--cyan)' },
-        { k: 'WORK PLANNED',   v: schedPct + '%', color: 'var(--text2)' },
-        { k: 'SLIP DAYS',      v: evm.slipDays != null ? (evm.slipDays > 0 ? '+' + evm.slipDays + 'd' : evm.slipDays === 0 ? 'On schedule' : Math.abs(evm.slipDays) + 'd ahead') : '—', color: evm.slipDays > 0 ? 'var(--amber)' : 'var(--green)' },
-      ];
-      const interp = spiVal == null ? 'Not enough data to compute SPI yet.' :
-        spiVal >= 1 ? `SPI ${v}: ahead of schedule — completing more work than planned for this point in time.` :
-        spiVal >= 0.9 ? `SPI ${v}: slightly behind planned pace. ${Math.round((1-spiVal)*100)}% less work earned than planned.` :
-        `SPI ${v}: significantly behind schedule. ${Math.round((1-spiVal)*100)}% less work earned than planned.`;
-      return _reg({ title: 'SPI — Schedule Perf. Index', value: v, color, formula: 'SPI = EV ÷ PV  (earned value ÷ planned value)', rows, interp });
-    },
-
-    // TASKS
-    tasks(done, total, evm) {
-      const rows = [
-        { k: 'COMPLETE',     v: done, color: 'var(--green)' },
-        { k: 'IN PROGRESS',  v: total - done - evm.overdueTasks - evm.blockedTasks },
-        { k: 'OVERDUE',      v: evm.overdueTasks, color: evm.overdueTasks > 0 ? 'var(--amber)' : 'var(--text1)' },
-        { k: 'BLOCKED',      v: evm.blockedTasks, color: evm.blockedTasks > 0 ? 'var(--red)' : 'var(--text1)' },
-        { k: 'TOTAL',        v: total },
-      ];
-      return _reg({ title: 'TASKS', value: done + '/' + total, color: 'var(--text1)', rows, interp: done + ' of ' + total + ' tasks complete (' + Math.round(done/Math.max(total,1)*100) + '%).' });
-    },
-
-    // OVERDUE
-    overdue(count, evm) {
-      const rows = [
-        { k: 'OVERDUE TASKS',  v: count,  color: 'var(--red)' },
-        { k: 'BLOCKED TASKS',  v: evm.blockedTasks, color: evm.blockedTasks > 0 ? 'var(--red)' : 'var(--text3)' },
-        { k: 'SPI IMPACT',     v: evm.spi != null ? evm.spi.toFixed(2) : '—', color: evm.spi != null && evm.spi < 1 ? 'var(--amber)' : 'var(--green)' },
-      ];
-      return _reg({ title: 'OVERDUE', value: count, color: 'var(--red)', rows, interp: evm.diagnosis });
-    },
-
-    // LABOR budget
-    labor(budget, used, pct) {
-      const remaining = budget - used;
-      const color = pct > 90 ? 'var(--red)' : pct > 80 ? 'var(--amber)' : 'var(--green)';
-      const rows = [
-        { k: 'BUDGET',    v: budget.toFixed(0) + 'h' },
-        { k: 'USED',      v: used.toFixed(0) + 'h (' + pct + '%)', color },
-        { k: 'REMAINING', v: remaining.toFixed(0) + 'h', color: remaining < 0 ? 'var(--red)' : 'var(--text1)' },
-      ];
-      return _reg({ title: 'LABOR BUDGET', value: pct + '%', color, rows, interp: remaining >= 0 ? (budget - used).toFixed(0) + ' hours remaining in labor budget.' : Math.abs(remaining).toFixed(0) + ' hours over labor budget.' });
-    },
-
-    // EXPENSE budget
-    expense(budget, used, pct) {
-      const remaining = budget - used;
-      const color = pct > 90 ? 'var(--red)' : pct > 80 ? 'var(--amber)' : 'var(--green)';
-      const rows = [
-        { k: 'BUDGET',    v: '$' + (budget/1000).toFixed(0) + 'K' },
-        { k: 'USED',      v: '$' + (used/1000).toFixed(1) + 'K (' + pct + '%)', color },
-        { k: 'REMAINING', v: '$' + (remaining/1000).toFixed(1) + 'K', color: remaining < 0 ? 'var(--red)' : 'var(--text1)' },
-      ];
-      return _reg({ title: 'EXPENSE BUDGET', value: pct + '%', color, rows, interp: 'Expense actuals estimated from billable hours × $150 blended rate.' });
-    },
-
-    // P25
-    p25(date, targetDate, evm) {
-      const target = targetDate ? UI.fmtDateShort(targetDate) : '—';
-      const slipP25 = targetDate && date ? Math.round((new Date(date+'T00:00:00') - new Date(targetDate+'T00:00:00')) / 86400000) : null;
-      const rows = [
-        { k: 'SCENARIO',     v: 'Optimistic (P25)' },
-        { k: 'ASSUMPTION',   v: 'SPI recovers to 1.0' },
-        { k: 'FORECAST DATE', v: UI.fmtDateShort(date), color: 'var(--green)' },
-        { k: 'TARGET DATE',  v: target },
-        { k: 'VS TARGET',    v: slipP25 != null ? (slipP25 <= 0 ? Math.abs(slipP25) + 'd early ✓' : '+' + slipP25 + 'd late') : '—', color: slipP25 != null && slipP25 <= 0 ? 'var(--green)' : 'var(--amber)' },
-      ];
-      return _reg({ title: 'P25 — OPTIMISTIC', value: UI.fmtDateShort(date), color: 'var(--green)', formula: 'Remaining work completes at SPI = 1.0', rows, interp: 'Best-case scenario: team recovers to full efficiency for all remaining work.' });
-    },
-
-    // P50
-    p50(date, targetDate, spiVal, evm) {
-      const target = targetDate ? UI.fmtDateShort(targetDate) : '—';
-      const slipP50 = evm.slipDays;
-      const color = slipP50 != null && slipP50 <= 0 ? 'var(--green)' : slipP50 != null && slipP50 <= 14 ? 'var(--amber)' : 'var(--red)';
-      const rows = [
-        { k: 'SCENARIO',     v: 'Most Likely (P50)' },
-        { k: 'ASSUMPTION',   v: 'Current SPI continues: ' + (spiVal != null ? spiVal.toFixed(2) : '—') },
-        { k: 'FORECAST DATE', v: UI.fmtDateShort(date), color },
-        { k: 'TARGET DATE',  v: target },
-        { k: 'VS TARGET',    v: slipP50 != null ? (slipP50 <= 0 ? Math.abs(slipP50) + 'd early ✓' : '+' + slipP50 + 'd late') : '—', color: slipP50 != null && slipP50 <= 0 ? 'var(--green)' : slipP50 != null && slipP50 <= 14 ? 'var(--amber)' : 'var(--red)' },
-      ];
-      return _reg({ title: 'P50 — MOST LIKELY', value: UI.fmtDateShort(date), color, formula: 'TEAC = Planned Duration ÷ SPI  (PMI Earned Schedule)', rows, interp: 'Base forecast assuming current schedule performance continues unchanged.' });
-    },
-
-    // P80
-    p80(date, targetDate, spiVal, evm) {
-      const target = targetDate ? UI.fmtDateShort(targetDate) : '—';
-      const degradedSpi = spiVal != null ? (spiVal * 0.85).toFixed(2) : '—';
-      const slipP80 = targetDate && date ? Math.round((new Date(date+'T00:00:00') - new Date(targetDate+'T00:00:00')) / 86400000) : null;
-      const color = slipP80 != null && slipP80 > 0 ? 'var(--red)' : 'var(--amber)';
-      const rows = [
-        { k: 'SCENARIO',      v: 'Pessimistic (P80)' },
-        { k: 'ASSUMPTION',    v: 'SPI degrades 15%: ' + degradedSpi },
-        { k: 'FORECAST DATE', v: UI.fmtDateShort(date), color: 'var(--amber)' },
-        { k: 'TARGET DATE',   v: target },
-        { k: 'VS TARGET',     v: slipP80 != null ? (slipP80 <= 0 ? Math.abs(slipP80) + 'd early' : '+' + slipP80 + 'd late') : '—', color: slipP80 != null && slipP80 > 0 ? 'var(--red)' : 'var(--amber)' },
-      ];
-      return _reg({ title: 'P80 — PESSIMISTIC', value: UI.fmtDateShort(date), color, formula: 'TEAC = Planned Duration ÷ (SPI × 0.85)', rows, interp: 'Stress-test scenario: if conditions worsen 15% from current pace, this is the projected outcome.' });
-    },
-
-    // TARGET date
-    target(targetDate, dLeft) {
-      const rows = [
-        { k: 'TARGET DATE', v: UI.fmtDateShort(targetDate), color: 'var(--text1)' },
-        { k: 'DAYS REMAINING', v: dLeft !== null ? (dLeft < 0 ? Math.abs(dLeft) + 'd PAST DUE' : dLeft + 'd') : '—', color: dLeft !== null && dLeft < 0 ? 'var(--red)' : dLeft !== null && dLeft < 30 ? 'var(--amber)' : 'var(--text1)' },
-      ];
-      return _reg({ title: 'TARGET DATE', color: 'var(--text2)', rows, interp: 'Planned project completion date from the project record.' });
-    },
-
-    // FORECAST (P50)
-    forecast(p50Date, slipDays, targetDate) {
-      const color = !slipDays || slipDays <= 0 ? 'var(--green)' : slipDays <= 14 ? 'var(--amber)' : 'var(--red)';
-      const rows = [
-        { k: 'FORECAST DATE', v: UI.fmtDateShort(p50Date), color },
-        { k: 'TARGET DATE',   v: targetDate ? UI.fmtDateShort(targetDate) : '—' },
-        { k: 'VARIANCE',      v: slipDays != null ? (slipDays <= 0 ? Math.abs(slipDays) + 'd early ✓' : '+' + slipDays + 'd late') : '—', color },
-      ];
-      return _reg({ title: 'FORECAST FINISH', value: slipDays != null && slipDays > 0 ? '+' + slipDays + 'd' : '✓', color, formula: 'P50: current SPI continues to completion', rows, interp: 'Most-likely finish date based on current schedule performance index.' });
-    },
-
-    // TCPI
-    tcpi(tcpiVal, evm) {
-      const v = tcpiVal != null ? tcpiVal.toFixed(2) : '—';
-      const color = tcpiVal == null ? 'var(--text3)' : tcpiVal <= 1.0 ? 'var(--green)' : tcpiVal <= 1.1 ? 'var(--amber)' : 'var(--red)';
-      const rows = [
-        { k: 'WORK REMAINING',   v: evm.bac > 0 ? (evm.bac - evm.ev).toFixed(1) + 'h EV' : '—' },
-        { k: 'BUDGET REMAINING', v: evm.bac > 0 ? (evm.bac - evm.actualHrs).toFixed(1) + 'h' : '—' },
-        { k: 'CURRENT CPI',      v: evm.cpi != null ? evm.cpi.toFixed(2) : '—' },
-      ];
-      const interp = tcpiVal == null ? 'Cannot compute — missing baseline hours.' :
-        tcpiVal <= 1.0 ? `TCPI ${v}: required efficiency is achievable. Team can finish within budget at current pace.` :
-        tcpiVal <= 1.1 ? `TCPI ${v}: team must work slightly more efficiently than current CPI to stay within budget.` :
-        `TCPI ${v}: recovery is aggressive — team must work ${((tcpiVal-1)*100).toFixed(0)}% more efficiently than current pace to hit BAC.`;
-      return _reg({ title: 'TCPI — To-Complete Perf. Index', value: v, color, formula: 'TCPI = (BAC − EV) ÷ (BAC − AC)', rows, interp });
-    },
-
-    // EAC
-    eac(eacVal, bac, cv) {
-      if (!eacVal || !bac) return _reg({ title: 'EAC — Estimate at Completion', color: 'var(--text3)', rows: [], interp: 'Cannot compute — missing baseline hours or no hours logged.' });
-      const color = cv > 0 ? 'var(--red)' : 'var(--green)';
-      const rows = [
-        { k: 'EAC', v: eacVal.toFixed(0) + 'h', color },
-        { k: 'BAC', v: bac.toFixed(0) + 'h' },
-        { k: 'VARIANCE (CV)', v: cv > 0 ? '+' + cv.toFixed(0) + 'h OVER' : Math.abs(cv).toFixed(0) + 'h UNDER', color },
-      ];
-      return _reg({ title: 'EAC — Estimate at Completion', value: eacVal.toFixed(0) + 'h', color, formula: 'EAC = BAC ÷ CPI', rows, interp: cv > 0 ? `Project is forecast to overrun by ${cv.toFixed(0)} hours at current cost performance.` : `Project is tracking ${Math.abs(cv).toFixed(0)} hours under the budget baseline.` });
-    },
-  };
-})();
-</script>
-
-
-<!-- ── GAUGE POPUP ──────────────────────────────────────────────────── -->
-<div id="gauge-overlay" style="display:none;position:fixed;inset:0;z-index:2000;
-  background:rgba(0,0,0,0.75);backdrop-filter:blur(3px);
-  align-items:center;justify-content:center;" onclick="closeGaugePopup(event)">
-  <div id="gauge-panel" style="background:var(--bg1);border:1px solid rgba(0,210,255,0.25);
-    width:1120px;max-width:98vw;position:relative;
-    max-height:96vh;overflow-y:auto;
-    box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(0,210,255,0.08);"
-    onclick="event.stopPropagation()">
-
-    <!-- Header -->
-    <div style="padding:16px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.07);
-      background:rgba(0,210,255,0.03);display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div id="gp-title" style="font-family:var(--font-hud);font-size:18px;font-weight:700;
-          color:var(--text0);letter-spacing:.05em;"></div>
-        <div id="gp-diagnosis" style="font-family:var(--font-mono);font-size:11px;
-          color:var(--text3);margin-top:3px;font-style:italic;"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span id="gp-badge" style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-          padding:3px 10px;border:1px solid;"></span>
-        <button onclick="closeGaugePopup()" style="background:none;border:none;
-          color:var(--text3);font-size:18px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
-      </div>
-    </div>
-
-    <!-- Gauge grid -->
-    <div id="gp-gauges" style="display:grid;grid-template-columns:repeat(4,1fr);
-      gap:12px;padding:24px 20px 28px;border-bottom:1px solid rgba(255,255,255,0.07);"></div>
-
-    <!-- Stats row -->
-    <div id="gp-stats" style="display:grid;grid-template-columns:repeat(5,1fr);
-      gap:0;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.07);"></div>
-
-    <!-- Forecast row -->
-    <div id="gp-forecast" style="padding:12px 20px 16px;
-      font-family:var(--font-mono);font-size:11px;color:var(--text2);
-      display:flex;gap:24px;flex-wrap:wrap;"></div>
-  </div>
-</div>
-
-<script>
-function closeGaugePopup(e) {
-  if (!e || e.target === document.getElementById('gauge-overlay'))
-    document.getElementById('gauge-overlay').style.display = 'none';
-}
-document.addEventListener('keydown', e => { if (e.key==='Escape') document.getElementById('gauge-overlay').style.display='none'; });
-
-function openGaugePopup(projId) {
-  const d = window._gaugeReg && window._gaugeReg[projId];
-  if (!d) return;
-
-  // Header
-  document.getElementById('gp-title').textContent = d.name;
-  document.getElementById('gp-diagnosis').textContent = d.diagnosis;
-  const badge = document.getElementById('gp-badge');
-  badge.textContent = d.hLabel;
-  badge.style.color       = d.health==='blocked' ? 'var(--red)' : d.health==='at-risk' ? 'var(--amber)' : 'var(--green)';
-  badge.style.borderColor = d.health==='blocked' ? 'rgba(255,71,87,.4)' : d.health==='at-risk' ? 'rgba(255,170,0,.4)' : 'rgba(0,229,160,.4)';
-  badge.style.background  = d.health==='blocked' ? 'rgba(255,71,87,.08)' : d.health==='at-risk' ? 'rgba(255,170,0,.06)' : 'rgba(0,229,160,.08)';
-
-  // CPI outlier guard — CPI > 3.0 means no real hours logged yet
-  const cpiNoData = d.cpi == null || d.cpi > 3.0;
-  const cpiDisplay = cpiNoData ? '— (no hours)' : d.cpiStr;
-
-  // Schedule Variance in days (#8 — your call: SV days)
-  const svNoData = d.slipDays == null;
-  const svVal    = svNoData ? 0 : Math.min(60, Math.max(-30, d.slipDays)); // clamp -30→+60
-  const svMax    = 60; // 0=on schedule (midpoint if we center), but for a gauge: 0→60 slip
-  // For SV gauge: use 0-100 scale where 50=on schedule, >50=slip, <50=ahead
-  const svGaugeVal  = svNoData ? 50 : Math.min(100, Math.max(0, 50 - (d.slipDays||0)));
-  // Display matches gauge visual: right/green=ahead, left/red=behind
-  // slipDays<0 = ahead → show as +Nd (good); slipDays>0 = behind → show as -Nd (bad)
-  const svDisplay = svNoData ? '—'
-    : d.slipDays === 0 ? 'ON TRK'
-    : d.slipDays < 0   ? '+' + Math.abs(d.slipDays) + 'd'
-    : '-' + d.slipDays + 'd';
-  const svColor     = !d.slipDays||d.slipDays<=0 ? 'var(--green)' : d.slipDays<=14 ? 'var(--amber)' : 'var(--red)';
-
-  // 8 gauges: 4×2 grid
-  const gauges = [
-    // Row 1: Budget gauges
-    { label:'TOTAL BUDGET %',   value: d.totalBudgetPct, max:100, isIndex:false, noData: d.totalBudgetHrs===0, display: d.totalBudgetPct+'%',  color:'var(--cyan)' },
-    { label:'LABOR BUDGET %',   value: d.laborPct,       max:100, isIndex:false, noData: d.laborBudget===0,   display: d.laborPct+'%',          color: d.laborPct>90?'var(--red)':d.laborPct>75?'var(--amber)':'var(--cyan)' },
-    { label:'EXPENSE BUDGET %', value: d.expPct,         max:100, isIndex:false, noData: d.expBudget===0,     display: d.expPct+'%',            color: d.expPct>90?'var(--red)':d.expPct>75?'var(--amber)':'var(--cyan)' },
-    { label:'WORK COMPLETE %',  value: d.pctDone,        max:100, isIndex:false, noData: false,               display: d.pctDone+'%',           color:'var(--cyan)' },
-    // Row 2: Performance indices
-    { label:'CPI',  value: cpiNoData?0:d.cpi,  max:2.0, isIndex:true,  noData: cpiNoData,      display: cpiDisplay,  color: UI.indexColor(d.cpi) },
-    { label:'SPI',  value: d.spi,               max:2.0, isIndex:true,  noData: d.spi==null||d.spi>3.0, display: d.spiStr,   color: UI.indexColor(d.spi) },
-    { label:'TCPI', value: d.tcpi,              max:2.0, isIndex:true,  noData: d.tcpi==null,   display: d.tcpiStr,   color: UI.indexColor(d.tcpi) },
-    { label:'SCHEDULE VAR',     value: svGaugeVal,       max:100, isIndex:false, noData: svNoData,            display: svDisplay,               color: svColor,  svMode:true, isSV:true },
-  ];
-
-  document.getElementById('gp-gauges').innerHTML = gauges.map(g => buildSpeedometer(g)).join('');
-
-  // Stats row — compact, all key numbers
-  const stats = [
-    { k:'WORK %',    v: d.pctDone+'%',          c:'var(--cyan)' },
-    { k:'LABOR %',   v: d.laborPct+'%',          c: d.laborPct>80?'var(--amber)':'var(--cyan)' },
-    { k:'CPI',       v: cpiNoData?'—':d.cpiStr,  c: UI.indexColor(d.cpi) },
-    { k:'SPI',       v: d.spiStr||'—',           c: UI.indexColor(d.spi) },
-    { k:'TCPI',      v: d.tcpiStr||'—',          c: UI.indexColor(d.tcpi) },
-    { k:'TASKS',     v: d.done+'/'+d.total,      c:'var(--text1)' },
-    { k:'OVERDUE',   v: d.overdueTasks||0,       c: d.overdueTasks>0?'var(--red)':'var(--text3)' },
-    { k:'SCHEDULE',  v: svDisplay,               c: svColor },
-  ];
-
-  document.getElementById('gp-stats').style.gridTemplateColumns = 'repeat(8,1fr)';
-  document.getElementById('gp-stats').innerHTML = stats.map(s => `
-    <div style="display:flex;flex-direction:column;gap:4px;padding:0 10px;border-right:1px solid rgba(255,255,255,.06);">
-      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.1em;">${s.k}</span>
-      <span style="font-family:var(--font-hud);font-size:20px;font-weight:700;color:${s.c}">${s.v}</span>
-    </div>`).join('');
-
-  // Forecast row
-  const fItems = [];
-  if (d.targetDate) fItems.push(`<span><span style="color:var(--text3)">TARGET </span><span style="color:var(--text1)">${UI.fmtDateShort(d.targetDate)}</span></span>`);
-  if (d.p50Date)    fItems.push(`<span><span style="color:var(--text3)">FORECAST (P50) </span><span style="color:${!d.slipDays||d.slipDays<=0?'var(--green)':d.slipDays<=14?'var(--amber)':'var(--red)'}">${UI.fmtDateShort(d.p50Date)}</span></span>`);
-  if (d.dLeft!=null)fItems.push(`<span><span style="color:var(--text3)">DAYS REMAINING </span><span style="color:${d.dLeft<30?'var(--amber)':'var(--text1)'}">${d.dLeft}d</span></span>`);
-  if (!svNoData)    fItems.push(`<span><span style="color:var(--text3)">SCHEDULE VARIANCE </span><span style="color:${svColor}">${d.slipDays<=0?'✓ On track':'+'+d.slipDays+'d slip'}</span></span>`);
-  if (d.laborBudget>0) fItems.push(`<span><span style="color:var(--text3)">LABOR </span><span style="color:${d.laborPct>80?'var(--amber)':'var(--cyan)'}">${d.laborPct}% of ${d.laborBudget.toFixed(0)}h</span></span>`);
-  if (cpiNoData) fItems.push(`<span style="color:var(--amber);font-style:italic;">CPI unavailable — no hours logged yet</span>`);
-  document.getElementById('gp-forecast').innerHTML = fItems.join('');
-
-  document.getElementById('gauge-overlay').style.display = 'flex';
-}
-
-function buildSpeedometer(g) {
-  const W=260, H=142, CX=130, CY=112, RO=88, RI=64, BEZ_O=100, BEZ_I=97;
-
-  function pt(r,a){ return {x:+(CX+r*Math.cos(a)).toFixed(2), y:+(CY-r*Math.sin(a)).toFixed(2)}; }
-  function v2a(v,max){ return Math.PI*(1-Math.min(1,Math.max(0,v/max))); }
-
-  function ring(ro,ri,fill){
-    const p1=pt(ro,Math.PI),p2=pt(ro,0),q1=pt(ri,Math.PI),q2=pt(ri,0);
-    return `<path d="M${p1.x},${p1.y} A${ro},${ro},0,0,0,${p2.x},${p2.y} L${q2.x},${q2.y} A${ri},${ri},0,0,1,${q1.x},${q1.y} Z" fill="${fill}"/>`;
-  }
-
-  function gradZones(max) {
-    const steps=40; let out='';
-    for(let i=0;i<steps;i++){
-      const v1=max*i/steps, v2=max*(i+1)/steps, t=i/(steps-1);
-      let r,gv,b;
-      // Anchor transitions to PMI zone boundaries: red 0–0.9, amber 0.9–1.0, green 1.0–2.0
-      // On 0–2.0 scale: t=0.45=0.9/2, t=0.50=1.0/2
-      if(t<0.45){ r=220; gv=Math.round(40+t/0.45*160); b=30; }
-      else if(t<0.50){ const s=(t-0.45)/0.05; r=220; gv=200; b=30; }
-      else { r=Math.round(220-(t-0.50)/0.50*170); gv=200; b=30+Math.round((t-0.50)/0.50*50); }
-      const fill=`rgb(${r},${gv},${b})`;
-      const a1=v2a(v1,max),a2=v2a(v2,max);
-      const p1o=pt(RO,a1),p2o=pt(RO,a2),p1i=pt(RI,a1),p2i=pt(RI,a2);
-      const large=(v2-v1)/max>0.5?1:0;
-      out+=`<path d="M${p1o.x},${p1o.y} A${RO},${RO},0,${large},0,${p2o.x},${p2o.y} L${p2i.x},${p2i.y} A${RI},${RI},0,${large},1,${p1i.x},${p1i.y} Z" fill="${fill}"/>`;
-    }
-    return out;
-  }
-
-  function buildTicks(max,step) {
-    let out='';
-    for(let v=0;v<=max;v+=step){
-      const a=v2a(v,max);
-      const p1=pt(RO+2,a),p2=pt(RO+9,a),pl=pt(RO+17,a);
-      out+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="rgba(255,255,255,.9)" stroke-width="1.5"/>`;
-      out+=`<text x="${pl.x}" y="${(+pl.y+3).toFixed(1)}" text-anchor="middle" fill="rgba(255,255,255,.9)" font-family="Courier New" font-size="9" font-weight="700">${v}</text>`;
-    }
-    return out;
-  }
-
-  function buildNeedle(v,max) {
-    const a=v2a(Math.min(max,Math.max(0,v)),max);
-    const tip=pt(RO-3,a);
-    const bx=+(CX-14*Math.cos(a)).toFixed(1), by=+(CY+14*Math.sin(a)).toFixed(1);
-    return `<line x1="${bx}" y1="${by}" x2="${tip.x}" y2="${tip.y}" stroke="#ff2020" stroke-width="2.5" stroke-linecap="round"/>`;
-  }
-
-  // For index gauges (CPI/SPI/TCPI): gradient goes bad(red)→caution(amber)→good(green)
-  // Scale: 0–max (1.5 for indices, 100 for work%)
-  // Zone colors stay the same — left=red, right=green
-  // But for index gauges we label 0, .5, 1.0, 1.5 not 0,10,20...
-  const isIndex = g.isIndex;
-  const max = g.max;
-  const tickStep = isIndex ? null : 10; // handled separately for index
-
-  function indexTicks(max) {
-    const vals = [{v:0,l:'0'},{v:0.5,l:'.5'},{v:1.0,l:'1.0'},{v:1.5,l:'1.5'},{v:2.0,l:'2.0'}];
-    let out='';
-    vals.forEach(({v,l}) => {
-      const a=v2a(v,max);
-      const p1=pt(RO+2,a),p2=pt(RO+9,a),pl=pt(RO+17,a);
-      out+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="rgba(255,255,255,.9)" stroke-width="1.5"/>`;
-      out+=`<text x="${pl.x}" y="${(+pl.y+3).toFixed(1)}" text-anchor="middle" fill="rgba(255,255,255,.9)" font-family="Courier New" font-size="8.5" font-weight="700">${l}</text>`;
-    });
-    return out;
-  }
-
-  function svTicks() {
-    // SV gauge: 0=50d behind, 50=on schedule, 100=50d ahead
-    const vals = [
-      {v:0,l:'-50d'},{v:25,l:'-25d'},{v:50,l:'0'},{v:75,l:'+25d'},{v:100,l:'+50d'}
-    ];
-    let out='';
-    vals.forEach(({v,l}) => {
-      const a=v2a(v,max), isMajor=true;
-      const p1=pt(RO+2,a), p2=pt(RO+9,a), pl=pt(RO+17,a);
-      out+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="rgba(255,255,255,.9)" stroke-width="1.5"/>`;
-      out+=`<text x="${pl.x}" y="${(+pl.y+3).toFixed(1)}" text-anchor="middle" fill="rgba(255,255,255,.9)" font-family="Courier New" font-size="8.5" font-weight="700">${l}</text>`;
-    });
-    return out;
-  }
-  const ticks = g.isSV ? svTicks() : isIndex ? indexTicks(max) : buildTicks(max, 10);
-  const needle = (!g.noData && g.value != null) ? buildNeedle(g.value, max) : '';
-  const displayVal = g.noData ? '—' : g.display;
-  const valColor = '#111111';
-
-  return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;overflow:hidden;">
-    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-      <defs>
-        <clipPath id="semiclip-${g.label.replace(/\s/g,'_')}">
-          <rect x="0" y="0" width="${W}" height="${CY}"/>
-        </clipPath>
-      </defs>
-      <rect width="${W}" height="${H}" fill="#0d1520"/>
-      <g clip-path="url(#semiclip-${g.label.replace(/\s/g,'_')})">
-        ${ring(BEZ_O,BEZ_I,'#1a50c0')}
-        ${ring(BEZ_I,BEZ_I-3,'#0a3090')}
-        ${ring(BEZ_I-3,RO+1,'#0d1a30')}
-        ${gradZones(max)}
-        ${ring(RI,RI-2,'#0a1428')}
-        ${ring(RI-2,RI-18,'#141f35')}
-        ${ring(RI-18,RI-20,'#0a1428')}
-        <rect x="0" y="${CY-1}" width="${W}" height="3" fill="#0d1520"/>
-        ${ticks}
-        ${needle}
-      </g>
-      <circle cx="${CX}" cy="${CY}" r="6" fill="#cc2020" stroke="#ff6060" stroke-width="1"/>
-      <rect x="${CX-28}" y="${CY+6}" width="56" height="22" rx="11" fill="white" stroke="rgba(0,0,0,.15)" stroke-width="0.5"/>
-      <text x="${CX}" y="${CY+21}" text-anchor="middle" fill="${valColor}" font-family="Arial, sans-serif" font-size="13" font-weight="900">${displayVal}</text>
-    </svg>
-    <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:white;letter-spacing:.08em;margin-top:-2px;text-align:center;">${g.label}</span>
-  </div>`;
-}
-
-function initGaugePopupGauges() {
-  if (!window._pendingGauges || !window.Gauge) return;
-  window._pendingGauges.forEach(({id, g}) => {
-    const canvas = document.getElementById(id);
-    if (!canvas) return;
-
-    // Scale: index gauges 0–1.5, work% 0–100 mapped to 0–1
-    const isIndex = g.isIndex;
-    const max = g.max || (isIndex ? 1.5 : 100);
-    const rawVal = g.noData ? 0 : (g.value != null ? g.value : 0);
-    // Normalize to 0–1 for gauge
-    const normVal = Math.min(1, Math.max(0, rawVal / max));
-
-    // Zone breakpoints normalized
-    const z1 = isIndex ? 0.9/max : 40/max;   // red→amber
-    const z2 = isIndex ? 1.0/max : 70/max;   // amber→green
-
-    const gauge = new Gauge(canvas).setOptions({
-      angle: -0.25,
-      lineWidth: 0.42,
-      radiusScale: 0.95,
-      pointer: {
-        length: 0.62,
-        strokeWidth: 0.038,
-        color: '#e03030'
-      },
-      limitMax: false,
-      limitMin: false,
-      strokeColor: '#1e2a3a',
-      generateGradient: false,
-      highDpiSupport: true,
-      staticZones: [
-        { strokeStyle: '#8b1c1c', min: 0,  max: z1  },
-        { strokeStyle: '#8b6500', min: z1, max: z2  },
-        { strokeStyle: '#0d5c2a', min: z2, max: 1.0 },
-      ],
-      staticLabels: {
-        font: '9px Courier New',
-        labels: isIndex ? [0, z1, z2, 1.0] : [0, 40/max, 1.0],
-        color: 'rgba(255,255,255,0.55)',
-        fractionDigits: isIndex ? 2 : 0,
-      },
-      renderTicks: {
-        divisions: isIndex ? 6 : 5,
-        divWidth: 1.0,
-        divLength: 0.65,
-        divColor: 'rgba(255,255,255,0.4)',
-        subDivisions: 3,
-        subLength: 0.45,
-        subWidth: 0.55,
-        subColor: 'rgba(255,255,255,0.18)',
-      },
-    });
-
-    gauge.maxValue = 1.0;
-    gauge.setMinValue(0);
-    gauge.animationSpeed = 28;
-    gauge.set(g.noData ? 0 : normVal);
-
-    // Draw value text centered below needle pivot
-    const ctx = canvas.getContext('2d');
-    const cx = canvas.width / 2, cy = Math.round(canvas.height * 0.82);
-    setTimeout(() => {
-      ctx.font = 'bold 11px Courier New';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = g.noData ? 'rgba(255,255,255,.3)' : g.color;
-      ctx.clearRect(cx-28, cy-14, 56, 18);
-      ctx.fillText(g.noData ? '—' : g.display, cx, cy);
-    }, 350);
-  });
-  window._pendingGauges = [];
-}
-</script>
-
 </body>
 </html>

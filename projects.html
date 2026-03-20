@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Projects — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+:root {
+  --sidebar-w: 220px;
+  --bg:      #0f1117;
+  --bg1:     #0c1220;
+  --bg2:     #111827;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --text0:   #e8f4ff;
+  --text1:   #c8dff0;
+  --text2:   #7a9bbf;
+  --text3:   #3a5a7a;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --cyan:    #00d2ff;
+  --cyan-dim: rgba(0,210,255,.08);
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+  --purple:  #7c4dff;
+  --font-hud:  'Rajdhani', 'Inter', sans-serif;
+  --font-ui:   'Inter', system-ui, sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --border-act: rgba(0,210,255,.25);
+}
+
+html, body { height:100%; overflow:hidden; }
+body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
+       display:flex; flex-direction:column; }
+#app  { display:flex; flex:1; overflow:hidden; }
+#main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+
+/* ── Sidebar (same as resource-requests.html) ── */
+#sidebar { width:var(--sidebar-w); flex-shrink:0; background:var(--bg1);
+           border-right:1px solid var(--border); display:flex; flex-direction:column;
+           height:100%; overflow:hidden; }
+.sidebar-logo { padding:16px 18px 14px; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.logo-mark { width:28px; height:28px; flex-shrink:0; }
+.wordmark { font-family:var(--font-hud); font-size:18px; font-weight:700;
+            letter-spacing:.08em; color:var(--text0); line-height:1; }
+.wordmark span { color:var(--cyan); }
+.firm { font-family:var(--font-mono); font-size:11px; color:var(--text3);
+        letter-spacing:.18em; margin-top:3px; }
+#sidebar-nav { flex:1; overflow-y:auto; padding:8px 10px; }
+.nav-section-label { font-family:var(--font-mono); font-size:11px; color:var(--text3);
+                     letter-spacing:.2em; padding:10px 8px 4px; }
+.nav-item { display:flex; align-items:center; gap:9px; padding:9px 10px;
+            border-left:2px solid transparent; cursor:pointer; font-size:13px;
+            font-weight:500; color:var(--text2); letter-spacing:.04em;
+            transition:all .12s; margin-bottom:1px; text-decoration:none; }
+.nav-item:hover { color:var(--text0); background:rgba(0,210,255,.04); }
+.nav-item.active { border-left-color:var(--cyan); background:var(--cyan-dim); color:var(--cyan); }
+.nav-icon { font-size:13px; width:16px; text-align:center; flex-shrink:0; }
+#operator { border-top:1px solid var(--border); padding:12px 14px; flex-shrink:0; }
+.op-label { font-family:var(--font-mono); font-size:11px; color:var(--text3);
+            letter-spacing:.2em; margin-bottom:8px; }
+.op-user { display:flex; align-items:center; gap:9px; padding:8px 10px;
+           background:var(--bg2); border:1px solid var(--border); margin-bottom:8px; }
+.op-avatar { width:32px; height:32px; flex-shrink:0; background:#1a3a5a;
+             border:1px solid rgba(0,210,255,.3); display:flex; align-items:center;
+             justify-content:center; font-family:var(--font-hud); font-size:13px;
+             font-weight:700; color:var(--cyan); }
+.op-name { font-size:13px; font-weight:600; color:var(--text0); line-height:1.2; }
+.op-role { font-family:var(--font-mono); font-size:11px; color:var(--amber);
+           letter-spacing:.12em; margin-top:1px; }
+.op-tools { display:flex; gap:6px; margin-bottom:8px; }
+.op-btn { flex:1; padding:6px 0; background:transparent; border:1px solid var(--border);
+          color:var(--text3); cursor:pointer; font-size:13px; display:flex;
+          align-items:center; justify-content:center; transition:all .12s; }
+.op-btn:hover { border-color:var(--cyan); color:var(--cyan); background:var(--cyan-dim); }
+.op-version { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.op-version span { font-family:var(--font-mono); font-size:11px; color:var(--text3); }
+.nominal { display:flex; align-items:center; gap:5px; flex:1; }
+.nominal-dot { width:5px; height:5px; background:var(--green); transform:rotate(45deg); }
+.nominal-text { font-family:var(--font-mono); font-size:11px; color:var(--text2); letter-spacing:.1em; }
+.op-notif { position:relative; background:none; border:1px solid var(--border);
+            color:var(--text2); cursor:pointer; padding:3px 7px; font-size:12px; transition:all .12s; }
+.op-logout { background:none; border:1px solid var(--border); color:var(--text3);
+             cursor:pointer; padding:3px 8px; font-family:var(--font-mono);
+             font-size:11px; letter-spacing:.1em; transition:all .12s; }
+.op-logout:hover { border-color:var(--red); color:var(--red); }
+.notif-badge { position:absolute; top:-5px; right:-5px; background:var(--red); color:#fff;
+               font-size:10px; font-weight:700; width:15px; height:15px; border-radius:50%;
+               display:flex; align-items:center; justify-content:center; }
+
+/* ── Page header ── */
+.page-header { padding:16px 24px 12px; border-bottom:1px solid var(--border);
+               display:flex; align-items:flex-end; justify-content:space-between; flex-shrink:0; }
+.page-title { font-family:var(--font-hud); font-size:22px; font-weight:700;
+              letter-spacing:.06em; color:var(--text0); }
+.page-subtitle { font-family:var(--font-mono); font-size:11px; color:var(--muted);
+                 letter-spacing:.12em; margin-top:3px; }
+
+/* ── View switcher ── */
+.view-strip { display:flex; gap:2px; padding:0 24px;
+              border-bottom:1px solid var(--border); flex-shrink:0; }
+.view-btn { padding:10px 18px; font-size:11px; font-weight:600; letter-spacing:.08em;
+            text-transform:uppercase; background:none; border:none; color:var(--muted);
+            cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
+            transition:all .15s; font-family:var(--font-ui); }
+.view-btn.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+.view-btn:hover:not(.active) { color:var(--text); }
+
+/* ── Milestone horizon strip ── */
+.horizon { padding:12px 24px; border-bottom:1px solid var(--border);
+           background:rgba(0,210,255,.02); flex-shrink:0; overflow-x:auto; }
+.horizon-label { font-size:9px; font-weight:700; letter-spacing:.12em;
+                 text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.horizon-track { display:flex; align-items:center; gap:6px; min-width:max-content; }
+.milestone-pip { display:flex; flex-direction:column; align-items:center; gap:3px;
+                 cursor:default; }
+.milestone-pip .pip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.milestone-pip .pip-name { font-size:9px; color:var(--muted); max-width:80px;
+                           text-align:center; line-height:1.2; white-space:nowrap;
+                           overflow:hidden; text-overflow:ellipsis; }
+.milestone-pip .pip-date { font-family:var(--font-mono); font-size:9px; color:var(--text3); }
+.horizon-connector { width:24px; height:1px; background:var(--border); flex-shrink:0; }
+.horizon-today { width:2px; height:28px; background:var(--cyan); opacity:.4;
+                 border-radius:1px; flex-shrink:0; position:relative; }
+.horizon-today::after { content:'TODAY'; position:absolute; top:-14px; left:50%;
+                        transform:translateX(-50%); font-size:8px; color:var(--cyan);
+                        font-family:var(--font-mono); letter-spacing:.08em; white-space:nowrap; }
+
+/* ── Content scroll area ── */
+.content { flex:1; overflow-y:auto; padding:20px 24px 32px; }
+.content::-webkit-scrollbar { width:4px; }
+.content::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* ── KPI strip ── */
+.kpi-strip { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px; }
+.kpi { background:var(--surface); border:1px solid var(--border); padding:12px 14px;
+       border-top:2px solid; position:relative; }
+.kpi-val { font-family:var(--font-hud); font-size:28px; font-weight:700; line-height:1; margin-bottom:4px; }
+.kpi-lbl { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+           color:var(--muted); margin-bottom:2px; }
+.kpi-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
+
+/* ── Project card (Portfolio view) ── */
+.proj-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(520px,1fr)); gap:14px; }
+.proj-card { background:var(--surface); border:1px solid var(--border); border-radius:6px;
+             overflow:hidden; cursor:pointer; transition:border-color .15s; }
+.proj-card:hover { border-color:var(--border2); }
+.proj-card.status-active  { border-left:3px solid var(--cyan); }
+.proj-card.status-planning { border-left:3px solid var(--muted); }
+.proj-card.status-on_hold  { border-left:3px solid var(--amber); }
+.proj-card.status-complete { border-left:3px solid var(--green); opacity:.7; }
+
+.proj-card-head { padding:14px 16px 10px; display:flex; align-items:flex-start;
+                  justify-content:space-between; gap:12px; }
+.proj-name { font-size:14px; font-weight:700; color:var(--text0); line-height:1.3; }
+.proj-meta { font-size:11px; color:var(--muted); margin-top:3px; }
+.proj-status-badge { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+                     padding:2px 8px; border-radius:3px; border:1px solid; flex-shrink:0; }
+.proj-status-badge.active   { color:var(--cyan); border-color:rgba(0,210,255,.3); background:rgba(0,210,255,.06); }
+.proj-status-badge.planning { color:var(--muted); border-color:var(--border2); background:transparent; }
+.proj-status-badge.on_hold  { color:var(--amber); border-color:rgba(212,144,31,.3); background:rgba(212,144,31,.06); }
+.proj-status-badge.complete { color:var(--green); border-color:rgba(42,157,64,.3); background:rgba(42,157,64,.06); }
+
+/* EVM row */
+.evm-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+           background:var(--border); border-top:1px solid var(--border);
+           border-bottom:1px solid var(--border); }
+.evm-cell { background:var(--surf2); padding:8px 12px; text-align:center; }
+.evm-cell-label { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+                  color:var(--muted); margin-bottom:3px; }
+.evm-cell-val { font-family:var(--font-hud); font-size:18px; font-weight:700; line-height:1; }
+
+/* Progress bar */
+.proj-progress { padding:10px 16px; }
+.progress-bar-bg { height:4px; background:rgba(255,255,255,.06); border-radius:2px; overflow:hidden; }
+.progress-bar-fg { height:100%; border-radius:2px; transition:width .3s; }
+.progress-meta { display:flex; justify-content:space-between; font-size:10px;
+                 color:var(--muted); margin-top:5px; }
+
+/* Forecast + signals row */
+.proj-footer { padding:10px 16px 12px; display:flex; align-items:center;
+               justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.forecast-dates { display:flex; gap:12px; font-size:11px; }
+.forecast-item { display:flex; flex-direction:column; gap:1px; }
+.forecast-item .fl { font-size:9px; color:var(--muted); letter-spacing:.06em;
+                     text-transform:uppercase; }
+.forecast-item .fv { font-weight:600; }
+.signal-badges { display:flex; gap:6px; align-items:center; }
+.sig-badge { font-size:9px; font-weight:700; letter-spacing:.08em; padding:2px 7px;
+             border-radius:3px; border:1px solid; }
+.sig-badge.task { color:var(--amber); border-color:rgba(212,144,31,.3); background:rgba(212,144,31,.06); }
+.sig-badge.request { color:#f07a7a; border-color:rgba(192,64,74,.3); background:rgba(192,64,74,.06); }
+.sig-badge.milestone { color:var(--purple); border-color:rgba(124,77,255,.3); background:rgba(124,77,255,.06); }
+
+/* Diagnosis */
+.proj-diagnosis { padding:0 16px 10px; font-size:11px; color:var(--muted);
+                  font-style:italic; line-height:1.5; }
+
+/* ── Exceptions view ── */
+.exception-list { display:flex; flex-direction:column; gap:8px; }
+.exception-card { background:var(--surface); border:1px solid var(--border); border-radius:6px;
+                  padding:12px 16px; display:flex; align-items:center; gap:14px; }
+.exception-card.sev-critical { border-left:3px solid var(--red); }
+.exception-card.sev-high     { border-left:3px solid var(--amber); }
+.exception-card.sev-medium   { border-left:3px solid var(--accent); }
+.exc-icon { width:32px; height:32px; border-radius:50%; display:flex; align-items:center;
+            justify-content:center; font-size:14px; flex-shrink:0; }
+.exc-icon.task     { background:rgba(212,144,31,.1); }
+.exc-icon.request  { background:rgba(192,64,74,.1); }
+.exc-icon.milestone{ background:rgba(124,77,255,.1); }
+.exc-icon.budget   { background:rgba(79,142,247,.1); }
+.exc-body { flex:1; min-width:0; }
+.exc-title { font-size:13px; font-weight:600; color:var(--text); }
+.exc-sub   { font-size:11px; color:var(--muted); margin-top:2px; }
+.exc-proj  { font-size:10px; font-family:var(--font-mono); color:var(--accent);
+             margin-top:3px; }
+.exc-age   { font-size:10px; font-family:var(--font-mono); color:var(--muted);
+             flex-shrink:0; text-align:right; }
+.exc-section-header { font-size:10px; font-weight:700; letter-spacing:.1em;
+                      text-transform:uppercase; color:var(--muted); padding:8px 0 4px;
+                      border-bottom:1px solid var(--border); margin-bottom:8px; }
+
+/* ── Team view ── */
+.team-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:12px; }
+.team-card { background:var(--surface); border:1px solid var(--border); border-radius:6px;
+             padding:14px 16px; }
+.team-card-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.team-avatar { width:36px; height:36px; border-radius:50%; background:rgba(79,142,247,.15);
+               color:var(--accent); font-size:12px; font-weight:700; display:flex;
+               align-items:center; justify-content:center; flex-shrink:0; }
+.team-name  { font-size:13px; font-weight:700; }
+.team-title { font-size:11px; color:var(--muted); margin-top:1px; }
+.team-alloc-bar { height:6px; border-radius:3px; background:rgba(255,255,255,.06);
+                  margin-bottom:6px; overflow:hidden; }
+.team-alloc-fill { height:100%; border-radius:3px; }
+.team-projects { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.team-project-row { display:flex; align-items:center; justify-content:space-between;
+                    font-size:11px; }
+.team-project-name { color:var(--muted); }
+.team-project-pct  { font-family:var(--font-mono); color:var(--text); }
+
+/* ── Add Project button ── */
+.add-btn { padding:8px 16px; background:rgba(0,210,255,.08); border:1px solid rgba(0,210,255,.25);
+           color:var(--cyan); font-size:11px; font-weight:700; letter-spacing:.08em;
+           text-transform:uppercase; cursor:pointer; border-radius:4px; font-family:var(--font-ui);
+           transition:all .15s; }
+.add-btn:hover { background:rgba(0,210,255,.14); }
+
+/* ── Empty state ── */
+.empty { text-align:center; padding:60px 24px; color:var(--muted); }
+.empty .icon { font-size:36px; margin-bottom:12px; }
+.empty .title { font-size:14px; font-weight:700; color:var(--text); margin-bottom:6px; }
+
+/* ── Loading ── */
+.loading { display:flex; align-items:center; justify-content:center; flex:1;
+           font-family:var(--font-mono); font-size:12px; color:var(--muted);
+           letter-spacing:.1em; }
+
+/* ── Toast ── */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+         background:var(--surf2); border:1px solid var(--border2); border-radius:8px;
+         padding:10px 20px; font-size:12px; font-weight:600; z-index:300;
+         display:none; }
+.toast.show { display:block; animation:fadeUp .2s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateX(-50%) translateY(6px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+</style>
+</head>
+<body>
+
+<div id="app">
+<nav id="sidebar"></nav>
+
+<div id="main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">PROJECTS</div>
+      <div class="page-subtitle" id="page-subtitle">Loading portfolio...</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)" id="header-meta"></div>
+      <button class="add-btn" onclick="openAddProject()">+ ADD PROJECT</button>
+    </div>
+  </div>
+
+  <!-- 90-day milestone horizon -->
+  <div class="horizon">
+    <div class="horizon-label">MILESTONE HORIZON — NEXT 90 DAYS</div>
+    <div class="horizon-track" id="horizon-track">
+      <div style="font-size:11px;color:var(--muted)">Loading...</div>
+    </div>
+  </div>
+
+  <!-- View switcher -->
+  <div class="view-strip">
+    <button class="view-btn active" onclick="switchView('portfolio')" id="vbtn-portfolio">PORTFOLIO</button>
+    <button class="view-btn" onclick="switchView('exceptions')" id="vbtn-exceptions">
+      EXCEPTIONS <span id="exc-count" style="font-size:9px;background:rgba(192,64,74,.2);color:#f07a7a;
+        padding:1px 5px;border-radius:3px;margin-left:4px;display:none">0</span>
+    </button>
+    <button class="view-btn" onclick="switchView('team')" id="vbtn-team">TEAM</button>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="content">
+    <div class="loading">LOADING PORTFOLIO DATA...</div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+Sidebar.init('projects.html');
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _projects    = [];
+let _tasks       = [];
+let _milestones  = [];
+let _allocations = [];
+let _resources   = [];
+let _requests    = [];
+let _timeEntries = [];
+let _evms        = {};
+let _currentView = 'portfolio';
+
+// ── EVM computation (from dashboard.html) ─────────────────────────────────────
+function calcEVM(proj, projTasks, projEntries) {
+  const today       = new Date().toLocaleDateString('en-CA');
+  const bac         = parseFloat(proj.budget_baseline_hours || 0);
+  const actualHrs   = (projEntries||[]).reduce((s,e) => s + parseFloat(e.hours||0), 0);
+  const totalEffort = projTasks.reduce((s,t) => s + parseFloat(t.effort_days||1), 0);
+  const earnedEff   = projTasks.reduce((s,t) =>
+    s + (parseFloat(t.pct_complete||0)/100 * parseFloat(t.effort_days||1)), 0);
+  const evPct       = totalEffort > 0 ? earnedEff / totalEffort : 0;
+  const ev          = bac > 0 ? evPct * bac : earnedEff;
+
+  const startDate   = proj.start_date;
+  const targetDate  = proj.target_date;
+  const daysTotal   = (startDate && targetDate)
+    ? Math.max(1, Math.round((new Date(targetDate+'T00:00:00') - new Date(startDate+'T00:00:00')) / 86400000)) : 0;
+  const daysElapsed = startDate
+    ? Math.max(0, Math.round((new Date(today) - new Date(startDate+'T00:00:00')) / 86400000)) : 0;
+  const schedPct    = daysTotal > 0 ? Math.min(1, daysElapsed / daysTotal) : 0;
+  const pv          = bac > 0 ? schedPct * bac : schedPct * totalEffort;
+
+  const cpi  = actualHrs > 0 ? ev / actualHrs : null;
+  const spi  = pv > 0        ? ev / pv         : null;
+  const eac  = (cpi && cpi > 0 && bac > 0) ? bac / cpi : null;
+
+  let teacDate = null, slipDays = null;
+  let p25Date = null, p50Date = null, p80Date = null;
+  if (spi && spi > 0 && daysTotal > 0 && startDate) {
+    const teacDays = Math.round(daysTotal / spi);
+    const ms = (d) => new Date(startDate+'T00:00:00').getTime() + d * 86400000;
+    teacDate  = new Date(ms(teacDays)).toLocaleDateString('en-CA');
+    if (targetDate)
+      slipDays = Math.round((new Date(teacDate+'T00:00:00') - new Date(targetDate+'T00:00:00')) / 86400000);
+    const daysRem = daysTotal - daysElapsed;
+    p25Date = new Date(ms(Math.round(daysElapsed + daysRem / 1.0))).toLocaleDateString('en-CA');
+    p50Date = new Date(ms(Math.round(daysTotal / spi))).toLocaleDateString('en-CA');
+    p80Date = new Date(ms(Math.round(daysTotal / (spi * 0.85)))).toLocaleDateString('en-CA');
+  }
+
+  const workRem  = bac - ev;
+  const fundsRem = bac - actualHrs;
+  const tcpi     = fundsRem > 0 ? workRem / fundsRem : null;
+
+  const overdueTasks  = projTasks.filter(t =>
+    t.due_date && t.due_date < today && t.status !== 'complete').length;
+  const blockedTasks  = projTasks.filter(t => t.status === 'blocked').length;
+  const inProgressCnt = projTasks.filter(t => t.status === 'in_progress').length;
+  const completeCnt   = projTasks.filter(t => t.status === 'complete').length;
+
+  let diagnosis = '';
+  if (blockedTasks > 0 && spi && spi < 1)
+    diagnosis = `${blockedTasks} blocked task${blockedTasks!==1?'s':''} — schedule at ${(spi*100).toFixed(0)}% efficiency`;
+  else if (overdueTasks > 0)
+    diagnosis = `${overdueTasks} overdue task${overdueTasks!==1?'s':''} — resourcing pressure on schedule`;
+  else if (cpi && cpi < 0.95)
+    diagnosis = `Cost overrun: CPI ${cpi.toFixed(2)} — ${((1/cpi-1)*100).toFixed(0)}% more effort than planned`;
+  else if (spi && spi < 0.95)
+    diagnosis = `Schedule slipping: SPI ${spi.toFixed(2)} — ${Math.round((1-spi)*100)}% behind plan`;
+  else
+    diagnosis = 'On track — no significant variance detected';
+
+  return { evPct, ev, pv, bac, actualHrs, cpi, spi, eac, tcpi,
+           teacDate, slipDays, p25Date, p50Date, p80Date,
+           diagnosis, overdueTasks, blockedTasks, inProgressCnt, completeCnt,
+           totalTasks: projTasks.length };
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [projects, tasks, milestones, allocations, resources, requests, times] = await Promise.all([
+      API.getProjects().catch(()=>[]),
+      API.getTasks().catch(()=>[]),
+      API.get('milestones?select=*&order=target_date.asc').catch(()=>[]),
+      API.get('resource_allocations?select=*').catch(()=>[]),
+      API.get('resources?is_active=eq.true&select=id,first_name,last_name,title').catch(()=>[]),
+      API.get('resource_requests?status=in.(pending,acknowledged,countered,escalated,delegated)&select=*').catch(()=>[]),
+      API.get('time_entries?select=*').catch(()=>[]),
+    ]);
+
+    _projects    = projects    || [];
+    _tasks       = tasks       || [];
+    _milestones  = milestones  || [];
+    _allocations = allocations || [];
+    _resources   = resources   || [];
+    _requests    = requests    || [];
+    _timeEntries = times       || [];
+
+    // Compute EVM for all projects
+    _projects.forEach(p => {
+      const pt = _tasks.filter(t => t.project_id === p.id);
+      const pe = _timeEntries.filter(e => e.project_id === p.id);
+      _evms[p.id] = calcEVM(p, pt, pe);
+    });
+
+    renderHeader();
+    renderHorizon();
+    renderView(_currentView);
+  } catch(e) {
+    document.getElementById('content').innerHTML =
+      `<div class="loading" style="color:var(--red)">Error loading data: ${e.message}</div>`;
+  }
+}
+
+// ── Header meta ───────────────────────────────────────────────────────────────
+function renderHeader() {
+  const active   = _projects.filter(p => p.status === 'active').length;
+  const planning = _projects.filter(p => p.status === 'planning').length;
+  const openReqs = _requests.length;
+  document.getElementById('page-subtitle').textContent =
+    `${_projects.length} projects total · ${active} active · ${planning} in planning`;
+  document.getElementById('header-meta').textContent =
+    openReqs > 0 ? `${openReqs} open resource request${openReqs!==1?'s':''}` : '';
+}
+
+// ── Milestone horizon ─────────────────────────────────────────────────────────
+function renderHorizon() {
+  const today    = new Date();
+  const in90     = new Date(today.getTime() + 90 * 86400000);
+  const todayStr = today.toLocaleDateString('en-CA');
+
+  const upcoming = _milestones
+    .filter(m => m.target_date >= todayStr && m.target_date <= in90.toLocaleDateString('en-CA'))
+    .sort((a,b) => a.target_date.localeCompare(b.target_date));
+
+  if (!upcoming.length) {
+    document.getElementById('horizon-track').innerHTML =
+      '<div style="font-size:11px;color:var(--muted)">No milestones in the next 90 days</div>';
+    return;
+  }
+
+  const statusColor = { complete:'var(--green)', in_progress:'var(--cyan)',
+    at_risk:'var(--amber)', blocked:'var(--red)', not_started:'var(--muted)' };
+
+  const proj = Object.fromEntries(_projects.map(p => [p.id, p.name.split('—')[0].trim()]));
+
+  let html = '';
+  upcoming.forEach((m, i) => {
+    const color = statusColor[m.status] || 'var(--muted)';
+    const daysAway = Math.round((new Date(m.target_date+'T00:00:00') - today) / 86400000);
+    const projName = proj[m.project_id] || '—';
+    html += `
+      <div class="milestone-pip" title="${escHtml(m.name)} · ${escHtml(projName)}">
+        <div class="pip-dot" style="background:${color}"></div>
+        <div class="pip-name" style="color:${color === 'var(--muted)' ? 'var(--muted)' : 'var(--text)'}">
+          ${escHtml(m.name.substring(0,20))}</div>
+        <div class="pip-date">${daysAway}d</div>
+      </div>`;
+    if (i < upcoming.length - 1) html += '<div class="horizon-connector"></div>';
+  });
+
+  document.getElementById('horizon-track').innerHTML = html;
+}
+
+// ── View switcher ─────────────────────────────────────────────────────────────
+function switchView(view) {
+  _currentView = view;
+  ['portfolio','exceptions','team'].forEach(v => {
+    document.getElementById('vbtn-' + v).classList.toggle('active', v === view);
+  });
+  renderView(view);
+}
+
+function renderView(view) {
+  const el = document.getElementById('content');
+  if      (view === 'portfolio')  renderPortfolio(el);
+  else if (view === 'exceptions') renderExceptions(el);
+  else if (view === 'team')       renderTeam(el);
+}
+
+// ── Portfolio view ─────────────────────────────────────────────────────────────
+function renderPortfolio(el) {
+  const active   = _projects.filter(p => p.status === 'active');
+  const planning = _projects.filter(p => p.status === 'planning');
+  const other    = _projects.filter(p => !['active','planning'].includes(p.status));
+
+  // KPI strip
+  const allEvms    = active.map(p => _evms[p.id]).filter(Boolean);
+  const avgCPI     = allEvms.filter(e=>e.cpi).length
+    ? (allEvms.filter(e=>e.cpi).reduce((s,e)=>s+e.cpi,0)/allEvms.filter(e=>e.cpi).length).toFixed(2) : '—';
+  const avgSPI     = allEvms.filter(e=>e.spi).length
+    ? (allEvms.filter(e=>e.spi).reduce((s,e)=>s+e.spi,0)/allEvms.filter(e=>e.spi).length).toFixed(2) : '—';
+  const worstSlip  = Math.max(0, ...allEvms.map(e=>e.slipDays||0));
+  const totalBudgetH = _projects.reduce((s,p)=>s+(p.budget_baseline_hours||0),0);
+  const totalUsedH   = _timeEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const openReqs   = _requests.length;
+
+  const cpiColor = avgCPI === '—' ? 'var(--muted)' : parseFloat(avgCPI) >= 1 ? 'var(--green)' : parseFloat(avgCPI) >= 0.9 ? 'var(--amber)' : 'var(--red)';
+  const spiColor = avgSPI === '—' ? 'var(--muted)' : parseFloat(avgSPI) >= 1 ? 'var(--green)' : parseFloat(avgSPI) >= 0.9 ? 'var(--amber)' : 'var(--red)';
+  const slipColor = worstSlip === 0 ? 'var(--green)' : worstSlip <= 14 ? 'var(--amber)' : 'var(--red)';
+  const reqColor  = openReqs === 0 ? 'var(--green)' : 'var(--red)';
+
+  let html = `
+    <div class="kpi-strip">
+      <div class="kpi" style="border-top-color:${cpiColor}">
+        <div class="kpi-lbl">Portfolio CPI</div>
+        <div class="kpi-val" style="color:${cpiColor}">${avgCPI}</div>
+        <div class="kpi-sub">Cost performance avg</div>
+      </div>
+      <div class="kpi" style="border-top-color:${spiColor}">
+        <div class="kpi-lbl">Portfolio SPI</div>
+        <div class="kpi-val" style="color:${spiColor}">${avgSPI}</div>
+        <div class="kpi-sub">Schedule performance avg</div>
+      </div>
+      <div class="kpi" style="border-top-color:${slipColor}">
+        <div class="kpi-lbl">Worst Slip</div>
+        <div class="kpi-val" style="color:${slipColor}">${worstSlip > 0 ? '+'+worstSlip+'d' : '✓'}</div>
+        <div class="kpi-sub">Forecast vs target</div>
+      </div>
+      <div class="kpi" style="border-top-color:var(--accent)">
+        <div class="kpi-lbl">Labor Hours</div>
+        <div class="kpi-val" style="color:var(--text)">${Math.round(totalUsedH)}</div>
+        <div class="kpi-sub">of ${totalBudgetH.toLocaleString()} budgeted</div>
+      </div>
+      <div class="kpi" style="border-top-color:${reqColor}">
+        <div class="kpi-lbl">Open Requests</div>
+        <div class="kpi-val" style="color:${reqColor}">${openReqs}</div>
+        <div class="kpi-sub">Resource requests pending</div>
+      </div>
+    </div>`;
+
+  // Project cards
+  const sections = [
+    { label: 'ACTIVE', items: active },
+    { label: 'PLANNING', items: planning },
+    { label: 'OTHER', items: other },
+  ].filter(s => s.items.length > 0);
+
+  sections.forEach(sec => {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--muted);
+      text-transform:uppercase;margin:${sec === sections[0] ? '0' : '20px'} 0 10px">${sec.label}</div>
+      <div class="proj-grid">`;
+    sec.items.forEach(p => { html += renderProjectCard(p); });
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+
+  // Update exceptions badge
+  const excCount = buildExceptions().length;
+  const excEl = document.getElementById('exc-count');
+  if (excCount > 0) {
+    excEl.textContent = excCount;
+    excEl.style.display = 'inline';
+  }
+}
+
+function renderProjectCard(p) {
+  const evm     = _evms[p.id] || {};
+  const pm      = _resources.find(r => r.id === p.pm_resource_id);
+  const pmInit  = pm ? (pm.first_name[0]+pm.last_name[0]).toUpperCase() : '??';
+  const pmName  = pm ? pm.first_name + ' ' + pm.last_name : '—';
+  const openReq = _requests.filter(r => r.project_id === p.id).length;
+  const upcomingMs = _milestones.filter(m =>
+    m.project_id === p.id &&
+    m.target_date >= new Date().toLocaleDateString('en-CA') &&
+    ['not_started','in_progress','at_risk'].includes(m.status)
+  ).sort((a,b) => a.target_date.localeCompare(b.target_date));
+
+  const nextMs = upcomingMs[0];
+  const today  = new Date().toLocaleDateString('en-CA');
+
+  const cpiC = !evm.cpi ? 'var(--muted)' : evm.cpi >= 1 ? 'var(--green)' : evm.cpi >= 0.9 ? 'var(--amber)' : 'var(--red)';
+  const spiC = !evm.spi ? 'var(--muted)' : evm.spi >= 1 ? 'var(--green)' : evm.spi >= 0.9 ? 'var(--amber)' : 'var(--red)';
+  const tcpiC = !evm.tcpi ? 'var(--muted)' : evm.tcpi <= 1.1 ? 'var(--green)' : evm.tcpi <= 1.2 ? 'var(--amber)' : 'var(--red)';
+  const slipC = !evm.slipDays || evm.slipDays <= 0 ? 'var(--green)' : evm.slipDays <= 14 ? 'var(--amber)' : 'var(--red)';
+
+  const pct = Math.round((evm.evPct || 0) * 100);
+  const pctColor = pct >= 75 ? 'var(--green)' : pct >= 40 ? 'var(--cyan)' : 'var(--accent)';
+
+  const pctUsed = evm.bac > 0 ? (evm.actualHrs / evm.bac * 100).toFixed(0) : '—';
+
+  return `
+  <div class="proj-card status-${p.status}" onclick="goToProject('${p.id}')">
+    <div class="proj-card-head">
+      <div>
+        <div class="proj-name">${escHtml(p.name)}</div>
+        <div class="proj-meta">
+          <span style="color:var(--muted)">${escHtml(p.phase||'—')}</span>
+          <span style="color:var(--border2);margin:0 6px">·</span>
+          <span style="width:18px;height:18px;border-radius:50%;background:rgba(79,142,247,.15);
+            color:var(--accent);font-size:9px;font-weight:700;display:inline-flex;
+            align-items:center;justify-content:center;margin-right:3px">${pmInit}</span>
+          ${escHtml(pmName)}
+          ${p.target_date ? `<span style="color:var(--border2);margin:0 6px">·</span>
+            <span>Due ${fmtDate(p.target_date)}</span>` : ''}
+        </div>
+      </div>
+      <span class="proj-status-badge ${p.status}">${p.status.replace('_',' ')}</span>
+    </div>
+
+    <!-- EVM row -->
+    <div class="evm-row">
+      <div class="evm-cell">
+        <div class="evm-cell-label">CPI</div>
+        <div class="evm-cell-val" style="color:${cpiC}">${evm.cpi ? evm.cpi.toFixed(2) : '—'}</div>
+      </div>
+      <div class="evm-cell">
+        <div class="evm-cell-label">SPI</div>
+        <div class="evm-cell-val" style="color:${spiC}">${evm.spi ? evm.spi.toFixed(2) : '—'}</div>
+      </div>
+      <div class="evm-cell">
+        <div class="evm-cell-label">TCPI</div>
+        <div class="evm-cell-val" style="color:${tcpiC}">${evm.tcpi ? evm.tcpi.toFixed(2) : '—'}</div>
+      </div>
+      <div class="evm-cell">
+        <div class="evm-cell-label">FORECAST SLIP</div>
+        <div class="evm-cell-val" style="color:${slipC}">
+          ${!evm.slipDays || evm.slipDays <= 0 ? '✓' : '+'+evm.slipDays+'d'}
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="proj-progress">
+      <div style="display:flex;justify-content:space-between;font-size:10px;
+          color:var(--muted);margin-bottom:5px">
+        <span>${pct}% complete</span>
+        <span>${evm.actualHrs ? Math.round(evm.actualHrs) : 0}h used of ${evm.bac || '—'}h budget</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fg" style="width:${pct}%;background:${pctColor}"></div>
+      </div>
+    </div>
+
+    <!-- Forecast + signals -->
+    <div class="proj-footer">
+      <div class="forecast-dates">
+        <div class="forecast-item">
+          <span class="fl">Target</span>
+          <span class="fv" style="color:var(--muted)">${fmtDate(p.target_date)}</span>
+        </div>
+        ${evm.p50Date ? `
+        <div class="forecast-item">
+          <span class="fl">P50 Forecast</span>
+          <span class="fv" style="color:${slipC}">${fmtDate(evm.p50Date)}</span>
+        </div>` : ''}
+        ${nextMs ? `
+        <div class="forecast-item">
+          <span class="fl">Next milestone</span>
+          <span class="fv" style="color:${nextMs.status==='at_risk'?'var(--amber)':'var(--text)'}">
+            ${escHtml(nextMs.name.substring(0,25))} · ${fmtDate(nextMs.target_date)}</span>
+        </div>` : ''}
+      </div>
+      <div class="signal-badges">
+        ${evm.overdueTasks > 0 ? `<span class="sig-badge task">⚠ ${evm.overdueTasks} overdue</span>` : ''}
+        ${openReq > 0 ? `<span class="sig-badge request">⬡ ${openReq} request${openReq!==1?'s':''}</span>` : ''}
+        ${upcomingMs.filter(m=>m.status==='at_risk').length > 0 ?
+          `<span class="sig-badge milestone">◈ milestone at risk</span>` : ''}
+      </div>
+    </div>
+
+    <!-- Diagnosis -->
+    ${evm.diagnosis ? `<div class="proj-diagnosis">${escHtml(evm.diagnosis)}</div>` : ''}
+  </div>`;
+}
+
+// ── Exceptions view ───────────────────────────────────────────────────────────
+function buildExceptions() {
+  const today   = new Date().toLocaleDateString('en-CA');
+  const in7     = new Date(Date.now() + 7*86400000).toLocaleDateString('en-CA');
+  const items   = [];
+  const projName = (id) => _projects.find(p=>p.id===id)?.name || '—';
+
+  // 1. Overdue tasks
+  _tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'complete').forEach(t => {
+    const daysOver = Math.round((new Date(today) - new Date(t.due_date+'T00:00:00')) / 86400000);
+    items.push({
+      type: 'task', sev: daysOver > 7 ? 'critical' : 'high',
+      title: `Overdue: ${t.name}`,
+      sub: `${daysOver} day${daysOver!==1?'s':''} past due date · ${t.status.replace('_',' ')}`,
+      proj: projName(t.project_id),
+      projId: t.project_id,
+      age: daysOver + 'd overdue',
+      sortKey: -daysOver,
+    });
+  });
+
+  // 2. At-risk milestones
+  _milestones.filter(m => m.status === 'at_risk' || m.status === 'blocked').forEach(m => {
+    items.push({
+      type: 'milestone', sev: m.status === 'blocked' ? 'critical' : 'high',
+      title: `${m.status === 'blocked' ? 'Blocked' : 'At risk'}: ${m.name}`,
+      sub: `Milestone target ${fmtDate(m.target_date)}`,
+      proj: projName(m.project_id),
+      projId: m.project_id,
+      age: fmtDate(m.target_date),
+      sortKey: m.target_date,
+    });
+  });
+
+  // 3. Open resource requests
+  _requests.forEach(r => {
+    const hoursOpen = Math.round((Date.now() - new Date(r.submitted_at)) / 3600000);
+    const res = _resources.find(x=>x.id===r.requested_resource_id);
+    const resName = res ? res.first_name + ' ' + res.last_name : '—';
+    items.push({
+      type: 'request', sev: r.urgency === 'critical' ? 'critical' : hoursOpen > 24 ? 'high' : 'medium',
+      title: `Resource request: ${resName}`,
+      sub: `${r.urgency.toUpperCase()} · ${r.status} · ${hoursOpen}h without resolution`,
+      proj: projName(r.project_id),
+      projId: r.project_id,
+      age: hoursOpen + 'h open',
+      sortKey: -hoursOpen,
+    });
+  });
+
+  // 4. Budget warnings (> 80% consumed)
+  _projects.filter(p => p.status === 'active').forEach(p => {
+    const evm = _evms[p.id];
+    if (!evm || !evm.bac || evm.bac === 0) return;
+    const pctUsed = evm.actualHrs / evm.bac;
+    if (pctUsed >= 0.8 && evm.evPct < 0.9) {
+      items.push({
+        type: 'budget', sev: pctUsed >= 0.95 ? 'critical' : 'high',
+        title: `Budget warning: ${(pctUsed*100).toFixed(0)}% hours consumed`,
+        sub: `${Math.round(evm.actualHrs)}h used of ${evm.bac}h budget · ${Math.round(evm.evPct*100)}% complete`,
+        proj: p.name,
+        projId: p.id,
+        age: `CPI ${evm.cpi?.toFixed(2)||'—'}`,
+        sortKey: -pctUsed,
+      });
+    }
+  });
+
+  return items.sort((a,b) => {
+    const sevOrder = {critical:0, high:1, medium:2};
+    return (sevOrder[a.sev]||3) - (sevOrder[b.sev]||3);
+  });
+}
+
+function renderExceptions(el) {
+  const items = buildExceptions();
+
+  if (!items.length) {
+    el.innerHTML = `<div class="empty">
+      <div class="icon">✓</div>
+      <div class="title">No exceptions</div>
+      <div>All projects, milestones, and resources are on track.</div>
+    </div>`;
+    return;
+  }
+
+  const typeIcon  = { task:'⚠', request:'⬡', milestone:'◈', budget:'$' };
+  const typeLabel = { task:'TASK', request:'RESOURCE REQUEST', milestone:'MILESTONE', budget:'BUDGET' };
+
+  let html = `<div class="exception-list">`;
+  let lastSev = null;
+
+  items.forEach(item => {
+    if (item.sev !== lastSev) {
+      const labels = { critical:'🚨 CRITICAL', high:'⚠ HIGH PRIORITY', medium:'ℹ MEDIUM' };
+      html += `<div class="exc-section-header">${labels[item.sev]||item.sev.toUpperCase()}</div>`;
+      lastSev = item.sev;
+    }
+    html += `
+    <div class="exception-card sev-${item.sev}" onclick="goToProject('${item.projId}')">
+      <div class="exc-icon ${item.type}">${typeIcon[item.type]}</div>
+      <div class="exc-body">
+        <div class="exc-title">${escHtml(item.title)}</div>
+        <div class="exc-sub">${escHtml(item.sub)}</div>
+        <div class="exc-proj">${escHtml(item.proj)} · ${typeLabel[item.type]}</div>
+      </div>
+      <div class="exc-age">${escHtml(item.age)}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ── Team view ─────────────────────────────────────────────────────────────────
+function renderTeam(el) {
+  // Group allocations by resource
+  const resourceMap = {};
+  _allocations.forEach(a => {
+    if (!resourceMap[a.resource_id]) resourceMap[a.resource_id] = [];
+    resourceMap[a.resource_id].push(a);
+  });
+
+  const cards = _resources.map(r => {
+    const allocs     = resourceMap[r.id] || [];
+    const totalPct   = allocs.reduce((s,a) => s + (a.allocation_pct||0), 0);
+    const initials   = (r.first_name[0] + r.last_name[0]).toUpperCase();
+    const overAlloc  = totalPct > 100;
+    const allocColor = overAlloc ? 'var(--red)' : totalPct >= 100 ? 'var(--amber)' : 'var(--green)';
+    const fillPct    = Math.min(100, totalPct);
+
+    const projRows = allocs.map(a => {
+      const proj = _projects.find(p => p.id === a.project_id);
+      return `<div class="team-project-row">
+        <span class="team-project-name">${escHtml(proj?.name?.substring(0,28)||'—')}</span>
+        <span class="team-project-pct">${a.allocation_pct}%</span>
+      </div>`;
+    }).join('');
+
+    const openReqs = _requests.filter(r2 =>
+      r2.requested_resource_id === r.id ||
+      r2.requesting_resource_id === r.id
+    ).length;
+
+    return `
+    <div class="team-card">
+      <div class="team-card-head">
+        <div class="team-avatar">${initials}</div>
+        <div>
+          <div class="team-name">${escHtml(r.first_name + ' ' + r.last_name)}</div>
+          <div class="team-title">${escHtml(r.title||'—')}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px">
+        <span style="color:var(--muted)">Total allocation</span>
+        <span style="color:${allocColor};font-weight:700">${totalPct}%${overAlloc?' ⚠':''}</span>
+      </div>
+      <div class="team-alloc-bar">
+        <div class="team-alloc-fill" style="width:${fillPct}%;background:${allocColor}"></div>
+      </div>
+      ${projRows ? `<div class="team-projects">${projRows}</div>` : '<div style="font-size:11px;color:var(--text3);margin-top:8px">No current allocations</div>'}
+      ${openReqs > 0 ? `<div style="margin-top:8px;font-size:10px;color:#f07a7a">
+        ${openReqs} open resource request${openReqs!==1?'s':''}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = cards || '<div class="empty"><div class="title">No resources found</div></div>';
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function goToProject(projectId) {
+  window.location.href = `/project-detail.html?id=${projectId}`;
+}
+
+function openAddProject() {
+  // If project-drawer.js is loaded, use it; otherwise navigate to a create page
+  if (typeof ProjectDrawer !== 'undefined') {
+    ProjectDrawer.open();
+  } else {
+    showToast('Project creation available in Project Detail page', 'info');
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date((d.includes('T') ? d : d + 'T00:00:00'))
+    .toLocaleDateString('en-US', {month:'short', day:'numeric', year:'2-digit'});
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show`;
+  el.style.borderColor = type === 'info' ? 'rgba(79,142,247,.4)' : 'rgba(42,157,64,.4)';
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>
