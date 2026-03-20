@@ -938,8 +938,8 @@ function renderProjectCard(p) {
     <div class="proj-progress">
       <div style="display:flex;justify-content:space-between;font-size:10px;
           color:var(--muted);margin-bottom:5px">
-        <span data-tip="Effort-weighted schedule progress: ${evm.earnedEffortDays||0} of ${evm.totalEffortDays||0} planned effort-days earned across ${evm.completeCnt||0} complete + ${evm.inProgressCnt||0} in-progress tasks of ${evm.totalTasks||0} total"
-          style="cursor:default">${pct}% Planned Work Complete</span>
+        <span data-tip="Effort-weighted progress: ${evm.completeCnt||0} complete + ${evm.inProgressCnt||0} in-progress tasks of ${evm.totalTasks||0} total. Earned ${Math.round((evm.evPct||0)*100)}% of BAC."
+          style="cursor:pointer">${pct}% Planned Work Complete</span>
         <span>${evm.actualHrs ? Math.round(evm.actualHrs) : 0}h used of ${evm.bac || '—'}h budget</span>
       </div>
       <div class="progress-bar-bg">
@@ -1184,6 +1184,24 @@ function showToast(msg, type='info') {
   el.style.borderColor = type === 'info' ? 'rgba(79,142,247,.4)' : 'rgba(42,157,64,.4)';
   setTimeout(() => el.classList.remove('show'), 3000);
 }
+
+// ── data-tip delegated handler ───────────────────────────────────────────────
+// For elements injected via innerHTML, CSS :hover::after won't reliably fire
+// Use a delegated mouseover/mouseout on the content area instead
+document.addEventListener('mouseover', function(e) {
+  const el = e.target.closest('[data-tip]');
+  if (!el) return;
+  const tip = el.getAttribute('data-tip');
+  if (!tip) return;
+  TIP.show('<div style="font-size:12px;line-height:1.5;max-width:280px">' + escHtml(tip) + '</div>', e);
+});
+document.addEventListener('mouseout', function(e) {
+  const el = e.target.closest('[data-tip]');
+  if (el && !el.contains(e.relatedTarget)) TIP.hide();
+});
+document.addEventListener('mousemove', function(e) {
+  if (e.target.closest('[data-tip]')) TIP.position(e);
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadAll();
