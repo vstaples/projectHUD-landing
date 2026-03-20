@@ -580,7 +580,8 @@ function renderRequestCard(req, isSent = false) {
         <div style="font-size:11px;color:var(--muted);margin-top:2px">
           ${isSent ? `Approver: ${escHtml(aprName)} · ` : `Requested by: ${escHtml(reqName)} · `}
           <span style="color:var(--accent)">${escHtml(project?.name||'—')}</span>
-          ${task ? ` · <span style="color:var(--muted)">${escHtml(task.name)}</span>` : ''}
+          ${task?.phase ? ` · <span style="color:var(--muted)">${escHtml(task.phase)}</span>` : ''}
+          ${task?.name  ? ` · <span style="color:var(--text)">${escHtml(task.name)}</span>` : ''}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
@@ -748,7 +749,10 @@ function renderResolvedCard(req) {
           <span class="urgency ${req.urgency}">${req.urgency.toUpperCase()}</span>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">
-          Requested by ${escHtml(reqName)} · ${escHtml(project?.name||'—')} · ${fmtDate(req.submitted_at)}
+          Requested by ${escHtml(reqName)} · <span style="color:var(--accent)">${escHtml(project?.name||'—')}</span>
+          ${task?.phase ? ` · <span style="color:var(--muted)">${escHtml(task.phase)}</span>` : ''}
+          ${task?.name  ? ` · <span style="color:var(--text)">${escHtml(task.name)}</span>` : ''}
+          · ${fmtDate(req.submitted_at)}
         </div>
         ${req.denial_reason ? `<div style="font-size:11px;color:#f07a7a;margin-top:4px;font-style:italic">
           Denial: "${escHtml(req.denial_reason)}"</div>` : ''}
