@@ -1461,10 +1461,10 @@ function renderExceptions(el) {
             <span style="color:var(--muted);margin-left:8px">${t.daysOver}d overdue · ${escHtml(t.phase||'—')} · ${t.assignee ? t.assignee.first_name+' '+t.assignee.last_name : '—'}</span>
           </div>
           <div style="display:flex;align-items:center;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
-            ${!t.exception_priority ? '<span class="pri-unset">unset</span>' : ''}
-            <button class="pri-btn high${t.exception_priority==='high'?' active':''}" onclick="setPriority('${t.id}','high',this)">HIGH</button>
-            <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}" onclick="setPriority('${t.id}','medium',this)">MED</button>
-            <button class="pri-btn low${t.exception_priority==='low'?' active':''}" onclick="setPriority('${t.id}','low',this)">LOW</button>
+            ${!t.exception_priority ? '<span style="font-size:9px;font-weight:800;color:#ffffff;letter-spacing:.06em;margin-right:2px">PRIORITY</span>' : ''}
+            <button class="pri-btn high${t.exception_priority==='high'?' active':''}" onclick="setPriority('${t.id}','high',this,event)">HIGH</button>
+            <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}" onclick="setPriority('${t.id}','medium',this,event)">MED</button>
+            <button class="pri-btn low${t.exception_priority==='low'?' active':''}" onclick="setPriority('${t.id}','low',this,event)">LOW</button>
           </div>
         </div>
         <div id="exc-${idx}-${t.id?.substring(0,8)}" style="display:none;padding:10px 14px 10px 56px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)">
@@ -1566,7 +1566,6 @@ function analyzeRootCause(t, taskDeliverables, taskDeps) {
 
 // ── Criticality assessment ────────────────────────────────────────────────────
 function assessCriticality(t) {
-  // Downstream milestone proximity
   const today = new Date().toLocaleDateString('en-CA');
   const downstreamMilestones = _milestones.filter(m =>
     m.project_id === t.project_id &&
@@ -1576,14 +1575,13 @@ function assessCriticality(t) {
 
   const nearestMs = downstreamMilestones[0];
   const daysToMs  = nearestMs ? Math.round((new Date(nearestMs.target_date+'T00:00:00') - new Date()) / 86400000) : null;
-
-  // Fan-out — how many tasks does this unblock
   const fanOut = _dependencies.filter(d => d.predecessor_task_id === t.id).length;
 
-  if (daysToMs !== null && daysToMs <= 14) return { level:'HIGH', color:'#f07a7a', reason:`On critical path to ${nearestMs.name} in ${daysToMs} day${daysToMs!==1?'s':''}` };
-  if (daysToMs !== null && daysToMs <= 30) return { level:'MEDIUM', color:'var(--amber)', reason:`Milestone ${nearestMs.name} in ${daysToMs} days` };
-  if (fanOut >= 3) return { level:'MEDIUM', color:'var(--amber)', reason:`Blocks ${fanOut} downstream tasks` };
-  return { level:'LOW', color:'var(--muted)', reason: daysToMs ? `Next milestone in ${daysToMs} days` : 'No immediate milestone dependency' };
+  // HIGH = red, MEDIUM = amber, LOW = cyan/blue
+  if (daysToMs !== null && daysToMs <= 14) return { level:'HIGH',   color:'#f07a7a',      bg:'rgba(192,64,74,.08)',   reason:`Critical path to ${nearestMs.name} in ${daysToMs}d` };
+  if (daysToMs !== null && daysToMs <= 30) return { level:'MEDIUM', color:'var(--amber)',  bg:'rgba(212,144,31,.08)', reason:`Milestone ${nearestMs.name} in ${daysToMs}d` };
+  if (fanOut >= 3)                         return { level:'MEDIUM', color:'var(--amber)',  bg:'rgba(212,144,31,.08)', reason:`Blocks ${fanOut} downstream tasks` };
+  return { level:'LOW', color:'var(--accent)', bg:'rgba(79,142,247,.08)', reason: daysToMs ? `Next milestone in ${daysToMs}d` : 'No immediate milestone dependency' };
 }
 
 // ── Full case file renderer ───────────────────────────────────────────────────
@@ -1627,9 +1625,9 @@ function renderTaskDetail(t) {
         <div class="exc-detail-sub">${escHtml(proj?.name||'—')}</div>
         <div class="exc-detail-sub" style="margin-top:4px">${pctDisplay}% complete</div>
       </div>
-      <div class="exc-detail-cell">
+      <div class="exc-detail-cell" style="border-color:${criticality.color};border-left:2px solid ${criticality.color}">
         <div class="exc-detail-label">Criticality</div>
-        <div class="exc-detail-val" style="color:${criticality.color}">${criticality.level}</div>
+        <div class="exc-detail-val" style="color:${criticality.color};font-size:14px">${criticality.level}</div>
         <div class="exc-detail-sub">${escHtml(criticality.reason)}</div>
       </div>
     </div>
@@ -1768,10 +1766,11 @@ function renderTaskDetail(t) {
     </div>
     <div class="case-pane-body" id="${caseId}-actions">
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:6px">
+        <button class="case-action-btn" style="background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.35)" onclick="logAnnotation('${t.id}','action_item',event)">✚ Add Action Item</button>
+        <button class="case-action-btn amber" onclick="logAnnotation('${t.id}','note',event)">📝 Add Note</button>
+        <button class="case-action-btn" onclick="logAnnotation('${t.id}','acknowledgment',event)">✓ Acknowledge</button>
+        ${blockingInputs && blockingInputs.length > 0 ? `<button class="case-action-btn amber" onclick="logAnnotation('${t.id}','block_discovery',event)">📄 Flag Blocking Input</button>` : ''}
         ${!openReq ? `<button class="case-action-btn" onclick="raiseResourceRequest('${t.id}','${t.project_id}',event)">⬡ Raise Resource Request</button>` : ''}
-        <button class="case-action-btn amber" onclick="logAnnotation('${t.id}','note',event)">📝 Add Note to Record</button>
-        ${blockingInputs && blockingInputs.length > 0 ? `<button class="case-action-btn amber" onclick="logAnnotation('${t.id}','block_discovery',event)">📄 Flag Input as Blocking</button>` : ''}
-        <button class="case-action-btn" onclick="logAnnotation('${t.id}','acknowledgment',event)">✓ Acknowledge &amp; Record Intent</button>
         <button class="case-action-btn red" onclick="logAnnotation('${t.id}','escalation',event)">↑ Escalate</button>
       </div>
     </div>
@@ -1833,7 +1832,7 @@ async function loadAndToggleHistory(taskId, paneId, event) {
       const color = typeColor[a.action_type] || 'var(--muted)';
       const label = typeLabel[a.action_type] || a.action_type;
       const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-      return `<div class="hist-row">
+      return `<div class="hist-row" id="ann-${a.id}">
         <div class="hist-time">${ts}</div>
         <div style="flex:1;min-width:0">
           <div class="hist-type" style="color:${color}">${label}</div>
@@ -1842,6 +1841,7 @@ async function loadAndToggleHistory(taskId, paneId, event) {
           ${a.intended_action ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>` : ''}
           ${a.outcome ? `<div class="hist-body" style="color:var(--green)">Outcome: ${escHtml(a.outcome)}</div>` : ''}
         </div>
+        <button onclick="deleteAnnotation('${a.id}',event)" title="Delete (dev)" style="background:none;border:none;color:var(--border2);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#f07a7a'" onmouseleave="this.style.color='var(--border2)'">🗑</button>
       </div>`;
     }).join('');
   } catch(e) {
@@ -2003,7 +2003,7 @@ async function confirmResourcePicker() {
       firm_id: FIRM_ID, project_id: task?.project_id||null,
       entity_type:'task', entity_id:_rpTaskId,
       actor_resource_id: CURRENT_USER_RESOURCE_ID, action_type:'intervention',
-      notes: `Task assigned to: ${names}${_rpSelected.length>1?' (team assignment)':''}`,
+      notes: `Task assigned to: ${_rpSelected.map(id=>{const r=resolveAssignee(id);return r?r.first_name+' '+r.last_name:id;}).join(', ')}${_rpSelected.length>1?' (team assignment)':''}`,
       occurred_at: new Date().toISOString(),
     });
     closeResourcePicker();
@@ -2016,7 +2016,8 @@ async function confirmResourcePicker() {
 }
 
 // ── Set exception priority — persists to DB, updates local state + DOM ──────────
-async function setPriority(taskId, priority, btnEl) {
+async function setPriority(taskId, priority, btnEl, event) {
+  if (event) event.stopPropagation();
   try {
     await API.patch(`tasks?id=eq.${taskId}`, { exception_priority: priority });
     // Update local task state
@@ -2108,16 +2109,18 @@ function logAnnotation(taskId, actionType, event) {
   if (existing) { existing.remove(); return; }
 
   const titles = {
-    note: 'Add Note to Chain of Custody',
+    action_item:    'Add Action Item',
+    note:           'Add Note to Chain of Custody',
     acknowledgment: 'Acknowledge & Record Intent',
-    block_discovery: 'Record Blocking Condition',
-    escalation: 'Escalate — Record Reason',
+    block_discovery:'Record Blocking Condition',
+    escalation:     'Escalate — Record Reason',
   };
   const placeholders = {
-    note: 'Describe what you observed or decided...',
+    action_item:    'Describe the action, who is responsible, and the deadline...',
+    note:           'Describe what you observed or decided...',
     acknowledgment: 'Describe your understanding of the block condition...',
-    block_discovery: 'Describe the specific input or condition that is blocking this task...',
-    escalation: 'Describe why this needs escalation and to whom...',
+    block_discovery:'Describe the specific input or condition that is blocking this task...',
+    escalation:     'Describe why this needs escalation and to whom...',
   };
 
   const widget = document.createElement('div');
@@ -2188,7 +2191,7 @@ async function saveAnnotation(taskId, actionType, containerId, event) {
               const color = typeColor[a.action_type] || 'var(--muted)';
               const label = typeLabel[a.action_type] || a.action_type;
               const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-              return `<div class="hist-row">
+              return `<div class="hist-row" id="ann-${a.id}">
                 <div class="hist-time">${ts}</div>
                 <div style="flex:1;min-width:0">
                   <div class="hist-type" style="color:${color}">${label}</div>
@@ -2196,6 +2199,7 @@ async function saveAnnotation(taskId, actionType, containerId, event) {
                   ${a.notes?`<div class="hist-body">${escHtml(a.notes)}</div>`:''}
                   ${a.intended_action?`<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>`:''}
                 </div>
+                <button onclick="deleteAnnotation('${a.id}',event)" title="Delete (dev)" style="background:none;border:none;color:var(--border2);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#f07a7a'" onmouseleave="this.style.color='var(--border2)'">🗑</button>
               </div>`;
             }).join('');
       }
@@ -2368,6 +2372,20 @@ async function submitResourceRequest(taskId, projectId, event) {
     // Don't re-render — would collapse expanded panes
   } catch(e) {
     showToast('Error: '+e.message, 'error');
+  }
+}
+
+// ── Delete annotation (dev mode) ─────────────────────────────────────────────
+async function deleteAnnotation(annotationId, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('Delete this chain of custody entry? (Development only)')) return;
+  try {
+    await API.del(`exception_annotations?id=eq.${annotationId}`);
+    const row = document.getElementById('ann-' + annotationId);
+    if (row) row.remove();
+    showToast('Entry deleted', 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
   }
 }
 
