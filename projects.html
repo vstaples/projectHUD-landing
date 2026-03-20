@@ -388,6 +388,95 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
   text-transform:uppercase; color:var(--muted); margin:8px 0 4px; }
 #rich-tip .tip-badge { display:inline-block; padding:2px 7px; border-radius:3px;
   font-size:10px; font-weight:700; margin-right:4px; margin-bottom:2px; }
+/* ── Modal overlay ── */
+.hud-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:400;
+  display:flex; align-items:center; justify-content:center; padding:20px; }
+.hud-modal { background:var(--surf2); border:1px solid var(--border2); border-radius:8px;
+  box-shadow:0 8px 40px rgba(0,0,0,.6); max-height:80vh; display:flex; flex-direction:column;
+  font-family:var(--font-ui); }
+.hud-modal-header { padding:14px 18px 12px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.hud-modal-title { font-size:13px; font-weight:700; color:var(--text0); letter-spacing:.04em; }
+.hud-modal-close { background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:18px; line-height:1; padding:0 2px; transition:color .15s; }
+.hud-modal-close:hover { color:var(--text); }
+.hud-modal-body { flex:1; overflow-y:auto; padding:14px 18px; }
+.hud-modal-body::-webkit-scrollbar { width:4px; }
+.hud-modal-body::-webkit-scrollbar-thumb { background:var(--border2); }
+.hud-modal-footer { padding:12px 18px; border-top:1px solid var(--border);
+  display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-shrink:0; }
+
+/* Resource picker */
+.rp-dept-header { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--cyan); padding:10px 0 5px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+.rp-table { width:100%; border-collapse:collapse; font-size:11px; }
+.rp-table th { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); padding:4px 8px; text-align:left; border-bottom:1px solid var(--border); }
+.rp-table td { padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+.rp-table tr:hover td { background:rgba(255,255,255,.03); cursor:pointer; }
+.rp-table tr.selected td { background:rgba(0,210,255,.06); }
+.rp-alloc-bar { height:4px; border-radius:2px; background:rgba(255,255,255,.08); width:60px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:6px; }
+.rp-alloc-fill { height:100%; border-radius:2px; }
+.rp-selected-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; min-height:28px;
+  padding:4px; background:rgba(0,0,0,.2); border:1px solid var(--border); border-radius:4px; }
+.rp-chip { display:flex; align-items:center; gap:4px; background:rgba(0,210,255,.1);
+  border:1px solid rgba(0,210,255,.25); color:var(--cyan); font-size:10px; font-weight:600;
+  padding:2px 8px; border-radius:3px; }
+.rp-chip-x { cursor:pointer; font-size:13px; line-height:1; color:var(--muted); }
+.rp-chip-x:hover { color:#f07a7a; }
+.rp-search { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+  font-size:11px; padding:6px 10px; border-radius:4px; font-family:var(--font-ui); margin-bottom:10px; }
+.rp-search:focus { outline:none; border-color:var(--cyan); }
+
+/* Form fields */
+.hud-field-label { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:4px; margin-top:12px; }
+.hud-field-label:first-child { margin-top:0; }
+.hud-input { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-ui); }
+.hud-input:focus { outline:none; border-color:var(--cyan); }
+.hud-textarea { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-ui);
+  resize:vertical; min-height:70px; }
+.hud-textarea:focus { outline:none; border-color:var(--cyan); }
+.hud-select { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-ui); }
+.hud-select:focus { outline:none; border-color:var(--cyan); }
+
+/* Inline annotation widget */
+.annotation-widget { background:rgba(0,0,0,.2); border:1px solid var(--border2); border-radius:6px;
+  padding:12px; margin-top:8px; }
+.annotation-widget-title { font-size:10px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--cyan); margin-bottom:8px; }
+
+/* Task name tooltip */
+.task-tip { position:fixed; background:var(--surf2); border:1px solid var(--border2);
+  border-radius:6px; padding:0; z-index:350; min-width:420px; max-width:600px;
+  max-height:400px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.6);
+  font-family:var(--font-ui); pointer-events:none; }
+.task-tip::-webkit-scrollbar { width:4px; }
+.task-tip::-webkit-scrollbar-thumb { background:var(--border2); }
+.task-tip-phase { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--cyan); padding:8px 12px 6px; border-bottom:1px solid var(--border);
+  position:sticky; top:0; background:var(--surf2); }
+.task-tip-row { display:grid; grid-template-columns:1fr 100px 80px 80px;
+  gap:6px; padding:5px 12px; border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:10px; align-items:center; }
+.task-tip-row:last-child { border-bottom:none; }
+.task-tip-row.header { font-size:9px; font-weight:700; letter-spacing:.06em; color:var(--muted);
+  text-transform:uppercase; background:rgba(0,0,0,.2); }
+.task-tip-row.current { background:rgba(0,210,255,.06); }
+
+/* Save/Cancel buttons */
+.btn-save { background:rgba(0,210,255,.1); border:1px solid rgba(0,210,255,.3); color:var(--cyan);
+  font-size:11px; font-weight:700; letter-spacing:.06em; padding:6px 14px; border-radius:4px;
+  cursor:pointer; font-family:var(--font-ui); transition:all .15s; }
+.btn-save:hover { background:rgba(0,210,255,.18); }
+.btn-cancel { background:transparent; border:1px solid var(--border); color:var(--muted);
+  font-size:11px; font-weight:600; padding:6px 14px; border-radius:4px;
+  cursor:pointer; font-family:var(--font-ui); transition:all .15s; }
+.btn-cancel:hover { border-color:var(--text); color:var(--text); }
+
 /* ── Toast ── */
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
          background:var(--surf2); border:1px solid var(--border2); border-radius:8px;
@@ -1327,7 +1416,9 @@ function renderExceptions(el) {
         const clsColor = t.cls === 'blocked' ? '#f07a7a' : 'var(--amber)';
         html += `<div class="exc-group-item" onclick="event.stopPropagation();toggleExcCard('exc-${idx}-${t.id?.substring(0,8)}')">
           <div style="flex:1;min-width:0">
-            <span style="font-weight:600;color:${clsColor}">${t.cls === 'blocked' ? '🔴' : '⚠'} ${escHtml(t.name)}</span>
+            <span style="font-weight:600;color:${clsColor};cursor:default"
+              onmouseenter="showTaskTip('${t.id}',this,event)"
+              onmouseleave="hideTaskTip()">${t.cls === 'blocked' ? '🔴' : '⚠'} ${escHtml(t.name)}</span>
             <span style="color:var(--muted);margin-left:8px">${t.daysOver}d overdue · ${escHtml(t.phase||'—')} · ${t.assignee ? t.assignee.first_name+' '+t.assignee.last_name : '—'}</span>
           </div>
           <span style="color:var(--muted);font-size:10px">${t.assigneeAlloc}% alloc</span>
@@ -1470,10 +1561,6 @@ function renderTaskDetail(t) {
   const pctDisplay = Math.round((t.pct_complete||0) * (t.pct_complete <= 1 ? 100 : 1));
 
   // ── SITUATION PANEL ────────────────────────────────────────────────────────
-  const assigneeOptions = _resources.map(r =>
-    `<option value="${r.id}" ${t.assigned_to === r.id ? 'selected' : ''}>${escHtml(r.first_name+' '+r.last_name)} — ${(_allocations.filter(a=>a.resource_id===r.id).reduce((s,a)=>s+(a.allocation_pct||0),0))}% alloc</option>`
-  ).join('');
-
   let html = `
     <div class="exc-classification ${cls}">${classificationLabel(cls)}</div>
 
@@ -1485,10 +1572,10 @@ function renderTaskDetail(t) {
              <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER-ALLOCATED' : ''}</div>`
           : `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>`
         }
-        <select class="assignee-select" style="margin-top:6px" onchange="assignTask('${t.id}',this.value,event)" onclick="event.stopPropagation()">
-          <option value="">— Assign resource —</option>
-          ${assigneeOptions}
-        </select>
+        <button class="case-action-btn" style="margin-top:6px;width:100%;text-align:left" onclick="openResourcePicker('${t.id}',event)">
+          👤 ${t.assigned_to && t.assignee ? 'Change / Add Assignees' : 'Assign Resource →'}
+        </button>
+        <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:4px"></div>
       </div>
       <div class="exc-detail-cell">
         <div class="exc-detail-label">Phase</div>
@@ -1538,7 +1625,10 @@ function renderTaskDetail(t) {
         ${blockingCount > 0 ? `<span style="color:#f07a7a;font-size:9px">(${blockingCount} blocking)</span>` : ''}
         ${inputs.length === 0 && outputs.length === 0 ? '<span style="color:var(--text3)">None defined</span>' : `<span style="color:var(--text3)">${inputs.length} in · ${outputs.length} out</span>`}
       </div>
-      <div class="case-pane-arrow" id="${caseId}-io-arrow">▼</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="case-action-btn" style="font-size:9px;padding:2px 8px" onclick="openAddInput('${t.id}',event)">+ Add Input</button>
+        <div class="case-pane-arrow" id="${caseId}-io-arrow">▼</div>
+      </div>
     </div>
     <div class="case-pane-body" id="${caseId}-io">`;
 
@@ -1739,42 +1829,457 @@ async function assignTask(taskId, resourceId, event) {
   }
 }
 
-// ── Log annotation ────────────────────────────────────────────────────────────
-async function logAnnotation(taskId, actionType, event) {
+// ── Resource Picker Modal ─────────────────────────────────────────────────────
+let _rpTaskId = null;
+let _rpSelected = [];  // array of resource IDs
+
+function openResourcePicker(taskId, event) {
   if (event) event.stopPropagation();
-  const labels = { note:'Add note', acknowledgment:'Record your understanding and intended action', block_discovery:'Describe the blocking condition', escalation:'Describe why you are escalating' };
-  const prompt = labels[actionType] || 'Add notes';
-  const notes = window.prompt(prompt + ':');
-  if (!notes || !notes.trim()) return;
+  _rpTaskId = taskId;
+  const task = _tasks.find(t => t.id === taskId);
+  // Pre-populate with current assignee
+  _rpSelected = task?.assigned_to ? [task.assigned_to] : [];
 
-  let intendedAction = null;
-  if (actionType === 'acknowledgment') {
-    intendedAction = window.prompt('What do you intend to do? (e.g. "Raise resource request", "Reschedule", "Escalate to Vaughn")');
-  }
+  const overlay = document.createElement('div');
+  overlay.className = 'hud-modal-overlay';
+  overlay.id = 'rp-overlay';
+  overlay.onclick = e => { if (e.target === overlay) closeResourcePicker(); };
 
-  try {
-    const task = _tasks.find(t => t.id === taskId);
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID,
-      project_id: task?.project_id || null,
-      entity_type: 'task',
-      entity_id: taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type: actionType,
-      notes: notes.trim(),
-      intended_action: intendedAction || null,
-      occurred_at: new Date().toISOString(),
+  const today = new Date();
+  // Group resources by department
+  const byDept = {};
+  _resources.forEach(r => {
+    const dept = r.department || 'Other';
+    if (!byDept[dept]) byDept[dept] = [];
+    byDept[dept].push(r);
+  });
+
+  const levelOrder = { principal:0, senior:1, staff:2, junior:3 };
+  Object.values(byDept).forEach(arr => arr.sort((a,b) => (levelOrder[a.level]||9)-(levelOrder[b.level]||9) || a.last_name.localeCompare(b.last_name)));
+
+  let tableHTML = '';
+  Object.entries(byDept).sort(([a],[b])=>a.localeCompare(b)).forEach(([dept, resources]) => {
+    tableHTML += `<div class="rp-dept-header">${escHtml(dept)}</div>
+    <table class="rp-table">
+      <thead><tr>
+        <th>Name</th><th>Level / Title</th><th>Yrs Exp</th><th>% Allocated</th>
+      </tr></thead><tbody>`;
+    resources.forEach(r => {
+      const alloc = _allocations.filter(a=>a.resource_id===r.id).reduce((s,a)=>s+(a.allocation_pct||0),0);
+      const yrs = r.hire_date ? Math.floor((today - new Date(r.hire_date)) / (365.25*86400000)) : '—';
+      const allocColor = alloc > 100 ? 'var(--red)' : alloc > 80 ? 'var(--amber)' : 'var(--green)';
+      const levelLabel = { principal:'Principal', senior:'Senior', staff:'Staff', junior:'Junior' }[r.level] || (r.level||'');
+      tableHTML += `<tr id="rp-row-${r.id}" class="${_rpSelected.includes(r.id)?'selected':''}" onclick="rpToggle('${r.id}','${escHtml(r.first_name+' '+r.last_name)}')">
+        <td style="font-weight:600;color:var(--text)">${escHtml(r.first_name+' '+r.last_name)}</td>
+        <td style="color:var(--muted)">${levelLabel}${r.title?` · ${escHtml(r.title)}`:''}  </td>
+        <td style="font-family:var(--font-mono)">${yrs}</td>
+        <td>
+          <span style="color:${allocColor};font-weight:700;font-family:var(--font-mono)">${alloc}%</span>
+          <span class="rp-alloc-bar"><span class="rp-alloc-fill" style="width:${Math.min(100,alloc)}%;background:${allocColor}"></span></span>
+        </td>
+      </tr>`;
     });
-    showToast('Recorded in chain of custody', 'success');
-  } catch(e) {
-    showToast('Error recording: ' + e.message, 'error');
+    tableHTML += '</tbody></table>';
+  });
+
+  overlay.innerHTML = `
+    <div class="hud-modal" style="width:640px">
+      <div class="hud-modal-header">
+        <div class="hud-modal-title">Assign Resource(s) — ${escHtml(task?.name?.substring(0,40)||'Task')}</div>
+        <button class="hud-modal-close" onclick="closeResourcePicker()">✕</button>
+      </div>
+      <div class="hud-modal-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Click to select one or more resources. For team tasks (e.g. design review) select all participants.</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Selected</div>
+        <div class="rp-selected-chips" id="rp-chips">
+          ${_rpSelected.length === 0 ? '<span style="font-size:11px;color:var(--text3);padding:4px 6px">None selected</span>' : _rpSelected.map(id => {
+            const r = _resources.find(r=>r.id===id);
+            return r ? `<div class="rp-chip">${escHtml(r.first_name+' '+r.last_name)}<span class="rp-chip-x" onclick="rpToggle('${r.id}','',event)">×</span></div>` : '';
+          }).join('')}
+        </div>
+        <input class="rp-search" placeholder="Search by name, title, department..." oninput="rpFilter(this.value)">
+        <div id="rp-table-container">${tableHTML}</div>
+      </div>
+      <div class="hud-modal-footer">
+        <button class="btn-cancel" onclick="closeResourcePicker()">Cancel</button>
+        <button class="btn-save" onclick="confirmResourcePicker()">✓ Confirm Assignment</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function rpToggle(resourceId, name, event) {
+  if (event) event.stopPropagation();
+  const idx = _rpSelected.indexOf(resourceId);
+  if (idx >= 0) _rpSelected.splice(idx, 1);
+  else _rpSelected.push(resourceId);
+  // Update row highlight
+  const row = document.getElementById('rp-row-' + resourceId);
+  if (row) row.classList.toggle('selected', _rpSelected.includes(resourceId));
+  // Update chips
+  const chips = document.getElementById('rp-chips');
+  if (chips) {
+    if (_rpSelected.length === 0) {
+      chips.innerHTML = '<span style="font-size:11px;color:var(--text3);padding:4px 6px">None selected</span>';
+    } else {
+      chips.innerHTML = _rpSelected.map(id => {
+        const r = _resources.find(r=>r.id===id);
+        return r ? `<div class="rp-chip">${escHtml(r.first_name+' '+r.last_name)}<span class="rp-chip-x" onclick="rpToggle('${r.id}','',event)">×</span></div>` : '';
+      }).join('');
+    }
   }
 }
 
-// ── Raise resource request shortcut ──────────────────────────────────────────
+function rpFilter(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('#rp-table-container tr[id^="rp-row-"]').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = !q || text.includes(q) ? '' : 'none';
+  });
+}
+
+function closeResourcePicker() {
+  const overlay = document.getElementById('rp-overlay');
+  if (overlay) overlay.remove();
+}
+
+async function confirmResourcePicker() {
+  if (!_rpTaskId || _rpSelected.length === 0) {
+    showToast('Select at least one resource', 'warning'); return;
+  }
+  // Assign primary (first selected) to task.assigned_to
+  const primaryId = _rpSelected[0];
+  const primaryRes = _resources.find(r=>r.id===primaryId);
+  const names = _rpSelected.map(id=>_resources.find(r=>r.id===id)?.first_name||id).join(', ');
+  try {
+    await API.patch(`tasks?id=eq.${_rpTaskId}`, { assigned_to: primaryId });
+    const task = _tasks.find(t=>t.id===_rpTaskId);
+    if (task) task.assigned_to = primaryId;
+    // Log to CoC
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: task?.project_id||null,
+      entity_type:'task', entity_id:_rpTaskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID, action_type:'intervention',
+      notes: `Task assigned to: ${names}${_rpSelected.length>1?' (team assignment)':''}`,
+      occurred_at: new Date().toISOString(),
+    });
+    closeResourcePicker();
+    showToast(`Assigned to ${names} — recorded in chain of custody`, 'success');
+    renderView('exceptions');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Inline annotation widget ──────────────────────────────────────────────────
+function logAnnotation(taskId, actionType, event) {
+  if (event) event.stopPropagation();
+  const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
+  const containerId = caseId + '-annotation-widget';
+
+  // Remove existing widget if open
+  const existing = document.getElementById(containerId);
+  if (existing) { existing.remove(); return; }
+
+  const titles = {
+    note: 'Add Note to Chain of Custody',
+    acknowledgment: 'Acknowledge & Record Intent',
+    block_discovery: 'Record Blocking Condition',
+    escalation: 'Escalate — Record Reason',
+  };
+  const placeholders = {
+    note: 'Describe what you observed or decided...',
+    acknowledgment: 'Describe your understanding of the block condition...',
+    block_discovery: 'Describe the specific input or condition that is blocking this task...',
+    escalation: 'Describe why this needs escalation and to whom...',
+  };
+
+  const widget = document.createElement('div');
+  widget.className = 'annotation-widget';
+  widget.id = containerId;
+  widget.onclick = e => e.stopPropagation();
+  widget.innerHTML = `
+    <div class="annotation-widget-title">${titles[actionType]||actionType}</div>
+    <textarea class="hud-textarea" id="${containerId}-notes" placeholder="${placeholders[actionType]||'Add notes...'}" rows="3"></textarea>
+    ${actionType === 'acknowledgment' ? `
+    <div class="hud-field-label" style="margin-top:8px">What do you intend to do?</div>
+    <input class="hud-input" id="${containerId}-intent" placeholder="e.g. Raise resource request, Reschedule, Escalate to Vaughn">
+    ` : ''}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn-save" onclick="saveAnnotation('${taskId}','${actionType}','${containerId}',event)">✓ Save to Record</button>
+      <button class="btn-cancel" onclick="document.getElementById('${containerId}')?.remove()">Cancel</button>
+    </div>`;
+
+  // Find the actions pane body and append
+  const actionsPaneId = caseId + '-actions';
+  const actionsPane = document.getElementById(actionsPaneId);
+  if (actionsPane) {
+    actionsPane.appendChild(widget);
+    actionsPane.classList.add('open');
+    const arrow = document.getElementById(actionsPaneId + '-arrow');
+    if (arrow) arrow.classList.add('open');
+    setTimeout(() => widget.querySelector('textarea')?.focus(), 50);
+  }
+}
+
+async function saveAnnotation(taskId, actionType, containerId, event) {
+  if (event) event.stopPropagation();
+  const notesEl  = document.getElementById(containerId + '-notes');
+  const intentEl = document.getElementById(containerId + '-intent');
+  const notes = notesEl?.value?.trim();
+  if (!notes) { showToast('Please enter a note', 'warning'); return; }
+
+  const task = _tasks.find(t=>t.id===taskId);
+  try {
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: task?.project_id||null,
+      entity_type:'task', entity_id:taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type: actionType, notes,
+      intended_action: intentEl?.value?.trim() || null,
+      occurred_at: new Date().toISOString(),
+    });
+    document.getElementById(containerId)?.remove();
+    showToast('Saved to chain of custody', 'success');
+    // Auto-refresh the CoC pane if open
+    const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
+    const histBody = document.getElementById(caseId+'-hist');
+    if (histBody?.classList.contains('open')) {
+      await loadAndToggleHistory(taskId, caseId+'-hist', null);
+      histBody.classList.add('open');
+      const arrow = document.getElementById(caseId+'-hist-arrow');
+      if (arrow) arrow.classList.add('open');
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Add Input modal ───────────────────────────────────────────────────────────
+function openAddInput(taskId, event) {
+  if (event) event.stopPropagation();
+  const task = _tasks.find(t=>t.id===taskId);
+  const overlay = document.createElement('div');
+  overlay.className = 'hud-modal-overlay';
+  overlay.id = 'add-input-overlay';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+
+  const typeOptions = ['drawing','specification','test_report','approval','material_cert','procedure','analysis','model','prototype','other']
+    .map(t=>`<option value="${t}">${t.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>`).join('');
+  const stateOptions = ['completed','approved','released'].map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  overlay.innerHTML = `
+    <div class="hud-modal" style="width:480px">
+      <div class="hud-modal-header">
+        <div class="hud-modal-title">Add Required Input — ${escHtml(task?.name?.substring(0,30)||'Task')}</div>
+        <button class="hud-modal-close" onclick="this.closest('.hud-modal-overlay').remove()">✕</button>
+      </div>
+      <div class="hud-modal-body">
+        <div class="hud-field-label">Input Name *</div>
+        <input class="hud-input" id="ai-name" placeholder="e.g. PCB Layout Drawing Rev B">
+        <div class="hud-field-label">Type</div>
+        <select class="hud-select" id="ai-type">${typeOptions}</select>
+        <div class="hud-field-label">Description</div>
+        <textarea class="hud-textarea" id="ai-desc" placeholder="What this document or artifact must contain..." rows="2"></textarea>
+        <div class="hud-field-label">Source (if external)</div>
+        <input class="hud-input" id="ai-source" placeholder="e.g. Vendor: PCB Manufacturer, Client: Approval">
+        <div class="hud-field-label">Minimum Required State</div>
+        <select class="hud-select" id="ai-state">${stateOptions}</select>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+          <input type="checkbox" id="ai-required" checked>
+          <label for="ai-required" style="font-size:11px;color:var(--text)">Hard gate — task cannot start without this input</label>
+        </div>
+      </div>
+      <div class="hud-modal-footer">
+        <button class="btn-cancel" onclick="this.closest('.hud-modal-overlay').remove()">Cancel</button>
+        <button class="btn-save" onclick="saveNewInput('${taskId}',event)">✓ Add Input</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>document.getElementById('ai-name')?.focus(), 50);
+}
+
+async function saveNewInput(taskId, event) {
+  if (event) event.stopPropagation();
+  const name = document.getElementById('ai-name')?.value?.trim();
+  if (!name) { showToast('Name is required', 'warning'); return; }
+  const task = _tasks.find(t=>t.id===taskId);
+  try {
+    const [created] = await API.post('task_deliverables', {
+      firm_id: FIRM_ID, task_id: taskId,
+      direction:'input',
+      deliverable_type: document.getElementById('ai-type')?.value || 'other',
+      name,
+      description: document.getElementById('ai-desc')?.value?.trim() || null,
+      source_external: document.getElementById('ai-source')?.value?.trim() || null,
+      minimum_state: document.getElementById('ai-state')?.value || 'approved',
+      is_required: document.getElementById('ai-required')?.checked !== false,
+      current_state: 'not_started',
+      sequence_order: _deliverables.filter(d=>d.task_id===taskId&&d.direction==='input').length + 1,
+    });
+    if (created) _deliverables.push(created);
+    document.getElementById('add-input-overlay')?.remove();
+    showToast('Input added', 'success');
+    renderView('exceptions');
+  } catch(e) {
+    showToast('Error: '+e.message, 'error');
+  }
+}
+
+// ── Resource Request modal ────────────────────────────────────────────────────
 function raiseResourceRequest(taskId, projectId, event) {
   if (event) event.stopPropagation();
-  window.location.href = `/resources.html?raise=1&task_id=${taskId}&project_id=${projectId}`;
+  const task = _tasks.find(t=>t.id===taskId);
+  const proj = _projects.find(p=>p.id===projectId);
+  const overlay = document.createElement('div');
+  overlay.className = 'hud-modal-overlay';
+  overlay.id = 'rr-overlay';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+
+  const resOptions = _resources.map(r =>
+    `<option value="${r.id}">${escHtml(r.first_name+' '+r.last_name)} — ${escHtml(r.title||r.level||'')}</option>`
+  ).join('');
+
+  overlay.innerHTML = `
+    <div class="hud-modal" style="width:520px">
+      <div class="hud-modal-header">
+        <div class="hud-modal-title">Raise Resource Request</div>
+        <button class="hud-modal-close" onclick="this.closest('.hud-modal-overlay').remove()">✕</button>
+      </div>
+      <div class="hud-modal-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,.2);border-radius:4px">
+          Task: <strong style="color:var(--text)">${escHtml(task?.name||'—')}</strong> · ${escHtml(proj?.name||'—')}
+        </div>
+        <div class="hud-field-label">Resource Needed *</div>
+        <select class="hud-select" id="rr-resource">${resOptions}</select>
+        <div class="hud-field-label">Urgency</div>
+        <select class="hud-select" id="rr-urgency">
+          <option value="high">HIGH</option>
+          <option value="critical">CRITICAL</option>
+          <option value="medium">MEDIUM</option>
+          <option value="low">LOW</option>
+        </select>
+        <div class="hud-field-label">Allocation % Requested</div>
+        <input class="hud-input" id="rr-alloc" type="number" min="10" max="100" step="10" value="50" style="width:100px">
+        <div class="hud-field-label">Proposed Start Date</div>
+        <input class="hud-input" id="rr-start" type="date" value="${new Date().toLocaleDateString('en-CA')}" style="width:160px">
+        <div class="hud-field-label">What is failing and why is this resource needed? *</div>
+        <textarea class="hud-textarea" id="rr-context" placeholder="Describe the specific situation and what the resource will do..." rows="3"></textarea>
+        <div class="hud-field-label">Impact if not resolved</div>
+        <textarea class="hud-textarea" id="rr-impact" placeholder="Milestone at risk, client consequence, cost impact..." rows="2"></textarea>
+        <div class="hud-field-label">What has already been tried?</div>
+        <textarea class="hud-textarea" id="rr-tried" placeholder="Resources already approached, alternatives considered..." rows="2"></textarea>
+      </div>
+      <div class="hud-modal-footer">
+        <button class="btn-cancel" onclick="this.closest('.hud-modal-overlay').remove()">Cancel</button>
+        <button class="btn-save" onclick="submitResourceRequest('${taskId}','${projectId}',event)">⬡ Submit Request</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function submitResourceRequest(taskId, projectId, event) {
+  if (event) event.stopPropagation();
+  const context = document.getElementById('rr-context')?.value?.trim();
+  const resourceId = document.getElementById('rr-resource')?.value;
+  if (!context || !resourceId) { showToast('Resource and context are required', 'warning'); return;  }
+
+  const task = _tasks.find(t=>t.id===taskId);
+  const approverRes = _resources.find(r=>r.id!==CURRENT_USER_RESOURCE_ID);
+  try {
+    const [req] = await API.post('resource_requests', {
+      firm_id: FIRM_ID,
+      requesting_resource_id: CURRENT_USER_RESOURCE_ID,
+      requested_resource_id: resourceId,
+      approver_resource_id: approverRes?.id || CURRENT_USER_RESOURCE_ID,
+      project_id: projectId,
+      task_id: taskId,
+      urgency: document.getElementById('rr-urgency')?.value || 'high',
+      allocation_pct: parseInt(document.getElementById('rr-alloc')?.value)||50,
+      proposed_start: document.getElementById('rr-start')?.value || null,
+      context,
+      impact_statement: document.getElementById('rr-impact')?.value?.trim() || null,
+      attempts_made: document.getElementById('rr-tried')?.value?.trim() || null,
+      status: 'pending',
+      submitted_at: new Date().toISOString(),
+      sla_tier1_hours: 4, sla_tier2_hours: 24, sla_tier3_hours: 48,
+    });
+    if (req) {
+      await API.post('resource_request_events', {
+        firm_id: FIRM_ID, request_id: req.id,
+        actor_resource_id: CURRENT_USER_RESOURCE_ID, actor_role:'pm',
+        event_type:'submitted', heartbeat_tier:0,
+        notes:'Request submitted from Exception Triage', occurred_at: new Date().toISOString(),
+      });
+      _requests.push(req);
+    }
+    document.getElementById('rr-overlay')?.remove();
+    showToast('Resource request submitted', 'success');
+    renderView('exceptions');
+  } catch(e) {
+    showToast('Error: '+e.message, 'error');
+  }
+}
+
+// ── Task name hover tooltip ───────────────────────────────────────────────────
+let _taskTipEl = null;
+let _taskTipTimer = null;
+
+function showTaskTip(taskId, anchorEl, event) {
+  clearTimeout(_taskTipTimer);
+  _taskTipTimer = setTimeout(() => {
+    const task = _tasks.find(t=>t.id===taskId);
+    if (!task) return;
+
+    // Get all tasks in same phase
+    const phaseTasks = _tasks
+      .filter(t => t.project_id === task.project_id && t.phase === task.phase)
+      .sort((a,b) => (a.sequence_order||0)-(b.sequence_order||0));
+
+    // Get dependency IDs for this task
+    const myDeps = _dependencies.filter(d => d.predecessor_task_id===taskId||d.successor_task_id===taskId);
+
+    const statusColor = { complete:'var(--green)', in_progress:'var(--cyan)', blocked:'#f07a7a', not_started:'var(--muted)' };
+
+    let rows = phaseTasks.map(t => {
+      const isCurrent = t.id === taskId;
+      const assignee = _resources.find(r=>r.id===t.assigned_to);
+      const aName = assignee ? assignee.first_name+' '+assignee.last_name : '—';
+      const sc = statusColor[t.status] || 'var(--muted)';
+      const pct = Math.round((t.pct_complete||0) * (t.pct_complete<=1?100:1));
+      const depCount = _dependencies.filter(d=>d.predecessor_task_id===t.id||d.successor_task_id===t.id).length;
+      return `<div class="task-tip-row${isCurrent?' current':''}">
+        <div style="color:${isCurrent?'var(--text0)':'var(--text)'};font-weight:${isCurrent?700:400}">${escHtml(t.name?.substring(0,38)||'—')}</div>
+        <div style="color:var(--muted);font-size:10px">${escHtml(aName.substring(0,18))}</div>
+        <div style="color:${sc};font-size:10px">${t.status?.replace('_',' ')||'—'} ${pct>0?pct+'%':''}</div>
+        <div style="color:var(--muted);font-size:10px">${depCount>0?depCount+' dep':''}</div>
+      </div>`;
+    }).join('');
+
+    if (!_taskTipEl) {
+      _taskTipEl = document.createElement('div');
+      _taskTipEl.className = 'task-tip';
+      document.body.appendChild(_taskTipEl);
+    }
+    _taskTipEl.innerHTML = `
+      <div class="task-tip-phase">${escHtml(task.phase||'Phase')} — ${phaseTasks.length} tasks</div>
+      <div class="task-tip-row header">
+        <div>Task</div><div>Assignee</div><div>Status</div><div>Deps</div>
+      </div>
+      ${rows}`;
+
+    // Position
+    const rect = anchorEl.getBoundingClientRect();
+    const tipW = 420;
+    const left = Math.min(rect.left, window.innerWidth - tipW - 16);
+    const top  = rect.bottom + 8;
+    _taskTipEl.style.cssText = `left:${left}px;top:${top}px;display:block`;
+  }, 300);
+}
+
+function hideTaskTip() {
+  clearTimeout(_taskTipTimer);
+  if (_taskTipEl) _taskTipEl.style.display = 'none';
 }
 
 function toggleExcCard(id) {
