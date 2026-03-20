@@ -582,7 +582,7 @@ function renderRequestCard(req, isSent = false) {
     var p = _projects.find(function(x) { return x.id === a.project_id; });
     return p ? p.name : '?';
   }).join(' and ');
-  const _resName  = resource ? resource.first_name + ' ' + resource.last_name : '—';
+  const _resName  = requested ? requested.first_name + ' ' + requested.last_name : '—';
   const _line1    = 'If approved: ' + _resName + ' moves from ' + _cur + '% → ' + _new + '% total allocation';
   const _line2    = _over
     ? '⚠ Over-allocated by ' + (_new - 100) + '% — existing commitments on ' + _projs + ' remain unchanged'
