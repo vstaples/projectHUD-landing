@@ -512,6 +512,9 @@ function renderRequestCard(req, isSent = false) {
     <div class="card-body" id="body-${req.id.replace(/-/g,'')}">
       ${priorDenialHTML}
 
+      <!-- Phase + task context -->
+      ${task ? `<div style="padding:8px 12px;background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.12);border-radius:6px;margin-bottom:8px;font-size:11px"><span style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em">PHASE </span><span style="color:var(--accent);font-weight:600">${escHtml(task.phase||'')}</span><span style="color:var(--border2);margin:0 8px">·</span><span style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em">TASK </span><span style="color:var(--text)">${escHtml(task.name||'')}</span>${task.due_date?'<span style="color:var(--border2);margin:0 8px">·</span><span style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em">DUE </span><span style="color:var(--text)">'+fmtDate(task.due_date)+'</span>':''}</div>` : ''}
+
       <!-- Commitment row -->
       <div class="commit-row">
         ${req.hours_requested ? `<div class="commit-item"><span class="cl">HOURS</span><span class="cv">${req.hours_requested}h</span></div>` : ''}
@@ -520,16 +523,22 @@ function renderRequestCard(req, isSent = false) {
         ${req.proposed_start  ? `<div class="commit-item"><span class="cl">START</span><span class="cv">${fmtDate(req.proposed_start)}</span></div>` : ''}
       </div>
 
-      <!-- Context -->
-      <div class="ctx-label">What is failing and why</div>
-      <div class="ctx-text">${escHtml(req.context)}</div>
+      <!-- PM Recommendation section -->
+      <div style="padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;margin-bottom:10px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:10px">PM'S RECOMMENDATION &amp; REQUEST</div>
 
-      <div class="ctx-label">Impact if not resolved</div>
-      <div class="ctx-text impact">${escHtml(req.impact_statement||'—')}</div>
+        <div class="ctx-label">Situation &amp; what is failing</div>
+        <div class="ctx-text">${escHtml(req.context)}</div>
 
-      ${req.attempts_made ? `
-      <div class="ctx-label">What has been tried</div>
-      <div class="ctx-text" style="color:var(--muted)">${escHtml(req.attempts_made)}</div>` : ''}
+        <div class="ctx-label">Impact if not resolved</div>
+        <div class="ctx-text impact">${escHtml(req.impact_statement||'—')}</div>
+
+        ${req.attempts_made ? `<div class="ctx-label">What has already been tried</div>
+        <div class="ctx-text" style="color:var(--muted)">${escHtml(req.attempts_made)}</div>` : ''}
+
+        <div class="ctx-label" style="margin-top:10px">The ask</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
+      </div>
 
       <!-- Counter notes visible on in-progress cards -->
       ${req.counter_notes ? `
@@ -552,12 +561,14 @@ function renderRequestCard(req, isSent = false) {
           let eventData = null;
           try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
           const counterNotes = eventData?.counter_notes;
-          const elapsedSince = events.indexOf(e) > 0
-            ? (() => {
-                const prev = events[events.indexOf(e)-1];
-                const hrs = Math.round((new Date(e.occurred_at) - new Date(prev.occurred_at)) / 3600000);
-                return hrs > 0 ? `<span style="color:var(--muted);font-size:9px"> (+${hrs}h)</span>` : '';
-              })()
+          const idx = events.indexOf(e);
+          const baseTime = idx === 0
+            ? new Date(req.submitted_at)
+            : new Date(events[idx-1].occurred_at);
+          const hoursEl = Math.round((new Date(e.occurred_at) - baseTime) / 3600000 * 10) / 10;
+          const elapsedLabel = idx === 0 ? 'from submission' : 'later';
+          const elapsedSince = hoursEl > 0
+            ? '<span style="color:var(--muted);font-size:9px;margin-left:4px">(+' + hoursEl + 'h ' + elapsedLabel + ')</span>'
             : '';
           return `
           <div class="chain-event">
@@ -631,6 +642,7 @@ function renderResolvedCard(req) {
   const requesting = _resources.find(r => r.id === req.requesting_resource_id);
   const requested  = _resources.find(r => r.id === req.requested_resource_id);
   const project    = _projects.find(p => p.id === req.project_id);
+  const task       = req.task_id ? _tasks.find(t => t.id === req.task_id) : null;
   const resName    = requested  ? `${requested.first_name} ${requested.last_name}`  : '—';
   const reqName    = requesting ? `${requesting.first_name} ${requesting.last_name}` : '—';
   const resInit    = requested  ? (requested.first_name[0]+requested.last_name[0]).toUpperCase() : '?';
@@ -674,11 +686,14 @@ function renderResolvedCard(req) {
     <!-- Expandable body -->
     <div id="${bodyId}" style="display:none;border-top:1px solid var(--border);
         padding:14px 16px;" onclick="event.stopPropagation()">
-      <div class="ctx-label">What was failing and why</div>
-      <div class="ctx-text">${escHtml(req.context)}</div>
-      ${req.impact_statement ? `
-      <div class="ctx-label">Impact stated</div>
-      <div class="ctx-text impact">${escHtml(req.impact_statement)}</div>` : ''}
+      ${task ? `<div style="padding:7px 10px;background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.12);border-radius:5px;margin-bottom:10px;font-size:11px"><span style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em">PHASE </span><span style="color:var(--accent);font-weight:600">${escHtml(task.phase||'')}</span><span style="color:var(--border2);margin:0 8px">·</span><span style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em">TASK </span><span style="color:var(--text)">${escHtml(task.name||'')}</span></div>` : ''}
+      <div style="padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;margin-bottom:10px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">PM'S RECOMMENDATION &amp; REQUEST</div>
+        <div class="ctx-label">Situation &amp; what was failing</div>
+        <div class="ctx-text">${escHtml(req.context)}</div>
+        ${req.impact_statement ? `<div class="ctx-label">Impact stated</div>
+        <div class="ctx-text impact">${escHtml(req.impact_statement)}</div>` : ''}
+      </div>
       <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
       <div class="chain">
         ${events.map(e => {
