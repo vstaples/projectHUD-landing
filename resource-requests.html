@@ -632,7 +632,7 @@ function renderRequestCard(req, isSent = false) {
       <!-- Chain of custody -->
       <div class="ctx-label" style="margin-top:16px">Chain of custody</div>
       <div class="chain">
-        ${events.map(e => {
+        ${[...events].reverse().map(e => {
           // Extract actor name
           const actorRes = _resources.find(r => r.id === e.actor_resource_id);
           const actorName = actorRes
@@ -662,7 +662,8 @@ function renderRequestCard(req, isSent = false) {
               ${elapsedSince}
               ${e.notes && !counterNotes ? ` <div style="color:var(--muted);font-size:11px;margin-top:2px">${escHtml(e.notes)}</div>` : ''}
               ${counterNotes ? `<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"${escHtml(counterNotes)}"</div>` : ''}
-              ${impactSnap  ? `<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">${escHtml(impactSnap)}</div>` : ''}
+              ${impactSnap ? `<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">${escHtml(impactSnap)}</div>` : ''}
+              ${eventData?.impact_statement ? `<div style="margin-top:4px;padding:5px 8px;background:rgba(192,64,74,.06);border-left:2px solid rgba(192,64,74,.3);border-radius:2px;font-size:11px;color:#f07a7a;font-style:italic">"${escHtml(eventData.impact_statement)}"</div>` : ''}
             </div>
           </div>`;
         }).join('')}
@@ -787,7 +788,7 @@ function renderResolvedCard(req) {
         ${(() => {
           // Establish baseline: use submitted_at from request as t=0
           // If first event is not 'submitted', we still calculate from req.submitted_at
-          return events.map((e, idx) => {
+          return [...events].reverse().map((e, idx) => {
             const actorRes  = _resources.find(r => r.id === e.actor_resource_id);
             const actorName = actorRes ? actorRes.first_name + ' ' + actorRes.last_name
                             : e.actor_role === 'system' ? 'System' : e.actor_role || 'Unknown';
@@ -814,7 +815,8 @@ function renderResolvedCard(req) {
                 ${e.notes && !counterNotes && !denialReason ? '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+escHtml(e.notes)+'</div>' : ''}
                 ${counterNotes ? '<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(counterNotes)+'"</div>' : ''}
                 ${denialReason ? '<div style="color:#f07a7a;font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(denialReason)+'"</div>' : ''}
-                ${impactSnap   ? '<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">'+escHtml(impactSnap)+'</div>' : ''}
+                ${impactSnap ? '<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">'+escHtml(impactSnap)+'</div>' : ''}
+                ${eventData?.impact_statement ? '<div style="margin-top:4px;padding:5px 8px;background:rgba(192,64,74,.06);border-left:2px solid rgba(192,64,74,.3);border-radius:2px;font-size:11px;color:#f07a7a;font-style:italic">"'+escHtml(eventData.impact_statement)+'"</div>' : ''}
               </div>
             </div>`;
           }).join('');
@@ -955,7 +957,11 @@ async function submitApprove(reqId) {
       actor_resource_id: CURRENT_USER_RESOURCE_ID,
       actor_role: 'approver', event_type: 'approved',
       notes: note || `Approved — ${_resources.find(r=>r.id===req.requested_resource_id)?.first_name} allocated to project`,
-      event_data: { impact_snapshot: impactSnapshot, approval_note: note || null },
+      event_data: {
+        impact_snapshot:  impactSnapshot,
+        approval_note:    note || null,
+        impact_statement: req.impact_statement || null,
+      },
       occurred_at: new Date().toISOString(),
     });
 
