@@ -938,8 +938,9 @@ function renderProjectCard(p) {
     <div class="proj-progress">
       <div style="display:flex;justify-content:space-between;font-size:10px;
           color:var(--muted);margin-bottom:5px">
-        <span data-tip="Effort-weighted progress: ${evm.completeCnt||0} complete + ${evm.inProgressCnt||0} in-progress tasks of ${evm.totalTasks||0} total. Earned ${Math.round((evm.evPct||0)*100)}% of BAC."
-          style="cursor:pointer">${pct}% Planned Work Complete</span>
+        <span style="cursor:default"
+          onmouseenter="TIP.show('<div class=\'tip-title\'>${pct}% Planned Work Complete</div><div class=\'tip-section\'>Effort-weighted progress</div><div class=\'tip-row\'><span class=\'tip-lbl\'>Complete tasks</span><span class=\'tip-val\'>${evm.completeCnt||0} of ${evm.totalTasks||0}</span></div><div class=\'tip-row\'><span class=\'tip-lbl\'>In progress</span><span class=\'tip-val\'>${evm.inProgressCnt||0} tasks</span></div><div class=\'tip-row\'><span class=\'tip-lbl\'>Earned value</span><span class=\'tip-val\'>${Math.round((evm.evPct||0)*100)}% of BAC</span></div><div class=\'tip-row\'><span class=\'tip-lbl\'>Hours used</span><span class=\'tip-val\'>${Math.round(evm.actualHrs||0)}h of ${evm.bac||0}h</span></div>',event)"
+          onmouseleave="TIP.hide()" onmousemove="TIP.position(event)">${pct}% Planned Work Complete</span>
         <span>${evm.actualHrs ? Math.round(evm.actualHrs) : 0}h used of ${evm.bac || '—'}h budget</span>
       </div>
       <div class="progress-bar-bg">
