@@ -988,6 +988,10 @@ function renderHorizon() {
 
 // ── View switcher ─────────────────────────────────────────────────────────────
 function switchView(view) {
+  // Reset action items render guard when leaving that view
+  if (_currentView === 'actionitems' && view !== 'actionitems') {
+    _renderingActionItems = false;
+  }
   _currentView = view;
   ['portfolio','exceptions','team','actionitems'].forEach(v => {
     document.getElementById('vbtn-' + v).classList.toggle('active', v === view);
@@ -2767,7 +2771,14 @@ function renderTeam(el) {
 }
 
 // ── Action Items view ──────────────────────────────────────────────────────────
+let _renderingActionItems = false;
+
 async function renderActionItems(el) {
+  // Guard against concurrent renders — async fn called without await in renderView
+  if (_renderingActionItems) return;
+  _renderingActionItems = true;
+
+  try {
   el.innerHTML = '<div class="loading">LOADING ACTION ITEMS...</div>';
 
   // Load all action items across all active projects
@@ -2898,6 +2909,10 @@ async function renderActionItems(el) {
       HUD.ActionItems.renderList(listEl, projItems, resolveAssignee, contextFn);
     }
   });
+
+  } finally {
+    _renderingActionItems = false;
+  }
 }
 function goToProject(projectId) {
   window.location.href = `/project-detail.html?id=${projectId}`;
