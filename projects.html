@@ -1461,7 +1461,7 @@ function renderExceptions(el) {
             <span style="color:var(--muted);margin-left:8px">${t.daysOver}d overdue · ${escHtml(t.phase||'—')} · ${t.assignee ? t.assignee.first_name+' '+t.assignee.last_name : '—'}</span>
           </div>
           <div style="display:flex;align-items:center;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
-            ${!t.exception_priority ? '<span style="font-size:9px;font-weight:800;color:#ffffff;letter-spacing:.06em;margin-right:2px">PRIORITY</span>' : ''}
+            ${!t.exception_priority ? '<span style="font-size:9px;font-weight:400;color:#ffffff;letter-spacing:.06em;margin-right:2px">PRIORITY</span>' : ''}
             <button class="pri-btn high${t.exception_priority==='high'?' active':''}" onclick="setPriority('${t.id}','high',this,event)">HIGH</button>
             <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}" onclick="setPriority('${t.id}','medium',this,event)">MED</button>
             <button class="pri-btn low${t.exception_priority==='low'?' active':''}" onclick="setPriority('${t.id}','low',this,event)">LOW</button>
@@ -1611,13 +1611,14 @@ function renderTaskDetail(t) {
         <div class="exc-detail-label">Assignee</div>
         ${t.assigned_to && t.assignee
           ? `<div class="exc-detail-val">${escHtml(t.assignee.first_name+' '+t.assignee.last_name)}</div>
-             <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER-ALLOCATED' : ''}</div>`
-          : `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>`
+             <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER-ALLOCATED' : ''}</div>
+             <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:3px;font-size:10px;color:var(--muted)"></div>`
+          : `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>
+             <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:3px"></div>`
         }
         <button class="case-action-btn" style="margin-top:6px;width:100%;text-align:left" onclick="openResourcePicker('${t.id}',event)">
           👤 ${t.assigned_to && t.assignee ? 'Change / Add Assignees' : 'Assign Resource →'}
         </button>
-        <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:4px"></div>
       </div>
       <div class="exc-detail-cell">
         <div class="exc-detail-label">Phase</div>
@@ -1766,7 +1767,7 @@ function renderTaskDetail(t) {
     </div>
     <div class="case-pane-body" id="${caseId}-actions">
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:6px">
-        <button class="case-action-btn" style="background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.35)" onclick="logAnnotation('${t.id}','action_item',event)">✚ Add Action Item</button>
+        <button class="case-action-btn" style="background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.35)" onclick="openAddActionItem('${t.id}','${t.project_id}',event)">✚ Add Action Item</button>
         <button class="case-action-btn amber" onclick="logAnnotation('${t.id}','note',event)">📝 Add Note</button>
         <button class="case-action-btn" onclick="logAnnotation('${t.id}','acknowledgment',event)">✓ Acknowledge</button>
         ${blockingInputs && blockingInputs.length > 0 ? `<button class="case-action-btn amber" onclick="logAnnotation('${t.id}','block_discovery',event)">📄 Flag Blocking Input</button>` : ''}
@@ -1832,12 +1833,16 @@ async function loadAndToggleHistory(taskId, paneId, event) {
       const color = typeColor[a.action_type] || 'var(--muted)';
       const label = typeLabel[a.action_type] || a.action_type;
       const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      // Resolve any raw UUIDs in notes text
+      const resolvedNotes = a.notes ? a.notes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => {
+        const r = resolveAssignee(id); return r ? r.first_name+' '+r.last_name : id;
+      }) : '';
       return `<div class="hist-row" id="ann-${a.id}">
         <div class="hist-time">${ts}</div>
         <div style="flex:1;min-width:0">
           <div class="hist-type" style="color:${color}">${label}</div>
           <div class="hist-actor">${escHtml(actorName)}</div>
-          ${a.notes ? `<div class="hist-body">${escHtml(a.notes)}</div>` : ''}
+          ${resolvedNotes ? `<div class="hist-body">${escHtml(resolvedNotes)}</div>` : ''}
           ${a.intended_action ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>` : ''}
           ${a.outcome ? `<div class="hist-body" style="color:var(--green)">Outcome: ${escHtml(a.outcome)}</div>` : ''}
         </div>
@@ -2174,39 +2179,193 @@ async function saveAnnotation(taskId, actionType, containerId, event) {
     const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
     const histBody = document.getElementById(caseId+'-hist');
     if (histBody?.classList.contains('open')) {
-      // Re-load history content without closing pane
       const histContent = document.getElementById(caseId+'-hist-content');
       if (histContent) {
         histContent.textContent = 'Refreshing...';
-        const annotations = await API.get(
-          `exception_annotations?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
-        ).catch(()=>[]);
-        const typeLabel = { block_discovery:'Block Discovered', block_classification:'Classified', acknowledgment:'Acknowledged', intended_action:'Intent Recorded', intervention:'Intervention', escalation:'Escalated', note:'Note', resolution:'Resolved', unblocked:'Unblocked' };
-        const typeColor = { block_discovery:'#f07a7a', escalation:'#f07a7a', acknowledgment:'var(--cyan)', resolution:'var(--green)', unblocked:'var(--green)', note:'var(--muted)', intervention:'var(--amber)' };
-        histContent.innerHTML = annotations.length === 0
-          ? '<div style="color:var(--text3);font-style:italic;padding:4px 0">No history recorded yet.</div>'
-          : annotations.map(a => {
-              const actor = _resources.find(r => r.id === a.actor_resource_id);
-              const actorName = actor ? actor.first_name+' '+actor.last_name : 'System';
-              const color = typeColor[a.action_type] || 'var(--muted)';
-              const label = typeLabel[a.action_type] || a.action_type;
-              const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-              return `<div class="hist-row" id="ann-${a.id}">
-                <div class="hist-time">${ts}</div>
-                <div style="flex:1;min-width:0">
-                  <div class="hist-type" style="color:${color}">${label}</div>
-                  <div class="hist-actor">${escHtml(actorName)}</div>
-                  ${a.notes?`<div class="hist-body">${escHtml(a.notes)}</div>`:''}
-                  ${a.intended_action?`<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>`:''}
-                </div>
-                <button onclick="deleteAnnotation('${a.id}',event)" title="Delete (dev)" style="background:none;border:none;color:var(--border2);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#f07a7a'" onmouseleave="this.style.color='var(--border2)'">🗑</button>
-              </div>`;
-            }).join('');
+        await _refreshCoCContent(taskId, histContent);
       }
     }
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
+}
+
+// ── Add Action Item modal (mirrors Pipeline/Action Items widget) ───────────────
+function openAddActionItem(taskId, projectId, event) {
+  if (event) event.stopPropagation();
+  const task    = _tasks.find(t => t.id === taskId);
+  const proj    = _projects.find(p => p.id === projectId);
+  const today   = new Date().toLocaleDateString('en-CA');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'hud-modal-overlay';
+  overlay.id = 'ai-modal-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  // Resource options grouped like resource picker
+  const resOptions = [
+    ..._users.map(u => `<option value="${u.id}">${escHtml(u.name)}</option>`),
+    ..._resources.filter(r => !_users.find(u=>u.id===r.id))
+      .map(r => `<option value="${r.id}">${escHtml(r.first_name+' '+r.last_name)}</option>`)
+  ].join('');
+
+  overlay.innerHTML = `
+    <div class="hud-modal" style="width:500px">
+      <div class="hud-modal-header">
+        <div class="hud-modal-title">✚ Add Action Item</div>
+        <button class="hud-modal-close" onclick="this.closest('.hud-modal-overlay').remove()">✕</button>
+      </div>
+      <div class="hud-modal-body">
+        <div style="font-size:11px;background:rgba(0,0,0,.2);padding:6px 8px;border-radius:4px;color:var(--muted);margin-bottom:10px">
+          Task: <strong style="color:var(--text)">${escHtml(task?.name||'—')}</strong>
+          ${proj ? ` · <span>${escHtml(proj.name)}</span>` : ''}
+        </div>
+
+        <div class="hud-field-label">Description *</div>
+        <textarea class="hud-textarea" id="aim-desc" placeholder="What needs to be done..." rows="3" autofocus></textarea>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:2px">
+          <div>
+            <div class="hud-field-label">Assigned To *</div>
+            <select class="hud-select" id="aim-responsible">
+              <option value="">— Select person —</option>
+              ${resOptions}
+            </select>
+          </div>
+          <div>
+            <div class="hud-field-label">Due Date *</div>
+            <input class="hud-input" id="aim-target" type="date" value="${new Date(Date.now()+7*86400000).toLocaleDateString('en-CA')}">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:2px">
+          <div>
+            <div class="hud-field-label">Priority</div>
+            <select class="hud-select" id="aim-priority">
+              <option value="high">HIGH</option>
+              <option value="critical">CRITICAL</option>
+              <option value="medium" selected>MEDIUM</option>
+              <option value="low">LOW</option>
+            </select>
+          </div>
+          <div>
+            <div class="hud-field-label">Source</div>
+            <select class="hud-select" id="aim-source">
+              <option value="internal" selected>Internal</option>
+              <option value="client_request">Client Request</option>
+              <option value="meeting">Meeting</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="hud-field-label">Deliverable / Expected Output</div>
+        <input class="hud-input" id="aim-deliverable" placeholder="What will be produced when this is done...">
+
+        <div class="hud-field-label">Comments</div>
+        <textarea class="hud-textarea" id="aim-comments" placeholder="Additional context..." rows="2"></textarea>
+      </div>
+      <div class="hud-modal-footer">
+        <button class="btn-cancel" onclick="this.closest('.hud-modal-overlay').remove()">Cancel</button>
+        <button class="btn-save" onclick="saveAddActionItem('${taskId}','${projectId}',event)">✚ Save Action Item</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('aim-desc')?.focus(), 50);
+}
+
+async function saveAddActionItem(taskId, projectId, event) {
+  if (event) event.stopPropagation();
+  const desc        = document.getElementById('aim-desc')?.value?.trim();
+  const responsible = document.getElementById('aim-responsible')?.value;
+  const targetDate  = document.getElementById('aim-target')?.value;
+  if (!desc)        { showToast('Description is required', 'warning'); return; }
+  if (!responsible) { showToast('Please assign to someone', 'warning'); return; }
+  if (!targetDate)  { showToast('Due date is required', 'warning'); return; }
+
+  const task = _tasks.find(t => t.id === taskId);
+  try {
+    const payload = {
+      firm_id:       FIRM_ID,
+      project_id:    projectId || null,
+      submitted_by:  CURRENT_USER_RESOURCE_ID,
+      description:   desc,
+      responsible:   responsible,
+      target_date:   targetDate,
+      assigned_date: new Date().toLocaleDateString('en-CA'),
+      priority:      document.getElementById('aim-priority')?.value || 'medium',
+      source:        document.getElementById('aim-source')?.value   || 'internal',
+      deliverable:   document.getElementById('aim-deliverable')?.value?.trim() || null,
+      comments:      document.getElementById('aim-comments')?.value?.trim()    || null,
+      status:        'open',
+    };
+    await API.post('action_items', payload);
+
+    // Also log to CoC
+    const assignee = resolveAssignee(responsible);
+    const assigneeName = assignee ? assignee.first_name+' '+assignee.last_name : responsible;
+    await API.post('exception_annotations', {
+      firm_id: FIRM_ID, project_id: projectId||null,
+      entity_type:'task', entity_id: taskId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      action_type: 'action_item',
+      notes: `Action item created: "${desc}" — assigned to ${assigneeName}, due ${targetDate}`,
+      occurred_at: new Date().toISOString(),
+    });
+
+    document.getElementById('ai-modal-overlay')?.remove();
+    showToast('Action item saved', 'success');
+
+    // Refresh CoC if open
+    const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
+    const histBody = document.getElementById(caseId+'-hist');
+    if (histBody?.classList.contains('open')) {
+      const histContent = document.getElementById(caseId+'-hist-content');
+      if (histContent) await _refreshCoCContent(taskId, histContent);
+    }
+  } catch(e) {
+    showToast('Error saving: ' + e.message, 'error');
+  }
+}
+
+// ── Shared CoC content refresh ────────────────────────────────────────────────
+async function _refreshCoCContent(taskId, contentEl) {
+  const annotations = await API.get(
+    `exception_annotations?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
+  ).catch(()=>[]);
+
+  const typeLabel = { block_discovery:'Block Discovered', block_classification:'Classified',
+    acknowledgment:'Acknowledged', intended_action:'Intent Recorded', intervention:'Intervention',
+    escalation:'Escalated', note:'Note', resolution:'Resolved', unblocked:'Unblocked',
+    action_item:'Action Item Created' };
+  const typeColor = { block_discovery:'#f07a7a', escalation:'#f07a7a',
+    acknowledgment:'var(--cyan)', resolution:'var(--green)', unblocked:'var(--green)',
+    note:'var(--muted)', intervention:'var(--amber)', action_item:'var(--cyan)' };
+
+  if (!annotations.length) {
+    contentEl.innerHTML = '<div style="color:var(--text3);font-style:italic;padding:4px 0">No history recorded yet. Actions taken from this card will appear here.</div>';
+    return;
+  }
+  contentEl.innerHTML = annotations.map(a => {
+    const actor = resolveAssignee(a.actor_resource_id);
+    const actorName = actor ? actor.first_name+' '+actor.last_name : 'System';
+    const color = typeColor[a.action_type] || 'var(--muted)';
+    const label = typeLabel[a.action_type] || a.action_type;
+    const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const resolvedNotes = a.notes ? a.notes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => {
+      const r = resolveAssignee(id); return r ? r.first_name+' '+r.last_name : id;
+    }) : '';
+    return `<div class="hist-row" id="ann-${a.id}">
+      <div class="hist-time">${ts}</div>
+      <div style="flex:1;min-width:0">
+        <div class="hist-type" style="color:${color}">${label}</div>
+        <div class="hist-actor">${escHtml(actorName)}</div>
+        ${resolvedNotes ? `<div class="hist-body">${escHtml(resolvedNotes)}</div>` : ''}
+        ${a.intended_action ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>` : ''}
+        ${a.outcome ? `<div class="hist-body" style="color:var(--green)">Outcome: ${escHtml(a.outcome)}</div>` : ''}
+      </div>
+      <button onclick="deleteAnnotation('${a.id}',event)" title="Delete (dev)" style="background:none;border:none;color:var(--border2);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#f07a7a'" onmouseleave="this.style.color='var(--border2)'">🗑</button>
+    </div>`;
+  }).join('');
 }
 
 // ── Add Input modal ───────────────────────────────────────────────────────────
