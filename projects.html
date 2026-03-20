@@ -548,6 +548,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
+<script src="/js/action-items.js"></script>
 <script src="/js/sidebar.js"></script>
 <script>
 Sidebar.init('projects.html');
@@ -1613,20 +1614,34 @@ function renderTaskDetail(t) {
       <div class="exc-detail-cell">
         <div class="exc-detail-label">Assignee</div>
         ${(() => {
-          // Gather all assignees: task_assignees junction + primary assigned_to
-          const junctionAssignees = _taskAssignees
+          // Collect all unique assignees: junction table entries deduplicated by resolved id
+          const junctionIds = _taskAssignees
             .filter(a => a.task_id === t.id)
-            .map(a => resolveAssignee(a.user_id || a.resource_id))
+            .map(a => a.user_id || a.resource_id)
             .filter(Boolean);
-          const primary = t.assigned_to ? resolveAssignee(t.assigned_to) : null;
-          // Deduplicate
-          const allAssignees = primary ? [primary, ...junctionAssignees.filter(a => a.id !== primary.id)] : junctionAssignees;
-          if (allAssignees.length === 0) {
+          // If no junction entries, fall back to primary assigned_to alone
+          const idList = junctionIds.length > 0
+            ? [...new Set([t.assigned_to, ...junctionIds].filter(Boolean))]
+            : (t.assigned_to ? [t.assigned_to] : []);
+          if (idList.length === 0) {
             return `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>`;
           }
-          return `<div class="exc-detail-val">${escHtml(allAssignees[0].first_name+' '+allAssignees[0].last_name)}</div>
-            ${allAssignees.length > 1 ? `<div style="margin-top:3px">${allAssignees.slice(1).map(a=>`<span style="font-size:10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);color:var(--cyan);padding:1px 6px;border-radius:3px;margin-right:3px">${escHtml(a.first_name+' '+a.last_name)}</span>`).join('')}</div>` : ''}
-            <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% allocation${t.assigneeAlloc > 100 ? ' — OVER' : ''}</div>`;
+          // Render each person as a chip with their own allocation line
+          return idList.map((rid, idx) => {
+            const person = resolveAssignee(rid);
+            if (!person) return '';
+            const name = person.first_name + ' ' + person.last_name;
+            const alloc = _allocations.filter(a => a.resource_id === rid).reduce((s,a) => s + (a.allocation_pct||0), 0);
+            const ac = alloc > 100 ? 'var(--red)' : alloc > 80 ? 'var(--amber)' : alloc > 0 ? 'var(--green)' : 'var(--muted)';
+            const isPrimary = rid === t.assigned_to;
+            return `<div style="display:inline-flex;flex-direction:column;margin-right:6px;margin-bottom:4px;vertical-align:top">
+              <span style="font-size:10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);
+                  color:var(--cyan);padding:2px 7px;border-radius:3px;white-space:nowrap">
+                ${escHtml(name)}${isPrimary ? ' ★' : ''}
+              </span>
+              <span style="font-size:9px;color:${ac};margin-top:2px;padding-left:2px">${alloc}% alloc</span>
+            </div>`;
+          }).join('');
         })()}
         <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:3px"></div>
         <button class="case-action-btn" style="margin-top:6px;width:100%;text-align:left" onclick="openResourcePicker('${t.id}',event)">
@@ -1832,126 +1847,17 @@ async function toggleActionsPane(paneId, taskId, event) {
   }
 }
 
-function _renderActionItemsList(listEl, items, taskId) {
-  if (!items || items.length === 0) {
-    listEl.innerHTML = '<div style="font-size:10px;color:var(--muted);font-style:italic;padding:4px 0">No action items yet.</div>';
-    return;
-  }
-  const priColor = { critical:'#f07a7a', high:'#f07a7a', medium:'var(--amber)', low:'var(--muted)' };
-  const today = new Date().toLocaleDateString('en-CA');
-  listEl.innerHTML = items.map(item => {
-    const done    = item.status === 'completed';
-    const assignee = resolveAssignee(item.responsible);
-    const aName    = assignee ? assignee.first_name+' '+assignee.last_name : '—';
-    const initials = assignee ? (assignee.first_name[0]||'')+(assignee.last_name[0]||'') : '?';
-    const pc       = priColor[item.priority] || 'var(--muted)';
-    const overdue  = !done && item.target_date && item.target_date < today;
-    const due      = item.target_date ? fmtDate(item.target_date) : null;
-
-    // Status badge colours
-    const badgeBg  = done ? 'rgba(42,157,64,.15)' : overdue ? 'rgba(192,64,74,.12)' : 'rgba(212,144,31,.12)';
-    const badgeClr = done ? '#7af0a0'              : overdue ? '#f07a7a'              : 'var(--amber)';
-
-    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;
-        border-bottom:1px solid rgba(255,255,255,.04)"
-        data-ai-id="${item.id}"
-        data-ai-status="${item.status||'open'}">
-
-      <!-- Checkbox -->
-      <div style="width:15px;height:15px;border-radius:4px;flex-shrink:0;margin-top:2px;
-          border:1px solid ${done?'var(--green)':'rgba(255,255,255,.14)'};
-          background:${done?'var(--green)':'transparent'};
-          display:flex;align-items:center;justify-content:center;
-          cursor:pointer;font-size:9px;color:#fff"
-          onclick="event.stopPropagation();_toggleActionItem(this)">
-        ${done?'✓':''}
-      </div>
-
-      <!-- Body -->
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:500;line-height:1.45;margin-bottom:4px;
-            color:${done?'var(--muted)':'var(--text)'};
-            text-decoration:${done?'line-through':'none'}">
-          ${escHtml(item.description)}
-        </div>
-        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <!-- Priority dot + assignee -->
-          <div style="display:flex;align-items:center;gap:4px">
-            <div style="width:5px;height:5px;border-radius:50%;background:${pc};flex-shrink:0"></div>
-            <div style="width:15px;height:15px;border-radius:50%;flex-shrink:0;
-                background:rgba(79,142,247,.15);color:var(--accent);
-                font-size:7px;font-weight:700;
-                display:flex;align-items:center;justify-content:center">
-              ${escHtml(initials)}
-            </div>
-            <span style="font-size:10px;color:var(--muted)">${escHtml(aName)}</span>
-          </div>
-          <!-- Due date -->
-          ${due ? `<span style="font-size:10px;color:${overdue?'#f07a7a':'var(--muted)'}"
-              data-due="${item.target_date}">
-            ${overdue?'⚠ ':''}Due ${due}
-          </span>` : ''}
-          <!-- Status badge -->
-          <span data-status-badge
-              style="font-size:10px;padding:1px 6px;border-radius:4px;
-              background:${badgeBg};color:${badgeClr}">
-            ${(item.status||'open').replace('_',' ')}
-          </span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+function _renderActionItemsList(listEl, items) {
+  HUD.ActionItems.renderList(listEl, items, resolveAssignee);
 }
 
-// Toggle action item status — PATCHes action_items.status, updates DOM in-place, no re-render
-async function _toggleActionItem(checkboxEl) {
-  const row       = checkboxEl.closest('[data-ai-id]');
-  if (!row) return;
-  const id        = row.dataset.aiId;
-  const curStatus = row.dataset.aiStatus || 'open';
-  const newStatus = curStatus === 'completed' ? 'open' : 'completed';
-
-  try {
-    await API.patch(`action_items?id=eq.${id}`, { status: newStatus });
-
-    // Update row data attribute
-    row.dataset.aiStatus = newStatus;
-    const done = newStatus === 'completed';
-
-    // Update checkbox appearance
-    checkboxEl.style.background  = done ? 'var(--green)' : 'transparent';
-    checkboxEl.style.borderColor = done ? 'var(--green)' : 'rgba(255,255,255,.14)';
-    checkboxEl.textContent       = done ? '✓' : '';
-
-    // Update description line-through + colour
-    const descEl = row.querySelector('[style*="text-decoration"]');
-    if (descEl) {
-      descEl.style.textDecoration = done ? 'line-through' : 'none';
-      descEl.style.color          = done ? 'var(--muted)' : 'var(--text)';
-    }
-
-    // Update status badge
-    const badge = row.querySelector('[data-status-badge]');
-    if (badge) {
-      badge.textContent       = done ? 'completed' : 'open';
-      badge.style.background  = done ? 'rgba(42,157,64,.15)' : 'rgba(212,144,31,.12)';
-      badge.style.color       = done ? '#7af0a0'              : 'var(--amber)';
-    }
-
-    // Update overdue warning on due-date span
-    const today = new Date().toLocaleDateString('en-CA');
-    const dueSpan = row.querySelector('[data-due]');
-    if (dueSpan) {
-      const due = dueSpan.dataset.due;
-      const isOverdue = due && due < today && !done;
-      dueSpan.style.color = isOverdue ? '#f07a7a' : 'var(--muted)';
-      dueSpan.textContent = (isOverdue ? '⚠ ' : '') + 'Due ' + fmtDate(due);
-    }
-
-  } catch(e) {
-    console.error('_toggleActionItem error:', e);
-    showToast('Could not update action item status', 'error');
-  }
+// Toggle action item status — delegates to shared module.
+// Note: projects.html uses `action_items` table (not prospect_action_items),
+// so we override the table before delegating.
+function _toggleActionItem(checkboxEl) {
+  const row = checkboxEl.closest('[data-ai-id]');
+  if (row && !row.dataset.aiTable) row.dataset.aiTable = 'action_items';
+  HUD.ActionItems.toggleFromRow(checkboxEl);
 }
 
 // After saving an action item, refresh the list in the open pane
@@ -2404,169 +2310,64 @@ async function saveAnnotation(taskId, actionType, containerId, event) {
 // ── Add Action Item modal (mirrors Pipeline/Action Items widget) ───────────────
 function openAddActionItem(taskId, projectId, event) {
   if (event) event.stopPropagation();
-  const task    = _tasks.find(t => t.id === taskId);
-  const proj    = _projects.find(p => p.id === projectId);
-  const today   = new Date().toLocaleDateString('en-CA');
-
-  const overlay = document.createElement('div');
-  overlay.className = 'hud-modal-overlay';
-  overlay.id = 'ai-modal-overlay';
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-
-  // Resource options grouped by department — users first, then resources
-  const byDeptAI = {};
-  // Put the 4 Apex users at top under "Project Team"
-  if (_users.length > 0) byDeptAI['Project Team'] = _users.map(u => ({id: u.id, label: u.name, sub: u.title||''}));
-  // Group resources by department
-  _resources.forEach(r => {
-    const dept = r.department || 'Other';
-    if (!byDeptAI[dept]) byDeptAI[dept] = [];
-    byDeptAI[dept].push({id: r.id, label: r.first_name+' '+r.last_name, sub: r.title||r.level||''});
-  });
-  const resOptions = Object.entries(byDeptAI)
-    .sort(([a],[b]) => a === 'Project Team' ? -1 : b === 'Project Team' ? 1 : a.localeCompare(b))
-    .map(([dept, people]) =>
-      `<optgroup label="${escHtml(dept)}">${people.map(p =>
-        `<option value="${p.id}">${escHtml(p.label)}${p.sub?' — '+p.sub:''}</option>`
-      ).join('')}</optgroup>`
-    ).join('');
-
-  overlay.innerHTML = `
-    <div class="hud-modal" style="width:500px">
-      <div class="hud-modal-header">
-        <div class="hud-modal-title">✚ Add Action Item</div>
-        <button class="hud-modal-close" onclick="this.closest('.hud-modal-overlay').remove()">✕</button>
-      </div>
-      <div class="hud-modal-body">
-        <div style="font-size:11px;background:rgba(0,0,0,.2);padding:6px 8px;border-radius:4px;color:var(--muted);margin-bottom:10px">
-          Task: <strong style="color:var(--text)">${escHtml(task?.name||'—')}</strong>
-          ${proj ? ` · <span>${escHtml(proj.name)}</span>` : ''}
-        </div>
-
-        <div class="hud-field-label">Description *</div>
-        <textarea class="hud-textarea" id="aim-desc" placeholder="What needs to be done..." rows="3" autofocus></textarea>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:2px">
-          <div>
-            <div class="hud-field-label">Assigned To *</div>
-            <select class="hud-select" id="aim-responsible">
-              <option value="">— Select person —</option>
-              ${resOptions}
-            </select>
-          </div>
-          <div>
-            <div class="hud-field-label">Due Date *</div>
-            <input class="hud-input" id="aim-target" type="date" value="${new Date(Date.now()+7*86400000).toLocaleDateString('en-CA')}">
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:2px">
-          <div>
-            <div class="hud-field-label">Priority</div>
-            <select class="hud-select" id="aim-priority">
-              <option value="high">HIGH</option>
-              <option value="critical">CRITICAL</option>
-              <option value="medium" selected>MEDIUM</option>
-              <option value="low">LOW</option>
-            </select>
-          </div>
-          <div>
-            <div class="hud-field-label">Source</div>
-            <select class="hud-select" id="aim-source">
-              <option value="internal" selected>Internal</option>
-              <option value="client_request">Client Request</option>
-              <option value="meeting">Meeting</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="hud-field-label">Deliverable / Expected Output</div>
-        <input class="hud-input" id="aim-deliverable" placeholder="What will be produced when this is done...">
-
-        <div class="hud-field-label">Comments</div>
-        <textarea class="hud-textarea" id="aim-comments" placeholder="Additional context..." rows="2"></textarea>
-      </div>
-      <div class="hud-modal-footer">
-        <button class="btn-cancel" onclick="this.closest('.hud-modal-overlay').remove()">Cancel</button>
-        <button class="btn-save" onclick="saveAddActionItem('${taskId}','${projectId}',event)">✚ Save Action Item</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  setTimeout(() => document.getElementById('aim-desc')?.focus(), 50);
-}
-
-async function saveAddActionItem(taskId, projectId, event) {
-  if (event) event.stopPropagation();
-  const desc        = document.getElementById('aim-desc')?.value?.trim();
-  const responsible = document.getElementById('aim-responsible')?.value;
-  const targetDate  = document.getElementById('aim-target')?.value;
-  if (!desc)        { showToast('Description is required', 'warning'); return; }
-  if (!responsible) { showToast('Please assign to someone', 'warning'); return; }
-  if (!targetDate)  { showToast('Due date is required', 'warning'); return; }
-
   const task = _tasks.find(t => t.id === taskId);
-  try {
-    // submitted_by must be a users.id — find current user in _users
-    const currentUser = _users.find(u =>
-      u.resource_id === CURRENT_USER_RESOURCE_ID ||
-      u.name?.toLowerCase().includes('vaughn')
-    );
-    const submittedBy = currentUser?.id || _users[0]?.id;
+  const proj = _projects.find(p => p.id === projectId);
 
-    // responsible: if selected ID is a resource not in users, map via resource_id
-    let responsibleUserId = responsible;
-    const isUser = _users.find(u => u.id === responsible);
-    if (!isUser) {
-      // It's a resource ID — find matching user by resource_id
-      const matchUser = _users.find(u => u.resource_id === responsible);
-      if (matchUser) responsibleUserId = matchUser.id;
-      // If still no match (extended resource staff), keep the ID but warn
-    }
+  // Resolve current user's users.id for submitted_by FK
+  const currentUser = _users.find(u =>
+    u.resource_id === CURRENT_USER_RESOURCE_ID ||
+    u.name?.toLowerCase().includes('vaughn')
+  );
+  const submittedBy = currentUser?.id || _users[0]?.id;
 
-    const payload = {
-      firm_id:       FIRM_ID,
-      project_id:    projectId || null,
-      submitted_by:  submittedBy,
-      description:   desc,
-      responsible:   responsibleUserId,
-      target_date:   targetDate,
-      assigned_date: new Date().toLocaleDateString('en-CA'),
-      priority:      document.getElementById('aim-priority')?.value || 'medium',
-      source:        document.getElementById('aim-source')?.value   || 'internal',
-      deliverable:   document.getElementById('aim-deliverable')?.value?.trim() || null,
-      comments:      document.getElementById('aim-comments')?.value?.trim()    || null,
-      status:        'open',
-    };
-    await API.post('action_items', payload);
+  // Build people list: Project Team (users) first, then resources grouped by dept
+  const people = [];
+  _users.forEach(u => people.push({ group: 'Project Team', id: u.id, label: u.name, sub: u.title||'' }));
+  _resources.forEach(r => people.push({
+    group: r.department || 'Other',
+    id:    r.id,
+    label: r.first_name + ' ' + r.last_name,
+    sub:   r.title || r.level || '',
+  }));
+  // Sort groups: Project Team first, rest alphabetical
+  people.sort((a, b) => {
+    if (a.group === 'Project Team') return -1;
+    if (b.group === 'Project Team') return  1;
+    return a.group.localeCompare(b.group) || a.label.localeCompare(b.label);
+  });
 
-    // Also log to CoC
-    const assignee = resolveAssignee(responsible);
-    const assigneeName = assignee ? assignee.first_name+' '+assignee.last_name : responsible;
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: projectId||null,
-      entity_type:'task', entity_id: taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type: 'action_item',
-      notes: `Action item created: "${desc}" — assigned to ${assigneeName}, due ${targetDate}`,
-      occurred_at: new Date().toISOString(),
-    });
-
-    document.getElementById('ai-modal-overlay')?.remove();
-    showToast('Action item saved', 'success');
-
-    // Refresh action items list in the open pane
-    await _refreshActionItemsList(taskId);
-
-    // Refresh CoC if open
-    const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
-    const histBody = document.getElementById(caseId+'-hist');
-    if (histBody?.classList.contains('open')) {
-      const histContent = document.getElementById(caseId+'-hist-content');
-      if (histContent) await _refreshCoCContent(taskId, histContent);
-    }
-  } catch(e) {
-    showToast('Error saving: ' + e.message, 'error');
-  }
+  HUD.ActionItems.open({
+    table:       'action_items',
+    firmId:      FIRM_ID,
+    projectId,
+    taskId,
+    taskName:    task?.name    || null,
+    projectName: proj?.name    || null,
+    submittedBy,
+    people,
+    onSave: async (saved) => {
+      await _refreshActionItemsList(taskId);
+      // Refresh CoC if open
+      const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
+      const histBody = document.getElementById(caseId + '-hist');
+      if (histBody?.classList.contains('open')) {
+        const histContent = document.getElementById(caseId + '-hist-content');
+        if (histContent) await _refreshCoCContent(taskId, histContent);
+      }
+    },
+    onCoCLog: async ({ description, responsible, target_date }) => {
+      const assignee     = resolveAssignee(responsible);
+      const assigneeName = assignee ? assignee.first_name + ' ' + assignee.last_name : responsible;
+      await API.post('exception_annotations', {
+        firm_id: FIRM_ID, project_id: projectId || null,
+        entity_type: 'task', entity_id: taskId,
+        actor_resource_id: CURRENT_USER_RESOURCE_ID,
+        action_type: 'action_item',
+        notes: `Action item created: "${description}" — assigned to ${assigneeName}, due ${target_date}`,
+        occurred_at: new Date().toISOString(),
+      });
+    },
+  });
 }
 
 // ── Shared CoC content refresh ────────────────────────────────────────────────
