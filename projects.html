@@ -1464,6 +1464,7 @@ function renderTaskDetail(t) {
   // Task-specific deliverables and dependencies
   const taskDeliverables = _deliverables.filter(d => d.task_id === t.id);
   const taskDeps = _dependencies.filter(d => d.predecessor_task_id === t.id || d.successor_task_id === t.id);
+  const blockingInputs = taskDeliverables.filter(d => d.direction === 'input' && isDelivBlocking(d));
   const rootCauses = analyzeRootCause(t, taskDeliverables, taskDeps);
   const criticality = assessCriticality(t);
   const pctDisplay = Math.round((t.pct_complete||0) * (t.pct_complete <= 1 ? 100 : 1));
