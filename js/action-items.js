@@ -22,6 +22,13 @@ function _fmt(d) {
   if (!d) return '';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
+function _fmtCreated(iso) {
+  if (!iso) return '';
+  const dt = new Date(iso);
+  const date = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const time = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return date + ' · ' + time;
+}
 function _esc(s) {
   if (typeof escHtml === 'function') return escHtml(s);
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -137,6 +144,10 @@ function renderList(listEl, items, resolveFn, contextFn) {
               background:${badgeBg};color:${badgeClr}">
             ${_esc((item.status||'open').replace('_',' '))}
           </span>
+          ${item.created_at ? `<span style="font-size:10px;color:rgba(255,255,255,.2);margin-left:2px"
+              title="Created ${_fmtCreated(item.created_at)}">
+            ${_fmtCreated(item.created_at)}
+          </span>` : ''}
         </div>
       </div>
     </div>`;
@@ -597,12 +608,34 @@ async function deleteById(id, trashEl) {
   const tbl = row?.dataset?.aiTable || 'action_items';
   try {
     await API.del(`${tbl}?id=eq.${id}`);
-    // Remove the row from the DOM in-place — no re-render
+
+    // Remove the row from the DOM in-place — no re-render of surrounding list
     if (row) {
       row.style.transition = 'opacity .2s';
       row.style.opacity    = '0';
       setTimeout(() => row.remove(), 200);
     }
+
+    // Decrement ai-count badge in-place
+    const badge = document.getElementById('ai-count');
+    if (badge) {
+      const current = parseInt(badge.textContent, 10) || 0;
+      const next    = Math.max(0, current - 1);
+      badge.textContent    = next;
+      badge.style.display  = next > 0 ? '' : 'none';
+    }
+
+    // If the ACTION ITEMS view is currently rendered, also remove the row there.
+    // It shares the same data-ai-id so one selector finds it in either pane.
+    // (The row.remove() above handles the EXCEPTIONS pane row; this handles
+    //  the ACTION ITEMS view row if the user has visited it this session.)
+    document.querySelectorAll(`[data-ai-id="${id}"]`).forEach(el => {
+      if (el === row) return; // already handled above
+      el.style.transition = 'opacity .2s';
+      el.style.opacity    = '0';
+      setTimeout(() => el.remove(), 200);
+    });
+
     _toast('Action item deleted.', 'success');
   } catch(e) {
     _toast('Failed to delete action item.', 'error');

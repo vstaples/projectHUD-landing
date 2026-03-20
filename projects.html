@@ -1856,7 +1856,7 @@ async function toggleActionsPane(paneId, taskId, event) {
 
   try {
     const items = await API.get(
-      `action_items?project_id=eq.${_tasks.find(t=>t.id===taskId)?.project_id}&select=id,description,responsible,target_date,status,priority&order=created_at.desc`
+      `action_items?project_id=eq.${_tasks.find(t=>t.id===taskId)?.project_id}&select=id,description,responsible,target_date,status,priority,created_at&order=created_at.desc`
     ).catch(()=>[]);
     _renderActionItemsList(listEl, items, taskId);
   } catch(e) {
@@ -1885,7 +1885,7 @@ async function _refreshActionItemsList(taskId) {
   listEl.dataset.loaded = ''; // allow reload
   const task = _tasks.find(t=>t.id===taskId);
   const items = await API.get(
-    `action_items?project_id=eq.${task?.project_id}&select=id,description,responsible,target_date,status,priority&order=created_at.desc`
+    `action_items?project_id=eq.${task?.project_id}&select=id,description,responsible,target_date,status,priority,created_at&order=created_at.desc`
   ).catch(()=>[]);
   _renderActionItemsList(listEl, items, taskId);
 }
@@ -2782,7 +2782,7 @@ async function renderActionItems(el) {
   let items = [];
   try {
     items = await API.get(
-      `action_items?project_id=in.(${projectIds})&order=target_date.asc,created_at.desc&select=id,project_id,task_id,description,responsible,target_date,status,priority`
+      `action_items?project_id=in.(${projectIds})&order=target_date.asc,created_at.desc&select=id,project_id,task_id,description,responsible,target_date,status,priority,created_at`
     );
   } catch(e) {
     el.innerHTML = '<div class="empty"><div class="title">Could not load action items</div></div>';
