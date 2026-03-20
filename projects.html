@@ -792,6 +792,11 @@ function renderPortfolio(el) {
   const slipColor = worstSlip === 0 ? 'var(--green)' : worstSlip <= 14 ? 'var(--amber)' : 'var(--red)';
   const reqColor  = openReqs === 0 ? 'var(--green)' : 'var(--red)';
 
+  // Pre-compute tooltip strings — avoids ${} expressions inside HTML attrs inside template literals
+  const tipSlip  = worstSlip > 0 ? 'Worst P50 forecast slip across active projects' : 'All projects on or ahead of target';
+  const tipHours = Math.round(totalBudgetH > 0 ? totalUsedH/totalBudgetH*100 : 0) + '% of total portfolio budget consumed';
+  const tipReqs  = openReqs > 0 ? openReqs + ' open resource request' + (openReqs!==1?'s':'') + ' — navigate to Requests page' : 'No open resource requests';
+
   let html = `
     <div class="kpi-strip">
       <div class="kpi" style="border-top-color:${cpiColor};cursor:default"
@@ -806,17 +811,17 @@ function renderPortfolio(el) {
         <div class="kpi-val" style="color:${spiColor}">${avgSPI}</div>
         <div class="kpi-sub">Schedule performance avg</div>
       </div>
-      <div class="kpi" style="border-top-color:${slipColor}" data-tip="${worstSlip > 0 ? 'Worst P50 forecast slip across all active projects' : 'All projects tracking on or ahead of target dates'}">
+      <div class="kpi" style="border-top-color:${slipColor}" data-tip="${tipSlip}">
         <div class="kpi-lbl">Worst Slip</div>
         <div class="kpi-val" style="color:${slipColor}">${worstSlip > 0 ? '+'+worstSlip+'d' : '✓'}</div>
         <div class="kpi-sub">Forecast vs target</div>
       </div>
-      <div class="kpi" style="border-top-color:var(--accent)" data-tip="${Math.round(totalUsedH/totalBudgetH*100)}% of total portfolio budget consumed across all projects">
+      <div class="kpi" style="border-top-color:var(--accent)" data-tip="${tipHours}">
         <div class="kpi-lbl">Labor Hours</div>
         <div class="kpi-val" style="color:var(--text)">${Math.round(totalUsedH)}</div>
         <div class="kpi-sub">of ${totalBudgetH.toLocaleString()} budgeted</div>
       </div>
-      <div class="kpi" style="border-top-color:${reqColor}" data-tip="${openReqs > 0 ? openReqs+' resource request'+( openReqs!==1?'s':'')+' awaiting decision — navigate to Requests page' : 'No open resource requests'}">
+      <div class="kpi" style="border-top-color:${reqColor}" data-tip="${tipReqs}">
         <div class="kpi-lbl">Open Requests</div>
         <div class="kpi-val" style="color:${reqColor}">${openReqs}</div>
         <div class="kpi-sub">Resource requests pending</div>
@@ -964,7 +969,7 @@ function renderProjectCard(p) {
           onmouseenter="TIP.show(requestsTipHTML('${p.id}'),event)"
           onmouseleave="TIP.hide()" onmousemove="TIP.position(event)">⬡ ${openReq} request${openReq!==1?'s':''}</span>` : ''}
         ${upcomingMs.filter(m=>m.status==='at_risk').length > 0 ?
-          `<span class="sig-badge milestone" data-tip="${upcomingMs.filter(m=>m.status==='at_risk').map(m=>m.name.substring(0,30)).join(', ')} — milestone at risk">◈ milestone at risk</span>` : ''}
+          `<span class="sig-badge milestone" data-tip="One or more upcoming milestones flagged at risk — expand for details">◈ milestone at risk</span>` : ''}
       </div>
     </div>
 
