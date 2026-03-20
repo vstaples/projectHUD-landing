@@ -642,6 +642,7 @@ function renderRequestCard(req, isSent = false) {
           let eventData = null;
           try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
           const counterNotes = eventData?.counter_notes;
+          const impactSnap   = eventData?.impact_snapshot;
           const idx = events.indexOf(e);
           const baseTime = idx === 0
             ? new Date(req.submitted_at)
@@ -794,6 +795,7 @@ function renderResolvedCard(req) {
             try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
             const counterNotes = eventData?.counter_notes;
             const denialReason = eventData?.denial_reason;
+            const impactSnap   = eventData?.impact_snapshot;
             // Elapsed: first event always measures from submission; subsequent from prior event
             const baseTime  = idx === 0 ? new Date(req.submitted_at) : new Date(events[idx-1].occurred_at);
             const hoursEl   = Math.round((new Date(e.occurred_at) - baseTime) / 3600000 * 10) / 10;
@@ -812,6 +814,7 @@ function renderResolvedCard(req) {
                 ${e.notes && !counterNotes && !denialReason ? '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+escHtml(e.notes)+'</div>' : ''}
                 ${counterNotes ? '<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(counterNotes)+'"</div>' : ''}
                 ${denialReason ? '<div style="color:#f07a7a;font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(denialReason)+'"</div>' : ''}
+                ${impactSnap   ? '<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">'+escHtml(impactSnap)+'</div>' : ''}
               </div>
             </div>`;
           }).join('');
