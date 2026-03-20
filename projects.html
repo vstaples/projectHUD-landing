@@ -1822,8 +1822,7 @@ async function assignTask(taskId, resourceId, event) {
     const t = _tasks.find(t => t.id === taskId);
     if (t) t.assigned_to = resourceId;
     showToast('Task assigned — recorded in chain of custody', 'success');
-    // Refresh exceptions view
-    renderView('exceptions');
+    _patchTaskDisplayInPlace(taskId, resourceId, _resources.find(r=>r.id===resourceId)?.first_name || resourceId);
   } catch(e) {
     showToast('Error assigning task: ' + e.message, 'error');
   }
@@ -1965,9 +1964,40 @@ async function confirmResourcePicker() {
     });
     closeResourcePicker();
     showToast(`Assigned to ${names} — recorded in chain of custody`, 'success');
-    renderView('exceptions');
+    // Update DOM in-place — don't rebuild whole view (would collapse expanded panes)
+    _patchTaskDisplayInPlace(_rpTaskId, primaryId, names);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Inline patch — update assignee display without rebuilding the view ─────────
+function _patchTaskDisplayInPlace(taskId, resourceId, names) {
+  const res   = _resources.find(r => r.id === resourceId);
+  if (!res) return;
+  const alloc = _allocations.filter(a => a.resource_id === resourceId).reduce((s,a)=>s+(a.allocation_pct||0),0);
+  const allocColor = alloc > 100 ? 'var(--red)' : alloc > 80 ? 'var(--amber)' : 'var(--green)';
+
+  // Find the Assignee detail cell anywhere in the current expanded cards
+  document.querySelectorAll('.exc-detail-cell').forEach(cell => {
+    const lbl = cell.querySelector('.exc-detail-label');
+    if (lbl?.textContent?.trim() !== 'Assignee') return;
+    const valEl = cell.querySelector('.exc-detail-val');
+    const subEl = cell.querySelector('.exc-detail-sub');
+    if (valEl) { valEl.textContent = names; valEl.style.color = ''; }
+    if (subEl) {
+      subEl.textContent = alloc + '% total allocation' + (alloc > 100 ? ' — OVER-ALLOCATED' : '');
+      subEl.style.color = allocColor;
+    }
+    const btn = cell.querySelector('.case-action-btn');
+    if (btn) btn.textContent = '👤 Change / Add Assignees';
+  });
+
+  // Update the inline display chip row if present
+  const caseShort = taskId.replace(/-/g,'').substring(0,12);
+  const chipDiv = document.getElementById('assignees-display-' + caseShort);
+  if (chipDiv) {
+    chipDiv.innerHTML = `<div style="font-size:10px;color:var(--cyan);margin-top:2px">✓ Assigned: ${escHtml(names)}</div>`;
   }
 }
 
@@ -2041,14 +2071,38 @@ async function saveAnnotation(taskId, actionType, containerId, event) {
     });
     document.getElementById(containerId)?.remove();
     showToast('Saved to chain of custody', 'success');
-    // Auto-refresh the CoC pane if open
+    // Auto-refresh the CoC pane if open — don't re-render whole view
     const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
     const histBody = document.getElementById(caseId+'-hist');
     if (histBody?.classList.contains('open')) {
-      await loadAndToggleHistory(taskId, caseId+'-hist', null);
-      histBody.classList.add('open');
-      const arrow = document.getElementById(caseId+'-hist-arrow');
-      if (arrow) arrow.classList.add('open');
+      // Re-load history content without closing pane
+      const histContent = document.getElementById(caseId+'-hist-content');
+      if (histContent) {
+        histContent.textContent = 'Refreshing...';
+        const annotations = await API.get(
+          `exception_annotations?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
+        ).catch(()=>[]);
+        const typeLabel = { block_discovery:'Block Discovered', block_classification:'Classified', acknowledgment:'Acknowledged', intended_action:'Intent Recorded', intervention:'Intervention', escalation:'Escalated', note:'Note', resolution:'Resolved', unblocked:'Unblocked' };
+        const typeColor = { block_discovery:'#f07a7a', escalation:'#f07a7a', acknowledgment:'var(--cyan)', resolution:'var(--green)', unblocked:'var(--green)', note:'var(--muted)', intervention:'var(--amber)' };
+        histContent.innerHTML = annotations.length === 0
+          ? '<div style="color:var(--text3);font-style:italic;padding:4px 0">No history recorded yet.</div>'
+          : annotations.map(a => {
+              const actor = _resources.find(r => r.id === a.actor_resource_id);
+              const actorName = actor ? actor.first_name+' '+actor.last_name : 'System';
+              const color = typeColor[a.action_type] || 'var(--muted)';
+              const label = typeLabel[a.action_type] || a.action_type;
+              const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+              return `<div class="hist-row">
+                <div class="hist-time">${ts}</div>
+                <div style="flex:1;min-width:0">
+                  <div class="hist-type" style="color:${color}">${label}</div>
+                  <div class="hist-actor">${escHtml(actorName)}</div>
+                  ${a.notes?`<div class="hist-body">${escHtml(a.notes)}</div>`:''}
+                  ${a.intended_action?`<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>`:''}
+                </div>
+              </div>`;
+            }).join('');
+      }
     }
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
@@ -2214,8 +2268,8 @@ async function submitResourceRequest(taskId, projectId, event) {
       _requests.push(req);
     }
     document.getElementById('rr-overlay')?.remove();
-    showToast('Resource request submitted', 'success');
-    renderView('exceptions');
+    showToast('Resource request submitted — view in Requests page', 'success');
+    // Don't re-render — would collapse expanded panes
   } catch(e) {
     showToast('Error: '+e.message, 'error');
   }
