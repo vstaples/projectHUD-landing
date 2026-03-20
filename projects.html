@@ -559,18 +559,22 @@ function pmTipHTML(r) {
 
   return `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div style="width:40px;height:40px;border-radius:50%;background:rgba(79,142,247,.15);
-          color:var(--accent);font-size:14px;font-weight:700;display:flex;align-items:center;
-          justify-content:center;flex-shrink:0;border:1px solid rgba(79,142,247,.3)">${initials}</div>
+      ${r.avatar_url
+        ? `<img src="${escHtml(r.avatar_url)}" style="width:40px;height:40px;border-radius:50%;
+              object-fit:cover;flex-shrink:0;border:1px solid rgba(79,142,247,.3)">`
+        : `<div style="width:40px;height:40px;border-radius:50%;background:rgba(79,142,247,.15);
+              color:var(--accent);font-size:14px;font-weight:700;display:flex;align-items:center;
+              justify-content:center;flex-shrink:0;border:1px solid rgba(79,142,247,.3)">${initials}</div>`}
       <div>
         <div style="font-weight:700;font-size:13px">${escHtml(r.first_name + ' ' + r.last_name)}</div>
         <div style="font-size:11px;color:var(--muted)">${escHtml(r.title||'—')}</div>
+        ${r.department ? `<div style="font-size:10px;color:var(--muted)">${escHtml(r.department)}${r.location ? ' · '+escHtml(r.location) : ''}</div>` : ''}
         ${r.email ? `<div style="font-size:10px;color:var(--accent)">${escHtml(r.email)}</div>` : ''}
       </div>
     </div>
-    ${r.bio ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;
+    ${(r.bio || r.notes) ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;
         padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);line-height:1.6">
-        ${escHtml(r.bio)}</div>` :
+        ${escHtml(r.bio || r.notes)}</div>` :
       `<div style="font-size:11px;color:var(--text3);margin-bottom:8px;
         padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);font-style:italic">
         No bio on file</div>`}
