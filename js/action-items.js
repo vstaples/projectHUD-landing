@@ -329,17 +329,32 @@ function open(config) {
         comments,
         status: 'open',
       };
+
+      // ── Step 1: write the action item — must succeed before anything else
       const [saved] = await API.post(table, payload);
 
+      // ── Step 2: close modal and confirm immediately
+      // Done before callbacks so a slow/failing CoC log never leaves the
+      // modal open or makes the user think the save itself failed.
       document.getElementById('aim-modal-overlay')?.remove();
       _toast('Action item saved', 'success');
 
-      if (onCoCLog)  await onCoCLog({ ...payload, id: saved?.id, responsible });
-      if (onSave)    await onSave(saved || payload);
+      // ── Step 3: CoC annotation — fire-and-forget, never blocks or errors
+      // A 409 unique-constraint hit on exception_annotations must not surface
+      // as a user-facing failure — the action item is already written to the DB.
+      if (onCoCLog) {
+        onCoCLog({ ...payload, id: saved?.id, responsible })
+          .catch(e => console.warn('[ActionItems] CoC log skipped:', e.message));
+      }
+
+      // ── Step 4: page refresh callback
+      if (onSave) await onSave(saved || payload);
 
     } catch(e) {
+      // Only reached if the action_items POST itself failed
       _toast('Error saving: ' + e.message, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '✚ Save Action Item'; }
+      const retryBtn = document.getElementById('aim-save-btn');
+      if (retryBtn) { retryBtn.disabled = false; retryBtn.textContent = '✚ Save Action Item'; }
     }
   });
 }
