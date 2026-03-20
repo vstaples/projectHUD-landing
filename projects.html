@@ -264,6 +264,25 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
            font-family:var(--font-mono); font-size:12px; color:var(--muted);
            letter-spacing:.1em; }
 
+/* ── Tooltips ── */
+[data-tip] { position:relative; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position:absolute; bottom:calc(100% + 6px); left:50%;
+  transform:translateX(-50%);
+  background:var(--surf3); border:1px solid var(--border2);
+  color:var(--text); font-size:11px; line-height:1.5;
+  padding:6px 10px; border-radius:5px; white-space:nowrap;
+  z-index:200; pointer-events:none; font-style:normal;
+  box-shadow:0 4px 12px rgba(0,0,0,.4);
+  font-family:var(--font-ui); font-weight:400; letter-spacing:0;
+}
+[data-tip]:hover::before {
+  content:''; position:absolute; bottom:calc(100% + 1px); left:50%;
+  transform:translateX(-50%);
+  border:5px solid transparent; border-top-color:var(--border2);
+  z-index:201; pointer-events:none;
+}
 /* ── Toast ── */
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
          background:var(--surf2); border:1px solid var(--border2); border-radius:8px;
@@ -342,8 +361,11 @@ function calcEVM(proj, projTasks, projEntries) {
   const bac         = parseFloat(proj.budget_baseline_hours || 0);
   const actualHrs   = (projEntries||[]).reduce((s,e) => s + parseFloat(e.hours||0), 0);
   const totalEffort = projTasks.reduce((s,t) => s + parseFloat(t.effort_days||1), 0);
+  // Detect pct_complete scale: if max value <= 1 it's a fraction (0–1), else whole number (0–100)
+  const maxPct      = projTasks.reduce((m,t) => Math.max(m, parseFloat(t.pct_complete||0)), 0);
+  const pctScale    = maxPct <= 1 ? 1 : 100;  // divide by this to get 0–1
   const earnedEff   = projTasks.reduce((s,t) =>
-    s + (parseFloat(t.pct_complete||0)/100 * parseFloat(t.effort_days||1)), 0);
+    s + (parseFloat(t.pct_complete||0)/pctScale * parseFloat(t.effort_days||1)), 0);
   const evPct       = totalEffort > 0 ? earnedEff / totalEffort : 0;
   const ev          = bac > 0 ? evPct * bac : earnedEff;
 
@@ -529,27 +551,27 @@ function renderPortfolio(el) {
 
   let html = `
     <div class="kpi-strip">
-      <div class="kpi" style="border-top-color:${cpiColor}">
+      <div class="kpi" style="border-top-color:${cpiColor}" data-tip="Average CPI across active projects. Below 1.0 = over budget">
         <div class="kpi-lbl">Portfolio CPI</div>
         <div class="kpi-val" style="color:${cpiColor}">${avgCPI}</div>
         <div class="kpi-sub">Cost performance avg</div>
       </div>
-      <div class="kpi" style="border-top-color:${spiColor}">
+      <div class="kpi" style="border-top-color:${spiColor}" data-tip="Average SPI across active projects. Below 1.0 = behind schedule">
         <div class="kpi-lbl">Portfolio SPI</div>
         <div class="kpi-val" style="color:${spiColor}">${avgSPI}</div>
         <div class="kpi-sub">Schedule performance avg</div>
       </div>
-      <div class="kpi" style="border-top-color:${slipColor}">
+      <div class="kpi" style="border-top-color:${slipColor}" data-tip="${worstSlip > 0 ? 'Worst P50 forecast slip across all active projects' : 'All projects tracking on or ahead of target dates'}">
         <div class="kpi-lbl">Worst Slip</div>
         <div class="kpi-val" style="color:${slipColor}">${worstSlip > 0 ? '+'+worstSlip+'d' : '✓'}</div>
         <div class="kpi-sub">Forecast vs target</div>
       </div>
-      <div class="kpi" style="border-top-color:var(--accent)">
+      <div class="kpi" style="border-top-color:var(--accent)" data-tip="${Math.round(totalUsedH/totalBudgetH*100)}% of total portfolio budget consumed across all projects">
         <div class="kpi-lbl">Labor Hours</div>
         <div class="kpi-val" style="color:var(--text)">${Math.round(totalUsedH)}</div>
         <div class="kpi-sub">of ${totalBudgetH.toLocaleString()} budgeted</div>
       </div>
-      <div class="kpi" style="border-top-color:${reqColor}">
+      <div class="kpi" style="border-top-color:${reqColor}" data-tip="${openReqs > 0 ? openReqs+' resource request'+( openReqs!==1?'s':'')+' awaiting decision — navigate to Requests page' : 'No open resource requests'}">
         <div class="kpi-lbl">Open Requests</div>
         <div class="kpi-val" style="color:${reqColor}">${openReqs}</div>
         <div class="kpi-sub">Resource requests pending</div>
@@ -628,19 +650,19 @@ function renderProjectCard(p) {
 
     <!-- EVM row -->
     <div class="evm-row">
-      <div class="evm-cell">
+      <div class="evm-cell" data-tip="Cost Performance Index — earned value ÷ actual cost. Above 1.0 = under budget">
         <div class="evm-cell-label">CPI</div>
         <div class="evm-cell-val" style="color:${cpiC}">${evm.cpi ? evm.cpi.toFixed(2) : '—'}</div>
       </div>
-      <div class="evm-cell">
+      <div class="evm-cell" data-tip="Schedule Performance Index — earned value ÷ planned value. Above 1.0 = ahead of schedule">
         <div class="evm-cell-label">SPI</div>
         <div class="evm-cell-val" style="color:${spiC}">${evm.spi ? evm.spi.toFixed(2) : '—'}</div>
       </div>
-      <div class="evm-cell">
+      <div class="evm-cell" data-tip="To Complete Performance Index — efficiency required to finish on budget. Above 1.15 = recovery unlikely">
         <div class="evm-cell-label">TCPI</div>
         <div class="evm-cell-val" style="color:${tcpiC}">${evm.tcpi ? evm.tcpi.toFixed(2) : '—'}</div>
       </div>
-      <div class="evm-cell">
+      <div class="evm-cell" data-tip="${!evm.slipDays || evm.slipDays <= 0 ? 'Forecast on or ahead of target date' : 'P50 forecast is '+evm.slipDays+' days past target date of '+fmtDate(p.target_date)}">
         <div class="evm-cell-label">FORECAST SLIP</div>
         <div class="evm-cell-val" style="color:${slipC}">
           ${!evm.slipDays || evm.slipDays <= 0 ? '✓' : '+'+evm.slipDays+'d'}
@@ -680,10 +702,10 @@ function renderProjectCard(p) {
         </div>` : ''}
       </div>
       <div class="signal-badges">
-        ${evm.overdueTasks > 0 ? `<span class="sig-badge task">⚠ ${evm.overdueTasks} overdue</span>` : ''}
-        ${openReq > 0 ? `<span class="sig-badge request">⬡ ${openReq} request${openReq!==1?'s':''}</span>` : ''}
+        ${evm.overdueTasks > 0 ? `<span class="sig-badge task" data-tip="${evm.overdueTasks} task${evm.overdueTasks!==1?'s':''} past due date — click to review">⚠ ${evm.overdueTasks} overdue</span>` : ''}
+        ${openReq > 0 ? `<span class="sig-badge request" data-tip="${openReq} open resource request${openReq!==1?'s':''} — navigate to Requests page">⬡ ${openReq} request${openReq!==1?'s':''}</span>` : ''}
         ${upcomingMs.filter(m=>m.status==='at_risk').length > 0 ?
-          `<span class="sig-badge milestone">◈ milestone at risk</span>` : ''}
+          `<span class="sig-badge milestone" data-tip="${upcomingMs.filter(m=>m.status==='at_risk').map(m=>m.name.substring(0,30)).join(', ')} — milestone at risk">◈ milestone at risk</span>` : ''}
       </div>
     </div>
 
