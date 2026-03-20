@@ -433,11 +433,12 @@ textarea.resp-input:focus, select.resp-input:focus, input.resp-input:focus {
 Sidebar.init('resource-requests.html');
 
 // ── State ────────────────────────────────────────────────────────────────────
-let _requests   = [];
-let _events     = {};   // request_id → events[]
-let _resources  = [];
-let _projects   = [];
-let _tasks      = [];
+let _requests    = [];
+let _events      = {};   // request_id → events[]
+let _resources   = [];
+let _projects    = [];
+let _tasks       = [];
+let _allocations = [];   // resource_allocations — for impact calculations
 let _currentView = 'pending';
 
 // Current user resource — Vaughn as default PM, Chris as approver
@@ -447,17 +448,19 @@ const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
 
 // ── Load ─────────────────────────────────────────────────────────────────────
 async function loadAll() {
-  const [requests, resources, projects, tasks] = await Promise.all([
+  const [requests, resources, projects, tasks, allocations] = await Promise.all([
     API.get('resource_requests?order=submitted_at.desc&select=*').catch(()=>[]),
     API.get('resources?is_active=eq.true&select=id,first_name,last_name,title,firm_id').catch(()=>[]),
     API.getProjects().catch(()=>[]),
     API.getTasks().catch(()=>[]),
+    API.get('resource_allocations?select=resource_id,project_id,allocation_pct').catch(()=>[]),
   ]);
 
-  _requests  = requests  || [];
-  _resources = resources || [];
-  _projects  = projects  || [];
-  _tasks     = tasks     || [];
+  _requests    = requests    || [];
+  _resources   = resources   || [];
+  _projects    = projects    || [];
+  _tasks       = tasks       || [];
+  _allocations = allocations || [];
 
   // Load events for all requests
   if (_requests.length > 0) {
@@ -632,18 +635,32 @@ function renderRequestCard(req, isSent = false) {
 
         <div class="ctx-label" style="margin-top:10px">The ask</div>
         <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
+
+        ${(() => {
+          // Compute impact inline from already-loaded allocation data
+          const resId     = req.requested_resource_id;
+          const resource  = _resources.find(r => r.id === resId);
+          const resName   = resource ? resource.first_name + ' ' + resource.last_name : '—';
+          const resAllocs = _allocations ? _allocations.filter(a => a.resource_id === resId) : [];
+          const current   = resAllocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
+          const newTotal  = current + (req.allocation_pct || 0);
+          const over      = newTotal > 100;
+          const proj      = _projects.find(p => p.id === req.project_id);
+          const color     = over ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
+          const line1     = \`If approved: \${resName} moves from \${current}% → \${newTotal}% total allocation\`;
+          const line2     = over
+            ? \`⚠ Over-allocated by \${newTotal - 100}% — existing commitments on \${resAllocs.map(a => _projects.find(p=>p.id===a.project_id)?.name||'?').join(' and ')} remain unchanged\`
+            : newTotal === 100
+              ? \`\${resName} will be fully committed across all projects\`
+              : \`Within available capacity\`;
+          return \`<div style="margin-top:8px;font-size:11px;line-height:1.7">
+            <span style="color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">IMPACT IF APPROVED</span><br>
+            <span style="color:\${color}">\${line1}</span><br>
+            <span style="color:\${over?'#f07a7a':'var(--muted)'};\${over?'font-weight:600':''}">\${line2}</span>
+          </div>\`;
+        })()}
       </div>
 
-      <!-- Impact If Approved — loaded inline, always visible below The Ask -->
-      <div id="impact-block-${req.id.replace(/-/g,'')}"
-           style="margin-top:8px;background:rgba(255,255,255,.02);border:1px solid var(--border);
-                  border-left:3px solid rgba(79,142,247,.4);border-radius:6px;padding:10px 12px">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-            color:var(--accent);margin-bottom:8px">IMPACT IF APPROVED</div>
-        <div id="impact-content-${req.id.replace(/-/g,'')}" style="font-size:11px;color:var(--muted)">
-          Loading allocation data...
-        </div>
-      </div>
 
       <!-- Counter notes visible on in-progress cards -->
       ${req.counter_notes ? `
@@ -807,18 +824,32 @@ function renderResolvedCard(req) {
         <div class="ctx-text" style="color:var(--muted)">${escHtml(req.attempts_made)}</div>` : ''}
         <div class="ctx-label" style="margin-top:10px">The ask</div>
         <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
+
+        ${(() => {
+          // Compute impact inline from already-loaded allocation data
+          const resId     = req.requested_resource_id;
+          const resource  = _resources.find(r => r.id === resId);
+          const resName   = resource ? resource.first_name + ' ' + resource.last_name : '—';
+          const resAllocs = _allocations ? _allocations.filter(a => a.resource_id === resId) : [];
+          const current   = resAllocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
+          const newTotal  = current + (req.allocation_pct || 0);
+          const over      = newTotal > 100;
+          const proj      = _projects.find(p => p.id === req.project_id);
+          const color     = over ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
+          const line1     = \`If approved: \${resName} moves from \${current}% → \${newTotal}% total allocation\`;
+          const line2     = over
+            ? \`⚠ Over-allocated by \${newTotal - 100}% — existing commitments on \${resAllocs.map(a => _projects.find(p=>p.id===a.project_id)?.name||'?').join(' and ')} remain unchanged\`
+            : newTotal === 100
+              ? \`\${resName} will be fully committed across all projects\`
+              : \`Within available capacity\`;
+          return \`<div style="margin-top:8px;font-size:11px;line-height:1.7">
+            <span style="color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">IMPACT IF APPROVED</span><br>
+            <span style="color:\${color}">\${line1}</span><br>
+            <span style="color:\${over?'#f07a7a':'var(--muted)'};\${over?'font-weight:600':''}">\${line2}</span>
+          </div>\`;
+        })()}
       </div>
 
-      <!-- Impact If Approved — loaded inline, always visible below The Ask -->
-      <div id="impact-block-${req.id.replace(/-/g,'')}"
-           style="margin-top:8px;background:rgba(255,255,255,.02);border:1px solid var(--border);
-                  border-left:3px solid rgba(79,142,247,.4);border-radius:6px;padding:10px 12px">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-            color:var(--accent);margin-bottom:8px">IMPACT IF APPROVED</div>
-        <div id="impact-content-${req.id.replace(/-/g,'')}" style="font-size:11px;color:var(--muted)">
-          Loading allocation data...
-        </div>
-      </div>
       <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
       <div class="chain">
         ${(() => {
@@ -880,8 +911,6 @@ function toggleCard(reqId) {
   if (!wasOpen) {
     const req = _requests.find(r => r.id === reqId);
 
-    // Load allocation impact into the inline block
-    loadImpactBlock(reqId);
     if (req && req.status === 'pending') {
       // Update status to acknowledged (seen)
       API.patch(`resource_requests?id=eq.${reqId}`, {
@@ -919,69 +948,6 @@ function collapseCard(reqId) {
   closeResponsePanel(reqId);
 }
 
-async function loadImpactBlock(reqId) {
-  const contentEl = document.getElementById('impact-content-' + reqId.replace(/-/g,''));
-  if (!contentEl) return;
-
-  const req      = _requests.find(r => r.id === reqId);
-  const project  = _projects.find(p => p.id === req?.project_id);
-  const resource = _resources.find(r => r.id === req?.requested_resource_id);
-  if (!req || !resource) { contentEl.textContent = 'Unable to load allocation data.'; return; }
-
-  try {
-    const allocs = await API.get(
-      `resource_allocations?resource_id=eq.${req.requested_resource_id}&select=*`
-    ).catch(() => []);
-
-    const currentTotal  = allocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
-    const newTotal      = currentTotal + (req.allocation_pct || 0);
-    const overAllocated = newTotal > 100;
-    const totalColor    = overAllocated ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
-
-    const allocRows = allocs.map(a => {
-      const projName = _projects.find(p => p.id === a.project_id)?.name || 'Unknown project';
-      return `<div style="display:flex;justify-content:space-between;padding:2px 0;
-          border-bottom:1px solid rgba(255,255,255,.04)">
-        <span style="color:var(--muted)">${escHtml(projName)}</span>
-        <span>${a.allocation_pct}%</span>
-      </div>`;
-    }).join('');
-
-    const totalLabel = overAllocated
-      ? `<span style="color:var(--red);font-weight:700">${newTotal}% — OVER-ALLOCATED by ${newTotal - 100}%</span>`
-      : newTotal === 100
-        ? `<span style="color:var(--amber);font-weight:700">${newTotal}% — Fully committed</span>`
-        : `<span style="color:#7af0a0;font-weight:700">${newTotal}%</span>`;
-
-    contentEl.innerHTML = `
-      ${allocRows}
-      <div style="display:flex;justify-content:space-between;padding:3px 0;
-          border-top:1px solid rgba(255,255,255,.08);margin-top:4px">
-        <span style="color:var(--muted)">Currently</span>
-        <span>${currentTotal}%</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:2px 0">
-        <span style="color:#7af0a0">+ This request (${escHtml(project?.name||'—')})</span>
-        <span style="color:#7af0a0">+${req.allocation_pct || 0}%</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0 0;
-          border-top:1px solid rgba(255,255,255,.08);margin-top:4px;font-size:12px">
-        <span style="color:${totalColor}">New total allocation</span>
-        ${totalLabel}
-      </div>
-      ${overAllocated ? `<div style="margin-top:6px;font-size:10px;color:#f07a7a">
-        ⚠ Approving over-allocates ${escHtml(resource.first_name)} by ${newTotal - 100}%.
-        Existing commitments are unchanged.</div>` : ''}`;
-
-    // Cache the snapshot string for use in approval CoC
-    req._impactSnapshot = `At approval: ${allocs.map(a => {
-      return (_projects.find(p=>p.id===a.project_id)?.name||'project') + ': ' + a.allocation_pct + '%';
-    }).join(', ')} + this request (${req.allocation_pct}%) = ${newTotal}% total${newTotal > 100 ? ' [OVER-ALLOCATED]' : ''}`;
-
-  } catch(e) {
-    contentEl.textContent = 'Unable to load allocation data.';
-  }
-}
 
 // ── Approve ───────────────────────────────────────────────────────────────────
 function openApprove(reqId) {
@@ -997,8 +963,14 @@ async function submitApprove(reqId) {
 
   try {
     // Update request status
-    // Use cached impact snapshot from loadImpactBlock (already computed when card opened)
-    const impactSnapshot = req._impactSnapshot || `Allocation impact not computed — approved directly`;
+    // Compute impact snapshot at approval time from loaded allocations
+    const resAllocs2  = (_allocations || []).filter(a => a.resource_id === req.requested_resource_id);
+    const cur2        = resAllocs2.reduce((s, a) => s + (a.allocation_pct || 0), 0);
+    const new2        = cur2 + (req.allocation_pct || 0);
+    const allocSummary2 = resAllocs2.map(a => {
+      return (_projects.find(p=>p.id===a.project_id)?.name||'project') + ': ' + a.allocation_pct + '%';
+    }).join(', ');
+    const impactSnapshot = `At approval: ${allocSummary2} + this request (${req.allocation_pct}%) = ${new2}% total${new2 > 100 ? ' [OVER-ALLOCATED]' : ''}`;
 
     await API.patch(`resource_requests?id=eq.${reqId}`, {
       status: 'approved', resolved_at: new Date().toISOString(),
