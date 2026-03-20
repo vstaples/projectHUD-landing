@@ -544,7 +544,7 @@ function requestsTipHTML(projId) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
         <span style="font-weight:600">${escHtml(resName)}</span>
         <span class="tip-badge" style="background:${urgColor}18;color:${urgColor};border:1px solid ${urgColor}40">
-          ${r.urgency.toUpperCase()}</span>
+          ${(r.urgency||'unknown').toUpperCase()}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
         <span>${r.status.replace('_',' ')}</span>
@@ -1180,7 +1180,7 @@ function buildExceptions() {
     items.push({
       type: 'request', sev: r.urgency === 'critical' ? 'critical' : hoursOpen > 24 ? 'high' : 'medium',
       title: `Resource request: ${resName}`,
-      sub: `${r.urgency.toUpperCase()} · ${r.status} · ${hoursOpen}h without resolution`,
+      sub: `${(r.urgency||'unknown').toUpperCase()} · ${r.status||'—'} · ${hoursOpen}h without resolution`,
       proj: projName(r.project_id),
       projId: r.project_id,
       age: hoursOpen + 'h open',
