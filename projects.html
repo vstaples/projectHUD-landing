@@ -641,7 +641,8 @@ function showProgressTip(el, pct, done, inprog, total, earnedPct, usedH, budgetH
 let _projects    = [];
 let _tasks       = [];
 let _milestones  = [];
-let _allocations = [];
+let _allocations  = [];
+let _deliverables = [];   // task_deliverables — inputs not yet at required state
 let _resources   = [];
 let _requests    = [];
 let _timeEntries = [];
@@ -722,11 +723,12 @@ function calcEVM(proj, projTasks, projEntries) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadAll() {
   try {
-    const [projects, tasks, milestones, allocations, resources, requests, times] = await Promise.all([
+    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables] = await Promise.all([
       API.getProjects().catch(()=>[]),
       API.getTasks().catch(()=>[]),
       API.get('milestones?select=*&order=target_date.asc').catch(()=>[]),
       API.get('resource_allocations?select=*').catch(()=>[]),
+    API.get('task_deliverables?direction=eq.input&select=*').catch(()=>[]),
       API.get('resources?is_active=eq.true&select=id,first_name,last_name,title,email,bio,level,availability_pct').catch(()=>[]),
       API.get('resource_requests?status=in.(pending,acknowledged,countered,escalated,delegated)&select=*').catch(()=>[]),
       API.get('time_entries?select=*').catch(()=>[]),
@@ -735,7 +737,8 @@ async function loadAll() {
     _projects    = projects    || [];
     _tasks       = tasks       || [];
     _milestones  = milestones  || [];
-    _allocations = allocations || [];
+    _allocations  = allocations  || [];
+  _deliverables = deliverables || [];
     _resources   = resources   || [];
     _requests    = requests    || [];
     _timeEntries = times       || [];
@@ -1031,14 +1034,29 @@ function renderProjectCard(p) {
 }
 
 // ── Exceptions view ───────────────────────────────────────────────────────────
+function getBlockingDeliverables(taskId) {
+  // Returns input deliverables that are NOT in their required state
+  return _deliverables.filter(d => {
+    if (d.task_id !== taskId || d.direction !== 'input') return false;
+    if (!d.is_required) return false;
+    const stateOrder = { not_started:0, in_progress:1, draft:2, under_review:3, approved:4, released:5 };
+    const required   = stateOrder[d.minimum_state] ?? 4;
+    const current    = stateOrder[d.current_state]  ?? 0;
+    return current < required; // not yet at minimum required state
+  });
+}
+
 function classifyTask(t) {
   // Three-way classification: late | blocked | technical
-  if (t.status === 'blocked') return 'blocked';
+  if (t.status === 'blocked') return 'technical';
+  // Check deliverable inputs — if any required input is below minimum state, task is blocked by inputs
+  const blockedInputs = getBlockingDeliverables(t.id);
+  if (blockedInputs.length > 0) return 'blocked';
   // Check if any open resource request exists for this task
-  const hasRequest = _requests.some(r => r.task_id === t.id || 
+  const hasRequest = _requests.some(r => r.task_id === t.id ||
     (r.project_id === t.project_id && r.requested_resource_id === t.assigned_to));
-  if (hasRequest) return 'blocked'; // resource constraint is the identified blocker
-  return 'late'; // default: late but potentially unblocked
+  if (hasRequest) return 'blocked';
+  return 'late'; // unblocked — labor/scheduling issue
 }
 
 function classificationLabel(cls) {
@@ -1047,8 +1065,16 @@ function classificationLabel(cls) {
 
 function suggestNextAction(t, cls, assigneeAlloc, hasRequest) {
   const name = _resources.find(r=>r.id===t.assigned_to)?.first_name || 'The assignee';
-  if (cls === 'technical') return `Initiate a root cause investigation. Assign a technical lead to diagnose and document the failure mode before assigning additional effort.`;
-  if (cls === 'blocked' && hasRequest) return `A resource request is already open. Review it in the Requests page — approve or counter to unblock this task.`;
+  if (cls === 'technical') return 'Initiate a root cause investigation. Assign a technical lead to diagnose and document the failure mode before assigning additional effort.';
+  // Check for specific blocking inputs
+  const blockedInputs = getBlockingDeliverables(t.id);
+  if (blockedInputs.length > 0) {
+    const first = blockedInputs[0];
+    const stateLabel = { not_started:'not yet started', draft:'in draft', under_review:'under review — awaiting sign-off', approved:'approved but not yet released' }[first.current_state] || first.current_state;
+    const needed = { released:'formally released', approved:'approved' }[first.minimum_state] || first.minimum_state;
+    return `This task is waiting on an input that is not yet ready: "${first.name}" is currently ${stateLabel} — must be ${needed} before work can proceed. ${blockedInputs.length > 1 ? `(+${blockedInputs.length-1} other blocked input${blockedInputs.length>2?'s':''})` : ''} Escalate the review or find an alternate path.`;
+  }
+  if (cls === 'blocked' && hasRequest) return 'A resource request is already open. Review it in the Requests page — approve or counter to unblock this task.';
   if (assigneeAlloc > 100) return `${name} is at ${assigneeAlloc}% total allocation — over-committed. Consider raising a resource request or redistributing their workload before expecting progress.`;
   if (assigneeAlloc > 80) return `${name} is at ${assigneeAlloc}% allocation across projects. Review their current task priorities and confirm this task is their active focus.`;
   return `Check in directly with ${name} to understand the specific blocker. If it is an input dependency or external factor, classify this task as Blocked to trigger the correct triage path.`;
@@ -1301,6 +1327,7 @@ function renderTaskDetail(t) {
   const proj = _projects.find(p => p.id === t.project_id);
   const openReq = _requests.find(r => r.task_id === t.id ||
     (r.project_id === t.project_id && r.requested_resource_id === t.assigned_to));
+  const blockedInputs = getBlockingDeliverables(t.id);
 
   return `
     <div class="exc-classification ${cls}">${classificationLabel(cls)}</div>
@@ -1324,9 +1351,31 @@ function renderTaskDetail(t) {
     ${openReq ? `<div style="font-size:11px;color:var(--accent);margin-bottom:8px;padding:5px 8px;
         background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);border-radius:4px">
         ⬡ Resource request already open — ${openReq.urgency?.toUpperCase()} · ${openReq.status}
-        <a href="/resource-requests.html" onclick="event.stopPropagation()" 
+        <a href="/resource-requests.html" onclick="event.stopPropagation()"
            style="color:var(--cyan);margin-left:8px;text-decoration:none">View →</a>
       </div>` : ''}
+    ${blockedInputs.length > 0 ? `<div style="margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#f07a7a;margin-bottom:5px">
+        BLOCKED INPUTS — ${blockedInputs.length} required input${blockedInputs.length!==1?'s':''} not ready
+      </div>
+      ${blockedInputs.map(d => {
+        const stateColor = { not_started:'var(--muted)', draft:'var(--amber)', under_review:'var(--amber)', approved:'var(--green)' }[d.current_state] || 'var(--muted)';
+        const typeLabel  = { drawing:'Drawing', specification:'Spec', test_report:'Test Report', approval:'Approval', material_cert:'Material Cert', procedure:'Procedure', analysis:'Analysis', model:'Model', prototype:'Prototype', other:'Document' }[d.deliverable_type] || d.deliverable_type;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;
+            padding:5px 8px;margin-bottom:3px;background:rgba(192,64,74,.06);
+            border:1px solid rgba(192,64,74,.2);border-radius:4px;font-size:11px">
+          <div>
+            <span style="font-weight:600;color:var(--text)">${escHtml(d.name)}</span>
+            <span style="color:var(--muted);margin-left:6px">${typeLabel}</span>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:10px">
+            <span style="color:${stateColor}">${d.current_state.replace(/_/g,' ')}</span>
+            <span style="color:var(--text3);margin:0 4px">→ needs</span>
+            <span style="color:var(--text)">${d.minimum_state}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
     <div class="exc-suggestion">
       <div class="exc-suggestion-label">Suggested Next Action</div>
       ${escHtml(t.suggestion || suggestNextAction(t, cls, t.assigneeAlloc, !!openReq))}
