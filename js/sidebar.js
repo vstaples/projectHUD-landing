@@ -138,11 +138,12 @@ const Sidebar = (() => {
   function render(activePage, firmName, currentUser, notifCount, showToolbar) {
     const currentPath = window.location.pathname;
     const NAV_ITEMS = [
-      { href: '/dashboard.html',  icon: '◈', label: 'Dashboard', section: 'main'  },
-      { href: '/pipeline.html',   icon: '▥', label: 'Pipeline',  section: 'main'  },
-      { href: '/resources.html',  icon: '◎', label: 'Resources', section: 'main'  },
-      { href: '/audit-log.html',  icon: '▦', label: 'Audit Log', section: 'admin' },
-      { href: '/users.html',      icon: '◑', label: 'User Mgmt', section: 'admin' },
+      { href: '/dashboard.html',          icon: '◈', label: 'Dashboard',  section: 'main'  },
+      { href: '/pipeline.html',           icon: '▥', label: 'Pipeline',   section: 'main'  },
+      { href: '/resources.html',          icon: '◎', label: 'Resources',  section: 'main'  },
+      { href: '/resource-requests.html',  icon: '⬡', label: 'Requests',   section: 'main'  },
+      { href: '/audit-log.html',          icon: '▦', label: 'Audit Log',  section: 'admin' },
+      { href: '/users.html',              icon: '◑', label: 'User Mgmt',  section: 'admin' },
     ];
     const navItem = item => {
       const isActive = currentPath === item.href || (activePage && activePage === item.href.replace('/',''));

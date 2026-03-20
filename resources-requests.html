@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resource Requests — ProjectHUD</title>
+<link rel="stylesheet" href="/css/hud.css">
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+:root {
+  --sidebar-w: 56px;
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --cyan:    #00d2ff;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+  --purple:  #7c4dff;
+}
+
+body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text);
+       display:flex; height:100vh; overflow:hidden; }
+#sidebar-container { width:var(--sidebar-w); flex-shrink:0; }
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* Page header */
+.page-header { padding:16px 24px 12px; border-bottom:1px solid var(--border);
+               display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.page-title { font-size:18px; font-weight:700; letter-spacing:.04em; }
+.page-subtitle { font-size:11px; color:var(--muted); margin-top:2px; letter-spacing:.06em; text-transform:uppercase; }
+
+/* Content area */
+.content { flex:1; overflow-y:auto; padding:20px 24px; }
+
+/* Tab strip */
+.tab-strip { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:0; }
+.tab-btn { padding:8px 16px; font-size:11px; font-weight:600; letter-spacing:.06em;
+           text-transform:uppercase; background:none; border:none; color:var(--muted);
+           cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; }
+.tab-btn.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+.tab-btn:hover:not(.active) { color:var(--text); }
+.tab-count { display:inline-flex; align-items:center; justify-content:center;
+             width:18px; height:18px; border-radius:9px; font-size:10px;
+             background:rgba(192,64,74,.2); color:#f07a7a; margin-left:6px; font-weight:700; }
+.tab-count.amber { background:rgba(212,144,31,.2); color:var(--amber); }
+.tab-count.green { background:rgba(42,157,64,.2); color:var(--green); }
+
+/* Request card */
+.request-card { background:var(--surface); border:1px solid var(--border);
+                border-radius:8px; margin-bottom:12px; overflow:hidden;
+                transition:border-color .15s; cursor:pointer; }
+.request-card:hover { border-color:var(--border2); }
+.request-card.tier-1 { border-left:3px solid var(--amber); }
+.request-card.tier-2 { border-left:3px solid #f07a7a; }
+.request-card.tier-3 { border-left:3px solid var(--red); animation:heartbeat-red 2s ease-in-out infinite; }
+.request-card.tier-0 { border-left:3px solid var(--accent); }
+
+@keyframes heartbeat-red {
+  0%   { box-shadow:0 0 0 0 rgba(192,64,74,.4); }
+  50%  { box-shadow:0 0 0 8px rgba(192,64,74,.0); }
+  100% { box-shadow:0 0 0 0 rgba(192,64,74,.0); }
+}
+
+.card-header { padding:14px 16px; display:flex; align-items:center; gap:12px; }
+.card-body { padding:0 16px 14px; display:none; }
+.card-body.open { display:block; }
+
+/* Urgency badge */
+.urgency { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+           padding:2px 8px; border-radius:3px; border:1px solid; flex-shrink:0; }
+.urgency.critical { color:#f07a7a; border-color:rgba(192,64,74,.4); background:rgba(192,64,74,.08); }
+.urgency.high     { color:var(--amber); border-color:rgba(212,144,31,.4); background:rgba(212,144,31,.06); }
+.urgency.medium   { color:var(--accent); border-color:rgba(79,142,247,.4); background:rgba(79,142,247,.06); }
+.urgency.low      { color:var(--muted); border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.03); }
+
+/* Avatar */
+.avatar { width:34px; height:34px; border-radius:50%; background:rgba(79,142,247,.15);
+          color:var(--accent); font-size:11px; font-weight:700; display:flex;
+          align-items:center; justify-content:center; flex-shrink:0; }
+
+/* Elapsed timer */
+.elapsed { font-size:10px; font-family:monospace; padding:3px 8px; border-radius:4px; flex-shrink:0; }
+.elapsed.tier-0 { color:var(--muted); background:rgba(255,255,255,.04); }
+.elapsed.tier-1 { color:var(--amber); background:rgba(212,144,31,.08); }
+.elapsed.tier-2 { color:#f07a7a; background:rgba(192,64,74,.08); }
+.elapsed.tier-3 { color:#f07a7a; background:rgba(192,64,74,.12); font-weight:700; }
+
+/* Context sections */
+.ctx-label { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+             color:var(--muted); margin-bottom:4px; margin-top:12px; }
+.ctx-text { font-size:12px; color:var(--text); line-height:1.6; }
+.ctx-text.impact { color:#f0b07a; }
+
+/* Commitment row */
+.commit-row { display:flex; gap:16px; margin-top:12px; padding:10px 12px;
+              background:var(--surf2); border-radius:6px; flex-wrap:wrap; }
+.commit-item { font-size:11px; }
+.commit-item .cl { color:var(--muted); font-size:10px; letter-spacing:.06em; }
+.commit-item .cv { color:var(--text); font-weight:600; margin-left:4px; }
+
+/* Chain of custody */
+.chain { margin-top:12px; padding:10px 12px; background:rgba(79,142,247,.04);
+         border:1px solid rgba(79,142,247,.1); border-radius:6px; }
+.chain-event { display:flex; align-items:flex-start; gap:8px; padding:4px 0;
+               border-bottom:1px solid rgba(255,255,255,.04); font-size:11px; }
+.chain-event:last-child { border-bottom:none; }
+.chain-dot { width:6px; height:6px; border-radius:50%; background:var(--accent);
+             margin-top:4px; flex-shrink:0; }
+.chain-dot.system { background:var(--muted); }
+.chain-dot.escalated { background:var(--red); }
+.chain-time { color:var(--muted); font-size:10px; font-family:monospace; flex-shrink:0; min-width:80px; }
+
+/* Action buttons */
+.action-row { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+.btn { padding:8px 16px; border-radius:6px; font-size:11px; font-weight:700;
+       letter-spacing:.06em; text-transform:uppercase; cursor:pointer; transition:all .15s;
+       border:1px solid; font-family:inherit; }
+.btn-approve { color:#7af0a0; border-color:rgba(42,157,64,.4); background:rgba(42,157,64,.08); }
+.btn-approve:hover { background:rgba(42,157,64,.16); }
+.btn-deny    { color:#f07a7a; border-color:rgba(192,64,74,.4); background:rgba(192,64,74,.08); }
+.btn-deny:hover { background:rgba(192,64,74,.16); }
+.btn-counter { color:var(--amber); border-color:rgba(212,144,31,.4); background:rgba(212,144,31,.06); }
+.btn-counter:hover { background:rgba(212,144,31,.14); }
+.btn-delegate { color:var(--muted); border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.04); }
+.btn-delegate:hover { color:var(--text); background:rgba(255,255,255,.08); }
+
+/* Response panels */
+.response-panel { margin-top:12px; padding:14px; background:var(--surf2);
+                  border-radius:8px; border:1px solid var(--border2); display:none; }
+.response-panel.open { display:block; }
+.resp-label { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+              margin-bottom:8px; }
+.resp-label.deny { color:#f07a7a; }
+.resp-label.counter { color:var(--amber); }
+.resp-label.delegate { color:var(--muted); }
+textarea.resp-input, select.resp-input, input.resp-input {
+  width:100%; padding:8px 10px; border-radius:5px; font-size:12px; line-height:1.5;
+  font-family:inherit; background:var(--surf3); border:1px solid var(--border2);
+  color:var(--text); resize:vertical; outline:none; margin-bottom:8px; }
+textarea.resp-input:focus, select.resp-input:focus, input.resp-input:focus {
+  border-color:var(--accent); }
+.char-count { font-size:10px; color:var(--muted); text-align:right; margin-top:-4px; margin-bottom:8px; }
+.required-note { font-size:10px; color:#f07a7a; margin-bottom:8px; }
+
+.btn-submit { padding:8px 20px; border-radius:5px; font-size:11px; font-weight:700;
+              letter-spacing:.06em; cursor:pointer; font-family:inherit; transition:all .15s; border:1px solid; }
+.btn-submit.approve { color:#7af0a0; border-color:rgba(42,157,64,.5); background:rgba(42,157,64,.12); }
+.btn-submit.deny    { color:#f07a7a; border-color:rgba(192,64,74,.5); background:rgba(192,64,74,.12); }
+.btn-submit.counter { color:var(--amber); border-color:rgba(212,144,31,.5); background:rgba(212,144,31,.1); }
+.btn-submit.delegate{ color:var(--muted); border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); }
+.btn-cancel { padding:8px 16px; border-radius:5px; font-size:11px; font-weight:700;
+              letter-spacing:.06em; cursor:pointer; font-family:inherit; background:none;
+              border:1px solid var(--border); color:var(--muted); margin-left:8px; transition:all .15s; }
+.btn-cancel:hover { color:var(--text); }
+
+/* Resolved card */
+.resolved-card { background:var(--surface); border:1px solid var(--border); border-radius:8px;
+                 margin-bottom:8px; padding:14px 16px; opacity:.7; }
+
+/* Empty state */
+.empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
+.empty-state .icon { font-size:36px; margin-bottom:12px; }
+.empty-state .title { font-size:14px; font-weight:700; color:var(--text); margin-bottom:6px; }
+
+/* Prior denials warning */
+.prior-denial { background:rgba(192,64,74,.06); border:1px solid rgba(192,64,74,.2);
+                border-radius:6px; padding:10px 12px; margin-bottom:12px; font-size:11px; }
+.prior-denial .pd-label { font-size:9px; font-weight:700; letter-spacing:.1em;
+                           text-transform:uppercase; color:#f07a7a; margin-bottom:4px; }
+
+/* Overlay/drawer */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100;
+           display:none; justify-content:flex-end; }
+.overlay.open { display:flex; }
+.drawer { width:520px; max-width:95vw; background:var(--surface);
+          border-left:1px solid var(--border2); display:flex; flex-direction:column;
+          height:100%; overflow:hidden; }
+.drawer-head { display:flex; align-items:center; justify-content:space-between;
+               padding:16px 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.drawer-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.drawer-close { width:28px; height:28px; border-radius:6px; border:1px solid var(--border2);
+                background:var(--surf2); cursor:pointer; font-size:14px; color:var(--muted);
+                display:flex; align-items:center; justify-content:center; }
+.drawer-body { flex:1; overflow-y:auto; padding:20px; }
+.drawer-foot { display:flex; gap:8px; padding:14px 20px; border-top:1px solid var(--border); flex-shrink:0; }
+
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:10px; font-weight:700; letter-spacing:.08em;
+               text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+.field input, .field select, .field textarea {
+  width:100%; padding:8px 10px; border-radius:5px; font-size:12px; font-family:inherit;
+  background:var(--surf2); border:1px solid var(--border2); color:var(--text);
+  outline:none; resize:vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color:var(--accent); }
+
+/* Toast */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+         background:var(--surf2); border:1px solid var(--border2); border-radius:8px;
+         padding:10px 20px; font-size:12px; font-weight:600; z-index:300;
+         display:none; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+.toast.show { display:block; animation:fadeInUp .25s ease; }
+.toast.success { border-color:rgba(42,157,64,.4); color:#7af0a0; }
+.toast.error   { border-color:rgba(192,64,74,.4); color:#f07a7a; }
+.toast.info    { border-color:rgba(79,142,247,.4); color:var(--accent); }
+@keyframes fadeInUp { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+</style>
+</head>
+<body>
+
+<div id="sidebar-container"><nav id="sidebar"></nav></div>
+
+<div class="main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">RESOURCE REQUESTS</div>
+      <div class="page-subtitle">Chain of Custody · Approvals &amp; Decisions</div>
+    </div>
+    <div style="font-size:11px;color:var(--muted)" id="header-meta"></div>
+  </div>
+
+  <div class="content">
+    <!-- Tab strip -->
+    <div class="tab-strip">
+      <button class="tab-btn active" onclick="switchView('pending')" id="tab-pending">
+        PENDING <span class="tab-count" id="cnt-pending">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchView('resolved')" id="tab-resolved">
+        RESOLVED <span class="tab-count green" id="cnt-resolved">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchView('sent')" id="tab-sent">
+        MY REQUESTS <span class="tab-count amber" id="cnt-sent">0</span>
+      </button>
+    </div>
+
+    <div id="view-pending"></div>
+    <div id="view-resolved" style="display:none"></div>
+    <div id="view-sent" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Counter-proposal drawer -->
+<div class="overlay" id="counter-overlay" onclick="if(event.target===this)closeCounter()">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div>
+        <div class="drawer-title" style="color:var(--amber)">COUNTER-PROPOSAL</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Propose an alternative resource or arrangement</div>
+      </div>
+      <button class="drawer-close" onclick="closeCounter()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="counter-req-id" />
+      <div class="field">
+        <label>Alternative Resource</label>
+        <select id="counter-resource">
+          <option value="">— Same resource, different terms —</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label>Alternative Start Date</label>
+          <input type="date" id="counter-start" />
+        </div>
+        <div class="field">
+          <label>Alternative % Allocation</label>
+          <input type="number" id="counter-pct" min="10" max="100" step="10" placeholder="e.g. 25" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Your Proposal &amp; Reasoning <span style="color:#f07a7a">*</span></label>
+        <textarea id="counter-notes" rows="4"
+          placeholder="Explain your counter-proposal. e.g. 'Alan can support for 25% time starting next Monday rather than immediately — this avoids disrupting his current critical path work on the seals mitigation task.'"></textarea>
+        <div class="char-count" id="counter-char">0 / 500</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);padding:10px 12px;background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.1);border-radius:6px">
+        💡 Your counter-proposal will be sent to the PM immediately. They can accept it or continue the conversation.
+        This exchange is permanently recorded in the chain of custody.
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn-submit counter" onclick="submitCounter()">SEND COUNTER-PROPOSAL →</button>
+      <button class="btn-cancel" onclick="closeCounter()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delegate drawer -->
+<div class="overlay" id="delegate-overlay" onclick="if(event.target===this)closeDelegate()">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div>
+        <div class="drawer-title" style="color:var(--muted)">DELEGATE APPROVAL</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Redirect this request to another approver</div>
+      </div>
+      <button class="drawer-close" onclick="closeDelegate()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="hidden" id="delegate-req-id" />
+      <div class="field">
+        <label>Delegate To <span style="color:#f07a7a">*</span></label>
+        <select id="delegate-resource">
+          <option value="">— Select approver —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Reason for Delegation <span style="color:#f07a7a">*</span></label>
+        <textarea id="delegate-notes" rows="3"
+          placeholder="e.g. 'I am traveling this week and cannot make this decision. Delegating to Margaret Holloway who has authority over this resource group.'"></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--muted);padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px">
+        ⚠ Delegation is permanent and recorded. The new approver receives full context and the chain of custody is updated.
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn-submit delegate" onclick="submitDelegate()">DELEGATE REQUEST →</button>
+      <button class="btn-cancel" onclick="closeDelegate()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+Sidebar.init('resource-requests.html');
+
+// ── State ────────────────────────────────────────────────────────────────────
+let _requests   = [];
+let _events     = {};   // request_id → events[]
+let _resources  = [];
+let _projects   = [];
+let _tasks      = [];
+let _currentView = 'pending';
+
+// Current user resource — Vaughn as default PM, Chris as approver
+// In production this resolves from auth.uid() → resources
+const CURRENT_USER_RESOURCE_ID = 'e1000001-0000-0000-0000-000000000002'; // Chris (approver)
+const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
+
+// ── Load ─────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const [requests, resources, projects, tasks] = await Promise.all([
+    API.get('resource_requests?order=submitted_at.desc&select=*').catch(()=>[]),
+    API.get('resources?is_active=eq.true&select=id,first_name,last_name,title,firm_id').catch(()=>[]),
+    API.getProjects().catch(()=>[]),
+    API.getTasks().catch(()=>[]),
+  ]);
+
+  _requests  = requests  || [];
+  _resources = resources || [];
+  _projects  = projects  || [];
+  _tasks     = tasks     || [];
+
+  // Load events for all requests
+  if (_requests.length > 0) {
+    const ids = _requests.map(r => r.id).join(',');
+    const events = await API.get(
+      `resource_request_events?request_id=in.(${ids})&order=occurred_at.asc&select=*`
+    ).catch(()=>[]);
+    _events = {};
+    (events||[]).forEach(e => {
+      if (!_events[e.request_id]) _events[e.request_id] = [];
+      _events[e.request_id].push(e);
+    });
+  }
+
+  renderAll();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderAll() {
+  const pending   = _requests.filter(r => ['pending','acknowledged','escalated'].includes(r.status));
+  const resolved  = _requests.filter(r => ['approved','denied','countered','withdrawn','expired'].includes(r.status));
+  const sent      = _requests.filter(r => r.requesting_resource_id === CURRENT_USER_RESOURCE_ID);
+
+  document.getElementById('cnt-pending').textContent  = pending.length;
+  document.getElementById('cnt-resolved').textContent = resolved.length;
+  document.getElementById('cnt-sent').textContent     = sent.length;
+
+  document.getElementById('header-meta').textContent =
+    `${_requests.length} total request${_requests.length!==1?'s':''} · ${pending.length} awaiting decision`;
+
+  renderView('pending',  pending);
+  renderView('resolved', resolved);
+  renderView('sent',     sent);
+}
+
+function renderView(view, reqs) {
+  const el = document.getElementById('view-' + view);
+  if (!reqs.length) {
+    const labels = {
+      pending:  { icon:'✓', title:'All clear', sub:'No pending requests requiring your decision.' },
+      resolved: { icon:'📋', title:'No resolved requests yet', sub:'Approved and denied requests will appear here.' },
+      sent:     { icon:'📤', title:'No requests sent', sub:'Requests you submit will appear here with live chain status.' },
+    };
+    const l = labels[view];
+    el.innerHTML = `<div class="empty-state">
+      <div class="icon">${l.icon}</div>
+      <div class="title">${l.title}</div>
+      <div>${l.sub}</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = reqs.map(r => view === 'resolved'
+    ? renderResolvedCard(r)
+    : renderRequestCard(r, view === 'sent')).join('');
+}
+
+// ── Request Card ──────────────────────────────────────────────────────────────
+function renderRequestCard(req, isSent = false) {
+  const now        = new Date();
+  const submitted  = new Date(req.submitted_at);
+  const hoursElapsed = (now - submitted) / 3600000;
+  const tier = hoursElapsed >= req.sla_tier3_hours ? 3
+             : hoursElapsed >= req.sla_tier2_hours ? 2
+             : hoursElapsed >= req.sla_tier1_hours ? 1 : 0;
+
+  const requesting = _resources.find(r => r.id === req.requesting_resource_id);
+  const requested  = _resources.find(r => r.id === req.requested_resource_id);
+  const approver   = _resources.find(r => r.id === req.approver_resource_id);
+  const project    = _projects.find(p => p.id === req.project_id);
+  const task       = req.task_id ? _tasks.find(t => t.id === req.task_id) : null;
+
+  const reqName  = requesting ? `${requesting.first_name} ${requesting.last_name}` : '—';
+  const resName  = requested  ? `${requested.first_name} ${requested.last_name}`   : '—';
+  const resTitle = requested  ? (requested.title||'') : '';
+  const resInit  = requested  ? (requested.first_name[0]+requested.last_name[0]).toUpperCase() : '?';
+  const aprName  = approver   ? `${approver.first_name} ${approver.last_name}` : '—';
+
+  const elapsed  = formatElapsed(hoursElapsed);
+  const tierLabels = ['Submitted', '⚡ Follow-up sent', '⚠ Awaiting decision', '🚨 Escalation ready'];
+  const tierLabel  = tierLabels[tier];
+
+  const events = _events[req.id] || [];
+
+  // Check for prior denials of this resource
+  const priorDenials = _requests.filter(r =>
+    r.id !== req.id &&
+    r.requested_resource_id === req.requested_resource_id &&
+    r.status === 'denied' &&
+    r.denial_reason
+  );
+
+  const priorDenialHTML = priorDenials.length > 0 ? `
+    <div class="prior-denial">
+      <div class="pd-label">⚠ Prior Denial on Record</div>
+      ${priorDenials.map(d => `<div style="font-size:11px;color:var(--text)">
+        ${_resources.find(r=>r.id===d.denial_resource_id)?.first_name||'Someone'} denied this resource
+        on ${fmtDate(d.denied_at)} — reason: <em style="color:var(--muted)">"${escHtml(d.denial_reason)}"</em>
+      </div>`).join('')}
+    </div>` : '';
+
+  const cardId = 'card-' + req.id.replace(/-/g,'');
+
+  return `
+  <div class="request-card tier-${tier}" id="${cardId}" onclick="toggleCard('${req.id}')">
+    <div class="card-header">
+      <div class="avatar">${resInit}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700">${escHtml(resName)}</span>
+          <span class="urgency ${req.urgency}">${req.urgency.toUpperCase()}</span>
+          <span style="font-size:10px;color:var(--muted)">${escHtml(resTitle)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+          ${isSent ? `Approver: ${escHtml(aprName)} · ` : `Requested by: ${escHtml(reqName)} · `}
+          <span style="color:var(--accent)">${escHtml(project?.name||'—')}</span>
+          ${task ? ` · <span style="color:var(--muted)">${escHtml(task.name)}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        <span class="elapsed tier-${tier}">${elapsed}</span>
+        <span style="font-size:9px;color:${tier>=2?'#f07a7a':tier===1?'var(--amber)':'var(--muted)'}">${tierLabel}</span>
+      </div>
+    </div>
+
+    <div class="card-body" id="body-${req.id.replace(/-/g,'')}">
+      ${priorDenialHTML}
+
+      <!-- Commitment row -->
+      <div class="commit-row">
+        ${req.hours_requested ? `<div class="commit-item"><span class="cl">HOURS</span><span class="cv">${req.hours_requested}h</span></div>` : ''}
+        ${req.weeks_requested ? `<div class="commit-item"><span class="cl">DURATION</span><span class="cv">${req.weeks_requested}w</span></div>` : ''}
+        ${req.allocation_pct  ? `<div class="commit-item"><span class="cl">ALLOCATION</span><span class="cv">${req.allocation_pct}%</span></div>` : ''}
+        ${req.proposed_start  ? `<div class="commit-item"><span class="cl">START</span><span class="cv">${fmtDate(req.proposed_start)}</span></div>` : ''}
+      </div>
+
+      <!-- Context -->
+      <div class="ctx-label">What is failing and why</div>
+      <div class="ctx-text">${escHtml(req.context)}</div>
+
+      <div class="ctx-label">Impact if not resolved</div>
+      <div class="ctx-text impact">${escHtml(req.impact_statement||'—')}</div>
+
+      ${req.attempts_made ? `
+      <div class="ctx-label">What has been tried</div>
+      <div class="ctx-text" style="color:var(--muted)">${escHtml(req.attempts_made)}</div>` : ''}
+
+      <!-- Chain of custody -->
+      <div class="ctx-label" style="margin-top:16px">Chain of custody</div>
+      <div class="chain">
+        ${events.map(e => `
+          <div class="chain-event">
+            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('escalat')?'escalated':''}"></div>
+            <div class="chain-time">${fmtDateTime(e.occurred_at)}</div>
+            <div style="flex:1;color:${e.actor_role==='system'?'var(--muted)':'var(--text)'}">
+              <span style="font-weight:600">${formatEventType(e.event_type)}</span>
+              ${e.notes ? ` — <span style="color:var(--muted)">${escHtml(e.notes)}</span>` : ''}
+            </div>
+          </div>`).join('')}
+        ${events.length === 0 ? '<div style="font-size:11px;color:var(--muted)">No events yet</div>' : ''}
+      </div>
+
+      ${!isSent ? `
+      <!-- Action buttons (approver view) -->
+      <div class="action-row" onclick="event.stopPropagation()">
+        <button class="btn btn-approve" onclick="openApprove('${req.id}')">✓ Approve</button>
+        <button class="btn btn-deny"    onclick="openDeny('${req.id}')">✕ Deny</button>
+        <button class="btn btn-counter" onclick="openCounter('${req.id}')">↕ Counter</button>
+        <button class="btn btn-delegate" onclick="openDelegate('${req.id}')">→ Delegate</button>
+      </div>
+
+      <!-- Inline response panels -->
+      <div class="response-panel" id="panel-approve-${req.id.replace(/-/g,'')}" onclick="event.stopPropagation()">
+        <div class="resp-label" style="color:#7af0a0">✓ CONFIRM APPROVAL</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+          Approving this request will allocate <strong style="color:var(--text)">${resName}</strong>
+          at <strong style="color:var(--text)">${req.allocation_pct||'—'}%</strong>
+          to <strong style="color:var(--text)">${project?.name||'—'}</strong>
+          starting <strong style="color:var(--text)">${fmtDate(req.proposed_start)}</strong>.
+          This is a permanent record.
+        </div>
+        <textarea class="resp-input" id="approve-note-${req.id.replace(/-/g,'')}" rows="2"
+          placeholder="Optional: add context for the PM (e.g. 'Approved — please coordinate directly with Alan on handoff timing')"></textarea>
+        <div>
+          <button class="btn-submit approve" onclick="submitApprove('${req.id}')">✓ CONFIRM APPROVAL</button>
+          <button class="btn-cancel" onclick="closeResponsePanel('${req.id}')">Cancel</button>
+        </div>
+      </div>
+
+      <div class="response-panel" id="panel-deny-${req.id.replace(/-/g,'')}" onclick="event.stopPropagation()">
+        <div class="resp-label deny">✕ DENY REQUEST</div>
+        <div class="required-note">A reason is required. This reason is permanent, immutable, and will be visible to the requesting PM and on any future request for this resource.</div>
+        <textarea class="resp-input" id="deny-reason-${req.id.replace(/-/g,'')}" rows="3"
+          placeholder="Required: state your reason for denial. e.g. 'Alan is on the critical path for the seals mitigation task — removing him now would cause a larger schedule impact than the PCB issue. Suggest requesting an external contractor instead.'"
+          oninput="updateDenyChar('${req.id}')"></textarea>
+        <div class="char-count" id="deny-char-${req.id.replace(/-/g,'')}">0 characters — minimum 20 required</div>
+        <div>
+          <button class="btn-submit deny" onclick="submitDeny('${req.id}')">✕ CONFIRM DENIAL</button>
+          <button class="btn-cancel" onclick="closeResponsePanel('${req.id}')">Cancel</button>
+        </div>
+      </div>` : `
+      <!-- PM view — show status only -->
+      <div style="margin-top:12px;padding:10px 12px;background:rgba(79,142,247,.04);
+          border-radius:6px;font-size:11px;color:var(--muted)">
+        Status: <strong style="color:${req.status==='pending'?'var(--amber)':'var(--text)'}">${req.status.toUpperCase()}</strong>
+        · Approver: ${escHtml(aprName)}
+        ${tier >= 3 ? `<br><br><button class="btn btn-deny" style="margin-top:8px;font-size:10px"
+          onclick="event.stopPropagation();composeEscalation('${req.id}')">📧 Compose escalation email</button>` : ''}
+      </div>`}
+    </div>
+  </div>`;
+}
+
+// ── Resolved card ─────────────────────────────────────────────────────────────
+function renderResolvedCard(req) {
+  const requested = _resources.find(r => r.id === req.requested_resource_id);
+  const project   = _projects.find(p => p.id === req.project_id);
+  const resName   = requested ? `${requested.first_name} ${requested.last_name}` : '—';
+
+  const statusColors = {
+    approved:  '#7af0a0',
+    denied:    '#f07a7a',
+    countered: 'var(--amber)',
+    withdrawn: 'var(--muted)',
+    expired:   'var(--muted)',
+  };
+  const sc = statusColors[req.status] || 'var(--muted)';
+
+  return `
+  <div class="resolved-card">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700">${escHtml(resName)}</div>
+        <div style="font-size:11px;color:var(--muted)">${escHtml(project?.name||'—')} · ${fmtDate(req.submitted_at)}</div>
+        ${req.denial_reason ? `<div style="font-size:11px;color:#f07a7a;margin-top:4px">
+          Denial reason: <em>"${escHtml(req.denial_reason)}"</em></div>` : ''}
+      </div>
+      <span style="font-size:10px;font-weight:700;color:${sc};letter-spacing:.06em;text-transform:uppercase">
+        ${req.status}</span>
+    </div>
+  </div>`;
+}
+
+// ── Card toggle ───────────────────────────────────────────────────────────────
+function toggleCard(reqId) {
+  const body = document.getElementById('body-' + reqId.replace(/-/g,''));
+  if (!body) return;
+  body.classList.toggle('open');
+}
+
+// ── Approve ───────────────────────────────────────────────────────────────────
+function openApprove(reqId) {
+  closeResponsePanel(reqId);
+  document.getElementById('panel-approve-' + reqId.replace(/-/g,'')).classList.add('open');
+}
+
+async function submitApprove(reqId) {
+  const req  = _requests.find(r => r.id === reqId);
+  const note = document.getElementById('approve-note-' + reqId.replace(/-/g,'')).value.trim();
+  if (!req) return;
+
+  try {
+    // Update request status
+    await API.patch(`resource_requests?id=eq.${reqId}`, {
+      status: 'approved', resolved_at: new Date().toISOString(),
+      resolution_notes: note || null,
+    });
+
+    // Log event
+    await API.post('resource_request_events', {
+      firm_id: FIRM_ID, request_id: reqId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      actor_role: 'approver', event_type: 'approved',
+      notes: note || `Approved — ${_resources.find(r=>r.id===req.requested_resource_id)?.first_name} allocated to project`,
+      occurred_at: new Date().toISOString(),
+    });
+
+    // Auto-create allocation record
+    const requested = _resources.find(r => r.id === req.requested_resource_id);
+    if (requested) {
+      await API.post('resource_allocations', {
+        firm_id:       FIRM_ID,
+        resource_id:   req.requested_resource_id,
+        project_id:    req.project_id,
+        start_date:    req.proposed_start,
+        end_date:      req.proposed_end || null,
+        allocation_pct: req.allocation_pct || 50,
+        notes:         `Auto-created from approved resource request — ${note||''}`,
+      }).catch(()=>null); // non-fatal if allocation table has constraints
+    }
+
+    showToast('✓ Request approved — allocation created', 'success');
+    await loadAll();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Deny ──────────────────────────────────────────────────────────────────────
+function openDeny(reqId) {
+  closeResponsePanel(reqId);
+  document.getElementById('panel-deny-' + reqId.replace(/-/g,'')).classList.add('open');
+}
+
+function updateDenyChar(reqId) {
+  const ta  = document.getElementById('deny-reason-' + reqId.replace(/-/g,''));
+  const cnt = document.getElementById('deny-char-'   + reqId.replace(/-/g,''));
+  const n   = ta.value.length;
+  cnt.textContent = `${n} characters${n < 20 ? ' — minimum 20 required' : ' ✓'}`;
+  cnt.style.color = n < 20 ? '#f07a7a' : 'var(--green)';
+}
+
+async function submitDeny(reqId) {
+  const req    = _requests.find(r => r.id === reqId);
+  const reason = document.getElementById('deny-reason-' + reqId.replace(/-/g,'')).value.trim();
+
+  if (!reason || reason.length < 20) {
+    showToast('A reason of at least 20 characters is required to deny a request.', 'error');
+    return;
+  }
+
+  try {
+    await API.patch(`resource_requests?id=eq.${reqId}`, {
+      status:            'denied',
+      denial_reason:     reason,
+      denial_resource_id: CURRENT_USER_RESOURCE_ID,
+      denied_at:         new Date().toISOString(),
+      resolved_at:       new Date().toISOString(),
+    });
+
+    await API.post('resource_request_events', {
+      firm_id: FIRM_ID, request_id: reqId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      actor_role: 'approver', event_type: 'denied',
+      notes: `Denied — reason recorded permanently`,
+      event_data: { denial_reason: reason },
+      occurred_at: new Date().toISOString(),
+    });
+
+    await API.post('resource_request_events', {
+      firm_id: FIRM_ID, request_id: reqId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      actor_role: 'approver', event_type: 'denial_reason_added',
+      notes: reason.substring(0, 200),
+      occurred_at: new Date().toISOString(),
+    });
+
+    showToast('Request denied — reason permanently recorded', 'info');
+    await loadAll();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Counter ───────────────────────────────────────────────────────────────────
+function openCounter(reqId) {
+  closeResponsePanel(reqId);
+  document.getElementById('counter-req-id').value = reqId;
+  document.getElementById('counter-notes').value  = '';
+  document.getElementById('counter-pct').value    = '';
+  document.getElementById('counter-char').textContent = '0 / 500';
+
+  // Populate alternative resource dropdown
+  const req = _requests.find(r => r.id === reqId);
+  const sel = document.getElementById('counter-resource');
+  sel.innerHTML = '<option value="">— Same resource, different terms —</option>' +
+    _resources
+      .filter(r => r.id !== req?.requested_resource_id)
+      .map(r => `<option value="${r.id}">${r.first_name} ${r.last_name}${r.title?' · '+r.title:''}</option>`)
+      .join('');
+
+  document.getElementById('counter-overlay').classList.add('open');
+}
+
+function closeCounter() { document.getElementById('counter-overlay').classList.remove('open'); }
+
+document.getElementById('counter-notes').addEventListener('input', function() {
+  document.getElementById('counter-char').textContent = this.value.length + ' / 500';
+});
+
+async function submitCounter() {
+  const reqId    = document.getElementById('counter-req-id').value;
+  const altRes   = document.getElementById('counter-resource').value || null;
+  const pct      = parseFloat(document.getElementById('counter-pct').value) || null;
+  const start    = document.getElementById('counter-start').value || null;
+  const notes    = document.getElementById('counter-notes').value.trim();
+
+  if (!notes || notes.length < 10) {
+    showToast('Please describe your counter-proposal (min 10 characters)', 'error');
+    return;
+  }
+
+  try {
+    await API.patch(`resource_requests?id=eq.${reqId}`, {
+      status:             'countered',
+      counter_resource_id: altRes,
+      counter_notes:      notes,
+      countered_at:       new Date().toISOString(),
+    });
+
+    await API.post('resource_request_events', {
+      firm_id: FIRM_ID, request_id: reqId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      actor_role: 'approver', event_type: 'countered',
+      notes: `Counter-proposal submitted`,
+      event_data: { counter_notes: notes, alt_resource: altRes, alt_pct: pct },
+      occurred_at: new Date().toISOString(),
+    });
+
+    closeCounter();
+    showToast('Counter-proposal sent to PM', 'success');
+    await loadAll();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Delegate ──────────────────────────────────────────────────────────────────
+function openDelegate(reqId) {
+  closeResponsePanel(reqId);
+  document.getElementById('delegate-req-id').value   = reqId;
+  document.getElementById('delegate-notes').value    = '';
+
+  const sel = document.getElementById('delegate-resource');
+  sel.innerHTML = '<option value="">— Select approver —</option>' +
+    _resources
+      .filter(r => r.id !== CURRENT_USER_RESOURCE_ID)
+      .map(r => `<option value="${r.id}">${r.first_name} ${r.last_name}${r.title?' · '+r.title:''}</option>`)
+      .join('');
+
+  document.getElementById('delegate-overlay').classList.add('open');
+}
+
+function closeDelegate() { document.getElementById('delegate-overlay').classList.remove('open'); }
+
+async function submitDelegate() {
+  const reqId     = document.getElementById('delegate-req-id').value;
+  const delegateTo = document.getElementById('delegate-resource').value;
+  const notes     = document.getElementById('delegate-notes').value.trim();
+
+  if (!delegateTo) { showToast('Please select an approver to delegate to', 'error'); return; }
+  if (!notes)      { showToast('Please state your reason for delegation', 'error'); return; }
+
+  try {
+    await API.patch(`resource_requests?id=eq.${reqId}`, {
+      approver_resource_id: delegateTo,
+      status: 'pending',
+    });
+
+    const newApprover = _resources.find(r => r.id === delegateTo);
+    await API.post('resource_request_events', {
+      firm_id: FIRM_ID, request_id: reqId,
+      actor_resource_id: CURRENT_USER_RESOURCE_ID,
+      actor_role: 'approver', event_type: 'delegated',
+      notes: `Delegated to ${newApprover?.first_name} ${newApprover?.last_name} — ${notes}`,
+      event_data: { delegated_to: delegateTo, reason: notes },
+      occurred_at: new Date().toISOString(),
+    });
+
+    closeDelegate();
+    showToast(`Delegated to ${newApprover?.first_name} ${newApprover?.last_name}`, 'success');
+    await loadAll();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Escalation email ──────────────────────────────────────────────────────────
+async function composeEscalation(reqId) {
+  const req       = _requests.find(r => r.id === reqId);
+  if (!req) return;
+  const res       = _resources.find(r => r.id === req.requested_resource_id);
+  const proj      = _projects.find(p => p.id === req.project_id);
+  const approver  = _resources.find(r => r.id === req.approver_resource_id);
+  const resName   = res ? `${res.first_name} ${res.last_name}` : '—';
+  const hoursElapsed = Math.round((new Date() - new Date(req.submitted_at)) / 3600000);
+
+  const subject = `[URGENT] Resource Request Awaiting Response — ${resName} for ${proj?.name||'Project'}`;
+  const body = `This message is being sent to raise visibility on an unresolved resource request impacting project delivery.
+
+PROJECT: ${proj?.name||'—'}
+RESOURCE REQUESTED: ${resName}
+URGENCY: ${req.urgency?.toUpperCase()}
+SUBMITTED: ${new Date(req.submitted_at).toLocaleString()}
+HOURS WITHOUT RESPONSE: ${hoursElapsed}h
+APPROVER NOTIFIED: ${approver ? approver.first_name + ' ' + approver.last_name : '—'}
+
+WHY THIS IS CRITICAL:
+${req.context}
+
+IMPACT IF NOT RESOLVED:
+${req.impact_statement || 'Not specified.'}
+
+This request has been open for ${hoursElapsed} hours without a response. The project cannot progress without resolution. I am requesting guidance or authorization as soon as possible.
+
+This request is tracked in ProjectHUD as part of our chain of custody for project decisions.`;
+
+  await API.post('resource_request_events', {
+    firm_id: FIRM_ID, request_id: reqId,
+    actor_role: 'pm', event_type: 'escalation_email_composed',
+    notes: `Escalation email composed after ${hoursElapsed}h without response`,
+    occurred_at: new Date().toISOString(),
+  }).catch(()=>null);
+
+  window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+  showToast('Escalation email composed — check your email client', 'info', 5000);
+  await loadAll();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function closeResponsePanel(reqId) {
+  const id = reqId.replace(/-/g,'');
+  ['approve','deny'].forEach(t => {
+    const p = document.getElementById(`panel-${t}-${id}`);
+    if (p) p.classList.remove('open');
+  });
+}
+
+function switchView(view) {
+  _currentView = view;
+  ['pending','resolved','sent'].forEach(v => {
+    document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
+    document.getElementById('tab-' + v).classList.toggle('active', v === view);
+  });
+}
+
+function formatElapsed(hours) {
+  if (hours < 1)  return Math.round(hours * 60) + 'm ago';
+  if (hours < 24) return Math.round(hours) + 'h ago';
+  return Math.round(hours / 24) + 'd ago';
+}
+
+function formatEventType(type) {
+  const labels = {
+    submitted:              'Submitted',
+    notification_sent:      'Notification sent',
+    notification_resent:    'Follow-up notification',
+    viewed:                 'Viewed by approver',
+    acknowledged:           'Acknowledged',
+    approved:               '✓ Approved',
+    denied:                 '✕ Denied',
+    denial_reason_added:    'Denial reason recorded',
+    countered:              '↕ Counter-proposal sent',
+    delegated:              '→ Delegated',
+    escalated:              '⚠ Escalated',
+    escalation_email_composed: '📧 Escalation email composed',
+    escalation_email_sent:  '📧 Escalation email sent',
+    meeting_injected:       '📅 Added to meeting agenda',
+    resolved:               '✓ Resolved',
+    comment:                'Comment',
+  };
+  return labels[type] || type;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d.includes('T') ? d : d + 'T00:00:00')
+    .toLocaleDateString('en-US', {month:'short', day:'numeric', year:'2-digit'});
+}
+
+function fmtDateTime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-US', {month:'short', day:'numeric',
+    hour:'2-digit', minute:'2-digit', hour12:true});
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type='info', duration=3500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// Close drawers on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeCounter(); closeDelegate(); }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadAll();
+
+// Refresh heartbeat tiers every 5 minutes
+setInterval(loadAll, 300000);
+</script>
+</body>
+</html>
