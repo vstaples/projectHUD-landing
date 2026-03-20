@@ -799,9 +799,7 @@ function renderPortfolio(el) {
 
   let html = `
     <div class="kpi-strip">
-      <div class="kpi" style="border-top-color:${cpiColor};cursor:default"
-          onmouseenter="TIP.show('<div class=\"tip-title\">Portfolio CPI</div><div class=\"tip-formula\">Average CPI = Σ EV ÷ Σ AC across active projects</div><div class=\"tip-row\"><span class=\"tip-lbl\">Portfolio average</span><span class=\"tip-val\" style=\"color:${cpiColor}\">${avgCPI}</span></div><div class=\"tip-interp\">CPI above 1.0 = portfolio under budget on average. Below 0.9 = systemic cost pressure.',event)"
-          onmouseleave="TIP.hide()" onmousemove="TIP.position(event)">
+      <div class="kpi" style="border-top-color:${cpiColor}" data-tip="Average CPI across active projects. Below 1.0 = over budget">
         <div class="kpi-lbl">Portfolio CPI</div>
         <div class="kpi-val" style="color:${cpiColor}">${avgCPI}</div>
         <div class="kpi-sub">Cost performance avg</div>
