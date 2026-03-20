@@ -808,6 +808,7 @@ let _allocations  = [];
 let _deliverables  = [];  // task_deliverables — inputs/outputs per task
 let _dependencies  = [];  // task_dependencies — predecessor/successor links
 let _users         = [];  // users table — tasks.assigned_to references users.id
+let _taskAssignees = [];  // task_assignees junction table — multiple assignees per task
 let _resources   = [];
 let _requests    = [];
 let _timeEntries = [];
@@ -888,7 +889,7 @@ function calcEVM(proj, projTasks, projEntries) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadAll() {
   try {
-    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables, deps, users] = await Promise.all([
+    const [projects, tasks, milestones, allocations, resources, requests, times, deliverables, deps, users, taskAssignees] = await Promise.all([
       API.getProjects().catch(()=>[]),
       API.getTasks().catch(()=>[]),
       API.get('milestones?select=*&order=target_date.asc').catch(()=>[]),
@@ -899,6 +900,7 @@ async function loadAll() {
       API.get('task_deliverables?select=*&order=direction.asc,sequence_order.asc').catch(()=>[]),
       API.get('task_dependencies?select=*').catch(()=>[]),
       API.get('users?is_active=eq.true&select=id,name,email,title,resource_id').catch(()=>[]),
+      API.get('task_assignees?select=*').catch(()=>[]),
     ]);
 
     _projects      = projects     || [];
@@ -911,6 +913,7 @@ async function loadAll() {
     _deliverables  = deliverables || [];
     _dependencies  = deps         || [];
     _users         = users        || [];
+    _taskAssignees = taskAssignees || [];
 
     // Compute EVM for all projects
     _projects.forEach(p => {
@@ -1609,13 +1612,23 @@ function renderTaskDetail(t) {
     <div class="exc-detail-grid">
       <div class="exc-detail-cell">
         <div class="exc-detail-label">Assignee</div>
-        ${t.assigned_to && t.assignee
-          ? `<div class="exc-detail-val">${escHtml(t.assignee.first_name+' '+t.assignee.last_name)}</div>
-             <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% total allocation${t.assigneeAlloc > 100 ? ' — OVER-ALLOCATED' : ''}</div>
-             <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:3px;font-size:10px;color:var(--muted)"></div>`
-          : `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>
-             <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:3px"></div>`
-        }
+        ${(() => {
+          // Gather all assignees: task_assignees junction + primary assigned_to
+          const junctionAssignees = _taskAssignees
+            .filter(a => a.task_id === t.id)
+            .map(a => resolveAssignee(a.user_id || a.resource_id))
+            .filter(Boolean);
+          const primary = t.assigned_to ? resolveAssignee(t.assigned_to) : null;
+          // Deduplicate
+          const allAssignees = primary ? [primary, ...junctionAssignees.filter(a => a.id !== primary.id)] : junctionAssignees;
+          if (allAssignees.length === 0) {
+            return `<div class="exc-detail-val" style="color:#f07a7a">— Unassigned —</div>`;
+          }
+          return `<div class="exc-detail-val">${escHtml(allAssignees[0].first_name+' '+allAssignees[0].last_name)}</div>
+            ${allAssignees.length > 1 ? `<div style="margin-top:3px">${allAssignees.slice(1).map(a=>`<span style="font-size:10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);color:var(--cyan);padding:1px 6px;border-radius:3px;margin-right:3px">${escHtml(a.first_name+' '+a.last_name)}</span>`).join('')}</div>` : ''}
+            <div class="exc-detail-sub" style="color:${allocColor}">${t.assigneeAlloc}% allocation${t.assigneeAlloc > 100 ? ' — OVER' : ''}</div>`;
+        })()}
+        <div id="assignees-display-${t.id?.replace(/-/g,'').substring(0,12)}" style="margin-top:3px"></div>
         <button class="case-action-btn" style="margin-top:6px;width:100%;text-align:left" onclick="openResourcePicker('${t.id}',event)">
           👤 ${t.assigned_to && t.assignee ? 'Change / Add Assignees' : 'Assign Resource →'}
         </button>
@@ -1998,22 +2011,41 @@ async function confirmResourcePicker() {
   // Assign primary (first selected) to task.assigned_to
   const primaryId = _rpSelected[0];
   const primaryRes = _resources.find(r=>r.id===primaryId);
-  const names = _rpSelected.map(id=>_resources.find(r=>r.id===id)?.first_name||id).join(', ');
+  const names = _rpSelected.map(id=>{const r=resolveAssignee(id);return r?r.first_name+' '+r.last_name:id;}).join(', ');
   try {
     await API.patch(`tasks?id=eq.${_rpTaskId}`, { assigned_to: primaryId });
     const task = _tasks.find(t=>t.id===_rpTaskId);
     if (task) task.assigned_to = primaryId;
+
+    // Write all selected to task_assignees junction — clear then re-insert
+    await API.del(`task_assignees?task_id=eq.${_rpTaskId}&firm_id=eq.${FIRM_ID}`).catch(()=>{});
+    for (const rid of _rpSelected) {
+      const isUser = !!_users.find(u => u.id === rid);
+      await API.post('task_assignees', {
+        firm_id: FIRM_ID, task_id: _rpTaskId,
+        user_id:     isUser ? rid : null,
+        resource_id: !isUser ? rid : null,
+        role: 'assignee',
+      }).catch(()=>{});
+    }
+    // Update local cache
+    _taskAssignees = _taskAssignees.filter(a => a.task_id !== _rpTaskId);
+    _rpSelected.forEach(rid => {
+      const isUser = !!_users.find(u => u.id === rid);
+      _taskAssignees.push({ task_id: _rpTaskId, firm_id: FIRM_ID,
+        user_id: isUser ? rid : null, resource_id: !isUser ? rid : null });
+    });
+
     // Log to CoC
     await API.post('exception_annotations', {
       firm_id: FIRM_ID, project_id: task?.project_id||null,
       entity_type:'task', entity_id:_rpTaskId,
       actor_resource_id: CURRENT_USER_RESOURCE_ID, action_type:'intervention',
-      notes: `Task assigned to: ${_rpSelected.map(id=>{const r=resolveAssignee(id);return r?r.first_name+' '+r.last_name:id;}).join(', ')}${_rpSelected.length>1?' (team assignment)':''}`,
+      notes: `Task assigned to: ${names}${_rpSelected.length>1?' (team assignment)':''}`,
       occurred_at: new Date().toISOString(),
     });
     closeResourcePicker();
     showToast(`Assigned to ${names} — recorded in chain of custody`, 'success');
-    // Update DOM in-place — don't rebuild whole view (would collapse expanded panes)
     _patchTaskDisplayInPlace(_rpTaskId, primaryId, names);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
@@ -2095,11 +2127,18 @@ function _patchTaskDisplayInPlace(taskId, resourceId, names) {
     if (btn) btn.textContent = '👤 Change / Add Assignees';
   });
 
-  // Update the inline display chip row if present
+  // Rebuild the full assignee display in-place
   const caseShort = taskId.replace(/-/g,'').substring(0,12);
   const chipDiv = document.getElementById('assignees-display-' + caseShort);
   if (chipDiv) {
-    chipDiv.innerHTML = `<div style="font-size:10px;color:var(--cyan);margin-top:2px">✓ Assigned: ${escHtml(names)}</div>`;
+    // Build chips for all task_assignees
+    const allForTask = _taskAssignees.filter(a => a.task_id === taskId);
+    const extras = allForTask
+      .map(a => resolveAssignee(a.user_id || a.resource_id))
+      .filter(r => r && r.id !== resourceId);
+    chipDiv.innerHTML = extras.length > 0
+      ? extras.map(r => `<span style="font-size:10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);color:var(--cyan);padding:1px 6px;border-radius:3px;margin-right:3px">${escHtml(r.first_name+' '+r.last_name)}</span>`).join('')
+      : '';
   }
 }
 
@@ -2202,12 +2241,23 @@ function openAddActionItem(taskId, projectId, event) {
   overlay.id = 'ai-modal-overlay';
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
 
-  // Resource options grouped like resource picker
-  const resOptions = [
-    ..._users.map(u => `<option value="${u.id}">${escHtml(u.name)}</option>`),
-    ..._resources.filter(r => !_users.find(u=>u.id===r.id))
-      .map(r => `<option value="${r.id}">${escHtml(r.first_name+' '+r.last_name)}</option>`)
-  ].join('');
+  // Resource options grouped by department — users first, then resources
+  const byDeptAI = {};
+  // Put the 4 Apex users at top under "Project Team"
+  if (_users.length > 0) byDeptAI['Project Team'] = _users.map(u => ({id: u.id, label: u.name, sub: u.title||''}));
+  // Group resources by department
+  _resources.forEach(r => {
+    const dept = r.department || 'Other';
+    if (!byDeptAI[dept]) byDeptAI[dept] = [];
+    byDeptAI[dept].push({id: r.id, label: r.first_name+' '+r.last_name, sub: r.title||r.level||''});
+  });
+  const resOptions = Object.entries(byDeptAI)
+    .sort(([a],[b]) => a === 'Project Team' ? -1 : b === 'Project Team' ? 1 : a.localeCompare(b))
+    .map(([dept, people]) =>
+      `<optgroup label="${escHtml(dept)}">${people.map(p =>
+        `<option value="${p.id}">${escHtml(p.label)}${p.sub?' — '+p.sub:''}</option>`
+      ).join('')}</optgroup>`
+    ).join('');
 
   overlay.innerHTML = `
     <div class="hud-modal" style="width:500px">
@@ -2284,12 +2334,29 @@ async function saveAddActionItem(taskId, projectId, event) {
 
   const task = _tasks.find(t => t.id === taskId);
   try {
+    // submitted_by must be a users.id — find current user in _users
+    const currentUser = _users.find(u =>
+      u.resource_id === CURRENT_USER_RESOURCE_ID ||
+      u.name?.toLowerCase().includes('vaughn')
+    );
+    const submittedBy = currentUser?.id || _users[0]?.id;
+
+    // responsible: if selected ID is a resource not in users, map via resource_id
+    let responsibleUserId = responsible;
+    const isUser = _users.find(u => u.id === responsible);
+    if (!isUser) {
+      // It's a resource ID — find matching user by resource_id
+      const matchUser = _users.find(u => u.resource_id === responsible);
+      if (matchUser) responsibleUserId = matchUser.id;
+      // If still no match (extended resource staff), keep the ID but warn
+    }
+
     const payload = {
       firm_id:       FIRM_ID,
       project_id:    projectId || null,
-      submitted_by:  CURRENT_USER_RESOURCE_ID,
+      submitted_by:  submittedBy,
       description:   desc,
-      responsible:   responsible,
+      responsible:   responsibleUserId,
       target_date:   targetDate,
       assigned_date: new Date().toLocaleDateString('en-CA'),
       priority:      document.getElementById('aim-priority')?.value || 'medium',
