@@ -61,7 +61,10 @@ function setContext({ resources, onRefresh, attachments, commentCounts }) {
 // resolveFn(id) → { first_name, last_name } — caller provides person lookup
 // Called by: projects.html _renderActionItemsList, project-detail.html overview
 
-function renderList(listEl, items, resolveFn) {
+// contextFn(item) — optional, returns an HTML string injected between description
+// and the meta row. Used by the ACTION ITEMS view to show task/phase context.
+// Not used by prospect-detail or the exception pane — pass null to omit.
+function renderList(listEl, items, resolveFn, contextFn) {
   if (!items || items.length === 0) {
     listEl.innerHTML = '<div style="font-size:10px;color:var(--muted);font-style:italic;padding:4px 0">No action items yet.</div>';
     return;
@@ -77,6 +80,7 @@ function renderList(listEl, items, resolveFn) {
     const pc       = priColor[item.priority] || 'var(--muted,#7a8099)';
     const overdue  = !done && item.target_date && item.target_date < today;
     const due      = item.target_date ? _fmt(item.target_date) : null;
+    const context  = contextFn ? contextFn(item) : '';
 
     const badgeBg  = done ? 'rgba(42,157,64,.15)' : overdue ? 'rgba(192,64,74,.12)' : 'rgba(212,144,31,.12)';
     const badgeClr = done ? '#7af0a0'              : overdue ? '#f07a7a'             : 'var(--amber,#d4901f)';
@@ -96,11 +100,12 @@ function renderList(listEl, items, resolveFn) {
       </div>
       <!-- Body -->
       <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:500;line-height:1.45;margin-bottom:4px;
+        <div style="font-size:11px;font-weight:500;line-height:1.45;margin-bottom:${context?'2px':'4px'};
             color:${done?'var(--muted,#7a8099)':'var(--text,#e8eaf0)'};
             text-decoration:${done?'line-through':'none'}">
           ${_esc(item.description)}
         </div>
+        ${context}
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:4px">
             <div style="width:5px;height:5px;border-radius:50%;background:${pc};flex-shrink:0"></div>
@@ -156,6 +161,7 @@ function open(config) {
     onSave,
     onCoCLog,
     resolveResponsible = null,  // optional fn(selectedId) → usersId | null
+    tasks = null,               // optional [{id, name, phase}] — renders task picker in modal
   } = config;
 
   // Remove any stale modal
@@ -212,6 +218,28 @@ function open(config) {
             style="width:100%;padding:7px 10px;border:1px solid rgba(255,255,255,.14);border-radius:6px;
             background:rgba(0,0,0,.25);color:var(--text,#e8eaf0);font-size:12px;font-family:inherit;
             outline:none;resize:vertical;min-height:68px;line-height:1.5;box-sizing:border-box;"></textarea>
+
+        ${tasks && tasks.length > 0 ? `
+        <div style="margin-top:10px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+              color:var(--muted,#7a8099);margin-bottom:5px;">Related Task <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.6">(optional)</span></div>
+          <select id="aim-task-id"
+              style="width:100%;padding:7px 10px;border:1px solid rgba(255,255,255,.14);border-radius:6px;
+              background:var(--surf2,#1e2436);color:var(--text,#e8eaf0);font-size:12px;font-family:inherit;
+              outline:none;box-sizing:border-box;">
+            <option value="">— Not linked to a task —</option>
+            ${Object.entries(tasks.reduce((acc, t) => {
+              const ph = t.phase || 'Other';
+              if (!acc[ph]) acc[ph] = [];
+              acc[ph].push(t);
+              return acc;
+            }, {})).map(([phase, pts]) =>
+              `<optgroup label="${_esc(phase)}">${pts.map(t =>
+                `<option value="${_esc(t.id)}">${_esc(t.name)}</option>`
+              ).join('')}</optgroup>`
+            ).join('')}
+          </select>
+        </div>` : ''}
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;">
           <div>
@@ -301,13 +329,14 @@ function open(config) {
   // Wire save button — keep all save logic here, no inline onclick with escaping nightmares
   document.getElementById('aim-save-btn').addEventListener('click', async function _aimSave() {
     document.getElementById('aim-save-btn').removeEventListener('click', _aimSave);
-    const desc       = document.getElementById('aim-desc')?.value?.trim();
+    const desc        = document.getElementById('aim-desc')?.value?.trim();
     const responsible = document.getElementById('aim-responsible')?.value;
-    const targetDate = document.getElementById('aim-target')?.value;
-    const priority   = document.getElementById('aim-priority')?.value   || 'medium';
-    const source     = document.getElementById('aim-source')?.value     || 'internal';
+    const targetDate  = document.getElementById('aim-target')?.value;
+    const priority    = document.getElementById('aim-priority')?.value   || 'medium';
+    const source      = document.getElementById('aim-source')?.value     || 'internal';
     const deliverable = document.getElementById('aim-deliverable')?.value?.trim() || null;
-    const comments   = document.getElementById('aim-comments')?.value?.trim()    || null;
+    const comments    = document.getElementById('aim-comments')?.value?.trim()    || null;
+    const selectedTaskId = document.getElementById('aim-task-id')?.value || null;
 
     if (!desc)       { _toast('Description is required', 'warning'); return; }
     if (!responsible){ _toast('Please assign to someone', 'warning'); return; }
@@ -330,6 +359,7 @@ function open(config) {
       const payload = {
         firm_id:       firmId,
         project_id:    projectId || null,
+        task_id:       selectedTaskId || taskId || null,
         submitted_by:  submittedBy || null,
         description:   desc,
         responsible:   responsibleId,

@@ -2782,12 +2782,16 @@ async function renderActionItems(el) {
   let items = [];
   try {
     items = await API.get(
-      `action_items?project_id=in.(${projectIds})&order=target_date.asc,created_at.desc&select=id,project_id,description,responsible,target_date,status,priority`
+      `action_items?project_id=in.(${projectIds})&order=target_date.asc,created_at.desc&select=id,project_id,task_id,description,responsible,target_date,status,priority`
     );
   } catch(e) {
     el.innerHTML = '<div class="empty"><div class="title">Could not load action items</div></div>';
     return;
   }
+
+  // Build a task lookup map for context display
+  const taskMap = {};
+  _tasks.forEach(t => { taskMap[t.id] = t; });
 
   // Update badge
   const openCount = items.filter(a => a.status !== 'complete' && a.status !== 'cancelled').length;
@@ -2839,7 +2843,9 @@ async function renderActionItems(el) {
           </span>` : `<span style="font-size:10px;color:var(--green)">✓ all complete</span>`}
         </div>
         <button onclick="(function(){
-          const proj=_projects.find(p=>p.id==='${proj.id}');
+          const proj = _projects.find(p=>p.id==='${proj.id}');
+          const projTasks = _tasks.filter(t=>t.project_id==='${proj.id}'&&t.status!=='complete')
+            .sort((a,b)=>(a.phase||'').localeCompare(b.phase||'')||(a.name||'').localeCompare(b.name||''));
           HUD.ActionItems.open({
             table:'action_items', firmId:FIRM_ID,
             projectId:'${proj.id}',
@@ -2847,6 +2853,7 @@ async function renderActionItems(el) {
             submittedBy:'${submittedBy}',
             people:_users.map(u=>({group:'Project Team',id:u.id,label:u.name,sub:u.title||''})),
             resolveResponsible:(id)=>_users.find(u=>u.id===id)?id:(_users.find(u=>u.resource_id===id)?.id||null),
+            tasks:projTasks,
             onSave:()=>switchView('actionitems'),
           });
         })()"
@@ -2871,10 +2878,25 @@ async function renderActionItems(el) {
 
   // Now render each project's list using the shared module
   activeProjects.forEach(proj => {
-    const listEl = document.getElementById('ai-list-' + proj.id);
+    const listEl   = document.getElementById('ai-list-' + proj.id);
     const projItems = byProject[proj.id] || [];
     if (listEl && projItems.length > 0) {
-      HUD.ActionItems.renderList(listEl, projItems, resolveAssignee);
+      // contextFn — injects phase · task name between description and meta row
+      const contextFn = (item) => {
+        if (!item.task_id) return '';
+        const t = taskMap[item.task_id];
+        if (!t) return '';
+        return `<div style="font-size:10px;color:var(--muted);margin-bottom:4px;
+            display:flex;align-items:center;gap:5px;">
+          <span style="padding:1px 6px;border-radius:3px;
+              background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+              font-size:9px;letter-spacing:.04em;text-transform:uppercase;
+              color:var(--muted)">${escHtml(t.phase||'—')}</span>
+          <span style="color:rgba(255,255,255,.35)">·</span>
+          <span>${escHtml(t.name)}</span>
+        </div>`;
+      };
+      HUD.ActionItems.renderList(listEl, projItems, resolveAssignee, contextFn);
     }
   });
 }
