@@ -634,6 +634,17 @@ function renderRequestCard(req, isSent = false) {
         <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
       </div>
 
+      <!-- Impact If Approved — loaded inline, always visible below The Ask -->
+      <div id="impact-block-${req.id.replace(/-/g,'')}"
+           style="margin-top:8px;background:rgba(255,255,255,.02);border:1px solid var(--border);
+                  border-left:3px solid rgba(79,142,247,.4);border-radius:6px;padding:10px 12px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+            color:var(--accent);margin-bottom:8px">IMPACT IF APPROVED</div>
+        <div id="impact-content-${req.id.replace(/-/g,'')}" style="font-size:11px;color:var(--muted)">
+          Loading allocation data...
+        </div>
+      </div>
+
       <!-- Counter notes visible on in-progress cards -->
       ${req.counter_notes ? `
       <div class="ctx-label" style="margin-top:12px">Counter-proposal on record</div>
@@ -673,10 +684,10 @@ function renderRequestCard(req, isSent = false) {
               <span style="font-weight:600">${formatEventType(e.event_type)}</span>
               <span style="font-size:10px;color:var(--muted);margin-left:4px">— ${escHtml(actorName)}</span>
               ${elapsedSince}
-              ${e.notes && !counterNotes ? ` <div style="color:var(--muted);font-size:11px;margin-top:2px">${escHtml(e.notes)}</div>` : ''}
               ${counterNotes ? `<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"${escHtml(counterNotes)}"</div>` : ''}
-              ${impactSnap ? `<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">${escHtml(impactSnap)}</div>` : ''}
-              ${eventData?.impact_statement ? `<div style="margin-top:4px;padding:5px 8px;background:rgba(192,64,74,.06);border-left:2px solid rgba(192,64,74,.3);border-radius:2px;font-size:11px;color:#f07a7a;font-style:italic">"${escHtml(eventData.impact_statement)}"</div>` : ''}
+              ${impactSnap && !counterNotes ? `<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px;padding:3px 6px;background:rgba(255,255,255,.03);border-radius:3px">${escHtml(impactSnap)}</div>` : ''}
+              ${eventData?.approval_note ? `<div style="color:var(--text);font-size:11px;font-style:italic;margin-top:4px;padding:4px 8px;border-left:2px solid rgba(79,142,247,.4)">"${escHtml(eventData.approval_note)}"</div>` : ''}
+              ${!counterNotes && !impactSnap && !eventData?.approval_note && e.notes ? `<div style="color:var(--muted);font-size:11px;margin-top:2px">${escHtml(e.notes)}</div>` : ''}
             </div>
           </div>`;
         }).join('')}
@@ -695,11 +706,12 @@ function renderRequestCard(req, isSent = false) {
       <!-- Inline response panels -->
       <div class="response-panel" id="panel-approve-${req.id.replace(/-/g,'')}" onclick="event.stopPropagation()">
         <div class="resp-label" style="color:#7af0a0">✓ CONFIRM APPROVAL</div>
-        <div id="alloc-impact-${req.id.replace(/-/g,'')}" style="margin-bottom:10px">
-          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Loading allocation impact...</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+          Review the <strong style="color:var(--accent)">Impact If Approved</strong> above before confirming.
+          This decision is permanent and will be recorded in the chain of custody.
         </div>
         <textarea class="resp-input" id="approve-note-${req.id.replace(/-/g,'')}" rows="2"
-          placeholder="Optional: add context for the PM (e.g. 'Approved — please coordinate directly with Alan on handoff timing')"></textarea>
+          placeholder="Optional: add your comments (e.g. 'Approved — please coordinate directly with Alan on handoff timing')"></textarea>
         <div>
           <button class="btn-submit approve" onclick="submitApprove('${req.id}')">✓ CONFIRM APPROVAL</button>
           <button class="btn-cancel" onclick="closeResponsePanel('${req.id}')">Cancel</button>
@@ -796,6 +808,17 @@ function renderResolvedCard(req) {
         <div class="ctx-label" style="margin-top:10px">The ask</div>
         <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
       </div>
+
+      <!-- Impact If Approved — loaded inline, always visible below The Ask -->
+      <div id="impact-block-${req.id.replace(/-/g,'')}"
+           style="margin-top:8px;background:rgba(255,255,255,.02);border:1px solid var(--border);
+                  border-left:3px solid rgba(79,142,247,.4);border-radius:6px;padding:10px 12px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+            color:var(--accent);margin-bottom:8px">IMPACT IF APPROVED</div>
+        <div id="impact-content-${req.id.replace(/-/g,'')}" style="font-size:11px;color:var(--muted)">
+          Loading allocation data...
+        </div>
+      </div>
       <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
       <div class="chain">
         ${(() => {
@@ -825,11 +848,11 @@ function renderResolvedCard(req) {
                 <span style="font-weight:600">${formatEventType(e.event_type)}</span>
                 <span style="font-size:10px;color:var(--muted);margin-left:4px">— ${escHtml(actorName)}</span>
                 ${elapsed}
-                ${e.notes && !counterNotes && !denialReason ? '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+escHtml(e.notes)+'</div>' : ''}
                 ${counterNotes ? '<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(counterNotes)+'"</div>' : ''}
                 ${denialReason ? '<div style="color:#f07a7a;font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(denialReason)+'"</div>' : ''}
-                ${impactSnap ? '<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px">'+escHtml(impactSnap)+'</div>' : ''}
-                ${eventData?.impact_statement ? '<div style="margin-top:4px;padding:5px 8px;background:rgba(192,64,74,.06);border-left:2px solid rgba(192,64,74,.3);border-radius:2px;font-size:11px;color:#f07a7a;font-style:italic">"'+escHtml(eventData.impact_statement)+'"</div>' : ''}
+                ${impactSnap && !counterNotes && !denialReason ? '<div style="color:var(--muted);font-size:10px;font-family:monospace;margin-top:4px;padding:3px 6px;background:rgba(255,255,255,.03);border-radius:3px">'+escHtml(impactSnap)+'</div>' : ''}
+                ${eventData?.approval_note ? '<div style="color:var(--text);font-size:11px;font-style:italic;margin-top:4px;padding:4px 8px;border-left:2px solid rgba(79,142,247,.4)">"'+escHtml(eventData.approval_note)+'"</div>' : ''}
+                ${!counterNotes && !denialReason && !impactSnap && !eventData?.approval_note && e.notes ? '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+escHtml(e.notes)+'</div>' : ''}
               </div>
             </div>`;
           }).join('');
@@ -853,9 +876,12 @@ function toggleCard(reqId) {
   const wasOpen = body.classList.contains('open');
   body.classList.toggle('open');
 
-  // When opening: log "viewed" + set status to acknowledged if still pending
+  // When opening: load impact data + log "viewed" + set acknowledged
   if (!wasOpen) {
     const req = _requests.find(r => r.id === reqId);
+
+    // Load allocation impact into the inline block
+    loadImpactBlock(reqId);
     if (req && req.status === 'pending') {
       // Update status to acknowledged (seen)
       API.patch(`resource_requests?id=eq.${reqId}`, {
@@ -893,90 +919,75 @@ function collapseCard(reqId) {
   closeResponsePanel(reqId);
 }
 
-// ── Approve ───────────────────────────────────────────────────────────────────
-async function openApprove(reqId) {
-  closeResponsePanel(reqId);
-  document.getElementById('panel-approve-' + reqId.replace(/-/g,'')).classList.add('open');
+async function loadImpactBlock(reqId) {
+  const contentEl = document.getElementById('impact-content-' + reqId.replace(/-/g,''));
+  if (!contentEl) return;
 
-  // Load and render allocation impact
-  const req         = _requests.find(r => r.id === reqId);
-  const project     = _projects.find(p => p.id === req?.project_id);
-  const resource    = _resources.find(r => r.id === req?.requested_resource_id);
-  const resName     = resource ? resource.first_name + ' ' + resource.last_name : '—';
-  const impactEl    = document.getElementById('alloc-impact-' + reqId.replace(/-/g,''));
-  if (!impactEl) return;
+  const req      = _requests.find(r => r.id === reqId);
+  const project  = _projects.find(p => p.id === req?.project_id);
+  const resource = _resources.find(r => r.id === req?.requested_resource_id);
+  if (!req || !resource) { contentEl.textContent = 'Unable to load allocation data.'; return; }
 
   try {
-    // Get current allocations for this resource
     const allocs = await API.get(
-      `resource_allocations?resource_id=eq.${req.requested_resource_id}&select=*,project:projects(name)`
+      `resource_allocations?resource_id=eq.${req.requested_resource_id}&select=*`
     ).catch(() => []);
 
     const currentTotal  = allocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
     const newTotal      = currentTotal + (req.allocation_pct || 0);
     const overAllocated = newTotal > 100;
-    const availPct      = resource?.available_pct || 100;
+    const totalColor    = overAllocated ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
 
-    // Build allocation breakdown rows
     const allocRows = allocs.map(a => {
-      const projName = a.project?.name || _projects.find(p => p.id === a.project_id)?.name || 'Unknown project';
-      return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;
+      const projName = _projects.find(p => p.id === a.project_id)?.name || 'Unknown project';
+      return `<div style="display:flex;justify-content:space-between;padding:2px 0;
           border-bottom:1px solid rgba(255,255,255,.04)">
         <span style="color:var(--muted)">${escHtml(projName)}</span>
-        <span style="color:var(--text)">${a.allocation_pct}%</span>
+        <span>${a.allocation_pct}%</span>
       </div>`;
     }).join('');
 
-    const totalColor  = overAllocated ? 'var(--red)' : newTotal >= 100 ? 'var(--amber)' : '#7af0a0';
-    const totalLabel  = overAllocated
-      ? `⚠ ${newTotal}% — OVER-ALLOCATED by ${newTotal - 100}%`
-      : newTotal === 100 ? `${newTotal}% — Fully committed`
-      : `${newTotal}% of ${availPct}% available`;
+    const totalLabel = overAllocated
+      ? `<span style="color:var(--red);font-weight:700">${newTotal}% — OVER-ALLOCATED by ${newTotal - 100}%</span>`
+      : newTotal === 100
+        ? `<span style="color:var(--amber);font-weight:700">${newTotal}% — Fully committed</span>`
+        : `<span style="color:#7af0a0;font-weight:700">${newTotal}%</span>`;
 
-    impactEl.innerHTML = `
-      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);
-          border-radius:6px;padding:10px 12px;margin-bottom:10px">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-            color:var(--muted);margin-bottom:8px">ALLOCATION IMPACT — ${escHtml(resName)}</div>
-
-        ${allocRows}
-
-        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;
-            border-top:1px solid rgba(255,255,255,.08);margin-top:4px">
-          <span style="color:var(--muted)">Currently allocated</span>
-          <span style="color:var(--text);font-weight:600">${currentTotal}%</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0">
-          <span style="color:#7af0a0">+ This approval (${escHtml(project?.name||'—')})</span>
-          <span style="color:#7af0a0;font-weight:600">+${req.allocation_pct || 0}%</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0 2px;
-            border-top:1px solid rgba(255,255,255,.08);margin-top:4px;font-weight:700">
-          <span style="color:${totalColor}">New total allocation</span>
-          <span style="color:${totalColor}">${totalLabel}</span>
-        </div>
-
-        ${overAllocated ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(192,64,74,.08);
-            border:1px solid rgba(192,64,74,.25);border-radius:4px;font-size:11px;color:#f07a7a">
-          ⚠ Approving this request will over-allocate ${escHtml(resName)} by ${newTotal - 100}%.
-          Their existing commitments on ${allocs.map(a => {
-            return _projects.find(p => p.id === a.project_id)?.name || 'another project';
-          }).join(' and ')} remain unchanged. Proceed with awareness.
-        </div>` : ''}
+    contentEl.innerHTML = `
+      ${allocRows}
+      <div style="display:flex;justify-content:space-between;padding:3px 0;
+          border-top:1px solid rgba(255,255,255,.08);margin-top:4px">
+        <span style="color:var(--muted)">Currently</span>
+        <span>${currentTotal}%</span>
       </div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0">
+        <span style="color:#7af0a0">+ This request (${escHtml(project?.name||'—')})</span>
+        <span style="color:#7af0a0">+${req.allocation_pct || 0}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0 0;
+          border-top:1px solid rgba(255,255,255,.08);margin-top:4px;font-size:12px">
+        <span style="color:${totalColor}">New total allocation</span>
+        ${totalLabel}
+      </div>
+      ${overAllocated ? `<div style="margin-top:6px;font-size:10px;color:#f07a7a">
+        ⚠ Approving over-allocates ${escHtml(resource.first_name)} by ${newTotal - 100}%.
+        Existing commitments are unchanged.</div>` : ''}`;
 
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        This approval is a permanent record. The allocation will take effect
-        starting <strong style="color:var(--text)">${fmtDate(req.proposed_start)}</strong>.
-      </div>`;
+    // Cache the snapshot string for use in approval CoC
+    req._impactSnapshot = `At approval: ${allocs.map(a => {
+      return (_projects.find(p=>p.id===a.project_id)?.name||'project') + ': ' + a.allocation_pct + '%';
+    }).join(', ')} + this request (${req.allocation_pct}%) = ${newTotal}% total${newTotal > 100 ? ' [OVER-ALLOCATED]' : ''}`;
+
   } catch(e) {
-    impactEl.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-      Approving will allocate <strong style="color:var(--text)">${escHtml(resName)}</strong>
-      at <strong>${req.allocation_pct||'—'}%</strong>
-      to <strong>${escHtml(project?.name||'—')}</strong>
-      starting <strong>${fmtDate(req.proposed_start)}</strong>.
-    </div>`;
+    contentEl.textContent = 'Unable to load allocation data.';
   }
+}
+
+// ── Approve ───────────────────────────────────────────────────────────────────
+function openApprove(reqId) {
+  closeResponsePanel(reqId);
+  document.getElementById('panel-approve-' + reqId.replace(/-/g,'')).classList.add('open');
+  // Impact If Approved is already loaded in the card body — no additional fetch needed
 }
 
 async function submitApprove(reqId) {
@@ -986,17 +997,8 @@ async function submitApprove(reqId) {
 
   try {
     // Update request status
-    // Build allocation impact snapshot for permanent record
-    const allocs = await API.get(
-      `resource_allocations?resource_id=eq.${req.requested_resource_id}&select=*`
-    ).catch(() => []);
-    const currentTotal = allocs.reduce((s, a) => s + (a.allocation_pct || 0), 0);
-    const newTotal     = currentTotal + (req.allocation_pct || 0);
-    const allocSummary = allocs.map(a => {
-      const pName = _projects.find(p => p.id === a.project_id)?.name || a.project_id.substring(0,8);
-      return `${pName}: ${a.allocation_pct}%`;
-    }).join(', ');
-    const impactSnapshot = `At approval: ${allocSummary} + this request (${req.allocation_pct}%) = ${newTotal}% total${newTotal > 100 ? ' [OVER-ALLOCATED]' : ''}`;
+    // Use cached impact snapshot from loadImpactBlock (already computed when card opened)
+    const impactSnapshot = req._impactSnapshot || `Allocation impact not computed — approved directly`;
 
     await API.patch(`resource_requests?id=eq.${reqId}`, {
       status: 'approved', resolved_at: new Date().toISOString(),
@@ -1020,15 +1022,13 @@ async function submitApprove(reqId) {
       actor_role: 'approver', event_type: 'approved',
       notes: (() => {
         const resFirst = _resources.find(r=>r.id===req.requested_resource_id)?.first_name || '—';
-        const parts = [`Approved — ${resFirst} allocated to project`];
-        if (impactSnapshot) parts.push(impactSnapshot);
-        if (note) parts.push(`Note: ${note}`);
-        return parts.join(' · ');
+        const resLast  = _resources.find(r=>r.id===req.requested_resource_id)?.last_name  || '';
+        const projName = _projects.find(p=>p.id===req.project_id)?.name || 'project';
+        return `Approved — ${resFirst} ${resLast} allocated to ${projName}`;
       })(),
       event_data: {
-        impact_snapshot:  impactSnapshot,
-        approval_note:    note || null,
-        impact_statement: req.impact_statement || null,
+        impact_snapshot: impactSnapshot,   // "New total allocation" string
+        approval_note:   note || null,     // approver's comments
       },
       occurred_at: new Date().toISOString(),
     });
