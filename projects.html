@@ -1464,7 +1464,7 @@ function renderExceptions(el) {
             <span style="color:var(--muted);margin-left:8px">${t.daysOver}d overdue · ${escHtml(t.phase||'—')} · ${t.assignee ? t.assignee.first_name+' '+t.assignee.last_name : '—'}</span>
           </div>
           <div style="display:flex;align-items:center;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
-            ${!t.exception_priority ? '<span style="font-size:9px;font-weight:400;color:#ffffff;letter-spacing:.06em;margin-right:2px">PRIORITY</span>' : ''}
+            <span style="font-size:9px;font-weight:400;letter-spacing:.06em;margin-right:2px;color:${t.exception_priority ? 'var(--border2)' : '#ffffff'}">PRIORITY</span>
             <button class="pri-btn high${t.exception_priority==='high'?' active':''}" onclick="setPriority('${t.id}','high',this,event)">HIGH</button>
             <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}" onclick="setPriority('${t.id}','medium',this,event)">MED</button>
             <button class="pri-btn low${t.exception_priority==='low'?' active':''}" onclick="setPriority('${t.id}','low',this,event)">LOW</button>
@@ -1773,12 +1773,15 @@ function renderTaskDetail(t) {
   html += `</div></div>`;
 
   // ── ACTIONS PANE ───────────────────────────────────────────────────────────
+  // Render existing action items for this task
+  const taskActionItems = [];  // loaded async — placeholder rendered now, filled on open
   html += `<div class="case-pane">
-    <div class="case-pane-header" onclick="toggleCasePane('${caseId}-actions',event)">
+    <div class="case-pane-header" onclick="toggleActionsPane('${caseId}-actions','${t.id}',event)">
       <div class="case-pane-title"><span class="pane-icon">⚡</span> Actions</div>
       <div class="case-pane-arrow" id="${caseId}-actions-arrow">▼</div>
     </div>
     <div class="case-pane-body" id="${caseId}-actions">
+      <div id="${caseId}-action-items-list" style="margin-bottom:8px"></div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:6px">
         <button class="case-action-btn" style="background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.35)" onclick="openAddActionItem('${t.id}','${t.project_id}',event)">✚ Add Action Item</button>
         <button class="case-action-btn amber" onclick="logAnnotation('${t.id}','note',event)">📝 Add Note</button>
@@ -1802,6 +1805,69 @@ function renderTaskDetail(t) {
   </div>`;
 
   return html;
+}
+
+// ── Actions pane toggle — loads action items on open ─────────────────────────
+async function toggleActionsPane(paneId, taskId, event) {
+  if (event) event.stopPropagation();
+  const body  = document.getElementById(paneId);
+  const arrow = document.getElementById(paneId + '-arrow');
+  if (!body) return;
+  const open = body.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open', open);
+  if (!open) return;
+
+  // Load and render action items for this task
+  const listEl = document.getElementById(paneId.replace('-actions', '') + '-action-items-list');
+  if (!listEl || listEl.dataset.loaded) return;
+  listEl.dataset.loaded = '1';
+
+  try {
+    const items = await API.get(
+      `action_items?project_id=eq.${_tasks.find(t=>t.id===taskId)?.project_id}&select=id,description,responsible,target_date,status,priority&order=created_at.desc`
+    ).catch(()=>[]);
+    _renderActionItemsList(listEl, items, taskId);
+  } catch(e) {
+    listEl.innerHTML = '<div style="font-size:10px;color:var(--muted)">Could not load action items.</div>';
+  }
+}
+
+function _renderActionItemsList(listEl, items, taskId) {
+  if (!items || items.length === 0) {
+    listEl.innerHTML = '<div style="font-size:10px;color:var(--text3);font-style:italic;padding:4px 0">No action items yet.</div>';
+    return;
+  }
+  const priColor = { critical:'#f07a7a', high:'#f07a7a', medium:'var(--amber)', low:'var(--muted)' };
+  const statusColor = { open:'var(--amber)', in_progress:'var(--cyan)', completed:'var(--green)', cancelled:'var(--muted)' };
+  listEl.innerHTML = items.map(item => {
+    const assignee = resolveAssignee(item.responsible);
+    const aName = assignee ? assignee.first_name+' '+assignee.last_name : '—';
+    const pc = priColor[item.priority] || 'var(--muted)';
+    const sc = statusColor[item.status] || 'var(--muted)';
+    const due = item.target_date ? fmtDate(item.target_date) : '—';
+    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <div style="width:6px;height:6px;border-radius:50%;background:${pc};flex-shrink:0;margin-top:4px"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:600;color:var(--text)">${escHtml(item.description)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">
+          ${escHtml(aName)} · Due ${due} · <span style="color:${sc}">${item.status?.replace('_',' ')||'open'}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// After saving an action item, refresh the list in the open pane
+async function _refreshActionItemsList(taskId) {
+  const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
+  const listEl = document.getElementById(caseId + '-action-items-list');
+  if (!listEl) return;
+  listEl.dataset.loaded = ''; // allow reload
+  const task = _tasks.find(t=>t.id===taskId);
+  const items = await API.get(
+    `action_items?project_id=eq.${task?.project_id}&select=id,description,responsible,target_date,status,priority&order=created_at.desc`
+  ).catch(()=>[]);
+  _renderActionItemsList(listEl, items, taskId);
 }
 
 // ── Case pane toggle ──────────────────────────────────────────────────────────
@@ -2019,21 +2085,30 @@ async function confirmResourcePicker() {
 
     // Write all selected to task_assignees junction — clear then re-insert
     await API.del(`task_assignees?task_id=eq.${_rpTaskId}&firm_id=eq.${FIRM_ID}`).catch(()=>{});
+    const insertErrors = [];
     for (const rid of _rpSelected) {
-      const isUser = !!_users.find(u => u.id === rid);
-      await API.post('task_assignees', {
+      // Determine if ID belongs to users table or resources table
+      const isUser     = !!_users.find(u => u.id === rid);
+      const isResource = !!_resources.find(r => r.id === rid);
+      // Skip if ID not found in either — prevents FK violations
+      if (!isUser && !isResource) { insertErrors.push(rid); continue; }
+      const result = await API.post('task_assignees', {
         firm_id: FIRM_ID, task_id: _rpTaskId,
         user_id:     isUser ? rid : null,
-        resource_id: !isUser ? rid : null,
+        resource_id: isResource ? rid : null,
         role: 'assignee',
-      }).catch(()=>{});
+      }).catch(e => { insertErrors.push(rid+':'+e.message); return null; });
     }
+    if (insertErrors.length) console.warn('task_assignees insert errors:', insertErrors);
     // Update local cache
     _taskAssignees = _taskAssignees.filter(a => a.task_id !== _rpTaskId);
     _rpSelected.forEach(rid => {
-      const isUser = !!_users.find(u => u.id === rid);
-      _taskAssignees.push({ task_id: _rpTaskId, firm_id: FIRM_ID,
-        user_id: isUser ? rid : null, resource_id: !isUser ? rid : null });
+      const isUser     = !!_users.find(u => u.id === rid);
+      const isResource = !!_resources.find(r => r.id === rid);
+      if (isUser || isResource) {
+        _taskAssignees.push({ task_id: _rpTaskId, firm_id: FIRM_ID,
+          user_id: isUser ? rid : null, resource_id: isResource ? rid : null });
+      }
     });
 
     // Log to CoC
@@ -2381,6 +2456,9 @@ async function saveAddActionItem(taskId, projectId, event) {
 
     document.getElementById('ai-modal-overlay')?.remove();
     showToast('Action item saved', 'success');
+
+    // Refresh action items list in the open pane
+    await _refreshActionItemsList(taskId);
 
     // Refresh CoC if open
     const caseId = 'case-' + taskId.replace(/-/g,'').substring(0,12);
