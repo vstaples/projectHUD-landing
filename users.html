@@ -424,7 +424,7 @@
 <body>
 <div class="um-wrap">
   <!-- Sidebar injected by sidebar.js -->
-  <div id="sidebar-mount"></div>
+  <nav id="sidebar"></nav>
 
   <div class="um-main">
     <div class="um-header">
@@ -2445,6 +2445,8 @@ async function removeAvatar(resourceId) {
   if (res) res.avatar_url = null;
   renderResources();
 }
+  // Init sidebar
+  Sidebar.init('users.html');
 </script>
 </body>
 </html>
