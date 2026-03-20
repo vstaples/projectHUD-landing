@@ -693,30 +693,46 @@ function renderResolvedCard(req) {
         <div class="ctx-text">${escHtml(req.context)}</div>
         ${req.impact_statement ? `<div class="ctx-label">Impact stated</div>
         <div class="ctx-text impact">${escHtml(req.impact_statement)}</div>` : ''}
+        ${req.attempts_made ? `<div class="ctx-label">What was tried</div>
+        <div class="ctx-text" style="color:var(--muted)">${escHtml(req.attempts_made)}</div>` : ''}
+        <div class="ctx-label" style="margin-top:10px">The ask</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.6">Requesting <strong>${_resources.find(x=>x.id===req.requested_resource_id)?.first_name+' '+(_resources.find(x=>x.id===req.requested_resource_id)?.last_name||'')||'—'}</strong>${req.allocation_pct?' at <strong>'+req.allocation_pct+'%</strong> allocation':''}${req.hours_requested?' for <strong>'+req.hours_requested+'h</strong>':''}${req.proposed_start?' starting <strong>'+fmtDate(req.proposed_start)+'</strong>':''} to address the situation above.</div>
       </div>
       <div class="ctx-label" style="margin-top:14px">Chain of custody</div>
       <div class="chain">
-        ${events.map(e => {
-          const actorRes = _resources.find(r => r.id === e.actor_resource_id);
-          const actorName = actorRes ? actorRes.first_name + ' ' + actorRes.last_name
-                          : e.actor_role === 'system' ? 'System' : e.actor_role || 'Unknown';
-          let eventData = null;
-          try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
-          const counterNotes = eventData?.counter_notes;
-          const denialReason = eventData?.denial_reason;
-          return `
-          <div class="chain-event">
-            <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('deni')||e.event_type.includes('escalat')?'escalated':''}"></div>
-            <div class="chain-time">${fmtDateTime(e.occurred_at)}</div>
-            <div style="flex:1;color:${e.actor_role==='system'?'var(--muted)':'var(--text)'}">
-              <span style="font-weight:600">${formatEventType(e.event_type)}</span>
-              <span style="font-size:10px;color:var(--muted);margin-left:4px">— ${escHtml(actorName)}</span>
-              ${e.notes && !counterNotes && !denialReason ? `<div style="color:var(--muted);font-size:11px;margin-top:2px">${escHtml(e.notes)}</div>` : ''}
-              ${counterNotes ? `<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"${escHtml(counterNotes)}"</div>` : ''}
-              ${denialReason ? `<div style="color:#f07a7a;font-size:11px;font-style:italic;margin-top:4px">"${escHtml(denialReason)}"</div>` : ''}
-            </div>
-          </div>`;
-        }).join('')}
+        ${(() => {
+          // Establish baseline: use submitted_at from request as t=0
+          // If first event is not 'submitted', we still calculate from req.submitted_at
+          return events.map((e, idx) => {
+            const actorRes  = _resources.find(r => r.id === e.actor_resource_id);
+            const actorName = actorRes ? actorRes.first_name + ' ' + actorRes.last_name
+                            : e.actor_role === 'system' ? 'System' : e.actor_role || 'Unknown';
+            let eventData = null;
+            try { eventData = e.event_data ? (typeof e.event_data === 'string' ? JSON.parse(e.event_data) : e.event_data) : null; } catch(x) {}
+            const counterNotes = eventData?.counter_notes;
+            const denialReason = eventData?.denial_reason;
+            // Elapsed: first event always measures from submission; subsequent from prior event
+            const baseTime  = idx === 0 ? new Date(req.submitted_at) : new Date(events[idx-1].occurred_at);
+            const hoursEl   = Math.round((new Date(e.occurred_at) - baseTime) / 3600000 * 10) / 10;
+            const elLabel   = idx === 0 ? 'from submission' : 'later';
+            const elapsed   = hoursEl > 0
+              ? '<span style="color:var(--muted);font-size:9px;margin-left:4px">(+'+hoursEl+'h '+elLabel+')</span>'
+              : '';
+            return `
+            <div class="chain-event">
+              <div class="chain-dot ${e.actor_role==='system'?'system':e.event_type.includes('deni')||e.event_type.includes('escalat')?'escalated':''}"></div>
+              <div class="chain-time">${fmtDateTime(e.occurred_at)}</div>
+              <div style="flex:1;color:${e.actor_role==='system'?'var(--muted)':'var(--text)'}">
+                <span style="font-weight:600">${formatEventType(e.event_type)}</span>
+                <span style="font-size:10px;color:var(--muted);margin-left:4px">— ${escHtml(actorName)}</span>
+                ${elapsed}
+                ${e.notes && !counterNotes && !denialReason ? '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+escHtml(e.notes)+'</div>' : ''}
+                ${counterNotes ? '<div style="color:var(--amber);font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(counterNotes)+'"</div>' : ''}
+                ${denialReason ? '<div style="color:#f07a7a;font-size:11px;font-style:italic;margin-top:4px">"'+escHtml(denialReason)+'"</div>' : ''}
+              </div>
+            </div>`;
+          }).join('');
+        })()}
         ${events.length===0?'<div style="font-size:11px;color:var(--muted)">No events recorded</div>':''}
       </div>
     </div>
