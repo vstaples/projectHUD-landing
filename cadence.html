@@ -2550,7 +2550,28 @@ async function commitTemplate() {
     const newStatus = statusEl?.value || _selectedTmpl.status;
     const oldStatus = _selectedTmpl.status;
 
-    // ── Version bump ──────────────────────────────────────────────────────────
+    // ── Release gate — check BIST before any DB writes ────────────────────────
+    if (newStatus === 'released' && oldStatus !== 'released') {
+      // Compute what the new version will be (so gate queries against it)
+      let gMaj = _selectedTmpl.version_major || 0;
+      let gMin = _selectedTmpl.version_minor || 0;
+      let gPat = _selectedTmpl.version_patch || 0;
+      gMaj += 1; gMin = 0; gPat = 0; // releasing always bumps major
+      const pendingVersion = `${gMaj}.${gMin}.${gPat}`;
+
+      const gate = await runGateCheck(_selectedTmpl.id, pendingVersion);
+
+      if (gate.tier !== 3) {
+        // Tier 0/1/2 — show gate dialog; proceed only if user confirms
+        if (btn) { btn.textContent = 'Commit'; btn.disabled = false; }
+        await showGateDialog(_selectedTmpl.id, pendingVersion, () => {
+          // User cleared the gate — re-invoke commitTemplate to do the actual write
+          commitTemplate();
+        });
+        return; // abort this invocation
+      }
+      // Tier 3 — all passing, proceed silently
+    }
     let maj = _selectedTmpl.version_major || 0;
     let min = _selectedTmpl.version_minor || 0;
     let pat = _selectedTmpl.version_patch || 0;
@@ -2837,6 +2858,511 @@ async function deleteTemplate() {
 }
 
 // ── Status change handler ─────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// BIST — Built-in Self Test engine
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Actor slug → resource/user lookup ────────────────────────────────────────
+function _bistResolveActor(slug) {
+  if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
+  const r = _resources_cad.find(r =>
+    r.name?.toLowerCase().replace(/\s+/g,'_') === slug.toLowerCase() ||
+    r.id === slug
+  );
+  const u = r ? _users_cad.find(u => u.resource_id === r.id) : null;
+  return {
+    resourceId: r?.id || _myResourceId,
+    userId:     u?.id || null,
+    userName:   r?.name || slug,
+  };
+}
+
+// ── State model builder — derived from CoC events ────────────────────────────
+function _bistBuildState(inst, steps, coc) {
+  const completedIds = new Set(coc.filter(e=>e.event_type==='step_completed').map(e=>e.template_step_id));
+  const activeIds    = new Set(coc.map(e=>e.template_step_id).filter(Boolean));
+  const lastCompleted = steps.filter(s=>completedIds.has(s.id))
+    .reduce((max,s) => Math.max(max, s.sequence_order), 0);
+  const readyStep = steps
+    .filter(s => s.sequence_order > lastCompleted && !activeIds.has(s.id))
+    .sort((a,b) => a.sequence_order - b.sequence_order)[0];
+
+  const stepsState = {};
+  steps.forEach(s => {
+    const done      = completedIds.has(s.id);
+    const touched   = activeIds.has(s.id);
+    const isReady   = s.id === readyStep?.id;
+    const cEvt      = done ? coc.slice().reverse().find(e =>
+      e.event_type==='step_completed' && e.template_step_id===s.id) : null;
+    const loops     = coc.filter(e=>e.event_type==='step_completed'&&e.template_step_id===s.id).length;
+    const actEvt    = coc.find(e=>e.event_type==='step_activated'&&e.template_step_id===s.id);
+    stepsState[s.sequence_order] = {
+      id:           s.id,
+      name:         s.name,
+      step_type:    s.step_type,
+      state:        done?'done':touched?'active':isReady?'ready':'waiting',
+      outcome:      cEvt?.outcome || null,
+      activated_at: actEvt?.created_at || null,
+      completed_at: cEvt?.created_at   || null,
+      loops,
+      docs: { evidence:{count:0}, authorization:{count:0}, reference:{count:0} },
+    };
+  });
+
+  return {
+    instance: {
+      status:      inst.status,
+      launched_at: inst.launched_at,
+      title:       inst.title,
+    },
+    steps: stepsState,
+    coc,
+  };
+}
+
+// ── Assertion evaluator ───────────────────────────────────────────────────────
+function _bistEval(check, state) {
+  const path = check.replace(/step\[(\d+)\]/, 'steps.$1').split('.');
+  return path.reduce((obj, key) => obj?.[key], state);
+}
+
+function _bistAssert(assert, state) {
+  const actual = _bistEval(assert.check, state);
+  if (assert.eq         !== undefined) return actual === assert.eq;
+  if (assert.not_eq     !== undefined) return actual !== assert.not_eq;
+  if (assert.gte        !== undefined) return Number(actual) >= Number(assert.gte);
+  if (assert.lte        !== undefined) return Number(actual) <= Number(assert.lte);
+  if (assert.contains   !== undefined) return String(actual||'').includes(assert.contains);
+  if (assert.exists     !== undefined) return actual !== undefined && actual !== null;
+  if (assert.not_exists !== undefined) return actual === undefined || actual === null;
+  return false;
+}
+
+// ── Run a single BIST script ──────────────────────────────────────────────────
+async function runBistScript(scriptId, onProgress) {
+  const runStart = Date.now();
+
+  // Load script
+  const scripts = await API.get(`bist_test_scripts?id=eq.${scriptId}`).catch(()=>[]);
+  const script  = scripts?.[0];
+  if (!script) throw new Error('Script not found');
+
+  const spec = typeof script.script === 'string' ? JSON.parse(script.script) : script.script;
+
+  // Create run record
+  const runRows = await API.post('bist_runs', {
+    firm_id:          FIRM_ID_CAD,
+    script_id:        scriptId,
+    template_version: spec.template_version || _selectedTmpl?.version || '?',
+    status:           'running',
+    steps_passed:     0,
+    steps_failed:     0,
+    run_by:           _myResourceId || null,
+    run_at:           new Date().toISOString(),
+  });
+  const runId      = runRows?.[0]?.id;
+  let   instId     = null;
+  let   stepsPassed = 0;
+
+  // Load template steps for seq→id resolution
+  const tmplSteps = await API.get(
+    `workflow_template_steps?template_id=eq.${script.template_id}&order=sequence_order.asc`
+  ).catch(()=>[]);
+
+  const stepBySeq = {};
+  (tmplSteps||[]).forEach(s => { stepBySeq[s.sequence_order] = s; });
+
+  async function reloadState() {
+    if (!instId) return null;
+    const [instArr, coc] = await Promise.all([
+      API.get(`workflow_instances?id=eq.${instId}`).catch(()=>[]),
+      API.get(`workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`).catch(()=>[]),
+    ]);
+    const inst = instArr?.[0];
+    if (!inst) return null;
+    inst._tmplSteps = tmplSteps;
+    return _bistBuildState(inst, tmplSteps||[], coc||[]);
+  }
+
+  try {
+    for (let si = 0; si < spec.steps.length; si++) {
+      const stp = spec.steps[si];
+      onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si, total: spec.steps.length });
+
+      // ── Execute action ──────────────────────────────────────────────────────
+      if (stp.action === 'launch_instance') {
+        const actor   = _bistResolveActor(stp.params?.launched_by);
+        const title   = (stp.params?.title||'BIST — {timestamp}')
+          .replace('{timestamp}', new Date().toISOString());
+        const rows = await API.post('workflow_instances', {
+          firm_id:     FIRM_ID_CAD,
+          template_id: script.template_id,
+          title,
+          status:      'in_progress',
+          launched_by: actor.userId || null,
+          launched_at: new Date().toISOString(),
+          created_at:  new Date().toISOString(),
+        });
+        instId = rows?.[0]?.id;
+        if (!instId) throw new Error('Failed to create instance');
+        // Write launch CoC event
+        await API.post('workflow_step_instances', {
+          instance_id: instId, firm_id: FIRM_ID_CAD,
+          event_type: 'instance_launched', step_type: 'trigger',
+          step_name: 'Instance launched', actor_name: actor.userName,
+          created_at: new Date().toISOString(),
+        });
+        // Auto-activate first step
+        const firstStep = stepBySeq[1];
+        if (firstStep) {
+          await API.post('workflow_step_instances', {
+            instance_id: instId, firm_id: FIRM_ID_CAD,
+            event_type: 'step_activated', template_step_id: firstStep.id,
+            step_type: firstStep.step_type, step_name: firstStep.name,
+            actor_name: 'System', created_at: new Date().toISOString(),
+          });
+        }
+
+      } else if (stp.action === 'complete_step') {
+        const seq   = stp.params?.step_seq;
+        const step  = stepBySeq[seq];
+        if (!step) throw new Error(`No step at sequence ${seq}`);
+        const actor = _bistResolveActor(stp.params?.actor);
+        // Write step_completed
+        await API.post('workflow_step_instances', {
+          instance_id: instId, firm_id: FIRM_ID_CAD,
+          event_type: 'step_completed', template_step_id: step.id,
+          step_type: step.step_type, step_name: step.name,
+          outcome: stp.params?.outcome || null,
+          event_notes: stp.params?.notes || null,
+          actor_name: actor.userName,
+          created_at: new Date().toISOString(),
+        });
+        // Auto-activate next step
+        const nextStep = stepBySeq[seq + 1];
+        if (nextStep) {
+          await API.post('workflow_step_instances', {
+            instance_id: instId, firm_id: FIRM_ID_CAD,
+            event_type: 'step_activated', template_step_id: nextStep.id,
+            step_type: nextStep.step_type, step_name: nextStep.name,
+            actor_name: 'System', created_at: new Date().toISOString(),
+          });
+        }
+
+      } else if (stp.action === 'wait') {
+        await new Promise(r => setTimeout(r, stp.params?.ms || 100));
+
+      } else if (stp.action === 'assert_only') {
+        // No action — just fall through to assertions below
+      }
+
+      // ── Evaluate assertions ─────────────────────────────────────────────────
+      if (stp.asserts?.length) {
+        const state = await reloadState();
+        if (!state) throw new Error('Could not reload instance state');
+
+        for (const assert of stp.asserts) {
+          const pass = _bistAssert(assert, state);
+          if (!pass) {
+            const actual = _bistEval(assert.check, state);
+            const expected = assert.eq ?? assert.gte ?? assert.lte ??
+              assert.contains ?? assert.not_eq ?? '(exists check)';
+            const reason = `${assert.check}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
+            onProgress?.({ type:'step_fail', stepId: stp.id, stepIdx: si, reason });
+            // Update run record as failed
+            await API.patch(`bist_runs?id=eq.${runId}`, {
+              status:          'failed',
+              steps_passed:    stepsPassed,
+              steps_failed:    1,
+              failure_step:    stp.id,
+              failure_reason:  reason,
+              failure_assertion: assert,
+              instance_id:     instId,
+              duration_ms:     Date.now() - runStart,
+            }).catch(()=>{});
+            // Cleanup
+            await _bistCleanup(instId, spec.cleanup);
+            return { status:'failed', runId, reason, failedStep: stp.id };
+          }
+        }
+      }
+
+      stepsPassed++;
+      onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si });
+    }
+
+    // All steps passed
+    await API.patch(`bist_runs?id=eq.${runId}`, {
+      status:       'passed',
+      steps_passed: stepsPassed,
+      steps_failed: 0,
+      instance_id:  instId,
+      duration_ms:  Date.now() - runStart,
+    }).catch(()=>{});
+
+    await _bistCleanup(instId, spec.cleanup);
+    onProgress?.({ type:'complete', status:'passed' });
+    return { status:'passed', runId };
+
+  } catch(e) {
+    await API.patch(`bist_runs?id=eq.${runId}`, {
+      status:        'error',
+      failure_reason: e.message,
+      instance_id:   instId,
+      duration_ms:   Date.now() - runStart,
+    }).catch(()=>{});
+    await _bistCleanup(instId, spec.cleanup);
+    onProgress?.({ type:'error', message: e.message });
+    return { status:'error', runId, reason: e.message };
+  }
+}
+
+async function _bistCleanup(instId, mode) {
+  if (!instId || mode === 'keep') return;
+  if (mode === 'suspend') {
+    await API.patch(`workflow_instances?id=eq.${instId}`,
+      { status:'overridden', notes:'BIST cleanup', updated_at: new Date().toISOString() }
+    ).catch(()=>{});
+    return;
+  }
+  // default: delete
+  await API.del(`workflow_step_instances?instance_id=eq.${instId}`).catch(()=>{});
+  await API.del(`workflow_instances?id=eq.${instId}`).catch(()=>{});
+}
+
+// ── Gate check — returns tier and results ─────────────────────────────────────
+async function runGateCheck(templateId, version) {
+  const [scripts, allRuns] = await Promise.all([
+    API.get(`bist_test_scripts?template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
+    API.get(`bist_runs?template_version=eq.${version}&order=run_at.desc&limit=200`).catch(()=>[]),
+  ]);
+
+  if (!scripts?.length) return { tier: 0, results: [] };
+
+  const results = (scripts||[]).map(s => {
+    const latestRun = (allRuns||[]).find(r => r.script_id === s.id);
+    const state = !latestRun            ? 'not_run'
+                : latestRun.status === 'passed' ? 'passed'
+                : 'failed';
+    return { script: s, run: latestRun || null, state };
+  });
+
+  const failed  = results.filter(r => r.state === 'failed');
+  const notRun  = results.filter(r => r.state === 'not_run');
+
+  if (failed.length)  return { tier: 2, results, failed };
+  if (notRun.length)  return { tier: 1, results, notRun };
+  return { tier: 3, results };
+}
+
+// ── Gate dialog — shows coverage table and run controls ───────────────────────
+async function showGateDialog(templateId, version, onProceed) {
+  // Remove any existing dialog
+  document.getElementById('bist-gate-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bist-gate-overlay';
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;z-index:9999`;
+
+  async function render(gateResult) {
+    const { tier, results } = gateResult;
+
+    const tierColor   = tier===3?'var(--green)':tier===0?'var(--amber)':'var(--red)';
+    const tierLabel   = tier===3?'All tests passing'
+                      : tier===2?'Tests failing — cannot release'
+                      : tier===1?'Tests not run against this version'
+                      : 'No test coverage';
+    const tierIcon    = tier===3?'✓':tier===0?'⚠':'✕';
+
+    const rowsHtml = results.map(r => {
+      const stateColor = r.state==='passed'?'var(--green)'
+                       : r.state==='failed'?'var(--red)':'var(--muted)';
+      const stateIcon  = r.state==='passed'?'✓':r.state==='failed'?'✕':'○';
+      const runInfo    = r.run
+        ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">
+             v${escHtml(r.run.template_version||'?')} · 
+             ${new Date(r.run.run_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+           </span>`
+        : `<span style="font-size:9px;color:var(--muted)">Never run</span>`;
+      const failDetail = r.state==='failed' && r.run?.failure_reason
+        ? `<div style="font-size:10px;color:var(--red);margin-top:2px;padding:2px 6px;
+             background:rgba(192,64,74,.08);border-left:2px solid var(--red);
+             font-family:var(--font-mono)">${escHtml(r.run.failure_reason)}</div>` : '';
+      return `
+        <div id="bist-row-${r.script.id}"
+          style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:3px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="color:${stateColor};font-size:12px;width:14px;flex-shrink:0">${stateIcon}</span>
+            <span style="font-size:12px;color:var(--text);flex:1">${escHtml(r.script.name)}</span>
+            ${runInfo}
+          </div>
+          ${failDetail}
+        </div>`;
+    }).join('');
+
+    const canRunAll = tier !== 3;
+    overlay.innerHTML = `
+      <div style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;
+        width:480px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+        <!-- Header -->
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);
+          display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Release gate</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--font-mono)">
+              v${escHtml(version)}
+            </div>
+          </div>
+          <button onclick="document.getElementById('bist-gate-overlay').remove()"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0">✕</button>
+        </div>
+        <!-- Status banner -->
+        <div style="padding:10px 16px;background:${tierColor}18;border-bottom:1px solid ${tierColor}44;
+          display:flex;align-items:center;gap:8px">
+          <span style="color:${tierColor};font-size:14px">${tierIcon}</span>
+          <span style="font-size:12px;font-weight:500;color:${tierColor}">${tierLabel}</span>
+        </div>
+        <!-- Test rows -->
+        <div style="flex:1;overflow-y:auto;padding:0 16px">
+          ${results.length
+            ? rowsHtml
+            : `<div style="font-size:12px;color:var(--muted);padding:16px 0;text-align:center">
+                No test scripts found for this template.
+               </div>`}
+        </div>
+        <!-- Footer actions -->
+        <div style="padding:12px 16px;border-top:1px solid var(--border);
+          display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${tier === 0 ? `
+            <div style="flex:1;font-size:11px;color:var(--muted)">
+              No tests — releasing without validation
+            </div>
+            <button id="bist-proceed-btn" onclick="bistProceed()"
+              style="padding:7px 16px;background:var(--amber);color:#000;border:none;
+                border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+              Release anyway
+            </button>` : ''}
+          ${tier === 1 || tier === 2 ? `
+            <button id="bist-run-btn" onclick="bistRunAll('${templateId}','${version}')"
+              style="padding:7px 16px;background:var(--cad);color:#fff;border:none;
+                border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+              ▶ Run all tests
+            </button>` : ''}
+          ${tier === 3 ? `
+            <div style="flex:1;font-size:11px;color:var(--green)">
+              ✓ All tests passing — ready to release
+            </div>
+            <button id="bist-proceed-btn" onclick="bistProceed()"
+              style="padding:7px 16px;background:var(--green);color:#fff;border:none;
+                border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+              Release
+            </button>` : ''}
+          <button onclick="bistOverride()"
+            style="padding:7px 12px;background:none;border:1px solid var(--border);
+              border-radius:5px;font-size:11px;color:var(--muted);cursor:pointer">
+            Override…
+          </button>
+        </div>
+      </div>`;
+
+    // Expose gate callbacks on window for inline onclick handlers
+    window._bistOnProceed = onProceed;
+  }
+
+  await render(await runGateCheck(templateId, version));
+  document.body.appendChild(overlay);
+}
+
+// Gate action callbacks
+function bistProceed() {
+  document.getElementById('bist-gate-overlay')?.remove();
+  window._bistOnProceed?.();
+}
+
+async function bistRunAll(templateId, version) {
+  const btn = document.getElementById('bist-run-btn');
+  if (btn) { btn.textContent = 'Running…'; btn.disabled = true; }
+
+  const scripts = await API.get(`bist_test_scripts?template_id=eq.${templateId}`).catch(()=>[]);
+  if (!scripts?.length) return;
+
+  for (const script of scripts) {
+    const rowEl = document.getElementById(`bist-row-${script.id}`);
+    if (rowEl) rowEl.querySelector('span').textContent = '…';
+
+    const result = await runBistScript(script.id, ({ type, reason }) => {
+      if (type === 'step_pass' || type === 'step_fail') {
+        const icon = rowEl?.querySelector('span:first-child');
+        if (icon) icon.textContent = type === 'step_pass' ? '…' : '✕';
+      }
+    });
+
+    if (rowEl) {
+      const icon  = rowEl.querySelector('span:first-child');
+      const color = result.status === 'passed' ? 'var(--green)' : 'var(--red)';
+      if (icon) { icon.textContent = result.status === 'passed' ? '✓' : '✕'; icon.style.color = color; }
+      if (result.status !== 'passed' && result.reason) {
+        const detail = document.createElement('div');
+        detail.style.cssText = `font-size:10px;color:var(--red);margin-top:2px;padding:2px 6px;
+          background:rgba(192,64,74,.08);border-left:2px solid var(--red);font-family:var(--font-mono)`;
+        detail.textContent = result.reason;
+        rowEl.appendChild(detail);
+      }
+    }
+  }
+
+  // Re-check gate after all runs
+  const gate = await runGateCheck(templateId, version);
+  if (gate.tier === 3) {
+    // All passing — update banner and show Release button
+    const banner = document.querySelector('#bist-gate-overlay [style*="Release gate"]')
+      ?.closest('div')?.nextElementSibling;
+    const footer = document.querySelector('#bist-gate-overlay [style*="border-top"]');
+    if (banner) {
+      banner.style.background = 'var(--green)18';
+      banner.style.borderColor = 'var(--green)44';
+      banner.querySelector('span').textContent = '✓';
+      banner.querySelector('span:last-child').textContent = 'All tests passing — ready to release';
+    }
+    if (footer) {
+      footer.innerHTML = `
+        <div style="flex:1;font-size:11px;color:var(--green)">✓ All tests passing</div>
+        <button id="bist-proceed-btn" onclick="bistProceed()"
+          style="padding:7px 16px;background:var(--green);color:#fff;border:none;
+            border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+          Release
+        </button>
+        <button onclick="bistOverride()"
+          style="padding:7px 12px;background:none;border:1px solid var(--border);
+            border-radius:5px;font-size:11px;color:var(--muted);cursor:pointer">
+          Override…
+        </button>`;
+    }
+  } else {
+    if (btn) { btn.textContent = '▶ Run all tests'; btn.disabled = false; }
+  }
+}
+
+async function bistOverride() {
+  const reason = prompt('Override reason (required — this will be recorded permanently in the Chain of Custody):');
+  if (!reason?.trim()) return;
+  // Write override CoC entry
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+  await API.post('workflow_template_coc', {
+    firm_id:         FIRM_ID_CAD,
+    template_id:     _selectedTmpl?.id,
+    event_type:      'bist_override',
+    changed_by:      _myResourceId || null,
+    changed_by_name: authorName,
+    note:            `Released without passing tests — ${reason}`,
+    version_at:      _selectedTmpl?.version,
+    created_at:      new Date().toISOString(),
+  }).catch(()=>{});
+  document.getElementById('bist-gate-overlay')?.remove();
+  window._bistOnProceed?.();
+}
+
 function onStatusChange() {
   const sel = document.getElementById('tmpl-status-sel');
   const newStatus = sel?.value;
@@ -2928,6 +3454,7 @@ function renderTmplCoC(rows) {
     status_changed: 'var(--accent)',
     step_modified:  'var(--cad)',
     field_changed:  'var(--text2)',
+    bist_override:  'var(--amber)',
   };
   const evtLabel = {
     released:       'Released',
@@ -2935,6 +3462,7 @@ function renderTmplCoC(rows) {
     status_changed: 'Status Changed',
     step_modified:  'Step Modified',
     field_changed:  'Step Modified',
+    bist_override:  'Release Override',
   };
 
   function fmtTs(ts) {
