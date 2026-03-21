@@ -269,14 +269,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   font-family:var(--font-mono);font-size:9px;padding:2px 7px;
   border-radius:3px;border:1px solid;flex-shrink:0;
 }
-.spine-delete{
-  position:absolute;top:8px;right:8px;
-  background:none;border:none;color:var(--muted);
-  cursor:pointer;font-size:13px;opacity:0;transition:opacity .15s;
-  padding:2px 4px;border-radius:3px;
+.spine-delete{display:none} /* legacy — replaced by inline */
+.spine-delete-inline{
+  background:none;border:1px solid transparent;
+  color:var(--muted);cursor:pointer;font-size:12px;
+  opacity:0;transition:all .15s;
+  padding:2px 5px;border-radius:4px;flex-shrink:0;
 }
-.spine-card:hover .spine-delete{opacity:.5}
-.spine-delete:hover{opacity:1 !important;color:var(--red)}
+.spine-card:hover .spine-delete-inline{opacity:.6}
+.spine-delete-inline:hover{opacity:1 !important;background:rgba(192,64,74,.15);border-color:rgba(192,64,74,.4);color:var(--red)}
 
 .spine-drag-handle{
   font-size:14px;color:var(--muted);cursor:grab;
@@ -287,7 +288,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .spine-drag-handle:hover{opacity:1 !important;color:var(--text2)}
 .spine-step.drag-over-top{border-top:2px solid var(--cad);margin-top:-2px}
 .spine-step.drag-over-bottom{border-bottom:2px solid var(--cad)}
-.spine-step.dragging{opacity:.4}
+.spine-step.dragging .spine-card{
+  opacity:.6;
+  border-color:var(--cad) !important;
+  box-shadow:0 0 0 2px rgba(0,210,255,.25);
+  background:rgba(0,210,255,.06) !important;
+}
 
 /* step type node colours */
 .sn-trigger{background:var(--step-trigger);border-color:rgba(192,64,74,.4);color:var(--step-trigger-c)}
@@ -892,9 +898,6 @@ function renderSpine() {
           <!-- Card header — always visible -->
           <div class="spine-card${sel?' selected':''}" style="border-radius:${sel?'6px 6px 0 0':'6px'}"
             onclick="selectStep('${step.id}')">
-            ${!step._virtual ? `<button class="spine-delete"
-              onclick="event.stopPropagation();removeStep('${step.id}')"
-              title="Delete step">🗑</button>` : ''}
             <div class="spine-card-row">
               <div>
                 <div class="spine-card-name">${escHtml(step.name || meta.label)}</div>
@@ -916,11 +919,14 @@ function renderSpine() {
                   ${step.forward_input ? `<span style="color:var(--amber)">⬆ forwards</span>` : ''}
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
                 <span class="spine-card-badge"
                   style="background:${meta.badgeColor};color:${meta.badgeText};border-color:${meta.badgeText}40">
                   ${meta.label.toUpperCase()}
                 </span>
+                ${!step._virtual ? `<button class="spine-delete-inline"
+                  onclick="event.stopPropagation();removeStep('${step.id}')"
+                  title="Delete step">🗑</button>` : ''}
                 <span style="font-size:10px;color:var(--muted);transition:transform .15s;
                   transform:rotate(${sel?'180':'0'}deg)">▼</span>
               </div>
@@ -1964,8 +1970,21 @@ async function saveTemplate(silent = false) {
     await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, patch);
     Object.assign(_selectedTmpl, patch);
 
-    // 2. Upsert steps
+    // 2. Save steps
+    // Strategy: to avoid unique constraint on (template_id, sequence_order) during reorder,
+    // first shift all existing steps to temp high sequence_orders, then save real values.
     const steps = _selectedTmpl.steps || [];
+    const existingIds = steps.filter(s => !s._new).map(s => s.id);
+
+    if (existingIds.length > 0) {
+      // Pass 1: set all to temp values (sequence_order + 10000) to clear the constraint
+      for (const step of steps.filter(s => !s._new)) {
+        await API.patch(`workflow_template_steps?id=eq.${step.id}`,
+          { sequence_order: step.sequence_order + 10000 });
+      }
+    }
+
+    // Pass 2: upsert with real values
     for (const step of steps) {
       const stepPayload = {
         template_id:         _selectedTmpl.id,
