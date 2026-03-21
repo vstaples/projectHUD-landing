@@ -560,30 +560,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 }
 @keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
 
-/* ── Step threaded comments ───────────────────────────────────────────── */
-.step-comments-container{max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:6px 6px 0 0;background:var(--bg1)}
-.comment-item{padding:10px 14px;border-bottom:1px solid var(--border)}
-.comment-item:last-child{border-bottom:none}
-.comment-reply-item{padding:8px 14px 8px 36px;border-bottom:1px solid rgba(255,255,255,.03);background:rgba(255,255,255,.015)}
-.comment-reply-item:last-child{border-bottom:none}
-.comment-header{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.comment-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.25)}
-.comment-author{font-size:12px;font-weight:600;color:var(--text);flex:1}
-.comment-ts{font-size:10px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap}
-.comment-body{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:4px}
-.comment-reply-btn{background:none;border:none;font-size:10px;color:var(--muted);cursor:pointer;padding:0;letter-spacing:.04em}
-.comment-reply-btn:hover{color:var(--accent)}
-.comment-reply-compose{margin:6px 0 0 0;display:none}
-.comment-reply-compose.open{display:flex;gap:6px;align-items:flex-end}
-.comment-reply-compose textarea{flex:1;padding:6px 8px;font-size:11px;font-family:inherit;background:var(--surf2);border:1px solid var(--border2);color:var(--text);resize:none;min-height:46px;border-radius:4px;outline:none}
-.comment-reply-compose textarea:focus{border-color:var(--accent)}
-.comment-reply-compose button{padding:5px 10px;background:var(--accent);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;border-radius:4px;white-space:nowrap;flex-shrink:0}
-.comment-compose{display:flex;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;overflow:hidden}
-.comment-compose-input{flex:1;padding:9px 12px;font-size:12px;font-family:inherit;background:var(--surf2);border:none;color:var(--text);resize:none;min-height:44px;outline:none}
-.comment-compose-input:focus{background:var(--surf3)}
-.comment-send-btn{padding:0 16px;background:var(--accent);border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;transition:opacity .15s}
-.comment-send-btn:hover{opacity:.85}
-.comments-empty{padding:16px;font-size:11px;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
@@ -1498,23 +1474,7 @@ function renderInlineStepConfig(step) {
 
     </div>
 
-    <!-- Discussion & Comments — meeting steps only, below documents -->
-    ${step.step_type === 'meeting' ? `
-    <div style="padding:10px 14px 0">
-      <label class="config-label" style="margin-bottom:8px">Discussion &amp; Comments</label>
-      <div id="step-comments-${step.id}" class="step-comments-container">
-        <div class="comments-loading" style="font-size:11px;color:var(--muted);padding:8px 0">
-          Loading comments…
-        </div>
-      </div>
-      <div class="comment-compose" id="compose-${step.id}">
-        <textarea class="comment-compose-input" id="compose-input-${step.id}"
-          placeholder="Add a comment… (Ctrl+Enter to send)"
-          onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitComment('${step.id}',null)}"></textarea>
-        <button class="comment-send-btn"
-          onclick="submitComment('${step.id}',null)">Send</button>
-      </div>
-    </div>` : ''}`; 
+    `; 
 }
 
 // ── Document attachment handlers ──────────────────────────────────────────────
@@ -1837,10 +1797,7 @@ function selectStep(id) {
       : (_selectedTmpl?.steps?.find(s => s.id === id) || null);
   }
   reRenderSpine();
-  // Load comments if this is a meeting step being expanded
-  if (_selectedStep && _selectedStep.step_type === 'meeting') {
-    setTimeout(() => loadStepComments(_selectedStep.id), 80);
-  }
+  // Comments on meeting steps are instance-only — not applicable in template editor
 }
 
 function refreshConfigPanel() { reRenderSpine(); } // backwards compat shim
@@ -3559,119 +3516,6 @@ API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_n
     return da < db ? -1 : da > db ? 1 : a.name.localeCompare(b.name);
   }); })
   .catch(() => {});
-
-// ── Inline meeting object functions ──────────────────────────────────────────
-const _commentsCache = {}; // stepId → [{id,parent_id,author_name,body,created_at,replies:[]}]
-
-async function loadStepComments(stepId) {
-  try {
-    const rows = await API.get(
-      `workflow_step_comments?template_step_id=eq.${stepId}&order=created_at.asc`
-    ).catch(() => []);
-    // Build threaded tree: top-level + replies
-    const topLevel = rows.filter(r => !r.parent_id);
-    topLevel.forEach(c => {
-      c.replies = rows.filter(r => r.parent_id === c.id);
-    });
-    _commentsCache[stepId] = topLevel;
-    renderStepComments(stepId);
-  } catch(e) { console.warn('Comments load failed:', e); }
-}
-
-function renderStepComments(stepId) {
-  const el = document.getElementById('step-comments-' + stepId);
-  if (!el) return;
-  const comments = _commentsCache[stepId] || [];
-
-  if (!comments.length) {
-    el.innerHTML = '<div class="comments-empty">No comments yet — be the first to add one.</div>';
-    return;
-  }
-
-  function fmtTs(ts) {
-    if (!ts) return '';
-    const d = new Date(ts);
-    return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
-      + ', ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-  }
-
-  function initials(name) {
-    return (name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  }
-
-  function renderComment(c, isReply = false) {
-    const cls = isReply ? 'comment-reply-item' : 'comment-item';
-    const replySection = !isReply ? `
-      <div class="comment-reply-compose" id="reply-compose-${c.id}">
-        <textarea placeholder="Reply…"
-          id="reply-input-${c.id}"
-          onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitComment('${stepId}','${c.id}')}"></textarea>
-        <button onclick="submitComment('${stepId}','${c.id}')">Reply</button>
-      </div>` : '';
-
-    const replies = (c.replies||[]).map(r => renderComment(r, true)).join('');
-
-    return `
-      <div class="${cls}" id="comment-${c.id}">
-        <div class="comment-header">
-          <div class="comment-avatar">${initials(c.author_name)}</div>
-          <span class="comment-author">${escHtml(c.author_name||'Unknown')}</span>
-          <span class="comment-ts">${fmtTs(c.created_at)}</span>
-          ${!isReply ? `<button class="comment-reply-btn" onclick="toggleReplyCompose('${c.id}')">↩ Reply</button>` : ''}
-        </div>
-        <div class="comment-body">${escHtml(c.body)}</div>
-        ${replySection}
-        ${replies}
-      </div>`;
-  }
-
-  el.innerHTML = comments.map(c => renderComment(c)).join('');
-  // Scroll to bottom
-  el.scrollTop = el.scrollHeight;
-}
-
-function toggleReplyCompose(commentId) {
-  const el = document.getElementById('reply-compose-' + commentId);
-  if (!el) return;
-  el.classList.toggle('open');
-  if (el.classList.contains('open')) {
-    document.getElementById('reply-input-' + commentId)?.focus();
-  }
-}
-
-async function submitComment(stepId, parentId) {
-  const inputEl = parentId
-    ? document.getElementById('reply-input-' + parentId)
-    : document.getElementById('compose-input-' + stepId);
-  const body = inputEl?.value?.trim();
-  if (!body) return;
-
-  const btn = parentId
-    ? inputEl?.nextElementSibling
-    : document.getElementById('compose-' + stepId)?.querySelector('.comment-send-btn');
-  if (btn) { btn.textContent = '…'; btn.disabled = true; }
-
-  try {
-    await API.post('workflow_step_comments', {
-      firm_id:          FIRM_ID_CAD,
-      template_step_id: stepId,
-      parent_id:        parentId || null,
-      author_name:      _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
-      author_resource_id: _myResourceId || null,
-      body,
-      created_at:       new Date().toISOString(),
-    });
-    inputEl.value = '';
-    if (parentId) {
-      document.getElementById('reply-compose-' + parentId)?.classList.remove('open');
-    }
-    await loadStepComments(stepId);
-  } catch(e) {
-    cadToast('Comment failed: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.textContent = parentId ? 'Reply' : 'Send'; btn.disabled = false; }
-  }
-}
 
 function escHtml(s) {
   return (s || '').toString()
