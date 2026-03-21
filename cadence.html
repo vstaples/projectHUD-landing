@@ -103,7 +103,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   display:flex;flex-direction:column;
   background:var(--bg1);
 }
-.cad-editor-col{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.cad-editor-col{flex:1;display:flex;flex-direction:row;overflow:hidden}
+.cad-editor-inner{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 
 /* ── List col ── */
 .list-col-header{
@@ -130,9 +131,51 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   font-size:9px;padding:1px 6px;border-radius:3px;
   font-family:var(--font-mono);letter-spacing:.06em;
 }
-.tmpl-status.draft{color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border)}
-.tmpl-status.active{color:var(--green);background:rgba(42,157,64,.1);border:1px solid rgba(42,157,64,.25)}
+.tmpl-status.draft{color:var(--amber);background:rgba(212,144,31,.1);border:1px solid rgba(212,144,31,.3)}
+.tmpl-status.released{color:var(--green);background:rgba(42,157,64,.1);border:1px solid rgba(42,157,64,.25)}
 .tmpl-status.archived{color:var(--text3);background:transparent;border:1px solid var(--border)}
+
+/* template card draft state — amber left border */
+.tmpl-item.status-draft{border-left:2px solid rgba(212,144,31,.5)}
+.tmpl-item.status-released{border-left:2px solid rgba(42,157,64,.4)}
+.tmpl-item-name.status-draft{color:var(--amber)}
+
+/* ── Template CoC panel ── */
+.tmpl-coc-panel{
+  width:0;flex-shrink:0;overflow:hidden;
+  border-left:1px solid transparent;
+  background:var(--bg1);
+  display:flex;flex-direction:column;
+  transition:width .22s ease, border-color .22s ease;
+}
+.tmpl-coc-panel.open{
+  width:280px;
+  border-left-color:var(--border);
+}
+.tmpl-coc-header{
+  padding:12px 14px 10px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.tmpl-coc-title{
+  font-size:9px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);
+}
+.tmpl-coc-body{flex:1;overflow-y:auto;padding:10px 12px}
+.tmpl-coc-body::-webkit-scrollbar{width:3px}
+.tmpl-coc-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.tmpl-coc-event{
+  display:flex;gap:8px;padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:11px;
+}
+.tmpl-coc-event:last-child{border-bottom:none}
+.tmpl-coc-dot{
+  width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;
+}
+.tmpl-coc-body-text{flex:1;line-height:1.45}
+.tmpl-coc-who{font-size:10px;color:var(--muted);margin-top:2px}
 
 /* ── Editor col ── */
 .editor-empty{
@@ -648,6 +691,7 @@ let _instances      = [];
 let _selectedTmpl   = null;   // full template object with .steps[]
 let _selectedStep   = null;   // step object currently in config panel
 let _dirtySteps     = false;  // unsaved changes flag
+let _structuralChange = false; // true when steps added/deleted since last save
 let _autoSaveTimer  = null;   // setInterval handle
 let _lastSavedAt    = null;   // Date of last successful auto-save
 
@@ -738,14 +782,19 @@ function renderTemplateList() {
       <div style="margin-top:8px"><button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">Create First Template</button></div>
     </div>`;
   }
-  return _templates.map(t => `
-    <div class="tmpl-item${_selectedTmpl?.id===t.id?' active':''}" onclick="selectTemplate('${t.id}')">
-      <div class="tmpl-item-name">${escHtml(t.name)}</div>
+  return _templates.map(t => {
+    const ver = t.version || '0.0.0';
+    const st  = t.status || 'draft';
+    return `
+    <div class="tmpl-item status-${st}${_selectedTmpl?.id===t.id?' active':''}" onclick="selectTemplate('${t.id}')">
+      <div class="tmpl-item-name status-${st}">${escHtml(t.name)}</div>
       <div class="tmpl-item-meta">
-        <span class="tmpl-status ${t.status}">${t.status.toUpperCase()}</span>
+        <span class="tmpl-status ${st}">${st.toUpperCase()}</span>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${escHtml(ver)}</span>
         <span>${t.trigger_type.replace(/_/g,' ')}</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderEditorEmpty() {
@@ -789,6 +838,7 @@ async function selectTemplate(id) {
   _selectedTmpl.steps = steps || [];
   _selectedStep = null;
   _lastSavedAt  = null;
+  _structuralChange = false;
 
   // Re-render list to update active state
   const listEl = document.getElementById('tmpl-list');
@@ -802,16 +852,41 @@ function renderEditor() {
   if (!col || !_selectedTmpl) return;
 
   const t = _selectedTmpl;
-  col.innerHTML = `
+  const ver = t.version || '0.0.0';
+
+  // Ensure CoC panel wrapper exists in editor-col
+  if (!document.getElementById('tmpl-coc-panel')) {
+    col.innerHTML = `
+      <div class="cad-editor-inner" id="editor-inner"></div>
+      <div class="tmpl-coc-panel" id="tmpl-coc-panel">
+        <div class="tmpl-coc-header">
+          <span class="tmpl-coc-title">Change History</span>
+          <button onclick="toggleTmplCoC()" style="background:none;border:none;
+            color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
+        </div>
+        <div class="tmpl-coc-body" id="tmpl-coc-body">
+          <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">
+            Loading…
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const inner = document.getElementById('editor-inner');
+  if (!inner) return;
+
+  inner.innerHTML = `
     <!-- Toolbar -->
     <div class="editor-toolbar">
       <input class="editor-title-input" id="tmpl-name-input"
         value="${escHtml(t.name)}" placeholder="Template name..."
         oninput="markDirty()" />
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);
+        flex-shrink:0;padding:0 4px" title="Version">${escHtml(ver)}</span>
       <select class="config-select" style="width:auto;font-size:11px" id="tmpl-status-sel"
-        onchange="markDirty()">
+        onchange="onStatusChange()">
         <option value="draft"${t.status==='draft'?' selected':''}>Draft</option>
-        <option value="active"${t.status==='active'?' selected':''}>Active</option>
+        <option value="released"${t.status==='released'?' selected':''}>Released</option>
         <option value="archived"${t.status==='archived'?' selected':''}>Archived</option>
       </select>
       <!-- Auto-save status indicator -->
@@ -824,6 +899,8 @@ function renderEditor() {
       </span>
       <div style="display:flex;gap:6px;margin-left:8px">
         <button class="btn btn-ghost btn-sm" onclick="launchInstance()">▶ Launch</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleTmplCoC()" id="coc-btn"
+          title="Change history">CoC</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
         <button class="btn btn-solid btn-sm" id="save-btn" onclick="saveTemplate()">Save</button>
       </div>
@@ -1906,6 +1983,7 @@ function addStep(type) {
   _selectedTmpl.steps.push(newStep);
   _selectedStep = newStep;
   _dirtySteps = true;
+  _structuralChange = true;
 
   reRenderSpine();
   // Hide AI banner
@@ -1983,6 +2061,7 @@ function removeStep(id) {
   _selectedTmpl.steps.forEach((s, i) => s.sequence_order = i + 1);
   if (_selectedStep?.id === id) _selectedStep = null;
   _dirtySteps = true;
+  _structuralChange = true;
   reRenderSpine();
 }
 
@@ -1999,12 +2078,64 @@ async function saveTemplate(silent = false) {
     const triggerEl = document.getElementById('tmpl-trigger-sel');
     const descEl    = document.getElementById('tmpl-desc-input');
 
+    const newStatus = statusEl?.value || _selectedTmpl.status;
+    const oldStatus = _selectedTmpl.status;
+
+    // ── Version calculation ────────────────────────────────────────────────────
+    let maj = _selectedTmpl.version_major || 0;
+    let min = _selectedTmpl.version_minor || 0;
+    let pat = _selectedTmpl.version_patch || 0;
+
+    // Releasing: bump major, reset minor+patch
+    if (newStatus === 'released' && oldStatus !== 'released') {
+      maj += 1; min = 0; pat = 0;
+    }
+    // Back to draft from released: no version bump on status change itself —
+    // version bumps happen when steps change
+    else if (newStatus === 'draft' && oldStatus === 'released') {
+      // no bump on status change — bumps come from step edits below
+    }
+    // Step structure changed (add/delete)
+    else if (_structuralChange && newStatus !== 'released') {
+      min += 1; pat = 0;
+    }
+    // Step content modified only (no structural change)
+    else if (_dirtySteps && !_structuralChange && newStatus !== 'released') {
+      pat += 1;
+    }
+
+    const newVersion = `${maj}.${min}.${pat}`;
+
+    // ── CoC event type ─────────────────────────────────────────────────────────
+    let cocEventType = 'field_changed';
+    let cocNote      = 'Template saved';
+    if (newStatus === 'released' && oldStatus !== 'released') {
+      cocEventType = 'released';
+      cocNote      = `Released as version ${newVersion}`;
+    } else if (newStatus === 'archived' && oldStatus !== 'archived') {
+      cocEventType = 'archived';
+      cocNote      = 'Template archived';
+    } else if (newStatus === 'draft' && oldStatus !== 'draft') {
+      cocEventType = 'status_changed';
+      cocNote      = `Returned to draft (was ${oldStatus})`;
+    } else if (_structuralChange) {
+      cocEventType = 'step_modified';
+      cocNote      = `Steps added or removed → ${newVersion}`;
+    } else if (_dirtySteps) {
+      cocEventType = 'step_modified';
+      cocNote      = `Step content modified → ${newVersion}`;
+    }
+
     const patch = {
-      name:         nameEl?.value?.trim()  || _selectedTmpl.name,
-      status:       statusEl?.value        || _selectedTmpl.status,
-      trigger_type: triggerEl?.value       || _selectedTmpl.trigger_type,
-      description:  descEl?.value?.trim()  || null,
-      updated_at:   new Date().toISOString(),
+      name:          nameEl?.value?.trim()  || _selectedTmpl.name,
+      status:        newStatus,
+      trigger_type:  triggerEl?.value       || _selectedTmpl.trigger_type,
+      description:   descEl?.value?.trim()  || null,
+      version:       newVersion,
+      version_major: maj,
+      version_minor: min,
+      version_patch: pat,
+      updated_at:    new Date().toISOString(),
     };
 
     // 1. Save template header
@@ -2046,7 +2177,6 @@ async function saveTemplate(silent = false) {
     });
 
     // Pass A: INSERT new steps using a guaranteed-safe temp sequence_order
-    // (offset by 50000 so they never collide with existing rows)
     const newSteps = steps.filter(s => s._new);
     for (const step of newSteps) {
       const payload = { ...buildStepPayload(step), sequence_order: step.sequence_order + 50000 };
@@ -2054,30 +2184,54 @@ async function saveTemplate(silent = false) {
       if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
     }
 
-    // Pass B: shift ALL rows (new + existing) to temp range (seq + 10000)
-    // This clears the constraint so Pass C can freely assign real values
+    // Pass B: shift ALL rows to temp range
     for (const step of steps) {
       await API.patch(`workflow_template_steps?id=eq.${step.id}`,
         { sequence_order: step.sequence_order + 10000 });
     }
 
-    // Pass C: set real sequence_order and full payload on all steps
+    // Pass C: set real sequence_order and full payload
     for (const step of steps) {
       await API.patch(`workflow_template_steps?id=eq.${step.id}`, buildStepPayload(step));
     }
+
+    // 3. Write CoC event
+    const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+    await API.post('workflow_template_coc', {
+      firm_id:        FIRM_ID_CAD,
+      template_id:    _selectedTmpl.id,
+      event_type:     cocEventType,
+      changed_by:     _myResourceId || null,
+      changed_by_name: authorName,
+      old_value:      oldStatus !== newStatus ? oldStatus : null,
+      new_value:      oldStatus !== newStatus ? newStatus : null,
+      note:           cocNote,
+      version_at:     newVersion,
+      created_at:     new Date().toISOString(),
+    }).catch(() => {}); // CoC write is non-fatal
 
     // Update local list
     const idx = _templates.findIndex(t => t.id === _selectedTmpl.id);
     if (idx >= 0) _templates[idx] = { ..._templates[idx], ...patch };
 
-    _dirtySteps  = false;
-    _lastSavedAt = new Date();
+    _dirtySteps      = false;
+    _structuralChange = false;
+    _lastSavedAt     = new Date();
     _updateAutoSaveIndicator('saved');
     updateBadges();
 
-    // Refresh template list name if changed
+    // Update version display in toolbar
+    const verEl = document.querySelector('.editor-toolbar [title="Version"]');
+    if (verEl) verEl.textContent = newVersion;
+
+    // Refresh template list
     const listEl = document.getElementById('tmpl-list');
     if (listEl) listEl.innerHTML = renderTemplateList();
+
+    // Refresh CoC panel if open
+    if (document.getElementById('tmpl-coc-panel')?.classList.contains('open')) {
+      loadTmplCoC(_selectedTmpl.id);
+    }
 
     if (!silent) cadToast('Template saved', 'success');
 
@@ -2181,7 +2335,96 @@ async function deleteTemplate() {
   }
 }
 
-// ── AI Draft ──────────────────────────────────────────────────────────────────
+// ── Status change handler ─────────────────────────────────────────────────────
+function onStatusChange() {
+  markDirty();
+  // Visual feedback: if changing to released, prompt save immediately
+  const newStatus = document.getElementById('tmpl-status-sel')?.value;
+  if (newStatus === 'released') {
+    cadToast('Set to Released — save to bump version to next major', 'info');
+  }
+}
+
+// ── Template Chain of Custody panel ──────────────────────────────────────────
+function toggleTmplCoC() {
+  const panel  = document.getElementById('tmpl-coc-panel');
+  const cocBtn = document.getElementById('coc-btn');
+  if (!panel) return;
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open');
+  if (cocBtn) {
+    cocBtn.style.color       = opening ? 'var(--cad)'      : '';
+    cocBtn.style.borderColor = opening ? 'var(--cad-wire)' : '';
+    cocBtn.style.background  = opening ? 'var(--cad-dim)'  : '';
+  }
+  if (opening && _selectedTmpl) loadTmplCoC(_selectedTmpl.id);
+}
+
+async function loadTmplCoC(templateId) {
+  const bodyEl = document.getElementById('tmpl-coc-body');
+  if (!bodyEl) return;
+  bodyEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">Loading…</div>';
+  try {
+    const rows = await API.get(
+      `workflow_template_coc?template_id=eq.${templateId}&order=created_at.desc&limit=100`
+    ).catch(() => []);
+    renderTmplCoC(rows || []);
+  } catch(e) {
+    bodyEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:12px">Failed to load history.</div>';
+  }
+}
+
+function renderTmplCoC(rows) {
+  const bodyEl = document.getElementById('tmpl-coc-body');
+  if (!bodyEl) return;
+
+  if (!rows.length) {
+    bodyEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">No history yet.</div>';
+    return;
+  }
+
+  const evtColor = {
+    released:       '#7af0a0',
+    archived:       'var(--muted)',
+    status_changed: 'var(--accent)',
+    step_modified:  'var(--cad)',
+    field_changed:  'var(--text2)',
+  };
+
+  const evtLabel = {
+    released:       'Released',
+    archived:       'Archived',
+    status_changed: 'Status changed',
+    step_modified:  'Steps modified',
+    field_changed:  'Edited',
+  };
+
+  function fmtTs(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  }
+
+  bodyEl.innerHTML = rows.map(e => {
+    const color = evtColor[e.event_type] || 'var(--muted)';
+    const label = evtLabel[e.event_type] || e.event_type?.replace(/_/g,' ');
+    return `
+      <div class="tmpl-coc-event">
+        <div class="tmpl-coc-dot" style="background:${color}"></div>
+        <div class="tmpl-coc-body-text">
+          <div style="color:${color};font-weight:600;font-size:10px;
+            text-transform:uppercase;letter-spacing:.06em">${label}</div>
+          <div style="color:var(--text2);margin-top:1px">${escHtml(e.note || '')}</div>
+          ${e.version_at ? `<div style="font-family:var(--font-mono);font-size:10px;
+            color:var(--muted);margin-top:1px">v${escHtml(e.version_at)}</div>` : ''}
+          <div class="tmpl-coc-who">
+            ${escHtml(e.changed_by_name || 'System')} · ${fmtTs(e.created_at)}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
 async function runAIDraft() {
   const input = document.getElementById('ai-draft-input')?.value?.trim();
   if (!input) { cadToast('Describe your process first', 'info'); return; }
