@@ -398,6 +398,53 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .is-complete{color:var(--green);border-color:rgba(42,157,64,.3);background:rgba(42,157,64,.08)}
 .is-attention{color:var(--red);border-color:rgba(192,64,74,.3);background:rgba(192,64,74,.08)}
 
+/* ── Instance detail view ── */
+.inst-detail{display:flex;flex:1;overflow:hidden;height:100%}
+.inst-detail-spine{
+  width:320px;flex-shrink:0;border-right:1px solid var(--border);
+  overflow-y:auto;background:var(--bg1);display:flex;flex-direction:column;
+}
+.inst-detail-main{flex:1;overflow-y:auto;padding:20px 24px;min-width:0}
+.inst-detail-header{
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.inst-step-row{
+  display:flex;align-items:flex-start;gap:0;padding:0;
+  border-bottom:1px solid var(--border);
+}
+.inst-step-track{
+  width:40px;flex-shrink:0;display:flex;flex-direction:column;
+  align-items:center;padding:12px 0;
+}
+.inst-step-node{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;flex-shrink:0;border:2px solid;
+}
+.inst-step-line{flex:1;width:1px;background:var(--border);margin:3px 0;min-height:12px}
+.inst-step-body{flex:1;padding:10px 12px 10px 0;min-width:0}
+.inst-step-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.inst-step-meta{font-size:10px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.inst-step-row.active .inst-step-body{border-left:2px solid var(--cad);padding-left:10px}
+.inst-step-row.complete .inst-step-node{opacity:.6}
+/* CoC timeline */
+.coc-event{
+  display:flex;gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--border);
+  font-size:12px;
+}
+.coc-event:last-child{border-bottom:none}
+.coc-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  margin-top:4px;
+}
+.coc-event-body{flex:1;min-width:0}
+.coc-event-type{font-size:10px;font-family:var(--font-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.coc-event-name{color:var(--text);font-weight:500;margin:1px 0}
+.coc-event-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.coc-event-notes{font-size:11px;color:var(--text2);margin-top:4px;font-style:italic}
+
 /* Modal overlay */
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;
@@ -600,6 +647,7 @@ function updateBadges() {
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
   if (tab !== 'templates') stopAutoSave();
+  if (tab !== 'instances') _selectedInstance = null;
   _currentTab = tab;
   ['templates','instances','forms','triggers'].forEach(t => {
     document.getElementById('tab-'+t)?.classList.toggle('active', t===tab);
@@ -1990,35 +2038,239 @@ async function confirmLaunch() {
 // ── Instances tab ─────────────────────────────────────────────────────────────
 function renderInstancesTab(el) {
   const statusLabel = { pending:'PENDING', in_progress:'IN PROGRESS', complete:'COMPLETE', cancelled:'CANCELLED', overridden:'OVERRIDDEN' };
-  const statusClass = { pending:'is-pending', in_progress:'is-progress', complete:'is-complete', cancelled:'is-pending', overridden:'is-attention' };
+  const statusColor = { pending:'var(--muted)', in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--muted)', overridden:'var(--amber)' };
 
   el.innerHTML = `
-    <div style="flex:1;overflow:auto;padding:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
-          Active Instances
+    <div style="display:flex;height:100%;overflow:hidden">
+
+      <!-- Left: instance list -->
+      <div style="width:320px;flex-shrink:0;border-right:1px solid var(--border);
+        overflow-y:auto;display:flex;flex-direction:column">
+        <div style="padding:14px 16px 10px;font-size:9px;font-weight:600;
+          letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex-shrink:0">
+          Instances
+        </div>
+        ${!_instances.length
+          ? `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">
+               No instances yet. Launch a template to create one.
+             </div>`
+          : _instances.map(inst => {
+              const tmpl   = _templates.find(t => t.id === inst.template_id);
+              const active = _selectedInstance?.id === inst.id;
+              const color  = statusColor[inst.status] || 'var(--muted)';
+              return `
+              <div onclick="selectInstance('${inst.id}')"
+                style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;
+                  background:${active ? 'var(--surf2)' : 'transparent'};
+                  border-left:3px solid ${active ? 'var(--cad)' : 'transparent'};
+                  transition:background .12s">
+                <div style="font-size:13px;font-weight:500;color:var(--text);
+                  margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                  ${escHtml(inst.title||tmpl?.name||'Untitled')}
+                </div>
+                <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;align-items:center">
+                  <span style="color:${color};font-weight:600;font-size:9px;
+                    letter-spacing:.08em;text-transform:uppercase">${statusLabel[inst.status]||inst.status}</span>
+                  <span>${escHtml(tmpl?.name||'—')}</span>
+                  <span>${inst.launched_at ? new Date(inst.launched_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</span>
+                </div>
+              </div>`;
+            }).join('')}
+      </div>
+
+      <!-- Right: instance detail -->
+      <div id="instance-detail" style="flex:1;overflow-y:auto;min-width:0">
+        ${_selectedInstance
+          ? '' /* filled by renderInstanceDetail() */
+          : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+               height:100%;color:var(--muted);gap:8px">
+               <div style="font-size:32px;opacity:.2">◎</div>
+               <div style="font-size:12px">Select an instance to view its status and history</div>
+             </div>`}
+      </div>
+
+    </div>`;
+
+  // If an instance is already selected, render its detail
+  if (_selectedInstance) {
+    const detailEl = document.getElementById('instance-detail');
+    if (detailEl) renderInstanceDetail(detailEl, _selectedInstance);
+  }
+}
+
+let _selectedInstance = null;
+
+async function selectInstance(id) {
+  _selectedInstance = _instances.find(i => i.id === id) || null;
+  if (!_selectedInstance) return;
+
+  // Re-render the list to update active state
+  renderInstancesTab(document.getElementById('cad-content'));
+
+  // Load step instances (CoC) for this instance
+  const detailEl = document.getElementById('instance-detail');
+  if (!detailEl) return;
+  detailEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px">Loading…</div>`;
+
+  try {
+    const [stepInsts, tmplSteps] = await Promise.all([
+      API.get(`workflow_step_instances?instance_id=eq.${id}&order=created_at.asc`).catch(()=>[]),
+      (() => {
+        const tmpl = _templates.find(t => t.id === _selectedInstance.template_id);
+        return tmpl
+          ? API.get(`workflow_template_steps?template_id=eq.${tmpl.id}&order=sequence_order.asc`).catch(()=>[])
+          : Promise.resolve([]);
+      })(),
+    ]);
+    _selectedInstance._stepInsts  = stepInsts  || [];
+    _selectedInstance._tmplSteps  = tmplSteps  || [];
+    renderInstanceDetail(detailEl, _selectedInstance);
+  } catch(e) {
+    detailEl.innerHTML = `<div style="padding:40px;color:var(--red)">Failed to load: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderInstanceDetail(el, inst) {
+  const tmpl      = _templates.find(t => t.id === inst.template_id);
+  const steps     = inst._tmplSteps  || [];
+  const coc       = inst._stepInsts  || [];
+  const statusColor = { pending:'var(--muted)', in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--muted)', overridden:'var(--amber)' };
+  const evtColor  = {
+    instance_launched:  'var(--cad)',
+    step_activated:     'var(--accent)',
+    step_action:        'var(--green)',
+    step_completed:     'var(--green)',
+    rejected:           'var(--red)',
+    escalation_triggered:'var(--amber)',
+    override:           'var(--amber)',
+    instance_completed: 'var(--green)',
+    token_issued:       'var(--muted)',
+    reminder_sent:      'var(--muted)',
+  };
+  const evtLabel = {
+    instance_launched:   'Instance Launched',
+    step_activated:      'Step Activated',
+    step_action:         'Action Taken',
+    step_completed:      'Step Completed',
+    rejected:            'Rejected',
+    escalation_triggered:'Escalation Triggered',
+    override:            'PM Override',
+    instance_completed:  'Instance Completed',
+    token_issued:        'Token Issued',
+    reminder_sent:       'Reminder Sent',
+  };
+
+  // Build a set of which step IDs have CoC events
+  const activeStepIds = new Set(coc.map(e => e.step_id).filter(Boolean));
+  const completedStepIds = new Set(
+    coc.filter(e => e.event_type === 'step_completed').map(e => e.step_id)
+  );
+  const rejectedStepIds = new Set(
+    coc.filter(e => e.event_type === 'rejected').map(e => e.step_id)
+  );
+
+  el.innerHTML = `
+    <div style="padding:20px 24px;border-bottom:1px solid var(--border);
+      display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px">
+          ${escHtml(inst.title||tmpl?.name||'Untitled Instance')}
+        </div>
+        <div style="font-size:11px;color:var(--muted);display:flex;gap:12px">
+          <span>Template: <strong style="color:var(--text2)">${escHtml(tmpl?.name||'—')}</strong></span>
+          <span>Launched: <strong style="color:var(--text2)">${inst.launched_at ? new Date(inst.launched_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—'}</strong></span>
+          <span>ID: <code style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">${inst.id.substring(0,8)}…</code></span>
         </div>
       </div>
-      ${!_instances.length
-        ? `<div class="list-empty"><div class="icon">◎</div><div>No instances yet.<br/>Launch a template to create one.</div></div>`
-        : `<table class="inst-table">
-            <thead><tr>
-              <th>Title</th><th>Template</th><th>Status</th><th>Launched</th><th>Current Step</th>
-            </tr></thead>
-            <tbody>
-              ${_instances.map(inst => {
-                const tmpl = _templates.find(t => t.id === inst.template_id);
-                return `<tr>
-                  <td style="color:var(--text);font-weight:500">${escHtml(inst.title||'—')}</td>
-                  <td>${escHtml(tmpl?.name||'—')}</td>
-                  <td><span class="inst-status ${statusClass[inst.status]||'is-pending'}">${statusLabel[inst.status]||inst.status}</span></td>
-                  <td>${inst.launched_at ? new Date(inst.launched_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'}</td>
-                  <td style="color:var(--muted)">—</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>`
-      }
+      <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+        color:${statusColor[inst.status]||'var(--muted)'};
+        border:1px solid ${statusColor[inst.status]||'var(--border)'};
+        padding:3px 10px;border-radius:3px;flex-shrink:0">
+        ${inst.status?.replace('_',' ').toUpperCase()||'—'}
+      </span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;height:calc(100% - 73px);overflow:hidden">
+
+      <!-- Step spine -->
+      <div style="border-right:1px solid var(--border);overflow-y:auto;padding:20px">
+        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+          color:var(--muted);margin-bottom:14px">Workflow Steps</div>
+        ${!steps.length
+          ? `<div style="font-size:12px;color:var(--muted)">Template steps not loaded.</div>`
+          : steps.map((s, idx) => {
+              const meta      = STEP_META[s.step_type] || STEP_META.action;
+              const done      = completedStepIds.has(s.id);
+              const rejected  = rejectedStepIds.has(s.id);
+              const touched   = activeStepIds.has(s.id);
+              const nodeColor = done ? 'var(--green)' : rejected ? 'var(--red)' : touched ? 'var(--cad)' : 'var(--surf3)';
+              const textColor = done ? 'var(--green)' : rejected ? 'var(--red)' : touched ? 'var(--text)' : 'var(--muted)';
+              const isLast    = idx === steps.length - 1;
+              return `
+              <div style="display:flex;gap:0;margin-bottom:0">
+                <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
+                  <div style="width:26px;height:26px;border-radius:50%;
+                    background:${nodeColor};border:1.5px solid ${nodeColor};
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:11px;color:${done||rejected||touched?'#fff':meta.badgeText};
+                    flex-shrink:0;font-family:var(--font-hud)">
+                    ${done ? '✓' : rejected ? '✕' : meta.icon}
+                  </div>
+                  ${!isLast ? `<div style="width:2px;flex:1;min-height:24px;background:${touched?'var(--border2)':'var(--border)'};margin:2px 0"></div>` : ''}
+                </div>
+                <div style="flex:1;min-width:0;padding:3px 0 ${isLast?'0':'20px'} 10px">
+                  <div style="font-size:12px;font-weight:500;color:${textColor}">
+                    ${escHtml(s.name||meta.label)}
+                  </div>
+                  <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
+                    <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;
+                      text-transform:uppercase">${meta.label}</span>
+                    ${s.due_days != null ? `<span>⏱ ${s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+'d'}</span>` : ''}
+                    ${done ? `<span style="color:var(--green)">✓ Complete</span>` : ''}
+                    ${rejected ? `<span style="color:var(--red)">✕ Rejected</span>` : ''}
+                    ${touched && !done && !rejected ? `<span style="color:var(--cad)">● Active</span>` : ''}
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
+      </div>
+
+      <!-- Chain of Custody -->
+      <div style="overflow-y:auto;padding:20px">
+        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+          color:var(--muted);margin-bottom:14px">Chain of Custody</div>
+        ${!coc.length
+          ? `<div style="font-size:12px;color:var(--muted)">No events recorded yet.</div>`
+          : coc.map(evt => {
+              const color = evtColor[evt.event_type] || 'var(--muted)';
+              const label = evtLabel[evt.event_type] || evt.event_type?.replace(/_/g,' ');
+              const step  = steps.find(s => s.id === evt.step_id);
+              const ts    = evt.created_at ? new Date(evt.created_at) : null;
+              return `
+              <div style="display:flex;gap:10px;margin-bottom:14px">
+                <!-- Timeline dot -->
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:16px">
+                  <div style="width:8px;height:8px;border-radius:50%;background:${color};
+                    margin-top:3px;flex-shrink:0"></div>
+                  <div style="width:1px;flex:1;min-height:10px;background:var(--border);margin-top:3px"></div>
+                </div>
+                <!-- Event body -->
+                <div style="flex:1;min-width:0;padding-bottom:4px">
+                  <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:11px;font-weight:600;color:${color}">${label}</span>
+                    ${step ? `<span style="font-size:10px;color:var(--muted)">→ ${escHtml(step.name||'')}</span>` : ''}
+                  </div>
+                  ${evt.actor_name ? `<div style="font-size:10px;color:var(--text2);margin-top:1px">By ${escHtml(evt.actor_name)}</div>` : ''}
+                  ${evt.notes ? `<div style="font-size:11px;color:var(--text2);margin-top:3px;
+                    padding:4px 8px;background:var(--surf2);border-radius:3px;
+                    border-left:2px solid ${color}">${escHtml(evt.notes)}</div>` : ''}
+                  ${ts ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--font-mono)">
+                    ${ts.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})}</div>` : ''}
+                </div>
+              </div>`;
+            }).join('')}
+      </div>
+
     </div>`;
 }
 
