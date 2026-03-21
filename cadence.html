@@ -799,9 +799,11 @@ function renderSpine() {
                 <div class="spine-card-name">${escHtml(step.name || meta.label)}</div>
                 <div class="spine-card-meta">
                   ${assigneeLine !== '—' ? `<span>👤 ${escHtml(assigneeLine)}</span>` : ''}
-                  ${step.due_days ? `<span>⏱ ${step.due_type==='before_completion' ? step.due_days+'d before target' : '+'+step.due_days+'d'}</span>` : ''}
+                  ${step.due_days != null ? `<span>⏱ ${step.due_type==='before_completion' ? step.due_days+'d before target' : '+'+step.due_days+'d'}</span>` : ''}
                   ${step.escalate_after_days ? `<span style="color:var(--amber)">↑ escalate d${step.escalate_after_days}</span>` : ''}
                   ${(step._attachedDocs||[]).length ? `<span style="color:var(--cad)">📄 ${step._attachedDocs.length} doc${step._attachedDocs.length>1?'s':''} · ${escHtml(step._attachedDocs[0].version||'')}</span>` : ''}
+                  ${step.require_output ? `<span style="color:var(--amber)">⬆ output required</span>` : ''}
+                  ${step.input_from_step ? `<span style="color:var(--green)">⬇ input from prior step</span>` : ''}
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -923,9 +925,9 @@ function renderInlineStepConfig(step) {
               X days before workflow completion date
             </option>
           </select>
-          <input class="config-input" type="number" min="1" style="width:70px;flex-shrink:0"
-            value="${step.due_days||''}" placeholder="days"
-            oninput="updateStepField('due_days',parseInt(this.value)||null)" />
+          <input class="config-input" type="number" min="0" style="width:70px;flex-shrink:0"
+            value="${step.due_days!=null?step.due_days:''}" placeholder="days"
+            oninput="updateStepField('due_days',this.value===''?null:parseInt(this.value))" />
           <span style="font-size:11px;color:var(--muted)">
             ${(step.due_type||'after_prior')==='after_prior'
               ? 'business days from prior step'
@@ -968,11 +970,54 @@ function renderInlineStepConfig(step) {
           oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
       </div>
 
+      <!-- Output requirement toggle (action/form steps) -->
+      ${step.step_type === 'action' || step.step_type === 'form' ? `
+      <div class="config-section cfg-full">
+        <label class="config-label" style="margin-bottom:8px">Output Document Requirement</label>
+        <div class="config-toggle"
+          onclick="updateStepField('require_output',!${!!step.require_output});reRenderSpine()">
+          <div class="toggle-box${step.require_output?' on':''}"></div>
+          <span style="font-size:11px">${step.require_output
+            ? 'Step cannot advance until completed document is uploaded'
+            : 'Output document optional'}</span>
+        </div>
+      </div>` : ''}
+
+      <!-- Input from prior step (approval/review/signoff/external steps) -->
+      ${step.step_type === 'approval' || step.step_type === 'review' ||
+        step.step_type === 'signoff' || step.step_type === 'external' ? `
+      <div class="config-section cfg-full">
+        <label class="config-label">Input Document — From Prior Step</label>
+        <select class="config-select"
+          onchange="updateStepField('input_from_step',this.value||null)">
+          <option value="">— None (no prior step output required) —</option>
+          ${(_selectedTmpl?.steps||[])
+            .filter(s => s.id !== step.id &&
+              (s.step_type === 'action' || s.step_type === 'form') &&
+              s.require_output)
+            .map(s => `<option value="${s.id}"
+              ${step.input_from_step===s.id?' selected':''}>
+              Step ${s.sequence_order}: ${escHtml(s.name||'Action')}
+              (requires completed doc)
+            </option>`).join('')}
+        </select>
+        ${step.input_from_step ? `
+        <div style="margin-top:6px;font-size:11px;color:var(--green);display:flex;gap:6px;align-items:center">
+          <span>✓</span>
+          <span>When this step activates, the completed document from the selected step
+          will be presented to the approver as a required input.</span>
+        </div>` : `
+        <div style="margin-top:6px;font-size:11px;color:var(--muted)">
+          Only steps with "Require output document" enabled appear here.
+        </div>`}
+      </div>` : ''}
+
     </div>
 
-    <!-- Document / Form attachment zone -->
-    <div style="padding:0 14px;margin-bottom:4px">
-      <label class="config-label" style="margin-bottom:6px">Attached Forms & Documents</label>
+    <!-- Template-attached reference docs (read-only forms for reference) -->
+    <div style="padding:0 14px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">
+      <label class="config-label" style="margin-bottom:0">Reference Forms & Documents</label>
+      <span style="font-size:10px;color:var(--muted)">Attached at template design time — visible to assignee</span>
     </div>
 
     <!-- Attached docs list -->
@@ -996,7 +1041,21 @@ function renderInlineStepConfig(step) {
         </div>`).join('')}
     </div>
 
-    <!-- Drop zone -->
+    <!-- Output zone: where the assignee uploads their completed document at runtime -->
+    ${step.require_output ? `
+    <div style="padding:0 14px 6px;margin-top:10px;border-top:1px solid var(--border)">
+      <label class="config-label" style="margin-bottom:6px;color:var(--amber)">
+        ⬆ OUTPUT ZONE — Assignee uploads completed document here at runtime
+      </label>
+      <div class="doc-drop-zone" style="border-color:rgba(212,144,31,.35);background:rgba(212,144,31,.04);cursor:default;pointer-events:none">
+        <div class="doc-drop-zone-icon" style="opacity:.4">📤</div>
+        <div class="doc-drop-zone-text">
+          Completed scan or filled document uploaded here when instance runs.<br/>
+          <strong style="color:var(--amber)">Step cannot advance until this is filled.</strong>
+        </div>
+      </div>
+    </div>` : `
+    <!-- Drop zone for reference docs -->
     <div class="doc-drop-zone" id="dropzone-${step.id}"
       ondragover="event.preventDefault();this.classList.add('drag-over')"
       ondragleave="this.classList.remove('drag-over')"
@@ -1004,13 +1063,13 @@ function renderInlineStepConfig(step) {
       onclick="document.getElementById('file-input-${step.id}').click()">
       <div class="doc-drop-zone-icon">📂</div>
       <div class="doc-drop-zone-text">
-        <strong>Drop a file here</strong> or click to browse<br/>
-        PDF, Word, Excel, or any document to attach to this step
+        <strong>Drop a reference document here</strong> or click to browse<br/>
+        Blank forms, specs, or instructions visible to the assignee
       </div>
       <input type="file" id="file-input-${step.id}" style="display:none"
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
         multiple onchange="handleDocFileInput(event,'${step.id}')" />
-    </div>`;
+    </div>`}`;
 }
 
 // ── Document attachment handlers ──────────────────────────────────────────────
@@ -1181,7 +1240,8 @@ function updateStepField(field, value) {
   _dirtySteps = true;
   // Only re-render spine for fields that affect the card summary line
   const cardFields = ['name','assignee_name','assignee_email','assignee_role',
-                      'due_days','due_type','escalate_after_days','parallel_required'];
+                      'due_days','due_type','escalate_after_days','parallel_required',
+                      'require_output','input_from_step'];
   if (cardFields.includes(field)) reRenderSpine();
 }
 
@@ -1337,6 +1397,8 @@ async function saveTemplate(silent = false) {
         parallel_required:   !!step.parallel_required,
         branch_conditions:   step.branch_conditions || [],
         instructions:        step.instructions || null,
+        require_output:      !!step.require_output,
+        input_from_step:     step.input_from_step || null,
       };
 
       if (step._new) {
