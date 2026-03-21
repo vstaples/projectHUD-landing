@@ -174,7 +174,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tmpl-coc-dot{
   width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;
 }
-.tmpl-coc-body-text{flex:1;line-height:1.45}
+.tmpl-coc-body-text{flex:1;line-height:1.45;min-width:0}
 .tmpl-coc-who{font-size:10px;color:var(--muted);margin-top:2px}
 
 /* ── Editor col ── */
@@ -671,6 +671,97 @@ let _structuralChange = false; // true when steps added/deleted since last save
 let _versionBumped  = false;  // true once version has been bumped in this draft session
 let _autoSaveTimer  = null;   // setInterval handle
 let _lastSavedAt    = null;   // Date of last successful auto-save
+let _stepSnapshot   = {};     // { stepId: {name, assignee_type, assignee_name, ...} } at load/commit time
+
+// ── Pending change bin — persisted in localStorage per template ───────────────
+const _BIN_PREFIX = 'cadence_pending_';
+
+function _binKey(templateId) { return _BIN_PREFIX + templateId; }
+
+function _binLoad(templateId) {
+  try { return JSON.parse(localStorage.getItem(_binKey(templateId)) || '[]'); }
+  catch(e) { return []; }
+}
+
+function _binAppend(templateId, entry) {
+  const bin = _binLoad(templateId);
+  bin.push({ ...entry, ts: new Date().toISOString() });
+  try { localStorage.setItem(_binKey(templateId), JSON.stringify(bin)); } catch(e) {}
+}
+
+function _binClear(templateId) {
+  try { localStorage.removeItem(_binKey(templateId)); } catch(e) {}
+}
+
+function _binCount(templateId) { return _binLoad(templateId).length; }
+
+// Build a comparable snapshot of a step's key fields
+function _stepSnap(step) {
+  return {
+    id:                  step.id,
+    name:                step.name || '',
+    step_type:           step.step_type || '',
+    assignee_type:       step.assignee_type || '',
+    assignee_name:       step.assignee_name || '',
+    assignee_email:      step.assignee_email || '',
+    assignee_role:       step.assignee_role || '',
+    due_days:            step.due_days ?? null,
+    escalate_after_days: step.escalate_after_days ?? null,
+    instructions:        step.instructions || '',
+    sequence_order:      step.sequence_order,
+  };
+}
+
+function _takeSnapshot() {
+  if (!_selectedTmpl?.steps) return;
+  _stepSnapshot = {};
+  _selectedTmpl.steps.forEach(s => { _stepSnapshot[s.id] = _stepSnap(s); });
+}
+
+// Diff current steps against snapshot, return array of human-readable change strings
+function _diffSteps(prevSnap, currentSteps) {
+  const diffs = [];
+  const prevIds  = new Set(Object.keys(prevSnap));
+  const currIds  = new Set(currentSteps.map(s => s.id));
+
+  // Added steps
+  currentSteps.filter(s => !prevIds.has(s.id)).forEach(s => {
+    diffs.push(`Step added: "${s.name || s.step_type}"`);
+  });
+
+  // Deleted steps
+  [...prevIds].filter(id => !currIds.has(id)).forEach(id => {
+    diffs.push(`Step deleted: "${prevSnap[id].name || prevSnap[id].step_type}"`);
+  });
+
+  // Modified steps + reorders
+  currentSteps.filter(s => prevIds.has(s.id)).forEach(s => {
+    const prev = prevSnap[s.id];
+    const curr = _stepSnap(s);
+    const label = `"${curr.name || curr.step_type}"`;
+
+    if (prev.sequence_order !== curr.sequence_order)
+      diffs.push(`Step reordered: ${label} position ${prev.sequence_order} → ${curr.sequence_order}`);
+    if (prev.name !== curr.name)
+      diffs.push(`Step name: "${prev.name}" → "${curr.name}"`);
+    if (prev.step_type !== curr.step_type)
+      diffs.push(`Step type: "${prev.step_type}" → "${curr.step_type}"`);
+    if (prev.assignee_type !== curr.assignee_type)
+      diffs.push(`${label} assignee type: "${prev.assignee_type}" → "${curr.assignee_type}"`);
+    if (prev.assignee_name !== curr.assignee_name && curr.assignee_name)
+      diffs.push(`${label} assignee: "${prev.assignee_name || '—'}" → "${curr.assignee_name}"`);
+    if (prev.assignee_role !== curr.assignee_role && curr.assignee_role)
+      diffs.push(`${label} role: "${prev.assignee_role || '—'}" → "${curr.assignee_role}"`);
+    if (prev.due_days !== curr.due_days)
+      diffs.push(`${label} due days: ${prev.due_days ?? '—'} → ${curr.due_days ?? '—'}`);
+    if (prev.escalate_after_days !== curr.escalate_after_days)
+      diffs.push(`${label} escalate after: ${prev.escalate_after_days ?? '—'} → ${curr.escalate_after_days ?? '—'}`);
+    if (prev.instructions !== curr.instructions && (prev.instructions || curr.instructions))
+      diffs.push(`${label} instructions updated`);
+  });
+
+  return diffs;
+}
 
 // Step type display metadata
 const STEP_META = {
@@ -817,12 +908,15 @@ async function selectTemplate(id) {
   _lastSavedAt  = null;
   _structuralChange = false;
   _versionBumped    = false;
+  _takeSnapshot();  // baseline for diff on next commit
 
   // Re-render list to update active state
   const listEl = document.getElementById('tmpl-list');
   if (listEl) listEl.innerHTML = renderTemplateList();
   renderEditor();
   startAutoSave(); // begin 30-second auto-save cycle
+  // Show pending indicator if bin has uncommitted changes
+  _updateVersionDisplay();
 }
 
 function renderEditor() {
@@ -880,7 +974,7 @@ function renderEditor() {
         <button class="btn btn-ghost btn-sm" onclick="toggleTmplCoC()" id="coc-btn"
           title="Change history">CoC</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
-        <button class="btn btn-solid btn-sm" id="save-btn" onclick="saveTemplate()">Save</button>
+        <button class="btn btn-solid btn-sm" id="commit-btn" onclick="commitTemplate()">Commit</button>
       </div>
     </div>
 
@@ -1806,19 +1900,30 @@ function refreshConfigPanel() { reRenderSpine(); } // backwards compat shim
 
 function updateStepField(field, value) {
   if (!_selectedStep || _selectedStep.id === '__trigger__') return;
+  const prev = _selectedStep[field];
   _selectedStep[field] = value;
   _dirtySteps = true;
-  // Only re-render spine for fields that affect the card summary line
-  // NOTE: 'name' intentionally excluded — reRenderSpine destroys the input mid-keystroke
-  // Instead we surgically patch the card header text directly
-  const cardFields = ['assignee_name','assignee_email','assignee_role',
-                      'due_days','due_type','escalate_after_days','parallel_required',
-                      'input_from_step','forward_input','reject_to'];
+  _updateVersionDisplay();
+
+  // Append to pending bin for CoC diff (skip noisy real-time fields)
+  const skipBin = ['instructions']; // instructions tracked by diff, not bin
+  if (_selectedTmpl?.id && !skipBin.includes(field) && prev !== value) {
+    _binAppend(_selectedTmpl.id, {
+      type:     'field_changed',
+      stepName: _selectedStep.name || _selectedStep.step_type || 'Step',
+      field,
+      from:     prev,
+      to:       value,
+    });
+  }
+
+  // Surgically update card header for name field
   if (field === 'name') {
-    // Update card header text directly without rebuilding the spine
     const cardEl = document.querySelector(`#sstep-${_selectedStep.id} .spine-card-name`);
     if (cardEl) cardEl.textContent = value || (STEP_META[_selectedStep.step_type]?.label || '');
-  } else if (cardFields.includes(field)) {
+  } else if (['assignee_name','assignee_email','assignee_role',
+              'due_days','due_type','escalate_after_days','parallel_required',
+              'input_from_step','forward_input','reject_to'].includes(field)) {
     reRenderSpine();
   }
 }
@@ -1826,6 +1931,16 @@ function updateStepField(field, value) {
 function markDirty() {
   _dirtySteps = true;
   _updateAutoSaveIndicator('unsaved');
+  _updateVersionDisplay();
+}
+
+function _updateVersionDisplay() {
+  if (!_selectedTmpl) return;
+  const ver     = _selectedTmpl.version || '0.0.0';
+  const pending = _binCount(_selectedTmpl.id) > 0 || _dirtySteps;
+  const display = pending ? ver + '*' : ver;
+  const verEl   = document.querySelector('.editor-toolbar [title="Version"]');
+  if (verEl) verEl.textContent = display;
 }
 
 // ── Auto-save ─────────────────────────────────────────────────────────────────
@@ -1951,6 +2066,7 @@ function addStep(type) {
   _selectedStep = newStep;
   _dirtySteps = true;
   _structuralChange = true;
+  if (_selectedTmpl.id) _binAppend(_selectedTmpl.id, { type: 'step_added', stepName: newStep.name || type });
 
   reRenderSpine();
   // Hide AI banner
@@ -2010,6 +2126,7 @@ function stepDrop(event, targetStepId) {
   // Renumber sequence_order
   steps.forEach((s, i) => s.sequence_order = i + 1);
   _dirtySteps = true;
+  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, { type: 'step_reordered', stepName: moved?.name || 'Step' });
   reRenderSpine();
 }
 
@@ -2024,20 +2141,69 @@ function stepDragEnd(event) {
 function removeStep(id) {
   if (!_selectedTmpl?.steps) return;
   if (!confirm('Remove this step?')) return;
+  const removed = _selectedTmpl.steps.find(s => s.id === id);
   _selectedTmpl.steps = _selectedTmpl.steps.filter(s => s.id !== id);
   _selectedTmpl.steps.forEach((s, i) => s.sequence_order = i + 1);
   if (_selectedStep?.id === id) _selectedStep = null;
   _dirtySteps = true;
   _structuralChange = true;
+  if (_selectedTmpl.id) _binAppend(_selectedTmpl.id, { type: 'step_deleted', stepName: removed?.name || 'Step' });
   reRenderSpine();
 }
 
-// ── Save template ─────────────────────────────────────────────────────────────
+// ── Save template (auto-save: silent persist, no version bump, no CoC) ────────
 async function saveTemplate(silent = false) {
   if (!_selectedTmpl) return;
 
-  const btn = document.getElementById('save-btn');
-  if (!silent && btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+  try {
+    const nameEl    = document.getElementById('tmpl-name-input');
+    const statusEl  = document.getElementById('tmpl-status-sel');
+    const triggerEl = document.getElementById('tmpl-trigger-sel');
+    const descEl    = document.getElementById('tmpl-desc-input');
+
+    // Auto-save: persist current state, no version change
+    const patch = {
+      name:         nameEl?.value?.trim()  || _selectedTmpl.name,
+      status:       statusEl?.value        || _selectedTmpl.status,
+      trigger_type: triggerEl?.value       || _selectedTmpl.trigger_type,
+      description:  descEl?.value?.trim()  || null,
+      version:      _selectedTmpl.version  || '0.0.0',
+      version_major: _selectedTmpl.version_major || 0,
+      version_minor: _selectedTmpl.version_minor || 0,
+      version_patch: _selectedTmpl.version_patch || 0,
+      updated_at:   new Date().toISOString(),
+    };
+
+    await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, patch);
+    Object.assign(_selectedTmpl, patch);
+
+    await _saveSteps();
+
+    const idx = _templates.findIndex(t => t.id === _selectedTmpl.id);
+    if (idx >= 0) _templates[idx] = { ..._templates[idx], ...patch };
+
+    _dirtySteps = false;
+    _lastSavedAt = new Date();
+    _updateAutoSaveIndicator('saved');
+    _updateVersionDisplay(); // keep asterisk — uncommitted changes still pending
+    updateBadges();
+
+    const listEl = document.getElementById('tmpl-list');
+    if (listEl) listEl.innerHTML = renderTemplateList();
+
+  } catch(e) {
+    _updateAutoSaveIndicator('error');
+    if (!silent) cadToast('Auto-save failed: ' + e.message, 'error');
+    else cadToast('Auto-save failed: ' + e.message, 'error');
+  }
+}
+
+// ── Commit template (explicit: version bump + rich CoC entry + bin clear) ─────
+async function commitTemplate() {
+  if (!_selectedTmpl) return;
+
+  const btn = document.getElementById('commit-btn');
+  if (btn) { btn.textContent = 'Committing…'; btn.disabled = true; }
 
   try {
     const nameEl    = document.getElementById('tmpl-name-input');
@@ -2048,49 +2214,69 @@ async function saveTemplate(silent = false) {
     const newStatus = statusEl?.value || _selectedTmpl.status;
     const oldStatus = _selectedTmpl.status;
 
-    // ── Version calculation ────────────────────────────────────────────────────
+    // ── Version bump ──────────────────────────────────────────────────────────
     let maj = _selectedTmpl.version_major || 0;
     let min = _selectedTmpl.version_minor || 0;
     let pat = _selectedTmpl.version_patch || 0;
 
-    // Releasing: bump major, reset minor+patch, clear bump flag
     if (newStatus === 'released' && oldStatus !== 'released') {
       maj += 1; min = 0; pat = 0;
-      _versionBumped = false; // reset so next draft cycle can bump again
-    }
-    // Only bump once per draft editing session (structural or content change)
-    // Subsequent autosaves in the same session keep the same version
-    else if (!_versionBumped && newStatus !== 'released') {
-      if (_structuralChange) {
-        min += 1; pat = 0;
-        _versionBumped = true;
-      } else if (_dirtySteps) {
-        pat += 1;
-        _versionBumped = true;
-      }
+    } else if (_structuralChange) {
+      min += 1; pat = 0;
+    } else if (_dirtySteps || _binCount(_selectedTmpl.id) > 0) {
+      pat += 1;
     }
 
     const newVersion = `${maj}.${min}.${pat}`;
 
-    // ── CoC event type ─────────────────────────────────────────────────────────
-    let cocEventType = 'field_changed';
-    let cocNote      = 'Template saved';
+    // ── Build diff from snapshot + pending bin ────────────────────────────────
+    const diffs = _diffSteps(_stepSnapshot, _selectedTmpl.steps || []);
+
+    // Also add any binned structural events not captured by diff
+    const bin = _binLoad(_selectedTmpl.id);
+
+    // ── CoC note construction ─────────────────────────────────────────────────
+    let cocEventType = 'step_modified';
+    let cocStepName  = '';
+
     if (newStatus === 'released' && oldStatus !== 'released') {
       cocEventType = 'released';
-      cocNote      = `Released as version ${newVersion}`;
     } else if (newStatus === 'archived' && oldStatus !== 'archived') {
       cocEventType = 'archived';
-      cocNote      = 'Template archived';
     } else if (newStatus === 'draft' && oldStatus !== 'draft') {
       cocEventType = 'status_changed';
-      cocNote      = `Returned to draft (was ${oldStatus})`;
-    } else if (_structuralChange) {
-      cocEventType = 'step_modified';
-      cocNote      = `Steps added or removed → ${newVersion}`;
-    } else if (_dirtySteps) {
-      cocEventType = 'step_modified';
-      cocNote      = `Step content modified → ${newVersion}`;
     }
+
+    // Step name for CoC header line
+    const changedStepIds = new Set([
+      ...diffs.map(() => ''),
+      ...(bin.filter(e => e.stepName).map(e => e.stepName))
+    ]);
+    const uniqueStepNames = [...new Set(
+      [...diffs, ...bin.map(e => e.stepName || '')].map(d => {
+        const m = (typeof d === 'string' ? d : '').match(/"([^"]+)"/);
+        return m ? m[1] : '';
+      }).filter(Boolean)
+    )];
+    cocStepName = uniqueStepNames.length === 1
+      ? uniqueStepNames[0]
+      : uniqueStepNames.length > 1
+        ? `${uniqueStepNames.length} steps`
+        : (_selectedTmpl.name || 'Template');
+
+    // Build note: diff bullets
+    const allDiffs = diffs.length ? diffs : (bin.map(e =>
+      e.type === 'step_added'    ? `Step added: "${e.stepName}"` :
+      e.type === 'step_deleted'  ? `Step deleted: "${e.stepName}"` :
+      e.type === 'step_reordered'? `Step reordered: "${e.stepName}"` : ''
+    ).filter(Boolean));
+
+    const cocNote = allDiffs.length
+      ? allDiffs.map(d => `• ${d}`).join('\n')
+      : cocEventType === 'released' ? `Released as ${newVersion}`
+      : cocEventType === 'archived' ? 'Template archived'
+      : cocEventType === 'status_changed' ? `Returned to draft (was ${oldStatus})`
+      : 'Template updated';
 
     const patch = {
       name:          nameEl?.value?.trim()  || _selectedTmpl.name,
@@ -2104,109 +2290,114 @@ async function saveTemplate(silent = false) {
       updated_at:    new Date().toISOString(),
     };
 
-    // 1. Save template header
+    // 1. Persist template header
     await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, patch);
     Object.assign(_selectedTmpl, patch);
 
-    // 2. Save steps — three-pass strategy to avoid unique(template_id, sequence_order) collisions
-    const steps = _selectedTmpl.steps || [];
+    // 2. Persist steps
+    await _saveSteps();
 
-    // Build step payload (shared between passes)
-    const buildStepPayload = (step) => ({
-      template_id:         _selectedTmpl.id,
-      sequence_order:      step.sequence_order,
-      step_type:           step.step_type,
-      name:                step.name || null,
-      assignee_type:       step.assignee_type || null,
-      assignee_user_id:    step.assignee_user_id || null,
-      assignee_role:       step.assignee_role || null,
-      assignee_email:      step.assignee_email || null,
-      assignee_name:       step.assignee_name || null,
-      assignee_org:        step.assignee_org || null,
-      due_days:            step.due_days || null,
-      due_type:            step.due_type || 'after_prior',
-      escalate_after_days: step.escalate_after_days || null,
-      escalate_to:         step.escalate_to || 'pm',
-      parallel_required:   !!step.parallel_required,
-      branch_conditions:   step.branch_conditions || [],
-      instructions:        step.instructions || null,
-      input_from_step:     step.input_from_step || null,
-      forward_input:       !!step.forward_input,
-      reject_to:           step.reject_to || null,
-      confirm_items:       step._confirmItems || [],
-      meeting_agenda:      step._meetingAgenda || [],
-      meeting_comments:    step.meeting_comments || null,
-      attached_docs:       (step._attachedDocs || []).map(d => ({
-        name: d.name, version: d.version, role: d.role || 'reference',
-        size: d.size, path: d.path || null, url: d.url || null,
-      })),
-    });
-
-    // Pass A: INSERT new steps using a guaranteed-safe temp sequence_order
-    const newSteps = steps.filter(s => s._new);
-    for (const step of newSteps) {
-      const payload = { ...buildStepPayload(step), sequence_order: step.sequence_order + 50000 };
-      const res = await API.post('workflow_template_steps', payload);
-      if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
-    }
-
-    // Pass B: shift ALL rows to temp range
-    for (const step of steps) {
-      await API.patch(`workflow_template_steps?id=eq.${step.id}`,
-        { sequence_order: step.sequence_order + 10000 });
-    }
-
-    // Pass C: set real sequence_order and full payload
-    for (const step of steps) {
-      await API.patch(`workflow_template_steps?id=eq.${step.id}`, buildStepPayload(step));
-    }
-
-    // 3. Write CoC event
+    // 3. Write CoC entry
     const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
     await API.post('workflow_template_coc', {
-      firm_id:        FIRM_ID_CAD,
-      template_id:    _selectedTmpl.id,
-      event_type:     cocEventType,
-      changed_by:     _myResourceId || null,
+      firm_id:         FIRM_ID_CAD,
+      template_id:     _selectedTmpl.id,
+      event_type:      cocEventType,
+      changed_by:      _myResourceId || null,
       changed_by_name: authorName,
-      old_value:      oldStatus !== newStatus ? oldStatus : null,
-      new_value:      oldStatus !== newStatus ? newStatus : null,
-      note:           cocNote,
-      version_at:     newVersion,
-      created_at:     new Date().toISOString(),
-    }).catch(() => {}); // CoC write is non-fatal
+      field_name:      cocStepName || null,
+      old_value:       oldStatus !== newStatus ? oldStatus : null,
+      new_value:       oldStatus !== newStatus ? newStatus : null,
+      note:            cocNote,
+      version_at:      newVersion,
+      created_at:      new Date().toISOString(),
+    }).catch(() => {});
 
-    // Update local list
+    // 4. Clear bin, reset flags, take new snapshot
+    _binClear(_selectedTmpl.id);
+    _takeSnapshot();
+    _dirtySteps       = false;
+    _structuralChange = false;
+    _versionBumped    = false;
+    _lastSavedAt      = new Date();
+    _updateAutoSaveIndicator('saved');
+
+    // 5. Update UI
     const idx = _templates.findIndex(t => t.id === _selectedTmpl.id);
     if (idx >= 0) _templates[idx] = { ..._templates[idx], ...patch };
-
-    _dirtySteps      = false;
-    _structuralChange = false;
-    _lastSavedAt     = new Date();
-    _updateAutoSaveIndicator('saved');
     updateBadges();
 
-    // Update version display in toolbar
     const verEl = document.querySelector('.editor-toolbar [title="Version"]');
-    if (verEl) verEl.textContent = newVersion;
+    if (verEl) verEl.textContent = newVersion; // no asterisk after commit
 
-    // Refresh template list
     const listEl = document.getElementById('tmpl-list');
     if (listEl) listEl.innerHTML = renderTemplateList();
 
-    // Refresh CoC panel if open
     if (document.getElementById('tmpl-coc-panel')?.classList.contains('open')) {
       loadTmplCoC(_selectedTmpl.id);
     }
 
-    if (!silent) cadToast('Template saved', 'success');
+    cadToast(`Committed → v${newVersion}`, 'success');
 
   } catch(e) {
     _updateAutoSaveIndicator('error');
-    if (!silent) cadToast('Save failed: ' + e.message, 'error');
-    else cadToast('Auto-save failed: ' + e.message, 'error');
+    cadToast('Commit failed: ' + e.message, 'error');
   } finally {
-    if (!silent && btn) { btn.textContent = 'Save'; btn.disabled = false; }
+    if (btn) { btn.textContent = 'Commit'; btn.disabled = false; }
+  }
+}
+
+// ── Shared step persistence (used by both saveTemplate and commitTemplate) ─────
+async function _saveSteps() {
+  const steps = _selectedTmpl.steps || [];
+
+  const buildStepPayload = (step) => ({
+    template_id:         _selectedTmpl.id,
+    sequence_order:      step.sequence_order,
+    step_type:           step.step_type,
+    name:                step.name || null,
+    assignee_type:       step.assignee_type || null,
+    assignee_user_id:    step.assignee_user_id || null,
+    assignee_role:       step.assignee_role || null,
+    assignee_email:      step.assignee_email || null,
+    assignee_name:       step.assignee_name || null,
+    assignee_org:        step.assignee_org || null,
+    due_days:            step.due_days || null,
+    due_type:            step.due_type || 'after_prior',
+    escalate_after_days: step.escalate_after_days || null,
+    escalate_to:         step.escalate_to || 'pm',
+    parallel_required:   !!step.parallel_required,
+    branch_conditions:   step.branch_conditions || [],
+    instructions:        step.instructions || null,
+    input_from_step:     step.input_from_step || null,
+    forward_input:       !!step.forward_input,
+    reject_to:           step.reject_to || null,
+    confirm_items:       step._confirmItems || [],
+    meeting_agenda:      step._meetingAgenda || [],
+    meeting_comments:    step.meeting_comments || null,
+    attached_docs:       (step._attachedDocs || []).map(d => ({
+      name: d.name, version: d.version, role: d.role || 'reference',
+      size: d.size, path: d.path || null, url: d.url || null,
+    })),
+  });
+
+  // Pass A: INSERT new steps
+  const newSteps = steps.filter(s => s._new);
+  for (const step of newSteps) {
+    const payload = { ...buildStepPayload(step), sequence_order: step.sequence_order + 50000 };
+    const res = await API.post('workflow_template_steps', payload);
+    if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
+  }
+
+  // Pass B: shift to temp range
+  for (const step of steps) {
+    await API.patch(`workflow_template_steps?id=eq.${step.id}`,
+      { sequence_order: step.sequence_order + 10000 });
+  }
+
+  // Pass C: set real values
+  for (const step of steps) {
+    await API.patch(`workflow_template_steps?id=eq.${step.id}`, buildStepPayload(step));
   }
 }
 
@@ -2344,7 +2535,9 @@ function renderTmplCoC(rows) {
   const bodyEl = document.getElementById('tmpl-coc-body');
   if (!bodyEl) return;
 
-  if (!rows.length) {
+  const pending = _selectedTmpl ? _binLoad(_selectedTmpl.id) : [];
+
+  if (!rows.length && !pending.length) {
     bodyEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">No history yet.</div>';
     return;
   }
@@ -2356,40 +2549,110 @@ function renderTmplCoC(rows) {
     step_modified:  'var(--cad)',
     field_changed:  'var(--text2)',
   };
-
   const evtLabel = {
     released:       'Released',
     archived:       'Archived',
-    status_changed: 'Status changed',
-    step_modified:  'Steps modified',
-    field_changed:  'Edited',
+    status_changed: 'Status Changed',
+    step_modified:  'Step Modified',
+    field_changed:  'Step Modified',
   };
 
   function fmtTs(ts) {
     if (!ts) return '';
     const d = new Date(ts);
     return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
-      + ' ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+      + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
   }
 
-  bodyEl.innerHTML = rows.map(e => {
-    const color = evtColor[e.event_type] || 'var(--muted)';
-    const label = evtLabel[e.event_type] || e.event_type?.replace(/_/g,' ');
+  // ── Pending (uncommitted) bin at top ────────────────────────────────────────
+  let pendingHtml = '';
+  if (pending.length) {
+    // Build diff from snapshot against current state
+    const liveDiffs = _diffSteps(_stepSnapshot, _selectedTmpl?.steps || []);
+    // Merge with bin structural events not already in liveDiffs
+    const binLines = pending
+      .filter(e => ['step_added','step_deleted','step_reordered'].includes(e.type))
+      .map(e =>
+        e.type === 'step_added'     ? `Step added: "${e.stepName}"` :
+        e.type === 'step_deleted'   ? `Step deleted: "${e.stepName}"` :
+        `Step reordered: "${e.stepName}"`)
+      .filter(l => !liveDiffs.includes(l));
+
+    const allPending = [...liveDiffs, ...binLines];
+    const bulletHtml = allPending.length
+      ? allPending.map(d => `<div style="font-size:10px;color:var(--text2);line-height:1.7">· ${escHtml(d)}</div>`).join('')
+      : `<div style="font-size:10px;color:var(--muted)">Changes pending — no diff yet</div>`;
+
+    const nextVer = (() => {
+      let maj = _selectedTmpl?.version_major || 0;
+      let min = _selectedTmpl?.version_minor || 0;
+      let pat = _selectedTmpl?.version_patch || 0;
+      if (_structuralChange) { min += 1; pat = 0; }
+      else { pat += 1; }
+      return `${maj}.${min}.${pat}`;
+    })();
+
+    pendingHtml = `
+      <div style="border:1px solid rgba(212,144,31,.3);border-radius:5px;
+        background:rgba(212,144,31,.05);padding:8px 10px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <div style="color:var(--amber);font-weight:700;font-size:10px;
+            text-transform:uppercase;letter-spacing:.08em">Uncommitted</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--amber)">
+            → ${escHtml(nextVer)}*
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">
+          ${pending.length} pending change${pending.length !== 1 ? 's' : ''} — commit to lock version
+        </div>
+        ${bulletHtml}
+      </div>
+      <div style="border-top:1px solid var(--border);margin:0 0 10px"></div>`;
+  }
+
+  // ── Committed entries ────────────────────────────────────────────────────────
+  const committedHtml = rows.map(e => {
+    const color = evtColor[e.event_type] || 'var(--cad)';
+    const label = evtLabel[e.event_type] || 'Step Modified';
+
+    // Step name line (field_name stores the step name summary)
+    const stepLine = e.field_name
+      ? `<div style="font-size:11px;color:var(--text);margin-top:2px;font-weight:500">
+           Step: ${escHtml(e.field_name)}
+         </div>`
+      : '';
+
+    // Bullet diff lines
+    const noteParts = (e.note || '').split('\n').filter(l => l.trim());
+    const noteHtml = noteParts.map(l =>
+      `<div style="font-size:10px;color:var(--text2);line-height:1.7">
+         ${escHtml(l.startsWith('•') ? l : '· ' + l)}
+       </div>`
+    ).join('');
+
     return `
       <div class="tmpl-coc-event">
         <div class="tmpl-coc-dot" style="background:${color}"></div>
-        <div class="tmpl-coc-body-text">
-          <div style="color:${color};font-weight:600;font-size:10px;
-            text-transform:uppercase;letter-spacing:.06em">${label}</div>
-          <div style="color:var(--text2);margin-top:1px">${escHtml(e.note || '')}</div>
-          ${e.version_at ? `<div style="font-family:var(--font-mono);font-size:10px;
-            color:var(--muted);margin-top:1px">v${escHtml(e.version_at)}</div>` : ''}
-          <div class="tmpl-coc-who">
+        <div class="tmpl-coc-body-text" style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="color:${color};font-weight:700;font-size:10px;
+              text-transform:uppercase;letter-spacing:.08em">${label}</div>
+            ${e.version_at
+              ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">
+                   v${escHtml(e.version_at)}
+                 </div>`
+              : ''}
+          </div>
+          ${stepLine}
+          ${noteHtml}
+          <div class="tmpl-coc-who" style="margin-top:3px">
             ${escHtml(e.changed_by_name || 'System')} · ${fmtTs(e.created_at)}
           </div>
         </div>
       </div>`;
   }).join('');
+
+  bodyEl.innerHTML = pendingHtml + committedHtml;
 }
 async function runAIDraft() {
   const input = document.getElementById('ai-draft-input')?.value?.trim();
