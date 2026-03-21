@@ -2635,7 +2635,7 @@ function renderInstanceDetail(el, inst) {
                     <div style="display:flex;align-items:center;gap:8px">
                       <!-- Step name + meta — grows to fill -->
                       <div style="flex:1;min-width:0">
-                        <div style="font-size:12px;font-weight:500;color:${textColor}">
+                        <div style="font-size:12px;font-weight:700;color:var(--text)">
                           ${escHtml(s.name||meta.label)}
                         </div>
                         <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
@@ -2690,7 +2690,8 @@ function renderInstanceDetail(el, inst) {
                   <div style="border:1px solid var(--cad-wire);border-top:none;border-radius:0 0 5px 5px;
                     background:var(--bg1);padding:12px 14px;margin-bottom:0">
 
-                    <!-- Config read-only summary — no Type (shown in card header) -->
+                    <!-- Config read-only summary — hidden for meeting steps (redundant with inline card) -->
+                    ${s.step_type !== 'meeting' ? `
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;
                       font-size:11px;margin-bottom:12px;padding-bottom:12px;
                       border-bottom:1px solid var(--border)">
@@ -2700,7 +2701,7 @@ function renderInstanceDetail(el, inst) {
                         <div style="color:var(--amber);font-size:10px;margin-top:2px">${s.escalate_after_days}d → ${s.escalate_to||'PM'}</div></div>`:''}
                       ${s.instructions?`<div style="grid-column:1/-1"><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Instructions</span>
                         <div style="color:var(--text2);font-size:11px;margin-top:2px;line-height:1.4">${escHtml(s.instructions)}</div></div>`:''}
-                    </div>
+                    </div>` : ''}
 
                     <!-- Meeting step: inline meeting card (populated by renderCadMeetingStep) -->
                     ${s.step_type === 'meeting' ? `
@@ -2727,11 +2728,23 @@ function renderInstanceDetail(el, inst) {
                       </div>
                     </div>` : ''}
 
-                    <!-- Reassignment section — all resources, multi-assignee -->
+                    <!-- Reassignment section — collapsed behind toggle for meeting steps -->
                     ${canAct ? `
+                    ${s.step_type === 'meeting' ? `
+                    <div style="margin-top:4px">
+                      <button onclick="toggleCadReassign('${s.id}')"
+                        style="background:none;border:none;cursor:pointer;padding:0;
+                          display:flex;align-items:center;gap:5px;
+                          font-size:9px;font-weight:600;letter-spacing:.12em;
+                          text-transform:uppercase;color:var(--muted)">
+                        <span id="cad-reassign-chevron-${s.id}"
+                          style="font-size:8px;transition:transform .2s">▶</span>
+                        ↻ Reassign for This Instance
+                      </button>
+                      <div id="cad-reassign-panel-${s.id}" style="display:none;margin-top:8px">` : `
                     <div>
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                        color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>
+                        color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>`}
 
                       <!-- Current assignees — compact chips with ✕ on reassigned -->
                       <div id="reassign-list-${s.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:24px">
@@ -2804,7 +2817,8 @@ function renderInstanceDetail(el, inst) {
                         </div>
                       </div>`:''}
                       <span id="reassign-status-${s.id}" style="font-size:10px;color:var(--muted)"></span>
-                    </div>` : `
+
+                    ${s.step_type === 'meeting' ? `</div></div>` : `</div>`}` : `
                     <div style="font-size:10px;color:var(--muted)">
                       Instance is ${inst.status} — reassignment not available.
                     </div>`}
@@ -2895,6 +2909,15 @@ function _stopElapsedTimer() {
 }
 
 // ── Instance step toggle ───────────────────────────────────────────────────────
+function toggleCadReassign(stepId) {
+  const panel   = document.getElementById('cad-reassign-panel-' + stepId);
+  const chevron = document.getElementById('cad-reassign-chevron-' + stepId);
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display  = open ? 'none' : 'block';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+}
+
 function toggleInstanceStep(instId, stepId) {
   const inst = _instances.find(i => i.id === instId);
   if (!inst) return;
