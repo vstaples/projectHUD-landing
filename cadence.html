@@ -702,11 +702,17 @@ function _stepSnap(step) {
     name:                step.name || '',
     step_type:           step.step_type || '',
     assignee_type:       step.assignee_type || '',
+    assignee_user_id:    step.assignee_user_id || '',
     assignee_name:       step.assignee_name || '',
     assignee_email:      step.assignee_email || '',
     assignee_role:       step.assignee_role || '',
+    assignee_org:        step.assignee_org || '',
     due_days:            step.due_days ?? null,
+    due_type:            step.due_type || '',
     escalate_after_days: step.escalate_after_days ?? null,
+    escalate_to:         step.escalate_to || '',
+    parallel_required:   !!step.parallel_required,
+    forward_input:       !!step.forward_input,
     instructions:        step.instructions || '',
     sequence_order:      step.sequence_order,
   };
@@ -748,14 +754,24 @@ function _diffSteps(prevSnap, currentSteps) {
       diffs.push(`Step type: "${prev.step_type}" → "${curr.step_type}"`);
     if (prev.assignee_type !== curr.assignee_type)
       diffs.push(`${label} assignee type: "${prev.assignee_type}" → "${curr.assignee_type}"`);
-    if (prev.assignee_name !== curr.assignee_name && curr.assignee_name)
-      diffs.push(`${label} assignee: "${prev.assignee_name || '—'}" → "${curr.assignee_name}"`);
-    if (prev.assignee_role !== curr.assignee_role && curr.assignee_role)
-      diffs.push(`${label} role: "${prev.assignee_role || '—'}" → "${curr.assignee_role}"`);
+    if (prev.assignee_name !== curr.assignee_name)
+      diffs.push(`${label} assignee: "${prev.assignee_name || '—'}" → "${curr.assignee_name || '—'}"`);
+    if (prev.assignee_email !== curr.assignee_email && (prev.assignee_email || curr.assignee_email))
+      diffs.push(`${label} assignee email: "${prev.assignee_email || '—'}" → "${curr.assignee_email || '—'}"`);
+    if (prev.assignee_role !== curr.assignee_role)
+      diffs.push(`${label} role: "${prev.assignee_role || '—'}" → "${curr.assignee_role || '—'}"`);
     if (prev.due_days !== curr.due_days)
       diffs.push(`${label} due days: ${prev.due_days ?? '—'} → ${curr.due_days ?? '—'}`);
+    if (prev.due_type !== curr.due_type && (prev.due_type || curr.due_type))
+      diffs.push(`${label} due type: "${prev.due_type || '—'}" → "${curr.due_type || '—'}"`);
     if (prev.escalate_after_days !== curr.escalate_after_days)
       diffs.push(`${label} escalate after: ${prev.escalate_after_days ?? '—'} → ${curr.escalate_after_days ?? '—'}`);
+    if (prev.escalate_to !== curr.escalate_to && (prev.escalate_to || curr.escalate_to))
+      diffs.push(`${label} escalate to: "${prev.escalate_to || '—'}" → "${curr.escalate_to || '—'}"`);
+    if (prev.parallel_required !== curr.parallel_required)
+      diffs.push(`${label} multi-reviewer: ${prev.parallel_required} → ${curr.parallel_required}`);
+    if (prev.forward_input !== curr.forward_input)
+      diffs.push(`${label} forward input: ${prev.forward_input} → ${curr.forward_input}`);
     if (prev.instructions !== curr.instructions && (prev.instructions || curr.instructions))
       diffs.push(`${label} instructions updated`);
   });
@@ -2274,12 +2290,16 @@ async function commitTemplate() {
         ? `${uniqueStepNames.length} steps`
         : (_selectedTmpl.name || 'Template');
 
-    // Build note: diff bullets
-    const allDiffs = diffs.length ? diffs : (bin.map(e =>
-      e.type === 'step_added'    ? `Step added: "${e.stepName}"` :
-      e.type === 'step_deleted'  ? `Step deleted: "${e.stepName}"` :
-      e.type === 'step_reordered'? `Step reordered: "${e.stepName}"` : ''
-    ).filter(Boolean));
+    // Build note: all diff lines + any structural bin events not already captured
+    const structuralBinLines = bin
+      .filter(e => ['step_added','step_deleted','step_reordered'].includes(e.type))
+      .map(e =>
+        e.type === 'step_added'     ? `Step added: "${e.stepName}"` :
+        e.type === 'step_deleted'   ? `Step deleted: "${e.stepName}"` :
+        `Step reordered: "${e.stepName}"`)
+      .filter(l => !diffs.includes(l)); // avoid duplicates with _diffSteps output
+
+    const allDiffs = [...diffs, ...structuralBinLines];
 
     const cocNote = allDiffs.length
       ? allDiffs.map(d => `• ${d}`).join('\n')
