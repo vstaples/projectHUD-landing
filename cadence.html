@@ -156,7 +156,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 /* Editor body */
 .editor-body{flex:1;overflow-y:auto}
-.spine-area{padding:16px 24px;max-width:680px;margin:0 auto}
+.spine-area{padding:16px 24px;}
 /* inline step config — replaces right panel */
 .step-inline-cfg{
   display:none;
@@ -177,7 +177,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .cfg-full{grid-column:1/-1}
 /* drop zone */
 .doc-drop-zone{
-  margin:0 14px 12px;
+  margin:0;
   border:1.5px dashed var(--border2);border-radius:5px;
   padding:14px 16px;text-align:center;cursor:pointer;
   transition:all .15s;background:transparent;
@@ -1065,17 +1065,11 @@ function renderInlineStepConfig(step) {
       <span style="font-size:10px;color:var(--muted)">Assign a role to each document</span>
     </div>
 
-    <!-- Document role legend -->
-    <div style="padding:0 14px 8px;display:flex;gap:12px;flex-wrap:wrap">
-      <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px">
-        <span style="color:var(--accent)">📋 Reference</span> — blank form, visible to assignee
-      </span>
-      <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px">
-        <span style="color:var(--green)">📝 Evidence</span> — completed by assignee, stored on step
-      </span>
-      <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px">
-        <span style="color:var(--amber)">⬆ Authorization</span> — <strong style="color:var(--amber)">gates step · routed to next step</strong>
-      </span>
+    <!-- Document role legend — single row, no wrap -->
+    <div style="padding:0 14px 8px;display:flex;gap:20px;align-items:center;flex-wrap:nowrap;white-space:nowrap">
+      <span style="font-size:10px;color:var(--muted)"><span style="color:var(--accent)">📋 Reference</span> — blank form, visible to assignee</span>
+      <span style="font-size:10px;color:var(--muted)"><span style="color:var(--green)">📝 Evidence</span> — completed by assignee, stored on step</span>
+      <span style="font-size:10px;color:var(--muted)"><span style="color:var(--amber)">⬆ Authorization</span> — <strong style="color:var(--amber)">gates step · routed to next step</strong></span>
     </div>
 
     <!-- Attached docs list with role selector -->
@@ -1088,18 +1082,13 @@ function renderInlineStepConfig(step) {
                         : d.role==='evidence'      ? '📝'
                         : '📋';
         return `
-        <div class="attached-doc" style="flex-wrap:wrap;gap:6px;padding:8px 12px">
-          <span style="color:${roleColor};flex-shrink:0;font-size:14px">${roleIcon}</span>
-          <div style="flex:1;min-width:120px">
-            <div class="attached-doc-name">${escHtml(d.name)}</div>
-            <div style="font-size:10px;margin-top:1px;display:flex;gap:8px">
-              <span style="color:var(--cad);font-family:var(--font-mono)">${escHtml(d.version||'—')}</span>
-              <span style="color:var(--muted)">${escHtml(d.size||'')}</span>
-            </div>
-          </div>
-          <!-- Role selector -->
+        <div class="attached-doc" style="padding:6px 10px;gap:8px;flex-wrap:nowrap;align-items:center">
+          <span style="color:${roleColor};flex-shrink:0;font-size:13px">${roleIcon}</span>
+          <span class="attached-doc-name" style="flex:1;min-width:0">${escHtml(d.name)}</span>
+          <span style="font-size:10px;color:var(--cad);font-family:var(--font-mono);flex-shrink:0;white-space:nowrap">${escHtml(d.version||'—')}</span>
+          <span style="font-size:10px;color:var(--muted);flex-shrink:0;white-space:nowrap">${escHtml(d.size||'')}</span>
           <select style="font-size:10px;font-family:var(--font-mono);background:var(--surf3);
-            border:1px solid var(--border2);border-radius:3px;padding:3px 6px;
+            border:1px solid var(--border2);border-radius:3px;padding:2px 4px;
             color:${roleColor};cursor:pointer;flex-shrink:0"
             onchange="setDocRole('${step.id}',${i},this.value)">
             <option value="reference"${(d.role||'reference')==='reference'?' selected':''}>📋 Reference</option>
@@ -1107,47 +1096,43 @@ function renderInlineStepConfig(step) {
             <option value="authorization"${d.role==='authorization'?' selected':''}>⬆ Authorization</option>
           </select>
           <button class="attached-doc-remove" style="color:var(--accent);flex-shrink:0"
-            onclick="viewAttachedDoc('${step.id}',${i})"
-            title="View">⤢</button>
+            onclick="viewAttachedDoc('${step.id}',${i})" title="View">⤢</button>
           <button class="attached-doc-remove" style="flex-shrink:0"
-            onclick="removeAttachedDoc('${step.id}',${i})"
-            title="Remove">✕</button>
-          ${d.role==='authorization' ? `
-          <div style="width:100%;font-size:10px;color:var(--amber);padding:2px 0 0 22px">
-            ⚠ This document gates step completion and will be routed to the next approval step.
-          </div>` : ''}
+            onclick="removeAttachedDoc('${step.id}',${i})" title="Remove">✕</button>
         </div>`;
       }).join('')}
     </div>
 
-    <!-- Drop zone -->
-    <div class="doc-drop-zone" id="dropzone-${step.id}"
-      ondragover="event.preventDefault();this.classList.add('drag-over')"
-      ondragleave="this.classList.remove('drag-over')"
-      ondrop="handleDocDrop(event,'${step.id}')"
-      onclick="document.getElementById('file-input-${step.id}').click()">
-      <div class="doc-drop-zone-icon">📂</div>
-      <div class="doc-drop-zone-text">
-        <strong>Drop a document here</strong> or click to browse — then assign its role above
-      </div>
-      <input type="file" id="file-input-${step.id}" style="display:none"
-        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
-        multiple onchange="handleDocFileInput(event,'${step.id}')" />
-    </div>
+    <!-- Drop zone + output zone — side by side when both present -->
+    <div style="display:flex;gap:8px;padding:0 14px 10px;align-items:stretch">
 
-    <!-- Output zone preview — shown when an Authorization doc exists -->
-    ${docs.some(d => d.role === 'authorization') ? `
-    <div style="padding:0 14px 10px;margin-top:2px">
-      <div class="doc-drop-zone" style="border-color:rgba(212,144,31,.35);background:rgba(212,144,31,.04);
-          cursor:default;pointer-events:none;margin:0">
+      <!-- Drop zone — always shown -->
+      <div class="doc-drop-zone" id="dropzone-${step.id}" style="flex:1;margin:0"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handleDocDrop(event,'${step.id}')"
+        onclick="document.getElementById('file-input-${step.id}').click()">
+        <div class="doc-drop-zone-icon">📂</div>
+        <div class="doc-drop-zone-text">
+          <strong>Drop a document here</strong> or click to browse
+        </div>
+        <input type="file" id="file-input-${step.id}" style="display:none"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+          multiple onchange="handleDocFileInput(event,'${step.id}')" />
+      </div>
+
+      <!-- Output zone — shown alongside when an Authorization doc exists -->
+      ${docs.some(d => d.role === 'authorization') ? `
+      <div class="doc-drop-zone" style="flex:1;margin:0;border-color:rgba(212,144,31,.35);
+          background:rgba(212,144,31,.04);cursor:default;pointer-events:none">
         <div class="doc-drop-zone-icon" style="opacity:.4">📤</div>
         <div class="doc-drop-zone-text">
           <strong style="color:var(--amber)">Authorization output zone active</strong><br/>
-          At runtime, assignee uploads the completed Authorization document here.
-          Step cannot advance until filled. Completed copy routes to the next approval step.
+          At runtime, assignee uploads the completed copy here. Step cannot advance until filled.
         </div>
-      </div>
-    </div>` : ''}`;
+      </div>` : ''}
+
+    </div>`;
 }
 
 // ── Document attachment handlers ──────────────────────────────────────────────
