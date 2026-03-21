@@ -716,6 +716,8 @@ function _stepSnap(step) {
     forward_input:       !!step.forward_input,
     instructions:        step.instructions || '',
     sequence_order:      step.sequence_order,
+    meeting_agenda:      JSON.stringify(step._meetingAgenda || []),
+    confirm_items:       JSON.stringify(step._confirmItems || []),
   };
 }
 
@@ -775,6 +777,26 @@ function _diffSteps(prevSnap, currentSteps) {
       diffs.push(`${label} forward input: ${prev.forward_input} → ${curr.forward_input}`);
     if (prev.instructions !== curr.instructions && (prev.instructions || curr.instructions))
       diffs.push(`${label} instructions updated`);
+    if (prev.meeting_agenda !== curr.meeting_agenda) {
+      const prevArr = JSON.parse(prev.meeting_agenda || '[]');
+      const currArr = JSON.parse(curr.meeting_agenda || '[]');
+      if (currArr.length > prevArr.length)
+        diffs.push(`${label} agenda item added (${currArr.length} items)`);
+      else if (currArr.length < prevArr.length)
+        diffs.push(`${label} agenda item removed (${currArr.length} items)`);
+      else
+        diffs.push(`${label} agenda items updated`);
+    }
+    if (prev.confirm_items !== curr.confirm_items) {
+      const prevArr = JSON.parse(prev.confirm_items || '[]');
+      const currArr = JSON.parse(curr.confirm_items || '[]');
+      if (currArr.length > prevArr.length)
+        diffs.push(`${label} attestation item added (${currArr.length} items)`);
+      else if (currArr.length < prevArr.length)
+        diffs.push(`${label} attestation item removed (${currArr.length} items)`);
+      else
+        diffs.push(`${label} attestation items updated`);
+    }
   });
 
   return diffs;
@@ -803,12 +825,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAll() {
   try {
-    const [tmpls, insts] = await Promise.all([
+    const [tmpls, insts, users] = await Promise.all([
       API.get(`workflow_templates?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc`).catch(()=>[]),
       API.get(`workflow_instances?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc&limit=50`).catch(()=>[]),
+      API.get('users?is_active=eq.true&select=id,name,title,resource_id').catch(()=>[]),
     ]);
     _templates = tmpls || [];
     _instances = insts || [];
+    _users_cad = users || [];
     updateBadges();
   } catch(e) {
     cadToast('Failed to load workflows: ' + e.message, 'error');
@@ -1869,13 +1893,26 @@ function addMeetingAgendaItem(stepId) {
   if (!step) return;
   if (!step._meetingAgenda) step._meetingAgenda = [];
   step._meetingAgenda.push('');
-  markDirty(); reRenderSpine();
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, {
+    type: 'field_changed', stepName: step.name || 'Meeting',
+    field: 'meeting_agenda', from: null, to: 'added',
+    changedBy: authorName, ts: new Date().toISOString(),
+  });
+  markDirty(); reRenderSpine(); _refreshCoCIfOpen();
 }
 function removeMeetingAgendaItem(stepId, idx) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   if (!step?._meetingAgenda) return;
+  const removed = step._meetingAgenda[idx];
   step._meetingAgenda.splice(idx, 1);
-  markDirty(); reRenderSpine();
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, {
+    type: 'field_changed', stepName: step.name || 'Meeting',
+    field: 'meeting_agenda', from: removed, to: null,
+    changedBy: authorName, ts: new Date().toISOString(),
+  });
+  markDirty(); reRenderSpine(); _refreshCoCIfOpen();
 }
 function updateMeetingAgendaItem(stepId, idx, value) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
