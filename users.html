@@ -665,6 +665,25 @@
 
     <!-- INFO TAB -->
     <div class="res-drawer-panel active" id="rdp-info">
+    <div class="um-field" style="margin-bottom:14px">
+      <label>RESOURCE TYPE</label>
+      <div style="display:flex;gap:0;border:1px solid var(--border)">
+        <button id="rtype-internal" onclick="setResourceType('internal')"
+          style="flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          cursor:pointer;border:none;border-right:1px solid var(--border);
+          background:rgba(0,210,255,.1);color:var(--cyan);transition:all .15s">
+          INTERNAL
+        </button>
+        <button id="rtype-external" onclick="setResourceType('external')"
+          style="flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          cursor:pointer;border:none;background:transparent;color:var(--text3);transition:all .15s">
+          EXTERNAL
+        </button>
+      </div>
+      <div id="rtype-hint" style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:4px">
+        Internal: employee or contractor on staff. External: client contact, decision maker, or outside reviewer.
+      </div>
+    </div>
     <div class="um-divider">PERSONAL INFO</div>
     <div class="um-2col">
       <div class="um-field"><label>FIRST NAME <span class="req">*</span></label>
@@ -688,6 +707,7 @@
     </div>
 
     <div class="um-divider">ROLE CLASSIFICATION</div>
+    <div id="res-role-section">
     <div class="um-2col">
       <div class="um-field"><label>ROLE</label>
         <select id="res-role" class="um-select">
@@ -704,12 +724,16 @@
         </select>
       </div>
     </div>
-    <div class="um-2col">
+    <div id="res-hire-section" class="um-2col">
       <div class="um-field"><label>HIRE DATE</label>
         <input id="res-hire" class="um-input" type="date" /></div>
       <div class="um-field"><label>AVAILABILITY %</label>
         <input id="res-avail" class="um-input" type="number" min="0" max="100" value="100" /></div>
     </div>
+    </div><!-- end res-role-section -->
+    <!-- Availability for external (always shown, hire date hidden) -->
+    <div id="res-avail-external" class="um-field" style="display:none"><label>AVAILABILITY %</label>
+      <input id="res-avail-ext" class="um-input" type="number" min="0" max="100" value="100" /></div>
     <div class="um-field"><label>STATUS</label>
       <select id="res-status" class="um-select">
         <option value="true">Active</option>
@@ -999,8 +1023,9 @@ function renderResources() {
     const role  = UM.roles.find(ro => ro.id === r.role_id);
     const cat   = role ? UM.categories.find(c => c.id === role.category_id) : null;
     const initials = ((r.first_name||'?')[0] + (r.last_name||'?')[0]).toUpperCase();
-    const levelTag = r.level ? `<span class="res-tag level-${r.level}">${r.level.toUpperCase()}</span>` : '';
-    const statusTag = `<span class="res-tag ${r.is_active !== false ? 'active' : 'inactive'}">${r.is_active !== false ? 'ACTIVE' : 'INACTIVE'}</span>`;
+    const levelTag    = r.level ? `<span class="res-tag level-${r.level}">${r.level.toUpperCase()}</span>` : '';
+    const statusTag   = `<span class="res-tag ${r.is_active !== false ? 'active' : 'inactive'}">${r.is_active !== false ? 'ACTIVE' : 'INACTIVE'}</span>`;
+    const externalTag = r.is_external ? `<span class="res-tag" style="background:rgba(255,170,0,.08);border:1px solid rgba(255,170,0,.3);color:var(--amber)">EXTERNAL</span>` : '';
     return `<div class="um-card">
       <div class="um-card-top">
         <div class="res-row">
@@ -1024,8 +1049,8 @@ function renderResources() {
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
-        ${levelTag}${statusTag}
-        ${cat ? `<span class="res-tag" style="border:1px solid var(--border);color:var(--text3);">${cat.name.toUpperCase()}</span>` : ''}
+        ${externalTag}${levelTag}${statusTag}
+        ${!r.is_external && cat ? `<span class="res-tag" style="border:1px solid var(--border);color:var(--text3);">${cat.name.toUpperCase()}</span>` : ''}
       </div>
       ${r.email ? `<div class="um-card-field"><label>EMAIL</label><span>${r.email}</span></div>` : ''}
       ${r.phone ? `<div class="um-card-field"><label>PHONE</label><span>${r.phone}</span></div>` : ''}
@@ -1122,6 +1147,34 @@ function openResourceDrawer(id) {
   });
 
   openDrawer('resource-drawer');
+  // Set resource type toggle from existing record or default to internal
+  setResourceType(r?.is_external ? 'external' : 'internal');
+}
+
+function setResourceType(type) {
+  const intBtn  = document.getElementById('rtype-internal');
+  const extBtn  = document.getElementById('rtype-external');
+  const roleSection  = document.getElementById('res-role-section');
+  const availExt     = document.getElementById('res-avail-external');
+  const hint         = document.getElementById('rtype-hint');
+  const isExternal   = type === 'external';
+
+  // Toggle button styles
+  const activeStyle   = 'flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;cursor:pointer;border:none;border-right:1px solid var(--border);transition:all .15s;background:rgba(0,210,255,.1);color:var(--cyan)';
+  const inactiveStyle = 'flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;cursor:pointer;border:none;transition:all .15s;background:transparent;color:var(--text3)';
+  const extActiveStyle = 'flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;cursor:pointer;border:none;transition:all .15s;background:rgba(255,170,0,.1);color:var(--amber)';
+
+  if (intBtn) { intBtn.style.cssText = isExternal ? inactiveStyle + ';border-right:1px solid var(--border)' : activeStyle; intBtn.classList.toggle('rtype-active', !isExternal); }
+  if (extBtn) { extBtn.style.cssText = isExternal ? extActiveStyle : inactiveStyle; extBtn.classList.toggle('rtype-active', isExternal); }
+
+  // Show/hide role classification section
+  if (roleSection)  roleSection.style.display   = isExternal ? 'none' : '';
+  if (availExt)     availExt.style.display       = isExternal ? '' : 'none';
+
+  // Update hint text
+  if (hint) hint.textContent = isExternal
+    ? 'External: client contact, decision maker, or outside reviewer — no internal role required.'
+    : 'Internal: employee or contractor on staff — role classification applies.';
 }
 
 async function saveResource() {
@@ -1133,19 +1186,25 @@ async function saveResource() {
   const btn = document.getElementById('res-save-btn');
   btn.textContent = 'SAVING...'; btn.disabled = true;
 
+  const isExternal = document.getElementById('rtype-external')?.classList.contains('rtype-active');
+
   const payload = {
     firm_id:          UM.firmId,
     first_name:       first,
     last_name:        last,
+    name:             first + ' ' + last,
+    is_external:      isExternal,
     title:            document.getElementById('res-title').value.trim()    || null,
     email:            document.getElementById('res-email').value.trim()    || null,
     phone:            document.getElementById('res-phone').value.trim()    || null,
     department:       document.getElementById('res-dept').value.trim()     || null,
     location:         document.getElementById('res-location').value.trim() || null,
-    hud_role_id:      document.getElementById('res-role').value            || null,
-    level:            document.getElementById('res-level').value           || null,
-    hire_date:        document.getElementById('res-hire').value            || null,
-    availability_pct: parseFloat(document.getElementById('res-avail').value) || 100,
+    hud_role_id:      isExternal ? null : (document.getElementById('res-role').value || null),
+    level:            isExternal ? null : (document.getElementById('res-level').value || null),
+    hire_date:        isExternal ? null : (document.getElementById('res-hire').value  || null),
+    availability_pct: isExternal
+      ? (parseFloat(document.getElementById('res-avail-ext')?.value) || 100)
+      : (parseFloat(document.getElementById('res-avail').value) || 100),
     is_active:        document.getElementById('res-status').value === 'true',
     user_id:          document.getElementById('res-user-link').value       || null,
     notes:            document.getElementById('res-notes').value.trim()    || null,
