@@ -2041,7 +2041,7 @@ function renderInstancesTab(el) {
   const statusColor = { pending:'var(--muted)', in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--muted)', overridden:'var(--amber)' };
 
   el.innerHTML = `
-    <div style="display:flex;height:100%;overflow:hidden">
+    <div style="display:flex;height:100%;overflow:hidden;width:100%">
 
       <!-- Left: instance list -->
       <div style="width:320px;flex-shrink:0;border-right:1px solid var(--border);
@@ -2125,7 +2125,6 @@ async function selectInstance(id) {
     _selectedInstance._stepInsts  = stepInsts  || [];
     _selectedInstance._tmplSteps  = tmplSteps  || [];
     renderInstanceDetail(detailEl, _selectedInstance);
-    _startElapsedTimer(_selectedInstance);
   } catch(e) {
     detailEl.innerHTML = `<div style="padding:40px;color:var(--red)">Failed to load: ${escHtml(e.message)}</div>`;
   }
@@ -2164,8 +2163,15 @@ function renderInstanceDetail(el, inst) {
   const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.step_id));
   const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.step_id));
 
-  // Get latest reassignment per step from CoC
-  const reassignments = {};
+  // Map step_id → earliest activation timestamp for elapsed timers
+  const stepActivatedAt = {};
+  coc.filter(e => e.event_type === 'step_activated' && e.step_id)
+     .forEach(e => { if (!stepActivatedAt[e.step_id]) stepActivatedAt[e.step_id] = e.created_at; });
+
+  // Build map of step_id → completion timestamp
+  const stepCompletedAt = {};
+  coc.filter(e => e.event_type === 'step_completed' && e.step_id)
+     .forEach(e => { stepCompletedAt[e.step_id] = e.created_at; });
   coc.filter(e => e.event_type === 'step_reassigned').forEach(e => {
     if (e.step_id) reassignments[e.step_id] = e;
   });
@@ -2191,28 +2197,6 @@ function renderInstanceDetail(el, inst) {
           <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
         </div>
       </div>
-
-      <!-- Elapsed time timer -->
-      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px">
-        <div style="background:#1a2540;border:2px solid #2a3a5a;border-radius:8px;
-          padding:6px 14px;box-shadow:inset 0 2px 6px rgba(0,0,0,.5),0 0 10px rgba(0,180,255,.08)">
-          <div id="inst-elapsed-${inst.id}"
-            style="font-family:var(--font-mono);font-size:22px;font-weight:700;
-            color:${canAct?'#e8f4ff':'var(--muted)'};letter-spacing:.12em;
-            text-shadow:${canAct?'0 0 8px rgba(0,180,255,.4)':'none'};
-            min-width:120px;text-align:center">
-            ${inst.launched_at ? _fmtElapsed(Date.now() - new Date(inst.launched_at).getTime()) : '--:--:--'}
-          </div>
-        </div>
-        <div style="font-size:8px;font-weight:700;letter-spacing:.18em;
-          color:${canAct?'var(--cad)':'var(--muted)'};text-transform:uppercase">
-          ${canAct ? 'Elapsed Time' : inst.status?.replace('_',' ').toUpperCase()}
-        </div>
-        <div style="font-size:7px;color:var(--muted);letter-spacing:.12em;font-family:var(--font-mono)">
-          dd:hh:mm
-        </div>
-      </div>
-
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <!-- Status badge -->
         <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -2293,8 +2277,9 @@ function renderInstanceDetail(el, inst) {
                       background:${isSel?'var(--surf2)':'var(--bg2)'};
                       border:1px solid ${isSel?'var(--cad-wire)':'var(--border)'};
                       margin-bottom:0;transition:all .12s">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                      <div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <!-- Step name + meta — grows to fill -->
+                      <div style="flex:1;min-width:0">
                         <div style="font-size:12px;font-weight:500;color:${textColor}">
                           ${escHtml(s.name||meta.label)}
                         </div>
@@ -2307,6 +2292,39 @@ function renderInstanceDetail(el, inst) {
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
                         </div>
                       </div>
+                      <!-- Elapsed timer — right justified, dd:hh:mm -->
+                      ${(() => {
+                        const activatedAt  = stepActivatedAt[s.id];
+                        const completedAt  = stepCompletedAt[s.id];
+                        const monoStyle    = 'font-family:var(--font-mono);font-size:13px;letter-spacing:.04em';
+                        const labelStyle   = 'font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px';
+                        function calcElapsed(from, to) {
+                          const ms = (to ? new Date(to) : new Date()) - new Date(from);
+                          if (ms < 0) return '00:00:00';
+                          const m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+                          return `${String(d).padStart(2,'0')}:${String(h%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+                        }
+                        if (done && activatedAt) {
+                          const elapsed = calcElapsed(activatedAt, completedAt);
+                          return `<div style="text-align:right;flex-shrink:0">
+                            <div style="${monoStyle};color:var(--green)">${elapsed}</div>
+                            <div style="${labelStyle};color:var(--green)">Elapsed</div>
+                          </div>`;
+                        } else if (activatedAt) {
+                          const elapsed = calcElapsed(activatedAt, null);
+                          return `<div style="text-align:right;flex-shrink:0">
+                            <div id="timer-${s.id}" data-from="${activatedAt}"
+                              style="${monoStyle};color:var(--cad)">${elapsed}</div>
+                            <div style="${labelStyle};color:var(--cad)">Elapsed</div>
+                          </div>`;
+                        } else {
+                          return `<div style="text-align:right;flex-shrink:0">
+                            <div style="${monoStyle};color:var(--muted)">--:--:--</div>
+                            <div style="${labelStyle};color:var(--muted)">Waiting</div>
+                          </div>`;
+                        }
+                      })()}
+                      <!-- Chevron -->
                       <span style="font-size:10px;color:var(--muted);flex-shrink:0;
                         transition:transform .15s;transform:rotate(${isSel?180:0}deg)">▼</span>
                     </div>
@@ -2317,12 +2335,10 @@ function renderInstanceDetail(el, inst) {
                   <div style="border:1px solid var(--cad-wire);border-top:none;border-radius:0 0 5px 5px;
                     background:var(--bg1);padding:12px 14px;margin-bottom:0">
 
-                    <!-- Config read-only summary -->
+                    <!-- Config read-only summary — no Type (shown in card header) -->
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;
                       font-size:11px;margin-bottom:12px;padding-bottom:12px;
                       border-bottom:1px solid var(--border)">
-                      <div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Type</span>
-                        <div style="color:${meta.badgeText};font-size:10px;margin-top:2px">${meta.label}</div></div>
                       <div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Due</span>
                         <div style="color:var(--text2);font-size:10px;margin-top:2px">${s.due_days!=null?(s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+' business days'):'Not set'}</div></div>
                       ${s.escalate_after_days?`<div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Escalate After</span>
@@ -2331,47 +2347,93 @@ function renderInstanceDetail(el, inst) {
                         <div style="color:var(--text2);font-size:11px;margin-top:2px;line-height:1.4">${escHtml(s.instructions)}</div></div>`:''}
                     </div>
 
-                    <!-- Reassignment section -->
+                    <!-- Attached reference documents -->
+                    ${(s._attachedDocs||[]).length ? `
+                    <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+                        color:var(--muted);margin-bottom:6px">Attached Documents</div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+                        ${(s._attachedDocs||[]).map(d => {
+                          const roleColor = d.role==='authorization'?'var(--amber)':d.role==='evidence'?'var(--green)':'var(--accent)';
+                          const roleIcon  = d.role==='authorization'?'⬆':d.role==='evidence'?'📝':'📋';
+                          return `<div class="attached-doc" style="gap:6px">
+                            <span style="color:${roleColor};flex-shrink:0">${roleIcon}</span>
+                            <span class="attached-doc-name" style="flex:1;font-size:11px">${escHtml(d.name)}</span>
+                            <span style="font-size:9px;color:var(--cad);font-family:var(--font-mono);flex-shrink:0;white-space:nowrap">${escHtml(d.version||'')}</span>
+                            ${d.url?`<button class="attached-doc-remove" style="color:var(--accent)"
+                              onclick="window.open('${d.url}','_blank')" title="View">⤢</button>`:''}
+                          </div>`;
+                        }).join('')}
+                      </div>
+                    </div>` : ''}
+
+                    <!-- Reassignment section — all resources, multi-assignee -->
                     ${canAct ? `
                     <div>
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-                        ${s.assignee_type === 'user' || s.assignee_type === 'role' ? `
+
+                      <!-- Current assignees list -->
+                      <div id="reassign-list-${s.id}" style="margin-bottom:8px">
+                        ${(() => {
+                          // Collect current assignees from template + any reassignments
+                          const list = [];
+                          const templateName = s.assignee_type==='pm' ? 'Project Manager'
+                            : s.assignee_name || s.assignee_email || s.assignee_role
+                              || (_users_cad.find(u=>u.id===s.assignee_user_id)?.name) || null;
+                          if (templateName) list.push({ name: templateName, source: 'template', removable: false });
+                          // Add reassignments from CoC
+                          const stepReassigns = coc.filter(e=>e.event_type==='step_reassigned'&&e.step_id===s.id);
+                          stepReassigns.forEach(r => {
+                            if (r.assignee_name||r.assignee_email) {
+                              list.push({ name: r.assignee_name||r.assignee_email, email: r.assignee_email,
+                                source: 'reassigned', id: r.id, removable: true });
+                            }
+                          });
+                          return list.map(a => `
+                            <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;
+                              background:var(--surf3);border:1px solid var(--border2);border-radius:3px;margin-bottom:3px">
+                              <span style="font-size:11px;color:var(--text2);flex:1">${escHtml(a.name)}</span>
+                              ${a.source==='reassigned'?`<span style="font-size:9px;color:var(--accent);letter-spacing:.06em">REASSIGNED</span>`
+                                :`<span style="font-size:9px;color:var(--muted);letter-spacing:.06em">TEMPLATE</span>`}
+                            </div>`).join('') || '<div style="font-size:10px;color:var(--muted)">No assignee set</div>';
+                        })()}
+                      </div>
+
+                      <!-- Add assignee from all resources -->
+                      <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end;margin-bottom:8px">
                         <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Internal User</label>
-                          <select class="config-select" id="reassign-user-${s.id}" style="font-size:11px">
-                            <option value="">— Keep template default —</option>
-                            ${_users_cad.map(u=>`<option value="${u.id}"${reassign?.assignee_user_id===u.id?' selected':''}>${escHtml(u.name)}</option>`).join('')}
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Add Assignee</label>
+                          <select class="config-select" id="reassign-res-${s.id}" style="font-size:11px">
+                            <option value="">— Select resource —</option>
+                            ${_resources_cad.map(r=>`<option value="${r.id}"
+                              data-name="${escHtml(r.name)}"
+                              data-email="${escHtml(r.email||'')}"
+                              data-ext="${r.is_external?'1':'0'}">
+                              ${escHtml(r.name)}${r.is_external?' (External)':''}${r.title?' — '+escHtml(r.title):''}
+                            </option>`).join('')}
                           </select>
-                        </div>` : ''}
-                        ${s.assignee_type === 'external' ? `
+                        </div>
+                        <button class="btn btn-solid btn-sm" style="font-size:10px;white-space:nowrap"
+                          onclick="addReassignment('${inst.id}','${s.id}')">+ Add</button>
+                      </div>
+                      <!-- External override fields (shown when external resource selected or step is external) -->
+                      ${s.assignee_type==='external'?`
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
                         <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Recipient Name</label>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px">Name Override</label>
                           <input class="config-input" id="reassign-name-${s.id}" style="font-size:11px"
                             value="${escHtml(reassign?.assignee_name||s.assignee_name||'')}"
-                            placeholder="${escHtml(s.assignee_name||'Name')}" />
+                            placeholder="Full name" />
                         </div>
                         <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Email</label>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px">Email Override</label>
                           <input class="config-input" id="reassign-email-${s.id}" type="email" style="font-size:11px"
                             value="${escHtml(reassign?.assignee_email||s.assignee_email||'')}"
-                            placeholder="${escHtml(s.assignee_email||'email@example.com')}" />
+                            placeholder="email@example.com" />
                         </div>
-                        <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Organisation</label>
-                          <input class="config-input" id="reassign-org-${s.id}" style="font-size:11px"
-                            value="${escHtml(reassign?.assignee_org||s.assignee_org||'')}"
-                            placeholder="${escHtml(s.assignee_org||'Organisation')}" />
-                        </div>` : ''}
-                      </div>
-                      <div style="display:flex;gap:6px;align-items:center">
-                        <button class="btn btn-solid btn-sm" style="font-size:10px"
-                          onclick="saveReassignment('${inst.id}','${s.id}','${s.assignee_type}')">
-                          ↻ Save Reassignment
-                        </button>
-                        <span id="reassign-status-${s.id}" style="font-size:10px;color:var(--muted)"></span>
-                      </div>
+                      </div>`:''}
+                      <span id="reassign-status-${s.id}" style="font-size:10px;color:var(--muted)"></span>
                     </div>` : `
                     <div style="font-size:10px;color:var(--muted)">
                       Instance is ${inst.status} — reassignment not available.
@@ -2417,40 +2479,33 @@ function renderInstanceDetail(el, inst) {
       </div>
 
     </div>`;
+
+  // Start live tick for active step timers (dd:hh:mm updates every 30s)
+  _startElapsedTimer(inst);
 }
 
-// ── Elapsed time timer engine ─────────────────────────────────────────────────
+// ── Elapsed timer engine ──────────────────────────────────────────────────────
 let _elapsedTimer = null;
 
-function _fmtElapsed(ms) {
-  if (ms < 0) ms = 0;
-  const totalMins = Math.floor(ms / 60000);
-  const mins = totalMins % 60;
-  const hours = Math.floor(totalMins / 60) % 24;
-  const days  = Math.floor(totalMins / 1440);
-  return `${String(days).padStart(2,'0')}:${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
-}
-
 function _startElapsedTimer(inst) {
-  // Clear any existing timer
   if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
-
-  // Only tick for active instances with a launch time
-  if (!inst?.launched_at || inst.status === 'cancelled' || inst.status === 'complete') return;
-
-  const launched = new Date(inst.launched_at).getTime();
-  const elId = 'inst-elapsed-' + inst.id;
-
+  if (!inst || inst.status === 'cancelled' || inst.status === 'complete') return;
   _elapsedTimer = setInterval(() => {
-    const el = document.getElementById(elId);
-    if (!el) { clearInterval(_elapsedTimer); _elapsedTimer = null; return; }
-    el.textContent = _fmtElapsed(Date.now() - launched);
-  }, 10000); // update every 10 seconds (minutes precision)
+    document.querySelectorAll('[id^="timer-"][data-from]').forEach(el => {
+      const from = new Date(el.dataset.from);
+      const ms   = Date.now() - from;
+      if (ms < 0) return;
+      const m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+      el.textContent = `${String(d).padStart(2,'0')}:${String(h%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+    });
+  }, 30000); // tick every 30s — dd:hh:mm precision
 }
 
 function _stopElapsedTimer() {
   if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
 }
+
+// ── Instance step toggle ───────────────────────────────────────────────────────
 function toggleInstanceStep(instId, stepId) {
   const inst = _instances.find(i => i.id === instId);
   if (!inst) return;
@@ -2459,9 +2514,18 @@ function toggleInstanceStep(instId, stepId) {
   if (detailEl) renderInstanceDetail(detailEl, inst);
 }
 
-// ── Save reassignment ─────────────────────────────────────────────────────────
-async function saveReassignment(instId, stepId, assigneeType) {
+// ── Add assignee reassignment from resource picker ────────────────────────────
+async function addReassignment(instId, stepId) {
   const statusEl = document.getElementById(`reassign-status-${stepId}`);
+  const sel      = document.getElementById(`reassign-res-${stepId}`);
+  const resId    = sel?.value;
+
+  if (!resId) {
+    if (statusEl) { statusEl.textContent = 'Select a resource first'; statusEl.style.color = 'var(--red)'; }
+    return;
+  }
+
+  const resource = _resources_cad.find(r => r.id === resId);
   if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--muted)'; }
 
   try {
@@ -2470,23 +2534,16 @@ async function saveReassignment(instId, stepId, assigneeType) {
       firm_id:          FIRM_ID_CAD,
       event_type:       'step_reassigned',
       step_id:          stepId,
+      assignee_name:    resource?.name || null,
+      assignee_email:   resource?.email || null,
       created_at:       new Date().toISOString(),
     };
 
-    if (assigneeType === 'external') {
-      payload.assignee_name  = document.getElementById(`reassign-name-${stepId}`)?.value?.trim() || null;
-      payload.assignee_email = document.getElementById(`reassign-email-${stepId}`)?.value?.trim() || null;
-      payload.assignee_org   = document.getElementById(`reassign-org-${stepId}`)?.value?.trim() || null;
-    } else {
-      const userId = document.getElementById(`reassign-user-${stepId}`)?.value || null;
-      if (!userId) {
-        if (statusEl) { statusEl.textContent = 'Select a user first'; statusEl.style.color = 'var(--red)'; }
-        return;
-      }
-      const user = _users_cad.find(u => u.id === userId);
-      payload.assignee_user_id = userId;
-      payload.assignee_name    = user?.name || null;
-    }
+    // For external steps also read the override fields if present
+    const nameOverride  = document.getElementById(`reassign-name-${stepId}`)?.value?.trim();
+    const emailOverride = document.getElementById(`reassign-email-${stepId}`)?.value?.trim();
+    if (nameOverride)  payload.assignee_name  = nameOverride;
+    if (emailOverride) payload.assignee_email = emailOverride;
 
     await API.post('workflow_step_instances', payload);
 
@@ -2498,8 +2555,12 @@ async function saveReassignment(instId, stepId, assigneeType) {
       ).catch(() => inst._stepInsts);
     }
 
-    if (statusEl) { statusEl.textContent = '✓ Saved'; statusEl.style.color = 'var(--green)'; }
-    cadToast('Reassignment saved to Chain of Custody', 'success');
+    if (statusEl) { statusEl.textContent = `✓ ${resource?.name||'Resource'} added`; statusEl.style.color = 'var(--green)'; }
+    cadToast(`${resource?.name||'Resource'} assigned — recorded in Chain of Custody`, 'success');
+
+    // Reset picker
+    if (sel) sel.value = '';
+
     const detailEl = document.getElementById('instance-detail');
     if (detailEl && inst) renderInstanceDetail(detailEl, inst);
 
@@ -2561,6 +2622,7 @@ async function deleteInstance(instId) {
     await API.del(`workflow_instances?id=eq.${instId}`);
     _instances = _instances.filter(i => i.id !== instId);
     _selectedInstance = null;
+    _stopElapsedTimer();
     renderInstancesTab(document.getElementById('cad-content'));
     cadToast('Instance deleted', 'success');
   } catch(e) { cadToast('Delete failed: ' + e.message, 'error'); }
@@ -2582,10 +2644,7 @@ async function _reloadInstance(instId) {
   }
   renderInstancesTab(document.getElementById('cad-content'));
   const detailEl = document.getElementById('instance-detail');
-  if (detailEl && _selectedInstance) {
-    renderInstanceDetail(detailEl, _selectedInstance);
-    _startElapsedTimer(_selectedInstance);
-  }
+  if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
 }
 
 // ── Forms tab placeholder ─────────────────────────────────────────────────────
@@ -2616,11 +2675,18 @@ function renderTriggersTab(el) {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
-let _users_cad = [];
-// Load users once
+let _users_cad     = []; // app users (for template editor assignee dropdowns)
+let _resources_cad = []; // all firm resources (for instance reassignment)
+
 API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
 }).catch(() => {});
+
+API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_name,last_name,title,email,is_external&order=last_name.asc`)
+  .then(r => { _resources_cad = (r || []).map(x => ({
+    ...x, name: `${x.first_name||''} ${x.last_name||''}`.trim()
+  })); })
+  .catch(() => {});
 
 function escHtml(s) {
   return (s || '').toString()
