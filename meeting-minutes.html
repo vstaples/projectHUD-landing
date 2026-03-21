@@ -576,9 +576,12 @@ textarea.editor-area.lg { min-height: 120px; }
 <script src="/js/api.js"></script>
 <script src="/js/sidebar.js"></script>
 <script>
-const params      = new URLSearchParams(location.search);
-const MEETING_ID  = params.get('meeting_id');
-const PROSPECT_ID = params.get('prospect_id');
+const params             = new URLSearchParams(location.search);
+const MEETING_ID         = params.get('meeting_id');
+const PROSPECT_ID        = params.get('prospect_id');
+const WF_INSTANCE_ID     = params.get('workflow_instance_id');
+const WF_STEP_ID         = params.get('step_id');
+const IS_WORKFLOW_MODE   = !!(WF_INSTANCE_ID && WF_STEP_ID);
 
 let meeting       = null;
 let minutes       = null;
@@ -588,16 +591,331 @@ let resources     = [];
 let contacts      = [];
 let ccRecipients  = [];
 let _autosaveTimer = null;
-let _agendaNotes  = {};   // { [agendaItemId]: string } — per-item discussion notes
-let _agendaItems  = [];   // agenda items loaded with meeting
+let _agendaNotes  = {};
+let _agendaItems  = [];
+
+// Workflow mode state
+let _wfStep       = null;  // template step record
+let _wfInstance   = null;  // workflow instance record
+let _wfComments   = [];    // threaded comments
+let _myResourceId = null;
+let _myUserId     = null;
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!MEETING_ID) { location.href = '/pipeline.html'; return; }
-  if (window.Sidebar) Sidebar.init('pipeline');
-  await loadAll();
+  if (window.Sidebar) Sidebar.init(IS_WORKFLOW_MODE ? 'cadence' : 'pipeline');
+
+  // Load current user for comments authorship
+  try {
+    const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+    const sub   = JSON.parse(atob(token.split('.')[1])).sub;
+    const uRows = await API.get(`users?id=eq.${sub}&select=id,resource_id`).catch(()=>[]);
+    _myUserId     = uRows?.[0]?.id || null;
+    _myResourceId = uRows?.[0]?.resource_id || null;
+  } catch(e) {}
+
+  if (IS_WORKFLOW_MODE) {
+    await loadWorkflowMode();
+  } else {
+    if (!MEETING_ID) { location.href = '/pipeline.html'; return; }
+    await loadAll();
+  }
   bindAutosave();
 });
+
+// ── Workflow mode loader ────────────────────────────────
+async function loadWorkflowMode() {
+  try {
+    const [stepRows, instRows, resRows, commentRows] = await Promise.all([
+      API.get(`workflow_template_steps?id=eq.${WF_STEP_ID}&select=*`).catch(()=>[]),
+      API.get(`workflow_instances?id=eq.${WF_INSTANCE_ID}&select=*`).catch(()=>[]),
+      API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,email`).catch(()=>[]),
+      API.get(`workflow_step_comments?template_step_id=eq.${WF_STEP_ID}&order=created_at.asc`).catch(()=>[]),
+    ]);
+
+    _wfStep     = stepRows?.[0] || null;
+    _wfInstance = instRows?.[0] || null;
+    resources   = (resRows || []).map(r => ({ ...r, name: `${r.first_name||''} ${r.last_name||''}`.trim() }));
+    _wfComments = commentRows || [];
+
+    // Build threaded comment tree
+    const top = _wfComments.filter(c => !c.parent_id);
+    top.forEach(c => { c.replies = _wfComments.filter(r => r.parent_id === c.id); });
+
+    // Build synthetic "meeting" object from workflow step data
+    const agenda = Array.isArray(_wfStep?.meeting_agenda) ? _wfStep.meeting_agenda : [];
+    meeting = {
+      title:           _wfStep?.name || _wfInstance?.title || 'Meeting',
+      meeting_date:    new Date().toISOString(),
+      duration_minutes: 60,
+      location_or_link: null,
+    };
+
+    // Seed agenda items from template step
+    _agendaItems = agenda.map((item, i) => ({
+      id:    `wf-agenda-${i}`,
+      title: item,
+      sort_order: i,
+    }));
+
+    // Load attached docs from step
+    const attachedDocs = Array.isArray(_wfStep?.attached_docs) ? _wfStep.attached_docs : [];
+
+    renderWorkflowBanner();
+    renderHeader();
+    renderWorkflowMeta(attachedDocs);
+    renderWorkflowAttendees();
+    renderActionItems();
+    renderAgendaNotes();
+    renderWorkflowComments(top);
+    populateWorkflowForm();
+
+    // Update backbar
+    const backLink = document.getElementById('back-link');
+    const backProspect = document.getElementById('back-prospect');
+    const backMeeting  = document.getElementById('back-meeting');
+    if (backLink)    { backLink.textContent = '← Workflow'; backLink.href = '/cadence.html'; }
+    if (backProspect){ backProspect.style.display = 'none'; backProspect.previousSibling.style.display = 'none'; }
+    if (backMeeting)   backMeeting.textContent = escHtml(meeting.title);
+
+  } catch(e) {
+    console.error('Workflow mode load error:', e);
+  }
+}
+
+function renderWorkflowBanner() {
+  // Insert a green workflow context banner above the editor layout
+  const layout = document.querySelector('.editor-layout');
+  if (!layout) return;
+  const banner = document.createElement('div');
+  banner.style.cssText = `
+    background:rgba(79,200,140,.08);border:1px solid rgba(79,200,140,.3);
+    border-radius:6px;padding:10px 16px;margin:0 0 16px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    font-size:12px;color:#4fc88c;font-family:inherit;
+  `;
+  banner.innerHTML = `
+    <div>
+      <strong style="font-size:13px">◉ Workflow Meeting Step</strong>
+      <span style="color:rgba(255,255,255,.5);margin:0 8px">·</span>
+      <span style="color:rgba(255,255,255,.6)">${escHtml(_wfInstance?.title||'')}</span>
+    </div>
+    <button onclick="completeMeetingStep()"
+      style="padding:7px 16px;background:#4fc88c;border:none;color:#000;
+        font-size:12px;font-weight:700;cursor:pointer;border-radius:5px">
+      ✓ Complete Meeting Step
+    </button>`;
+  layout.parentNode.insertBefore(banner, layout);
+}
+
+function renderWorkflowMeta(attachedDocs) {
+  // Override meta pane with workflow context
+  const detailsEl = document.getElementById('meta-details');
+  if (detailsEl) detailsEl.innerHTML = `
+    <div><span style="color:var(--muted)">Instance: </span>${escHtml(_wfInstance?.title||'—')}</div>
+    <div><span style="color:var(--muted)">Step: </span>${escHtml(_wfStep?.name||'—')}</div>
+    <div><span style="color:var(--muted)">Status: </span>${(_wfInstance?.status||'—').replace('_',' ').toUpperCase()}</div>
+  `;
+
+  // Show attached reference documents in meta pane
+  if (attachedDocs.length) {
+    const sendHistEl = document.getElementById('meta-send-history');
+    if (sendHistEl) {
+      const docsSection = document.createElement('div');
+      docsSection.className = 'meta-section';
+      docsSection.innerHTML = `
+        <div class="meta-label">REFERENCE DOCUMENTS</div>
+        ${attachedDocs.map(d => {
+          const roleColor = d.role==='authorization'?'#d4901f':d.role==='evidence'?'#2a9d40':'#4f8ef7';
+          const roleIcon  = d.role==='authorization'?'⬆':d.role==='evidence'?'📝':'📋';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;
+            border-bottom:1px solid rgba(255,255,255,.04);font-size:12px">
+            <span style="color:${roleColor}">${roleIcon}</span>
+            <span style="flex:1;color:var(--text)">${escHtml(d.name)}</span>
+            ${d.version?`<span style="font-size:10px;color:var(--muted)">${escHtml(d.version)}</span>`:''}
+            ${d.url?`<a href="${d.url}" target="_blank"
+              style="font-size:10px;color:var(--accent);text-decoration:none">View ⤢</a>`:''}
+          </div>`;
+        }).join('')}`;
+      sendHistEl.parentNode.insertBefore(docsSection, sendHistEl.parentNode.querySelector('.meta-section:last-child'));
+    }
+  }
+}
+
+function renderWorkflowAttendees() {
+  // Show assignees from step as attendees placeholder
+  const el = document.getElementById('meta-attendees');
+  if (!el) return;
+  const names = [];
+  if (_wfStep?.assignee_name)  names.push(_wfStep.assignee_name);
+  if (_wfStep?.assignee_role)  names.push(_wfStep.assignee_role);
+  if (!names.length) { el.innerHTML = '<div style="font-size:11px;color:var(--muted)">Add attendees below</div>'; return; }
+  el.innerHTML = names.map(n => {
+    const initials = n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    return `<div class="attendee-chip">
+      <div class="att-av">${escHtml(initials)}</div>
+      <div><div class="att-name">${escHtml(n)}</div></div>
+      <span class="att-status att-invited">Invited</span>
+    </div>`;
+  }).join('');
+}
+
+function renderWorkflowComments(topComments) {
+  // Inject threaded comments section at the bottom of the editor pane
+  const editorPane = document.querySelector('.editor-pane');
+  if (!editorPane) return;
+
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.id = 'wf-comments-section';
+
+  function fmtTs(ts) {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  }
+  function initials(name) { return (name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+
+  function renderComment(c, isReply=false) {
+    const indent = isReply ? 'margin-left:32px;' : '';
+    return `<div style="${indent}padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)" id="wf-comment-${c.id}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.25)">${initials(c.author_name)}</div>
+        <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escHtml(c.author_name||'Unknown')}</span>
+        <span style="font-size:10px;color:var(--muted);font-family:monospace">${fmtTs(c.created_at)}</span>
+        ${!isReply?`<button onclick="toggleWfReply('${c.id}')" style="background:none;border:none;font-size:10px;color:var(--muted);cursor:pointer;padding:0">↩ Reply</button>`:''}
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,.7);line-height:1.5;padding-left:34px">${escHtml(c.body)}</div>
+      ${!isReply?`<div id="wf-reply-compose-${c.id}" style="display:none;margin:6px 0 0 34px">
+        <div style="display:flex;gap:6px;align-items:flex-end">
+          <textarea id="wf-reply-input-${c.id}" placeholder="Reply…"
+            style="flex:1;padding:6px 8px;font-size:11px;font-family:inherit;background:var(--surf2);border:1px solid rgba(255,255,255,.14);color:var(--text);resize:none;min-height:46px;border-radius:4px;outline:none"
+            onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitWfComment('${c.id}')}"></textarea>
+          <button onclick="submitWfComment('${c.id}')" style="padding:6px 12px;background:var(--accent);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;border-radius:4px">Reply</button>
+        </div>
+      </div>`:''}
+      ${(c.replies||[]).map(r=>renderComment(r,true)).join('')}
+    </div>`;
+  }
+
+  section.innerHTML = `
+    <div class="section-label">DISCUSSION &amp; COMMENTS</div>
+    <div id="wf-comments-list" style="max-height:320px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);border-radius:6px 6px 0 0;background:rgba(0,0,0,.15);padding:0 12px">
+      ${!topComments.length
+        ? '<div style="padding:16px;font-size:11px;color:var(--muted);text-align:center">No comments yet — be the first.</div>'
+        : topComments.map(c=>renderComment(c)).join('')}
+    </div>
+    <div style="display:flex;border:1px solid rgba(255,255,255,.08);border-top:none;border-radius:0 0 6px 6px;overflow:hidden">
+      <textarea id="wf-comment-input" placeholder="Add a comment… (Ctrl+Enter to send)"
+        style="flex:1;padding:9px 12px;font-size:12px;font-family:inherit;background:var(--surf2);border:none;color:var(--text);resize:none;min-height:44px;outline:none"
+        onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitWfComment(null)}"></textarea>
+      <button onclick="submitWfComment(null)"
+        style="padding:0 16px;background:var(--accent);border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer">Send</button>
+    </div>`;
+
+  editorPane.appendChild(section);
+}
+
+function toggleWfReply(commentId) {
+  const el = document.getElementById('wf-reply-compose-' + commentId);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'flex';
+  if (!isOpen) document.getElementById('wf-reply-input-' + commentId)?.focus();
+}
+
+async function submitWfComment(parentId) {
+  const input = parentId
+    ? document.getElementById('wf-reply-input-' + parentId)
+    : document.getElementById('wf-comment-input');
+  const body = input?.value?.trim();
+  if (!body) return;
+
+  const FIRM_ID = window.PHUD?.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const authorName = resources.find(r=>r.id===_myResourceId)?.name || 'Team Member';
+
+  try {
+    await API.post('workflow_step_comments', {
+      firm_id:           FIRM_ID,
+      instance_id:       WF_INSTANCE_ID,
+      template_step_id:  WF_STEP_ID,
+      parent_id:         parentId || null,
+      author_resource_id: _myResourceId || null,
+      author_name:       authorName,
+      body,
+      created_at:        new Date().toISOString(),
+    });
+    if (input) input.value = '';
+    if (parentId) document.getElementById('wf-reply-compose-' + parentId).style.display = 'none';
+    // Reload comments
+    const rows = await API.get(`workflow_step_comments?template_step_id=eq.${WF_STEP_ID}&order=created_at.asc`).catch(()=>[]);
+    const top = rows.filter(c=>!c.parent_id);
+    top.forEach(c => { c.replies = rows.filter(r=>r.parent_id===c.id); });
+    const listEl = document.getElementById('wf-comments-list');
+    if (listEl) listEl.innerHTML = top.map(c => {
+      // Re-use renderWorkflowComments inner logic via re-render
+      return `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:rgba(79,142,247,.15);color:#4f8ef7;border:1px solid rgba(79,142,247,.25)">${(c.author_name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+          <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escHtml(c.author_name||'Unknown')}</span>
+          <span style="font-size:10px;color:var(--muted);font-family:monospace">${new Date(c.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.7);line-height:1.5;padding-left:34px">${escHtml(c.body)}</div>
+        ${(c.replies||[]).map(r=>`<div style="margin-left:32px;padding:6px 0;border-top:1px solid rgba(255,255,255,.04)">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">
+            <div style="width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:rgba(79,142,247,.1);color:#4f8ef7">${(r.author_name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+            <span style="font-size:11px;font-weight:600;color:var(--text)">${escHtml(r.author_name||'')}</span>
+            <span style="font-size:10px;color:var(--muted);font-family:monospace">${new Date(r.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>
+          </div>
+          <div style="font-size:11px;color:rgba(255,255,255,.6);padding-left:28px">${escHtml(r.body)}</div>
+        </div>`).join('')}
+      </div>`;
+    }).join('');
+    listEl.scrollTop = listEl.scrollHeight;
+  } catch(e) {
+    alert('Comment failed: ' + e.message);
+  }
+}
+
+async function completeMeetingStep() {
+  if (!confirm('Mark this meeting step as complete? This will write a completion event to the Chain of Custody.')) return;
+  const SUPA_URL = window.PHUD?.SUPABASE_URL || 'https://dvbetgdzksatcgdfftbs.supabase.co';
+  const ANON_KEY = window.PHUD?.SUPABASE_KEY || '';
+  const FIRM_ID  = window.PHUD?.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  try {
+    // Save draft first
+    await saveDraft();
+    // Write step_completed CoC event
+    await API.post('workflow_step_instances', {
+      instance_id:      WF_INSTANCE_ID,
+      firm_id:          FIRM_ID,
+      event_type:       'step_completed',
+      template_step_id: WF_STEP_ID,
+      step_type:        'meeting',
+      step_name:        _wfStep?.name || 'Meeting',
+      outcome:          'complete',
+      event_notes:      'Meeting completed and minutes recorded.',
+      created_at:       new Date().toISOString(),
+    });
+    alert('Meeting step marked complete. Returning to workflow.');
+    window.close();
+    // Fallback if window.close() doesn't work (not opened as popup)
+    setTimeout(() => { location.href = '/cadence.html'; }, 400);
+  } catch(e) {
+    alert('Failed to complete step: ' + e.message);
+  }
+}
+
+function populateWorkflowForm() {
+  // Set a default subject from step/instance name
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const subjectEl = document.getElementById('f-subject');
+  if (subjectEl) subjectEl.value = `Meeting minutes — ${_wfStep?.name||'Meeting'} — ${dateStr}`;
+  // Pre-comments from step template
+  if (_wfStep?.meeting_comments) {
+    const msgEl = document.getElementById('f-message');
+    if (msgEl && !msgEl.value) msgEl.value = _wfStep.meeting_comments;
+  }
+}
 
 async function loadAll() {
   try {
