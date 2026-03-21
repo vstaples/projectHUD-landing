@@ -668,6 +668,7 @@ let _selectedTmpl   = null;   // full template object with .steps[]
 let _selectedStep   = null;   // step object currently in config panel
 let _dirtySteps     = false;  // unsaved changes flag
 let _structuralChange = false; // true when steps added/deleted since last save
+let _versionBumped  = false;  // true once version has been bumped in this draft session
 let _autoSaveTimer  = null;   // setInterval handle
 let _lastSavedAt    = null;   // Date of last successful auto-save
 
@@ -815,6 +816,7 @@ async function selectTemplate(id) {
   _selectedStep = null;
   _lastSavedAt  = null;
   _structuralChange = false;
+  _versionBumped    = false;
 
   // Re-render list to update active state
   const listEl = document.getElementById('tmpl-list');
@@ -1807,7 +1809,8 @@ function updateStepField(field, value) {
   _selectedStep[field] = value;
   _dirtySteps = true;
   // Only re-render spine for fields that affect the card summary line
-  const cardFields = ['name','assignee_name','assignee_email','assignee_role',
+  // NOTE: 'name' intentionally excluded — reRenderSpine destroys the input mid-keystroke
+  const cardFields = ['assignee_name','assignee_email','assignee_role',
                       'due_days','due_type','escalate_after_days','parallel_required',
                       'input_from_step','forward_input','reject_to'];
   if (cardFields.includes(field)) reRenderSpine();
@@ -2043,22 +2046,21 @@ async function saveTemplate(silent = false) {
     let min = _selectedTmpl.version_minor || 0;
     let pat = _selectedTmpl.version_patch || 0;
 
-    // Releasing: bump major, reset minor+patch
+    // Releasing: bump major, reset minor+patch, clear bump flag
     if (newStatus === 'released' && oldStatus !== 'released') {
       maj += 1; min = 0; pat = 0;
+      _versionBumped = false; // reset so next draft cycle can bump again
     }
-    // Back to draft from released: no version bump on status change itself —
-    // version bumps happen when steps change
-    else if (newStatus === 'draft' && oldStatus === 'released') {
-      // no bump on status change — bumps come from step edits below
-    }
-    // Step structure changed (add/delete)
-    else if (_structuralChange && newStatus !== 'released') {
-      min += 1; pat = 0;
-    }
-    // Step content modified only (no structural change)
-    else if (_dirtySteps && !_structuralChange && newStatus !== 'released') {
-      pat += 1;
+    // Only bump once per draft editing session (structural or content change)
+    // Subsequent autosaves in the same session keep the same version
+    else if (!_versionBumped && newStatus !== 'released') {
+      if (_structuralChange) {
+        min += 1; pat = 0;
+        _versionBumped = true;
+      } else if (_dirtySteps) {
+        pat += 1;
+        _versionBumped = true;
+      }
     }
 
     const newVersion = `${maj}.${min}.${pat}`;
