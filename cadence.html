@@ -2297,11 +2297,22 @@ function launchInstance() {
 }
 
 async function confirmLaunch() {
-  const title   = document.getElementById('launch-title')?.value?.trim();
-  const ownerId = document.getElementById('launch-owner')?.value;
-  const notes   = document.getElementById('launch-notes')?.value?.trim();
-  if (!title)   { cadToast('Title required', 'error'); return; }
-  if (!ownerId) { cadToast('Owner required — select who will manage this instance', 'error'); return; }
+  const title      = document.getElementById('launch-title')?.value?.trim();
+  const ownerResId = document.getElementById('launch-owner')?.value;  // resource_id
+  const notes      = document.getElementById('launch-notes')?.value?.trim();
+  if (!title)      { cadToast('Title required', 'error'); return; }
+  if (!ownerResId) { cadToast('Owner required — select who will manage this instance', 'error'); return; }
+
+  // Resolve resource_id → user_id for the launched_by FK
+  // The picker shows resources; launched_by requires a users.id
+  const ownerUser   = _users_cad.find(u => u.resource_id === ownerResId);
+  const launchedBy  = ownerUser?.id || _myUserId || null;
+  const ownerName   = _resources_cad.find(r => r.id === ownerResId)?.name || '';
+
+  if (!launchedBy) {
+    cadToast('Selected owner has no app user account — please select someone with a login', 'error');
+    return;
+  }
 
   try {
     const res = await API.post('workflow_instances', {
@@ -2310,7 +2321,7 @@ async function confirmLaunch() {
       title,
       notes:       notes || null,
       status:      'in_progress',
-      launched_by: ownerId,
+      launched_by: launchedBy,
       launched_at: new Date().toISOString(),
     });
 
@@ -2325,7 +2336,7 @@ async function confirmLaunch() {
         step_name:    'Instance launched',
         status:       'complete',
         event_type:   'instance_launched',
-        event_notes:  `Launched from template: ${_selectedTmpl.name}`,
+        event_notes:  `Launched from template: ${_selectedTmpl.name}${ownerName ? ' · Owner: ' + ownerName : ''}`,
         actor_resource_id: null,
       });
 
@@ -3179,6 +3190,7 @@ function renderResourceOptions(selectedId = '', placeholder = '— Select resour
 let _users_cad     = []; // app users (for template editor assignee dropdowns)
 let _resources_cad = []; // all firm resources (for instance reassignment)
 let _myResourceId  = null; // current user's resource ID (for owner auto-select)
+let _myUserId      = null; // current user's user ID (for launched_by FK)
 
 API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
@@ -3189,8 +3201,9 @@ API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   try {
     const token = await Auth.getFreshToken().catch(() => Auth.getToken());
     const sub   = JSON.parse(atob(token.split('.')[1])).sub;
-    const rows  = await API.get(`users?id=eq.${sub}&select=resource_id`).catch(() => []);
+    const rows  = await API.get(`users?id=eq.${sub}&select=id,resource_id`).catch(() => []);
     _myResourceId = rows?.[0]?.resource_id || null;
+    _myUserId     = rows?.[0]?.id          || null;
   } catch(e) {}
 })();
 
