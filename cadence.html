@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CadenceHUD — Workflow Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+<!-- Shared ProjectHUD infrastructure -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/sidebar.js"></script>
+
+<style>
+/* ── Reset & root vars (mirror projects.html) ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar-w:220px;
+  --bg:#0f1117; --bg1:#0c1220; --bg2:#111827;
+  --surface:#181c27; --surf2:#1e2436; --surf3:#232a3e;
+  --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+  --text:#e8eaf0; --text0:#e8f4ff; --text1:#c8dff0; --text2:#7a9bbf; --text3:#3a5a7a;
+  --muted:#7a8099;
+  --accent:#4f8ef7; --cyan:#00d2ff; --cyan-dim:rgba(0,210,255,.08);
+  --green:#2a9d40; --amber:#d4901f; --red:#c0404a; --purple:#7c4dff;
+  --font-hud:'Rajdhani','Inter',sans-serif;
+  --font-ui:'Inter',system-ui,sans-serif;
+  --font-mono:'Share Tech Mono',monospace;
+  /* CadenceHUD accent */
+  --cad:#c47d18;
+  --cad-dim:rgba(196,125,24,.1);
+  --cad-wire:rgba(196,125,24,.3);
+  /* Step type colours */
+  --step-approval:rgba(61,153,112,.18);   --step-approval-c:#3d9970;
+  --step-review:rgba(79,142,247,.18);     --step-review-c:#4f8ef7;
+  --step-signoff:rgba(196,125,24,.18);    --step-signoff-c:#c47d18;
+  --step-action:rgba(255,255,255,.08);    --step-action-c:rgba(255,255,255,.55);
+  --step-external:rgba(201,168,76,.18);   --step-external-c:#c9a84c;
+  --step-form:rgba(160,80,200,.18);       --step-form-c:#b070e0;
+  --step-branch:rgba(255,255,255,.05);    --step-branch-c:rgba(255,255,255,.35);
+  --step-trigger:rgba(192,64,74,.15);     --step-trigger-c:#c0404a;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.5}
+
+/* ── Layout ── */
+.hud-shell{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:var(--sidebar-w);flex-shrink:0} /* filled by sidebar.js */
+.cad-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* ── Top bar ── */
+.cad-topbar{
+  height:48px;flex-shrink:0;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:12px;
+}
+.cad-topbar-brand{
+  font-family:var(--font-hud);font-size:16px;font-weight:700;
+  letter-spacing:.06em;color:var(--cad);
+  display:flex;align-items:center;gap:6px;
+}
+.cad-topbar-brand::before{
+  content:'⬡';font-size:14px;
+}
+.cad-topbar-sub{
+  font-size:11px;color:var(--muted);
+  border-left:1px solid var(--border);padding-left:12px;
+}
+.cad-topbar-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* ── Sub-nav ── */
+.cad-subnav{
+  height:38px;flex-shrink:0;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:stretch;padding:0 20px;gap:0;
+}
+.subnav-item{
+  font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:0 16px;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:color .15s;
+}
+.subnav-item:hover{color:var(--text)}
+.subnav-item.active{color:var(--cad);border-bottom-color:var(--cad)}
+.subnav-badge{
+  font-size:9px;padding:1px 5px;border-radius:3px;
+  background:rgba(196,125,24,.15);color:var(--cad);
+}
+
+/* ── Content area ── */
+.cad-content{flex:1;overflow-y:auto;display:flex;gap:0}
+.cad-list-col{
+  width:320px;flex-shrink:0;
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  background:var(--bg1);
+}
+.cad-editor-col{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── List col ── */
+.list-col-header{
+  padding:14px 16px 10px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.list-col-title{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.list-col-body{flex:1;overflow-y:auto;padding:8px}
+.list-empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.8}
+.list-empty .icon{font-size:28px;margin-bottom:10px;opacity:.4}
+
+/* Template list item */
+.tmpl-item{
+  padding:10px 12px;border-radius:5px;cursor:pointer;
+  border:1px solid transparent;margin-bottom:4px;
+  transition:all .15s;
+}
+.tmpl-item:hover{background:var(--surf2);border-color:var(--border)}
+.tmpl-item.active{background:var(--surf3);border-color:var(--cad-wire)}
+.tmpl-item-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px}
+.tmpl-item-meta{font-size:11px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.tmpl-status{
+  font-size:9px;padding:1px 6px;border-radius:3px;
+  font-family:var(--font-mono);letter-spacing:.06em;
+}
+.tmpl-status.draft{color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border)}
+.tmpl-status.active{color:var(--green);background:rgba(42,157,64,.1);border:1px solid rgba(42,157,64,.25)}
+.tmpl-status.archived{color:var(--text3);background:transparent;border:1px solid var(--border)}
+
+/* ── Editor col ── */
+.editor-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;color:var(--muted);gap:12px;
+}
+.editor-empty .icon{font-size:40px;opacity:.2}
+.editor-empty p{font-size:13px;max-width:260px;text-align:center;line-height:1.6}
+
+/* Editor toolbar */
+.editor-toolbar{
+  height:44px;flex-shrink:0;
+  background:var(--surf2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:8px;
+}
+.editor-title-input{
+  flex:1;background:transparent;border:none;outline:none;
+  font-family:var(--font-hud);font-size:16px;font-weight:600;
+  color:var(--text);letter-spacing:.04em;min-width:0;
+}
+.editor-title-input::placeholder{color:var(--text3)}
+
+/* Editor body */
+.editor-body{
+  flex:1;overflow-y:auto;
+  display:flex;gap:0;
+}
+.spine-area{flex:1;padding:20px 24px;overflow-y:auto}
+.config-panel{
+  width:240px;flex-shrink:0;
+  border-left:1px solid var(--border);
+  background:var(--bg1);
+  overflow-y:auto;
+}
+.config-panel-header{
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  font-size:9px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--muted);
+}
+.config-section{padding:12px 14px;border-bottom:1px solid var(--border)}
+.config-label{
+  font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);display:block;margin-bottom:5px;
+}
+.config-input,.config-select,.config-textarea{
+  width:100%;background:var(--surf3);border:1px solid var(--border2);
+  border-radius:4px;padding:6px 8px;color:var(--text);
+  font-family:var(--font-ui);font-size:12px;outline:none;
+  transition:border-color .15s;
+}
+.config-input:focus,.config-select:focus,.config-textarea:focus{border-color:var(--cad-wire)}
+.config-textarea{resize:vertical;min-height:64px}
+.config-select{cursor:pointer}
+.config-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.config-toggle{
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;color:var(--text2);cursor:pointer;padding:4px 0;
+}
+.toggle-box{
+  width:32px;height:17px;border-radius:9px;
+  background:var(--surf3);border:1px solid var(--border2);
+  position:relative;transition:background .2s;cursor:pointer;flex-shrink:0;
+}
+.toggle-box.on{background:var(--cad);border-color:var(--cad)}
+.toggle-box::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:11px;height:11px;border-radius:50%;background:#fff;
+  transition:transform .2s;
+}
+.toggle-box.on::after{transform:translateX(15px)}
+
+/* ── Spine ── */
+.spine-wrap{padding:4px 0}
+.spine-step{display:flex;gap:0;position:relative}
+.spine-track{
+  width:36px;flex-shrink:0;
+  display:flex;flex-direction:column;align-items:center;
+}
+.spine-node{
+  width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;flex-shrink:0;border:1.5px solid;
+  z-index:1;cursor:pointer;transition:all .15s;font-family:var(--font-mono);
+}
+.spine-node:hover{transform:scale(1.1)}
+.spine-node.selected{box-shadow:0 0 0 3px rgba(196,125,24,.35)}
+.spine-line{width:1px;background:var(--border);flex:1;min-height:10px}
+.spine-content{flex:1;padding:3px 0 16px 10px}
+.spine-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:10px 12px;cursor:pointer;
+  transition:all .15s;position:relative;
+}
+.spine-card:hover{border-color:var(--border2)}
+.spine-card.selected{border-color:var(--cad-wire);background:rgba(196,125,24,.04)}
+.spine-card-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.spine-card-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px}
+.spine-card-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;margin-top:3px}
+.spine-card-badge{
+  font-family:var(--font-mono);font-size:9px;padding:2px 7px;
+  border-radius:3px;border:1px solid;flex-shrink:0;
+}
+.spine-delete{
+  position:absolute;top:8px;right:8px;
+  background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:13px;opacity:0;transition:opacity .15s;
+  padding:2px 4px;border-radius:3px;
+}
+.spine-card:hover .spine-delete{opacity:.5}
+.spine-delete:hover{opacity:1 !important;color:var(--red)}
+
+/* step type node colours */
+.sn-trigger{background:var(--step-trigger);border-color:rgba(192,64,74,.4);color:var(--step-trigger-c)}
+.sn-approval{background:var(--step-approval);border-color:rgba(61,153,112,.35);color:var(--step-approval-c)}
+.sn-review{background:var(--step-review);border-color:rgba(79,142,247,.35);color:var(--step-review-c)}
+.sn-signoff{background:var(--step-signoff);border-color:rgba(196,125,24,.35);color:var(--step-signoff-c)}
+.sn-action{background:var(--step-action);border-color:rgba(255,255,255,.15);color:var(--step-action-c)}
+.sn-external{background:var(--step-external);border-color:rgba(201,168,76,.35);color:var(--step-external-c)}
+.sn-form{background:var(--step-form);border-color:rgba(160,80,200,.35);color:var(--step-form-c)}
+.sn-branch{background:var(--step-branch);border-color:rgba(255,255,255,.12);color:var(--step-branch-c)}
+
+/* Add step button */
+.add-step-btn{
+  display:flex;align-items:center;gap:8px;
+  width:100%;padding:10px 12px;margin-top:4px;
+  background:transparent;border:1px dashed var(--border2);
+  border-radius:6px;color:var(--muted);cursor:pointer;
+  font-size:12px;font-family:var(--font-ui);
+  transition:all .15s;
+}
+.add-step-btn:hover{border-color:var(--cad-wire);color:var(--cad);background:var(--cad-dim)}
+
+/* Step type picker */
+.step-type-picker{
+  display:none;position:absolute;z-index:50;
+  background:var(--surf3);border:1px solid var(--border2);
+  border-radius:7px;padding:8px;box-shadow:0 8px 32px rgba(0,0,0,.4);
+  width:220px;
+}
+.step-type-picker.open{display:block}
+.stp-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:4px;cursor:pointer;
+  font-size:12px;color:var(--text2);transition:all .12s;
+}
+.stp-item:hover{background:var(--surface);color:var(--text)}
+.stp-icon{
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;flex-shrink:0;border:1px solid;
+}
+.stp-desc{font-size:10px;color:var(--muted);margin-top:1px}
+
+/* Condition builder */
+.cond-row{
+  display:flex;align-items:center;gap:5px;
+  padding:8px 10px;background:var(--surface);
+  border:1px solid var(--border);border-radius:4px;
+  margin-bottom:6px;flex-wrap:wrap;
+}
+.cond-kw{
+  font-family:var(--font-mono);font-size:10px;color:var(--muted);
+  flex-shrink:0;
+}
+.cond-select{
+  background:var(--surf3);border:1px solid var(--border2);
+  border-radius:3px;padding:3px 6px;color:var(--text);
+  font-size:11px;font-family:var(--font-ui);cursor:pointer;outline:none;
+}
+.cond-select:focus{border-color:var(--cad-wire)}
+
+/* Buttons */
+.btn{
+  font-size:11px;font-weight:500;padding:6px 14px;
+  border-radius:4px;border:1px solid;cursor:pointer;
+  font-family:var(--font-ui);transition:all .15s;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.btn-cad{color:var(--cad);border-color:var(--cad-wire);background:var(--cad-dim)}
+.btn-cad:hover{background:rgba(196,125,24,.18)}
+.btn-solid{background:var(--cad);color:var(--bg);border-color:var(--cad);font-weight:600}
+.btn-solid:hover{filter:brightness(1.1)}
+.btn-ghost{color:var(--muted);border-color:var(--border2);background:transparent}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-red{color:var(--red);border-color:rgba(192,64,74,.3);background:rgba(192,64,74,.06)}
+.btn-red:hover{background:rgba(192,64,74,.14)}
+.btn-sm{font-size:10px;padding:4px 10px}
+
+/* AI draft banner */
+.ai-banner{
+  background:rgba(196,125,24,.06);
+  border:1px solid var(--cad-wire);border-radius:6px;
+  padding:12px 16px;margin-bottom:16px;
+  display:flex;align-items:flex-start;gap:12px;
+}
+.ai-banner-icon{font-size:20px;flex-shrink:0}
+.ai-banner-body{flex:1}
+.ai-banner-title{font-size:12px;font-weight:600;color:var(--cad);margin-bottom:4px}
+.ai-banner-text{font-size:12px;color:var(--muted);line-height:1.5}
+.ai-draft-textarea{
+  width:100%;background:var(--surf3);border:1px solid var(--border2);
+  border-radius:4px;padding:10px 12px;color:var(--text);
+  font-size:13px;font-style:italic;outline:none;resize:none;
+  height:80px;font-family:var(--font-ui);line-height:1.6;
+  transition:border-color .15s;margin-top:8px;
+}
+.ai-draft-textarea:focus{border-color:var(--cad-wire)}
+
+/* Instances table */
+.inst-table{width:100%;border-collapse:collapse}
+.inst-table th{
+  font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);
+  text-align:left;background:var(--bg1);
+}
+.inst-table td{
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  font-size:12px;color:var(--text2);vertical-align:middle;
+}
+.inst-table tr:last-child td{border-bottom:none}
+.inst-table tr:hover td{background:rgba(255,255,255,.02);cursor:pointer}
+.inst-status{
+  font-family:var(--font-mono);font-size:9px;padding:2px 6px;
+  border-radius:3px;border:1px solid;
+}
+.is-pending{color:var(--muted);border-color:var(--border)}
+.is-progress{color:var(--cad);border-color:var(--cad-wire);background:var(--cad-dim)}
+.is-complete{color:var(--green);border-color:rgba(42,157,64,.3);background:rgba(42,157,64,.08)}
+.is-attention{color:var(--red);border-color:rgba(192,64,74,.3);background:rgba(192,64,74,.08)}
+
+/* Modal overlay */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.modal{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:8px;width:100%;max-width:500px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.modal-header{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surf2);
+}
+.modal-title{font-size:14px;font-weight:600;color:var(--text)}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;padding:2px 6px;border-radius:3px}
+.modal-close:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.modal-body{padding:18px}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* toast */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:6px}
+.toast{
+  background:var(--surf3);border:1px solid var(--border2);border-radius:5px;
+  padding:10px 16px;font-size:12px;color:var(--text);
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  animation:toastIn .2s ease;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.success{border-left:3px solid var(--green)}
+.toast.error{border-left:3px solid var(--red)}
+.toast.info{border-left:3px solid var(--cad)}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* scrollbars */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2)}
+
+/* Loading */
+.loading-pulse{
+  display:flex;align-items:center;justify-content:center;
+  padding:40px;color:var(--muted);font-size:12px;gap:8px;
+}
+.loading-pulse::before{
+  content:'';width:8px;height:8px;border-radius:50%;
+  background:var(--cad);
+  animation:pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
+</style>
+</head>
+<body>
+<div class="hud-shell">
+
+  <!-- Sidebar (filled by sidebar.js) -->
+  <div class="sidebar" id="sidebar"></div>
+
+  <!-- Main -->
+  <div class="cad-main">
+
+    <!-- Top bar -->
+    <div class="cad-topbar">
+      <div class="cad-topbar-brand">CadenceHUD</div>
+      <div class="cad-topbar-sub">Workflow Engine</div>
+      <div class="cad-topbar-actions">
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('instances')">◎ Instances</button>
+        <button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">+ New Template</button>
+      </div>
+    </div>
+
+    <!-- Sub-nav -->
+    <div class="cad-subnav">
+      <div class="subnav-item active" id="tab-templates" onclick="switchTab('templates')">
+        ⬡ Templates
+        <span class="subnav-badge" id="tmpl-count" style="display:none">0</span>
+      </div>
+      <div class="subnav-item" id="tab-instances" onclick="switchTab('instances')">
+        ◎ Instances
+        <span class="subnav-badge" id="inst-count" style="display:none">0</span>
+      </div>
+      <div class="subnav-item" id="tab-forms" onclick="switchTab('forms')">
+        📄 Form Library
+      </div>
+      <div class="subnav-item" id="tab-triggers" onclick="switchTab('triggers')">
+        ⚡ Triggers
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="cad-content" id="cad-content">
+      <!-- Filled dynamically -->
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Step type picker (shared, positioned absolutely) -->
+<div class="step-type-picker" id="step-type-picker">
+  <div class="stp-item" onclick="addStep('approval')">
+    <div class="stp-icon sn-approval">✓</div>
+    <div><div>Approval</div><div class="stp-desc">Structured decision — approve / decline</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('review')">
+    <div class="stp-icon sn-review">R</div>
+    <div><div>Review</div><div class="stp-desc">Deliver feedback, no binding decision</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('signoff')">
+    <div class="stp-icon sn-signoff">✍</div>
+    <div><div>Sign-off</div><div class="stp-desc">Formal signature with legal weight</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('action')">
+    <div class="stp-icon sn-action">→</div>
+    <div><div>Action</div><div class="stp-desc">Task to complete — done / not done</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('external')">
+    <div class="stp-icon sn-external">E</div>
+    <div><div>External</div><div class="stp-desc">Tokenized link — no login required</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('form')">
+    <div class="stp-icon sn-form">F</div>
+    <div><div>Collaborative Form</div><div class="stp-desc">Multi-party fillable document</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('branch')">
+    <div class="stp-icon sn-branch">⋔</div>
+    <div><div>Conditional Branch</div><div class="stp-desc">IF / THEN routing logic</div></div>
+  </div>
+  <div class="stp-item" onclick="addStep('wait')">
+    <div class="stp-icon sn-action">⏱</div>
+    <div><div>Wait</div><div class="stp-desc">Pause until date or upstream event</div></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ── State ────────────────────────────────────────────────────────────────────
+const FIRM_ID_CAD = 'aaaaaaaa-0001-0001-0001-000000000001';
+let _currentTab     = 'templates';
+let _templates      = [];
+let _instances      = [];
+let _selectedTmpl   = null;   // full template object with .steps[]
+let _selectedStep   = null;   // step object currently in config panel
+let _dirtySteps     = false;  // unsaved changes flag
+
+// Step type display metadata
+const STEP_META = {
+  trigger:  { icon:'⚡', label:'Trigger',            nodeClass:'sn-trigger',  badgeColor:'rgba(192,64,74,.2)',  badgeText:'#c0404a' },
+  approval: { icon:'✓',  label:'Approval',           nodeClass:'sn-approval', badgeColor:'rgba(61,153,112,.15)', badgeText:'#3d9970' },
+  review:   { icon:'R',  label:'Review',             nodeClass:'sn-review',   badgeColor:'rgba(79,142,247,.15)', badgeText:'#4f8ef7' },
+  signoff:  { icon:'✍',  label:'Sign-off',           nodeClass:'sn-signoff',  badgeColor:'rgba(196,125,24,.15)', badgeText:'#c47d18' },
+  action:   { icon:'→',  label:'Action',             nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.5)' },
+  external: { icon:'E',  label:'External',           nodeClass:'sn-external', badgeColor:'rgba(201,168,76,.15)', badgeText:'#c9a84c' },
+  form:     { icon:'F',  label:'Collaborative Form', nodeClass:'sn-form',     badgeColor:'rgba(160,80,200,.15)', badgeText:'#b070e0' },
+  branch:   { icon:'⋔',  label:'Branch',             nodeClass:'sn-branch',   badgeColor:'rgba(255,255,255,.05)', badgeText:'rgba(255,255,255,.4)' },
+  wait:     { icon:'⏱',  label:'Wait',               nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.4)' },
+};
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAll();
+  renderTab('templates');
+});
+
+async function loadAll() {
+  try {
+    const [tmpls, insts] = await Promise.all([
+      API.get(`workflow_templates?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc`).catch(()=>[]),
+      API.get(`workflow_instances?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc&limit=50`).catch(()=>[]),
+    ]);
+    _templates = tmpls || [];
+    _instances = insts || [];
+    updateBadges();
+  } catch(e) {
+    cadToast('Failed to load workflows: ' + e.message, 'error');
+  }
+}
+
+function updateBadges() {
+  const tc = document.getElementById('tmpl-count');
+  const ic = document.getElementById('inst-count');
+  if (tc) { tc.textContent = _templates.length; tc.style.display = _templates.length ? '' : 'none'; }
+  if (ic) { ic.textContent = _instances.filter(i=>i.status==='in_progress').length || ''; ic.style.display = _instances.filter(i=>i.status==='in_progress').length ? '' : 'none'; }
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  _currentTab = tab;
+  ['templates','instances','forms','triggers'].forEach(t => {
+    document.getElementById('tab-'+t)?.classList.toggle('active', t===tab);
+  });
+  renderTab(tab);
+}
+
+function renderTab(tab) {
+  const el = document.getElementById('cad-content');
+  if (tab === 'templates') renderTemplatesTab(el);
+  else if (tab === 'instances') renderInstancesTab(el);
+  else if (tab === 'forms')    renderFormsTab(el);
+  else if (tab === 'triggers') renderTriggersTab(el);
+}
+
+// ── Templates tab ─────────────────────────────────────────────────────────────
+function renderTemplatesTab(el) {
+  el.innerHTML = `
+    <div class="cad-list-col">
+      <div class="list-col-header">
+        <span class="list-col-title">Templates</span>
+        <button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">+ New</button>
+      </div>
+      <div class="list-col-body" id="tmpl-list">
+        ${renderTemplateList()}
+      </div>
+    </div>
+    <div class="cad-editor-col" id="editor-col">
+      ${_selectedTmpl ? '' : renderEditorEmpty()}
+    </div>`;
+  if (_selectedTmpl) renderEditor();
+}
+
+function renderTemplateList() {
+  if (!_templates.length) {
+    return `<div class="list-empty">
+      <div class="icon">⬡</div>
+      <div>No templates yet.</div>
+      <div style="margin-top:8px"><button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">Create First Template</button></div>
+    </div>`;
+  }
+  return _templates.map(t => `
+    <div class="tmpl-item${_selectedTmpl?.id===t.id?' active':''}" onclick="selectTemplate('${t.id}')">
+      <div class="tmpl-item-name">${escHtml(t.name)}</div>
+      <div class="tmpl-item-meta">
+        <span class="tmpl-status ${t.status}">${t.status.toUpperCase()}</span>
+        <span>${t.trigger_type.replace(/_/g,' ')}</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderEditorEmpty() {
+  return `<div class="editor-empty">
+    <div class="icon">⬡</div>
+    <p>Select a template from the list, or create a new one to begin building.</p>
+    <button class="btn btn-cad" onclick="openNewTemplateModal()">+ New Template</button>
+  </div>`;
+}
+
+async function selectTemplate(id) {
+  if (_dirtySteps) {
+    if (!confirm('You have unsaved changes. Discard and switch templates?')) return;
+    _dirtySteps = false;
+  }
+  _selectedTmpl = _templates.find(t => t.id === id) || null;
+  if (!_selectedTmpl) return;
+
+  // Load steps
+  const steps = await API.get(
+    `workflow_template_steps?template_id=eq.${id}&order=sequence_order.asc`
+  ).catch(() => []);
+  _selectedTmpl.steps = steps || [];
+  _selectedStep = null;
+
+  // Re-render list to update active state
+  const listEl = document.getElementById('tmpl-list');
+  if (listEl) listEl.innerHTML = renderTemplateList();
+  renderEditor();
+}
+
+function renderEditor() {
+  const col = document.getElementById('editor-col');
+  if (!col || !_selectedTmpl) return;
+
+  const t = _selectedTmpl;
+  col.innerHTML = `
+    <!-- Toolbar -->
+    <div class="editor-toolbar">
+      <input class="editor-title-input" id="tmpl-name-input"
+        value="${escHtml(t.name)}" placeholder="Template name..."
+        oninput="markDirty()" />
+      <select class="config-select" style="width:auto;font-size:11px" id="tmpl-status-sel"
+        onchange="markDirty()">
+        <option value="draft"${t.status==='draft'?' selected':''}>Draft</option>
+        <option value="active"${t.status==='active'?' selected':''}>Active</option>
+        <option value="archived"${t.status==='archived'?' selected':''}>Archived</option>
+      </select>
+      <div style="display:flex;gap:6px;margin-left:8px">
+        <button class="btn btn-ghost btn-sm" onclick="launchInstance()">▶ Launch</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
+        <button class="btn btn-solid btn-sm" id="save-btn" onclick="saveTemplate()">Save</button>
+      </div>
+    </div>
+
+    <!-- Editor body -->
+    <div class="editor-body">
+
+      <!-- Spine area -->
+      <div class="spine-area" id="spine-area">
+        ${renderAIBanner()}
+        <div id="spine-wrap" class="spine-wrap">
+          ${renderSpine()}
+        </div>
+        <button class="add-step-btn" onclick="toggleStepPicker(event)">
+          <span style="font-size:16px;line-height:1">+</span> Add step
+        </button>
+      </div>
+
+      <!-- Config panel -->
+      <div class="config-panel" id="config-panel">
+        ${renderConfigPanel()}
+      </div>
+    </div>`;
+}
+
+// ── AI Draft Banner ───────────────────────────────────────────────────────────
+function renderAIBanner() {
+  if (_selectedTmpl?.steps?.length) return ''; // hide once steps exist
+  return `
+    <div class="ai-banner" id="ai-banner">
+      <div class="ai-banner-icon">✦</div>
+      <div class="ai-banner-body">
+        <div class="ai-banner-title">AI-Assisted Template Authoring</div>
+        <div class="ai-banner-text">Describe your process in plain language and CadenceHUD will draft the step structure for you to review and adjust.</div>
+        <textarea class="ai-draft-textarea" id="ai-draft-input"
+          placeholder="e.g. Engineering submits a design spec. Two internal reviewers must approve. If either requests changes, it goes back to engineering. Once approved, the client signs off via email link..."></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-cad btn-sm" onclick="runAIDraft()" id="ai-draft-btn">✦ Draft Template</button>
+          <span id="ai-draft-status" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Spine rendering ───────────────────────────────────────────────────────────
+function renderSpine() {
+  const steps = _selectedTmpl?.steps || [];
+  if (!steps.length) {
+    return `<div style="padding:20px 0;font-size:12px;color:var(--muted);text-align:center">
+      No steps yet — add your first step below, or use AI draft above.
+    </div>`;
+  }
+
+  // Prepend virtual trigger node
+  const trigger = {
+    id: '__trigger__',
+    step_type: 'trigger',
+    name: 'Trigger: ' + (_selectedTmpl.trigger_type||'manual').replace(/_/g,' '),
+    sequence_order: 0,
+    _virtual: true,
+  };
+
+  return [trigger, ...steps].map((step, idx) => {
+    const meta    = STEP_META[step.step_type] || STEP_META.action;
+    const isLast  = idx === steps.length; // (includes trigger at 0)
+    const sel     = _selectedStep?.id === step.id;
+    const assigneeLine = step.assignee_name || step.assignee_email ||
+      (step.assignee_type === 'pm' ? 'Project Manager' :
+       step.assignee_type === 'role' ? step.assignee_role : '—');
+
+    return `
+      <div class="spine-step" id="sstep-${step.id}">
+        <div class="spine-track">
+          <div class="spine-node ${meta.nodeClass}${sel?' selected':''}"
+            onclick="selectStep('${step.id}')"
+            title="${meta.label}">${meta.icon}</div>
+          ${!isLast ? '<div class="spine-line"></div>' : ''}
+        </div>
+        <div class="spine-content">
+          <div class="spine-card${sel?' selected':''}" onclick="selectStep('${step.id}')">
+            ${!step._virtual ? `<button class="spine-delete" onclick="event.stopPropagation();removeStep('${step.id}')" title="Remove step">✕</button>` : ''}
+            <div class="spine-card-row">
+              <div>
+                <div class="spine-card-name">${escHtml(step.name || meta.label)}</div>
+                <div class="spine-card-meta">
+                  ${assigneeLine !== '—' ? `<span>👤 ${escHtml(assigneeLine)}</span>` : ''}
+                  ${step.due_days ? `<span>⏱ +${step.due_days}d</span>` : ''}
+                  ${step.escalate_after_days ? `<span style="color:var(--amber)">↑ escalate d${step.escalate_after_days}</span>` : ''}
+                </div>
+              </div>
+              <span class="spine-card-badge"
+                style="background:${meta.badgeColor};color:${meta.badgeText};border-color:${meta.badgeText}40">
+                ${meta.label.toUpperCase()}
+              </span>
+            </div>
+            ${step.step_type === 'branch' && step.branch_conditions?.length ? renderBranchConditions(step) : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderBranchConditions(step) {
+  const conds = step.branch_conditions || [];
+  return `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px">
+    ${conds.map(c => `
+      <div style="font-size:11px;display:flex;gap:6px;align-items:center">
+        <span style="font-family:var(--font-mono);color:var(--muted)">IF</span>
+        <span style="color:var(--text2)">${escHtml(c.condition||'—')}</span>
+        <span style="font-family:var(--font-mono);color:var(--muted)">→</span>
+        <span style="color:var(--cad)">${escHtml(c.label||'next step')}</span>
+      </div>`).join('')}
+  </div>`;
+}
+
+// ── Config panel ─────────────────────────────────────────────────────────────
+function renderConfigPanel() {
+  if (!_selectedStep || _selectedStep.id === '__trigger__') {
+    return renderTemplateConfig();
+  }
+  return renderStepConfig(_selectedStep);
+}
+
+function renderTemplateConfig() {
+  const t = _selectedTmpl;
+  return `
+    <div class="config-panel-header">Template Properties</div>
+    <div class="config-section">
+      <label class="config-label">Trigger Type</label>
+      <select class="config-select" id="tmpl-trigger-sel" onchange="markDirty()">
+        <option value="manual"${t.trigger_type==='manual'?' selected':''}>Manual Launch</option>
+        <option value="missed_milestone"${t.trigger_type==='missed_milestone'?' selected':''}>Missed Milestone</option>
+        <option value="resource_denied"${t.trigger_type==='resource_denied'?' selected':''}>Resource Request Denied</option>
+        <option value="meeting_close"${t.trigger_type==='meeting_close'?' selected':''}>Meeting Conclusion</option>
+        <option value="material_request"${t.trigger_type==='material_request'?' selected':''}>Material Request</option>
+        <option value="exception_resolved"${t.trigger_type==='exception_resolved'?' selected':''}>Exception Resolved</option>
+      </select>
+    </div>
+    <div class="config-section">
+      <label class="config-label">Description</label>
+      <textarea class="config-textarea" id="tmpl-desc-input"
+        placeholder="Describe what this workflow is for..." onchange="markDirty()">${escHtml(t.description||'')}</textarea>
+    </div>
+    <div class="config-section" style="border-bottom:none;padding-top:8px;font-size:11px;color:var(--muted)">
+      Click any step to configure it. Click the spine to add steps below.
+    </div>`;
+}
+
+function renderStepConfig(step) {
+  const meta = STEP_META[step.step_type] || STEP_META.action;
+  const isExternal = step.step_type === 'external' || step.step_type === 'signoff';
+
+  return `
+    <div class="config-panel-header" style="color:${meta.badgeText}">
+      ${meta.icon} ${meta.label}
+    </div>
+    <div class="config-section">
+      <label class="config-label">Step Name</label>
+      <input class="config-input" id="scfg-name" value="${escHtml(step.name||'')}"
+        placeholder="${meta.label}..."
+        oninput="updateStepField('name',this.value)" />
+    </div>
+    <div class="config-section">
+      <label class="config-label">Assignee Type</label>
+      <select class="config-select" id="scfg-atype"
+        onchange="updateStepField('assignee_type',this.value);refreshConfigPanel()">
+        <option value="user"${step.assignee_type==='user'?' selected':''}>Specific User</option>
+        <option value="role"${step.assignee_type==='role'?' selected':''}>Role</option>
+        <option value="external"${step.assignee_type==='external'?' selected':''}>External (no login)</option>
+        <option value="pm"${step.assignee_type==='pm'?' selected':''}>Project Manager</option>
+      </select>
+    </div>
+    ${step.assignee_type === 'user' ? `
+    <div class="config-section">
+      <label class="config-label">User</label>
+      <select class="config-select" id="scfg-user"
+        onchange="updateStepField('assignee_user_id',this.value)">
+        <option value="">— Select user —</option>
+        ${_users_cad.map(u=>`<option value="${u.id}"${step.assignee_user_id===u.id?' selected':''}>${escHtml(u.name)}</option>`).join('')}
+      </select>
+    </div>` : ''}
+    ${step.assignee_type === 'external' ? `
+    <div class="config-section">
+      <label class="config-label">Recipient Name</label>
+      <input class="config-input" id="scfg-aname" value="${escHtml(step.assignee_name||'')}"
+        placeholder="e.g. Sandra Ng"
+        oninput="updateStepField('assignee_name',this.value)" />
+    </div>
+    <div class="config-section">
+      <label class="config-label">Recipient Email</label>
+      <input class="config-input" type="email" id="scfg-email" value="${escHtml(step.assignee_email||'')}"
+        placeholder="e.g. sandra.ng@client.com"
+        oninput="updateStepField('assignee_email',this.value)" />
+    </div>
+    <div class="config-section">
+      <label class="config-label">Organisation</label>
+      <input class="config-input" id="scfg-org" value="${escHtml(step.assignee_org||'')}"
+        placeholder="e.g. OrthoMotion Dynamics"
+        oninput="updateStepField('assignee_org',this.value)" />
+    </div>` : ''}
+    ${step.assignee_type === 'role' ? `
+    <div class="config-section">
+      <label class="config-label">Role</label>
+      <input class="config-input" id="scfg-role" value="${escHtml(step.assignee_role||'')}"
+        placeholder="e.g. Quality Lead"
+        oninput="updateStepField('assignee_role',this.value)" />
+    </div>` : ''}
+    <div class="config-section">
+      <label class="config-label">Due (Business Days from Prior Step)</label>
+      <input class="config-input" type="number" min="1" id="scfg-due"
+        value="${step.due_days||''}" placeholder="e.g. 3"
+        oninput="updateStepField('due_days',parseInt(this.value)||null)" />
+    </div>
+    <div class="config-section">
+      <label class="config-label">Escalate After (Days)</label>
+      <input class="config-input" type="number" min="1" id="scfg-esc"
+        value="${step.escalate_after_days||''}" placeholder="e.g. 2"
+        oninput="updateStepField('escalate_after_days',parseInt(this.value)||null)" />
+    </div>
+    <div class="config-section">
+      <label class="config-label">Escalate To</label>
+      <select class="config-select" id="scfg-escto"
+        onchange="updateStepField('escalate_to',this.value)">
+        <option value="pm"${step.escalate_to==='pm'?' selected':''}>Project Manager</option>
+        <option value="manager"${step.escalate_to==='manager'?' selected':''}>Assignee's Manager</option>
+        <option value="custom"${step.escalate_to==='custom'?' selected':''}>Custom</option>
+      </select>
+    </div>
+    ${step.step_type === 'approval' || step.step_type === 'external' ? `
+    <div class="config-section">
+      <label class="config-label" style="margin-bottom:8px">Parallel Reviewers</label>
+      <div class="config-toggle" onclick="updateStepField('parallel_required',!${!!step.parallel_required});refreshConfigPanel()">
+        <div class="toggle-box${step.parallel_required?' on':''}"></div>
+        <span>${step.parallel_required ? 'All must sign off' : 'First responder advances step'}</span>
+      </div>
+    </div>` : ''}
+    <div class="config-section" style="border-bottom:none">
+      <label class="config-label">Instructions to Assignee</label>
+      <textarea class="config-textarea" id="scfg-instr"
+        placeholder="Optional context shown to the assignee..."
+        oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
+    </div>`;
+}
+
+// ── Step selection and editing ─────────────────────────────────────────────────
+function selectStep(id) {
+  if (id === '__trigger__') {
+    _selectedStep = { id: '__trigger__' };
+  } else {
+    _selectedStep = _selectedTmpl?.steps?.find(s => s.id === id) || null;
+  }
+  // Re-render spine to update selection highlight
+  const spineEl = document.getElementById('spine-wrap');
+  if (spineEl) spineEl.innerHTML = renderSpine();
+  // Re-render config panel
+  const cfg = document.getElementById('config-panel');
+  if (cfg) cfg.innerHTML = renderConfigPanel();
+}
+
+function refreshConfigPanel() {
+  const cfg = document.getElementById('config-panel');
+  if (cfg) cfg.innerHTML = renderConfigPanel();
+  const spineEl = document.getElementById('spine-wrap');
+  if (spineEl) spineEl.innerHTML = renderSpine();
+}
+
+function updateStepField(field, value) {
+  if (!_selectedStep || _selectedStep.id === '__trigger__') return;
+  _selectedStep[field] = value;
+  _dirtySteps = true;
+  // Live-update the spine card (just re-render it)
+  const spineEl = document.getElementById('spine-wrap');
+  if (spineEl) spineEl.innerHTML = renderSpine();
+}
+
+function markDirty() { _dirtySteps = true; }
+
+// ── Step picker ───────────────────────────────────────────────────────────────
+function toggleStepPicker(e) {
+  e.stopPropagation();
+  const picker = document.getElementById('step-type-picker');
+  if (!picker) return;
+  const btn = e.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  picker.style.top  = (rect.top - picker.offsetHeight - 8) + 'px';
+  picker.style.left = rect.left + 'px';
+  picker.style.position = 'fixed';
+  picker.classList.toggle('open');
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('step-type-picker')?.classList.remove('open');
+});
+
+function addStep(type) {
+  document.getElementById('step-type-picker')?.classList.remove('open');
+  if (!_selectedTmpl) return;
+
+  const meta = STEP_META[type] || STEP_META.action;
+  const newStep = {
+    id: 'new_' + Date.now(),
+    template_id: _selectedTmpl.id,
+    step_type: type,
+    name: meta.label,
+    sequence_order: (_selectedTmpl.steps?.length || 0) + 1,
+    assignee_type: type === 'external' ? 'external' : 'user',
+    due_days: 3,
+    escalate_after_days: null,
+    escalate_to: 'pm',
+    parallel_required: false,
+    branch_conditions: type === 'branch' ? [
+      { condition: 'Prior step result is Approved', label: 'Approved path', next_step_id: null },
+      { condition: 'Prior step result is Changes Requested', label: 'Revision path', next_step_id: null },
+    ] : [],
+    _new: true,
+  };
+
+  if (!_selectedTmpl.steps) _selectedTmpl.steps = [];
+  _selectedTmpl.steps.push(newStep);
+  _selectedStep = newStep;
+  _dirtySteps = true;
+
+  // Refresh spine and config
+  const spineEl = document.getElementById('spine-wrap');
+  if (spineEl) spineEl.innerHTML = renderSpine();
+  const cfg = document.getElementById('config-panel');
+  if (cfg) cfg.innerHTML = renderConfigPanel();
+  // Hide AI banner
+  document.getElementById('ai-banner')?.remove();
+}
+
+function removeStep(id) {
+  if (!_selectedTmpl?.steps) return;
+  if (!confirm('Remove this step?')) return;
+  _selectedTmpl.steps = _selectedTmpl.steps.filter(s => s.id !== id);
+  // Re-sequence
+  _selectedTmpl.steps.forEach((s, i) => s.sequence_order = i + 1);
+  if (_selectedStep?.id === id) _selectedStep = null;
+  _dirtySteps = true;
+  const spineEl = document.getElementById('spine-wrap');
+  if (spineEl) spineEl.innerHTML = renderSpine();
+  const cfg = document.getElementById('config-panel');
+  if (cfg) cfg.innerHTML = renderConfigPanel();
+}
+
+// ── Save template ─────────────────────────────────────────────────────────────
+async function saveTemplate() {
+  if (!_selectedTmpl) return;
+
+  const btn = document.getElementById('save-btn');
+  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+
+  try {
+    const nameEl    = document.getElementById('tmpl-name-input');
+    const statusEl  = document.getElementById('tmpl-status-sel');
+    const triggerEl = document.getElementById('tmpl-trigger-sel');
+    const descEl    = document.getElementById('tmpl-desc-input');
+
+    const patch = {
+      name:         nameEl?.value?.trim()  || _selectedTmpl.name,
+      status:       statusEl?.value        || _selectedTmpl.status,
+      trigger_type: triggerEl?.value       || _selectedTmpl.trigger_type,
+      description:  descEl?.value?.trim()  || null,
+      updated_at:   new Date().toISOString(),
+    };
+
+    // 1. Save template header
+    await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, patch);
+    Object.assign(_selectedTmpl, patch);
+
+    // 2. Upsert steps
+    const steps = _selectedTmpl.steps || [];
+    for (const step of steps) {
+      const stepPayload = {
+        template_id:         _selectedTmpl.id,
+        sequence_order:      step.sequence_order,
+        step_type:           step.step_type,
+        name:                step.name || null,
+        assignee_type:       step.assignee_type || null,
+        assignee_user_id:    step.assignee_user_id || null,
+        assignee_role:       step.assignee_role || null,
+        assignee_email:      step.assignee_email || null,
+        assignee_name:       step.assignee_name || null,
+        assignee_org:        step.assignee_org || null,
+        due_days:            step.due_days || null,
+        escalate_after_days: step.escalate_after_days || null,
+        escalate_to:         step.escalate_to || 'pm',
+        parallel_required:   !!step.parallel_required,
+        branch_conditions:   step.branch_conditions || [],
+        instructions:        step.instructions || null,
+      };
+
+      if (step._new) {
+        // INSERT
+        const res = await API.post('workflow_template_steps', stepPayload);
+        if (res?.[0]?.id) {
+          step.id = res[0].id;
+          delete step._new;
+        }
+      } else {
+        // PATCH
+        await API.patch(`workflow_template_steps?id=eq.${step.id}`, stepPayload);
+      }
+    }
+
+    // Update local list
+    const idx = _templates.findIndex(t => t.id === _selectedTmpl.id);
+    if (idx >= 0) _templates[idx] = { ..._templates[idx], ...patch };
+
+    _dirtySteps = false;
+    updateBadges();
+
+    // Refresh list
+    const listEl = document.getElementById('tmpl-list');
+    if (listEl) listEl.innerHTML = renderTemplateList();
+
+    cadToast('Template saved', 'success');
+  } catch(e) {
+    cadToast('Save failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = 'Save'; btn.disabled = false; }
+  }
+}
+
+// ── New template modal ─────────────────────────────────────────────────────────
+function openNewTemplateModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">New Workflow Template</div>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:12px">
+          <label class="config-label">Template Name *</label>
+          <input class="config-input" id="new-tmpl-name" placeholder="e.g. Design Review Sign-off" autofocus />
+        </div>
+        <div style="margin-bottom:12px">
+          <label class="config-label">Trigger Type</label>
+          <select class="config-select" id="new-tmpl-trigger">
+            <option value="manual">Manual Launch</option>
+            <option value="missed_milestone">Missed Milestone</option>
+            <option value="resource_denied">Resource Request Denied</option>
+            <option value="meeting_close">Meeting Conclusion</option>
+            <option value="material_request">Material Request</option>
+            <option value="exception_resolved">Exception Resolved</option>
+          </select>
+        </div>
+        <div>
+          <label class="config-label">Description</label>
+          <textarea class="config-textarea" id="new-tmpl-desc" placeholder="What is this workflow for?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button class="btn btn-solid" onclick="createTemplate()">Create Template →</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('new-tmpl-name')?.focus(), 50);
+}
+
+async function createTemplate() {
+  const name    = document.getElementById('new-tmpl-name')?.value?.trim();
+  const trigger = document.getElementById('new-tmpl-trigger')?.value;
+  const desc    = document.getElementById('new-tmpl-desc')?.value?.trim();
+
+  if (!name) { cadToast('Template name is required', 'error'); return; }
+
+  try {
+    const res = await API.post('workflow_templates', {
+      firm_id:      FIRM_ID_CAD,
+      name,
+      trigger_type: trigger || 'manual',
+      description:  desc || null,
+      status:       'draft',
+      created_by:   _users_cad[0]?.id || null,
+    });
+    if (res?.[0]) {
+      const newTmpl = { ...res[0], steps: [] };
+      _templates.unshift(newTmpl);
+      _selectedTmpl = newTmpl;
+      _selectedStep = null;
+      updateBadges();
+      document.querySelector('.modal-overlay')?.remove();
+      renderTab('templates');
+      cadToast('Template created', 'success');
+    }
+  } catch(e) {
+    cadToast('Create failed: ' + e.message, 'error');
+  }
+}
+
+// ── Delete template ───────────────────────────────────────────────────────────
+async function deleteTemplate() {
+  if (!_selectedTmpl) return;
+  if (!confirm(`Delete template "${_selectedTmpl.name}"? This cannot be undone.`)) return;
+  try {
+    await API.del(`workflow_templates?id=eq.${_selectedTmpl.id}`);
+    _templates = _templates.filter(t => t.id !== _selectedTmpl.id);
+    _selectedTmpl = null;
+    _selectedStep = null;
+    updateBadges();
+    renderTab('templates');
+    cadToast('Template deleted', 'success');
+  } catch(e) {
+    cadToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── AI Draft ──────────────────────────────────────────────────────────────────
+async function runAIDraft() {
+  const input = document.getElementById('ai-draft-input')?.value?.trim();
+  if (!input) { cadToast('Describe your process first', 'info'); return; }
+
+  const btn    = document.getElementById('ai-draft-btn');
+  const status = document.getElementById('ai-draft-status');
+  if (btn)    { btn.disabled = true; btn.textContent = '✦ Drafting...'; }
+  if (status) status.textContent = 'Calling Claude...';
+
+  try {
+    const prompt = `You are building a workflow template for a project management system.
+The user described their process as:
+"${input}"
+
+Return ONLY a JSON array of workflow steps (no markdown, no explanation). Each step:
+{
+  "step_type": "approval|review|signoff|action|external|form|branch|wait",
+  "name": "descriptive step name",
+  "assignee_type": "user|role|external|pm",
+  "assignee_role": "role name if assignee_type is role, else null",
+  "assignee_email": "email if external, else null",
+  "assignee_name": "name if external, else null",
+  "due_days": number or null,
+  "escalate_after_days": number or null,
+  "escalate_to": "pm|manager",
+  "parallel_required": true or false,
+  "instructions": "brief instructions for assignee or null",
+  "branch_conditions": [] or [{condition, label}] for branch steps
+}
+
+Use only the step types listed. For branches, add 2-3 conditions. Keep it to 3-6 steps maximum.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const data = await response.json();
+    const raw  = data.content?.map(c => c.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const draftSteps = JSON.parse(clean);
+
+    if (!Array.isArray(draftSteps)) throw new Error('Unexpected response shape');
+
+    // Apply draft steps
+    _selectedTmpl.steps = draftSteps.map((s, i) => ({
+      ...s,
+      id: 'new_' + Date.now() + '_' + i,
+      template_id: _selectedTmpl.id,
+      sequence_order: i + 1,
+      branch_conditions: s.branch_conditions || [],
+      _new: true,
+    }));
+    _dirtySteps = true;
+
+    document.getElementById('ai-banner')?.remove();
+
+    const spineEl = document.getElementById('spine-wrap');
+    if (spineEl) spineEl.innerHTML = renderSpine();
+
+    cadToast(`✦ Drafted ${draftSteps.length} steps — review and save`, 'info');
+  } catch(e) {
+    cadToast('AI draft failed: ' + e.message, 'error');
+    if (status) status.textContent = 'Failed — try again';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✦ Draft Template'; }
+    if (status) status.textContent = '';
+  }
+}
+
+// ── Launch instance ───────────────────────────────────────────────────────────
+function launchInstance() {
+  if (!_selectedTmpl) return;
+  if (_dirtySteps) { cadToast('Save the template before launching', 'info'); return; }
+  if (!_selectedTmpl.steps?.length) { cadToast('Add at least one step before launching', 'info'); return; }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Launch — ${escHtml(_selectedTmpl.name)}</div>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:12px">
+          <label class="config-label">Instance Title</label>
+          <input class="config-input" id="launch-title"
+            value="${escHtml(_selectedTmpl.name)} · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}" />
+        </div>
+        <div style="margin-bottom:12px">
+          <label class="config-label">Notes (optional)</label>
+          <textarea class="config-textarea" id="launch-notes" placeholder="Any context for this instance..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button class="btn btn-solid" onclick="confirmLaunch()">▶ Launch Workflow</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function confirmLaunch() {
+  const title = document.getElementById('launch-title')?.value?.trim();
+  const notes = document.getElementById('launch-notes')?.value?.trim();
+  if (!title) { cadToast('Title required', 'error'); return; }
+
+  try {
+    // Create the instance
+    const res = await API.post('workflow_instances', {
+      firm_id:     FIRM_ID_CAD,
+      template_id: _selectedTmpl.id,
+      title,
+      notes:       notes || null,
+      status:      'in_progress',
+      launched_by: _users_cad[0]?.id || null,
+      launched_at: new Date().toISOString(),
+    });
+
+    if (res?.[0]?.id) {
+      const instanceId = res[0].id;
+
+      // Write launch CoC event
+      await API.post('workflow_step_instances', {
+        instance_id:  instanceId,
+        firm_id:      FIRM_ID_CAD,
+        step_type:    'trigger',
+        step_name:    'Instance launched',
+        status:       'complete',
+        event_type:   'instance_launched',
+        event_notes:  `Launched from template: ${_selectedTmpl.name}`,
+        actor_resource_id: null,
+      });
+
+      _instances.unshift(res[0]);
+      updateBadges();
+      document.querySelector('.modal-overlay')?.remove();
+      cadToast('Workflow launched', 'success');
+      switchTab('instances');
+    }
+  } catch(e) {
+    cadToast('Launch failed: ' + e.message, 'error');
+  }
+}
+
+// ── Instances tab ─────────────────────────────────────────────────────────────
+function renderInstancesTab(el) {
+  const statusLabel = { pending:'PENDING', in_progress:'IN PROGRESS', complete:'COMPLETE', cancelled:'CANCELLED', overridden:'OVERRIDDEN' };
+  const statusClass = { pending:'is-pending', in_progress:'is-progress', complete:'is-complete', cancelled:'is-pending', overridden:'is-attention' };
+
+  el.innerHTML = `
+    <div style="flex:1;overflow:auto;padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
+          Active Instances
+        </div>
+      </div>
+      ${!_instances.length
+        ? `<div class="list-empty"><div class="icon">◎</div><div>No instances yet.<br/>Launch a template to create one.</div></div>`
+        : `<table class="inst-table">
+            <thead><tr>
+              <th>Title</th><th>Template</th><th>Status</th><th>Launched</th><th>Current Step</th>
+            </tr></thead>
+            <tbody>
+              ${_instances.map(inst => {
+                const tmpl = _templates.find(t => t.id === inst.template_id);
+                return `<tr>
+                  <td style="color:var(--text);font-weight:500">${escHtml(inst.title||'—')}</td>
+                  <td>${escHtml(tmpl?.name||'—')}</td>
+                  <td><span class="inst-status ${statusClass[inst.status]||'is-pending'}">${statusLabel[inst.status]||inst.status}</span></td>
+                  <td>${inst.launched_at ? new Date(inst.launched_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'}</td>
+                  <td style="color:var(--muted)">—</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`
+      }
+    </div>`;
+}
+
+// ── Forms tab placeholder ─────────────────────────────────────────────────────
+function renderFormsTab(el) {
+  el.innerHTML = `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:12px;padding:40px">
+      <div style="font-size:40px;opacity:.2">📄</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text2)">Form Library</div>
+      <p style="font-size:13px;max-width:320px;text-align:center;line-height:1.6">
+        Upload a PDF or Word document to absorb it into a fillable form with role-assigned field regions.
+        Coming in Session 2.
+      </p>
+      <button class="btn btn-cad" disabled style="opacity:.4;cursor:not-allowed">↑ Upload Document</button>
+    </div>`;
+}
+
+// ── Triggers tab placeholder ──────────────────────────────────────────────────
+function renderTriggersTab(el) {
+  el.innerHTML = `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:12px;padding:40px">
+      <div style="font-size:40px;opacity:.2">⚡</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text2)">Trigger Rules</div>
+      <p style="font-size:13px;max-width:320px;text-align:center;line-height:1.6">
+        Configure automatic workflow launches based on project events — missed milestones, denied resource requests, material requests, and more.
+        Coming in Session 3.
+      </p>
+    </div>`;
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+let _users_cad = [];
+// Load users once
+API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
+  _users_cad = u || [];
+}).catch(() => {});
+
+function escHtml(s) {
+  return (s || '').toString()
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function cadToast(msg, type='info') {
+  // Prefer shared showToast if available
+  if (typeof showToast === 'function') { showToast(msg, type); return; }
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+</script>
+</body>
+</html>
