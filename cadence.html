@@ -43,6 +43,7 @@
   --step-form:rgba(160,80,200,.18);       --step-form-c:#b070e0;
   --step-branch:rgba(255,255,255,.05);    --step-branch-c:rgba(255,255,255,.35);
   --step-trigger:rgba(192,64,74,.15);     --step-trigger-c:#c0404a;
+  --step-confirm:rgba(0,185,195,.15);     --step-confirm-c:#00b9c3;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.5}
 
@@ -286,6 +287,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .sn-external{background:var(--step-external);border-color:rgba(201,168,76,.35);color:var(--step-external-c)}
 .sn-form{background:var(--step-form);border-color:rgba(160,80,200,.35);color:var(--step-form-c)}
 .sn-branch{background:var(--step-branch);border-color:rgba(255,255,255,.12);color:var(--step-branch-c)}
+.sn-confirm{background:var(--step-confirm);border-color:rgba(0,185,195,.35);color:var(--step-confirm-c)}
 
 /* Add step button */
 .add-step-btn{
@@ -532,6 +534,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="stp-icon sn-action">⏱</div>
     <div><div>Wait</div><div class="stp-desc">Pause until date or upstream event</div></div>
   </div>
+  <div class="stp-item" onclick="addStep('confirmation')">
+    <div class="stp-icon sn-confirm">✓✓</div>
+    <div><div>Confirmation</div><div class="stp-desc">Attestation all activities are complete</div></div>
+  </div>
 </div>
 
 <script>
@@ -560,7 +566,8 @@ const STEP_META = {
   external: { icon:'E',  label:'External',           nodeClass:'sn-external', badgeColor:'rgba(201,168,76,.15)', badgeText:'#c9a84c' },
   form:     { icon:'F',  label:'Collaborative Form', nodeClass:'sn-form',     badgeColor:'rgba(160,80,200,.15)', badgeText:'#b070e0' },
   branch:   { icon:'⋔',  label:'Branch',             nodeClass:'sn-branch',   badgeColor:'rgba(255,255,255,.05)', badgeText:'rgba(255,255,255,.4)' },
-  wait:     { icon:'⏱',  label:'Wait',               nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.4)' },
+  wait:         { icon:'⏱',  label:'Wait',               nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.4)' },
+  confirmation: { icon:'✓✓', label:'Confirmation',        nodeClass:'sn-confirm',  badgeColor:'rgba(0,185,195,.15)',   badgeText:'#00b9c3' },
 };
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -667,7 +674,9 @@ async function selectTemplate(id) {
 
   // Hydrate _attachedDocs from persisted attached_docs column
   (steps || []).forEach(s => {
-    s.forward_input = !!s.forward_input;
+    s.forward_input   = !!s.forward_input;
+    s.reject_to       = s.reject_to || null;
+    s._confirmItems   = Array.isArray(s.confirm_items) ? s.confirm_items : [];
     s._attachedDocs = (s.attached_docs || []).map(d => ({
       name:    d.name,
       version: d.version,
@@ -978,8 +987,9 @@ function renderInlineStepConfig(step) {
         </div>
       </div>
 
-      <!-- Parallel toggle (approval/external only) -->
-      ${step.step_type === 'approval' || step.step_type === 'external' || step.step_type === 'signoff' ? `
+      <!-- Parallel toggle (approval/external/signoff/confirmation only) -->
+      ${step.step_type === 'approval' || step.step_type === 'external' ||
+        step.step_type === 'signoff' || step.step_type === 'confirmation' ? `
       <div class="config-section">
         <label class="config-label">Multi-Reviewer Rule</label>
         <div class="config-toggle"
@@ -988,6 +998,50 @@ function renderInlineStepConfig(step) {
           <span style="font-size:11px">${step.parallel_required ? 'All must sign off' : 'First response advances'}</span>
         </div>
       </div>` : '<div></div>'}
+
+      <!-- Reject-to field (approval/review/signoff/confirmation steps) -->
+      ${step.step_type === 'approval' || step.step_type === 'review' ||
+        step.step_type === 'signoff' || step.step_type === 'confirmation' ? `
+      <div class="config-section cfg-full">
+        <label class="config-label">On Rejection — Return to Step</label>
+        <select class="config-select"
+          onchange="updateStepField('reject_to',this.value||null)">
+          <option value="">— Prior step (default) —</option>
+          ${(_selectedTmpl?.steps||[])
+            .filter(s => s.sequence_order < step.sequence_order)
+            .sort((a,b) => a.sequence_order - b.sequence_order)
+            .map(s => `<option value="${s.id}" ${step.reject_to===s.id?' selected':''}>
+              Step ${s.sequence_order}: ${escHtml(s.name||STEP_META[s.step_type]?.label||'Step')}
+            </option>`).join('')}
+        </select>
+        <div style="margin-top:4px;font-size:10px;color:var(--muted)">
+          When rejected, the puck returns here and that step's assignee is notified to remediate.
+          A CoC rejection event is written with reason and timestamp.
+        </div>
+      </div>` : '<div></div>'}
+
+      <!-- Confirmation step: attestation items checklist -->
+      ${step.step_type === 'confirmation' ? `
+      <div class="config-section cfg-full">
+        <label class="config-label" style="margin-bottom:6px">Attestation Items</label>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+          At runtime, the assignee must check each item before confirming. Leave blank for a
+          simple "I confirm all activities are complete" attestation.
+        </div>
+        <div id="confirm-items-${step.id}">
+          ${(step._confirmItems||[]).map((item,i) => `
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+              <span style="color:var(--step-confirm-c);flex-shrink:0">✓</span>
+              <input class="config-input" style="flex:1" value="${escHtml(item)}"
+                placeholder="e.g. All action items closed"
+                oninput="updateConfirmItem('${step.id}',${i},this.value)" />
+              <button class="attached-doc-remove"
+                onclick="removeConfirmItem('${step.id}',${i})">✕</button>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:11px"
+          onclick="addConfirmItem('${step.id}')">+ Add item</button>
+      </div>` : ''}
 
       <!-- Instructions — full width -->
       <div class="config-section cfg-full">
@@ -1443,6 +1497,31 @@ function reRenderSpine() {
   if (spineEl) spineEl.innerHTML = renderSpine();
 }
 
+// ── Confirmation step attestation item helpers ────────────────────────────────
+function addConfirmItem(stepId) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step) return;
+  if (!step._confirmItems) step._confirmItems = [];
+  step._confirmItems.push('');
+  _dirtySteps = true;
+  reRenderSpine();
+}
+
+function removeConfirmItem(stepId, idx) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?._confirmItems) return;
+  step._confirmItems.splice(idx, 1);
+  _dirtySteps = true;
+  reRenderSpine();
+}
+
+function updateConfirmItem(stepId, idx, value) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?._confirmItems) return;
+  step._confirmItems[idx] = value;
+  _dirtySteps = true;
+}
+
 // ── Step selection ────────────────────────────────────────────────────────────
 function selectStep(id) {
   // Toggle — clicking selected step collapses it
@@ -1465,7 +1544,7 @@ function updateStepField(field, value) {
   // Only re-render spine for fields that affect the card summary line
   const cardFields = ['name','assignee_name','assignee_email','assignee_role',
                       'due_days','due_type','escalate_after_days','parallel_required',
-                      'input_from_step','forward_input'];
+                      'input_from_step','forward_input','reject_to'];
   if (cardFields.includes(field)) reRenderSpine();
 }
 
@@ -1548,6 +1627,10 @@ function addStep(type) {
     escalate_after_days: null,
     escalate_to: 'pm',
     parallel_required: false,
+    forward_input: false,
+    reject_to: null,
+    _confirmItems: [],
+    _attachedDocs: [],
     branch_conditions: type === 'branch' ? [
       { condition: 'Prior step result is Approved', label: 'Approved path', next_step_id: null },
       { condition: 'Prior step result is Changes Requested', label: 'Revision path', next_step_id: null },
@@ -1623,6 +1706,8 @@ async function saveTemplate(silent = false) {
         instructions:        step.instructions || null,
         input_from_step:     step.input_from_step || null,
         forward_input:       !!step.forward_input,
+        reject_to:           step.reject_to || null,
+        confirm_items:       step._confirmItems || [],
         attached_docs:       (step._attachedDocs || []).map(d => ({
           name: d.name, version: d.version, role: d.role || 'reference',
           size: d.size, path: d.path || null, url: d.url || null,
