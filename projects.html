@@ -341,6 +341,17 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .status-btn.in_progress { color:var(--cyan); border-color:rgba(0,210,255,.35); background:rgba(0,210,255,.07); }
 .status-btn.resolved    { color:var(--green); border-color:rgba(42,157,64,.35); background:rgba(42,157,64,.07); }
 
+/* exception view toggle */
+.exc-view-toggle { display:flex; gap:3px; }
+.exc-toggle-btn {
+  font-size:9px; font-weight:700; letter-spacing:.08em; padding:3px 10px;
+  border-radius:3px; border:1px solid var(--border2); cursor:pointer;
+  font-family:var(--font-ui); background:transparent; color:var(--muted);
+  transition:all .15s;
+}
+.exc-toggle-btn:hover { color:var(--text); }
+.exc-toggle-btn.active { background:var(--surf3); color:var(--text); border-color:var(--border2); }
+
 /* kanban */
 .kanban-wrap { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; align-items:start; }
 .kanban-col { background:var(--surf2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
@@ -560,7 +571,6 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
       EXCEPTIONS <span id="exc-count" style="font-size:9px;background:rgba(192,64,74,.2);color:#f07a7a;
         padding:1px 5px;border-radius:3px;margin-left:4px;display:none">0</span>
     </button>
-    <button class="view-btn" onclick="switchView('kanban')" id="vbtn-kanban">KANBAN</button>
     <button class="view-btn" onclick="switchView('team')" id="vbtn-team">TEAM</button>
     <button class="view-btn" onclick="switchView('actionitems')" id="vbtn-actionitems">
       ACTION ITEMS <span id="ai-count" style="font-size:9px;background:rgba(79,142,247,.2);color:var(--accent);
@@ -1019,13 +1029,15 @@ function renderHorizon() {
 }
 
 // ── View switcher ─────────────────────────────────────────────────────────────
+let _excView = 'list'; // 'list' | 'kanban' — toggled within EXCEPTIONS
+
 function switchView(view) {
   // Reset action items render guard when leaving that view
   if (_currentView === 'actionitems' && view !== 'actionitems') {
     _renderingActionItems = false;
   }
   _currentView = view;
-  ['portfolio','exceptions','kanban','team','actionitems'].forEach(v => {
+  ['portfolio','exceptions','team','actionitems'].forEach(v => {
     document.getElementById('vbtn-' + v)?.classList.toggle('active', v === view);
   });
   renderView(view);
@@ -1035,7 +1047,6 @@ function renderView(view) {
   const el = document.getElementById('content');
   if      (view === 'portfolio')   renderPortfolio(el);
   else if (view === 'exceptions')  renderExceptions(el);
-  else if (view === 'kanban')      renderKanban(el);
   else if (view === 'team')        renderTeam(el);
   else if (view === 'actionitems') renderActionItems(el);
 }
@@ -1476,8 +1487,29 @@ function buildExceptions() {
 function renderExceptions(el) {
   const items = buildExceptions();
 
+  // ── Toggle bar — always rendered at top regardless of empty state ──────────
+  const toggleBar = `
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:10px;">
+      <div class="exc-view-toggle">
+        <button class="exc-toggle-btn${_excView==='list'?' active':''}"
+            onclick="setExcView('list')">☰ LIST</button>
+        <button class="exc-toggle-btn${_excView==='kanban'?' active':''}"
+            onclick="setExcView('kanban')">⬛ KANBAN</button>
+      </div>
+    </div>`;
+
+  // ── Kanban sub-view ────────────────────────────────────────────────────────
+  if (_excView === 'kanban') {
+    el.innerHTML = toggleBar;
+    const kanbanEl = document.createElement('div');
+    el.appendChild(kanbanEl);
+    renderKanban(kanbanEl);
+    return;
+  }
+
+  // ── List sub-view ──────────────────────────────────────────────────────────
   if (!items.length) {
-    el.innerHTML = `<div class="empty">
+    el.innerHTML = toggleBar + `<div class="empty">
       <div class="icon">✓</div>
       <div class="title">No exceptions</div>
       <div>All projects, milestones, and resources are on track.</div>
@@ -1488,7 +1520,7 @@ function renderExceptions(el) {
   const typeIcon  = { task:'⚠', blocked:'🔴', request:'⬡', milestone:'◈', budget:'$' };
   const typeLabel = { task:'OVERDUE TASK', blocked:'BLOCKED TASK', request:'RESOURCE REQUEST', milestone:'MILESTONE', budget:'BUDGET' };
 
-  let html = `<div class="exception-list">`;
+  let html = toggleBar + `<div class="exception-list">`;
   let lastSev = null;
 
   items.forEach((item, idx) => {
@@ -2302,20 +2334,14 @@ async function setExceptionStatus(taskId, status, btnEl, event) {
     // If resolved — remove the row/card from the exceptions list in-place
     if (status === 'resolved') {
       // Find and fade-remove the containing exception card or group item
-      const card = btnEl.closest('.exception-card, .exc-group-item');
+      const card = btnEl.closest('.exc-group-card, .exception-card');
       if (card) {
         // If group item — also remove its detail pane sibling
         const sibling = card.nextElementSibling;
         if (sibling && !sibling.classList.contains('exc-group-item')) sibling.remove();
         card.style.transition = 'opacity .3s';
         card.style.opacity = '0';
-        setTimeout(() => {
-          card.remove();
-          // Update exc-count badge
-          const excEl = document.getElementById('exc-count');
-          const remaining = document.querySelectorAll('.exception-card, .exc-group-item').length;
-          if (excEl) { excEl.textContent = remaining; if (!remaining) excEl.style.display = 'none'; }
-        }, 300);
+        setTimeout(() => { card.remove(); _updateExcCount(); }, 300);
       }
     }
 
@@ -2345,19 +2371,33 @@ async function setExceptionStatusFromDetail(taskId, status, btnEl) {
       occurred_at: new Date().toISOString(),
     });
 
-    // Update the status indicator text in the recommendation panel
     const shortId = taskId.replace(/-/g,'').substring(0,8);
-    const indicator = document.getElementById('exc-status-indicator-' + shortId);
-    if (indicator) {
-      indicator.textContent = labels[status];
-      indicator.style.color = status === 'resolved' ? 'var(--green)' : status === 'in_progress' ? 'var(--cyan)' : 'var(--muted)';
-    }
 
-    // Re-render the recommendation panel to show/hide buttons correctly
-    const panel = btnEl.closest('[style*="Recommended Action"]') ||
-                  btnEl.parentElement?.closest('div[style*="cyan"]');
-    if (panel) {
-      // Rebuild just the buttons row
+    // ── Detect context: Kanban card vs EXCEPTIONS triage list ──────────────
+    const kanbanCard = btnEl.closest('[id^="kcard-"]');
+
+    if (kanbanCard) {
+      // ── Called from inside a Kanban inline case file ──────────────────────
+      // Re-render the entire Kanban so the card moves to the correct column.
+      // Brief fade-out of the source card before re-render for visual feedback.
+      kanbanCard.style.transition = 'opacity .25s';
+      kanbanCard.style.opacity = '0';
+      setTimeout(() => {
+        renderExceptions(document.getElementById('content'));
+        showToast(`Status → ${labels[status]}`, 'success');
+      }, 250);
+
+    } else {
+      // ── Called from EXCEPTIONS triage detail pane ─────────────────────────
+
+      // Update the status indicator text in the recommendation panel
+      const indicator = document.getElementById('exc-status-indicator-' + shortId);
+      if (indicator) {
+        indicator.textContent = labels[status];
+        indicator.style.color = status === 'resolved' ? 'var(--green)' : status === 'in_progress' ? 'var(--cyan)' : 'var(--muted)';
+      }
+
+      // Rebuild the buttons row
       const btnRow = btnEl.parentElement;
       if (btnRow) {
         btnRow.innerHTML = `
@@ -2376,32 +2416,45 @@ async function setExceptionStatusFromDetail(taskId, status, btnEl) {
             ${labels[status]}
           </span>`;
       }
-    }
 
-    // If resolved — also remove from the exceptions triage list
-    if (status === 'resolved') {
-      const caseId = 'case-' + shortId;
-      // Find the parent exception card by traversing up from the open detail pane
-      const excCard = document.querySelector(`.exception-card:has(#${caseId}), .exc-group-item:has(#exc-${shortId})`);
-      if (excCard) {
-        excCard.style.transition = 'opacity .3s';
-        excCard.style.opacity = '0';
-        setTimeout(() => excCard.remove(), 300);
+      // If resolved — fade and remove this task from the EXCEPTIONS triage list
+      if (status === 'resolved') {
+        // Find the specific exc-detail panel containing this button,
+        // then its sibling exc-group-item row (or the whole exception-card for single tasks)
+        const detailPanel = btnEl.closest('[id^="exc-"]');
+        const singleCard  = btnEl.closest('.exception-card');
+
+        if (singleCard) {
+          // Single task card — remove the whole card
+          singleCard.style.transition = 'opacity .3s';
+          singleCard.style.opacity = '0';
+          setTimeout(() => { singleCard.remove(); _updateExcCount(); }, 300);
+
+        } else if (detailPanel) {
+          // Grouped task — remove this task's row (exc-group-item) and its detail panel
+          const groupItem = detailPanel.previousElementSibling;
+          const fadeEls = [detailPanel, groupItem].filter(Boolean);
+          fadeEls.forEach(el => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; });
+          setTimeout(() => {
+            fadeEls.forEach(el => el.remove());
+            // If the group is now empty, remove the whole group card
+            const groupBody = btnEl.closest('.exc-group-body');
+            if (groupBody && !groupBody.querySelector('.exc-group-item')) {
+              const groupCard = groupBody.closest('.exc-group-card');
+              if (groupCard) groupCard.remove();
+            }
+            _updateExcCount();
+          }, 300);
+        }
       }
-      // Update row-level status buttons if visible
-      document.querySelectorAll('.status-btn').forEach(b => {
-        const row = b.closest('[data-task-id]') || b.closest('.exc-group-item');
-        if (!row) return;
-        const rowId = row.dataset?.taskId || row.querySelector('[onclick*="' + taskId.substring(0,8) + '"]')?.getAttribute('onclick')?.match(/[0-9a-f-]{36}/)?.[0];
-        if (rowId === taskId) b.classList.toggle('active', b.classList.contains(status));
-      });
+
+      // Refresh CoC if open
+      const cocContent = document.getElementById('case-' + shortId + '-hist-content');
+      if (cocContent) await _refreshCoCContent(taskId, cocContent);
+
+      showToast(`Status → ${labels[status]}`, 'success');
     }
 
-    // Refresh CoC if open
-    const cocContent = document.getElementById('case-' + shortId + '-hist-content');
-    if (cocContent) await _refreshCoCContent(taskId, cocContent);
-
-    showToast(`Status → ${labels[status]}`, 'success');
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
@@ -2518,8 +2571,8 @@ function renderKanban(el) {
                   style="color:var(--muted);font-size:10px;flex-shrink:0;margin-top:2px;
                   transition:transform .2s">▼</span>
             </div>
-            <!-- Move buttons -->
-            <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap"
+            <!-- Move + Priority buttons -->
+            <div style="display:flex;align-items:center;gap:5px;margin-top:7px;flex-wrap:wrap"
                 onclick="event.stopPropagation()">
               ${columns.filter(c => c !== col).map(c => `
                 <button class="status-btn ${c}"
@@ -2527,6 +2580,13 @@ function renderKanban(el) {
                     onclick="setKanbanStatus('${t.id}','${c}',this)">
                   → ${colMeta[c].label}
                 </button>`).join('')}
+              <span style="width:1px;height:12px;background:var(--border);margin:0 2px;flex-shrink:0"></span>
+              <button class="pri-btn high${t.exception_priority==='high'?' active':''}"
+                  onclick="setPriority('${t.id}','high',this,event)">HIGH</button>
+              <button class="pri-btn medium${t.exception_priority==='medium'?' active':''}"
+                  onclick="setPriority('${t.id}','medium',this,event)">MED</button>
+              <button class="pri-btn low${t.exception_priority==='low'?' active':''}"
+                  onclick="setPriority('${t.id}','low',this,event)">LOW</button>
             </div>
             <!-- Inline case file — hidden until expanded -->
             <div id="kdetail-${shortId}"
@@ -2560,6 +2620,12 @@ function renderKanban(el) {
   el.innerHTML = html;
 }
 
+// ── Toggle exceptions sub-view (LIST / KANBAN) ────────────────────────────────
+function setExcView(view) {
+  _excView = view;
+  renderExceptions(document.getElementById('content'));
+}
+
 // Move a card between Kanban columns — patches DB, updates local state, re-renders
 async function setKanbanStatus(taskId, status, btnEl) {
   try {
@@ -2575,8 +2641,8 @@ async function setKanbanStatus(taskId, status, btnEl) {
       notes: `Exception status set to ${labels[status]}`,
       occurred_at: new Date().toISOString(),
     });
-    // Re-render Kanban in-place
-    renderKanban(document.getElementById('content'));
+    // Re-render via renderExceptions so the toggle bar stays visible
+    renderExceptions(document.getElementById('content'));
     showToast(`Moved → ${labels[status]}`, 'success');
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
@@ -3294,6 +3360,15 @@ async function renderActionItems(el) {
     _renderingActionItems = false;
   }
 }
+// ── Update EXCEPTIONS badge count ─────────────────────────────────────────────
+function _updateExcCount() {
+  const remaining = document.querySelectorAll('.exception-card, .exc-group-item').length;
+  const excEl     = document.getElementById('exc-count');
+  if (!excEl) return;
+  excEl.textContent   = remaining;
+  excEl.style.display = remaining > 0 ? 'inline' : 'none';
+}
+
 function goToProject(projectId) {
   window.location.href = `/project-detail.html?id=${projectId}`;
 }
