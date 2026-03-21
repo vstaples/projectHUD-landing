@@ -149,30 +149,39 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 /* ── CoC resize handle ── */
 .tmpl-coc-resize{
-  width:4px;flex-shrink:0;cursor:col-resize;
-  background:transparent;
+  width:6px;flex-shrink:0;cursor:col-resize;
+  background:var(--border);
   transition:background .15s;
   position:relative;
+  display:none; /* hidden until panel is open */
 }
+.tmpl-coc-panel.open .tmpl-coc-resize{ display:block; }
 .tmpl-coc-resize:hover,.tmpl-coc-resize.dragging{
   background:var(--cad-wire);
 }
 .tmpl-coc-resize::after{
-  content:'';position:absolute;
-  top:50%;left:50%;transform:translate(-50%,-50%);
-  width:2px;height:32px;border-radius:2px;
-  background:var(--border2);
+  content:'⋮';
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:14px;
+  color:var(--muted);
+  line-height:1;
+  pointer-events:none;
 }
 .tmpl-coc-panel{
   width:0;flex-shrink:0;overflow:hidden;
   border-left:1px solid transparent;
   background:var(--bg1);
-  display:flex;flex-direction:column;
+  display:flex;flex-direction:row; /* handle + content side by side */
   transition:width .22s ease, border-color .22s ease;
 }
 .tmpl-coc-panel.open{
   width:280px;
   border-left-color:var(--border);
+}
+.tmpl-coc-inner{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;
 }
 .tmpl-coc-header{
   padding:12px 14px 10px;
@@ -915,9 +924,13 @@ function renderTemplateList() {
   return _templates.map(t => {
     const ver = t.version || '0.0.0';
     const st  = t.status || 'draft';
+    const locked = st === 'released';
     return `
     <div class="tmpl-item status-${st}${_selectedTmpl?.id===t.id?' active':''}" onclick="selectTemplate('${t.id}')">
-      <div class="tmpl-item-name status-${st}">${escHtml(t.name)}</div>
+      <div class="tmpl-item-name status-${st}" style="display:flex;align-items:center;gap:5px">
+        ${escHtml(t.name)}
+        ${locked ? '<span style="font-size:10px;opacity:.7" title="Released — read only">🔒</span>' : ''}
+      </div>
       <div class="tmpl-item-meta">
         <span class="tmpl-status ${st}">${st.toUpperCase()}</span>
         <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${escHtml(ver)}</span>
@@ -998,14 +1011,16 @@ function renderEditor() {
       <div class="cad-editor-inner" id="editor-inner"></div>
       <div class="tmpl-coc-panel" id="tmpl-coc-panel">
         <div class="tmpl-coc-resize" id="tmpl-coc-resize" title="Drag to resize"></div>
-        <div class="tmpl-coc-header">
-          <span class="tmpl-coc-title">Change History</span>
-          <button onclick="toggleTmplCoC()" style="background:none;border:none;
-            color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
-        </div>
-        <div class="tmpl-coc-body" id="tmpl-coc-body">
-          <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">
-            Loading…
+        <div class="tmpl-coc-inner">
+          <div class="tmpl-coc-header">
+            <span class="tmpl-coc-title">Change History</span>
+            <button onclick="toggleTmplCoC()" style="background:none;border:none;
+              color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
+          </div>
+          <div class="tmpl-coc-body" id="tmpl-coc-body">
+            <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">
+              Loading…
+            </div>
           </div>
         </div>
       </div>`;
@@ -1014,12 +1029,14 @@ function renderEditor() {
   const inner = document.getElementById('editor-inner');
   if (!inner) return;
 
+  const isReleased = t.status === 'released';
+
   inner.innerHTML = `
     <!-- Toolbar -->
     <div class="editor-toolbar">
       <input class="editor-title-input" id="tmpl-name-input"
         value="${escHtml(t.name)}" placeholder="Template name..."
-        oninput="markDirty()" />
+        oninput="markDirty()" ${isReleased ? 'disabled' : ''} />
       <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);
         flex-shrink:0;padding:0 4px" title="Version">${escHtml(ver)}</span>
       <select class="config-select" style="width:auto;font-size:11px" id="tmpl-status-sel"
@@ -1041,17 +1058,29 @@ function renderEditor() {
         <button class="btn btn-ghost btn-sm" onclick="toggleTmplCoC()" id="coc-btn"
           title="Change history">CoC</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
+        ${!isReleased ? `
         <button class="btn btn-ghost btn-sm" id="save-btn" onclick="saveTemplate(false)"
           title="Save without version bump">Save</button>
         <button class="btn btn-solid btn-sm" id="commit-btn" onclick="commitTemplate()">Commit</button>
+        ` : `
+        <span style="font-size:11px;color:var(--muted);padding:0 4px;
+          display:flex;align-items:center;gap:4px">🔒 Read only — set to Draft to edit</span>
+        `}
       </div>
     </div>
+
+    ${isReleased ? `
+    <div style="background:rgba(42,157,64,.07);border-bottom:1px solid rgba(42,157,64,.2);
+      padding:6px 16px;font-size:11px;color:#7af0a0;display:flex;align-items:center;gap:8px;
+      flex-shrink:0">
+      🔒 Released — template is read only. Change status to <strong>Draft</strong> to resume editing.
+    </div>` : ''}
 
     <!-- Template props bar -->
     <div class="tmpl-props-bar">
       <span class="tmpl-props-label">Trigger</span>
       <select class="config-select" style="width:auto;font-size:11px;padding:4px 8px" id="tmpl-trigger-sel"
-        onchange="markDirty()">
+        onchange="markDirty()" ${isReleased ? 'disabled' : ''}>
         <option value="manual"${t.trigger_type==='manual'?' selected':''}>Manual Launch</option>
         <option value="missed_milestone"${t.trigger_type==='missed_milestone'?' selected':''}>Missed Milestone</option>
         <option value="resource_denied"${t.trigger_type==='resource_denied'?' selected':''}>Resource Request Denied</option>
@@ -1062,19 +1091,20 @@ function renderEditor() {
       <span class="tmpl-props-label" style="margin-left:8px">Description</span>
       <input class="config-input" style="flex:1;font-size:11px;padding:4px 8px" id="tmpl-desc-input"
         value="${escHtml(t.description||'')}" placeholder="What is this workflow for?"
-        oninput="markDirty()" />
+        oninput="markDirty()" ${isReleased ? 'disabled' : ''} />
     </div>
 
     <!-- Editor body — single scrolling spine, no right panel -->
     <div class="editor-body">
       <div class="spine-area" id="spine-area">
-        ${renderAIBanner()}
+        ${!isReleased ? renderAIBanner() : ''}
         <div id="spine-wrap" class="spine-wrap">
           ${renderSpine()}
         </div>
+        ${!isReleased ? `
         <button class="add-step-btn" onclick="toggleStepPicker(event)">
           <span style="font-size:16px;line-height:1">+</span> Add step
-        </button>
+        </button>` : ''}
       </div>
     </div>`;
 }
@@ -1168,7 +1198,7 @@ function renderSpine() {
                   style="background:${meta.badgeColor};color:${meta.badgeText};border-color:${meta.badgeText}40">
                   ${meta.label.toUpperCase()}
                 </span>
-                ${!step._virtual ? `<button class="spine-delete-inline"
+                ${!step._virtual && _selectedTmpl?.status !== 'released' ? `<button class="spine-delete-inline"
                   onclick="event.stopPropagation();removeStep('${step.id}')"
                   title="Delete step">🗑</button>` : ''}
                 <span style="font-size:10px;color:var(--muted);transition:transform .15s;
@@ -1204,17 +1234,21 @@ function renderBranchConditions(step) {
 function renderInlineStepConfig(step) {
   const meta = STEP_META[step.step_type] || STEP_META.action;
   const docs = step._attachedDocs || [];
+  const ro   = _selectedTmpl?.status === 'released'; // read-only mode
+  const dis  = ro ? 'disabled' : '';                 // shorthand for input attribute
 
   return `
+    ${ro ? `<div style="font-size:10px;color:var(--muted);padding:4px 0 8px;
+      font-style:italic">🔒 Read only — set template to Draft to edit</div>` : ''}
     <!-- Config fields in a 2-column grid -->
-    <div class="cfg-grid">
+    <div class="cfg-grid" style="${ro ? 'opacity:.6;pointer-events:none;user-select:none' : ''}">
 
       <!-- Step Name — full width -->
       <div class="config-section cfg-full" style="padding-bottom:6px">
         <label class="config-label">Step Name</label>
         <input class="config-input" id="scfg-name-${step.id}" value="${escHtml(step.name||'')}"
           placeholder="${meta.label}..."
-          oninput="updateStepField('name',this.value)" />
+          oninput="updateStepField('name',this.value)" ${dis} />
       </div>
 
       <!-- Assignee Type -->
@@ -1967,7 +2001,21 @@ function removeMeetingAgendaItem(stepId, idx) {
 function updateMeetingAgendaItem(stepId, idx, value) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   if (!step?._meetingAgenda) return;
+  const prev = step._meetingAgenda[idx];
   step._meetingAgenda[idx] = value;
+  // Only bin on blur-equivalent — debounce so we don't flood on every keystroke
+  clearTimeout(step._agendaDebounce);
+  step._agendaDebounce = setTimeout(() => {
+    if (prev !== value && _selectedTmpl?.id) {
+      const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+      _binAppend(_selectedTmpl.id, {
+        type: 'field_changed', stepName: step.name || 'Meeting',
+        field: 'meeting_agenda', from: prev || '—', to: value || '—',
+        changedBy: authorName, ts: new Date().toISOString(),
+      });
+      _refreshCoCIfOpen();
+    }
+  }, 800);
   markDirty();
 }
 
@@ -2644,12 +2692,20 @@ async function deleteTemplate() {
 
 // ── Status change handler ─────────────────────────────────────────────────────
 function onStatusChange() {
-  markDirty();
-  // Visual feedback: if changing to released, prompt save immediately
-  const newStatus = document.getElementById('tmpl-status-sel')?.value;
+  const sel = document.getElementById('tmpl-status-sel');
+  const newStatus = sel?.value;
+
   if (newStatus === 'released') {
-    cadToast('Set to Released — save to bump version to next major', 'info');
+    const hasPending = _binCount(_selectedTmpl?.id || '') > 0 || _dirtySteps;
+    if (hasPending) {
+      cadToast('Commit all changes before releasing', 'error');
+      // Revert dropdown to current status
+      if (sel) sel.value = _selectedTmpl?.status || 'draft';
+      return;
+    }
+    cadToast('Releasing — commit will bump to next major version', 'info');
   }
+  markDirty();
 }
 
 // Refresh CoC panel in place if it's currently open (called on every bin append)
