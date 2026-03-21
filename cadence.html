@@ -2388,7 +2388,15 @@ function renderInstancesTab(el) {
                   <span style="color:${color};font-weight:600;font-size:9px;
                     letter-spacing:.08em;text-transform:uppercase">${statusLabel[inst.status]||inst.status}</span>
                   <span>${escHtml(tmpl?.name||'—')}</span>
-                  <span>${inst.launched_at ? new Date(inst.launched_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</span>
+                </div>
+                <div style="font-size:10px;color:var(--muted);display:flex;
+                  justify-content:space-between;align-items:center;margin-top:3px">
+                  <span style="color:var(--text2)">
+                    👤 ${escHtml(_users_cad.find(u=>u.id===inst.launched_by)?.name || '—')}
+                  </span>
+                  <span style="font-family:var(--font-mono);font-size:9px">
+                    ${inst.launched_at ? new Date(inst.launched_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—'}
+                  </span>
                 </div>
               </div>`;
             }).join('')}
@@ -2693,32 +2701,286 @@ function renderInstanceDetail(el, inst) {
                         <div style="color:var(--text2);font-size:11px;margin-top:2px;line-height:1.4">${escHtml(s.instructions)}</div></div>`:''}
                     </div>
 
-                    <!-- Meeting step: Open Meeting editor -->
+                    <!-- Meeting step: Full inline meeting object -->
                     ${s.step_type === 'meeting' ? `
-                    <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                        color:#4fc88c;margin-bottom:8px">◉ Meeting Step</div>
+                    <div id="meeting-obj-${inst.id}-${s.id}" style="margin-bottom:12px">
+                      <div style="display:flex;align-items:center;justify-content:space-between;
+                        margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(79,200,140,.2)">
+                        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;
+                          text-transform:uppercase;color:#4fc88c">◉ Meeting</div>
+                        <div id="meeting-status-${inst.id}-${s.id}"
+                          style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                          text-transform:uppercase;color:var(--muted);
+                          border:1px solid var(--border);padding:2px 8px;border-radius:3px">
+                          DRAFT
+                        </div>
+                      </div>
+
+                      <!-- Agenda read-only -->
                       ${(s._meetingAgenda||[]).length ? `
-                      <div style="margin-bottom:8px">
+                      <div style="margin-bottom:12px">
                         <div style="font-size:9px;color:var(--muted);letter-spacing:.08em;
-                          text-transform:uppercase;margin-bottom:4px">Agenda</div>
+                          text-transform:uppercase;margin-bottom:5px">Agenda</div>
                         ${(s._meetingAgenda||[]).map((item,i) =>
-                          `<div style="font-size:11px;color:var(--text2);padding:2px 0;
-                            display:flex;gap:6px"><span style="color:#4fc88c">${i+1}.</span>${escHtml(item)}</div>`
+                          `<div style="display:flex;gap:8px;font-size:11px;color:var(--text2);
+                            padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)">
+                            <span style="color:#4fc88c;flex-shrink:0;font-family:var(--font-mono)">${i+1}.</span>
+                            <span>${escHtml(item)}</span>
+                          </div>`
                         ).join('')}
                       </div>` : ''}
-                      <a href="/meeting-minutes.html?workflow_instance_id=${inst.id}&step_id=${s.id}"
-                        target="_blank"
-                        style="display:inline-flex;align-items:center;gap:6px;
-                          padding:7px 14px;border-radius:5px;font-size:11px;font-weight:600;
-                          background:rgba(79,200,140,.15);border:1px solid rgba(79,200,140,.4);
-                          color:#4fc88c;text-decoration:none;transition:all .15s"
-                        onmouseover="this.style.background='rgba(79,200,140,.25)'"
-                        onmouseout="this.style.background='rgba(79,200,140,.15)'">
-                        ◉ Open Meeting Editor
-                      </a>
-                      <div style="font-size:10px;color:var(--muted);margin-top:6px">
-                        Opens the full meeting editor — agenda, minutes, attendees, action items and email distribution.
+
+                      <!-- Two-column layout: editor left, meta right -->
+                      <div style="display:grid;grid-template-columns:1fr 260px;gap:0;
+                        border:1px solid var(--border);border-radius:5px;overflow:hidden">
+
+                        <!-- Left: content editor -->
+                        <div style="border-right:1px solid var(--border);padding:14px">
+
+                          <!-- Summary -->
+                          <div style="margin-bottom:12px">
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:5px;
+                              display:flex;justify-content:space-between">
+                              SUMMARY
+                              <span style="font-weight:400;font-size:9px">Brief overview of outcome</span>
+                            </div>
+                            <textarea id="mtg-summary-${inst.id}-${s.id}"
+                              style="width:100%;box-sizing:border-box;padding:8px 10px;
+                                font-size:12px;font-family:inherit;line-height:1.6;
+                                background:var(--surf2);border:1px solid var(--border2);
+                                color:var(--text);resize:vertical;min-height:60px;
+                                border-radius:4px;outline:none"
+                              placeholder="Summarize what was accomplished…"
+                              oninput="scheduleMtgAutosave('${inst.id}','${s.id}')"
+                              onfocus="this.style.borderColor='var(--accent)'"
+                              onblur="this.style.borderColor='var(--border2)'"></textarea>
+                          </div>
+
+                          <!-- Discussion notes per agenda item -->
+                          <div style="margin-bottom:12px">
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:5px">
+                              DISCUSSION NOTES
+                            </div>
+                            <div id="mtg-agenda-notes-${inst.id}-${s.id}">
+                              ${(s._meetingAgenda||[]).length
+                                ? (s._meetingAgenda||[]).map((item,i) => `
+                                  <div style="border:1px solid var(--border);border-radius:4px;
+                                    margin-bottom:4px;overflow:hidden">
+                                    <div onclick="this.nextElementSibling.style.display=
+                                      this.nextElementSibling.style.display==='none'?'block':'none'"
+                                      style="padding:6px 10px;cursor:pointer;
+                                        background:var(--surf2);display:flex;
+                                        align-items:center;gap:8px;user-select:none">
+                                      <span style="color:#4fc88c;font-size:10px;
+                                        font-family:var(--font-mono)">${i+1}</span>
+                                      <span style="font-size:11px;color:var(--text2);flex:1">
+                                        ${escHtml(item)}</span>
+                                      <span style="font-size:10px;color:var(--muted)">▾</span>
+                                    </div>
+                                    <div style="display:none;padding:8px">
+                                      <textarea
+                                        id="mtg-anote-${inst.id}-${s.id}-${i}"
+                                        style="width:100%;box-sizing:border-box;padding:6px 8px;
+                                          font-size:11px;font-family:inherit;line-height:1.5;
+                                          background:var(--surface);border:1px solid var(--border2);
+                                          color:var(--text);resize:none;min-height:50px;
+                                          border-radius:3px;outline:none"
+                                        placeholder="Notes for this item…"
+                                        oninput="scheduleMtgAutosave('${inst.id}','${s.id}')"></textarea>
+                                    </div>
+                                  </div>`)
+                                  .join('')
+                                : '<div style="font-size:11px;color:var(--muted)">No agenda items defined.</div>'}
+                            </div>
+                            <div style="margin-top:6px">
+                              <div style="font-size:9px;color:var(--muted);letter-spacing:.06em;
+                                text-transform:uppercase;margin-bottom:3px">Additional notes</div>
+                              <textarea id="mtg-notes-${inst.id}-${s.id}"
+                                style="width:100%;box-sizing:border-box;padding:7px 9px;
+                                  font-size:11px;font-family:inherit;line-height:1.5;
+                                  background:var(--surf2);border:1px solid var(--border2);
+                                  color:var(--text);resize:vertical;min-height:44px;
+                                  border-radius:4px;outline:none"
+                                placeholder="Discussion points not tied to a specific agenda item…"
+                                oninput="scheduleMtgAutosave('${inst.id}','${s.id}')"
+                                onfocus="this.style.borderColor='var(--accent)'"
+                                onblur="this.style.borderColor='var(--border2)'"></textarea>
+                            </div>
+                          </div>
+
+                          <!-- Decisions -->
+                          <div style="margin-bottom:12px">
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:5px;
+                              display:flex;justify-content:space-between">
+                              DECISIONS &amp; NEXT STEPS
+                              <span style="font-weight:400">Formal decisions made</span>
+                            </div>
+                            <textarea id="mtg-decisions-${inst.id}-${s.id}"
+                              style="width:100%;box-sizing:border-box;padding:7px 9px;
+                                font-size:11px;font-family:inherit;line-height:1.5;
+                                background:var(--surf2);border:1px solid var(--border2);
+                                color:var(--text);resize:vertical;min-height:52px;
+                                border-radius:4px;outline:none"
+                              placeholder="List decisions made and next steps agreed upon…"
+                              oninput="scheduleMtgAutosave('${inst.id}','${s.id}')"
+                              onfocus="this.style.borderColor='var(--accent)'"
+                              onblur="this.style.borderColor='var(--border2)'"></textarea>
+                          </div>
+
+                          <!-- Action Items -->
+                          <div style="margin-bottom:12px">
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:5px;
+                              display:flex;justify-content:space-between;align-items:center">
+                              ACTION ITEMS
+                              <span id="mtg-ai-count-${inst.id}-${s.id}"
+                                style="font-weight:400;font-size:9px"></span>
+                            </div>
+                            <div id="mtg-ai-list-${inst.id}-${s.id}"
+                              style="margin-bottom:6px"></div>
+                            <!-- Add row -->
+                            <div style="display:grid;grid-template-columns:1fr 140px 100px auto;
+                              gap:5px;align-items:center">
+                              <input id="mtg-ai-desc-${inst.id}-${s.id}"
+                                style="padding:5px 8px;font-size:11px;font-family:inherit;
+                                  background:var(--surf2);border:1px solid var(--border2);
+                                  color:var(--text);border-radius:4px;outline:none"
+                                placeholder="New action item…"
+                                onkeydown="if(event.key==='Enter')addMtgActionItem('${inst.id}','${s.id}')" />
+                              <select id="mtg-ai-assignee-${inst.id}-${s.id}"
+                                style="padding:5px 6px;font-size:11px;font-family:inherit;
+                                  background:var(--surf2);border:1px solid var(--border2);
+                                  color:var(--text);border-radius:4px;outline:none">
+                                <option value="">— Assign —</option>
+                                ${_resources_cad.map(r=>
+                                  `<option value="${r.id}">${escHtml(r.name)}</option>`
+                                ).join('')}
+                              </select>
+                              <input id="mtg-ai-due-${inst.id}-${s.id}" type="date"
+                                style="padding:5px 6px;font-size:11px;font-family:inherit;
+                                  background:var(--surf2);border:1px solid var(--border2);
+                                  color:var(--text);border-radius:4px;outline:none" />
+                              <button onclick="addMtgActionItem('${inst.id}','${s.id}')"
+                                style="padding:5px 10px;background:var(--accent);border:none;
+                                  color:#fff;font-size:11px;font-weight:600;cursor:pointer;
+                                  border-radius:4px;white-space:nowrap">+ Add</button>
+                            </div>
+                          </div>
+
+                          <!-- Next meeting + send -->
+                          <div style="display:grid;grid-template-columns:1fr auto;
+                            gap:10px;align-items:end;margin-top:8px;
+                            padding-top:10px;border-top:1px solid var(--border)">
+                            <div>
+                              <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                                text-transform:uppercase;color:var(--muted);margin-bottom:4px">
+                                NEXT MEETING</div>
+                              <input id="mtg-next-${inst.id}-${s.id}" type="datetime-local"
+                                style="padding:5px 8px;font-size:11px;font-family:inherit;
+                                  background:var(--surf2);border:1px solid var(--border2);
+                                  color:var(--text);border-radius:4px;outline:none"
+                                onchange="scheduleMtgAutosave('${inst.id}','${s.id}')" />
+                            </div>
+                            <div style="display:flex;gap:6px">
+                              <button onclick="saveMtgData('${inst.id}','${s.id}',true)"
+                                id="mtg-save-btn-${inst.id}-${s.id}"
+                                style="padding:6px 12px;background:var(--surf3);
+                                  border:1px solid var(--border2);color:var(--text2);
+                                  font-size:11px;cursor:pointer;border-radius:4px">
+                                Save Draft
+                              </button>
+                              <button onclick="sendMtgMinutes('${inst.id}','${s.id}')"
+                                style="padding:6px 12px;background:var(--accent);
+                                  border:none;color:#fff;font-size:11px;font-weight:600;
+                                  cursor:pointer;border-radius:4px">
+                                Send Minutes ✉
+                              </button>
+                            </div>
+                          </div>
+                          <div id="mtg-autosave-${inst.id}-${s.id}"
+                            style="font-size:10px;color:var(--muted);margin-top:4px;
+                            text-align:right"></div>
+                        </div>
+
+                        <!-- Right: meta panel -->
+                        <div style="padding:14px;background:var(--surf2)">
+
+                          <!-- Attendees -->
+                          <div style="margin-bottom:14px">
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:8px;
+                              padding-bottom:5px;border-bottom:1px solid var(--border)">
+                              ATTENDEES</div>
+                            <div id="mtg-attendees-${inst.id}-${s.id}">
+                              ${(() => {
+                                // Build attendee list from step assignees in CoC
+                                const stepReassigns = coc.filter(e =>
+                                  e.event_type==='step_reassigned' &&
+                                  e.template_step_id===s.id);
+                                const names = [];
+                                // Template default
+                                const templateName = s.assignee_name || s.assignee_email ||
+                                  (s.assignee_type==='pm'?'Project Manager':null);
+                                if (templateName) names.push(templateName);
+                                stepReassigns.forEach(r => {
+                                  if (r.assignee_name && !names.includes(r.assignee_name))
+                                    names.push(r.assignee_name);
+                                });
+                                return names.length
+                                  ? names.map(n => `
+                                    <div style="display:flex;align-items:center;gap:7px;
+                                      padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03)">
+                                      <div style="width:22px;height:22px;border-radius:50%;
+                                        display:flex;align-items:center;justify-content:center;
+                                        font-size:9px;font-weight:700;flex-shrink:0;
+                                        background:rgba(79,142,247,.15);color:var(--accent);
+                                        border:1px solid rgba(79,142,247,.25)">
+                                        ${(n.split(' ').map(w=>w[0]).join('').toUpperCase()||'?').slice(0,2)}
+                                      </div>
+                                      <span style="font-size:11px;color:var(--text2)">${escHtml(n)}</span>
+                                    </div>`).join('')
+                                  : '<div style="font-size:10px;color:var(--muted)">No attendees assigned yet.</div>';
+                              })()}
+                            </div>
+                          </div>
+
+                          <!-- CC recipients -->
+                          <div style="margin-bottom:14px">
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+                              padding-bottom:5px;border-bottom:1px solid var(--border)">
+                              CC RECIPIENTS</div>
+                            <div id="mtg-cc-list-${inst.id}-${s.id}"
+                              style="margin-bottom:5px"></div>
+                            <div style="display:flex;gap:5px">
+                              <input id="mtg-cc-input-${inst.id}-${s.id}"
+                                style="flex:1;padding:5px 7px;font-size:11px;font-family:inherit;
+                                  background:var(--surf3);border:1px solid var(--border2);
+                                  color:var(--text);border-radius:4px;outline:none"
+                                placeholder="Email or name…"
+                                onkeydown="if(event.key==='Enter')addMtgCC('${inst.id}','${s.id}')" />
+                              <button onclick="addMtgCC('${inst.id}','${s.id}')"
+                                style="padding:5px 8px;background:none;border:1px solid var(--border2);
+                                  color:var(--muted);font-size:11px;cursor:pointer;border-radius:4px">
+                                + Add</button>
+                            </div>
+                          </div>
+
+                          <!-- Send history -->
+                          <div>
+                            <div style="font-size:9px;font-weight:700;letter-spacing:.1em;
+                              text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+                              padding-bottom:5px;border-bottom:1px solid var(--border)">
+                              SEND HISTORY</div>
+                            <div id="mtg-send-history-${inst.id}-${s.id}"
+                              style="font-size:10px;color:var(--muted)">
+                              Not yet sent</div>
+                          </div>
+
+                        </div>
                       </div>
                     </div>` : ''}
                     ${(s._attachedDocs||[]).length ? `
@@ -2914,6 +3176,13 @@ function toggleInstanceStep(instId, stepId) {
   inst._selectedStep = inst._selectedStep === stepId ? null : stepId;
   const detailEl = document.getElementById('instance-detail');
   if (detailEl) renderInstanceDetail(detailEl, inst);
+  // Load meeting data after DOM renders
+  if (inst._selectedStep === stepId) {
+    const step = inst._tmplSteps?.find(s => s.id === stepId);
+    if (step?.step_type === 'meeting') {
+      setTimeout(() => loadMtgData(instId, stepId), 80);
+    }
+  }
 }
 
 // ── Add assignee reassignment from resource picker ────────────────────────────
@@ -3218,7 +3487,276 @@ API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_n
   }); })
   .catch(() => {});
 
-// ── Step threaded comments system ────────────────────────────────────────────
+// ── Inline meeting object functions ──────────────────────────────────────────
+const _mtgData     = {};  // cache: `${instId}-${stepId}` → {data, actionItems, ccRecipients}
+const _mtgTimers   = {};  // autosave timers
+
+function _mtgKey(instId, stepId) { return `${instId}-${stepId}`; }
+
+async function loadMtgData(instId, stepId) {
+  const key = _mtgKey(instId, stepId);
+  try {
+    const [dataRows, aiRows] = await Promise.all([
+      API.get(`workflow_step_meeting_data?instance_id=eq.${instId}&template_step_id=eq.${stepId}&limit=1`).catch(()=>[]),
+      API.get(`workflow_step_meeting_action_items?instance_id=eq.${instId}&template_step_id=eq.${stepId}&order=created_at.asc`).catch(()=>[]),
+    ]);
+    const data = dataRows?.[0] || null;
+    _mtgData[key] = {
+      id:           data?.id || null,
+      ccRecipients: data?.cc_recipients || [],
+      status:       data?.status || 'draft',
+      sentAt:       data?.sent_at || null,
+      actionItems:  aiRows || [],
+    };
+    // Populate fields
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    setVal(`mtg-summary-${instId}-${stepId}`,   data?.summary);
+    setVal(`mtg-notes-${instId}-${stepId}`,     (() => {
+      try { const p = JSON.parse(data?.discussion_notes||'null'); return p?.__freeform||data?.discussion_notes||''; } catch(e) { return data?.discussion_notes||''; }
+    })());
+    setVal(`mtg-decisions-${instId}-${stepId}`, data?.decisions_made);
+    setVal(`mtg-next-${instId}-${stepId}`,      data?.next_meeting_date ? new Date(data.next_meeting_date).toISOString().slice(0,16) : '');
+
+    // Populate agenda note textareas
+    const step = _selectedInstance?._tmplSteps?.find(s=>s.id===stepId);
+    if (step?._meetingAgenda?.length && data?.discussion_notes) {
+      try {
+        const parsed = JSON.parse(data.discussion_notes);
+        if (parsed?.__agenda) {
+          parsed.__agenda.forEach((note, i) => {
+            setVal(`mtg-anote-${instId}-${stepId}-${i}`, note);
+          });
+        }
+      } catch(e) {}
+    }
+
+    // Status badge
+    const statusEl = document.getElementById(`meeting-status-${instId}-${stepId}`);
+    if (statusEl) {
+      const statusMap = { draft:'DRAFT', sent:'SENT', submitted:'SUBMITTED' };
+      statusEl.textContent = statusMap[_mtgData[key].status] || 'DRAFT';
+      statusEl.style.color = _mtgData[key].status === 'sent' ? 'var(--green)' : 'var(--muted)';
+      statusEl.style.borderColor = _mtgData[key].status === 'sent' ? 'rgba(42,157,64,.4)' : 'var(--border)';
+    }
+
+    renderMtgActionItems(instId, stepId);
+    renderMtgCC(instId, stepId);
+    renderMtgSendHistory(instId, stepId);
+
+  } catch(e) { console.warn('Meeting data load failed:', e); }
+}
+
+function scheduleMtgAutosave(instId, stepId) {
+  const key = _mtgKey(instId, stepId);
+  const indEl = document.getElementById(`mtg-autosave-${instId}-${stepId}`);
+  if (indEl) { indEl.textContent = '● Unsaved'; indEl.style.color = 'var(--amber)'; }
+  clearTimeout(_mtgTimers[key]);
+  _mtgTimers[key] = setTimeout(() => saveMtgData(instId, stepId, true), 2000);
+}
+
+async function saveMtgData(instId, stepId, silent = false) {
+  const key  = _mtgKey(instId, stepId);
+  const step = _selectedInstance?._tmplSteps?.find(s => s.id === stepId);
+  const indEl = document.getElementById(`mtg-autosave-${instId}-${stepId}`);
+
+  // Build discussion notes JSON with per-agenda-item notes
+  const agendaNotes = (step?._meetingAgenda||[]).map((_, i) => {
+    return document.getElementById(`mtg-anote-${instId}-${stepId}-${i}`)?.value || '';
+  });
+  const freeform = document.getElementById(`mtg-notes-${instId}-${stepId}`)?.value || '';
+  const discussionNotes = agendaNotes.some(n=>n.trim()) || freeform.trim()
+    ? JSON.stringify({ __agenda: agendaNotes, __freeform: freeform })
+    : null;
+
+  const payload = {
+    firm_id:          FIRM_ID_CAD,
+    instance_id:      instId,
+    template_step_id: stepId,
+    summary:          document.getElementById(`mtg-summary-${instId}-${stepId}`)?.value || null,
+    discussion_notes: discussionNotes,
+    decisions_made:   document.getElementById(`mtg-decisions-${instId}-${stepId}`)?.value || null,
+    next_meeting_date: document.getElementById(`mtg-next-${instId}-${stepId}`)?.value || null,
+    cc_recipients:    _mtgData[key]?.ccRecipients || [],
+    status:           _mtgData[key]?.status || 'draft',
+    updated_at:       new Date().toISOString(),
+  };
+
+  try {
+    if (_mtgData[key]?.id) {
+      await API.patch(`workflow_step_meeting_data?id=eq.${_mtgData[key].id}`, payload);
+    } else {
+      const res = await API.post('workflow_step_meeting_data', payload);
+      if (res?.[0]?.id) _mtgData[key] = { ..._mtgData[key], id: res[0].id };
+    }
+    if (indEl) { indEl.textContent = '✓ Saved'; indEl.style.color = 'var(--green)'; }
+    setTimeout(() => { if (indEl) indEl.textContent = ''; }, 2500);
+    if (!silent) cadToast('Meeting data saved', 'success');
+  } catch(e) {
+    if (indEl) { indEl.textContent = 'Save failed'; indEl.style.color = 'var(--red)'; }
+    if (!silent) cadToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+function renderMtgActionItems(instId, stepId) {
+  const key  = _mtgKey(instId, stepId);
+  const el   = document.getElementById(`mtg-ai-list-${instId}-${stepId}`);
+  const cntEl = document.getElementById(`mtg-ai-count-${instId}-${stepId}`);
+  const items = _mtgData[key]?.actionItems || [];
+  if (cntEl) cntEl.textContent = items.length ? `${items.length} item${items.length!==1?'s':''}` : '';
+  if (!el) return;
+  if (!items.length) { el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px 0">No action items yet.</div>'; return; }
+  const today = new Date().toLocaleDateString('en-CA');
+  el.innerHTML = items.map(ai => {
+    const done    = ai.status === 'complete';
+    const overdue = !done && ai.due_date && ai.due_date < today;
+    const assignee = _resources_cad.find(r => r.id === ai.assigned_to_resource)?.name || '—';
+    return `<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;
+      border-radius:4px;background:var(--surf2);border:1px solid var(--border);margin-bottom:3px">
+      <div style="width:13px;height:13px;border-radius:3px;flex-shrink:0;margin-top:1px;
+        border:1px solid ${done?'var(--green)':'var(--border2)'};
+        background:${done?'var(--green)':'none'};
+        display:flex;align-items:center;justify-content:center;
+        font-size:8px;color:#fff;cursor:pointer"
+        onclick="toggleMtgAI('${instId}','${stepId}','${ai.id}','${ai.status}')">
+        ${done?'✓':''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:${done?'var(--muted)':'var(--text)'};
+          ${done?'text-decoration:line-through':''}">${escHtml(ai.description)}</div>
+        <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:1px">
+          <span>${escHtml(assignee)}</span>
+          ${ai.due_date?`<span style="color:${overdue?'var(--red)':'var(--muted)'}">
+            ${overdue?'⚠ ':''} Due ${ai.due_date}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addMtgActionItem(instId, stepId) {
+  const key  = _mtgKey(instId, stepId);
+  const desc = document.getElementById(`mtg-ai-desc-${instId}-${stepId}`)?.value?.trim();
+  if (!desc) return;
+  const assignee = document.getElementById(`mtg-ai-assignee-${instId}-${stepId}`)?.value || null;
+  const due      = document.getElementById(`mtg-ai-due-${instId}-${stepId}`)?.value || null;
+  try {
+    await API.post('workflow_step_meeting_action_items', {
+      firm_id: FIRM_ID_CAD, instance_id: instId, template_step_id: stepId,
+      description: desc, assigned_to_resource: assignee || null,
+      due_date: due || null, status: 'open',
+    });
+    document.getElementById(`mtg-ai-desc-${instId}-${stepId}`).value = '';
+    const aiRows = await API.get(`workflow_step_meeting_action_items?instance_id=eq.${instId}&template_step_id=eq.${stepId}&order=created_at.asc`).catch(()=>[]);
+    if (_mtgData[key]) _mtgData[key].actionItems = aiRows || [];
+    renderMtgActionItems(instId, stepId);
+  } catch(e) { cadToast('Failed to add action item: ' + e.message, 'error'); }
+}
+
+async function toggleMtgAI(instId, stepId, aiId, currentStatus) {
+  const key    = _mtgKey(instId, stepId);
+  const newStatus = currentStatus === 'complete' ? 'open' : 'complete';
+  try {
+    await API.patch(`workflow_step_meeting_action_items?id=eq.${aiId}`, { status: newStatus });
+    if (_mtgData[key]) {
+      const ai = _mtgData[key].actionItems.find(a => a.id === aiId);
+      if (ai) ai.status = newStatus;
+    }
+    renderMtgActionItems(instId, stepId);
+  } catch(e) { cadToast('Failed: ' + e.message, 'error'); }
+}
+
+function renderMtgCC(instId, stepId) {
+  const key = _mtgKey(instId, stepId);
+  const el  = document.getElementById(`mtg-cc-list-${instId}-${stepId}`);
+  if (!el) return;
+  const cc = _mtgData[key]?.ccRecipients || [];
+  el.innerHTML = cc.map((addr, i) => `
+    <div style="display:flex;align-items:center;gap:5px;padding:3px 6px;
+      border-radius:4px;background:var(--surf3);border:1px solid var(--border);
+      font-size:10px;color:var(--text);margin-bottom:2px">
+      <span style="flex:1">${escHtml(addr)}</span>
+      <button onclick="removeMtgCC('${instId}','${stepId}',${i})"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0">×</button>
+    </div>`).join('');
+}
+
+function addMtgCC(instId, stepId) {
+  const key   = _mtgKey(instId, stepId);
+  const input = document.getElementById(`mtg-cc-input-${instId}-${stepId}`);
+  const val   = input?.value?.trim();
+  if (!val) return;
+  if (!_mtgData[key]) _mtgData[key] = { ccRecipients: [] };
+  if (!_mtgData[key].ccRecipients.includes(val)) {
+    _mtgData[key].ccRecipients.push(val);
+    renderMtgCC(instId, stepId);
+    scheduleMtgAutosave(instId, stepId);
+  }
+  if (input) input.value = '';
+}
+
+function removeMtgCC(instId, stepId, idx) {
+  const key = _mtgKey(instId, stepId);
+  _mtgData[key]?.ccRecipients?.splice(idx, 1);
+  renderMtgCC(instId, stepId);
+  scheduleMtgAutosave(instId, stepId);
+}
+
+function renderMtgSendHistory(instId, stepId) {
+  const key = _mtgKey(instId, stepId);
+  const el  = document.getElementById(`mtg-send-history-${instId}-${stepId}`);
+  if (!el) return;
+  const sentAt = _mtgData[key]?.sentAt;
+  el.innerHTML = sentAt
+    ? `<div style="color:var(--green)">✓ Sent ${new Date(sentAt).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}</div>`
+    : '<span style="font-size:10px;color:var(--muted)">Not yet sent</span>';
+}
+
+async function sendMtgMinutes(instId, stepId) {
+  const key = _mtgKey(instId, stepId);
+  await saveMtgData(instId, stepId, true);
+  const inst = _instances.find(i => i.id === instId);
+  const step = inst?._tmplSteps?.find(s => s.id === stepId);
+
+  // Build recipient list from step assignees
+  const attendeeNames = [];
+  const templateName = step?.assignee_name || step?.assignee_email;
+  if (templateName) attendeeNames.push(templateName);
+  const coc = inst?._stepInsts || [];
+  coc.filter(e=>e.event_type==='step_reassigned'&&e.template_step_id===stepId)
+     .forEach(r => { if (r.assignee_email) attendeeNames.push(r.assignee_email); });
+  const ccList = _mtgData[key]?.ccRecipients || [];
+
+  if (!confirm(`Send meeting minutes to ${attendeeNames.length} attendee(s)${ccList.length?` + ${ccList.length} CC`:''}?\n\nThis will mark the meeting as Sent.`)) return;
+
+  try {
+    if (_mtgData[key]?.id) {
+      await API.patch(`workflow_step_meeting_data?id=eq.${_mtgData[key].id}`, {
+        status: 'submitted', sent_at: new Date().toISOString(),
+      });
+    }
+    if (_mtgData[key]) { _mtgData[key].status = 'submitted'; _mtgData[key].sentAt = new Date().toISOString(); }
+
+    // Write CoC event
+    await API.post('workflow_step_instances', {
+      instance_id: instId, firm_id: FIRM_ID_CAD,
+      event_type: 'step_action', template_step_id: stepId,
+      step_type: 'meeting', step_name: step?.name || 'Meeting',
+      event_notes: `Meeting minutes sent to ${attendeeNames.length} attendee(s)`,
+      created_at: new Date().toISOString(),
+    });
+
+    const statusEl = document.getElementById(`meeting-status-${instId}-${stepId}`);
+    if (statusEl) { statusEl.textContent = 'SENT'; statusEl.style.color = 'var(--green)'; statusEl.style.borderColor = 'rgba(42,157,64,.4)'; }
+    renderMtgSendHistory(instId, stepId);
+    cadToast('Meeting minutes sent', 'success');
+
+    // Reload CoC
+    const freshCoc = await API.get(`workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`).catch(()=>[]);
+    if (inst) inst._stepInsts = freshCoc;
+    const detailEl = document.getElementById('instance-detail');
+    if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
+  } catch(e) { cadToast('Send failed: ' + e.message, 'error'); }
+}
 const _commentsCache = {}; // stepId → [{id,parent_id,author_name,body,created_at,replies:[]}]
 
 async function loadStepComments(stepId) {
