@@ -1212,23 +1212,6 @@ function renderInlineStepConfig(step) {
       </div>
 
 
-      <!-- Meeting step: Live threaded comments -->
-      ${step.step_type === 'meeting' ? `
-      <div class="config-section cfg-full" style="padding-bottom:0">
-        <label class="config-label" style="margin-bottom:8px">Discussion &amp; Comments</label>
-        <div id="step-comments-${step.id}" class="step-comments-container">
-          <div class="comments-loading" style="font-size:11px;color:var(--muted);padding:8px 0">
-            Loading comments…
-          </div>
-        </div>
-        <div class="comment-compose" id="compose-${step.id}">
-          <textarea class="comment-compose-input" id="compose-input-${step.id}"
-            placeholder="Add a comment… (Ctrl+Enter to send)"
-            onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitComment('${step.id}',null)}"></textarea>
-          <button class="comment-send-btn"
-            onclick="submitComment('${step.id}',null)">Send</button>
-        </div>
-      </div>` : ''}
 
     </div><!-- /cfg-grid -->
 
@@ -1435,7 +1418,25 @@ function renderInlineStepConfig(step) {
         </div>
       </div>` : ''}
 
-    </div>`;
+    </div>
+
+    <!-- Discussion & Comments — meeting steps only, below documents -->
+    ${step.step_type === 'meeting' ? `
+    <div style="padding:10px 14px 0">
+      <label class="config-label" style="margin-bottom:8px">Discussion &amp; Comments</label>
+      <div id="step-comments-${step.id}" class="step-comments-container">
+        <div class="comments-loading" style="font-size:11px;color:var(--muted);padding:8px 0">
+          Loading comments…
+        </div>
+      </div>
+      <div class="comment-compose" id="compose-${step.id}">
+        <textarea class="comment-compose-input" id="compose-input-${step.id}"
+          placeholder="Add a comment… (Ctrl+Enter to send)"
+          onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();submitComment('${step.id}',null)}"></textarea>
+        <button class="comment-send-btn"
+          onclick="submitComment('${step.id}',null)">Send</button>
+      </div>
+    </div>` : ''}`; 
 }
 
 // ── Document attachment handlers ──────────────────────────────────────────────
@@ -2005,58 +2006,59 @@ async function saveTemplate(silent = false) {
     await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, patch);
     Object.assign(_selectedTmpl, patch);
 
-    // 2. Save steps
-    // Strategy: to avoid unique constraint on (template_id, sequence_order) during reorder,
-    // first shift all existing steps to temp high sequence_orders, then save real values.
+    // 2. Save steps — three-pass strategy to avoid unique(template_id, sequence_order) collisions
     const steps = _selectedTmpl.steps || [];
-    const existingIds = steps.filter(s => !s._new).map(s => s.id);
 
-    if (existingIds.length > 0) {
-      // Pass 1: set all to temp values (sequence_order + 10000) to clear the constraint
-      for (const step of steps.filter(s => !s._new)) {
-        await API.patch(`workflow_template_steps?id=eq.${step.id}`,
-          { sequence_order: step.sequence_order + 10000 });
-      }
+    // Build step payload (shared between passes)
+    const buildStepPayload = (step) => ({
+      template_id:         _selectedTmpl.id,
+      sequence_order:      step.sequence_order,
+      step_type:           step.step_type,
+      name:                step.name || null,
+      assignee_type:       step.assignee_type || null,
+      assignee_user_id:    step.assignee_user_id || null,
+      assignee_role:       step.assignee_role || null,
+      assignee_email:      step.assignee_email || null,
+      assignee_name:       step.assignee_name || null,
+      assignee_org:        step.assignee_org || null,
+      due_days:            step.due_days || null,
+      due_type:            step.due_type || 'after_prior',
+      escalate_after_days: step.escalate_after_days || null,
+      escalate_to:         step.escalate_to || 'pm',
+      parallel_required:   !!step.parallel_required,
+      branch_conditions:   step.branch_conditions || [],
+      instructions:        step.instructions || null,
+      input_from_step:     step.input_from_step || null,
+      forward_input:       !!step.forward_input,
+      reject_to:           step.reject_to || null,
+      confirm_items:       step._confirmItems || [],
+      meeting_agenda:      step._meetingAgenda || [],
+      meeting_comments:    step.meeting_comments || null,
+      attached_docs:       (step._attachedDocs || []).map(d => ({
+        name: d.name, version: d.version, role: d.role || 'reference',
+        size: d.size, path: d.path || null, url: d.url || null,
+      })),
+    });
+
+    // Pass A: INSERT new steps using a guaranteed-safe temp sequence_order
+    // (offset by 50000 so they never collide with existing rows)
+    const newSteps = steps.filter(s => s._new);
+    for (const step of newSteps) {
+      const payload = { ...buildStepPayload(step), sequence_order: step.sequence_order + 50000 };
+      const res = await API.post('workflow_template_steps', payload);
+      if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
     }
 
-    // Pass 2: upsert with real values
+    // Pass B: shift ALL rows (new + existing) to temp range (seq + 10000)
+    // This clears the constraint so Pass C can freely assign real values
     for (const step of steps) {
-      const stepPayload = {
-        template_id:         _selectedTmpl.id,
-        sequence_order:      step.sequence_order,
-        step_type:           step.step_type,
-        name:                step.name || null,
-        assignee_type:       step.assignee_type || null,
-        assignee_user_id:    step.assignee_user_id || null,
-        assignee_role:       step.assignee_role || null,
-        assignee_email:      step.assignee_email || null,
-        assignee_name:       step.assignee_name || null,
-        assignee_org:        step.assignee_org || null,
-        due_days:            step.due_days || null,
-        due_type:            step.due_type || 'after_prior',
-        escalate_after_days: step.escalate_after_days || null,
-        escalate_to:         step.escalate_to || 'pm',
-        parallel_required:   !!step.parallel_required,
-        branch_conditions:   step.branch_conditions || [],
-        instructions:        step.instructions || null,
-        input_from_step:     step.input_from_step || null,
-        forward_input:       !!step.forward_input,
-        reject_to:           step.reject_to || null,
-        confirm_items:       step._confirmItems || [],
-        meeting_agenda:      step._meetingAgenda || [],
-        meeting_comments:    step.meeting_comments || null,
-        attached_docs:       (step._attachedDocs || []).map(d => ({
-          name: d.name, version: d.version, role: d.role || 'reference',
-          size: d.size, path: d.path || null, url: d.url || null,
-        })),
-      };
+      await API.patch(`workflow_template_steps?id=eq.${step.id}`,
+        { sequence_order: step.sequence_order + 10000 });
+    }
 
-      if (step._new) {
-        const res = await API.post('workflow_template_steps', stepPayload);
-        if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
-      } else {
-        await API.patch(`workflow_template_steps?id=eq.${step.id}`, stepPayload);
-      }
+    // Pass C: set real sequence_order and full payload on all steps
+    for (const step of steps) {
+      await API.patch(`workflow_template_steps?id=eq.${step.id}`, buildStepPayload(step));
     }
 
     // Update local list
