@@ -1238,10 +1238,12 @@ function renderInlineStepConfig(step) {
   const dis  = ro ? 'disabled' : '';                 // shorthand for input attribute
 
   return `
+    <div style="${ro ? 'pointer-events:none;user-select:none' : ''}">
     ${ro ? `<div style="font-size:10px;color:var(--muted);padding:4px 0 8px;
-      font-style:italic">🔒 Read only — set template to Draft to edit</div>` : ''}
+      font-style:italic;pointer-events:none">🔒 Read only — set template to Draft to edit</div>` : ''}
+    <div style="${ro ? 'opacity:.55' : ''}">
     <!-- Config fields in a 2-column grid -->
-    <div class="cfg-grid" style="${ro ? 'opacity:.6;pointer-events:none;user-select:none' : ''}">
+    <div class="cfg-grid">
 
       <!-- Step Name — full width -->
       <div class="config-section cfg-full" style="padding-bottom:6px">
@@ -1677,7 +1679,7 @@ function renderInlineStepConfig(step) {
 
     </div>
 
-    `; 
+    </div></div>`; 
 }
 
 // ── Document attachment handlers ──────────────────────────────────────────────
@@ -2694,18 +2696,33 @@ async function deleteTemplate() {
 function onStatusChange() {
   const sel = document.getElementById('tmpl-status-sel');
   const newStatus = sel?.value;
+  if (!newStatus || !_selectedTmpl) return;
 
   if (newStatus === 'released') {
-    const hasPending = _binCount(_selectedTmpl?.id || '') > 0 || _dirtySteps;
+    const hasPending = _binCount(_selectedTmpl.id) > 0 || _dirtySteps;
     if (hasPending) {
       cadToast('Commit all changes before releasing', 'error');
-      // Revert dropdown to current status
-      if (sel) sel.value = _selectedTmpl?.status || 'draft';
+      if (sel) sel.value = _selectedTmpl.status || 'draft';
       return;
     }
-    cadToast('Releasing — commit will bump to next major version', 'info');
   }
+
+  // Update in-memory status immediately so renderEditor reflects the new state
+  _selectedTmpl.status = newStatus;
   markDirty();
+
+  // Re-render editor so read-only / edit state applies immediately
+  renderEditor();
+
+  // Restore the status selector value after renderEditor rebuilds the toolbar
+  const freshSel = document.getElementById('tmpl-status-sel');
+  if (freshSel) freshSel.value = newStatus;
+
+  if (newStatus === 'released') {
+    cadToast('Released — template is now read only', 'info');
+  } else if (newStatus === 'draft') {
+    cadToast('Back to Draft — editing enabled', 'info');
+  }
 }
 
 // Refresh CoC panel in place if it's currently open (called on every bin append)
