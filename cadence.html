@@ -647,7 +647,7 @@ function updateBadges() {
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
   if (tab !== 'templates') stopAutoSave();
-  if (tab !== 'instances') _selectedInstance = null;
+  if (tab !== 'instances') { _selectedInstance = null; _stopElapsedTimer(); }
   _currentTab = tab;
   ['templates','instances','forms','triggers'].forEach(t => {
     document.getElementById('tab-'+t)?.classList.toggle('active', t===tab);
@@ -2125,6 +2125,7 @@ async function selectInstance(id) {
     _selectedInstance._stepInsts  = stepInsts  || [];
     _selectedInstance._tmplSteps  = tmplSteps  || [];
     renderInstanceDetail(detailEl, _selectedInstance);
+    _startElapsedTimer(_selectedInstance);
   } catch(e) {
     detailEl.innerHTML = `<div style="padding:40px;color:var(--red)">Failed to load: ${escHtml(e.message)}</div>`;
   }
@@ -2190,6 +2191,28 @@ function renderInstanceDetail(el, inst) {
           <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
         </div>
       </div>
+
+      <!-- Elapsed time timer -->
+      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px">
+        <div style="background:#1a2540;border:2px solid #2a3a5a;border-radius:8px;
+          padding:6px 14px;box-shadow:inset 0 2px 6px rgba(0,0,0,.5),0 0 10px rgba(0,180,255,.08)">
+          <div id="inst-elapsed-${inst.id}"
+            style="font-family:var(--font-mono);font-size:22px;font-weight:700;
+            color:${canAct?'#e8f4ff':'var(--muted)'};letter-spacing:.12em;
+            text-shadow:${canAct?'0 0 8px rgba(0,180,255,.4)':'none'};
+            min-width:120px;text-align:center">
+            ${inst.launched_at ? _fmtElapsed(Date.now() - new Date(inst.launched_at).getTime()) : '--:--:--'}
+          </div>
+        </div>
+        <div style="font-size:8px;font-weight:700;letter-spacing:.18em;
+          color:${canAct?'var(--cad)':'var(--muted)'};text-transform:uppercase">
+          ${canAct ? 'Elapsed Time' : inst.status?.replace('_',' ').toUpperCase()}
+        </div>
+        <div style="font-size:7px;color:var(--muted);letter-spacing:.12em;font-family:var(--font-mono)">
+          dd:hh:mm
+        </div>
+      </div>
+
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <!-- Status badge -->
         <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -2396,7 +2419,38 @@ function renderInstanceDetail(el, inst) {
     </div>`;
 }
 
-// ── Instance step toggle ───────────────────────────────────────────────────────
+// ── Elapsed time timer engine ─────────────────────────────────────────────────
+let _elapsedTimer = null;
+
+function _fmtElapsed(ms) {
+  if (ms < 0) ms = 0;
+  const totalMins = Math.floor(ms / 60000);
+  const mins = totalMins % 60;
+  const hours = Math.floor(totalMins / 60) % 24;
+  const days  = Math.floor(totalMins / 1440);
+  return `${String(days).padStart(2,'0')}:${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
+}
+
+function _startElapsedTimer(inst) {
+  // Clear any existing timer
+  if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
+
+  // Only tick for active instances with a launch time
+  if (!inst?.launched_at || inst.status === 'cancelled' || inst.status === 'complete') return;
+
+  const launched = new Date(inst.launched_at).getTime();
+  const elId = 'inst-elapsed-' + inst.id;
+
+  _elapsedTimer = setInterval(() => {
+    const el = document.getElementById(elId);
+    if (!el) { clearInterval(_elapsedTimer); _elapsedTimer = null; return; }
+    el.textContent = _fmtElapsed(Date.now() - launched);
+  }, 10000); // update every 10 seconds (minutes precision)
+}
+
+function _stopElapsedTimer() {
+  if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
+}
 function toggleInstanceStep(instId, stepId) {
   const inst = _instances.find(i => i.id === instId);
   if (!inst) return;
@@ -2528,7 +2582,10 @@ async function _reloadInstance(instId) {
   }
   renderInstancesTab(document.getElementById('cad-content'));
   const detailEl = document.getElementById('instance-detail');
-  if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
+  if (detailEl && _selectedInstance) {
+    renderInstanceDetail(detailEl, _selectedInstance);
+    _startElapsedTimer(_selectedInstance);
+  }
 }
 
 // ── Forms tab placeholder ─────────────────────────────────────────────────────
