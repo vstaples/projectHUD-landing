@@ -2407,124 +2407,34 @@ async function setExceptionStatusFromDetail(taskId, status, btnEl) {
   }
 }
 
-// ── Kanban case modal — for resolved tasks not in the triage list ─────────────
-function _openKanbanCaseModal(t) {
-  document.getElementById('kanban-case-modal')?.remove();
+// ── Toggle Kanban card inline case file ────────────────────────────────────────
+// Opens/closes the renderTaskDetail panel embedded inside each Kanban card.
+// No view switching — the full case file lives right in the column.
+function toggleKanbanCard(taskId) {
+  const shortId = taskId.replace(/-/g,'').substring(0,8);
+  const detail  = document.getElementById('kdetail-' + shortId);
+  const arrow   = document.getElementById('kcard-arrow-' + shortId);
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  detail.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
 
-  const enriched = {
-    ...t,
-    daysOver: Math.round((new Date() - new Date(t.due_date + 'T00:00:00')) / 86400000),
-    assignee: resolveAssignee(t.assigned_to),
-    assigneeAlloc: _allocations.filter(a => a.resource_id === t.assigned_to).reduce((s,a)=>s+(a.allocation_pct||0),0),
-    hasRequest: _requests.some(r => r.task_id === t.id),
-    cls: classifyTask(t),
-    exception_status: t.exception_status || 'unattended',
-  };
-  enriched.suggestion = suggestNextAction(enriched, enriched.cls, enriched.assigneeAlloc, enriched.hasRequest);
-
-  const overlay = document.createElement('div');
-  overlay.id = 'kanban-case-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:800;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;';
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-
-  overlay.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;
-        width:100%;max-width:860px;overflow:hidden;">
-      <!-- Header -->
-      <div style="display:flex;align-items:center;justify-content:space-between;
-          padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surf2);">
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(t.name)}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">
-            ${enriched.daysOver}d overdue · ${escHtml(t.phase||'—')}
-            <span style="color:var(--green);margin-left:8px">● Resolved</span>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <button class="case-action-btn"
-              style="background:rgba(0,210,255,.08);border-color:rgba(0,210,255,.3);color:var(--cyan)"
-              onclick="setKanbanStatus('${t.id}','in_progress',this);document.getElementById('kanban-case-modal')?.remove()">
-            ↩ Reopen — Set In Progress
-          </button>
-          <button onclick="document.getElementById('kanban-case-modal').remove()"
-              style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
-        </div>
-      </div>
-      <!-- Case file body -->
-      <div style="padding:14px 16px;">
-        ${renderTaskDetail(enriched)}
-      </div>
-    </div>`;
-
-  document.body.appendChild(overlay);
-}
-
-// ── Open a specific task's exception case file from Kanban ────────────────────
-// Switches to EXCEPTIONS view, finds the task's detail panel by scanning the
-// rendered DOM (not by index — index is render-order dependent), opens it,
-// and scrolls it into view.
-function openExceptionCard(taskId) {
-  const t = _tasks.find(t => t.id === taskId);
-
-  // Resolved tasks don't appear in the EXCEPTIONS triage list.
-  // Show the case file in a lightweight modal overlay instead.
-  if (t?.exception_status === 'resolved') {
-    _openKanbanCaseModal(t);
-    return;
-  }
-
-  switchView('exceptions');
-  // Give renderExceptions time to build the DOM, then locate and open the card
-  setTimeout(() => {
-    // Strategy: find any element whose onclick references this taskId
-    // toggleExcCard is called with 'exc-N' or 'exc-N-SHORTID'
-    // The group item rows have onclick="...toggleExcCard('exc-N-SHORTID')"
-    // Single cards have onclick="toggleExcCard('exc-N')" on the .exception-card div
-    const shortId = taskId.replace(/-/g,'').substring(0,8);
-
-    // Try group item row first (most common — grouped by project)
-    const groupRow = Array.from(document.querySelectorAll('.exc-group-item')).find(el =>
-      el.getAttribute('onclick')?.includes(shortId)
-    );
-    if (groupRow) {
-      // Make sure the parent group is expanded
-      const groupBody = groupRow.closest('.exc-group-body');
-      if (groupBody && !groupBody.classList.contains('open')) {
-        const gid = groupBody.id;
-        toggleExcGroup(gid);
-      }
-      // Open this task's detail pane
-      const match = groupRow.getAttribute('onclick')?.match(/toggleExcCard\('([^']+)'\)/);
+  // Auto-load CoC on first open — same as toggleExcCard does in exceptions view
+  if (!isOpen && !detail.dataset.cocLoaded) {
+    detail.dataset.cocLoaded = '1';
+    const histBtn = detail.querySelector('[onclick*="loadAndToggleHistory"]');
+    if (histBtn) {
+      const match = histBtn.getAttribute('onclick')?.match(/loadAndToggleHistory\('([^']+)'/);
       if (match) {
-        const detailId = match[1];
-        const detail = document.getElementById(detailId);
-        if (detail && !detail.classList.contains('open') && detail.style.display !== 'block') {
-          toggleExcCard(detailId);
+        const caseId    = 'case-' + match[1].replace(/-/g,'').substring(0,12);
+        const histPaneId = caseId + '-hist';
+        const histBody  = document.getElementById(histPaneId);
+        if (histBody && !histBody.classList.contains('open')) {
+          loadAndToggleHistory(match[1], histPaneId, null);
         }
-        // Scroll the row into view
-        setTimeout(() => groupRow.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
-      }
-      return;
-    }
-
-    // Try single exception card
-    const singleCard = Array.from(document.querySelectorAll('.exception-card')).find(el => {
-      const detail = el.querySelector('.exc-detail');
-      return detail && (
-        detail.innerHTML.includes(taskId) ||
-        detail.querySelector('[onclick*="' + shortId + '"]')
-      );
-    });
-    if (singleCard) {
-      const match = singleCard.getAttribute('onclick')?.match(/toggleExcCard\('([^']+)'\)/);
-      if (match) {
-        const detailId = match[1];
-        const detail = document.getElementById(detailId);
-        if (detail && !detail.classList.contains('open')) toggleExcCard(detailId);
-        setTimeout(() => singleCard.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
       }
     }
-  }, 150);
+  }
 }
 
 // ── Kanban view ────────────────────────────────────────────────────────────────
@@ -2589,21 +2499,52 @@ function renderKanban(el) {
           const priColor = { high:'#f07a7a', medium:'var(--amber)', low:'var(--muted)' };
           const pc       = priColor[t.exception_priority] || 'rgba(255,255,255,.2)';
 
-          html += `<div class="kanban-card" onclick="openExceptionCard('${t.id}')">
-            <div class="kanban-card-name" style="color:${clsColor}">${escHtml(t.name)}</div>
-            <div class="kanban-card-meta">
-              <span>${daysOver}d overdue</span>
-              <span>${escHtml(t.phase || '—')}</span>
-              <span>${escHtml(aName)}</span>
-              ${t.exception_priority ? `<span style="color:${pc}">${t.exception_priority.toUpperCase()}</span>` : ''}
+          const shortId = t.id?.replace(/-/g,'').substring(0,8);
+
+          html += `<div class="kanban-card" id="kcard-${shortId}" style="cursor:default">
+            <!-- Card header — click to expand/collapse -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;cursor:pointer"
+                onclick="event.stopPropagation();toggleKanbanCard('${t.id}')">
+              <div style="flex:1;min-width:0">
+                <div class="kanban-card-name" style="color:${clsColor}">${escHtml(t.name)}</div>
+                <div class="kanban-card-meta" style="margin-top:3px">
+                  <span>${daysOver}d overdue</span>
+                  <span>${escHtml(t.phase || '—')}</span>
+                  <span>${escHtml(aName)}</span>
+                  ${t.exception_priority ? `<span style="color:${pc}">${t.exception_priority.toUpperCase()}</span>` : ''}
+                </div>
+              </div>
+              <span id="kcard-arrow-${shortId}"
+                  style="color:var(--muted);font-size:10px;flex-shrink:0;margin-top:2px;
+                  transition:transform .2s">▼</span>
             </div>
-            <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap" onclick="event.stopPropagation()">
+            <!-- Move buttons -->
+            <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap"
+                onclick="event.stopPropagation()">
               ${columns.filter(c => c !== col).map(c => `
-                <button class="status-btn ${c}${false?' active':''}"
+                <button class="status-btn ${c}"
                     style="opacity:.7;font-size:8px;padding:2px 6px"
                     onclick="setKanbanStatus('${t.id}','${c}',this)">
                   → ${colMeta[c].label}
                 </button>`).join('')}
+            </div>
+            <!-- Inline case file — hidden until expanded -->
+            <div id="kdetail-${shortId}"
+                style="display:none;margin-top:10px;padding-top:10px;
+                border-top:1px solid var(--border)">
+              ${(() => {
+                const enriched = {
+                  ...t,
+                  daysOver,
+                  assignee: resolveAssignee(t.assigned_to),
+                  assigneeAlloc: _allocations.filter(a => a.resource_id === t.assigned_to).reduce((s,a)=>s+(a.allocation_pct||0),0),
+                  hasRequest: _requests.some(r => r.task_id === t.id),
+                  cls,
+                  exception_status: t.exception_status || 'unattended',
+                };
+                enriched.suggestion = suggestNextAction(enriched, enriched.cls, enriched.assigneeAlloc, enriched.hasRequest);
+                return renderTaskDetail(enriched);
+              })()}
             </div>
           </div>`;
         });
