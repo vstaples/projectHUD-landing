@@ -2932,7 +2932,7 @@ async function openMeetingPage(instId, stepId) {
       const res = await API.post('meetings', {
         firm_id:                    FIRM_ID_CAD,
         title:                      step?.name || inst?.title || 'Meeting',
-        meeting_type:               'workflow',
+        meeting_type:               'ad_hoc',
         scheduled_date:             new Date().toISOString(),
         scheduled_duration_minutes: 60,
         status:                     'scheduled',
