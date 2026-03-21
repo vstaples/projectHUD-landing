@@ -881,8 +881,11 @@ const DEFAULT_OUTCOMES = {
     { id:'no_response',       label:'No response',        color:'#BA7517', isDefault:false },
   ],
   meeting:      [
-    { id:'completed',         label:'Completed',          color:'#1D9E75', isDefault:true  },
-    { id:'cancelled',         label:'Cancelled',          color:'#E24B4A', isDefault:false, isReject:true },
+    { id:'concluded',            label:'Concluded — no actions',       color:'#1D9E75', isDefault:true  },
+    { id:'concluded_actions',    label:'Concluded — actions pending',  color:'#BA7517', isDefault:false, holdsForActions:true },
+    { id:'design_change',        label:'Design change required',       color:'#E24B4A', isDefault:false, requiresReset:true },
+    { id:'full_reset',           label:'Full reset — awaiting input',  color:'#E24B4A', isDefault:false, requiresReset:true, requiresSuspend:true },
+    { id:'cancelled',            label:'Cancelled',                    color:'#888',    isDefault:false },
   ],
   confirmation: [
     { id:'confirmed',         label:'Confirmed',          color:'#1D9E75', isDefault:true  },
@@ -3726,19 +3729,26 @@ function renderInstanceDetail(el, inst) {
                     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--muted);margin-bottom:8px">Complete this step</div>
+
+                      <!-- Tier 1: Semantic outcome buttons -->
                       <div style="display:flex;flex-direction:column;gap:5px" id="outcome-btns-${s.id}">
                         ${_getOutcomes(s).map(o => `
-                        <button onclick="completeStep('${inst.id}','${s.id}','${escHtml(o.id)}','${escHtml(o.label)}')"
+                        <button id="obtn-${s.id}-${o.id}"
+                          onclick="selectOutcome('${s.id}','${escHtml(o.id)}',${!!o.requiresReset})"
                           style="display:flex;align-items:center;gap:10px;padding:9px 12px;
                             border:1px solid ${o.color}55;border-radius:6px;
                             background:${o.color}11;cursor:pointer;text-align:left;width:100%;
                             transition:background .12s"
                           onmouseover="this.style.background='${o.color}22'"
-                          onmouseout="this.style.background='${o.color}11'">
+                          onmouseout="this.style.background=this.classList.contains('selected')?'${o.color}33':'${o.color}11'">
                           <div style="width:9px;height:9px;border-radius:50%;background:${o.color};flex-shrink:0"></div>
                           <span style="font-size:12px;font-weight:500;color:${o.color}">${escHtml(o.label)}</span>
+                          ${o.holdsForActions ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7">holds until actions resolve</span>` : ''}
+                          ${o.requiresSuspend ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7">suspends instance</span>` : ''}
                         </button>`).join('')}
                       </div>
+
+                      <!-- Notes -->
                       <div style="margin-top:8px">
                         <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
                           text-transform:uppercase;display:block;margin-bottom:3px">Notes (optional)</label>
@@ -3746,6 +3756,50 @@ function renderInstanceDetail(el, inst) {
                           style="font-size:11px;resize:vertical;min-height:48px"
                           placeholder="Add context, reason, or summary…"></textarea>
                       </div>
+
+                      <!-- Tier 2: Routing override — auto-expands for reset outcomes, opt-in for others -->
+                      <div id="routing-override-${s.id}" style="margin-top:10px;
+                        border:1px solid var(--border);border-radius:6px;overflow:hidden">
+                        <button onclick="toggleRoutingOverride('${s.id}')"
+                          style="width:100%;padding:8px 12px;background:var(--bg2);border:none;
+                            cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+                            font-size:10px;color:var(--muted);text-align:left">
+                          <span>↩ Override routing</span>
+                          <span id="routing-chevron-${s.id}" style="font-size:9px;transition:transform .15s">▶</span>
+                        </button>
+                        <div id="routing-body-${s.id}" style="display:none;padding:10px 12px;
+                          border-top:1px solid var(--border);background:var(--bg1)">
+                          <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.5">
+                            Return the workflow to a prior step instead of advancing. The selected step
+                            will be re-activated and the CoC will record the reason.
+                          </div>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                            text-transform:uppercase;display:block;margin-bottom:4px">Return to step</label>
+                          <select id="route-target-${s.id}" class="config-select" style="font-size:11px;width:100%">
+                            <option value="">— Advance normally —</option>
+                            ${(inst._tmplSteps||[])
+                              .filter(ps => ps.sequence_order < s.sequence_order)
+                              .sort((a,b) => b.sequence_order - a.sequence_order)
+                              .map(ps => `<option value="${ps.id}">${ps.sequence_order}. ${escHtml(ps.name||STEP_META[ps.step_type]?.label||'Step')}</option>`)
+                              .join('')}
+                          </select>
+                          <div id="suspend-condition-wrap-${s.id}" style="display:none;margin-top:8px">
+                            <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                              text-transform:uppercase;display:block;margin-bottom:3px">Condition to re-activate</label>
+                            <input class="config-input" id="suspend-condition-${s.id}"
+                              style="font-size:11px" placeholder="e.g. Revised design package received" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Submit button — appears once an outcome is selected -->
+                      <button id="complete-submit-${s.id}" style="display:none;margin-top:10px;
+                        width:100%;padding:9px;border-radius:6px;border:none;
+                        background:var(--cad);color:#fff;font-size:12px;font-weight:600;
+                        cursor:pointer;letter-spacing:.02em"
+                        onclick="submitComplete('${inst.id}','${s.id}')">
+                        Complete step
+                      </button>
                     </div>` : ''}
 
                     <!-- Already completed — show outcome badge -->
@@ -3802,6 +3856,16 @@ function renderInstanceDetail(el, inst) {
                       <span style="font-size:10px;font-weight:500;color:${outColor}">${escHtml(outLabel)}</span>
                     </div>`;
                   })() : ''}
+                  ${evt.route_to_step_name ? `
+                    <div style="font-size:10px;color:var(--amber);margin-top:3px;display:flex;align-items:center;gap:4px">
+                      <span>↩</span>
+                      <span>Returns to: ${escHtml(evt.route_to_step_name)}</span>
+                    </div>` : ''}
+                  ${evt.suspend_condition ? `
+                    <div style="font-size:10px;color:var(--muted);margin-top:2px;
+                      padding:3px 6px;background:var(--surf2);border-left:2px solid var(--amber)">
+                      Awaiting: ${escHtml(evt.suspend_condition)}
+                    </div>` : ''}
                   ${evt.actor_name?`<div style="font-size:9px;color:var(--text2)">By ${escHtml(evt.actor_name)}</div>`:''}
                   ${evt.notes||evt.event_notes?`<div style="font-size:10px;color:var(--text2);margin-top:2px;
                     padding:3px 6px;background:var(--surf2);border-left:2px solid ${color}">
@@ -4094,8 +4158,109 @@ async function startStep(instId, stepId) {
   }
 }
 
-// ── Complete a step with a named outcome ──────────────────────────────────────
+// ── Complete step UI helpers ──────────────────────────────────────────────────
+function selectOutcome(stepId, outcomeId, requiresReset) {
+  // Deselect all buttons
+  document.querySelectorAll(`#outcome-btns-${stepId} button`).forEach(b => {
+    b.classList.remove('selected');
+    b.style.outline = 'none';
+    b.style.boxShadow = 'none';
+  });
+  // Select clicked button
+  const btn = document.getElementById(`obtn-${stepId}-${outcomeId}`);
+  if (btn) {
+    btn.classList.add('selected');
+    btn.style.outline = '2px solid currentColor';
+    btn.style.boxShadow = 'inset 0 0 0 1px currentColor';
+  }
+  // Store selection on the container
+  const container = document.getElementById(`outcome-btns-${stepId}`);
+  if (container) container.dataset.selected = outcomeId;
+
+  // Auto-expand routing override for reset outcomes
+  if (requiresReset) {
+    const body = document.getElementById(`routing-body-${stepId}`);
+    const chevron = document.getElementById(`routing-chevron-${stepId}`);
+    if (body) body.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(90deg)';
+  }
+
+  // Show/hide suspend condition field based on outcome flags
+  const outcomes = _getOutcomes({ step_type: document.getElementById(`outcome-btns-${stepId}`)?.closest('[data-step-type]')?.dataset.stepType });
+  const outcome = _instances.flatMap(i => i._tmplSteps||[])
+    .flatMap(s => _getOutcomes(s))
+    .find(o => o.id === outcomeId);
+  const suspendWrap = document.getElementById(`suspend-condition-wrap-${stepId}`);
+  if (suspendWrap) suspendWrap.style.display = outcome?.requiresSuspend ? 'block' : 'none';
+
+  // Show submit button
+  const submitBtn = document.getElementById(`complete-submit-${stepId}`);
+  if (submitBtn) submitBtn.style.display = 'block';
+}
+
+function toggleRoutingOverride(stepId) {
+  const body    = document.getElementById(`routing-body-${stepId}`);
+  const chevron = document.getElementById(`routing-chevron-${stepId}`);
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display    = open ? 'none' : 'block';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+async function submitComplete(instId, stepId) {
+  const container   = document.getElementById(`outcome-btns-${stepId}`);
+  const outcomeId   = container?.dataset.selected;
+  if (!outcomeId) { cadToast('Select an outcome first', 'error'); return; }
+
+  const inst        = _instances.find(i => i.id === instId);
+  const step        = inst?._tmplSteps?.find(s => s.id === stepId);
+  const outcomeDef  = _getOutcomes(step||{}).find(o => o.id === outcomeId);
+  const outcomeLabel = outcomeDef?.label || outcomeId;
+
+  const notes           = document.getElementById(`complete-notes-${stepId}`)?.value?.trim() || null;
+  const routeTargetId   = document.getElementById(`route-target-${stepId}`)?.value || null;
+  const routeTargetStep = routeTargetId
+    ? inst?._tmplSteps?.find(s => s.id === routeTargetId)
+    : null;
+  const suspendCondition = document.getElementById(`suspend-condition-${stepId}`)?.value?.trim() || null;
+  const authorName      = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+
+  const submitBtn = document.getElementById(`complete-submit-${stepId}`);
+  if (submitBtn) { submitBtn.textContent = 'Saving…'; submitBtn.disabled = true; }
+
+  try {
+    await API.post('workflow_step_instances', {
+      instance_id:        instId,
+      firm_id:            FIRM_ID_CAD,
+      event_type:         'step_completed',
+      template_step_id:   stepId,
+      step_type:          step?.step_type || 'action',
+      step_name:          step?.name || null,
+      outcome:            outcomeId,
+      route_to_step_id:   routeTargetId   || null,
+      route_to_step_name: routeTargetStep ? `${routeTargetStep.sequence_order}. ${routeTargetStep.name||'Step'}` : null,
+      suspend_condition:  suspendCondition || null,
+      event_notes:        notes,
+      actor_name:         authorName,
+      created_at:         new Date().toISOString(),
+    });
+
+    await _reloadInstance(instId);
+    const suffix = routeTargetStep ? ` → returning to ${routeTargetStep.name}` : '';
+    cadToast(`Step completed — ${outcomeLabel}${suffix}`, 'success');
+  } catch(e) {
+    cadToast('Failed to complete step: ' + e.message, 'error');
+    if (submitBtn) { submitBtn.textContent = 'Complete step'; submitBtn.disabled = false; }
+  }
+}
+
+// ── Complete a step with a named outcome (legacy direct call) ─────────────────
 async function completeStep(instId, stepId, outcomeId, outcomeLabel) {
+  // Thin wrapper — select the outcome and submit immediately (no routing override)
+  const container = document.getElementById(`outcome-btns-${stepId}`);
+  if (container) container.dataset.selected = outcomeId;
+  await submitComplete(instId, stepId);
+}
   const notes = document.getElementById(`complete-notes-${stepId}`)?.value?.trim() || null;
   const inst  = _instances.find(i => i.id === instId);
   const step  = inst?._tmplSteps?.find(s => s.id === stepId);
