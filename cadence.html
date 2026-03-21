@@ -672,6 +672,7 @@ let _versionBumped  = false;  // true once version has been bumped in this draft
 let _autoSaveTimer  = null;   // setInterval handle
 let _lastSavedAt    = null;   // Date of last successful auto-save
 let _stepSnapshot   = {};     // { stepId: {name, assignee_type, assignee_name, ...} } at load/commit time
+let _cocCommittedRows = [];   // cached committed CoC rows for live panel refresh
 
 // ── Pending change bin — persisted in localStorage per template ───────────────
 const _BIN_PREFIX = 'cadence_pending_';
@@ -1934,13 +1935,18 @@ function updateStepField(field, value) {
   // Append to pending bin for CoC diff (skip noisy real-time fields)
   const skipBin = ['instructions']; // instructions tracked by diff, not bin
   if (_selectedTmpl?.id && !skipBin.includes(field) && prev !== value) {
+    const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
     _binAppend(_selectedTmpl.id, {
-      type:     'field_changed',
-      stepName: _selectedStep.name || _selectedStep.step_type || 'Step',
+      type:      'field_changed',
+      stepName:  _selectedStep.name || _selectedStep.step_type || 'Step',
       field,
-      from:     prev,
-      to:       value,
+      from:      prev,
+      to:        value,
+      changedBy: authorName,
+      ts:        new Date().toISOString(),
     });
+    // Refresh CoC panel live if it's open
+    _refreshCoCIfOpen();
   }
 
   // Surgically update card header for name field
@@ -2092,7 +2098,12 @@ function addStep(type) {
   _selectedStep = newStep;
   _dirtySteps = true;
   _structuralChange = true;
-  if (_selectedTmpl.id) _binAppend(_selectedTmpl.id, { type: 'step_added', stepName: newStep.name || type });
+  if (_selectedTmpl.id) _binAppend(_selectedTmpl.id, {
+    type: 'step_added', stepName: newStep.name || type,
+    changedBy: _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
+    ts: new Date().toISOString(),
+  });
+  _refreshCoCIfOpen();
 
   reRenderSpine();
   // Hide AI banner
@@ -2152,7 +2163,12 @@ function stepDrop(event, targetStepId) {
   // Renumber sequence_order
   steps.forEach((s, i) => s.sequence_order = i + 1);
   _dirtySteps = true;
-  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, { type: 'step_reordered', stepName: moved?.name || 'Step' });
+  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, {
+    type: 'step_reordered', stepName: moved?.name || 'Step',
+    changedBy: _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
+    ts: new Date().toISOString(),
+  });
+  _refreshCoCIfOpen();
   reRenderSpine();
 }
 
@@ -2173,7 +2189,12 @@ function removeStep(id) {
   if (_selectedStep?.id === id) _selectedStep = null;
   _dirtySteps = true;
   _structuralChange = true;
-  if (_selectedTmpl.id) _binAppend(_selectedTmpl.id, { type: 'step_deleted', stepName: removed?.name || 'Step' });
+  if (_selectedTmpl.id) _binAppend(_selectedTmpl.id, {
+    type: 'step_deleted', stepName: removed?.name || 'Step',
+    changedBy: _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
+    ts: new Date().toISOString(),
+  });
+  _refreshCoCIfOpen();
   reRenderSpine();
 }
 
@@ -2345,6 +2366,7 @@ async function commitTemplate() {
 
     // 4. Clear bin, reset flags, take new snapshot
     _binClear(_selectedTmpl.id);
+    _cocCommittedRows = []; // force reload on next CoC open
     _takeSnapshot();
     _dirtySteps       = false;
     _structuralChange = false;
@@ -2532,6 +2554,14 @@ function onStatusChange() {
   }
 }
 
+// Refresh CoC panel in place if it's currently open (called on every bin append)
+function _refreshCoCIfOpen() {
+  const panel = document.getElementById('tmpl-coc-panel');
+  if (panel?.classList.contains('open')) {
+    renderTmplCoC(_cocCommittedRows);
+  }
+}
+
 // ── Template Chain of Custody panel ──────────────────────────────────────────
 function toggleTmplCoC() {
   const panel  = document.getElementById('tmpl-coc-panel');
@@ -2555,7 +2585,8 @@ async function loadTmplCoC(templateId) {
     const rows = await API.get(
       `workflow_template_coc?template_id=eq.${templateId}&order=created_at.desc&limit=100`
     ).catch(() => []);
-    renderTmplCoC(rows || []);
+    _cocCommittedRows = rows || [];
+    renderTmplCoC(_cocCommittedRows);
   } catch(e) {
     bodyEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:12px">Failed to load history.</div>';
   }
@@ -2609,8 +2640,36 @@ function renderTmplCoC(rows) {
       .filter(l => !liveDiffs.includes(l));
 
     const allPending = [...liveDiffs, ...binLines];
+
+    // Build bullet list with per-entry author + timestamp from bin where available
+    function fmtTsShort(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-US', { month:'short', day:'numeric' })
+        + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    }
+
+    // Map diff strings back to bin entries for attribution
     const bulletHtml = allPending.length
-      ? allPending.map(d => `<div style="font-size:10px;color:var(--text2);line-height:1.7">· ${escHtml(d)}</div>`).join('')
+      ? allPending.map(diffLine => {
+          // Find the most recent bin entry that corresponds to this diff line
+          const match = pending.slice().reverse().find(e => {
+            if (e.type === 'step_added'     && diffLine.startsWith('Step added:'))     return true;
+            if (e.type === 'step_deleted'   && diffLine.startsWith('Step deleted:'))   return true;
+            if (e.type === 'step_reordered' && diffLine.startsWith('Step reordered:')) return true;
+            if (e.type === 'field_changed'  && diffLine.includes(e.stepName || ''))    return true;
+            return false;
+          });
+          const who = match?.changedBy || '';
+          const when = match?.ts ? fmtTsShort(match.ts) : '';
+          const meta = (who || when)
+            ? `<span style="color:var(--muted);margin-left:8px">${escHtml(who)}${who&&when?' · ':''}${escHtml(when)}</span>`
+            : '';
+          return `<div style="font-size:10px;color:var(--text2);line-height:1.9;
+            display:flex;align-items:baseline;gap:4px">
+            <span>· ${escHtml(diffLine)}</span>${meta}
+          </div>`;
+        }).join('')
       : `<div style="font-size:10px;color:var(--muted)">Changes pending — no diff yet</div>`;
 
     const nextVer = (() => {
