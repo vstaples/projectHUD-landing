@@ -2851,12 +2851,16 @@ function onStatusChange() {
     }
   }
 
-  // Update in-memory status immediately so renderEditor reflects the new state
+  // Update in-memory status immediately so renderEditor and template list both reflect new state
   _selectedTmpl.status = newStatus;
+  const tmplIdx = _templates.findIndex(t => t.id === _selectedTmpl.id);
+  if (tmplIdx >= 0) _templates[tmplIdx].status = newStatus;
   markDirty();
 
-  // Re-render editor so read-only / edit state applies immediately
+  // Re-render editor and template list so read-only state + card badge apply immediately
   renderEditor();
+  const listEl = document.getElementById('tmpl-list');
+  if (listEl) listEl.innerHTML = renderTemplateList();
 
   // Restore the status selector value after renderEditor rebuilds the toolbar
   const freshSel = document.getElementById('tmpl-status-sel');
@@ -3372,6 +3376,15 @@ function renderInstanceDetail(el, inst) {
   const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.template_step_id));
   const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.template_step_id));
 
+  // Derive the "ready" step — immediately follows the last completed step, not yet touched
+  const lastCompletedOrder = steps
+    .filter(s => completedStepIds.has(s.id))
+    .reduce((max, s) => Math.max(max, s.sequence_order), 0);
+  const readyStep = steps
+    .filter(s => s.sequence_order > lastCompletedOrder && !activeStepIds.has(s.id))
+    .sort((a, b) => a.sequence_order - b.sequence_order)[0];
+  const readyStepId = readyStep?.id || null;
+
   // Map step_id → earliest activation timestamp for elapsed timers
   const stepActivatedAt = {};
   coc.filter(e => e.event_type === 'step_activated' && e.template_step_id)
@@ -3482,11 +3495,12 @@ function renderInstanceDetail(el, inst) {
               const completionEvt = done
                 ? coc.slice().reverse().find(e => e.event_type==='step_completed' && e.template_step_id===s.id)
                 : null;
+              const isReady  = s.id === readyStepId;
               const outcomeColor = completionEvt?.outcome
                 ? (_getOutcomes(s).find(o => o.id === completionEvt.outcome)?.color || 'var(--green)')
                 : done ? 'var(--green)' : null;
-              const nodeColor = outcomeColor || (rejected?'var(--red)':touched?'var(--cad)':'var(--surf3)');
-              const textColor = outcomeColor || (done?'var(--green)':rejected?'var(--red)':touched?'var(--text)':'var(--muted)');
+              const nodeColor = outcomeColor || (rejected?'var(--red)':touched?'var(--cad)':isReady?'var(--accent)':'var(--surf3)');
+              const textColor = outcomeColor || (done?'var(--green)':rejected?'var(--red)':touched?'var(--text)':isReady?'var(--accent)':'var(--muted)');
 
               // Current assignee — from reassignment CoC or template definition
               const assigneeDisplay = reassign
@@ -3534,6 +3548,7 @@ function renderInstanceDetail(el, inst) {
                           })() : ''}
                           ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
+                          ${isReady&&!touched?`<span style="color:var(--accent)">● Ready</span>`:''}
                         </div>
                       </div>
                       <!-- Elapsed timer — right justified, dd:hh:mm -->
@@ -3563,8 +3578,10 @@ function renderInstanceDetail(el, inst) {
                           </div>`;
                         } else {
                           return `<div style="text-align:right;flex-shrink:0">
-                            <div style="${monoStyle};color:var(--muted)">--:--:--</div>
-                            <div style="${labelStyle};color:var(--muted)">Waiting</div>
+                            <div style="${monoStyle};color:${isReady?'var(--accent)':'var(--muted)'}">--:--:--</div>
+                            <div style="${labelStyle};color:${isReady?'var(--accent)':'var(--muted)'}">
+                              ${isReady ? 'Ready' : 'Waiting'}
+                            </div>
                           </div>`;
                         }
                       })()}
@@ -4244,6 +4261,28 @@ async function submitComplete(instId, stepId) {
       actor_name:         authorName,
       created_at:         new Date().toISOString(),
     });
+
+    // Auto-activate next step if outcome advances normally (no reset/suspend/manual route)
+    const advancesNormally = !outcomeDef?.requiresReset && !outcomeDef?.requiresSuspend && !routeTargetId;
+    if (advancesNormally) {
+      const allSteps  = inst?._tmplSteps || [];
+      const currOrder = step?.sequence_order || 0;
+      const nextStep  = allSteps
+        .filter(s => s.sequence_order > currOrder)
+        .sort((a, b) => a.sequence_order - b.sequence_order)[0];
+      if (nextStep) {
+        await API.post('workflow_step_instances', {
+          instance_id:      instId,
+          firm_id:          FIRM_ID_CAD,
+          event_type:       'step_activated',
+          template_step_id: nextStep.id,
+          step_type:        nextStep.step_type || 'action',
+          step_name:        nextStep.name || null,
+          actor_name:       'System',
+          created_at:       new Date().toISOString(),
+        }).catch(() => {}); // non-fatal
+      }
+    }
 
     await _reloadInstance(instId);
     const suffix = routeTargetStep ? ` → returning to ${routeTargetStep.name}` : '';
