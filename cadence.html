@@ -140,7 +140,29 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tmpl-item.status-released{border-left:2px solid rgba(42,157,64,.4)}
 .tmpl-item-name.status-draft{color:var(--amber)}
 
-/* ── Template CoC panel ── */
+/* ── Save button dirty state ── */
+#save-btn.dirty{
+  color:var(--cad);
+  border-color:var(--cad-wire);
+  background:var(--cad-dim);
+}
+
+/* ── CoC resize handle ── */
+.tmpl-coc-resize{
+  width:4px;flex-shrink:0;cursor:col-resize;
+  background:transparent;
+  transition:background .15s;
+  position:relative;
+}
+.tmpl-coc-resize:hover,.tmpl-coc-resize.dragging{
+  background:var(--cad-wire);
+}
+.tmpl-coc-resize::after{
+  content:'';position:absolute;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  width:2px;height:32px;border-radius:2px;
+  background:var(--border2);
+}
 .tmpl-coc-panel{
   width:0;flex-shrink:0;overflow:hidden;
   border-left:1px solid transparent;
@@ -565,17 +587,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <body>
 <div class="hud-shell">
 
-  <!-- Sidebar (filled by sidebar.js) -->
-  <div class="sidebar" id="sidebar"></div>
-
-  <!-- Main -->
-  <div class="cad-main">
+  <!-- Main (full width — sidebar replaced by Dashboard link in topbar) -->
+  <div class="cad-main" style="width:100%">
 
     <!-- Top bar -->
     <div class="cad-topbar">
       <div class="cad-topbar-brand">CadenceHUD</div>
       <div class="cad-topbar-sub">Workflow Engine</div>
       <div class="cad-topbar-actions">
+        <a href="/projects.html" class="btn btn-ghost btn-sm"
+          style="text-decoration:none">← Dashboard</a>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('instances')">◎ Instances</button>
         <button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">+ New Template</button>
       </div>
@@ -976,6 +997,7 @@ function renderEditor() {
     col.innerHTML = `
       <div class="cad-editor-inner" id="editor-inner"></div>
       <div class="tmpl-coc-panel" id="tmpl-coc-panel">
+        <div class="tmpl-coc-resize" id="tmpl-coc-resize" title="Drag to resize"></div>
         <div class="tmpl-coc-header">
           <span class="tmpl-coc-title">Change History</span>
           <button onclick="toggleTmplCoC()" style="background:none;border:none;
@@ -1996,6 +2018,7 @@ function updateStepField(field, value) {
   _selectedStep[field] = value;
   _dirtySteps = true;
   _updateVersionDisplay();
+  document.getElementById('save-btn')?.classList.add('dirty');
 
   // Append to pending bin for CoC diff (skip noisy real-time fields)
   const skipBin = ['instructions']; // instructions tracked by diff, not bin
@@ -2029,6 +2052,7 @@ function markDirty() {
   _dirtySteps = true;
   _updateAutoSaveIndicator('unsaved');
   _updateVersionDisplay();
+  document.getElementById('save-btn')?.classList.add('dirty');
 }
 
 function _updateVersionDisplay() {
@@ -2302,6 +2326,7 @@ async function saveTemplate(silent = false) {
     _updateAutoSaveIndicator('saved');
     _updateVersionDisplay(); // keep asterisk — uncommitted changes still pending
     updateBadges();
+    document.getElementById('save-btn')?.classList.remove('dirty');
 
     const listEl = document.getElementById('tmpl-list');
     if (listEl) listEl.innerHTML = renderTemplateList();
@@ -2444,6 +2469,7 @@ async function commitTemplate() {
     _versionBumped    = false;
     _lastSavedAt      = new Date();
     _updateAutoSaveIndicator('saved');
+    document.getElementById('save-btn')?.classList.remove('dirty');
 
     // 5. Update UI
     const idx = _templates.findIndex(t => t.id === _selectedTmpl.id);
@@ -3958,6 +3984,48 @@ API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_n
     return da < db ? -1 : da > db ? 1 : a.name.localeCompare(b.name);
   }); })
   .catch(() => {});
+
+// ── CoC panel drag-to-resize ──────────────────────────────────────────────────
+(function() {
+  let _cocDragging = false;
+  let _cocStartX   = 0;
+  let _cocStartW   = 0;
+
+  document.addEventListener('mousedown', e => {
+    const handle = e.target.closest('#tmpl-coc-resize');
+    if (!handle) return;
+    const panel = document.getElementById('tmpl-coc-panel');
+    if (!panel) return;
+    _cocDragging = true;
+    _cocStartX   = e.clientX;
+    _cocStartW   = panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!_cocDragging) return;
+    const panel = document.getElementById('tmpl-coc-panel');
+    if (!panel) return;
+    const delta   = _cocStartX - e.clientX; // dragging left = wider
+    const newWidth = Math.max(240, Math.min(600, _cocStartW + delta));
+    panel.style.width = newWidth + 'px';
+    // Disable CSS transition while dragging for smooth feel
+    panel.style.transition = 'none';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!_cocDragging) return;
+    _cocDragging = false;
+    document.getElementById('tmpl-coc-resize')?.classList.remove('dragging');
+    document.body.style.cursor     = '';
+    document.body.style.userSelect = '';
+    const panel = document.getElementById('tmpl-coc-panel');
+    if (panel) panel.style.transition = ''; // restore CSS transition
+  });
+})();
 
 function escHtml(s) {
   return (s || '').toString()
