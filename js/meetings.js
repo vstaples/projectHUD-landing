@@ -167,6 +167,33 @@ const MeetingCard = (() => {
       .mc-reply-send:hover { opacity: .85; }
       .mc-sub-compose { display: none; margin: 6px 0 0 30px; }
       .mc-sub-compose.open { display: block; }
+
+      /* ── inline add panels ── */
+      .mc-add-panel {
+        background: var(--surf3); border: 1px solid var(--border2);
+        border-radius: 6px; padding: 10px 12px; margin-top: 8px;
+      }
+      .mc-add-panel select, .mc-add-panel input {
+        width: 100%; padding: 6px 8px; border-radius: 5px;
+        border: 1px solid var(--border2); background: var(--surf2);
+        color: var(--text); font-size: 12px; font-family: inherit;
+        outline: none; margin-bottom: 6px;
+      }
+      .mc-add-panel select:focus, .mc-add-panel input:focus { border-color: var(--accent); }
+      .mc-add-row { display: flex; gap: 6px; margin-top: 4px; }
+      .mc-add-row input { margin-bottom: 0; flex: 1; }
+      .mc-add-confirm {
+        padding: 6px 14px; border-radius: 5px;
+        border: 1px solid var(--accent); background: var(--accent);
+        color: #fff; font-size: 11px; font-weight: 600; cursor: pointer;
+        white-space: nowrap;
+      }
+      .mc-add-confirm:hover { opacity: .88; }
+      .mc-add-cancel {
+        padding: 6px 10px; border-radius: 5px;
+        border: 1px solid var(--border2); background: transparent;
+        color: var(--muted); font-size: 11px; cursor: pointer;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -204,39 +231,87 @@ const MeetingCard = (() => {
     return tops;
   }
 
-  // ── Render helpers ──────────────────────────────────────────────────────────
-  function _renderAttendees(attendees) {
-    if (!attendees.length) {
-      return '<div style="font-size:11px;color:var(--muted)">No attendees recorded.</div>';
-    }
-    return '<div style="display:flex;flex-wrap:wrap;gap:5px">' +
-      attendees.map(a => {
-        const name   = a.users?.name || 'Attendee';
-        const status = a.attendance_status || 'invited';
-        const sc     = status === 'attended' ? '#7af0c0'
-                     : status === 'accepted' ? 'var(--accent)'
-                     : status === 'declined' ? '#f07a7a' : 'var(--muted)';
-        return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;
-            border-radius:5px;border:1px solid var(--border);font-size:11px">
-          <div style="width:18px;height:18px;border-radius:50%;background:${sc}22;
-            color:${sc};font-size:8px;font-weight:700;display:flex;
-            align-items:center;justify-content:center">${_ini(name)}</div>
-          <span style="color:var(--text)">${_esc(name)}</span>
-          <span style="color:${sc};font-size:10px">${status}</span>
-        </div>`;
-      }).join('') + '</div>';
+  // ── Resource option builder (grouped by department, name + title) ─────────────
+  function _buildResourceOptions(resources) {
+    if (!resources || !resources.length) return '<option value="">No resources loaded</option>';
+    const groups = {};
+    resources.forEach(r => {
+      const grp = r.is_external
+        ? ('External' + (r.department ? ': ' + r.department : ''))
+        : (r.department || 'Internal');
+      if (!groups[grp]) groups[grp] = [];
+      groups[grp].push(r);
+    });
+    const opts = Object.entries(groups).map(([grp, members]) =>
+      `<optgroup label="${_esc(grp)}">
+        ${members.map(r => {
+          const name = r.name || ((r.first_name || '') + ' ' + (r.last_name || '')).trim();
+          return `<option value="${r.id}">${_esc(name)}${r.title ? ' — ' + _esc(r.title) : ''}</option>`;
+        }).join('')}
+      </optgroup>`
+    ).join('');
+    return `<option value="">— Select resource —</option>${opts}`;
   }
 
-  function _renderAgenda(agenda) {
-    if (!agenda.length) {
-      return '<div style="font-size:11px;color:var(--muted)">No agenda items recorded.</div>';
-    }
-    return agenda.map(a => `
-      <div class="mc-agenda-item">
-        <span class="mc-agenda-num">${a.sequence_order}.</span>
-        <span style="color:var(--text);flex:1">${_esc(a.title)}</span>
-        ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px">${_esc(a.notes_captured)}</span>` : ''}
-      </div>`).join('');
+  // ── Render helpers ──────────────────────────────────────────────────────────
+  function _renderAttendees(attendees, meetingId, editable, resources) {
+    const chips = attendees.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">' +
+        attendees.map(a => {
+          const name   = a.users?.name || a._resourceName || 'Attendee';
+          const status = a.attendance_status || 'invited';
+          const sc     = status === 'attended' ? '#7af0c0'
+                       : status === 'accepted' ? 'var(--accent)'
+                       : status === 'declined' ? '#f07a7a' : 'var(--muted)';
+          return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;
+              border-radius:5px;border:1px solid var(--border);font-size:11px">
+            <div style="width:18px;height:18px;border-radius:50%;background:${sc}22;
+              color:${sc};font-size:8px;font-weight:700;display:flex;
+              align-items:center;justify-content:center">${_ini(name)}</div>
+            <span style="color:var(--text)">${_esc(name)}</span>
+            <span style="color:${sc};font-size:10px">${status}</span>
+          </div>`;
+        }).join('') + '</div>'
+      : '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">No attendees recorded.</div>';
+
+    if (!editable) return chips;
+
+    return chips + `
+      <div id="mc-att-panel-${meetingId}" style="display:none" class="mc-add-panel">
+        <select id="mc-att-res-${meetingId}">${_buildResourceOptions(resources)}</select>
+        <div style="display:flex;gap:6px">
+          <button class="mc-add-confirm"
+            onclick="event.stopPropagation();MeetingCard._addAttendee('${meetingId}')">+ Add</button>
+          <button class="mc-add-cancel"
+            onclick="event.stopPropagation();MeetingCard._toggleAttPanel('${meetingId}')">Cancel</button>
+        </div>
+      </div>`;
+  }
+
+  function _renderAgenda(agenda, meetingId, editable) {
+    const items = agenda.length
+      ? agenda.map(a => `
+          <div class="mc-agenda-item">
+            <span class="mc-agenda-num">${a.sequence_order}.</span>
+            <span style="color:var(--text);flex:1">${_esc(a.title)}</span>
+            ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px">${_esc(a.notes_captured)}</span>` : ''}
+          </div>`).join('')
+      : '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">No agenda items recorded.</div>';
+
+    if (!editable) return items;
+
+    return items + `
+      <div id="mc-agenda-panel-${meetingId}" style="display:none" class="mc-add-panel">
+        <div class="mc-add-row">
+          <input id="mc-agenda-input-${meetingId}" type="text"
+            placeholder="Agenda item…"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();MeetingCard._addAgendaItem('${meetingId}')}" />
+          <button class="mc-add-confirm"
+            onclick="event.stopPropagation();MeetingCard._addAgendaItem('${meetingId}')">+ Add</button>
+          <button class="mc-add-cancel"
+            onclick="event.stopPropagation();MeetingCard._toggleAgendaPanel('${meetingId}')">Cancel</button>
+        </div>
+      </div>`;
   }
 
   function _renderActionItems(actionItems, meetingId, opts) {
@@ -411,6 +486,9 @@ const MeetingCard = (() => {
       const editHref = opts.editMinutesHref
         || `/meeting-minutes.html?meeting_id=${meetingId}${opts.prospectId ? '&prospect_id=' + opts.prospectId : ''}`;
 
+      const editable  = !!opts.editable;
+      const resources = opts.resources || [];
+
       // next meeting date (pulled from minutes if available)
       const nextMeetText = minutes?.next_meeting_date
         ? `<span style="color:var(--text);font-weight:600">${_fmtDate(minutes.next_meeting_date)}</span>`
@@ -449,12 +527,28 @@ const MeetingCard = (() => {
         <div style="font-size:11px;margin-bottom:10px">${nextMeetText}</div>
 
         <!-- attendees -->
-        <div class="mc-label">Attendees</div>
-        <div style="margin-bottom:12px">${_renderAttendees(attendees)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="mc-label" style="margin-bottom:0">Attendees</div>
+          ${editable ? `<button onclick="event.stopPropagation();MeetingCard._toggleAttPanel('${meetingId}')"
+            style="font-size:10px;padding:2px 8px;border-radius:4px;
+              border:1px solid var(--border2);background:transparent;
+              color:var(--muted);cursor:pointer">+ Add</button>` : ''}
+        </div>
+        <div id="mc-att-list-${meetingId}" style="margin-bottom:12px">
+          ${_renderAttendees(attendees, meetingId, editable, resources)}
+        </div>
 
         <!-- agenda -->
-        <div class="mc-label">Agenda</div>
-        <div style="margin-bottom:12px">${_renderAgenda(agenda)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="mc-label" style="margin-bottom:0">Agenda</div>
+          ${editable ? `<button onclick="event.stopPropagation();MeetingCard._toggleAgendaPanel('${meetingId}')"
+            style="font-size:10px;padding:2px 8px;border-radius:4px;
+              border:1px solid var(--border2);background:transparent;
+              color:var(--muted);cursor:pointer">+ Add</button>` : ''}
+        </div>
+        <div id="mc-agenda-list-${meetingId}" style="margin-bottom:12px">
+          ${_renderAgenda(agenda, meetingId, editable)}
+        </div>
 
         <!-- action items -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -624,6 +718,101 @@ const MeetingCard = (() => {
     }
   }
 
+  // ── Internal: toggle attendee add panel ────────────────────────────────────
+  function _toggleAttPanel(meetingId) {
+    const el = document.getElementById('mc-att-panel-' + meetingId);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    if (!open) setTimeout(() => el.querySelector('select')?.focus(), 50);
+  }
+
+  // ── Internal: toggle agenda add panel ──────────────────────────────────────
+  function _toggleAgendaPanel(meetingId) {
+    const el = document.getElementById('mc-agenda-panel-' + meetingId);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    if (!open) setTimeout(() => document.getElementById('mc-agenda-input-' + meetingId)?.focus(), 50);
+  }
+
+  // ── Internal: add attendee from resource picker ─────────────────────────────
+  async function _addAttendee(meetingId) {
+    const sel        = document.getElementById('mc-att-res-' + meetingId);
+    const resourceId = sel?.value;
+    if (!resourceId) return;
+
+    // Resolve user_id from resource_id (meeting_attendees FK is user_id)
+    const userRows = await API.get(
+      `users?resource_id=eq.${resourceId}&select=id,name&limit=1`
+    ).catch(() => []);
+    const userId   = userRows?.[0]?.id   || null;
+    const userName = userRows?.[0]?.name || sel.options[sel.selectedIndex]?.text?.split(' —')[0] || 'Attendee';
+
+    try {
+      await API.post('meeting_attendees', {
+        meeting_id:        meetingId,
+        user_id:           userId,
+        stakeholder_id:    userId ? null : resourceId,
+        attendance_status: 'invited',
+      });
+      bust(meetingId);
+      // Refresh just the attendees list
+      const data = await _load(meetingId);
+      const listEl = document.getElementById('mc-att-list-' + meetingId);
+      if (listEl) {
+        // Preserve editable state by re-rendering with same opts
+        // We store editable/resources on the container's dataset
+        const container = listEl.closest('[data-mc-editable]');
+        const editable  = container?.dataset.mcEditable === 'true';
+        const resources = container?._mcResources || [];
+        listEl.innerHTML = _renderAttendees(data.attendees, meetingId, editable, resources);
+      }
+      // Hide panel and reset
+      const panel = document.getElementById('mc-att-panel-' + meetingId);
+      if (panel) panel.style.display = 'none';
+      if (sel) sel.value = '';
+    } catch(e) {
+      console.error('Add attendee failed:', e);
+      if (typeof cadToast === 'function') cadToast('Failed to add attendee: ' + e.message, 'error');
+    }
+  }
+
+  // ── Internal: add agenda item ───────────────────────────────────────────────
+  async function _addAgendaItem(meetingId) {
+    const inp   = document.getElementById('mc-agenda-input-' + meetingId);
+    const title = inp?.value?.trim();
+    if (!title) return;
+
+    // Next sequence_order = current count + 1
+    const data  = _cache[meetingId];
+    const order = (data?.agenda?.length || 0) + 1;
+
+    try {
+      await API.post('meeting_agenda_items', {
+        meeting_id:     meetingId,
+        firm_id:        _firmId(),
+        title,
+        sequence_order: order,
+      });
+      bust(meetingId);
+      const fresh  = await _load(meetingId);
+      const listEl = document.getElementById('mc-agenda-list-' + meetingId);
+      if (listEl) {
+        const container = listEl.closest('[data-mc-editable]');
+        const editable  = container?.dataset.mcEditable === 'true';
+        listEl.innerHTML = _renderAgenda(fresh.agenda, meetingId, editable);
+      }
+      // Hide panel and reset
+      const panel = document.getElementById('mc-agenda-panel-' + meetingId);
+      if (panel) panel.style.display = 'none';
+      if (inp) inp.value = '';
+    } catch(e) {
+      console.error('Add agenda item failed:', e);
+      if (typeof cadToast === 'function') cadToast('Failed to add agenda item: ' + e.message, 'error');
+    }
+  }
+
   // ── Expose internals needed by inline onclick handlers ──────────────────────
   return {
     render,
@@ -633,6 +822,10 @@ const MeetingCard = (() => {
     _toggleSub,
     _post,
     _addAction,
+    _toggleAttPanel,
+    _toggleAgendaPanel,
+    _addAttendee,
+    _addAgendaItem,
   };
 
 })();

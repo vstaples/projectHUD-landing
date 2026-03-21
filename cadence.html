@@ -2947,9 +2947,13 @@ async function renderCadMeetingStep(inst, step) {
     // Phase A — no meeting record yet
     MeetingCard.renderPreLaunch(step, el, () => cadStartMeeting(inst.id, step.id));
   } else {
-    // Phase B — meeting exists: render the canonical card
+    // Phase B — meeting exists: render the canonical card in editable mode
+    el.dataset.mcEditable = 'true';
+    el._mcResources = _resources_cad;
     await MeetingCard.render(meetingId, el, {
       editMinutesHref: `/meeting-minutes.html?meeting_id=${meetingId}`,
+      editable:  true,
+      resources: _resources_cad,
     });
   }
 }
