@@ -995,6 +995,8 @@ function renderInlineStepConfig(step) {
           oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
       </div>
 
+    </div><!-- /cfg-grid -->
+
       <!-- Authorization input — auto-resolved from the immediately prior step -->
       ${step.step_type === 'approval' || step.step_type === 'review' ||
         step.step_type === 'signoff' || step.step_type === 'external' ? `
