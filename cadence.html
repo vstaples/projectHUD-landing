@@ -4261,36 +4261,7 @@ async function completeStep(instId, stepId, outcomeId, outcomeLabel) {
   if (container) container.dataset.selected = outcomeId;
   await submitComplete(instId, stepId);
 }
-  const notes = document.getElementById(`complete-notes-${stepId}`)?.value?.trim() || null;
-  const inst  = _instances.find(i => i.id === instId);
-  const step  = inst?._tmplSteps?.find(s => s.id === stepId);
-  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
 
-  // Disable buttons while saving
-  const btnContainer = document.getElementById(`outcome-btns-${stepId}`);
-  if (btnContainer) btnContainer.querySelectorAll('button').forEach(b => b.disabled = true);
-
-  try {
-    await API.post('workflow_step_instances', {
-      instance_id:      instId,
-      firm_id:          FIRM_ID_CAD,
-      event_type:       'step_completed',
-      template_step_id: stepId,
-      step_type:        step?.step_type || 'action',
-      step_name:        step?.name || null,
-      outcome:          outcomeId,
-      event_notes:      notes,
-      actor_name:       authorName,
-      created_at:       new Date().toISOString(),
-    });
-
-    await _reloadInstance(instId);
-    cadToast(`Step completed — ${outcomeLabel}`, 'success');
-  } catch(e) {
-    cadToast('Failed to complete step: ' + e.message, 'error');
-    if (btnContainer) btnContainer.querySelectorAll('button').forEach(b => b.disabled = false);
-  }
-}
 async function suspendInstance(instId) {
   const reason = prompt('Reason for suspension (optional):');
   if (reason === null) return; // cancelled prompt
