@@ -748,6 +748,7 @@ function _stepSnap(step) {
     sequence_order:      step.sequence_order,
     meeting_agenda:      JSON.stringify(step._meetingAgenda || []),
     confirm_items:       JSON.stringify(step._confirmItems || []),
+    outcomes:            JSON.stringify(step.outcomes || []),
   };
 }
 
@@ -817,6 +818,8 @@ function _diffSteps(prevSnap, currentSteps) {
       else
         diffs.push(`${label} agenda items updated`);
     }
+    if (prev.outcomes !== curr.outcomes)
+      diffs.push(`${label} outcomes updated`);
     if (prev.confirm_items !== curr.confirm_items) {
       const prevArr = JSON.parse(prev.confirm_items || '[]');
       const currArr = JSON.parse(curr.confirm_items || '[]');
@@ -847,7 +850,55 @@ const STEP_META = {
   meeting:      { icon:'◉',  label:'Meeting',            nodeClass:'sn-meeting',  badgeColor:'rgba(79,200,140,.15)',  badgeText:'#4fc88c' },
 };
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Default outcomes per step type ───────────────────────────────────────────
+// Each outcome: { label, color, isDefault (advances), isReject (loops back) }
+const DEFAULT_OUTCOMES = {
+  approval:     [
+    { id:'approved',          label:'Approved',           color:'#1D9E75', isDefault:true  },
+    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false },
+    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, isReject:true },
+  ],
+  review:       [
+    { id:'accepted',          label:'Accepted',           color:'#1D9E75', isDefault:true  },
+    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false },
+    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, isReject:true },
+  ],
+  signoff:      [
+    { id:'signed',            label:'Signed',             color:'#1D9E75', isDefault:true  },
+    { id:'declined',          label:'Declined',           color:'#E24B4A', isDefault:false, isReject:true },
+  ],
+  form:         [
+    { id:'submitted',         label:'Submitted',          color:'#1D9E75', isDefault:true  },
+    { id:'saved_incomplete',  label:'Saved (incomplete)', color:'#BA7517', isDefault:false },
+  ],
+  action:       [
+    { id:'done',              label:'Done',               color:'#1D9E75', isDefault:true  },
+    { id:'blocked',           label:'Blocked',            color:'#E24B4A', isDefault:false, isReject:true },
+    { id:'escalated',         label:'Escalated',          color:'#BA7517', isDefault:false },
+  ],
+  external:     [
+    { id:'responded',         label:'Responded',          color:'#1D9E75', isDefault:true  },
+    { id:'no_response',       label:'No response',        color:'#BA7517', isDefault:false },
+  ],
+  meeting:      [
+    { id:'completed',         label:'Completed',          color:'#1D9E75', isDefault:true  },
+    { id:'cancelled',         label:'Cancelled',          color:'#E24B4A', isDefault:false, isReject:true },
+  ],
+  confirmation: [
+    { id:'confirmed',         label:'Confirmed',          color:'#1D9E75', isDefault:true  },
+    { id:'incomplete',        label:'Incomplete',         color:'#BA7517', isDefault:false },
+  ],
+  wait:         [
+    { id:'condition_met',     label:'Condition met',      color:'#1D9E75', isDefault:true  },
+    { id:'timed_out',         label:'Timed out',          color:'#BA7517', isDefault:false },
+  ],
+};
+
+function _getOutcomes(step) {
+  // Use saved custom outcomes if present, else defaults for the step type
+  if (Array.isArray(step.outcomes) && step.outcomes.length) return step.outcomes;
+  return DEFAULT_OUTCOMES[step.step_type] || [{ id:'done', label:'Done', color:'#1D9E75', isDefault:true }];
+}
 document.addEventListener('DOMContentLoaded', async () => {
   await loadAll();
   renderTab('templates');
@@ -968,6 +1019,7 @@ async function selectTemplate(id) {
     s._confirmItems   = Array.isArray(s.confirm_items) ? s.confirm_items : [];
     s._meetingAgenda  = Array.isArray(s.meeting_agenda) ? s.meeting_agenda : [];
     s.meeting_comments = s.meeting_comments || '';
+    s.outcomes        = Array.isArray(s.outcomes) ? s.outcomes : [];
     s._attachedDocs = (s.attached_docs || []).map(d => ({
       name:    d.name,
       version: d.version,
@@ -1206,6 +1258,13 @@ function renderSpine() {
               </div>
             </div>
             ${step.step_type === 'branch' && step.branch_conditions?.length ? renderBranchConditions(step) : ''}
+            ${!step._virtual && step.step_type !== 'trigger' ? (() => {
+              const outs = _getOutcomes(step);
+              return `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;padding-top:5px;border-top:1px solid var(--border)">
+                ${outs.map(o => `<span style="font-size:9px;padding:1px 7px;border-radius:9px;font-weight:500;letter-spacing:.03em;
+                  background:${o.color}22;color:${o.color};border:1px solid ${o.color}44">${escHtml(o.label)}</span>`).join('')}
+              </div>`;
+            })() : ''}
           </div>
 
           <!-- Inline config — expands below card when selected -->
@@ -1602,6 +1661,43 @@ function renderInlineStepConfig(step) {
         </div>`;
       })() : ''}
 
+
+    <!-- Outcomes section — named exits for this step -->
+    ${step.step_type !== 'trigger' && step.step_type !== 'branch' ? `
+    <div style="padding:10px 14px 8px;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label class="config-label" style="margin-bottom:0">Outcomes</label>
+        <span style="font-size:10px;color:var(--muted)">Named exits — drive routing in Layer 2</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px" id="outcomes-list-${step.id}">
+        ${_getOutcomes(step).map((o, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;
+          background:var(--bg2);border:1px solid var(--border);border-radius:5px">
+          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${escHtml(o.color||'#888')}"></div>
+          <input class="config-input" style="flex:1;font-size:11px;padding:3px 6px"
+            value="${escHtml(o.label)}" placeholder="Outcome name"
+            oninput="updateOutcomeField('${step.id}',${i},'label',this.value)" />
+          <select class="config-select" style="font-size:10px;padding:3px 6px;width:auto"
+            onchange="updateOutcomeField('${step.id}',${i},'color',this.value)">
+            <option value="#1D9E75"${o.color==='#1D9E75'?' selected':''}>Green</option>
+            <option value="#BA7517"${o.color==='#BA7517'?' selected':''}>Amber</option>
+            <option value="#E24B4A"${o.color==='#E24B4A'?' selected':''}>Red</option>
+            <option value="#4f8ef7"${o.color==='#4f8ef7'?' selected':''}>Blue</option>
+            <option value="#888"${(o.color||'#888')==='#888'?' selected':''}>Gray</option>
+          </select>
+          ${!o.isDefault ? `
+          <button onclick="removeOutcome('${step.id}',${i})"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;
+              padding:0 2px;line-height:1;flex-shrink:0" title="Remove outcome">✕</button>
+          ` : `<span style="font-size:9px;color:var(--muted);flex-shrink:0;padding:0 4px"
+            title="Default — advances to next step">→</span>`}
+        </div>`).join('')}
+      </div>
+      <button onclick="addOutcome('${step.id}')"
+        style="margin-top:5px;width:100%;padding:5px;background:none;
+          border:1px dashed var(--border2);border-radius:5px;cursor:pointer;
+          font-size:11px;color:var(--muted)">+ Add outcome</button>
+    </div>` : ''}
 
     <!-- Documents section — per-document role assignment -->
     <div style="padding:0 14px 6px;display:flex;align-items:center;justify-content:space-between">
@@ -2021,7 +2117,51 @@ function updateMeetingAgendaItem(stepId, idx, value) {
   markDirty();
 }
 
-// ── Confirmation step attestation item helpers ────────────────────────────────
+// ── Outcome management (template editor) ─────────────────────────────────────
+function addOutcome(stepId) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step) return;
+  if (!step.outcomes || !step.outcomes.length) {
+    // Initialize from defaults first
+    step.outcomes = _getOutcomes(step).map(o => ({...o}));
+  }
+  step.outcomes.push({ id: 'outcome_' + Date.now(), label: 'New outcome', color: '#888', isDefault: false });
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, {
+    type: 'field_changed', stepName: step.name || 'Step',
+    field: 'outcomes', from: null, to: 'added',
+    changedBy: authorName, ts: new Date().toISOString(),
+  });
+  markDirty(); reRenderSpine(); _refreshCoCIfOpen();
+}
+
+function removeOutcome(stepId, idx) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?.outcomes) return;
+  step.outcomes.splice(idx, 1);
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+  if (_selectedTmpl?.id) _binAppend(_selectedTmpl.id, {
+    type: 'field_changed', stepName: step.name || 'Step',
+    field: 'outcomes', from: null, to: 'removed',
+    changedBy: authorName, ts: new Date().toISOString(),
+  });
+  markDirty(); reRenderSpine(); _refreshCoCIfOpen();
+}
+
+function updateOutcomeField(stepId, idx, field, value) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step) return;
+  // Ensure outcomes array is initialized from defaults
+  if (!step.outcomes || !step.outcomes.length) {
+    step.outcomes = _getOutcomes(step).map(o => ({...o}));
+  }
+  if (!step.outcomes[idx]) return;
+  step.outcomes[idx][field] = value;
+  markDirty();
+  // Refresh dot color inline without full re-render
+  const row = document.querySelector(`#outcomes-list-${stepId} > div:nth-child(${idx + 1}) > div:first-child`);
+  if (row && field === 'color') row.style.background = value;
+}
 function addConfirmItem(stepId) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   if (!step) return;
@@ -2575,6 +2715,7 @@ async function _saveSteps() {
     confirm_items:       step._confirmItems || [],
     meeting_agenda:      step._meetingAgenda || [],
     meeting_comments:    step.meeting_comments || null,
+    outcomes:            step.outcomes || null,
     attached_docs:       (step._attachedDocs || []).map(d => ({
       name: d.name, version: d.version, role: d.role || 'reference',
       size: d.size, path: d.path || null, url: d.url || null,
@@ -3331,10 +3472,18 @@ function renderInstanceDetail(el, inst) {
               const rejected = rejectedStepIds.has(s.id);
               const touched  = activeStepIds.has(s.id);
               const isSel    = selStep === s.id;
-              const nodeColor= done?'var(--green)':rejected?'var(--red)':touched?'var(--cad)':'var(--surf3)';
-              const textColor= done?'var(--green)':rejected?'var(--red)':touched?'var(--text)':'var(--muted)';
               const isLast   = idx === steps.length - 1;
               const reassign = reassignments[s.id];
+
+              // Resolve outcome color for completed steps
+              const completionEvt = done
+                ? coc.slice().reverse().find(e => e.event_type==='step_completed' && e.template_step_id===s.id)
+                : null;
+              const outcomeColor = completionEvt?.outcome
+                ? (_getOutcomes(s).find(o => o.id === completionEvt.outcome)?.color || 'var(--green)')
+                : done ? 'var(--green)' : null;
+              const nodeColor = outcomeColor || (rejected?'var(--red)':touched?'var(--cad)':'var(--surf3)');
+              const textColor = outcomeColor || (done?'var(--green)':rejected?'var(--red)':touched?'var(--text)':'var(--muted)');
 
               // Current assignee — from reassignment CoC or template definition
               const assigneeDisplay = reassign
@@ -3374,7 +3523,12 @@ function renderInstanceDetail(el, inst) {
                           <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;text-transform:uppercase">${meta.label}</span>
                           ${s.due_days!=null?`<span>⏱ ${s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+'d'}</span>`:''}
                           <span style="color:var(--text2)">👤 ${assigneeDisplay}</span>
-                          ${done?`<span style="color:var(--green)">✓ Complete</span>`:''}
+                          ${done ? (() => {
+                            const cEvt = coc.slice().reverse().find(e => e.event_type==='step_completed' && e.template_step_id===s.id);
+                            const oLabel = cEvt?.outcome ? (_getOutcomes(s).find(o=>o.id===cEvt.outcome)?.label || cEvt.outcome) : 'Complete';
+                            const oColor = cEvt?.outcome ? (_getOutcomes(s).find(o=>o.id===cEvt.outcome)?.color || 'var(--green)') : 'var(--green)';
+                            return `<span style="color:${oColor}">✓ ${escHtml(oLabel)}</span>`;
+                          })() : ''}
                           ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
                         </div>
@@ -3567,6 +3721,48 @@ function renderInstanceDetail(el, inst) {
                       </div>
                     </div>` : ''}
 
+                    <!-- Complete Step — outcome selection (shown when step is active, not yet done) -->
+                    ${canAct && touched && !done ? `
+                    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+                        color:var(--muted);margin-bottom:8px">Complete this step</div>
+                      <div style="display:flex;flex-direction:column;gap:5px" id="outcome-btns-${s.id}">
+                        ${_getOutcomes(s).map(o => `
+                        <button onclick="completeStep('${inst.id}','${s.id}','${escHtml(o.id)}','${escHtml(o.label)}')"
+                          style="display:flex;align-items:center;gap:10px;padding:9px 12px;
+                            border:1px solid ${o.color}55;border-radius:6px;
+                            background:${o.color}11;cursor:pointer;text-align:left;width:100%;
+                            transition:background .12s"
+                          onmouseover="this.style.background='${o.color}22'"
+                          onmouseout="this.style.background='${o.color}11'">
+                          <div style="width:9px;height:9px;border-radius:50%;background:${o.color};flex-shrink:0"></div>
+                          <span style="font-size:12px;font-weight:500;color:${o.color}">${escHtml(o.label)}</span>
+                        </button>`).join('')}
+                      </div>
+                      <div style="margin-top:8px">
+                        <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                          text-transform:uppercase;display:block;margin-bottom:3px">Notes (optional)</label>
+                        <textarea id="complete-notes-${s.id}" class="config-textarea"
+                          style="font-size:11px;resize:vertical;min-height:48px"
+                          placeholder="Add context, reason, or summary…"></textarea>
+                      </div>
+                    </div>` : ''}
+
+                    <!-- Already completed — show outcome badge -->
+                    ${done ? (() => {
+                      const completionEvt = coc.slice().reverse().find(e =>
+                        e.event_type === 'step_completed' && e.template_step_id === s.id);
+                      const outLabel = completionEvt?.outcome || 'Completed';
+                      const outColor = completionEvt?.outcome
+                        ? (_getOutcomes(s).find(o => o.id === completionEvt.outcome)?.color || 'var(--green)')
+                        : 'var(--green)';
+                      return `<div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+                        <div style="width:8px;height:8px;border-radius:50%;background:${outColor};flex-shrink:0"></div>
+                        <span style="font-size:11px;color:${outColor};font-weight:500">${escHtml(outLabel)}</span>
+                        ${completionEvt?.event_notes?`<span style="font-size:10px;color:var(--muted)">· ${escHtml(completionEvt.event_notes)}</span>`:''}
+                      </div>`;
+                    })() : ''}
+
                   </div>` : ''}
 
                   <div style="height:${isSel?'12':'20'}px"></div>
@@ -3595,6 +3791,17 @@ function renderInstanceDetail(el, inst) {
                 <div style="flex:1;min-width:0;padding-bottom:2px">
                   <div style="font-size:10px;font-weight:600;color:${color}">${label}</div>
                   ${step?`<div style="font-size:9px;color:var(--muted);margin-top:1px">→ ${escHtml(step.name||'')}</div>`:''}
+                  ${evt.outcome ? (() => {
+                    const outDef = step ? _getOutcomes(step).find(o => o.id === evt.outcome) : null;
+                    const outColor = outDef?.color || color;
+                    const outLabel = outDef?.label || evt.outcome;
+                    return `<div style="display:inline-flex;align-items:center;gap:5px;margin-top:3px;
+                      padding:2px 8px;border-radius:10px;
+                      background:${outColor}22;border:1px solid ${outColor}55">
+                      <div style="width:6px;height:6px;border-radius:50%;background:${outColor};flex-shrink:0"></div>
+                      <span style="font-size:10px;font-weight:500;color:${outColor}">${escHtml(outLabel)}</span>
+                    </div>`;
+                  })() : ''}
                   ${evt.actor_name?`<div style="font-size:9px;color:var(--text2)">By ${escHtml(evt.actor_name)}</div>`:''}
                   ${evt.notes||evt.event_notes?`<div style="font-size:10px;color:var(--text2);margin-top:2px;
                     padding:3px 6px;background:var(--surf2);border-left:2px solid ${color}">
@@ -3887,7 +4094,38 @@ async function startStep(instId, stepId) {
   }
 }
 
-// ── Suspend instance ──────────────────────────────────────────────────────────
+// ── Complete a step with a named outcome ──────────────────────────────────────
+async function completeStep(instId, stepId, outcomeId, outcomeLabel) {
+  const notes = document.getElementById(`complete-notes-${stepId}`)?.value?.trim() || null;
+  const inst  = _instances.find(i => i.id === instId);
+  const step  = inst?._tmplSteps?.find(s => s.id === stepId);
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+
+  // Disable buttons while saving
+  const btnContainer = document.getElementById(`outcome-btns-${stepId}`);
+  if (btnContainer) btnContainer.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  try {
+    await API.post('workflow_step_instances', {
+      instance_id:      instId,
+      firm_id:          FIRM_ID_CAD,
+      event_type:       'step_completed',
+      template_step_id: stepId,
+      step_type:        step?.step_type || 'action',
+      step_name:        step?.name || null,
+      outcome:          outcomeId,
+      event_notes:      notes,
+      actor_name:       authorName,
+      created_at:       new Date().toISOString(),
+    });
+
+    await _reloadInstance(instId);
+    cadToast(`Step completed — ${outcomeLabel}`, 'success');
+  } catch(e) {
+    cadToast('Failed to complete step: ' + e.message, 'error');
+    if (btnContainer) btnContainer.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+}
 async function suspendInstance(instId) {
   const reason = prompt('Reason for suspension (optional):');
   if (reason === null) return; // cancelled prompt
