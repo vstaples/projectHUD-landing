@@ -2123,7 +2123,14 @@ async function selectInstance(id) {
       })(),
     ]);
     _selectedInstance._stepInsts  = stepInsts  || [];
-    _selectedInstance._tmplSteps  = tmplSteps  || [];
+    // Hydrate _attachedDocs from attached_docs column (same as selectTemplate)
+    _selectedInstance._tmplSteps  = (tmplSteps || []).map(s => ({
+      ...s,
+      _attachedDocs: (s.attached_docs || []).map(d => ({
+        name: d.name, version: d.version, role: d.role||'reference',
+        size: d.size, path: d.path||null, url: d.url||null,
+      })),
+    }));
     renderInstanceDetail(detailEl, _selectedInstance);
   } catch(e) {
     detailEl.innerHTML = `<div style="padding:40px;color:var(--red)">Failed to load: ${escHtml(e.message)}</div>`;
@@ -2200,6 +2207,25 @@ function renderInstanceDetail(el, inst) {
           <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
         </div>
       </div>
+
+      <!-- Digital elapsed clock — dd:hh:mm since launch -->
+      ${inst.launched_at && canAct ? `
+      <div style="flex-shrink:0;text-align:center;
+        background:var(--bg1);border:1px solid var(--border2);border-radius:5px;
+        padding:6px 14px;min-width:110px">
+        <div id="inst-clock-${inst.id}"
+          data-from="${inst.launched_at}"
+          style="font-family:var(--font-mono);font-size:20px;font-weight:700;
+            letter-spacing:.08em;color:var(--cad);line-height:1">
+          ${(()=>{
+            const ms = Date.now() - new Date(inst.launched_at);
+            const m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+            return String(d).padStart(2,'0')+':'+String(h%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+          })()}
+        </div>
+        <div style="font-size:8px;color:var(--muted);text-transform:uppercase;
+          letter-spacing:.12em;margin-top:3px">Elapsed Time<br/>dd:hh:mm</div>
+      </div>` : ''}
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <!-- Status badge -->
         <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -2376,45 +2402,52 @@ function renderInstanceDetail(el, inst) {
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>
 
-                      <!-- Current assignees list -->
-                      <div id="reassign-list-${s.id}" style="margin-bottom:8px">
+                      <!-- Current assignees — compact chips -->
+                      <div id="reassign-list-${s.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:24px">
                         ${(() => {
-                          // Collect current assignees from template + any reassignments
                           const list = [];
                           const templateName = s.assignee_type==='pm' ? 'Project Manager'
                             : s.assignee_name || s.assignee_email || s.assignee_role
                               || (_users_cad.find(u=>u.id===s.assignee_user_id)?.name) || null;
-                          if (templateName) list.push({ name: templateName, source: 'template', removable: false });
-                          // Add reassignments from CoC
-                          const stepReassigns = coc.filter(e=>e.event_type==='step_reassigned'&&e.step_id===s.id);
-                          stepReassigns.forEach(r => {
-                            if (r.assignee_name||r.assignee_email) {
-                              list.push({ name: r.assignee_name||r.assignee_email, email: r.assignee_email,
-                                source: 'reassigned', id: r.id, removable: true });
-                            }
+                          if (templateName) list.push({ name: templateName, source: 'template' });
+                          coc.filter(e=>e.event_type==='step_reassigned'&&e.step_id===s.id).forEach(r => {
+                            if (r.assignee_name||r.assignee_email)
+                              list.push({ name: r.assignee_name||r.assignee_email, source: 'reassigned' });
                           });
                           return list.map(a => `
-                            <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;
-                              background:var(--surf3);border:1px solid var(--border2);border-radius:3px;margin-bottom:3px">
-                              <span style="font-size:11px;color:var(--text2);flex:1">${escHtml(a.name)}</span>
-                              ${a.source==='reassigned'?`<span style="font-size:9px;color:var(--accent);letter-spacing:.06em">REASSIGNED</span>`
-                                :`<span style="font-size:9px;color:var(--muted);letter-spacing:.06em">TEMPLATE</span>`}
-                            </div>`).join('') || '<div style="font-size:10px;color:var(--muted)">No assignee set</div>';
+                            <span style="display:inline-flex;align-items:center;gap:5px;
+                              padding:3px 8px;border-radius:12px;font-size:11px;
+                              background:${a.source==='reassigned'?'rgba(79,142,247,.15)':'var(--surf3)'};
+                              border:1px solid ${a.source==='reassigned'?'rgba(79,142,247,.35)':'var(--border2)'};
+                              color:${a.source==='reassigned'?'var(--accent)':'var(--text2)'}">
+                              ${escHtml(a.name)}
+                            </span>`).join('')
+                          || '<span style="font-size:10px;color:var(--muted)">No assignee set</span>';
                         })()}
                       </div>
 
-                      <!-- Add assignee from all resources -->
+                      <!-- Add assignee — grouped by department/external -->
                       <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end;margin-bottom:8px">
                         <div>
                           <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Add Assignee</label>
                           <select class="config-select" id="reassign-res-${s.id}" style="font-size:11px">
                             <option value="">— Select resource —</option>
-                            ${_resources_cad.map(r=>`<option value="${r.id}"
-                              data-name="${escHtml(r.name)}"
-                              data-email="${escHtml(r.email||'')}"
-                              data-ext="${r.is_external?'1':'0'}">
-                              ${escHtml(r.name)}${r.is_external?' (External)':''}${r.title?' — '+escHtml(r.title):''}
-                            </option>`).join('')}
+                            ${(() => {
+                              // Group by department (internal) then external company
+                              const groups = {};
+                              _resources_cad.forEach(r => {
+                                const grp = r.is_external ? ('External' + (r.department ? ': '+r.department : '')) : (r.department || 'Internal');
+                                if (!groups[grp]) groups[grp] = [];
+                                groups[grp].push(r);
+                              });
+                              return Object.entries(groups).map(([grp, members]) =>
+                                `<optgroup label="${escHtml(grp)}">
+                                  ${members.map(r =>
+                                    `<option value="${r.id}">${escHtml(r.name)}${r.title ? ' — '+escHtml(r.title) : ''}</option>`
+                                  ).join('')}
+                                </optgroup>`
+                              ).join('');
+                            })()}
                           </select>
                         </div>
                         <button class="btn btn-solid btn-sm" style="font-size:10px;white-space:nowrap"
@@ -2441,6 +2474,18 @@ function renderInstanceDetail(el, inst) {
                     <div style="font-size:10px;color:var(--muted)">
                       Instance is ${inst.status} — reassignment not available.
                     </div>`}
+
+                    <!-- Start Step button — only on first step not yet activated -->
+                    ${canAct && idx === 0 && !touched && !done ? `
+                    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+                      <button class="btn btn-cad btn-sm" style="font-size:11px;width:100%"
+                        onclick="startStep('${inst.id}','${s.id}')">
+                        ▶ Start This Step
+                      </button>
+                      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:center">
+                        Records a Step Activated event in the Chain of Custody and begins the elapsed timer.
+                      </div>
+                    </div>` : ''}
 
                   </div>` : ''}
 
@@ -2494,14 +2539,21 @@ function _startElapsedTimer(inst) {
   if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
   if (!inst || inst.status === 'cancelled' || inst.status === 'complete') return;
   _elapsedTimer = setInterval(() => {
+    // Tick all live step timers
     document.querySelectorAll('[id^="timer-"][data-from]').forEach(el => {
-      const from = new Date(el.dataset.from);
-      const ms   = Date.now() - from;
+      const ms = Date.now() - new Date(el.dataset.from);
       if (ms < 0) return;
       const m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
       el.textContent = `${String(d).padStart(2,'0')}:${String(h%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
     });
-  }, 30000); // tick every 30s — dd:hh:mm precision
+    // Tick instance header clock
+    document.querySelectorAll('[id^="inst-clock-"][data-from]').forEach(el => {
+      const ms = Date.now() - new Date(el.dataset.from);
+      if (ms < 0) return;
+      const m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+      el.textContent = `${String(d).padStart(2,'0')}:${String(h%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+    });
+  }, 30000);
 }
 
 function _stopElapsedTimer() {
@@ -2570,6 +2622,23 @@ async function addReassignment(instId, stepId) {
   } catch(e) {
     if (statusEl) { statusEl.textContent = 'Failed: ' + e.message; statusEl.style.color = 'var(--red)'; }
     cadToast('Reassignment failed: ' + e.message, 'error');
+  }
+}
+
+// ── Start a step (records step_activated CoC event) ──────────────────────────
+async function startStep(instId, stepId) {
+  try {
+    await API.post('workflow_step_instances', {
+      instance_id:  instId,
+      firm_id:      FIRM_ID_CAD,
+      event_type:   'step_activated',
+      step_id:      stepId,
+      created_at:   new Date().toISOString(),
+    });
+    await _reloadInstance(instId);
+    cadToast('Step started — elapsed timer running', 'success');
+  } catch(e) {
+    cadToast('Failed to start step: ' + e.message, 'error');
   }
 }
 
@@ -2685,10 +2754,15 @@ API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
 }).catch(() => {});
 
-API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_name,last_name,title,email,is_external&order=last_name.asc`)
+API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_name,last_name,title,email,department,is_external&order=last_name.asc`)
   .then(r => { _resources_cad = (r || []).map(x => ({
     ...x, name: `${x.first_name||''} ${x.last_name||''}`.trim()
-  })); })
+  })).sort((a,b) => {
+    // Externals last, then sort by department, then name
+    if (a.is_external !== b.is_external) return a.is_external ? 1 : -1;
+    const da = a.department||'', db = b.department||'';
+    return da < db ? -1 : da > db ? 1 : a.name.localeCompare(b.name);
+  }); })
   .catch(() => {});
 
 function escHtml(s) {
