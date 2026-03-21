@@ -1810,10 +1810,17 @@ function updateStepField(field, value) {
   _dirtySteps = true;
   // Only re-render spine for fields that affect the card summary line
   // NOTE: 'name' intentionally excluded — reRenderSpine destroys the input mid-keystroke
+  // Instead we surgically patch the card header text directly
   const cardFields = ['assignee_name','assignee_email','assignee_role',
                       'due_days','due_type','escalate_after_days','parallel_required',
                       'input_from_step','forward_input','reject_to'];
-  if (cardFields.includes(field)) reRenderSpine();
+  if (field === 'name') {
+    // Update card header text directly without rebuilding the spine
+    const cardEl = document.querySelector(`#sstep-${_selectedStep.id} .spine-card-name`);
+    if (cardEl) cardEl.textContent = value || (STEP_META[_selectedStep.step_type]?.label || '');
+  } else if (cardFields.includes(field)) {
+    reRenderSpine();
+  }
 }
 
 function markDirty() {
