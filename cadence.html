@@ -543,6 +543,8 @@ let _instances      = [];
 let _selectedTmpl   = null;   // full template object with .steps[]
 let _selectedStep   = null;   // step object currently in config panel
 let _dirtySteps     = false;  // unsaved changes flag
+let _autoSaveTimer  = null;   // setInterval handle
+let _lastSavedAt    = null;   // Date of last successful auto-save
 
 // Step type display metadata
 const STEP_META = {
@@ -586,6 +588,7 @@ function updateBadges() {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
+  if (tab !== 'templates') stopAutoSave();
   _currentTab = tab;
   ['templates','instances','forms','triggers'].forEach(t => {
     document.getElementById('tab-'+t)?.classList.toggle('active', t===tab);
@@ -659,11 +662,13 @@ async function selectTemplate(id) {
   ).catch(() => []);
   _selectedTmpl.steps = steps || [];
   _selectedStep = null;
+  _lastSavedAt  = null;
 
   // Re-render list to update active state
   const listEl = document.getElementById('tmpl-list');
   if (listEl) listEl.innerHTML = renderTemplateList();
   renderEditor();
+  startAutoSave(); // begin 30-second auto-save cycle
 }
 
 function renderEditor() {
@@ -683,6 +688,14 @@ function renderEditor() {
         <option value="active"${t.status==='active'?' selected':''}>Active</option>
         <option value="archived"${t.status==='archived'?' selected':''}>Archived</option>
       </select>
+      <!-- Auto-save status indicator -->
+      <span id="autosave-indicator"
+        style="font-size:10px;font-family:var(--font-mono);color:var(--muted);
+        display:flex;align-items:center;gap:5px;flex-shrink:0;margin-left:4px">
+        <span id="autosave-dot" style="width:6px;height:6px;border-radius:50%;
+          background:var(--muted);flex-shrink:0;transition:background .3s"></span>
+        <span id="autosave-text">Auto-save on</span>
+      </span>
       <div style="display:flex;gap:6px;margin-left:8px">
         <button class="btn btn-ghost btn-sm" onclick="launchInstance()">▶ Launch</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
@@ -1172,7 +1185,51 @@ function updateStepField(field, value) {
   if (cardFields.includes(field)) reRenderSpine();
 }
 
-function markDirty() { _dirtySteps = true; }
+function markDirty() {
+  _dirtySteps = true;
+  _updateAutoSaveIndicator('unsaved');
+}
+
+// ── Auto-save ─────────────────────────────────────────────────────────────────
+const AUTOSAVE_INTERVAL_MS = 30000; // 30 seconds
+
+function startAutoSave() {
+  stopAutoSave(); // clear any existing interval first
+  _autoSaveTimer = setInterval(async () => {
+    if (_dirtySteps && _selectedTmpl) {
+      _updateAutoSaveIndicator('saving');
+      await saveTemplate(true); // silent = true
+    }
+  }, AUTOSAVE_INTERVAL_MS);
+  _updateAutoSaveIndicator('saved');
+}
+
+function stopAutoSave() {
+  if (_autoSaveTimer) {
+    clearInterval(_autoSaveTimer);
+    _autoSaveTimer = null;
+  }
+}
+
+function _updateAutoSaveIndicator(state) {
+  const dot  = document.getElementById('autosave-dot');
+  const text = document.getElementById('autosave-text');
+  if (!dot || !text) return;
+  const states = {
+    saved:   { color: 'var(--green)', label: _lastSavedAt ? 'Saved ' + _fmtSaveTime(_lastSavedAt) : 'Saved' },
+    unsaved: { color: 'var(--amber)', label: 'Unsaved changes' },
+    saving:  { color: 'var(--cyan)',  label: 'Saving…' },
+    error:   { color: 'var(--red)',   label: 'Save failed' },
+  };
+  const s = states[state] || states.saved;
+  dot.style.background  = s.color;
+  text.style.color      = s.color;
+  text.textContent      = s.label;
+}
+
+function _fmtSaveTime(d) {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 // ── Step picker ───────────────────────────────────────────────────────────────
 function toggleStepPicker(e) {
@@ -1235,11 +1292,11 @@ function removeStep(id) {
 }
 
 // ── Save template ─────────────────────────────────────────────────────────────
-async function saveTemplate() {
+async function saveTemplate(silent = false) {
   if (!_selectedTmpl) return;
 
   const btn = document.getElementById('save-btn');
-  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+  if (!silent && btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 
   try {
     const nameEl    = document.getElementById('tmpl-name-input');
@@ -1283,14 +1340,9 @@ async function saveTemplate() {
       };
 
       if (step._new) {
-        // INSERT
         const res = await API.post('workflow_template_steps', stepPayload);
-        if (res?.[0]?.id) {
-          step.id = res[0].id;
-          delete step._new;
-        }
+        if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
       } else {
-        // PATCH
         await API.patch(`workflow_template_steps?id=eq.${step.id}`, stepPayload);
       }
     }
@@ -1299,18 +1351,23 @@ async function saveTemplate() {
     const idx = _templates.findIndex(t => t.id === _selectedTmpl.id);
     if (idx >= 0) _templates[idx] = { ..._templates[idx], ...patch };
 
-    _dirtySteps = false;
+    _dirtySteps  = false;
+    _lastSavedAt = new Date();
+    _updateAutoSaveIndicator('saved');
     updateBadges();
 
-    // Refresh list
+    // Refresh template list name if changed
     const listEl = document.getElementById('tmpl-list');
     if (listEl) listEl.innerHTML = renderTemplateList();
 
-    cadToast('Template saved', 'success');
+    if (!silent) cadToast('Template saved', 'success');
+
   } catch(e) {
-    cadToast('Save failed: ' + e.message, 'error');
+    _updateAutoSaveIndicator('error');
+    if (!silent) cadToast('Save failed: ' + e.message, 'error');
+    else cadToast('Auto-save failed: ' + e.message, 'error');
   } finally {
-    if (btn) { btn.textContent = 'Save'; btn.disabled = false; }
+    if (!silent && btn) { btn.textContent = 'Save'; btn.disabled = false; }
   }
 }
 
@@ -1379,6 +1436,7 @@ async function createTemplate() {
       updateBadges();
       document.querySelector('.modal-overlay')?.remove();
       renderTab('templates');
+      startAutoSave();
       cadToast('Template created', 'success');
     }
   } catch(e) {
@@ -1392,6 +1450,7 @@ async function deleteTemplate() {
   if (!confirm(`Delete template "${_selectedTmpl.name}"? This cannot be undone.`)) return;
   try {
     await API.del(`workflow_templates?id=eq.${_selectedTmpl.id}`);
+    stopAutoSave();
     _templates = _templates.filter(t => t.id !== _selectedTmpl.id);
     _selectedTmpl = null;
     _selectedStep = null;
