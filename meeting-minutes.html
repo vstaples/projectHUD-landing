@@ -482,6 +482,28 @@ textarea.editor-area.lg { min-height: 120px; }
           placeholder="Optional — e.g. 'Thank you all for a productive session. Please review the action items below…'"></textarea>
       </div>
 
+      <!-- COMMENTS — always shown, reads/writes meeting_comments table -->
+      <div class="section" id="mm-comments-section">
+        <div class="section-label">DISCUSSION &amp; COMMENTS</div>
+        <div id="mm-comments-list"
+          style="max-height:360px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);
+            border-radius:6px 6px 0 0;background:rgba(0,0,0,.15);padding:0 12px">
+          <div style="padding:16px;font-size:12px;color:var(--muted);text-align:center">Loading…</div>
+        </div>
+        <div style="display:flex;border:1px solid rgba(255,255,255,.08);border-top:none;
+          border-radius:0 0 6px 6px;overflow:hidden">
+          <textarea id="mm-new-comment"
+            placeholder="Add a comment… (Ctrl+Enter to send)"
+            style="flex:1;padding:9px 12px;font-size:13px;font-family:inherit;
+              background:var(--surf2);border:none;color:var(--text);
+              resize:none;min-height:52px;outline:none"
+            onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();mmPostComment(null)}"></textarea>
+          <button onclick="mmPostComment(null)"
+            style="padding:0 18px;background:var(--accent);border:none;
+              color:#fff;font-size:13px;font-weight:600;cursor:pointer">Send</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- RIGHT: META PANE -->
@@ -681,8 +703,8 @@ async function loadWorkflowMode() {
     // Inject: workflow context banner + reference docs + Complete button
     _injectWorkflowBanner(inst, attachedDocs);
 
-    // Inject: threaded comments at bottom of editor pane
-    await _injectWorkflowComments();
+    // Load comments from canonical meeting_comments table
+    await mmLoadComments();
 
   } catch(e) {
     console.error('Workflow mode error:', e);
@@ -889,6 +911,9 @@ async function loadAll() {
       document.getElementById('back-link').href =
         '/prospect-detail.html?id=' + PROSPECT_ID;
     }
+
+    // Load comments from canonical meeting_comments table
+    await mmLoadComments();
 
   } catch(e) {
     console.error(e);
@@ -1464,6 +1489,118 @@ async function sendMinutes() {
 }
 
 // ── exit ──────────────────────────────────────────────
+// ── Meeting comments (meeting_comments table — used in all modes) ─────────────
+async function mmLoadComments() {
+  if (!MEETING_ID) return;
+  try {
+    const rows = await API.get(
+      `meeting_comments?meeting_id=eq.${MEETING_ID}&order=created_at.asc`
+    ).catch(() => []);
+    const tops = (rows || []).filter(r => !r.parent_id);
+    tops.forEach(c => { c.replies = rows.filter(r => r.parent_id === c.id); });
+    mmRenderComments(tops);
+  } catch(e) { /* non-fatal */ }
+}
+
+function mmRenderComments(tops) {
+  const listEl = document.getElementById('mm-comments-list');
+  if (!listEl) return;
+
+  function ini(n) { return (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+  function ts(t)  {
+    if (!t) return '';
+    return new Date(t).toLocaleString('en-US', {
+      month:'short', day:'numeric', year:'numeric',
+      hour:'numeric', minute:'2-digit'
+    });
+  }
+
+  function renderOne(c, isReply = false) {
+    const indent = isReply ? 'margin-left:28px;' : '';
+    return `
+      <div style="${indent}padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;
+            background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.25);
+            font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">
+            ${ini(c.author_name)}
+          </div>
+          <span style="font-size:12px;font-weight:600;flex:1">${escHtml(c.author_name||'Team Member')}</span>
+          <span style="font-size:10px;color:var(--muted);font-family:monospace">${ts(c.created_at)}</span>
+          ${!isReply ? `<button onclick="mmToggleReply('${c.id}')"
+            style="background:none;border:none;font-size:10px;color:var(--muted);
+              cursor:pointer;padding:0">↩ Reply</button>` : ''}
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.75);line-height:1.5;padding-left:34px">
+          ${escHtml(c.body)}
+        </div>
+        ${(c.replies||[]).map(r => renderOne(r, true)).join('')}
+        ${!isReply ? `
+        <div id="mm-reply-compose-${c.id}" style="display:none;margin:6px 0 0 34px">
+          <div style="display:flex;gap:6px">
+            <textarea id="mm-reply-input-${c.id}" placeholder="Reply…"
+              style="flex:1;padding:6px 8px;font-size:11px;font-family:inherit;
+                background:var(--surf2);border:1px solid rgba(255,255,255,.14);
+                color:var(--text);resize:none;min-height:44px;border-radius:4px;outline:none"
+              onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();mmPostComment('${c.id}')}"></textarea>
+            <button onclick="mmPostComment('${c.id}')"
+              style="padding:0 12px;background:var(--accent);border:none;
+                color:#fff;font-size:11px;font-weight:600;cursor:pointer;border-radius:4px">Reply</button>
+          </div>
+        </div>` : ''}
+      </div>`;
+  }
+
+  if (!tops.length) {
+    listEl.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--muted);text-align:center">No comments yet.</div>';
+  } else {
+    listEl.innerHTML = tops.map(c => renderOne(c)).join('');
+    listEl.scrollTop = listEl.scrollHeight;
+  }
+}
+
+function mmToggleReply(commentId) {
+  const el = document.getElementById('mm-reply-compose-' + commentId);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (!open) setTimeout(() => document.getElementById('mm-reply-input-' + commentId)?.focus(), 50);
+}
+
+async function mmPostComment(parentId) {
+  if (!MEETING_ID) return;
+  const inp  = parentId
+    ? document.getElementById('mm-reply-input-' + parentId)
+    : document.getElementById('mm-new-comment');
+  const body = inp?.value?.trim();
+  if (!body) return;
+
+  const FIRM_ID    = window.PHUD?.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const authorName = resources.find(r => r.id === _myResourceId)?.name
+    || resources.find(r => r.id === _myResourceId)?.first_name + ' ' + resources.find(r => r.id === _myResourceId)?.last_name
+    || 'Team Member';
+
+  try {
+    await API.post('meeting_comments', {
+      firm_id:            FIRM_ID,
+      meeting_id:         MEETING_ID,
+      parent_id:          parentId || null,
+      author_resource_id: _myResourceId || null,
+      author_name:        authorName.trim() === '' ? 'Team Member' : authorName.trim(),
+      body,
+      created_at:         new Date().toISOString(),
+    });
+    if (inp) inp.value = '';
+    if (parentId) {
+      const el = document.getElementById('mm-reply-compose-' + parentId);
+      if (el) el.style.display = 'none';
+    }
+    await mmLoadComments();
+  } catch(e) {
+    alert('Failed to post comment: ' + e.message);
+  }
+}
+
 async function exitEditor() {
   // Autosave before leaving
   if (document.getElementById('f-summary').value ||
@@ -1473,8 +1610,10 @@ async function exitEditor() {
   }
   if (PROSPECT_ID) {
     location.href = '/prospect-detail.html?id=' + PROSPECT_ID + '&tab=meetings';
-  } else {
+  } else if (history.length > 1) {
     history.back();
+  } else {
+    window.close();
   }
 }
 
