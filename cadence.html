@@ -537,6 +537,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 'use strict';
 // ── State ────────────────────────────────────────────────────────────────────
 const FIRM_ID_CAD = 'aaaaaaaa-0001-0001-0001-000000000001';
+const SUPA_URL  = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
+const STORAGE_BUCKET = 'workflow-documents';
 let _currentTab     = 'templates';
 let _templates      = [];
 let _instances      = [];
@@ -660,6 +663,19 @@ async function selectTemplate(id) {
   const steps = await API.get(
     `workflow_template_steps?template_id=eq.${id}&order=sequence_order.asc`
   ).catch(() => []);
+
+  // Hydrate _attachedDocs from persisted attached_docs column
+  (steps || []).forEach(s => {
+    s._attachedDocs = (s.attached_docs || []).map(d => ({
+      name:    d.name,
+      version: d.version,
+      role:    d.role || 'reference',
+      size:    d.size,
+      path:    d.path || null,
+      url:     d.url  || null,
+      // file: not available after reload — viewAttachedDoc uses url instead
+    }));
+  });
   _selectedTmpl.steps = steps || [];
   _selectedStep = null;
   _lastSavedAt  = null;
@@ -801,9 +817,17 @@ function renderSpine() {
                   ${assigneeLine !== '—' ? `<span>👤 ${escHtml(assigneeLine)}</span>` : ''}
                   ${step.due_days != null ? `<span>⏱ ${step.due_type==='before_completion' ? step.due_days+'d before target' : '+'+step.due_days+'d'}</span>` : ''}
                   ${step.escalate_after_days ? `<span style="color:var(--amber)">↑ escalate d${step.escalate_after_days}</span>` : ''}
-                  ${(step._attachedDocs||[]).length ? `<span style="color:var(--cad)">📄 ${step._attachedDocs.length} doc${step._attachedDocs.length>1?'s':''} · ${escHtml(step._attachedDocs[0].version||'')}</span>` : ''}
-                  ${step.require_output ? `<span style="color:var(--amber)">⬆ output required</span>` : ''}
-                  ${step.input_from_step ? `<span style="color:var(--green)">⬇ input from prior step</span>` : ''}
+                  ${(step._attachedDocs||[]).length ? (() => {
+                    const auth  = (step._attachedDocs||[]).filter(d=>d.role==='authorization').length;
+                    const evid  = (step._attachedDocs||[]).filter(d=>d.role==='evidence').length;
+                    const ref   = (step._attachedDocs||[]).filter(d=>!d.role||d.role==='reference').length;
+                    const parts = [];
+                    if (auth)  parts.push(`<span style="color:var(--amber)">⬆ ${auth} auth</span>`);
+                    if (evid)  parts.push(`<span style="color:var(--green)">📝 ${evid} evidence</span>`);
+                    if (ref)   parts.push(`<span style="color:var(--accent)">📋 ${ref} ref</span>`);
+                    return parts.join('');
+                  })() : ''}
+                  ${step.input_from_step ? `<span style="color:var(--green)">⬇ input wired</span>` : ''}
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -970,19 +994,6 @@ function renderInlineStepConfig(step) {
           oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
       </div>
 
-      <!-- Output requirement toggle (action/form steps) -->
-      ${step.step_type === 'action' || step.step_type === 'form' ? `
-      <div class="config-section cfg-full">
-        <label class="config-label" style="margin-bottom:8px">Output Document Requirement</label>
-        <div class="config-toggle"
-          onclick="updateStepField('require_output',!${!!step.require_output});reRenderSpine()">
-          <div class="toggle-box${step.require_output?' on':''}"></div>
-          <span style="font-size:11px">${step.require_output
-            ? 'Step cannot advance until completed document is uploaded'
-            : 'Output document optional'}</span>
-        </div>
-      </div>` : ''}
-
       <!-- Input from prior step (approval/review/signoff/external steps) -->
       ${step.step_type === 'approval' || step.step_type === 'review' ||
         step.step_type === 'signoff' || step.step_type === 'external' ? `
@@ -990,58 +1001,88 @@ function renderInlineStepConfig(step) {
         <label class="config-label">Input Document — From Prior Step</label>
         <select class="config-select"
           onchange="updateStepField('input_from_step',this.value||null)">
-          <option value="">— None (no prior step output required) —</option>
+          <option value="">— None —</option>
           ${(_selectedTmpl?.steps||[])
             .filter(s => s.id !== step.id &&
-              (s.step_type === 'action' || s.step_type === 'form') &&
-              s.require_output)
+              (s._attachedDocs||[]).some(d => d.role === 'authorization'))
             .map(s => `<option value="${s.id}"
               ${step.input_from_step===s.id?' selected':''}>
               Step ${s.sequence_order}: ${escHtml(s.name||'Action')}
-              (requires completed doc)
             </option>`).join('')}
         </select>
-        ${step.input_from_step ? `
-        <div style="margin-top:6px;font-size:11px;color:var(--green);display:flex;gap:6px;align-items:center">
-          <span>✓</span>
-          <span>When this step activates, the completed document from the selected step
-          will be presented to the approver as a required input.</span>
-        </div>` : `
-        <div style="margin-top:6px;font-size:11px;color:var(--muted)">
-          Only steps with "Require output document" enabled appear here.
-        </div>`}
+        ${step.input_from_step
+          ? `<div style="margin-top:5px;font-size:11px;color:var(--green)">
+              ✓ Authorization document from that step will be presented to this approver.
+             </div>`
+          : `<div style="margin-top:5px;font-size:11px;color:var(--muted)">
+              Only steps with an Authorization document attached appear here.
+             </div>`}
       </div>` : ''}
 
     </div>
 
-    <!-- Template-attached reference docs (read-only forms for reference) -->
-    <div style="padding:0 14px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">
-      <label class="config-label" style="margin-bottom:0">Reference Forms & Documents</label>
-      <span style="font-size:10px;color:var(--muted)">Attached at template design time — visible to assignee</span>
+    <!-- Documents section — per-document role assignment -->
+    <div style="padding:0 14px 6px;display:flex;align-items:center;justify-content:space-between">
+      <label class="config-label" style="margin-bottom:0">Documents</label>
+      <span style="font-size:10px;color:var(--muted)">Assign a role to each document</span>
     </div>
 
-    <!-- Attached docs list -->
+    <!-- Document role legend -->
+    <div style="padding:0 14px 8px;display:flex;gap:12px;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px">
+        <span style="color:var(--accent)">📋 Reference</span> — blank form, visible to assignee
+      </span>
+      <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px">
+        <span style="color:var(--green)">📝 Evidence</span> — completed by assignee, stored on step
+      </span>
+      <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px">
+        <span style="color:var(--amber)">⬆ Authorization</span> — <strong style="color:var(--amber)">gates step · routed to next step</strong>
+      </span>
+    </div>
+
+    <!-- Attached docs list with role selector -->
     <div id="attached-docs-${step.id}">
-      ${docs.map((d,i) => `
-        <div class="attached-doc">
-          <span style="color:var(--cad);flex-shrink:0">📄</span>
-          <div style="flex:1;min-width:0">
+      ${docs.map((d,i) => {
+        const roleColor = d.role==='authorization' ? 'var(--amber)'
+                        : d.role==='evidence'      ? 'var(--green)'
+                        : 'var(--accent)';
+        const roleIcon  = d.role==='authorization' ? '⬆'
+                        : d.role==='evidence'      ? '📝'
+                        : '📋';
+        return `
+        <div class="attached-doc" style="flex-wrap:wrap;gap:6px;padding:8px 12px">
+          <span style="color:${roleColor};flex-shrink:0;font-size:14px">${roleIcon}</span>
+          <div style="flex:1;min-width:120px">
             <div class="attached-doc-name">${escHtml(d.name)}</div>
             <div style="font-size:10px;margin-top:1px;display:flex;gap:8px">
               <span style="color:var(--cad);font-family:var(--font-mono)">${escHtml(d.version||'—')}</span>
               <span style="color:var(--muted)">${escHtml(d.size||'')}</span>
             </div>
           </div>
-          <button class="attached-doc-remove" style="color:var(--accent);margin-right:2px"
+          <!-- Role selector -->
+          <select style="font-size:10px;font-family:var(--font-mono);background:var(--surf3);
+            border:1px solid var(--border2);border-radius:3px;padding:3px 6px;
+            color:${roleColor};cursor:pointer;flex-shrink:0"
+            onchange="setDocRole('${step.id}',${i},this.value)">
+            <option value="reference"${(d.role||'reference')==='reference'?' selected':''}>📋 Reference</option>
+            <option value="evidence"${d.role==='evidence'?' selected':''}>📝 Evidence</option>
+            <option value="authorization"${d.role==='authorization'?' selected':''}>⬆ Authorization</option>
+          </select>
+          <button class="attached-doc-remove" style="color:var(--accent);flex-shrink:0"
             onclick="viewAttachedDoc('${step.id}',${i})"
-            title="View document">⤢</button>
-          <button class="attached-doc-remove"
+            title="View">⤢</button>
+          <button class="attached-doc-remove" style="flex-shrink:0"
             onclick="removeAttachedDoc('${step.id}',${i})"
             title="Remove">✕</button>
-        </div>`).join('')}
+          ${d.role==='authorization' ? `
+          <div style="width:100%;font-size:10px;color:var(--amber);padding:2px 0 0 22px">
+            ⚠ This document gates step completion and will be routed to the next approval step.
+          </div>` : ''}
+        </div>`;
+      }).join('')}
     </div>
 
-    <!-- Reference doc drop zone — always present -->
+    <!-- Drop zone -->
     <div class="doc-drop-zone" id="dropzone-${step.id}"
       ondragover="event.preventDefault();this.classList.add('drag-over')"
       ondragleave="this.classList.remove('drag-over')"
@@ -1049,25 +1090,23 @@ function renderInlineStepConfig(step) {
       onclick="document.getElementById('file-input-${step.id}').click()">
       <div class="doc-drop-zone-icon">📂</div>
       <div class="doc-drop-zone-text">
-        <strong>Drop a reference document here</strong> or click to browse<br/>
-        Blank forms, specs, or instructions visible to the assignee
+        <strong>Drop a document here</strong> or click to browse — then assign its role above
       </div>
       <input type="file" id="file-input-${step.id}" style="display:none"
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
         multiple onchange="handleDocFileInput(event,'${step.id}')" />
     </div>
 
-    <!-- Output zone — shown additionally when require_output is on -->
-    ${step.require_output ? `
-    <div style="padding:0 14px 6px;margin-top:8px">
-      <label class="config-label" style="margin-bottom:6px;color:var(--amber)">
-        ⬆ OUTPUT ZONE — Assignee uploads completed document here at runtime
-      </label>
-      <div class="doc-drop-zone" style="border-color:rgba(212,144,31,.35);background:rgba(212,144,31,.04);cursor:default;pointer-events:none">
+    <!-- Output zone preview — shown when an Authorization doc exists -->
+    ${docs.some(d => d.role === 'authorization') ? `
+    <div style="padding:0 14px 10px;margin-top:2px">
+      <div class="doc-drop-zone" style="border-color:rgba(212,144,31,.35);background:rgba(212,144,31,.04);
+          cursor:default;pointer-events:none;margin:0">
         <div class="doc-drop-zone-icon" style="opacity:.4">📤</div>
         <div class="doc-drop-zone-text">
-          Completed scan or filled document uploaded here when instance runs.<br/>
-          <strong style="color:var(--amber)">Step cannot advance until this is filled.</strong>
+          <strong style="color:var(--amber)">Authorization output zone active</strong><br/>
+          At runtime, assignee uploads the completed Authorization document here.
+          Step cannot advance until filled. Completed copy routes to the next approval step.
         </div>
       </div>
     </div>` : ''}`;
@@ -1077,141 +1116,230 @@ function renderInlineStepConfig(step) {
 function handleDocDrop(e, stepId) {
   e.preventDefault();
   document.getElementById('dropzone-' + stepId)?.classList.remove('drag-over');
-  const files = [...(e.dataTransfer?.files || [])];
-  attachFilesToStep(stepId, files);
+  attachFilesToStep(stepId, [...(e.dataTransfer?.files || [])]);
 }
 
 function handleDocFileInput(e, stepId) {
-  const files = [...(e.target?.files || [])];
-  attachFilesToStep(stepId, files);
-  e.target.value = ''; // reset so same file can be re-added
+  attachFilesToStep(stepId, [...(e.target?.files || [])]);
+  e.target.value = '';
 }
 
-function attachFilesToStep(stepId, files) {
+// ── Upload file to Supabase Storage ──────────────────────────────────────────
+async function _uploadToStorage(file, stepId) {
+  const safeName  = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const path      = `${FIRM_ID_CAD}/${_selectedTmpl.id}/${stepId}/${Date.now()}_${safeName}`;
+  const res = await fetch(
+    `${SUPA_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPA_KEY,
+        'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type':  file.type || 'application/octet-stream',
+        'x-upsert':      'true',
+      },
+      body: file,
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Storage upload failed: ${res.status}`);
+  }
+  // Build public-style signed URL (1 year expiry for template docs)
+  const signRes = await fetch(
+    `${SUPA_URL}/storage/v1/object/sign/${STORAGE_BUCKET}/${path}`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPA_KEY,
+        'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ expiresIn: 31536000 }), // 1 year
+    }
+  );
+  const signData = await signRes.json();
+  const url = `${SUPA_URL}/storage/v1${signData.signedURL}`;
+  return { path, url };
+}
+
+// ── Delete file from Supabase Storage ────────────────────────────────────────
+async function _deleteFromStorage(path) {
+  if (!path) return;
+  await fetch(`${SUPA_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+    method: 'DELETE',
+    headers: {
+      'apikey':        SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+    },
+  }).catch(() => {}); // best-effort
+}
+
+// ── Persist attached_docs for a step immediately ──────────────────────────────
+async function _persistAttachedDocs(step) {
+  const meta = (step._attachedDocs || []).map(d => ({
+    name:    d.name,
+    version: d.version,
+    role:    d.role || 'reference',
+    size:    d.size,
+    path:    d.path  || null,
+    url:     d.url   || null,
+  }));
+  await API.patch(
+    `workflow_template_steps?id=eq.${step.id}`,
+    { attached_docs: meta }
+  );
+}
+
+async function attachFilesToStep(stepId, files) {
   if (!files.length) return;
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   if (!step) return;
   if (!step._attachedDocs) step._attachedDocs = [];
 
-  files.forEach(f => {
-    if (step._attachedDocs.find(d => d.name === f.name)) return; // skip duplicate
-    const kb = f.size < 1024 ? f.size + ' B'
-             : f.size < 1048576 ? Math.round(f.size/1024) + ' KB'
-             : (f.size/1048576).toFixed(1) + ' MB';
+  for (const f of files) {
+    if (step._attachedDocs.find(d => d.name === f.name)) continue;
 
-    // Prompt for document version — required for regulated industries
+    const kb = f.size < 1024        ? f.size + ' B'
+             : f.size < 1048576     ? Math.round(f.size / 1024) + ' KB'
+             : (f.size / 1048576).toFixed(1) + ' MB';
+
     const version = prompt(
       `Document version for "${f.name}"\n\n` +
       `Enter the released version number (e.g. Rev C, v2.1, 2026-03-21).\n` +
       `This must match the latest released copy on file.`,
       ''
     );
-    // Cancelled prompt = don't attach
-    if (version === null) return;
+    if (version === null) continue; // cancelled
 
-    step._attachedDocs.push({
-      name:    f.name,
-      size:    kb,
-      version: version.trim() || 'No version specified',
-      file:    f,
-    });
-  });
-
-  _dirtySteps = true;
-  reRenderSpine();
-  const attached = files.length;
-  if (attached) cadToast(attached === 1 ? `Attached: ${files[0].name}` : `${attached} files attached`, 'success');
+    cadToast(`Uploading ${f.name}…`, 'info');
+    try {
+      const { path, url } = await _uploadToStorage(f, stepId);
+      step._attachedDocs.push({
+        name:    f.name,
+        version: version.trim() || 'No version specified',
+        role:    'reference',
+        size:    kb,
+        path,
+        url,
+        file: f, // keep in-memory for immediate view without re-fetch
+      });
+      await _persistAttachedDocs(step);
+      _dirtySteps = false; // docs persisted independently
+      reRenderSpine();
+      cadToast(`Attached: ${f.name}`, 'success');
+    } catch(e) {
+      cadToast(`Upload failed: ${e.message}`, 'error');
+    }
+  }
 }
 
-function removeAttachedDoc(stepId, idx) {
+async function removeAttachedDoc(stepId, idx) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   if (!step?._attachedDocs) return;
-  // Revoke blob URL if one was created
   const doc = step._attachedDocs[idx];
-  if (doc?._blobUrl) URL.revokeObjectURL(doc._blobUrl);
+  if (!confirm(`Remove "${doc.name}"? This will permanently delete the file.`)) return;
+
+  // Delete from Storage
+  if (doc.path) await _deleteFromStorage(doc.path);
+  if (doc._blobUrl) URL.revokeObjectURL(doc._blobUrl);
+
   step._attachedDocs.splice(idx, 1);
-  _dirtySteps = true;
+  await _persistAttachedDocs(step).catch(() => {});
+  reRenderSpine();
+  cadToast(`Removed: ${doc.name}`, 'success');
+}
+
+async function setDocRole(stepId, idx, role) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?._attachedDocs?.[idx]) return;
+  step._attachedDocs[idx].role = role;
+  await _persistAttachedDocs(step).catch(() => {});
+  _dirtySteps = false;
   reRenderSpine();
 }
 
 function viewAttachedDoc(stepId, idx) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   const doc  = step?._attachedDocs?.[idx];
-  if (!doc?.file) { cadToast('File not available for preview', 'info'); return; }
+  if (!doc) return;
 
   const name   = doc.name.toLowerCase();
   const isPdf  = name.endsWith('.pdf');
   const isDocx = name.endsWith('.docx');
-  const isDoc  = name.endsWith('.doc');
 
-  if (isPdf) {
-    // PDFs render natively in the browser via blob URL
-    if (!doc._blobUrl) doc._blobUrl = URL.createObjectURL(doc.file);
-    window.open(doc._blobUrl, '_blank');
-    return;
+  // If we have an in-memory File object use it; otherwise use the stored URL
+  if (doc.file) {
+    if (isPdf) {
+      if (!doc._blobUrl) doc._blobUrl = URL.createObjectURL(doc.file);
+      window.open(doc._blobUrl, '_blank');
+    } else if (isDocx) {
+      _viewDocxFromFile(doc);
+    } else {
+      _downloadDoc(doc);
+    }
+  } else if (doc.url) {
+    // Reload from Storage URL
+    if (isPdf || isDocx) {
+      window.open(doc.url, '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = doc.url; a.target = '_blank'; a.download = doc.name; a.click();
+    }
+  } else {
+    cadToast('File not available — try re-attaching', 'info');
   }
+}
 
-  if (isDocx) {
-    // DOCX: use mammoth.js (already available in the artifact stack) to
-    // convert to HTML and render in a new tab — faithful inline preview
-    cadToast('Rendering document preview…', 'info');
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        // Dynamically load mammoth if not already present
-        if (typeof mammoth === 'undefined') {
-          await new Promise((res, rej) => {
-            const s = document.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
-            s.onload = res; s.onerror = rej;
-            document.head.appendChild(s);
-          });
-        }
-        const result = await mammoth.convertToHtml({ arrayBuffer: e.target.result });
-        const html = `<!DOCTYPE html><html><head>
-          <meta charset="UTF-8"/>
-          <title>${escHtml(doc.name)} · ${escHtml(doc.version||'')}</title>
-          <style>
-            body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;
-                   max-width: 800px; margin: 40px auto; padding: 0 32px; color: #1a1a1a; }
-            table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-            td, th { border: 1px solid #ccc; padding: 6px 10px; }
-            th { background: #f0f0f0; font-weight: 600; }
-            h1,h2,h3 { color: #1a2a3a; }
-            .doc-header { background:#f7f7f7; border-bottom:2px solid #00b0c8;
-              padding:12px 0 10px; margin-bottom:24px; }
-            .doc-header .title { font-size:13px; font-weight:700; color:#1a2a3a; }
-            .doc-header .meta  { font-size:11px; color:#666; margin-top:3px; }
-          </style>
-        </head><body>
-          <div class="doc-header">
-            <div class="title">📄 ${escHtml(doc.name)}</div>
-            <div class="meta">Version: ${escHtml(doc.version||'—')} &nbsp;·&nbsp; ${escHtml(doc.size||'')} &nbsp;·&nbsp; Read-only preview</div>
-          </div>
-          ${result.value}
-        </body></html>`;
-        const blob    = new Blob([html], { type: 'text/html' });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-      } catch(err) {
-        cadToast('Preview failed — downloading instead', 'error');
-        _downloadDoc(doc);
+function _viewDocxFromFile(doc) {
+  cadToast('Rendering document preview…', 'info');
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      if (typeof mammoth === 'undefined') {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
       }
-    };
-    reader.readAsArrayBuffer(doc.file);
-    return;
-  }
-
-  // All other types (xls, xlsx, ppt, txt, csv) — download/open blob directly
-  _downloadDoc(doc);
+      const result = await mammoth.convertToHtml({ arrayBuffer: e.target.result });
+      const html = `<!DOCTYPE html><html><head>
+        <meta charset="UTF-8"/>
+        <title>${escHtml(doc.name)}</title>
+        <style>
+          body{font-family:Arial,sans-serif;font-size:14px;line-height:1.6;
+               max-width:800px;margin:40px auto;padding:0 32px;color:#1a1a1a}
+          table{border-collapse:collapse;width:100%;margin:12px 0}
+          td,th{border:1px solid #ccc;padding:6px 10px}
+          th{background:#f0f0f0;font-weight:600}
+          .hdr{background:#f7f7f7;border-bottom:2px solid #00b0c8;padding:12px 0 10px;margin-bottom:24px}
+          .hdr .t{font-size:13px;font-weight:700;color:#1a2a3a}
+          .hdr .m{font-size:11px;color:#666;margin-top:3px}
+        </style>
+      </head><body>
+        <div class="hdr">
+          <div class="t">📄 ${escHtml(doc.name)}</div>
+          <div class="m">Version: ${escHtml(doc.version||'—')} · ${escHtml(doc.size||'')} · Read-only preview</div>
+        </div>
+        ${result.value}
+      </body></html>`;
+      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      window.open(blobUrl, '_blank');
+    } catch(err) {
+      cadToast('Preview failed — opening directly', 'error');
+      if (doc.url) window.open(doc.url, '_blank');
+    }
+  };
+  reader.readAsArrayBuffer(doc.file);
 }
 
 function _downloadDoc(doc) {
-  if (!doc._blobUrl) doc._blobUrl = URL.createObjectURL(doc.file);
+  const src = doc._blobUrl || (doc.file ? URL.createObjectURL(doc.file) : doc.url);
+  if (!src) { cadToast('File not available', 'info'); return; }
   const a = document.createElement('a');
-  a.href = doc._blobUrl;
-  a.download = doc.name;
-  a.click();
+  a.href = src; a.download = doc.name; a.click();
 }
 
 // ── Thin re-render wrapper (replaces refreshConfigPanel) ──────────────────────
@@ -1242,7 +1370,7 @@ function updateStepField(field, value) {
   // Only re-render spine for fields that affect the card summary line
   const cardFields = ['name','assignee_name','assignee_email','assignee_role',
                       'due_days','due_type','escalate_after_days','parallel_required',
-                      'require_output','input_from_step'];
+                      'input_from_step'];
   if (cardFields.includes(field)) reRenderSpine();
 }
 
@@ -1398,8 +1526,11 @@ async function saveTemplate(silent = false) {
         parallel_required:   !!step.parallel_required,
         branch_conditions:   step.branch_conditions || [],
         instructions:        step.instructions || null,
-        require_output:      !!step.require_output,
         input_from_step:     step.input_from_step || null,
+        attached_docs:       (step._attachedDocs || []).map(d => ({
+          name: d.name, version: d.version, role: d.role || 'reference',
+          size: d.size, path: d.path || null, url: d.url || null,
+        })),
       };
 
       if (step._new) {
