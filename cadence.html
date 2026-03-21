@@ -1702,12 +1702,45 @@ function toggleStepPicker(e) {
   e.stopPropagation();
   const picker = document.getElementById('step-type-picker');
   if (!picker) return;
-  const btn = e.currentTarget;
+
+  const isOpen = picker.classList.contains('open');
+  if (isOpen) { picker.classList.remove('open'); return; }
+
+  const btn  = e.currentTarget;
   const rect = btn.getBoundingClientRect();
-  picker.style.top  = (rect.top - picker.offsetHeight - 8) + 'px';
-  picker.style.left = rect.left + 'px';
+  const vh   = window.innerHeight;
+
+  // Temporarily show off-screen to measure real height
+  picker.style.visibility = 'hidden';
+  picker.style.top  = '-9999px';
+  picker.style.left = '-9999px';
   picker.style.position = 'fixed';
-  picker.classList.toggle('open');
+  picker.classList.add('open');
+
+  const ph = picker.offsetHeight;  // real height now measurable
+  const pw = picker.offsetWidth;
+
+  // Prefer opening above the button; fall back to below if not enough room
+  const spaceAbove = rect.top;
+  const spaceBelow = vh - rect.bottom;
+  let top;
+  if (spaceAbove >= ph + 8) {
+    top = rect.top - ph - 8;         // above
+  } else if (spaceBelow >= ph + 8) {
+    top = rect.bottom + 8;           // below
+  } else {
+    // Neither fits fully — align to top of viewport with scroll
+    top = Math.max(8, vh - ph - 8);
+  }
+
+  // Horizontal: prefer aligning left edge with button, clamp to viewport
+  let left = rect.left;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  if (left < 8) left = 8;
+
+  picker.style.top  = top  + 'px';
+  picker.style.left = left + 'px';
+  picker.style.visibility = '';
 }
 
 document.addEventListener('click', () => {
@@ -2038,8 +2071,7 @@ function launchInstance() {
         <div style="margin-bottom:12px">
           <label class="config-label">Workflow Owner <span style="color:var(--red)">*</span></label>
           <select class="config-select" id="launch-owner">
-            <option value="">— Select owner —</option>
-            ${_resources_cad.map(r=>`<option value="${r.id}">${escHtml(r.name)}${r.title?' — '+escHtml(r.title):''}</option>`).join('')}
+            ${renderResourceOptions(_myResourceId || '', '— Select owner —')}
           </select>
           <div style="font-size:10px;color:var(--muted);margin-top:4px">
             Owner receives issue escalations and manages blocked steps.
@@ -2545,23 +2577,7 @@ function renderInstanceDetail(el, inst) {
                         <div>
                           <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Add Assignee</label>
                           <select class="config-select" id="reassign-res-${s.id}" style="font-size:11px">
-                            <option value="">— Select resource —</option>
-                            ${(() => {
-                              // Group by department (internal) then external company
-                              const groups = {};
-                              _resources_cad.forEach(r => {
-                                const grp = r.is_external ? ('External' + (r.department ? ': '+r.department : '')) : (r.department || 'Internal');
-                                if (!groups[grp]) groups[grp] = [];
-                                groups[grp].push(r);
-                              });
-                              return Object.entries(groups).map(([grp, members]) =>
-                                `<optgroup label="${escHtml(grp)}">
-                                  ${members.map(r =>
-                                    `<option value="${r.id}">${escHtml(r.name)}${r.title ? ' — '+escHtml(r.title) : ''}</option>`
-                                  ).join('')}
-                                </optgroup>`
-                              ).join('');
-                            })()}
+                            ${renderResourceOptions('', '— Select resource —')}
                           </select>
                         </div>
                         <button class="btn btn-solid btn-sm" style="font-size:10px;white-space:nowrap"
@@ -2932,11 +2948,44 @@ function renderTriggersTab(el) {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
+
+// Shared resource option builder — grouped by dept/external, name + title columns
+function renderResourceOptions(selectedId = '', placeholder = '— Select resource —') {
+  const groups = {};
+  _resources_cad.forEach(r => {
+    const grp = r.is_external
+      ? ('External' + (r.department ? ': ' + r.department : ''))
+      : (r.department || 'Internal');
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(r);
+  });
+  const opts = Object.entries(groups).map(([grp, members]) =>
+    `<optgroup label="${escHtml(grp)}">
+      ${members.map(r =>
+        `<option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>
+          ${escHtml(r.name)}${r.title ? ' — ' + escHtml(r.title) : ''}
+        </option>`
+      ).join('')}
+    </optgroup>`
+  ).join('');
+  return `<option value="">${escHtml(placeholder)}</option>${opts}`;
+}
 let _users_cad     = []; // app users (for template editor assignee dropdowns)
 let _resources_cad = []; // all firm resources (for instance reassignment)
+let _myResourceId  = null; // current user's resource ID (for owner auto-select)
 
 API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
+}).catch(() => {});
+
+// Load current user's resource ID for owner auto-select
+Auth.getToken().then(token => {
+  try {
+    const sub = JSON.parse(atob(token.split('.')[1])).sub;
+    API.get(`users?id=eq.${sub}&select=resource_id`).then(rows => {
+      _myResourceId = rows?.[0]?.resource_id || null;
+    }).catch(() => {});
+  } catch(e) {}
 }).catch(() => {});
 
 API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_name,last_name,title,email,department,is_external&order=last_name.asc`)
