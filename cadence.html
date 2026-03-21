@@ -3600,10 +3600,19 @@ async function runAllTests() {
   if (btn) { btn.textContent = '▶ Run all tests'; btn.disabled = false; }
   // Gate summary already refreshed by last runSingleTest → loadTmplTests call
 }
+
+// ── Template Chain of Custody panel ──────────────────────────────────────────
+function toggleTmplCoC() {
   const panel  = document.getElementById('tmpl-coc-panel');
   const cocBtn = document.getElementById('coc-btn');
   if (!panel) return;
   const opening = !panel.classList.contains('open');
+  // Close Tests panel if open
+  if (opening) {
+    document.getElementById('tmpl-tests-panel')?.classList.remove('open');
+    const testsBtn = document.getElementById('tests-btn');
+    if (testsBtn) { testsBtn.style.color = ''; testsBtn.style.borderColor = ''; testsBtn.style.background = ''; }
+  }
   panel.classList.toggle('open');
   if (cocBtn) {
     cocBtn.style.color       = opening ? 'var(--cad)'      : '';
