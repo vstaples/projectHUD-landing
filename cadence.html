@@ -1019,6 +1019,8 @@ function renderEditor() {
         <button class="btn btn-ghost btn-sm" onclick="toggleTmplCoC()" id="coc-btn"
           title="Change history">CoC</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
+        <button class="btn btn-ghost btn-sm" id="save-btn" onclick="saveTemplate(false)"
+          title="Save without version bump">Save</button>
         <button class="btn btn-solid btn-sm" id="commit-btn" onclick="commitTemplate()">Commit</button>
       </div>
     </div>
@@ -2265,13 +2267,16 @@ function removeStep(id) {
 async function saveTemplate(silent = false) {
   if (!_selectedTmpl) return;
 
+  const btn = silent ? null : document.getElementById('save-btn');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
   try {
     const nameEl    = document.getElementById('tmpl-name-input');
     const statusEl  = document.getElementById('tmpl-status-sel');
     const triggerEl = document.getElementById('tmpl-trigger-sel');
     const descEl    = document.getElementById('tmpl-desc-input');
 
-    // Auto-save: persist current state, no version change
+    // Persist current state — no version bump, no CoC entry
     const patch = {
       name:         nameEl?.value?.trim()  || _selectedTmpl.name,
       status:       statusEl?.value        || _selectedTmpl.status,
@@ -2301,10 +2306,13 @@ async function saveTemplate(silent = false) {
     const listEl = document.getElementById('tmpl-list');
     if (listEl) listEl.innerHTML = renderTemplateList();
 
+    if (!silent) cadToast('Saved', 'success');
+
   } catch(e) {
     _updateAutoSaveIndicator('error');
-    if (!silent) cadToast('Auto-save failed: ' + e.message, 'error');
-    else cadToast('Auto-save failed: ' + e.message, 'error');
+    cadToast((silent ? 'Auto-save' : 'Save') + ' failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = 'Save'; btn.disabled = false; }
   }
 }
 
