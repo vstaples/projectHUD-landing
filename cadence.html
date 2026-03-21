@@ -994,32 +994,50 @@ function renderInlineStepConfig(step) {
           oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
       </div>
 
-      <!-- Input from prior step (approval/review/signoff/external steps) -->
+      <!-- Input from prior step — shown FIRST and prominently for approval-type steps -->
       ${step.step_type === 'approval' || step.step_type === 'review' ||
         step.step_type === 'signoff' || step.step_type === 'external' ? `
-      <div class="config-section cfg-full">
-        <label class="config-label">Input Document — From Prior Step</label>
-        <select class="config-select"
-          onchange="updateStepField('input_from_step',this.value||null)">
-          <option value="">— None —</option>
-          ${(_selectedTmpl?.steps||[])
-            .filter(s => s.id !== step.id &&
-              (s._attachedDocs||[]).some(d => d.role === 'authorization'))
-            .map(s => `<option value="${s.id}"
-              ${step.input_from_step===s.id?' selected':''}>
-              Step ${s.sequence_order}: ${escHtml(s.name||'Action')}
-            </option>`).join('')}
-        </select>
-        ${step.input_from_step
-          ? `<div style="margin-top:5px;font-size:11px;color:var(--green)">
-              ✓ Authorization document from that step will be presented to this approver.
-             </div>`
-          : `<div style="margin-top:5px;font-size:11px;color:var(--muted)">
-              Only steps with an Authorization document attached appear here.
-             </div>`}
+      <div class="config-section cfg-full" style="border:1px solid rgba(212,144,31,.4);
+        border-radius:5px;margin:8px 0 4px;background:rgba(212,144,31,.05)">
+        <label class="config-label" style="color:var(--amber);margin-bottom:6px">
+          ⬇ Authorization Input — Completed documents routed from a prior step
+        </label>
+        ${(() => {
+          const eligible = (_selectedTmpl?.steps||[])
+            .filter(s => s.sequence_order < step.sequence_order &&
+              (s._attachedDocs||[]).some(d => d.role === 'authorization'));
+          if (!eligible.length) return `
+            <div style="font-size:11px;color:var(--muted);padding:4px 0">
+              No prior steps have an <strong>Authorization</strong>-role document yet.
+              Attach one to a prior step and set its role to ⬆ Authorization.
+            </div>`;
+          return `
+          <select class="config-select" style="border-color:rgba(212,144,31,.5)"
+            onchange="updateStepField('input_from_step',this.value||null);reRenderSpine()">
+            <option value="">— Not wired —</option>
+            ${eligible.map(s => {
+              const authDocs = (s._attachedDocs||[])
+                .filter(d => d.role === 'authorization')
+                .map(d => d.name).join(', ');
+              return `<option value="${s.id}" ${step.input_from_step===s.id?' selected':''}>
+                Step ${s.sequence_order}: ${escHtml(s.name)} → ${escHtml(authDocs)}
+              </option>`;
+            }).join('')}
+          </select>
+          ${step.input_from_step
+            ? `<div style="margin-top:6px;font-size:11px;color:var(--green);
+                display:flex;gap:5px;align-items:flex-start">
+                <span>✓</span>
+                <span>When this step activates, the completed Authorization document(s)
+                uploaded by the prior step's assignee will be presented here for review.</span>
+               </div>`
+            : `<div style="margin-top:6px;font-size:11px;color:var(--muted)">
+                Select a step to wire its Authorization output to this approval task.
+               </div>`}`;
+        })()}
       </div>` : ''}
 
-    </div>
+
 
     <!-- Documents section — per-document role assignment -->
     <div style="padding:0 14px 6px;display:flex;align-items:center;justify-content:space-between">
