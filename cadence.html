@@ -1041,21 +1041,7 @@ function renderInlineStepConfig(step) {
         </div>`).join('')}
     </div>
 
-    <!-- Output zone: where the assignee uploads their completed document at runtime -->
-    ${step.require_output ? `
-    <div style="padding:0 14px 6px;margin-top:10px;border-top:1px solid var(--border)">
-      <label class="config-label" style="margin-bottom:6px;color:var(--amber)">
-        ⬆ OUTPUT ZONE — Assignee uploads completed document here at runtime
-      </label>
-      <div class="doc-drop-zone" style="border-color:rgba(212,144,31,.35);background:rgba(212,144,31,.04);cursor:default;pointer-events:none">
-        <div class="doc-drop-zone-icon" style="opacity:.4">📤</div>
-        <div class="doc-drop-zone-text">
-          Completed scan or filled document uploaded here when instance runs.<br/>
-          <strong style="color:var(--amber)">Step cannot advance until this is filled.</strong>
-        </div>
-      </div>
-    </div>` : `
-    <!-- Drop zone for reference docs -->
+    <!-- Reference doc drop zone — always present -->
     <div class="doc-drop-zone" id="dropzone-${step.id}"
       ondragover="event.preventDefault();this.classList.add('drag-over')"
       ondragleave="this.classList.remove('drag-over')"
@@ -1069,7 +1055,22 @@ function renderInlineStepConfig(step) {
       <input type="file" id="file-input-${step.id}" style="display:none"
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
         multiple onchange="handleDocFileInput(event,'${step.id}')" />
-    </div>`}`;
+    </div>
+
+    <!-- Output zone — shown additionally when require_output is on -->
+    ${step.require_output ? `
+    <div style="padding:0 14px 6px;margin-top:8px">
+      <label class="config-label" style="margin-bottom:6px;color:var(--amber)">
+        ⬆ OUTPUT ZONE — Assignee uploads completed document here at runtime
+      </label>
+      <div class="doc-drop-zone" style="border-color:rgba(212,144,31,.35);background:rgba(212,144,31,.04);cursor:default;pointer-events:none">
+        <div class="doc-drop-zone-icon" style="opacity:.4">📤</div>
+        <div class="doc-drop-zone-text">
+          Completed scan or filled document uploaded here when instance runs.<br/>
+          <strong style="color:var(--amber)">Step cannot advance until this is filled.</strong>
+        </div>
+      </div>
+    </div>` : ''}`;
 }
 
 // ── Document attachment handlers ──────────────────────────────────────────────
