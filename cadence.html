@@ -900,8 +900,12 @@ async function selectTemplate(id) {
       size:    d.size,
       path:    d.path || null,
       url:     d.url  || null,
-      // file: not available after reload — viewAttachedDoc uses url instead
     }));
+    // Resolve resource_id from stored user_id for picker pre-selection
+    if (s.assignee_user_id && !s.assignee_resource_id) {
+      s.assignee_resource_id =
+        _users_cad.find(u => u.id === s.assignee_user_id)?.resource_id || null;
+    }
   });
   _selectedTmpl.steps = steps || [];
   _selectedStep = null;
@@ -1167,6 +1171,7 @@ function renderInlineStepConfig(step) {
         <select class="config-select" id="scfg-user-${step.id}"
           onchange="autoFillAssignee('${step.id}',this.value)">
           ${renderResourceOptions(
+            step.assignee_resource_id ||
             _users_cad.find(u => u.id === step.assignee_user_id)?.resource_id || '',
             '— Select resource —'
           )}
@@ -1820,7 +1825,8 @@ function autoFillAssignee(stepId, resourceId) {
   if (!r) return;
   // assignee_user_id is a FK to users.id — resolve via resource_id
   const user = _users_cad.find(u => u.resource_id === resourceId);
-  updateStepField('assignee_user_id', user?.id || null);
+  updateStepField('assignee_user_id',    user?.id || null);
+  updateStepField('assignee_resource_id', resourceId);  // store for picker pre-selection
   if (r.email) updateStepField('assignee_email', r.email);
   if (r.name)  updateStepField('assignee_name',  r.name);
 }
@@ -3769,6 +3775,15 @@ let _myUserId      = null; // current user's user ID (for launched_by FK)
 
 API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
+  // Back-fill assignee_resource_id on any already-loaded steps
+  if (_selectedTmpl?.steps) {
+    _selectedTmpl.steps.forEach(s => {
+      if (s.assignee_user_id && !s.assignee_resource_id) {
+        s.assignee_resource_id =
+          _users_cad.find(u => u.id === s.assignee_user_id)?.resource_id || null;
+      }
+    });
+  }
 }).catch(() => {});
 
 // Load current user's resource ID for owner auto-select
