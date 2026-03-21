@@ -278,6 +278,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .spine-card:hover .spine-delete{opacity:.5}
 .spine-delete:hover{opacity:1 !important;color:var(--red)}
 
+.spine-drag-handle{
+  font-size:14px;color:var(--muted);cursor:grab;
+  opacity:0;transition:opacity .15s;user-select:none;
+  margin-bottom:2px;text-align:center;line-height:1;
+}
+.spine-step:hover .spine-drag-handle{opacity:.5}
+.spine-drag-handle:hover{opacity:1 !important;color:var(--text2)}
+.spine-step.drag-over-top{border-top:2px solid var(--cad);margin-top:-2px}
+.spine-step.drag-over-bottom{border-bottom:2px solid var(--cad)}
+.spine-step.dragging{opacity:.4}
+
 /* step type node colours */
 .sn-trigger{background:var(--step-trigger);border-color:rgba(192,64,74,.4);color:var(--step-trigger-c)}
 .sn-approval{background:var(--step-approval);border-color:rgba(61,153,112,.35);color:var(--step-approval-c)}
@@ -863,8 +874,15 @@ function renderSpine() {
        step.assignee_type === 'role' ? step.assignee_role : '—');
 
     return `
-      <div class="spine-step" id="sstep-${step.id}">
+      <div class="spine-step" id="sstep-${step.id}"
+        ${!step._virtual ? `draggable="true"
+          ondragstart="stepDragStart(event,'${step.id}')"
+          ondragover="stepDragOver(event,'${step.id}')"
+          ondragleave="stepDragLeave(event,'${step.id}')"
+          ondrop="stepDrop(event,'${step.id}')"
+          ondragend="stepDragEnd(event)"` : ''}>
         <div class="spine-track">
+          ${!step._virtual ? `<div class="spine-drag-handle" title="Drag to reorder">⠿</div>` : ''}
           <div class="spine-node ${meta.nodeClass}${sel?' selected':''}"
             onclick="selectStep('${step.id}')"
             title="${meta.label}">${meta.icon}</div>
@@ -876,7 +894,7 @@ function renderSpine() {
             onclick="selectStep('${step.id}')">
             ${!step._virtual ? `<button class="spine-delete"
               onclick="event.stopPropagation();removeStep('${step.id}')"
-              title="Remove step">✕</button>` : ''}
+              title="Delete step">🗑</button>` : ''}
             <div class="spine-card-row">
               <div>
                 <div class="spine-card-name">${escHtml(step.name || meta.label)}</div>
@@ -1845,6 +1863,70 @@ function addStep(type) {
   reRenderSpine();
   // Hide AI banner
   document.getElementById('ai-banner')?.remove();
+}
+
+// ── Step drag-and-drop reordering ─────────────────────────────────────────────
+let _dragStepId = null;
+
+function stepDragStart(event, stepId) {
+  _dragStepId = stepId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', stepId);
+  // Slight delay so the drag image renders before opacity drops
+  setTimeout(() => {
+    document.getElementById('sstep-' + stepId)?.classList.add('dragging');
+  }, 0);
+}
+
+function stepDragOver(event, stepId) {
+  if (!_dragStepId || _dragStepId === stepId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  // Show indicator above or below based on mouse position
+  const el   = document.getElementById('sstep-' + stepId);
+  const rect = el?.getBoundingClientRect();
+  if (!el || !rect) return;
+  const midY = rect.top + rect.height / 2;
+  el.classList.remove('drag-over-top', 'drag-over-bottom');
+  el.classList.add(event.clientY < midY ? 'drag-over-top' : 'drag-over-bottom');
+}
+
+function stepDragLeave(event, stepId) {
+  const el = document.getElementById('sstep-' + stepId);
+  el?.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function stepDrop(event, targetStepId) {
+  event.preventDefault();
+  const el = document.getElementById('sstep-' + targetStepId);
+  const isTop = el?.classList.contains('drag-over-top');
+  el?.classList.remove('drag-over-top', 'drag-over-bottom');
+
+  if (!_dragStepId || !_selectedTmpl?.steps) return;
+  if (_dragStepId === targetStepId) return;
+
+  const steps     = _selectedTmpl.steps;
+  const fromIdx   = steps.findIndex(s => s.id === _dragStepId);
+  const toIdx     = steps.findIndex(s => s.id === targetStepId);
+  if (fromIdx < 0 || toIdx < 0) return;
+
+  // Remove dragged step and insert before/after target
+  const [moved] = steps.splice(fromIdx, 1);
+  const insertAt = steps.findIndex(s => s.id === targetStepId);
+  steps.splice(isTop ? insertAt : insertAt + 1, 0, moved);
+
+  // Renumber sequence_order
+  steps.forEach((s, i) => s.sequence_order = i + 1);
+  _dirtySteps = true;
+  reRenderSpine();
+}
+
+function stepDragEnd(event) {
+  // Clean up any leftover indicators
+  document.querySelectorAll('.spine-step').forEach(el => {
+    el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
+  });
+  _dragStepId = null;
 }
 
 function removeStep(id) {
@@ -3043,14 +3125,14 @@ API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
 }).catch(() => {});
 
 // Load current user's resource ID for owner auto-select
-Auth.getToken().then(token => {
+(async () => {
   try {
-    const sub = JSON.parse(atob(token.split('.')[1])).sub;
-    API.get(`users?id=eq.${sub}&select=resource_id`).then(rows => {
-      _myResourceId = rows?.[0]?.resource_id || null;
-    }).catch(() => {});
+    const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+    const sub   = JSON.parse(atob(token.split('.')[1])).sub;
+    const rows  = await API.get(`users?id=eq.${sub}&select=resource_id`).catch(() => []);
+    _myResourceId = rows?.[0]?.resource_id || null;
   } catch(e) {}
-}).catch(() => {});
+})();
 
 API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_name,last_name,title,email,department,is_external&order=last_name.asc`)
   .then(r => { _resources_cad = (r || []).map(x => ({
