@@ -16,10 +16,12 @@ const Sidebar = (() => {
     auditlog: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>`,
     videolibrary: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="20" height="16" rx="2"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>`,
     pipeline:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="4" height="14" rx="1"/><rect x="8" y="8" width="4" height="11" rx="1"/><rect x="14" y="3" width="4" height="16" rx="1"/><rect x="20" y="10" width="2" height="9" rx="1"/></svg>`,
+    cadence:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
   };
 
   const TOOLBAR_ITEMS = [
     { key: 'pipeline',     label: 'Pipeline',     href: '/pipeline.html' },
+    { key: 'cadence',      label: 'CadenceHUD',   href: '/cadence.html' },
     { key: 'projects',     label: 'Projects',     href: '/projects.html' },
     { key: 'meetings',     label: 'Meetings',     href: '/meetings.html' },
     { key: 'documents',    label: 'Documents',    href: '/documents.html' },
@@ -141,7 +143,8 @@ const Sidebar = (() => {
       { href: '/dashboard.html',          icon: '◈', label: 'Dashboard',  section: 'main'  },
       { href: '/pipeline.html',           icon: '▥', label: 'Pipeline',   section: 'main'  },
       { href: '/resources.html',          icon: '◎', label: 'Resources',  section: 'main'  },
-      { href: '/resource-requests.html',  icon: '⬡', label: 'Requests',   section: 'main'  },
+      { href: '/resource-requests.html',  icon: '⬡', label: 'Requests',    section: 'main'  },
+      { href: '/cadence.html',            icon: '⬡', label: 'CadenceHUD',  section: 'main'  },
       { href: '/audit-log.html',          icon: '▦', label: 'Audit Log',  section: 'admin' },
       { href: '/users.html',              icon: '◑', label: 'User Mgmt',  section: 'admin' },
     ];
