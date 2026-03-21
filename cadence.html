@@ -2172,6 +2172,9 @@ function renderInstanceDetail(el, inst) {
   const stepCompletedAt = {};
   coc.filter(e => e.event_type === 'step_completed' && e.step_id)
      .forEach(e => { stepCompletedAt[e.step_id] = e.created_at; });
+
+  // Map step_id → latest reassignment CoC event
+  const reassignments = {};
   coc.filter(e => e.event_type === 'step_reassigned').forEach(e => {
     if (e.step_id) reassignments[e.step_id] = e;
   });
