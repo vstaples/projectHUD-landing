@@ -732,6 +732,7 @@ async function selectTemplate(id) {
     s.reject_to       = s.reject_to || null;
     s._confirmItems   = Array.isArray(s.confirm_items) ? s.confirm_items : [];
     s._meetingAgenda  = Array.isArray(s.meeting_agenda) ? s.meeting_agenda : [];
+    s.meeting_comments = s.meeting_comments || '';
     s._attachedDocs = (s.attached_docs || []).map(d => ({
       name:    d.name,
       version: d.version,
@@ -963,41 +964,59 @@ function renderInlineStepConfig(step) {
       <!-- Assignee detail — depends on type -->
       ${step.assignee_type === 'user' ? `
       <div class="config-section">
-        <label class="config-label">User</label>
+        <label class="config-label">Assignee</label>
         <select class="config-select" id="scfg-user-${step.id}"
-          onchange="updateStepField('assignee_user_id',this.value)">
-          <option value="">— Select user —</option>
-          ${_users_cad.map(u=>`<option value="${u.id}"${step.assignee_user_id===u.id?' selected':''}>${escHtml(u.name)}</option>`).join('')}
+          onchange="updateStepField('assignee_user_id',this.value);autoFillAssignee('${step.id}',this.value)">
+          ${renderResourceOptions(step.assignee_user_id||'', '— Select resource —')}
         </select>
       </div>` : ''}
 
       ${step.assignee_type === 'role' ? `
       <div class="config-section">
-        <label class="config-label">Role Name</label>
-        <input class="config-input" value="${escHtml(step.assignee_role||'')}"
-          placeholder="e.g. Quality Lead"
-          oninput="updateStepField('assignee_role',this.value)" />
+        <label class="config-label">Role / Job Title</label>
+        <select class="config-select" id="scfg-role-${step.id}"
+          onchange="updateStepField('assignee_role',this.value)">
+          <option value="">— Select role —</option>
+          ${[...new Set(_resources_cad.filter(r=>r.title).map(r=>r.title))].sort()
+            .map(t=>`<option value="${escHtml(t)}"${step.assignee_role===t?' selected':''}>${escHtml(t)}</option>`)
+            .join('')}
+        </select>
       </div>` : ''}
 
       ${step.assignee_type === 'external' ? `
       <div class="config-section">
-        <label class="config-label">Recipient Name</label>
-        <input class="config-input" value="${escHtml(step.assignee_name||'')}"
-          placeholder="e.g. Sandra Ng"
-          oninput="updateStepField('assignee_name',this.value)" />
-      </div>
-      <div class="config-section cfg-full" style="display:grid;grid-template-columns:1fr 1fr;gap:0">
-        <div class="config-section" style="border:none;padding:0 8px 0 0">
-          <label class="config-label">Email</label>
-          <input class="config-input" type="email" value="${escHtml(step.assignee_email||'')}"
-            placeholder="email@client.com"
-            oninput="updateStepField('assignee_email',this.value)" />
-        </div>
-        <div class="config-section" style="border:none;padding:0">
-          <label class="config-label">Organisation</label>
-          <input class="config-input" value="${escHtml(step.assignee_org||'')}"
-            placeholder="e.g. OrthoMotion Dynamics"
-            oninput="updateStepField('assignee_org',this.value)" />
+        <label class="config-label">External Recipient</label>
+        <select class="config-select" id="scfg-ext-${step.id}"
+          onchange="selectExternalAssignee('${step.id}',this.value)">
+          <option value="">— Select external resource —</option>
+          ${_resources_cad.filter(r=>r.is_external).map(r=>
+            `<option value="${r.id}"
+              data-name="${escHtml(r.name)}"
+              data-email="${escHtml(r.email||'')}"
+              data-org="${escHtml(r.department||'')}"
+              ${step.assignee_name===r.name?' selected':''}>
+              ${escHtml(r.name)}${r.title?' — '+escHtml(r.title):''}
+            </option>`).join('')}
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+          <div>
+            <label class="config-label" style="font-size:9px">Name</label>
+            <input class="config-input" id="scfg-extname-${step.id}" style="font-size:11px"
+              value="${escHtml(step.assignee_name||'')}" placeholder="Full name"
+              oninput="updateStepField('assignee_name',this.value)" />
+          </div>
+          <div>
+            <label class="config-label" style="font-size:9px">Email</label>
+            <input class="config-input" id="scfg-extemail-${step.id}" type="email" style="font-size:11px"
+              value="${escHtml(step.assignee_email||'')}" placeholder="email@client.com"
+              oninput="updateStepField('assignee_email',this.value)" />
+          </div>
+          <div>
+            <label class="config-label" style="font-size:9px">Organisation</label>
+            <input class="config-input" id="scfg-extorg-${step.id}" style="font-size:11px"
+              value="${escHtml(step.assignee_org||'')}" placeholder="e.g. OrthoMotion Dynamics"
+              oninput="updateStepField('assignee_org',this.value)" />
+          </div>
         </div>
       </div>` : ''}
 
@@ -1010,7 +1029,7 @@ function renderInlineStepConfig(step) {
           <select class="config-select" style="flex:0 0 auto;min-width:220px"
             onchange="updateStepField('due_type',this.value);reRenderSpine()">
             <option value="after_prior"${(step.due_type||'after_prior')==='after_prior'?' selected':''}>
-              X days after prior step completes
+              Within X days after prior step completes
             </option>
             <option value="before_completion"${step.due_type==='before_completion'?' selected':''}>
               X days before workflow completion date
@@ -1021,7 +1040,7 @@ function renderInlineStepConfig(step) {
             oninput="updateStepField('due_days',this.value===''?null:parseInt(this.value))" />
           <span style="font-size:11px;color:var(--muted)">
             ${(step.due_type||'after_prior')==='after_prior'
-              ? 'business days from prior step'
+              ? 'business days'
               : 'business days before target completion'}
           </span>
         </div>
@@ -1098,13 +1117,12 @@ function renderInlineStepConfig(step) {
           onclick="addConfirmItem('${step.id}')">+ Add item</button>
       </div>` : ''}
 
-      <!-- Meeting step: agenda items -->
+      <!-- Meeting step: agenda items, action items placeholder, instructions, comments -->
       ${step.step_type === 'meeting' ? `
       <div class="config-section cfg-full">
         <label class="config-label" style="margin-bottom:6px">Meeting Agenda Items</label>
         <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-          Pre-populate the agenda. At runtime a full meeting editor opens with minutes, 
-          attendees, action items and email distribution.
+          Pre-populate the agenda. Items may also be defined or edited after the instance is launched.
         </div>
         <div id="meeting-agenda-${step.id}">
           ${(step._meetingAgenda||[]).map((item,i) => `
@@ -1120,18 +1138,38 @@ function renderInlineStepConfig(step) {
         <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:11px;
           color:#4fc88c;border-color:rgba(79,200,140,.35)"
           onclick="addMeetingAgendaItem('${step.id}')">+ Add agenda item</button>
-        <div style="margin-top:10px;font-size:10px;color:var(--muted)">
+        <div style="margin-top:10px;font-size:11px;color:var(--muted)">
           Duration, location, and attendees are configured when the instance is launched.
+        </div>
+      </div>
+
+      <!-- Meeting: Action Items placeholder -->
+      <div class="config-section cfg-full">
+        <label class="config-label" style="margin-bottom:4px">Action Items</label>
+        <div style="font-size:11px;color:var(--muted);padding:8px 10px;
+          border:1px dashed var(--border2);border-radius:4px;
+          background:rgba(79,200,140,.03)">
+          ◉ Action items will be created and assigned during the meeting itself.
+          They are tracked within the meeting editor and appear in the Chain of Custody.
         </div>
       </div>` : ''}
 
-      <!-- Instructions — full width -->
+      <!-- Instructions — full width (always shown; for meeting steps shown after action items) -->
       <div class="config-section cfg-full">
         <label class="config-label">Instructions to Assignee</label>
         <textarea class="config-textarea" style="min-height:52px"
           placeholder="Optional context shown to the assignee..."
           oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
       </div>
+
+      <!-- Meeting step: Comments / Pre-meeting notes -->
+      ${step.step_type === 'meeting' ? `
+      <div class="config-section cfg-full">
+        <label class="config-label">Pre-Meeting Comments</label>
+        <textarea class="config-textarea" style="min-height:52px"
+          placeholder="Background context, reference materials, or notes for attendees prior to the meeting..."
+          oninput="updateStepField('meeting_comments',this.value)">${escHtml(step.meeting_comments||'')}</textarea>
+      </div>` : ''}
 
     </div><!-- /cfg-grid -->
 
@@ -1579,6 +1617,31 @@ function reRenderSpine() {
   if (spineEl) spineEl.innerHTML = renderSpine();
 }
 
+// ── Assignee auto-fill helpers ────────────────────────────────────────────────
+function autoFillAssignee(stepId, resourceId) {
+  const r = _resources_cad.find(x => x.id === resourceId);
+  if (!r) return;
+  updateStepField('assignee_user_id', resourceId);
+  // Also store email and name for notifications
+  if (r.email) updateStepField('assignee_email', r.email);
+  if (r.name)  updateStepField('assignee_name',  r.name);
+}
+
+function selectExternalAssignee(stepId, resourceId) {
+  const r = _resources_cad.find(x => x.id === resourceId);
+  if (!r) return;
+  updateStepField('assignee_name',  r.name  || '');
+  updateStepField('assignee_email', r.email || '');
+  updateStepField('assignee_org',   r.department || '');
+  // Update the text inputs immediately
+  const nameEl  = document.getElementById(`scfg-extname-${stepId}`);
+  const emailEl = document.getElementById(`scfg-extemail-${stepId}`);
+  const orgEl   = document.getElementById(`scfg-extorg-${stepId}`);
+  if (nameEl)  nameEl.value  = r.name  || '';
+  if (emailEl) emailEl.value = r.email || '';
+  if (orgEl)   orgEl.value   = r.department || '';
+}
+
 // ── Meeting step agenda item helpers ─────────────────────────────────────────
 function addMeetingAgendaItem(stepId) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
@@ -1845,6 +1908,7 @@ async function saveTemplate(silent = false) {
         reject_to:           step.reject_to || null,
         confirm_items:       step._confirmItems || [],
         meeting_agenda:      step._meetingAgenda || [],
+        meeting_comments:    step.meeting_comments || null,
         attached_docs:       (step._attachedDocs || []).map(d => ({
           name: d.name, version: d.version, role: d.role || 'reference',
           size: d.size, path: d.path || null, url: d.url || null,
