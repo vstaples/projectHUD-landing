@@ -2134,144 +2134,401 @@ function renderInstanceDetail(el, inst) {
   const tmpl      = _templates.find(t => t.id === inst.template_id);
   const steps     = inst._tmplSteps  || [];
   const coc       = inst._stepInsts  || [];
-  const statusColor = { pending:'var(--muted)', in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--muted)', overridden:'var(--amber)' };
+  const selStep   = inst._selectedStep || null;
+
+  const statusColor = {
+    pending:'var(--muted)', in_progress:'var(--cad)',
+    complete:'var(--green)', cancelled:'var(--red)', overridden:'var(--amber)'
+  };
   const evtColor  = {
-    instance_launched:  'var(--cad)',
-    step_activated:     'var(--accent)',
-    step_action:        'var(--green)',
-    step_completed:     'var(--green)',
-    rejected:           'var(--red)',
-    escalation_triggered:'var(--amber)',
-    override:           'var(--amber)',
-    instance_completed: 'var(--green)',
-    token_issued:       'var(--muted)',
-    reminder_sent:      'var(--muted)',
+    instance_launched:'var(--cad)', step_activated:'var(--accent)',
+    step_action:'var(--green)', step_completed:'var(--green)',
+    rejected:'var(--red)', escalation_triggered:'var(--amber)',
+    override:'var(--amber)', instance_completed:'var(--green)',
+    token_issued:'var(--muted)', reminder_sent:'var(--muted)',
+    step_reassigned:'var(--accent)', instance_suspended:'var(--amber)',
+    instance_cancelled:'var(--red)',
   };
   const evtLabel = {
-    instance_launched:   'Instance Launched',
-    step_activated:      'Step Activated',
-    step_action:         'Action Taken',
-    step_completed:      'Step Completed',
-    rejected:            'Rejected',
-    escalation_triggered:'Escalation Triggered',
-    override:            'PM Override',
-    instance_completed:  'Instance Completed',
-    token_issued:        'Token Issued',
-    reminder_sent:       'Reminder Sent',
+    instance_launched:'Instance Launched', step_activated:'Step Activated',
+    step_action:'Action Taken', step_completed:'Step Completed',
+    rejected:'Rejected', escalation_triggered:'Escalation Triggered',
+    override:'PM Override', instance_completed:'Instance Completed',
+    token_issued:'Token Issued', reminder_sent:'Reminder Sent',
+    step_reassigned:'Assignee Reassigned', instance_suspended:'Suspended',
+    instance_cancelled:'Cancelled',
   };
 
-  // Build a set of which step IDs have CoC events
-  const activeStepIds = new Set(coc.map(e => e.step_id).filter(Boolean));
-  const completedStepIds = new Set(
-    coc.filter(e => e.event_type === 'step_completed').map(e => e.step_id)
-  );
-  const rejectedStepIds = new Set(
-    coc.filter(e => e.event_type === 'rejected').map(e => e.step_id)
-  );
+  const activeStepIds    = new Set(coc.map(e => e.step_id).filter(Boolean));
+  const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.step_id));
+  const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.step_id));
+
+  // Get latest reassignment per step from CoC
+  const reassignments = {};
+  coc.filter(e => e.event_type === 'step_reassigned').forEach(e => {
+    if (e.step_id) reassignments[e.step_id] = e;
+  });
+
+  const isCancelled  = inst.status === 'cancelled';
+  const isComplete   = inst.status === 'complete';
+  const canAct       = !isCancelled && !isComplete;
 
   el.innerHTML = `
-    <div style="padding:20px 24px;border-bottom:1px solid var(--border);
-      display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
-      <div>
-        <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px">
+    <!-- Header -->
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
+      <div style="min-width:0">
+        <div style="font-size:15px;font-weight:600;color:var(--text);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${escHtml(inst.title||tmpl?.name||'Untitled Instance')}
         </div>
-        <div style="font-size:11px;color:var(--muted);display:flex;gap:12px">
+        <div style="font-size:10px;color:var(--muted);display:flex;gap:10px;margin-top:2px;flex-wrap:wrap">
           <span>Template: <strong style="color:var(--text2)">${escHtml(tmpl?.name||'—')}</strong></span>
-          <span>Launched: <strong style="color:var(--text2)">${inst.launched_at ? new Date(inst.launched_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—'}</strong></span>
-          <span>ID: <code style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">${inst.id.substring(0,8)}…</code></span>
+          <span>Launched: <strong style="color:var(--text2)">${inst.launched_at
+            ? new Date(inst.launched_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+            : '—'}</strong></span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
         </div>
       </div>
-      <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-        color:${statusColor[inst.status]||'var(--muted)'};
-        border:1px solid ${statusColor[inst.status]||'var(--border)'};
-        padding:3px 10px;border-radius:3px;flex-shrink:0">
-        ${inst.status?.replace('_',' ').toUpperCase()||'—'}
-      </span>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <!-- Status badge -->
+        <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+          color:${statusColor[inst.status]||'var(--muted)'};
+          border:1px solid ${statusColor[inst.status]||'var(--border)'};
+          padding:3px 8px;border-radius:3px">
+          ${inst.status?.replace('_',' ').toUpperCase()||'—'}
+        </span>
+        <!-- Action buttons -->
+        ${canAct ? `
+          <button class="btn btn-ghost btn-sm" title="Suspend instance"
+            onclick="suspendInstance('${inst.id}')"
+            style="font-size:10px;color:var(--amber);border-color:rgba(212,144,31,.4)">
+            ⏸ Suspend
+          </button>
+          <button class="btn btn-ghost btn-sm" title="Cancel instance"
+            onclick="cancelInstance('${inst.id}')"
+            style="font-size:10px;color:var(--red);border-color:rgba(192,64,74,.4)">
+            ✕ Cancel
+          </button>` : ''}
+        <button class="btn btn-ghost btn-sm" title="Delete instance permanently"
+          onclick="deleteInstance('${inst.id}')"
+          style="font-size:10px;color:var(--muted);border-color:var(--border)">
+          🗑 Delete
+        </button>
+      </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;height:calc(100% - 73px);overflow:hidden">
+    <!-- Body: steps flex:1 + CoC fixed 300px -->
+    <div style="display:flex;height:calc(100% - 65px);overflow:hidden">
 
-      <!-- Step spine -->
-      <div style="border-right:1px solid var(--border);overflow-y:auto;padding:20px">
+      <!-- Workflow Steps — fills remaining width -->
+      <div style="flex:1;overflow-y:auto;padding:16px 20px;min-width:0">
         <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-          color:var(--muted);margin-bottom:14px">Workflow Steps</div>
+          color:var(--muted);margin-bottom:12px">Workflow Steps
+          <span style="font-weight:400;font-size:9px;color:var(--muted);margin-left:8px">
+            — click a step to view or reassign
+          </span>
+        </div>
         ${!steps.length
           ? `<div style="font-size:12px;color:var(--muted)">Template steps not loaded.</div>`
           : steps.map((s, idx) => {
-              const meta      = STEP_META[s.step_type] || STEP_META.action;
-              const done      = completedStepIds.has(s.id);
-              const rejected  = rejectedStepIds.has(s.id);
-              const touched   = activeStepIds.has(s.id);
-              const nodeColor = done ? 'var(--green)' : rejected ? 'var(--red)' : touched ? 'var(--cad)' : 'var(--surf3)';
-              const textColor = done ? 'var(--green)' : rejected ? 'var(--red)' : touched ? 'var(--text)' : 'var(--muted)';
-              const isLast    = idx === steps.length - 1;
+              const meta     = STEP_META[s.step_type] || STEP_META.action;
+              const done     = completedStepIds.has(s.id);
+              const rejected = rejectedStepIds.has(s.id);
+              const touched  = activeStepIds.has(s.id);
+              const isSel    = selStep === s.id;
+              const nodeColor= done?'var(--green)':rejected?'var(--red)':touched?'var(--cad)':'var(--surf3)';
+              const textColor= done?'var(--green)':rejected?'var(--red)':touched?'var(--text)':'var(--muted)';
+              const isLast   = idx === steps.length - 1;
+              const reassign = reassignments[s.id];
+
+              // Current assignee — from reassignment CoC or template definition
+              const assigneeDisplay = reassign
+                ? `<span style="color:var(--accent)">↻ ${escHtml(reassign.assignee_name||reassign.assignee_email||'Reassigned')}</span>`
+                : s.assignee_type === 'pm' ? 'Project Manager'
+                : s.assignee_name || s.assignee_email || s.assignee_role
+                  || (s.assignee_type === 'user' && _users_cad.find(u=>u.id===s.assignee_user_id)?.name)
+                  || '—';
+
               return `
-              <div style="display:flex;gap:0;margin-bottom:0">
+              <div style="display:flex;gap:0;margin-bottom:0" id="istep-${s.id}">
                 <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
                   <div style="width:26px;height:26px;border-radius:50%;
                     background:${nodeColor};border:1.5px solid ${nodeColor};
                     display:flex;align-items:center;justify-content:center;
                     font-size:11px;color:${done||rejected||touched?'#fff':meta.badgeText};
-                    flex-shrink:0;font-family:var(--font-hud)">
-                    ${done ? '✓' : rejected ? '✕' : meta.icon}
+                    cursor:pointer;flex-shrink:0;font-family:var(--font-hud)"
+                    onclick="toggleInstanceStep('${inst.id}','${s.id}')">
+                    ${done?'✓':rejected?'✕':meta.icon}
                   </div>
-                  ${!isLast ? `<div style="width:2px;flex:1;min-height:24px;background:${touched?'var(--border2)':'var(--border)'};margin:2px 0"></div>` : ''}
+                  ${!isLast?`<div style="width:2px;flex:1;min-height:${isSel?'0':'24'}px;background:${touched?'var(--border2)':'var(--border)'};margin:2px 0"></div>`:''}
                 </div>
-                <div style="flex:1;min-width:0;padding:3px 0 ${isLast?'0':'20px'} 10px">
-                  <div style="font-size:12px;font-weight:500;color:${textColor}">
-                    ${escHtml(s.name||meta.label)}
+                <div style="flex:1;min-width:0;padding:3px 0 0 10px">
+                  <!-- Step card — clickable -->
+                  <div onclick="toggleInstanceStep('${inst.id}','${s.id}')"
+                    style="cursor:pointer;padding:6px 10px;border-radius:${isSel?'5px 5px 0 0':'5px'};
+                      background:${isSel?'var(--surf2)':'var(--bg2)'};
+                      border:1px solid ${isSel?'var(--cad-wire)':'var(--border)'};
+                      margin-bottom:0;transition:all .12s">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                      <div>
+                        <div style="font-size:12px;font-weight:500;color:${textColor}">
+                          ${escHtml(s.name||meta.label)}
+                        </div>
+                        <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
+                          <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;text-transform:uppercase">${meta.label}</span>
+                          ${s.due_days!=null?`<span>⏱ ${s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+'d'}</span>`:''}
+                          <span style="color:var(--text2)">👤 ${typeof assigneeDisplay === 'string' ? escHtml(assigneeDisplay) : assigneeDisplay}</span>
+                          ${done?`<span style="color:var(--green)">✓ Complete</span>`:''}
+                          ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
+                          ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
+                        </div>
+                      </div>
+                      <span style="font-size:10px;color:var(--muted);flex-shrink:0;
+                        transition:transform .15s;transform:rotate(${isSel?180:0}deg)">▼</span>
+                    </div>
                   </div>
-                  <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
-                    <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;
-                      text-transform:uppercase">${meta.label}</span>
-                    ${s.due_days != null ? `<span>⏱ ${s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+'d'}</span>` : ''}
-                    ${done ? `<span style="color:var(--green)">✓ Complete</span>` : ''}
-                    ${rejected ? `<span style="color:var(--red)">✕ Rejected</span>` : ''}
-                    ${touched && !done && !rejected ? `<span style="color:var(--cad)">● Active</span>` : ''}
-                  </div>
+
+                  <!-- Inline config + reassignment panel -->
+                  ${isSel ? `
+                  <div style="border:1px solid var(--cad-wire);border-top:none;border-radius:0 0 5px 5px;
+                    background:var(--bg1);padding:12px 14px;margin-bottom:0">
+
+                    <!-- Config read-only summary -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;
+                      font-size:11px;margin-bottom:12px;padding-bottom:12px;
+                      border-bottom:1px solid var(--border)">
+                      <div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Type</span>
+                        <div style="color:${meta.badgeText};font-size:10px;margin-top:2px">${meta.label}</div></div>
+                      <div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Due</span>
+                        <div style="color:var(--text2);font-size:10px;margin-top:2px">${s.due_days!=null?(s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+' business days'):'Not set'}</div></div>
+                      ${s.escalate_after_days?`<div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Escalate After</span>
+                        <div style="color:var(--amber);font-size:10px;margin-top:2px">${s.escalate_after_days}d → ${s.escalate_to||'PM'}</div></div>`:''}
+                      ${s.instructions?`<div style="grid-column:1/-1"><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Instructions</span>
+                        <div style="color:var(--text2);font-size:11px;margin-top:2px;line-height:1.4">${escHtml(s.instructions)}</div></div>`:''}
+                    </div>
+
+                    <!-- Reassignment section -->
+                    ${canAct ? `
+                    <div>
+                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+                        color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                        ${s.assignee_type === 'user' || s.assignee_type === 'role' ? `
+                        <div>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Internal User</label>
+                          <select class="config-select" id="reassign-user-${s.id}" style="font-size:11px">
+                            <option value="">— Keep template default —</option>
+                            ${_users_cad.map(u=>`<option value="${u.id}"${reassign?.assignee_user_id===u.id?' selected':''}>${escHtml(u.name)}</option>`).join('')}
+                          </select>
+                        </div>` : ''}
+                        ${s.assignee_type === 'external' ? `
+                        <div>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Recipient Name</label>
+                          <input class="config-input" id="reassign-name-${s.id}" style="font-size:11px"
+                            value="${escHtml(reassign?.assignee_name||s.assignee_name||'')}"
+                            placeholder="${escHtml(s.assignee_name||'Name')}" />
+                        </div>
+                        <div>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Email</label>
+                          <input class="config-input" id="reassign-email-${s.id}" type="email" style="font-size:11px"
+                            value="${escHtml(reassign?.assignee_email||s.assignee_email||'')}"
+                            placeholder="${escHtml(s.assignee_email||'email@example.com')}" />
+                        </div>
+                        <div>
+                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Organisation</label>
+                          <input class="config-input" id="reassign-org-${s.id}" style="font-size:11px"
+                            value="${escHtml(reassign?.assignee_org||s.assignee_org||'')}"
+                            placeholder="${escHtml(s.assignee_org||'Organisation')}" />
+                        </div>` : ''}
+                      </div>
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <button class="btn btn-solid btn-sm" style="font-size:10px"
+                          onclick="saveReassignment('${inst.id}','${s.id}','${s.assignee_type}')">
+                          ↻ Save Reassignment
+                        </button>
+                        <span id="reassign-status-${s.id}" style="font-size:10px;color:var(--muted)"></span>
+                      </div>
+                    </div>` : `
+                    <div style="font-size:10px;color:var(--muted)">
+                      Instance is ${inst.status} — reassignment not available.
+                    </div>`}
+
+                  </div>` : ''}
+
+                  <div style="height:${isSel?'12':'20'}px"></div>
                 </div>
               </div>`;
             }).join('')}
       </div>
 
-      <!-- Chain of Custody -->
-      <div style="overflow-y:auto;padding:20px">
+      <!-- Chain of Custody — fixed 300px right -->
+      <div style="width:300px;flex-shrink:0;border-left:1px solid var(--border);overflow-y:auto;padding:16px">
         <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-          color:var(--muted);margin-bottom:14px">Chain of Custody</div>
+          color:var(--muted);margin-bottom:12px">Chain of Custody</div>
         ${!coc.length
-          ? `<div style="font-size:12px;color:var(--muted)">No events recorded yet.</div>`
+          ? `<div style="font-size:11px;color:var(--muted)">No events yet.</div>`
           : coc.map(evt => {
               const color = evtColor[evt.event_type] || 'var(--muted)';
               const label = evtLabel[evt.event_type] || evt.event_type?.replace(/_/g,' ');
               const step  = steps.find(s => s.id === evt.step_id);
               const ts    = evt.created_at ? new Date(evt.created_at) : null;
               return `
-              <div style="display:flex;gap:10px;margin-bottom:14px">
-                <!-- Timeline dot -->
-                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:16px">
-                  <div style="width:8px;height:8px;border-radius:50%;background:${color};
-                    margin-top:3px;flex-shrink:0"></div>
-                  <div style="width:1px;flex:1;min-height:10px;background:var(--border);margin-top:3px"></div>
+              <div style="display:flex;gap:8px;margin-bottom:12px">
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:14px">
+                  <div style="width:7px;height:7px;border-radius:50%;background:${color};margin-top:3px;flex-shrink:0"></div>
+                  <div style="width:1px;flex:1;min-height:8px;background:var(--border);margin-top:2px"></div>
                 </div>
-                <!-- Event body -->
-                <div style="flex:1;min-width:0;padding-bottom:4px">
-                  <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-                    <span style="font-size:11px;font-weight:600;color:${color}">${label}</span>
-                    ${step ? `<span style="font-size:10px;color:var(--muted)">→ ${escHtml(step.name||'')}</span>` : ''}
-                  </div>
-                  ${evt.actor_name ? `<div style="font-size:10px;color:var(--text2);margin-top:1px">By ${escHtml(evt.actor_name)}</div>` : ''}
-                  ${evt.notes ? `<div style="font-size:11px;color:var(--text2);margin-top:3px;
-                    padding:4px 8px;background:var(--surf2);border-radius:3px;
-                    border-left:2px solid ${color}">${escHtml(evt.notes)}</div>` : ''}
-                  ${ts ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--font-mono)">
-                    ${ts.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})}</div>` : ''}
+                <div style="flex:1;min-width:0;padding-bottom:2px">
+                  <div style="font-size:10px;font-weight:600;color:${color}">${label}</div>
+                  ${step?`<div style="font-size:9px;color:var(--muted);margin-top:1px">→ ${escHtml(step.name||'')}</div>`:''}
+                  ${evt.actor_name?`<div style="font-size:9px;color:var(--text2)">By ${escHtml(evt.actor_name)}</div>`:''}
+                  ${evt.notes||evt.event_notes?`<div style="font-size:10px;color:var(--text2);margin-top:2px;
+                    padding:3px 6px;background:var(--surf2);border-left:2px solid ${color}">
+                    ${escHtml(evt.notes||evt.event_notes)}</div>`:''}
+                  ${ts?`<div style="font-size:9px;color:var(--muted);margin-top:1px;font-family:var(--font-mono)">
+                    ${ts.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>`:''}
                 </div>
               </div>`;
             }).join('')}
       </div>
 
     </div>`;
+}
+
+// ── Instance step toggle ───────────────────────────────────────────────────────
+function toggleInstanceStep(instId, stepId) {
+  const inst = _instances.find(i => i.id === instId);
+  if (!inst) return;
+  inst._selectedStep = inst._selectedStep === stepId ? null : stepId;
+  const detailEl = document.getElementById('instance-detail');
+  if (detailEl) renderInstanceDetail(detailEl, inst);
+}
+
+// ── Save reassignment ─────────────────────────────────────────────────────────
+async function saveReassignment(instId, stepId, assigneeType) {
+  const statusEl = document.getElementById(`reassign-status-${stepId}`);
+  if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--muted)'; }
+
+  try {
+    const payload = {
+      instance_id:      instId,
+      firm_id:          FIRM_ID_CAD,
+      event_type:       'step_reassigned',
+      step_id:          stepId,
+      created_at:       new Date().toISOString(),
+    };
+
+    if (assigneeType === 'external') {
+      payload.assignee_name  = document.getElementById(`reassign-name-${stepId}`)?.value?.trim() || null;
+      payload.assignee_email = document.getElementById(`reassign-email-${stepId}`)?.value?.trim() || null;
+      payload.assignee_org   = document.getElementById(`reassign-org-${stepId}`)?.value?.trim() || null;
+    } else {
+      const userId = document.getElementById(`reassign-user-${stepId}`)?.value || null;
+      if (!userId) {
+        if (statusEl) { statusEl.textContent = 'Select a user first'; statusEl.style.color = 'var(--red)'; }
+        return;
+      }
+      const user = _users_cad.find(u => u.id === userId);
+      payload.assignee_user_id = userId;
+      payload.assignee_name    = user?.name || null;
+    }
+
+    await API.post('workflow_step_instances', payload);
+
+    // Reload CoC
+    const inst = _instances.find(i => i.id === instId);
+    if (inst) {
+      inst._stepInsts = await API.get(
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+      ).catch(() => inst._stepInsts);
+    }
+
+    if (statusEl) { statusEl.textContent = '✓ Saved'; statusEl.style.color = 'var(--green)'; }
+    cadToast('Reassignment saved to Chain of Custody', 'success');
+    const detailEl = document.getElementById('instance-detail');
+    if (detailEl && inst) renderInstanceDetail(detailEl, inst);
+
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = 'Failed: ' + e.message; statusEl.style.color = 'var(--red)'; }
+    cadToast('Reassignment failed: ' + e.message, 'error');
+  }
+}
+
+// ── Suspend instance ──────────────────────────────────────────────────────────
+async function suspendInstance(instId) {
+  const reason = prompt('Reason for suspension (optional):');
+  if (reason === null) return; // cancelled prompt
+  try {
+    await API.patch(`workflow_instances?id=eq.${instId}`, {
+      status: 'overridden',
+      notes:  reason || null,
+      updated_at: new Date().toISOString(),
+    });
+    await API.post('workflow_step_instances', {
+      instance_id: instId, firm_id: FIRM_ID_CAD,
+      event_type: 'instance_suspended',
+      event_notes: reason || null,
+      created_at: new Date().toISOString(),
+    });
+    await _reloadInstance(instId);
+    cadToast('Instance suspended', 'success');
+  } catch(e) { cadToast('Suspend failed: ' + e.message, 'error'); }
+}
+
+// ── Cancel instance ───────────────────────────────────────────────────────────
+async function cancelInstance(instId) {
+  const reason = prompt('Reason for cancellation:');
+  if (reason === null) return;
+  if (!confirm('Cancel this instance permanently? This cannot be undone.')) return;
+  try {
+    await API.patch(`workflow_instances?id=eq.${instId}`, {
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      notes: reason || null,
+      updated_at: new Date().toISOString(),
+    });
+    await API.post('workflow_step_instances', {
+      instance_id: instId, firm_id: FIRM_ID_CAD,
+      event_type: 'instance_cancelled',
+      event_notes: reason || null,
+      created_at: new Date().toISOString(),
+    });
+    await _reloadInstance(instId);
+    cadToast('Instance cancelled', 'success');
+  } catch(e) { cadToast('Cancel failed: ' + e.message, 'error'); }
+}
+
+// ── Delete instance ───────────────────────────────────────────────────────────
+async function deleteInstance(instId) {
+  if (!confirm('Permanently delete this instance and all its Chain of Custody records? This cannot be undone.')) return;
+  try {
+    await API.del(`workflow_step_instances?instance_id=eq.${instId}`);
+    await API.del(`workflow_instances?id=eq.${instId}`);
+    _instances = _instances.filter(i => i.id !== instId);
+    _selectedInstance = null;
+    renderInstancesTab(document.getElementById('cad-content'));
+    cadToast('Instance deleted', 'success');
+  } catch(e) { cadToast('Delete failed: ' + e.message, 'error'); }
+}
+
+// ── Reload instance after status changes ──────────────────────────────────────
+async function _reloadInstance(instId) {
+  const fresh = await API.get(`workflow_instances?id=eq.${instId}&select=*`).catch(()=>[]);
+  if (fresh?.[0]) {
+    const idx = _instances.findIndex(i => i.id === instId);
+    if (idx >= 0) {
+      _instances[idx] = { ..._instances[idx], ...fresh[0] };
+      _selectedInstance = _instances[idx];
+      // Reload CoC
+      _selectedInstance._stepInsts = await API.get(
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+      ).catch(() => _selectedInstance._stepInsts || []);
+    }
+  }
+  renderInstancesTab(document.getElementById('cad-content'));
+  const detailEl = document.getElementById('instance-detail');
+  if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
 }
 
 // ── Forms tab placeholder ─────────────────────────────────────────────────────
