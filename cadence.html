@@ -2166,24 +2166,24 @@ function renderInstanceDetail(el, inst) {
     instance_cancelled:'Cancelled',
   };
 
-  const activeStepIds    = new Set(coc.map(e => e.step_id).filter(Boolean));
-  const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.step_id));
-  const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.step_id));
+  const activeStepIds    = new Set(coc.map(e => e.template_step_id).filter(Boolean));
+  const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.template_step_id));
+  const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.template_step_id));
 
   // Map step_id → earliest activation timestamp for elapsed timers
   const stepActivatedAt = {};
-  coc.filter(e => e.event_type === 'step_activated' && e.step_id)
-     .forEach(e => { if (!stepActivatedAt[e.step_id]) stepActivatedAt[e.step_id] = e.created_at; });
+  coc.filter(e => e.event_type === 'step_activated' && e.template_step_id)
+     .forEach(e => { if (!stepActivatedAt[e.template_step_id]) stepActivatedAt[e.template_step_id] = e.created_at; });
 
   // Build map of step_id → completion timestamp
   const stepCompletedAt = {};
-  coc.filter(e => e.event_type === 'step_completed' && e.step_id)
-     .forEach(e => { stepCompletedAt[e.step_id] = e.created_at; });
+  coc.filter(e => e.event_type === 'step_completed' && e.template_step_id)
+     .forEach(e => { stepCompletedAt[e.template_step_id] = e.created_at; });
 
   // Map step_id → latest reassignment CoC event
   const reassignments = {};
   coc.filter(e => e.event_type === 'step_reassigned').forEach(e => {
-    if (e.step_id) reassignments[e.step_id] = e;
+    if (e.template_step_id) reassignments[e.template_step_id] = e;
   });
 
   const isCancelled  = inst.status === 'cancelled';
@@ -2402,7 +2402,7 @@ function renderInstanceDetail(el, inst) {
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>
 
-                      <!-- Current assignees — compact chips -->
+                      <!-- Current assignees — compact chips with ✕ on reassigned -->
                       <div id="reassign-list-${s.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:24px">
                         ${(() => {
                           const list = [];
@@ -2410,17 +2410,30 @@ function renderInstanceDetail(el, inst) {
                             : s.assignee_name || s.assignee_email || s.assignee_role
                               || (_users_cad.find(u=>u.id===s.assignee_user_id)?.name) || null;
                           if (templateName) list.push({ name: templateName, source: 'template' });
-                          coc.filter(e=>e.event_type==='step_reassigned'&&e.step_id===s.id).forEach(r => {
-                            if (r.assignee_name||r.assignee_email)
-                              list.push({ name: r.assignee_name||r.assignee_email, source: 'reassigned' });
+                          coc.filter(e=>e.event_type==='step_reassigned'&&e.template_step_id===s.id).forEach(r => {
+                            if (r.assignee_name||r.assignee_email) {
+                              // Skip if a removal tombstone exists for this CoC event's assignee
+                              const removed = coc.some(e =>
+                                e.event_type==='step_reassignment_removed' &&
+                                e.template_step_id===s.id &&
+                                (e.assignee_name===r.assignee_name||e.assignee_email===r.assignee_email));
+                              if (!removed)
+                                list.push({ name: r.assignee_name||r.assignee_email,
+                                  source: 'reassigned', cocId: r.id });
+                            }
                           });
                           return list.map(a => `
                             <span style="display:inline-flex;align-items:center;gap:5px;
-                              padding:3px 8px;border-radius:12px;font-size:11px;
+                              padding:3px 8px 3px 10px;border-radius:12px;font-size:11px;
                               background:${a.source==='reassigned'?'rgba(79,142,247,.15)':'var(--surf3)'};
                               border:1px solid ${a.source==='reassigned'?'rgba(79,142,247,.35)':'var(--border2)'};
                               color:${a.source==='reassigned'?'var(--accent)':'var(--text2)'}">
                               ${escHtml(a.name)}
+                              ${a.source==='reassigned'?`
+                              <button onclick="removeReassignment('${inst.id}','${s.id}','${a.cocId}')"
+                                style="background:none;border:none;color:rgba(79,142,247,.6);cursor:pointer;
+                                font-size:11px;padding:0;line-height:1;margin-left:2px"
+                                title="Remove this assignee">✕</button>`:''}
                             </span>`).join('')
                           || '<span style="font-size:10px;color:var(--muted)">No assignee set</span>';
                         })()}
@@ -2504,7 +2517,7 @@ function renderInstanceDetail(el, inst) {
           : coc.map(evt => {
               const color = evtColor[evt.event_type] || 'var(--muted)';
               const label = evtLabel[evt.event_type] || evt.event_type?.replace(/_/g,' ');
-              const step  = steps.find(s => s.id === evt.step_id);
+              const step  = steps.find(s => s.id === evt.template_step_id);
               const ts    = evt.created_at ? new Date(evt.created_at) : null;
               return `
               <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -2588,7 +2601,7 @@ async function addReassignment(instId, stepId) {
       instance_id:      instId,
       firm_id:          FIRM_ID_CAD,
       event_type:       'step_reassigned',
-      step_id:          stepId,
+      template_step_id: stepId,
       assignee_name:    resource?.name || null,
       assignee_email:   resource?.email || null,
       created_at:       new Date().toISOString(),
@@ -2625,6 +2638,38 @@ async function addReassignment(instId, stepId) {
   }
 }
 
+// ── Remove a reassignment (writes tombstone CoC event) ────────────────────────
+async function removeReassignment(instId, stepId, cocEventId) {
+  try {
+    // Find the original reassignment to get the name for the tombstone
+    const inst = _instances.find(i => i.id === instId);
+    const orig = inst?._stepInsts?.find(e => e.id === cocEventId);
+
+    await API.post('workflow_step_instances', {
+      instance_id:      instId,
+      firm_id:          FIRM_ID_CAD,
+      event_type:       'step_reassignment_removed',
+      template_step_id: stepId,
+      assignee_name:    orig?.assignee_name || null,
+      assignee_email:   orig?.assignee_email || null,
+      event_notes:      `Removed assignee: ${orig?.assignee_name||orig?.assignee_email||'unknown'}`,
+      created_at:       new Date().toISOString(),
+    });
+
+    // Reload CoC and re-render
+    if (inst) {
+      inst._stepInsts = await API.get(
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+      ).catch(() => inst._stepInsts);
+    }
+    cadToast('Assignee removed', 'success');
+    const detailEl = document.getElementById('instance-detail');
+    if (detailEl && inst) renderInstanceDetail(detailEl, inst);
+  } catch(e) {
+    cadToast('Remove failed: ' + e.message, 'error');
+  }
+}
+
 // ── Start a step (records step_activated CoC event) ──────────────────────────
 async function startStep(instId, stepId) {
   try {
@@ -2632,7 +2677,7 @@ async function startStep(instId, stepId) {
       instance_id:  instId,
       firm_id:      FIRM_ID_CAD,
       event_type:   'step_activated',
-      step_id:      stepId,
+      template_step_id: stepId,
       created_at:   new Date().toISOString(),
     });
     await _reloadInstance(instId);
