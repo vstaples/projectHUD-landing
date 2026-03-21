@@ -3129,8 +3129,8 @@ async function _bistCleanup(instId, mode) {
 // ── Gate check — returns tier and results ─────────────────────────────────────
 async function runGateCheck(templateId, version) {
   const [scripts, allRuns] = await Promise.all([
-    API.get(`bist_test_scripts?template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
-    API.get(`bist_runs?template_version=eq.${version}&order=run_at.desc&limit=200`).catch(()=>[]),
+    API.get(`bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
+    API.get(`bist_runs?firm_id=eq.${FIRM_ID_CAD}&template_version=eq.${version}&order=run_at.desc&limit=200`).catch(()=>[]),
   ]);
 
   if (!scripts?.length) return { tier: 0, results: [] };
@@ -3451,14 +3451,14 @@ async function loadTmplTests(templateId) {
   bodyEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">Loading…</div>';
   try {
     const scripts = await API.get(
-      `bist_test_scripts?template_id=eq.${templateId}&order=created_at.asc`
+      `bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&template_id=eq.${templateId}&order=created_at.asc`
     ).catch(()=>[]);
 
     let runs = [];
     if (scripts?.length) {
       const ids = scripts.map(s => s.id).join(',');
       runs = await API.get(
-        `bist_runs?script_id=in.(${ids})&order=run_at.desc&limit=50`
+        `bist_runs?firm_id=eq.${FIRM_ID_CAD}&script_id=in.(${ids})&order=run_at.desc&limit=50`
       ).catch(()=>[]);
     }
 
@@ -3598,7 +3598,7 @@ async function runAllTests() {
   if (btn) { btn.textContent = 'Running…'; btn.disabled = true; }
 
   const scripts = await API.get(
-    `bist_test_scripts?template_id=eq.${_selectedTmpl?.id}&order=created_at.asc`
+    `bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&template_id=eq.${_selectedTmpl?.id}&order=created_at.asc`
   ).catch(()=>[]);
 
   for (const script of (scripts||[])) {
