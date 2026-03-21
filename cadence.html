@@ -667,6 +667,7 @@ async function selectTemplate(id) {
 
   // Hydrate _attachedDocs from persisted attached_docs column
   (steps || []).forEach(s => {
+    s.forward_input = !!s.forward_input;
     s._attachedDocs = (s.attached_docs || []).map(d => ({
       name:    d.name,
       version: d.version,
@@ -829,6 +830,7 @@ function renderSpine() {
                     return parts.join('');
                   })() : ''}
                   ${step.input_from_step ? `<span style="color:var(--green)">⬇ input wired</span>` : ''}
+                  ${step.forward_input ? `<span style="color:var(--amber)">⬆ forwards</span>` : ''}
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -997,66 +999,133 @@ function renderInlineStepConfig(step) {
 
     </div><!-- /cfg-grid -->
 
-      <!-- Authorization input — auto-resolved from the immediately prior step -->
+      <!-- Authorization input — chain-aware resolver for approval-type steps -->
       ${step.step_type === 'approval' || step.step_type === 'review' ||
         step.step_type === 'signoff' || step.step_type === 'external' ? `
-      <div class="config-section cfg-full" style="border:1px solid rgba(212,144,31,.4);
-        border-radius:5px;margin:8px 0 4px;background:rgba(212,144,31,.05)">
+      <div style="border:1px solid rgba(212,144,31,.4);border-radius:5px;
+        margin:8px 14px 4px;background:rgba(212,144,31,.05);padding:10px 12px">
+
         <label class="config-label" style="color:var(--amber);margin-bottom:8px">
-          ⬇ Authorization Input — from the immediately prior step
+          ⬇ Authorization Input — document(s) arriving at this step
         </label>
+
         ${(() => {
-          // Find the step immediately before this one by sequence_order
-          const allSteps   = _selectedTmpl?.steps || [];
-          const priorStep  = allSteps
+          // Walk backwards through the step chain to find the nearest auth source.
+          // A step is an auth source if it has Authorization-role docs attached,
+          // OR if it has forward_input:true (it's passing along what it received).
+          const allSteps = (_selectedTmpl?.steps || [])
             .filter(s => s.sequence_order < step.sequence_order)
-            .sort((a,b) => b.sequence_order - a.sequence_order)[0];
-          const authDocs   = priorStep
-            ? (priorStep._attachedDocs||[]).filter(d => d.role === 'authorization')
-            : [];
+            .sort((a,b) => b.sequence_order - a.sequence_order);
 
-          if (!priorStep) return `
-            <div style="font-size:11px;color:var(--muted)">
-              This is the first step — no prior step to draw from.
-            </div>`;
+          // Trace the chain: find what arrives at this step
+          // Walk forward through prior steps accumulating forwarded docs
+          const priorAsc = [...allSteps].reverse(); // ascending order
+          let chainDocs = []; // docs being passed along the chain
+          let sourceStep = null;
 
-          if (!authDocs.length) return `
-            <div style="font-size:11px;color:var(--muted)">
-              <strong>Step ${priorStep.sequence_order}: ${escHtml(priorStep.name||'Prior step')}</strong>
-              has no <strong>Authorization</strong>-role documents.<br/>
-              Open that step, attach the authorization form, and set its role to ⬆ Authorization.
+          for (const s of priorAsc) {
+            const authOnStep = (s._attachedDocs||[]).filter(d => d.role === 'authorization');
+            if (authOnStep.length) {
+              // This step has auth docs — they start the chain here
+              chainDocs = authOnStep;
+              sourceStep = s;
+            } else if (s.forward_input && chainDocs.length) {
+              // This step forwards whatever is in the chain — pass through
+              sourceStep = s;
+            } else if (!s.forward_input) {
+              // Chain broken — this step doesn't forward
+              chainDocs = [];
+              sourceStep = null;
+            }
+          }
+
+          if (!chainDocs.length) {
+            const nearestPrior = allSteps[0];
+            return `<div style="font-size:11px;color:var(--muted)">
+              No Authorization document is routed to this step yet.<br/>
+              ${nearestPrior
+                ? `Either attach an ⬆ Authorization document to a prior step,
+                   or enable <em>Forward on Approval</em> on an intermediate step.`
+                : `This appears to be the first step.`}
             </div>`;
+          }
 
           return `
-            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-              The following document(s) from
-              <strong style="color:var(--text)">
-                Step ${priorStep.sequence_order}: ${escHtml(priorStep.name||'Prior step')}
-              </strong>
-              will be presented to this approver at runtime:
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+              Arriving via <strong style="color:var(--text)">
+                Step ${sourceStep.sequence_order}: ${escHtml(sourceStep.name||'Prior step')}
+              </strong>:
             </div>
-            ${authDocs.map(d => `
-              <div class="attached-doc" style="margin:0 0 4px;border-color:rgba(212,144,31,.3)">
-                <span style="color:var(--amber);flex-shrink:0">⬆</span>
-                <div style="flex:1;min-width:0">
-                  <div class="attached-doc-name">${escHtml(d.name)}</div>
-                  <div style="font-size:10px;margin-top:1px;display:flex;gap:8px">
-                    <span style="color:var(--cad);font-family:var(--font-mono)">${escHtml(d.version||'—')}</span>
-                    <span style="color:var(--muted)">${escHtml(d.size||'')}</span>
-                  </div>
-                </div>
-                ${d.url ? `<button class="attached-doc-remove" style="color:var(--accent)"
-                  onclick="window.open('${d.url}','_blank')" title="Preview">⤢</button>` : ''}
-              </div>`).join('')}
-            <div style="margin-top:6px;font-size:11px;color:var(--green);
-              display:flex;gap:5px;align-items:flex-start">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
+              ${chainDocs.map(d => `
+                <div class="attached-doc" style="border-color:rgba(212,144,31,.35);gap:6px">
+                  <span style="color:var(--amber);flex-shrink:0">⬆</span>
+                  <span class="attached-doc-name" style="flex:1;min-width:0">${escHtml(d.name)}</span>
+                  <span style="font-size:10px;color:var(--cad);font-family:var(--font-mono);flex-shrink:0;white-space:nowrap">${escHtml(d.version||'—')}</span>
+                  ${d.url ? `<button class="attached-doc-remove" style="color:var(--accent)"
+                    onclick="window.open('${d.url}','_blank')" title="Preview">⤢</button>` : ''}
+                </div>`).join('')}
+            </div>
+            <div style="font-size:11px;color:var(--green);display:flex;gap:5px;align-items:flex-start">
               <span>✓</span>
-              <span>Assignee of Step ${priorStep.sequence_order} must upload the completed
-              Authorization document before their step can advance. That uploaded copy is
-              what the approver here will see.</span>
+              <span>These document(s) will be presented to this step's assignee at runtime.</span>
             </div>`;
         })()}
+
+        <!-- Forward on Approval toggle — pass received docs downstream -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(212,144,31,.2)">
+          <label class="config-label" style="margin-bottom:6px">Forward on Approval</label>
+          <div class="config-toggle"
+            onclick="updateStepField('forward_input',!${!!step.forward_input});reRenderSpine()">
+            <div class="toggle-box${step.forward_input?' on':''}"></div>
+            <span style="font-size:11px">${step.forward_input
+              ? 'Received Authorization document(s) will be passed to the next step when approved'
+              : 'Document chain stops here — not passed downstream'}</span>
+          </div>
+          ${step.forward_input ? `
+          <div style="margin-top:5px;font-size:11px;color:var(--amber);display:flex;gap:5px">
+            <span>⬆</span>
+            <span>The document(s) arriving at this step will be forwarded to the next step
+            in the chain when this approval is granted.</span>
+          </div>` : ''}
+        </div>
+
       </div>` : ''}
+
+      <!-- forward_input toggle for non-approval steps that receive auth docs -->
+      ${step.step_type === 'action' || step.step_type === 'form' ? (() => {
+        const allSteps = (_selectedTmpl?.steps || [])
+          .filter(s => s.sequence_order < step.sequence_order)
+          .sort((a,b) => b.sequence_order - a.sequence_order);
+        const priorAsc = [...allSteps].reverse();
+        let chainDocs = [], sourceStep = null;
+        for (const s of priorAsc) {
+          const authOnStep = (s._attachedDocs||[]).filter(d => d.role === 'authorization');
+          if (authOnStep.length) { chainDocs = authOnStep; sourceStep = s; }
+          else if (s.forward_input && chainDocs.length) { sourceStep = s; }
+          else if (!s.forward_input) { chainDocs = []; sourceStep = null; }
+        }
+        if (!chainDocs.length) return '';
+        return `
+        <div style="border:1px solid rgba(212,144,31,.3);border-radius:5px;
+          margin:8px 14px 4px;background:rgba(212,144,31,.03);padding:10px 12px">
+          <label class="config-label" style="color:var(--amber);margin-bottom:6px">
+            ⬇ Authorization Document in Chain
+          </label>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+            This step receives the Authorization document from
+            <strong style="color:var(--text)">Step ${sourceStep.sequence_order}: ${escHtml(sourceStep.name||'')}</strong>.
+          </div>
+          <label class="config-label" style="margin-bottom:6px">Forward Downstream</label>
+          <div class="config-toggle"
+            onclick="updateStepField('forward_input',!${!!step.forward_input});reRenderSpine()">
+            <div class="toggle-box${step.forward_input?' on':''}"></div>
+            <span style="font-size:11px">${step.forward_input
+              ? 'Pass Authorization document(s) to the next step'
+              : 'Document chain stops here'}</span>
+          </div>
+        </div>`;
+      })() : ''}
 
 
     <!-- Documents section — per-document role assignment -->
@@ -1396,7 +1465,7 @@ function updateStepField(field, value) {
   // Only re-render spine for fields that affect the card summary line
   const cardFields = ['name','assignee_name','assignee_email','assignee_role',
                       'due_days','due_type','escalate_after_days','parallel_required',
-                      'input_from_step'];
+                      'input_from_step','forward_input'];
   if (cardFields.includes(field)) reRenderSpine();
 }
 
@@ -1553,6 +1622,7 @@ async function saveTemplate(silent = false) {
         branch_conditions:   step.branch_conditions || [],
         instructions:        step.instructions || null,
         input_from_step:     step.input_from_step || null,
+        forward_input:       !!step.forward_input,
         attached_docs:       (step._attachedDocs || []).map(d => ({
           name: d.name, version: d.version, role: d.role || 'reference',
           size: d.size, path: d.path || null, url: d.url || null,
