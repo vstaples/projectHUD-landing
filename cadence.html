@@ -1759,6 +1759,10 @@ function selectStep(id) {
       : (_selectedTmpl?.steps?.find(s => s.id === id) || null);
   }
   reRenderSpine();
+  // Load comments if this is a meeting step being expanded
+  if (_selectedStep && _selectedStep.step_type === 'meeting') {
+    setTimeout(() => loadStepComments(_selectedStep.id), 80);
+  }
 }
 
 function refreshConfigPanel() { reRenderSpine(); } // backwards compat shim
@@ -3312,17 +3316,6 @@ async function submitComment(stepId, parentId) {
   } finally {
     if (btn) { btn.textContent = parentId ? 'Reply' : 'Send'; btn.disabled = false; }
   }
-}
-
-// Auto-load comments when a meeting step is expanded
-const _origSelectStep = selectStep;
-function selectStep(id) {
-  _origSelectStep(id);
-  // Defer to let the DOM render first
-  setTimeout(() => {
-    const step = _selectedTmpl?.steps?.find(s => s.id === id);
-    if (step?.step_type === 'meeting') loadStepComments(id);
-  }, 100);
 }
 
 function escHtml(s) {
