@@ -1165,8 +1165,11 @@ function renderInlineStepConfig(step) {
       <div class="config-section">
         <label class="config-label">Assignee</label>
         <select class="config-select" id="scfg-user-${step.id}"
-          onchange="updateStepField('assignee_user_id',this.value);autoFillAssignee('${step.id}',this.value)">
-          ${renderResourceOptions(step.assignee_user_id||'', '— Select resource —')}
+          onchange="autoFillAssignee('${step.id}',this.value)">
+          ${renderResourceOptions(
+            _users_cad.find(u => u.id === step.assignee_user_id)?.resource_id || '',
+            '— Select resource —'
+          )}
         </select>
       </div>` : ''}
 
@@ -1815,8 +1818,9 @@ function reRenderSpine() {
 function autoFillAssignee(stepId, resourceId) {
   const r = _resources_cad.find(x => x.id === resourceId);
   if (!r) return;
-  updateStepField('assignee_user_id', resourceId);
-  // Also store email and name for notifications
+  // assignee_user_id is a FK to users.id — resolve via resource_id
+  const user = _users_cad.find(u => u.resource_id === resourceId);
+  updateStepField('assignee_user_id', user?.id || null);
   if (r.email) updateStepField('assignee_email', r.email);
   if (r.name)  updateStepField('assignee_name',  r.name);
 }
