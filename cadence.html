@@ -1060,7 +1060,7 @@ function renderEditor() {
   const t = _selectedTmpl;
   const ver = t.version || '0.0.0';
 
-  // Ensure CoC panel wrapper exists in editor-col
+  // Ensure CoC + Tests panel wrappers exist in editor-col
   if (!document.getElementById('tmpl-coc-panel')) {
     col.innerHTML = `
       <div class="cad-editor-inner" id="editor-inner"></div>
@@ -1073,6 +1073,21 @@ function renderEditor() {
               color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
           </div>
           <div class="tmpl-coc-body" id="tmpl-coc-body">
+            <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">
+              Loading…
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tmpl-coc-panel" id="tmpl-tests-panel">
+        <div class="tmpl-coc-resize" id="tmpl-tests-resize" title="Drag to resize"></div>
+        <div class="tmpl-coc-inner">
+          <div class="tmpl-coc-header">
+            <span class="tmpl-coc-title">Tests</span>
+            <button onclick="toggleTmplTests()" style="background:none;border:none;
+              color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
+          </div>
+          <div class="tmpl-coc-body" id="tmpl-tests-body">
             <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">
               Loading…
             </div>
@@ -1112,6 +1127,9 @@ function renderEditor() {
         <button class="btn btn-ghost btn-sm" onclick="launchInstance()">▶ Launch</button>
         <button class="btn btn-ghost btn-sm" onclick="toggleTmplCoC()" id="coc-btn"
           title="Change history">CoC</button>
+        ${!isReleased ? `
+        <button class="btn btn-ghost btn-sm" onclick="toggleTmplTests()" id="tests-btn"
+          title="Built-in self tests">Tests</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
         ${!isReleased ? `
         <button class="btn btn-ghost btn-sm" id="save-btn" onclick="saveTemplate(false)"
@@ -2550,28 +2568,6 @@ async function commitTemplate() {
     const newStatus = statusEl?.value || _selectedTmpl.status;
     const oldStatus = _selectedTmpl.status;
 
-    // ── Release gate — check BIST before any DB writes ────────────────────────
-    if (newStatus === 'released' && oldStatus !== 'released') {
-      // Compute what the new version will be (so gate queries against it)
-      let gMaj = _selectedTmpl.version_major || 0;
-      let gMin = _selectedTmpl.version_minor || 0;
-      let gPat = _selectedTmpl.version_patch || 0;
-      gMaj += 1; gMin = 0; gPat = 0; // releasing always bumps major
-      const pendingVersion = `${gMaj}.${gMin}.${gPat}`;
-
-      const gate = await runGateCheck(_selectedTmpl.id, pendingVersion);
-
-      if (gate.tier !== 3) {
-        // Tier 0/1/2 — show gate dialog; proceed only if user confirms
-        if (btn) { btn.textContent = 'Commit'; btn.disabled = false; }
-        await showGateDialog(_selectedTmpl.id, pendingVersion, () => {
-          // User cleared the gate — re-invoke commitTemplate to do the actual write
-          commitTemplate();
-        });
-        return; // abort this invocation
-      }
-      // Tier 3 — all passing, proceed silently
-    }
     let maj = _selectedTmpl.version_major || 0;
     let min = _selectedTmpl.version_minor || 0;
     let pat = _selectedTmpl.version_patch || 0;
@@ -3363,38 +3359,59 @@ async function bistOverride() {
   window._bistOnProceed?.();
 }
 
-function onStatusChange() {
+async function onStatusChange() {
   const sel = document.getElementById('tmpl-status-sel');
   const newStatus = sel?.value;
   if (!newStatus || !_selectedTmpl) return;
 
   if (newStatus === 'released') {
+    // Block if uncommitted changes exist
     const hasPending = _binCount(_selectedTmpl.id) > 0 || _dirtySteps;
     if (hasPending) {
       cadToast('Commit all changes before releasing', 'error');
       if (sel) sel.value = _selectedTmpl.status || 'draft';
       return;
     }
+
+    // Gate: tests must be current and passing against the committed version
+    const gate = await runGateCheck(_selectedTmpl.id, _selectedTmpl.version || '0.0.0');
+
+    if (gate.tier !== 3) {
+      if (sel) sel.value = _selectedTmpl.status || 'draft';
+      const msg = gate.tier === 0 ? 'No test coverage — write and pass tests before releasing'
+                : gate.tier === 1 ? 'Tests not run against this version — run tests before releasing'
+                : 'Tests failing — fix and pass all tests before releasing';
+      cadToast(msg, 'error');
+      return;
+    }
+    // Tier 3 — all passing, fall through
   }
 
-  // Update in-memory status immediately so renderEditor and template list both reflect new state
-  _selectedTmpl.status = newStatus;
+  _proceedRelease(newStatus);
+}
+
+function _proceedRelease(newStatus) {
+  const sel = document.getElementById('tmpl-status-sel');
+  const status = newStatus || sel?.value || 'released';
+
+  // Update in-memory status
+  _selectedTmpl.status = status;
   const tmplIdx = _templates.findIndex(t => t.id === _selectedTmpl.id);
-  if (tmplIdx >= 0) _templates[tmplIdx].status = newStatus;
+  if (tmplIdx >= 0) _templates[tmplIdx].status = status;
   markDirty();
 
-  // Re-render editor and template list so read-only state + card badge apply immediately
+  // Re-render editor and template list
   renderEditor();
   const listEl = document.getElementById('tmpl-list');
   if (listEl) listEl.innerHTML = renderTemplateList();
 
-  // Restore the status selector value after renderEditor rebuilds the toolbar
+  // Restore selector after re-render
   const freshSel = document.getElementById('tmpl-status-sel');
-  if (freshSel) freshSel.value = newStatus;
+  if (freshSel) freshSel.value = status;
 
-  if (newStatus === 'released') {
+  if (status === 'released') {
     cadToast('Released — template is now read only', 'info');
-  } else if (newStatus === 'draft') {
+  } else if (status === 'draft') {
     cadToast('Back to Draft — editing enabled', 'info');
   }
 }
@@ -3407,8 +3424,182 @@ function _refreshCoCIfOpen() {
   }
 }
 
-// ── Template Chain of Custody panel ──────────────────────────────────────────
-function toggleTmplCoC() {
+// ── Tests panel toggle ────────────────────────────────────────────────────────
+function toggleTmplTests() {
+  const panel   = document.getElementById('tmpl-tests-panel');
+  const testsBtn = document.getElementById('tests-btn');
+  if (!panel) return;
+  const opening = !panel.classList.contains('open');
+  // Close CoC if open
+  if (opening) {
+    document.getElementById('tmpl-coc-panel')?.classList.remove('open');
+    const cocBtn = document.getElementById('coc-btn');
+    if (cocBtn) { cocBtn.style.color = ''; cocBtn.style.borderColor = ''; cocBtn.style.background = ''; }
+  }
+  panel.classList.toggle('open');
+  if (testsBtn) {
+    testsBtn.style.color       = opening ? 'var(--cad)'      : '';
+    testsBtn.style.borderColor = opening ? 'var(--cad-wire)' : '';
+    testsBtn.style.background  = opening ? 'var(--cad-dim)'  : '';
+  }
+  if (opening && _selectedTmpl) loadTmplTests(_selectedTmpl.id);
+}
+
+async function loadTmplTests(templateId) {
+  const bodyEl = document.getElementById('tmpl-tests-body');
+  if (!bodyEl) return;
+  bodyEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">Loading…</div>';
+  try {
+    const [scripts, runs] = await Promise.all([
+      API.get(`bist_test_scripts?template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
+      API.get(`bist_runs?script_id=in.(select id from bist_test_scripts where template_id=eq.${templateId})&order=run_at.desc&limit=50`).catch(()=>[]),
+    ]);
+    renderTmplTests(scripts||[], runs||[]);
+  } catch(e) {
+    bodyEl.innerHTML = `<div style="font-size:11px;color:var(--red);padding:12px">Failed to load tests: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderTmplTests(scripts, runs) {
+  const bodyEl = document.getElementById('tmpl-tests-body');
+  if (!bodyEl) return;
+  const ver = _selectedTmpl?.version || '0.0.0';
+
+  if (!scripts.length) {
+    bodyEl.innerHTML = `
+      <div style="padding:16px;text-align:center">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5">
+          No test scripts yet.<br/>Insert scripts into <code style="font-size:10px">bist_test_scripts</code>
+          to enable testing.
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:8px;padding:8px;
+          background:var(--bg2);border-radius:4px;text-align:left;font-family:var(--font-mono)">
+          Template: ${escHtml(_selectedTmpl?.id||'')}<br/>
+          Version: ${escHtml(ver)}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Gate summary
+  const currentRuns = scripts.map(s => ({
+    script: s,
+    run: runs.find(r => r.script_id === s.id && r.template_version === ver) || null,
+  }));
+  const passed  = currentRuns.filter(r => r.run?.status === 'passed').length;
+  const failed  = currentRuns.filter(r => r.run?.status === 'failed').length;
+  const notRun  = currentRuns.filter(r => !r.run).length;
+  const allPass = passed === scripts.length;
+
+  const gateBg    = allPass ? 'rgba(42,157,64,.08)' : failed ? 'rgba(192,64,74,.08)' : 'rgba(212,144,31,.08)';
+  const gateColor = allPass ? 'var(--green)' : failed ? 'var(--red)' : 'var(--amber)';
+  const gateIcon  = allPass ? '✓' : failed ? '✕' : '○';
+  const gateText  = allPass ? `All ${scripts.length} tests passing — ready to release`
+                  : failed  ? `${failed} test${failed>1?'s':''} failing`
+                  : `${notRun} test${notRun>1?'s':''} not yet run against v${ver}`;
+
+  const scriptRows = currentRuns.map(({ script, run }) => {
+    const stateColor = run?.status === 'passed' ? 'var(--green)'
+                     : run?.status === 'failed' ? 'var(--red)' : 'var(--muted)';
+    const stateIcon  = run?.status === 'passed' ? '✓'
+                     : run?.status === 'failed' ? '✕' : '○';
+    const runMeta = run
+      ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">
+           v${escHtml(run.template_version||'?')} · ${run.duration_ms ? (run.duration_ms/1000).toFixed(1)+'s' : ''}
+         </span>`
+      : `<span style="font-size:9px;color:var(--muted)">Not run for v${escHtml(ver)}</span>`;
+    const failDetail = run?.status === 'failed' && run.failure_reason
+      ? `<div style="font-size:9px;color:var(--red);margin-top:2px;padding:2px 6px;
+           background:rgba(192,64,74,.08);border-left:2px solid var(--red);
+           font-family:var(--font-mono);word-break:break-all">${escHtml(run.failure_reason)}</div>`
+      : '';
+    return `
+      <div id="bist-row-${script.id}"
+        style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="bist-icon-${script.id}" style="color:${stateColor};font-size:12px;
+            width:14px;flex-shrink:0;font-family:var(--font-mono)">${stateIcon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:var(--text);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+              title="${escHtml(script.name)}">${escHtml(script.name)}</div>
+            <div style="margin-top:2px">${runMeta}</div>
+          </div>
+          <button onclick="runSingleTest('${script.id}')"
+            style="flex-shrink:0;padding:3px 8px;font-size:10px;background:none;
+              border:1px solid var(--border);border-radius:4px;
+              color:var(--muted);cursor:pointer">▶</button>
+        </div>
+        <div id="bist-detail-${script.id}">${failDetail}</div>
+        <div id="bist-log-${script.id}" style="display:none;font-size:9px;
+          color:var(--muted);font-family:var(--font-mono);margin-top:4px;
+          padding:4px 6px;background:var(--bg2);border-radius:3px;line-height:1.6"></div>
+      </div>`;
+  }).join('');
+
+  bodyEl.innerHTML = `
+    <!-- Gate status summary -->
+    <div style="padding:8px 10px;margin-bottom:2px;border-radius:5px;
+      background:${gateBg};border:1px solid ${gateColor}44;
+      display:flex;align-items:center;gap:6px">
+      <span style="color:${gateColor};font-size:13px">${gateIcon}</span>
+      <span style="font-size:11px;color:${gateColor};font-weight:500">${gateText}</span>
+    </div>
+    <!-- Run all button -->
+    <div style="padding:8px 0 4px;display:flex;gap:6px;align-items:center">
+      <button id="bist-run-all-btn" onclick="runAllTests()"
+        style="flex:1;padding:7px;background:var(--cad);color:#fff;border:none;
+          border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+        ▶ Run all tests
+      </button>
+      <span style="font-size:9px;color:var(--muted)">v${escHtml(ver)}</span>
+    </div>
+    <!-- Script rows -->
+    <div style="padding:4px 0">${scriptRows}</div>`;
+}
+
+async function runSingleTest(scriptId) {
+  const iconEl  = document.getElementById(`bist-icon-${scriptId}`);
+  const logEl   = document.getElementById(`bist-log-${scriptId}`);
+  const detEl   = document.getElementById(`bist-detail-${scriptId}`);
+  if (iconEl)  { iconEl.textContent = '…'; iconEl.style.color = 'var(--muted)'; }
+  if (logEl)   { logEl.style.display = 'block'; logEl.textContent = 'Starting…'; }
+  if (detEl)   detEl.innerHTML = '';
+
+  const result = await runBistScript(scriptId, ({ type, stepIdx, total, reason, message }) => {
+    if (!logEl) return;
+    if (type === 'step_start') logEl.textContent += `\nStep ${(stepIdx||0)+1}/${total||'?'}…`;
+    if (type === 'step_pass')  logEl.textContent += ' ✓';
+    if (type === 'step_fail')  logEl.textContent += ` ✕\n${reason||''}`;
+    if (type === 'error')      logEl.textContent += `\nError: ${message||''}`;
+    logEl.scrollTop = logEl.scrollHeight;
+  });
+
+  if (iconEl) {
+    iconEl.textContent = result.status === 'passed' ? '✓' : '✕';
+    iconEl.style.color = result.status === 'passed' ? 'var(--green)' : 'var(--red)';
+  }
+  if (logEl) logEl.textContent += result.status === 'passed' ? '\nPassed ✓' : '\nFailed ✕';
+
+  // Refresh full panel to update gate summary
+  if (_selectedTmpl) await loadTmplTests(_selectedTmpl.id);
+}
+
+async function runAllTests() {
+  const btn = document.getElementById('bist-run-all-btn');
+  if (btn) { btn.textContent = 'Running…'; btn.disabled = true; }
+
+  const scripts = await API.get(
+    `bist_test_scripts?template_id=eq.${_selectedTmpl?.id}&order=created_at.asc`
+  ).catch(()=>[]);
+
+  for (const script of (scripts||[])) {
+    await runSingleTest(script.id);
+  }
+
+  if (btn) { btn.textContent = '▶ Run all tests'; btn.disabled = false; }
+  // Gate summary already refreshed by last runSingleTest → loadTmplTests call
+}
   const panel  = document.getElementById('tmpl-coc-panel');
   const cocBtn = document.getElementById('coc-btn');
   if (!panel) return;
@@ -5009,9 +5200,10 @@ API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_n
   let _cocStartW   = 0;
 
   document.addEventListener('mousedown', e => {
-    const handle = e.target.closest('#tmpl-coc-resize');
+    const handle = e.target.closest('#tmpl-coc-resize, #tmpl-tests-resize');
     if (!handle) return;
-    const panel = document.getElementById('tmpl-coc-panel');
+    const panelId = handle.id === 'tmpl-coc-resize' ? 'tmpl-coc-panel' : 'tmpl-tests-panel';
+    const panel = document.getElementById(panelId);
     if (!panel) return;
     _cocDragging = true;
     _cocStartX   = e.clientX;
