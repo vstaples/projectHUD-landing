@@ -974,6 +974,9 @@ function renderInlineStepConfig(step) {
               <span style="color:var(--muted)">${escHtml(d.size||'')}</span>
             </div>
           </div>
+          <button class="attached-doc-remove" style="color:var(--accent);margin-right:2px"
+            onclick="viewAttachedDoc('${step.id}',${i})"
+            title="View document">⤢</button>
           <button class="attached-doc-remove"
             onclick="removeAttachedDoc('${step.id}',${i})"
             title="Remove">✕</button>
@@ -1050,9 +1053,92 @@ function attachFilesToStep(stepId, files) {
 function removeAttachedDoc(stepId, idx) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
   if (!step?._attachedDocs) return;
+  // Revoke blob URL if one was created
+  const doc = step._attachedDocs[idx];
+  if (doc?._blobUrl) URL.revokeObjectURL(doc._blobUrl);
   step._attachedDocs.splice(idx, 1);
   _dirtySteps = true;
   reRenderSpine();
+}
+
+function viewAttachedDoc(stepId, idx) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  const doc  = step?._attachedDocs?.[idx];
+  if (!doc?.file) { cadToast('File not available for preview', 'info'); return; }
+
+  const name   = doc.name.toLowerCase();
+  const isPdf  = name.endsWith('.pdf');
+  const isDocx = name.endsWith('.docx');
+  const isDoc  = name.endsWith('.doc');
+
+  if (isPdf) {
+    // PDFs render natively in the browser via blob URL
+    if (!doc._blobUrl) doc._blobUrl = URL.createObjectURL(doc.file);
+    window.open(doc._blobUrl, '_blank');
+    return;
+  }
+
+  if (isDocx) {
+    // DOCX: use mammoth.js (already available in the artifact stack) to
+    // convert to HTML and render in a new tab — faithful inline preview
+    cadToast('Rendering document preview…', 'info');
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        // Dynamically load mammoth if not already present
+        if (typeof mammoth === 'undefined') {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        const result = await mammoth.convertToHtml({ arrayBuffer: e.target.result });
+        const html = `<!DOCTYPE html><html><head>
+          <meta charset="UTF-8"/>
+          <title>${escHtml(doc.name)} · ${escHtml(doc.version||'')}</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;
+                   max-width: 800px; margin: 40px auto; padding: 0 32px; color: #1a1a1a; }
+            table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+            td, th { border: 1px solid #ccc; padding: 6px 10px; }
+            th { background: #f0f0f0; font-weight: 600; }
+            h1,h2,h3 { color: #1a2a3a; }
+            .doc-header { background:#f7f7f7; border-bottom:2px solid #00b0c8;
+              padding:12px 0 10px; margin-bottom:24px; }
+            .doc-header .title { font-size:13px; font-weight:700; color:#1a2a3a; }
+            .doc-header .meta  { font-size:11px; color:#666; margin-top:3px; }
+          </style>
+        </head><body>
+          <div class="doc-header">
+            <div class="title">📄 ${escHtml(doc.name)}</div>
+            <div class="meta">Version: ${escHtml(doc.version||'—')} &nbsp;·&nbsp; ${escHtml(doc.size||'')} &nbsp;·&nbsp; Read-only preview</div>
+          </div>
+          ${result.value}
+        </body></html>`;
+        const blob    = new Blob([html], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch(err) {
+        cadToast('Preview failed — downloading instead', 'error');
+        _downloadDoc(doc);
+      }
+    };
+    reader.readAsArrayBuffer(doc.file);
+    return;
+  }
+
+  // All other types (xls, xlsx, ppt, txt, csv) — download/open blob directly
+  _downloadDoc(doc);
+}
+
+function _downloadDoc(doc) {
+  if (!doc._blobUrl) doc._blobUrl = URL.createObjectURL(doc.file);
+  const a = document.createElement('a');
+  a.href = doc._blobUrl;
+  a.download = doc.name;
+  a.click();
 }
 
 // ── Thin re-render wrapper (replaces refreshConfigPanel) ──────────────────────
