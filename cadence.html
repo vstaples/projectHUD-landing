@@ -2593,6 +2593,8 @@ async function addReassignment(instId, stepId) {
     return;
   }
 
+  const inst     = _instances.find(i => i.id === instId);
+  const step     = inst?._tmplSteps?.find(s => s.id === stepId);
   const resource = _resources_cad.find(r => r.id === resId);
   if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--muted)'; }
 
@@ -2602,6 +2604,8 @@ async function addReassignment(instId, stepId) {
       firm_id:          FIRM_ID_CAD,
       event_type:       'step_reassigned',
       template_step_id: stepId,
+      step_type:        step?.step_type || 'action',
+      step_name:        step?.name || null,
       assignee_name:    resource?.name || null,
       assignee_email:   resource?.email || null,
       created_at:       new Date().toISOString(),
@@ -2616,7 +2620,6 @@ async function addReassignment(instId, stepId) {
     await API.post('workflow_step_instances', payload);
 
     // Reload CoC
-    const inst = _instances.find(i => i.id === instId);
     if (inst) {
       inst._stepInsts = await API.get(
         `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
@@ -2641,8 +2644,8 @@ async function addReassignment(instId, stepId) {
 // ── Remove a reassignment (writes tombstone CoC event) ────────────────────────
 async function removeReassignment(instId, stepId, cocEventId) {
   try {
-    // Find the original reassignment to get the name for the tombstone
     const inst = _instances.find(i => i.id === instId);
+    const step = inst?._tmplSteps?.find(s => s.id === stepId);
     const orig = inst?._stepInsts?.find(e => e.id === cocEventId);
 
     await API.post('workflow_step_instances', {
@@ -2650,6 +2653,8 @@ async function removeReassignment(instId, stepId, cocEventId) {
       firm_id:          FIRM_ID_CAD,
       event_type:       'step_reassignment_removed',
       template_step_id: stepId,
+      step_type:        step?.step_type || 'action',
+      step_name:        step?.name || null,
       assignee_name:    orig?.assignee_name || null,
       assignee_email:   orig?.assignee_email || null,
       event_notes:      `Removed assignee: ${orig?.assignee_name||orig?.assignee_email||'unknown'}`,
@@ -2673,12 +2678,16 @@ async function removeReassignment(instId, stepId, cocEventId) {
 // ── Start a step (records step_activated CoC event) ──────────────────────────
 async function startStep(instId, stepId) {
   try {
+    const inst = _instances.find(i => i.id === instId);
+    const step = inst?._tmplSteps?.find(s => s.id === stepId);
     await API.post('workflow_step_instances', {
-      instance_id:  instId,
-      firm_id:      FIRM_ID_CAD,
-      event_type:   'step_activated',
+      instance_id:      instId,
+      firm_id:          FIRM_ID_CAD,
+      event_type:       'step_activated',
       template_step_id: stepId,
-      created_at:   new Date().toISOString(),
+      step_type:        step?.step_type || 'action',
+      step_name:        step?.name || null,
+      created_at:       new Date().toISOString(),
     });
     await _reloadInstance(instId);
     cadToast('Step started — elapsed timer running', 'success');
@@ -2699,9 +2708,11 @@ async function suspendInstance(instId) {
     });
     await API.post('workflow_step_instances', {
       instance_id: instId, firm_id: FIRM_ID_CAD,
-      event_type: 'instance_suspended',
+      event_type:  'instance_suspended',
+      step_type:   'trigger',
+      step_name:   'Instance suspended',
       event_notes: reason || null,
-      created_at: new Date().toISOString(),
+      created_at:  new Date().toISOString(),
     });
     await _reloadInstance(instId);
     cadToast('Instance suspended', 'success');
@@ -2722,9 +2733,11 @@ async function cancelInstance(instId) {
     });
     await API.post('workflow_step_instances', {
       instance_id: instId, firm_id: FIRM_ID_CAD,
-      event_type: 'instance_cancelled',
+      event_type:  'instance_cancelled',
+      step_type:   'trigger',
+      step_name:   'Instance cancelled',
       event_notes: reason || null,
-      created_at: new Date().toISOString(),
+      created_at:  new Date().toISOString(),
     });
     await _reloadInstance(instId);
     cadToast('Instance cancelled', 'success');
