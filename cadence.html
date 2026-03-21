@@ -189,10 +189,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .doc-drop-zone-text{font-size:11px;color:var(--muted);line-height:1.5}
 .doc-drop-zone-text strong{color:var(--cad);font-weight:500}
 .attached-doc{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 10px;margin:4px 14px;
+  display:flex;align-items:center;gap:6px;
+  padding:5px 8px;margin:0;
   background:var(--surf3);border:1px solid var(--border2);border-radius:4px;
-  font-size:11px;color:var(--text2);
+  font-size:11px;color:var(--text2);min-width:0;overflow:hidden;
 }
 .attached-doc-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attached-doc-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px}
@@ -1072,8 +1072,9 @@ function renderInlineStepConfig(step) {
       <span style="font-size:10px;color:var(--muted)"><span style="color:var(--amber)">⬆ Authorization</span> — <strong style="color:var(--amber)">gates step · routed to next step</strong></span>
     </div>
 
-    <!-- Attached docs list with role selector -->
-    <div id="attached-docs-${step.id}">
+    <!-- Attached docs — 2-column grid, tiles left-right, new row every 2 docs -->
+    <div id="attached-docs-${step.id}"
+      style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:0 14px 6px">
       ${docs.map((d,i) => {
         const roleColor = d.role==='authorization' ? 'var(--amber)'
                         : d.role==='evidence'      ? 'var(--green)'
@@ -1082,18 +1083,18 @@ function renderInlineStepConfig(step) {
                         : d.role==='evidence'      ? '📝'
                         : '📋';
         return `
-        <div class="attached-doc" style="padding:6px 10px;gap:8px;flex-wrap:nowrap;align-items:center">
-          <span style="color:${roleColor};flex-shrink:0;font-size:13px">${roleIcon}</span>
-          <span class="attached-doc-name" style="flex:1;min-width:0">${escHtml(d.name)}</span>
+        <div class="attached-doc" style="padding:5px 8px;gap:6px;flex-wrap:nowrap;align-items:center;margin:0">
+          <span style="color:${roleColor};flex-shrink:0;font-size:12px">${roleIcon}</span>
+          <span class="attached-doc-name" style="flex:1;min-width:0;font-size:11px">${escHtml(d.name)}</span>
           <span style="font-size:10px;color:var(--cad);font-family:var(--font-mono);flex-shrink:0;white-space:nowrap">${escHtml(d.version||'—')}</span>
           <span style="font-size:10px;color:var(--muted);flex-shrink:0;white-space:nowrap">${escHtml(d.size||'')}</span>
           <select style="font-size:10px;font-family:var(--font-mono);background:var(--surf3);
             border:1px solid var(--border2);border-radius:3px;padding:2px 4px;
             color:${roleColor};cursor:pointer;flex-shrink:0"
             onchange="setDocRole('${step.id}',${i},this.value)">
-            <option value="reference"${(d.role||'reference')==='reference'?' selected':''}>📋 Reference</option>
+            <option value="reference"${(d.role||'reference')==='reference'?' selected':''}>📋 Ref</option>
             <option value="evidence"${d.role==='evidence'?' selected':''}>📝 Evidence</option>
-            <option value="authorization"${d.role==='authorization'?' selected':''}>⬆ Authorization</option>
+            <option value="authorization"${d.role==='authorization'?' selected':''}>⬆ Auth</option>
           </select>
           <button class="attached-doc-remove" style="color:var(--accent);flex-shrink:0"
             onclick="viewAttachedDoc('${step.id}',${i})" title="View">⤢</button>
