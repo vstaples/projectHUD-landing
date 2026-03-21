@@ -3390,6 +3390,19 @@ function renderInstanceDetail(el, inst) {
   coc.filter(e => e.event_type === 'step_activated' && e.template_step_id)
      .forEach(e => { if (!stepActivatedAt[e.template_step_id]) stepActivatedAt[e.template_step_id] = e.created_at; });
 
+  // For steps with no activation event, fall back to when the prior step completed
+  // (covers existing instances predating auto-activation, and the ready step)
+  steps.forEach((s, idx) => {
+    if (!stepActivatedAt[s.id] && !completedStepIds.has(s.id)) {
+      const prior = steps[idx - 1];
+      if (prior && completedStepIds.has(prior.id)) {
+        const priorCompletion = coc.slice().reverse()
+          .find(e => e.event_type === 'step_completed' && e.template_step_id === prior.id);
+        if (priorCompletion) stepActivatedAt[s.id] = priorCompletion.created_at;
+      }
+    }
+  });
+
   // Build map of step_id → completion timestamp
   const stepCompletedAt = {};
   coc.filter(e => e.event_type === 'step_completed' && e.template_step_id)
@@ -3477,7 +3490,7 @@ function renderInstanceDetail(el, inst) {
         <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
           color:var(--muted);margin-bottom:12px">Workflow Steps
           <span style="font-weight:400;font-size:9px;color:var(--muted);margin-left:8px">
-            — click a step to view or reassign
+            — click a step to start, complete, or reassign
           </span>
         </div>
         ${!steps.length
@@ -3571,10 +3584,12 @@ function renderInstanceDetail(el, inst) {
                           </div>`;
                         } else if (activatedAt) {
                           const elapsed = calcElapsed(activatedAt, null);
+                          const timerColor = touched ? 'var(--cad)' : 'var(--accent)';
+                          const timerLabel = touched ? 'Elapsed' : 'Pending';
                           return `<div style="text-align:right;flex-shrink:0">
                             <div id="timer-${s.id}" data-from="${activatedAt}"
-                              style="${monoStyle};color:var(--cad)">${elapsed}</div>
-                            <div style="${labelStyle};color:var(--cad)">Elapsed</div>
+                              style="${monoStyle};color:${timerColor}">${elapsed}</div>
+                            <div style="${labelStyle};color:${timerColor}">${timerLabel}</div>
                           </div>`;
                         } else {
                           return `<div style="text-align:right;flex-shrink:0">
@@ -3729,20 +3744,8 @@ function renderInstanceDetail(el, inst) {
                       Instance is ${inst.status} — reassignment not available.
                     </div>`}
 
-                    <!-- Start Step button — only on first step not yet activated -->
-                    ${canAct && idx === 0 && !touched && !done ? `
-                    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-                      <button class="btn btn-cad btn-sm" style="font-size:11px;width:100%"
-                        onclick="startStep('${inst.id}','${s.id}')">
-                        ▶ Start This Step
-                      </button>
-                      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:center">
-                        Records a Step Activated event in the Chain of Custody and begins the elapsed timer.
-                      </div>
-                    </div>` : ''}
-
-                    <!-- Complete Step — outcome selection (shown when step is active, not yet done) -->
-                    ${canAct && touched && !done ? `
+                    <!-- Complete Step — outcome selection (shown when step is active or ready, not yet done) -->
+                    ${canAct && (touched || isReady) && !done ? `
                     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--muted);margin-bottom:8px">Complete this step</div>
