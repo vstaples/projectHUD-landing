@@ -288,6 +288,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .sn-form{background:var(--step-form);border-color:rgba(160,80,200,.35);color:var(--step-form-c)}
 .sn-branch{background:var(--step-branch);border-color:rgba(255,255,255,.12);color:var(--step-branch-c)}
 .sn-confirm{background:var(--step-confirm);border-color:rgba(0,185,195,.35);color:var(--step-confirm-c)}
+.sn-meeting{background:rgba(79,200,140,.15);border-color:rgba(79,200,140,.4);color:#4fc88c}
 
 /* Add step button */
 .add-step-btn{
@@ -585,6 +586,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="stp-icon sn-confirm">✓✓</div>
     <div><div>Confirmation</div><div class="stp-desc">Attestation all activities are complete</div></div>
   </div>
+  <div class="stp-item" onclick="addStep('meeting')">
+    <div class="stp-icon sn-meeting">◉</div>
+    <div><div>Meeting</div><div class="stp-desc">Scheduled meeting with agenda, minutes &amp; action items</div></div>
+  </div>
 </div>
 
 <script>
@@ -605,16 +610,17 @@ let _lastSavedAt    = null;   // Date of last successful auto-save
 
 // Step type display metadata
 const STEP_META = {
-  trigger:  { icon:'⚡', label:'Trigger',            nodeClass:'sn-trigger',  badgeColor:'rgba(192,64,74,.2)',  badgeText:'#c0404a' },
-  approval: { icon:'✓',  label:'Approval',           nodeClass:'sn-approval', badgeColor:'rgba(61,153,112,.15)', badgeText:'#3d9970' },
-  review:   { icon:'R',  label:'Review',             nodeClass:'sn-review',   badgeColor:'rgba(79,142,247,.15)', badgeText:'#4f8ef7' },
-  signoff:  { icon:'✍',  label:'Sign-off',           nodeClass:'sn-signoff',  badgeColor:'rgba(196,125,24,.15)', badgeText:'#c47d18' },
-  action:   { icon:'→',  label:'Action',             nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.5)' },
-  external: { icon:'E',  label:'External',           nodeClass:'sn-external', badgeColor:'rgba(201,168,76,.15)', badgeText:'#c9a84c' },
-  form:     { icon:'F',  label:'Collaborative Form', nodeClass:'sn-form',     badgeColor:'rgba(160,80,200,.15)', badgeText:'#b070e0' },
-  branch:   { icon:'⋔',  label:'Branch',             nodeClass:'sn-branch',   badgeColor:'rgba(255,255,255,.05)', badgeText:'rgba(255,255,255,.4)' },
+  trigger:      { icon:'⚡', label:'Trigger',            nodeClass:'sn-trigger',  badgeColor:'rgba(192,64,74,.2)',    badgeText:'#c0404a' },
+  approval:     { icon:'✓',  label:'Approval',           nodeClass:'sn-approval', badgeColor:'rgba(61,153,112,.15)',  badgeText:'#3d9970' },
+  review:       { icon:'R',  label:'Review',             nodeClass:'sn-review',   badgeColor:'rgba(79,142,247,.15)',  badgeText:'#4f8ef7' },
+  signoff:      { icon:'✍',  label:'Sign-off',           nodeClass:'sn-signoff',  badgeColor:'rgba(196,125,24,.15)',  badgeText:'#c47d18' },
+  action:       { icon:'→',  label:'Action',             nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.5)' },
+  external:     { icon:'E',  label:'External',           nodeClass:'sn-external', badgeColor:'rgba(201,168,76,.15)',  badgeText:'#c9a84c' },
+  form:         { icon:'F',  label:'Collaborative Form', nodeClass:'sn-form',     badgeColor:'rgba(160,80,200,.15)',  badgeText:'#b070e0' },
+  branch:       { icon:'⋔',  label:'Branch',             nodeClass:'sn-branch',   badgeColor:'rgba(255,255,255,.05)', badgeText:'rgba(255,255,255,.4)' },
   wait:         { icon:'⏱',  label:'Wait',               nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.4)' },
-  confirmation: { icon:'✓✓', label:'Confirmation',        nodeClass:'sn-confirm',  badgeColor:'rgba(0,185,195,.15)',   badgeText:'#00b9c3' },
+  confirmation: { icon:'✓✓', label:'Confirmation',       nodeClass:'sn-confirm',  badgeColor:'rgba(0,185,195,.15)',   badgeText:'#00b9c3' },
+  meeting:      { icon:'◉',  label:'Meeting',            nodeClass:'sn-meeting',  badgeColor:'rgba(79,200,140,.15)',  badgeText:'#4fc88c' },
 };
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -725,6 +731,7 @@ async function selectTemplate(id) {
     s.forward_input   = !!s.forward_input;
     s.reject_to       = s.reject_to || null;
     s._confirmItems   = Array.isArray(s.confirm_items) ? s.confirm_items : [];
+    s._meetingAgenda  = Array.isArray(s.meeting_agenda) ? s.meeting_agenda : [];
     s._attachedDocs = (s.attached_docs || []).map(d => ({
       name:    d.name,
       version: d.version,
@@ -1089,6 +1096,33 @@ function renderInlineStepConfig(step) {
         </div>
         <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:11px"
           onclick="addConfirmItem('${step.id}')">+ Add item</button>
+      </div>` : ''}
+
+      <!-- Meeting step: agenda items -->
+      ${step.step_type === 'meeting' ? `
+      <div class="config-section cfg-full">
+        <label class="config-label" style="margin-bottom:6px">Meeting Agenda Items</label>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+          Pre-populate the agenda. At runtime a full meeting editor opens with minutes, 
+          attendees, action items and email distribution.
+        </div>
+        <div id="meeting-agenda-${step.id}">
+          ${(step._meetingAgenda||[]).map((item,i) => `
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+              <span style="color:#4fc88c;flex-shrink:0;font-size:11px">${i+1}.</span>
+              <input class="config-input" style="flex:1" value="${escHtml(item)}"
+                placeholder="e.g. Review design drawings"
+                oninput="updateMeetingAgendaItem('${step.id}',${i},this.value)" />
+              <button class="attached-doc-remove"
+                onclick="removeMeetingAgendaItem('${step.id}',${i})">✕</button>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:11px;
+          color:#4fc88c;border-color:rgba(79,200,140,.35)"
+          onclick="addMeetingAgendaItem('${step.id}')">+ Add agenda item</button>
+        <div style="margin-top:10px;font-size:10px;color:var(--muted)">
+          Duration, location, and attendees are configured when the instance is launched.
+        </div>
       </div>` : ''}
 
       <!-- Instructions — full width -->
@@ -1545,6 +1579,27 @@ function reRenderSpine() {
   if (spineEl) spineEl.innerHTML = renderSpine();
 }
 
+// ── Meeting step agenda item helpers ─────────────────────────────────────────
+function addMeetingAgendaItem(stepId) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step) return;
+  if (!step._meetingAgenda) step._meetingAgenda = [];
+  step._meetingAgenda.push('');
+  markDirty(); reRenderSpine();
+}
+function removeMeetingAgendaItem(stepId, idx) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?._meetingAgenda) return;
+  step._meetingAgenda.splice(idx, 1);
+  markDirty(); reRenderSpine();
+}
+function updateMeetingAgendaItem(stepId, idx, value) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?._meetingAgenda) return;
+  step._meetingAgenda[idx] = value;
+  markDirty();
+}
+
 // ── Confirmation step attestation item helpers ────────────────────────────────
 function addConfirmItem(stepId) {
   const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
@@ -1756,6 +1811,7 @@ async function saveTemplate(silent = false) {
         forward_input:       !!step.forward_input,
         reject_to:           step.reject_to || null,
         confirm_items:       step._confirmItems || [],
+        meeting_agenda:      step._meetingAgenda || [],
         attached_docs:       (step._attachedDocs || []).map(d => ({
           name: d.name, version: d.version, role: d.role || 'reference',
           size: d.size, path: d.path || null, url: d.url || null,
@@ -1980,6 +2036,16 @@ function launchInstance() {
             value="${escHtml(_selectedTmpl.name)} · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}" />
         </div>
         <div style="margin-bottom:12px">
+          <label class="config-label">Workflow Owner <span style="color:var(--red)">*</span></label>
+          <select class="config-select" id="launch-owner">
+            <option value="">— Select owner —</option>
+            ${_resources_cad.map(r=>`<option value="${r.id}">${escHtml(r.name)}${r.title?' — '+escHtml(r.title):''}</option>`).join('')}
+          </select>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">
+            Owner receives issue escalations and manages blocked steps.
+          </div>
+        </div>
+        <div style="margin-bottom:12px">
           <label class="config-label">Notes (optional)</label>
           <textarea class="config-textarea" id="launch-notes" placeholder="Any context for this instance..."></textarea>
         </div>
@@ -1993,19 +2059,20 @@ function launchInstance() {
 }
 
 async function confirmLaunch() {
-  const title = document.getElementById('launch-title')?.value?.trim();
-  const notes = document.getElementById('launch-notes')?.value?.trim();
-  if (!title) { cadToast('Title required', 'error'); return; }
+  const title   = document.getElementById('launch-title')?.value?.trim();
+  const ownerId = document.getElementById('launch-owner')?.value;
+  const notes   = document.getElementById('launch-notes')?.value?.trim();
+  if (!title)   { cadToast('Title required', 'error'); return; }
+  if (!ownerId) { cadToast('Owner required — select who will manage this instance', 'error'); return; }
 
   try {
-    // Create the instance
     const res = await API.post('workflow_instances', {
       firm_id:     FIRM_ID_CAD,
       template_id: _selectedTmpl.id,
       title,
       notes:       notes || null,
       status:      'in_progress',
-      launched_by: _users_cad[0]?.id || null,
+      launched_by: ownerId,
       launched_at: new Date().toISOString(),
     });
 
@@ -2130,6 +2197,7 @@ async function selectInstance(id) {
         name: d.name, version: d.version, role: d.role||'reference',
         size: d.size, path: d.path||null, url: d.url||null,
       })),
+      _meetingAgenda: Array.isArray(s.meeting_agenda) ? s.meeting_agenda : [],
     }));
     renderInstanceDetail(detailEl, _selectedInstance);
   } catch(e) {
@@ -2315,7 +2383,7 @@ function renderInstanceDetail(el, inst) {
                         <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
                           <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;text-transform:uppercase">${meta.label}</span>
                           ${s.due_days!=null?`<span>⏱ ${s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+'d'}</span>`:''}
-                          <span style="color:var(--text2)">👤 ${typeof assigneeDisplay === 'string' ? escHtml(assigneeDisplay) : assigneeDisplay}</span>
+                          <span style="color:var(--text2)">👤 ${assigneeDisplay}</span>
                           ${done?`<span style="color:var(--green)">✓ Complete</span>`:''}
                           ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
@@ -2376,7 +2444,34 @@ function renderInstanceDetail(el, inst) {
                         <div style="color:var(--text2);font-size:11px;margin-top:2px;line-height:1.4">${escHtml(s.instructions)}</div></div>`:''}
                     </div>
 
-                    <!-- Attached reference documents -->
+                    <!-- Meeting step: Open Meeting editor -->
+                    ${s.step_type === 'meeting' ? `
+                    <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+                        color:#4fc88c;margin-bottom:8px">◉ Meeting Step</div>
+                      ${(s._meetingAgenda||[]).length ? `
+                      <div style="margin-bottom:8px">
+                        <div style="font-size:9px;color:var(--muted);letter-spacing:.08em;
+                          text-transform:uppercase;margin-bottom:4px">Agenda</div>
+                        ${(s._meetingAgenda||[]).map((item,i) =>
+                          `<div style="font-size:11px;color:var(--text2);padding:2px 0;
+                            display:flex;gap:6px"><span style="color:#4fc88c">${i+1}.</span>${escHtml(item)}</div>`
+                        ).join('')}
+                      </div>` : ''}
+                      <a href="/meeting-minutes.html?workflow_instance_id=${inst.id}&step_id=${s.id}"
+                        target="_blank"
+                        style="display:inline-flex;align-items:center;gap:6px;
+                          padding:7px 14px;border-radius:5px;font-size:11px;font-weight:600;
+                          background:rgba(79,200,140,.15);border:1px solid rgba(79,200,140,.4);
+                          color:#4fc88c;text-decoration:none;transition:all .15s"
+                        onmouseover="this.style.background='rgba(79,200,140,.25)'"
+                        onmouseout="this.style.background='rgba(79,200,140,.15)'">
+                        ◉ Open Meeting Editor
+                      </a>
+                      <div style="font-size:10px;color:var(--muted);margin-top:6px">
+                        Opens the full meeting editor — agenda, minutes, attendees, action items and email distribution.
+                      </div>
+                    </div>` : ''}
                     ${(s._attachedDocs||[]).length ? `
                     <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
@@ -2409,7 +2504,11 @@ function renderInstanceDetail(el, inst) {
                           const templateName = s.assignee_type==='pm' ? 'Project Manager'
                             : s.assignee_name || s.assignee_email || s.assignee_role
                               || (_users_cad.find(u=>u.id===s.assignee_user_id)?.name) || null;
-                          if (templateName) list.push({ name: templateName, source: 'template' });
+                          // Check if template assignee has been overridden
+                          const templateOverridden = coc.some(e =>
+                            e.event_type==='step_assignee_override' && e.template_step_id===s.id);
+                          if (templateName && !templateOverridden)
+                            list.push({ name: templateName, source: 'template' });
                           coc.filter(e=>e.event_type==='step_reassigned'&&e.template_step_id===s.id).forEach(r => {
                             if (r.assignee_name||r.assignee_email) {
                               // Skip if a removal tombstone exists for this CoC event's assignee
@@ -2429,11 +2528,13 @@ function renderInstanceDetail(el, inst) {
                               border:1px solid ${a.source==='reassigned'?'rgba(79,142,247,.35)':'var(--border2)'};
                               color:${a.source==='reassigned'?'var(--accent)':'var(--text2)'}">
                               ${escHtml(a.name)}
-                              ${a.source==='reassigned'?`
-                              <button onclick="removeReassignment('${inst.id}','${s.id}','${a.cocId}')"
-                                style="background:none;border:none;color:rgba(79,142,247,.6);cursor:pointer;
-                                font-size:11px;padding:0;line-height:1;margin-left:2px"
-                                title="Remove this assignee">✕</button>`:''}
+                              <button onclick="${a.source==='reassigned'
+                                ? `removeReassignment('${inst.id}','${s.id}','${a.cocId}')`
+                                : `overrideTemplateAssignee('${inst.id}','${s.id}')`}"
+                                style="background:none;border:none;
+                                color:${a.source==='reassigned'?'rgba(79,142,247,.6)':'rgba(255,255,255,.3)'};
+                                cursor:pointer;font-size:11px;padding:0;line-height:1;margin-left:2px"
+                                title="Remove">✕</button>
                             </span>`).join('')
                           || '<span style="font-size:10px;color:var(--muted)">No assignee set</span>';
                         })()}
@@ -2673,6 +2774,32 @@ async function removeReassignment(instId, stepId, cocEventId) {
   } catch(e) {
     cadToast('Remove failed: ' + e.message, 'error');
   }
+}
+
+// ── Override template default assignee ───────────────────────────────────────
+async function overrideTemplateAssignee(instId, stepId) {
+  const inst = _instances.find(i => i.id === instId);
+  const step = inst?._tmplSteps?.find(s => s.id === stepId);
+  try {
+    await API.post('workflow_step_instances', {
+      instance_id:      instId,
+      firm_id:          FIRM_ID_CAD,
+      event_type:       'step_assignee_override',
+      template_step_id: stepId,
+      step_type:        step?.step_type || 'action',
+      step_name:        step?.name || null,
+      event_notes:      'Template default assignee removed for this instance',
+      created_at:       new Date().toISOString(),
+    });
+    if (inst) {
+      inst._stepInsts = await API.get(
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+      ).catch(() => inst._stepInsts);
+    }
+    cadToast('Template assignee removed', 'success');
+    const detailEl = document.getElementById('instance-detail');
+    if (detailEl && inst) renderInstanceDetail(detailEl, inst);
+  } catch(e) { cadToast('Failed: ' + e.message, 'error'); }
 }
 
 // ── Start a step (records step_activated CoC event) ──────────────────────────
