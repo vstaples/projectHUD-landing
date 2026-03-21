@@ -942,8 +942,8 @@ async function selectTemplate(id) {
       path:    d.path || null,
       url:     d.url  || null,
     }));
-    // Resolve resource_id from stored user_id for picker pre-selection
-    if (s.assignee_user_id && !s.assignee_resource_id) {
+    // assignee_resource_id — read from DB directly, fall back to _users_cad lookup
+    if (!s.assignee_resource_id && s.assignee_user_id) {
       s.assignee_resource_id =
         _users_cad.find(u => u.id === s.assignee_user_id)?.resource_id || null;
     }
@@ -1864,12 +1864,38 @@ function reRenderSpine() {
 function autoFillAssignee(stepId, resourceId) {
   const r = _resources_cad.find(x => x.id === resourceId);
   if (!r) return;
-  // assignee_user_id is a FK to users.id — resolve via resource_id
   const user = _users_cad.find(u => u.resource_id === resourceId);
-  updateStepField('assignee_user_id',    user?.id || null);
-  updateStepField('assignee_resource_id', resourceId);  // store for picker pre-selection
-  if (r.email) updateStepField('assignee_email', r.email);
-  if (r.name)  updateStepField('assignee_name',  r.name);
+
+  const prevName = _selectedStep?.assignee_name || '';
+
+  // Write all related fields directly — bypass updateStepField to avoid
+  // multiple bin entries; we write one consolidated entry below
+  if (_selectedStep) {
+    _selectedStep.assignee_user_id     = user?.id     || null;
+    _selectedStep.assignee_resource_id = resourceId;
+    _selectedStep.assignee_email       = r.email      || null;
+    _selectedStep.assignee_name        = r.name       || null;
+    _dirtySteps = true;
+    _updateVersionDisplay();
+  }
+
+  // Single CoC bin entry for the whole assignee change
+  if (_selectedTmpl?.id && prevName !== r.name) {
+    const authorName = _resources_cad.find(x => x.id === _myResourceId)?.name || 'Team Member';
+    _binAppend(_selectedTmpl.id, {
+      type:      'field_changed',
+      stepName:  _selectedStep?.name || _selectedStep?.step_type || 'Step',
+      field:     'assignee',
+      from:      prevName || '—',
+      to:        r.name || '—',
+      changedBy: authorName,
+      ts:        new Date().toISOString(),
+    });
+    _refreshCoCIfOpen();
+  }
+
+  // Re-render spine so card summary + config panel update
+  reRenderSpine();
 }
 
 function selectExternalAssignee(stepId, resourceId) {
@@ -2447,6 +2473,7 @@ async function _saveSteps() {
     name:                step.name || null,
     assignee_type:       step.assignee_type || null,
     assignee_user_id:    step.assignee_user_id || null,
+    assignee_resource_id: step.assignee_resource_id || null,
     assignee_role:       step.assignee_role || null,
     assignee_email:      step.assignee_email || null,
     assignee_name:       step.assignee_name || null,
