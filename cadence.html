@@ -3450,10 +3450,18 @@ async function loadTmplTests(templateId) {
   if (!bodyEl) return;
   bodyEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding-top:24px">Loading…</div>';
   try {
-    const [scripts, runs] = await Promise.all([
-      API.get(`bist_test_scripts?template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
-      API.get(`bist_runs?script_id=in.(select id from bist_test_scripts where template_id=eq.${templateId})&order=run_at.desc&limit=50`).catch(()=>[]),
-    ]);
+    const scripts = await API.get(
+      `bist_test_scripts?template_id=eq.${templateId}&order=created_at.asc`
+    ).catch(()=>[]);
+
+    let runs = [];
+    if (scripts?.length) {
+      const ids = scripts.map(s => s.id).join(',');
+      runs = await API.get(
+        `bist_runs?script_id=in.(${ids})&order=run_at.desc&limit=50`
+      ).catch(()=>[]);
+    }
+
     renderTmplTests(scripts||[], runs||[]);
   } catch(e) {
     bodyEl.innerHTML = `<div style="font-size:11px;color:var(--red);padding:12px">Failed to load tests: ${escHtml(e.message)}</div>`;
