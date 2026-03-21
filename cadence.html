@@ -155,22 +155,55 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .editor-title-input::placeholder{color:var(--text3)}
 
 /* Editor body */
-.editor-body{
-  flex:1;overflow-y:auto;
-  display:flex;gap:0;
-}
-.spine-area{flex:1;padding:20px 24px;overflow-y:auto}
-.config-panel{
-  width:240px;flex-shrink:0;
-  border-left:1px solid var(--border);
+.editor-body{flex:1;overflow-y:auto}
+.spine-area{padding:16px 24px;max-width:680px;margin:0 auto}
+/* inline step config — replaces right panel */
+.step-inline-cfg{
+  display:none;
+  margin-top:0;
+  border-top:1px solid var(--border);
   background:var(--bg1);
-  overflow-y:auto;
+  border-radius:0 0 6px 6px;
+  animation:cfgOpen .18s ease;
 }
-.config-panel-header{
-  padding:12px 14px;border-bottom:1px solid var(--border);
-  font-size:9px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--muted);
+.step-inline-cfg.open{display:block}
+@keyframes cfgOpen{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.cfg-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+  padding:12px 14px;
 }
+.cfg-grid .config-section{border:none;padding:8px 8px}
+.cfg-full{grid-column:1/-1}
+/* drop zone */
+.doc-drop-zone{
+  margin:0 14px 12px;
+  border:1.5px dashed var(--border2);border-radius:5px;
+  padding:14px 16px;text-align:center;cursor:pointer;
+  transition:all .15s;background:transparent;
+}
+.doc-drop-zone:hover,.doc-drop-zone.drag-over{
+  border-color:var(--cad-wire);background:var(--cad-dim);
+}
+.doc-drop-zone-icon{font-size:20px;margin-bottom:6px;opacity:.5}
+.doc-drop-zone-text{font-size:11px;color:var(--muted);line-height:1.5}
+.doc-drop-zone-text strong{color:var(--cad);font-weight:500}
+.attached-doc{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px;margin:4px 14px;
+  background:var(--surf3);border:1px solid var(--border2);border-radius:4px;
+  font-size:11px;color:var(--text2);
+}
+.attached-doc-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attached-doc-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px}
+.attached-doc-remove:hover{color:var(--red)}
+/* template props bar */
+.tmpl-props-bar{
+  display:flex;align-items:center;gap:10px;
+  padding:6px 16px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.tmpl-props-label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex-shrink:0}
 .config-section{padding:12px 14px;border-bottom:1px solid var(--border)}
 .config-label{
   font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
@@ -657,10 +690,26 @@ function renderEditor() {
       </div>
     </div>
 
-    <!-- Editor body -->
-    <div class="editor-body">
+    <!-- Template props bar -->
+    <div class="tmpl-props-bar">
+      <span class="tmpl-props-label">Trigger</span>
+      <select class="config-select" style="width:auto;font-size:11px;padding:4px 8px" id="tmpl-trigger-sel"
+        onchange="markDirty()">
+        <option value="manual"${t.trigger_type==='manual'?' selected':''}>Manual Launch</option>
+        <option value="missed_milestone"${t.trigger_type==='missed_milestone'?' selected':''}>Missed Milestone</option>
+        <option value="resource_denied"${t.trigger_type==='resource_denied'?' selected':''}>Resource Request Denied</option>
+        <option value="meeting_close"${t.trigger_type==='meeting_close'?' selected':''}>Meeting Conclusion</option>
+        <option value="material_request"${t.trigger_type==='material_request'?' selected':''}>Material Request</option>
+        <option value="exception_resolved"${t.trigger_type==='exception_resolved'?' selected':''}>Exception Resolved</option>
+      </select>
+      <span class="tmpl-props-label" style="margin-left:8px">Description</span>
+      <input class="config-input" style="flex:1;font-size:11px;padding:4px 8px" id="tmpl-desc-input"
+        value="${escHtml(t.description||'')}" placeholder="What is this workflow for?"
+        oninput="markDirty()" />
+    </div>
 
-      <!-- Spine area -->
+    <!-- Editor body — single scrolling spine, no right panel -->
+    <div class="editor-body">
       <div class="spine-area" id="spine-area">
         ${renderAIBanner()}
         <div id="spine-wrap" class="spine-wrap">
@@ -669,11 +718,6 @@ function renderEditor() {
         <button class="add-step-btn" onclick="toggleStepPicker(event)">
           <span style="font-size:16px;line-height:1">+</span> Add step
         </button>
-      </div>
-
-      <!-- Config panel -->
-      <div class="config-panel" id="config-panel">
-        ${renderConfigPanel()}
       </div>
     </div>`;
 }
@@ -706,7 +750,6 @@ function renderSpine() {
     </div>`;
   }
 
-  // Prepend virtual trigger node
   const trigger = {
     id: '__trigger__',
     step_type: 'trigger',
@@ -716,9 +759,9 @@ function renderSpine() {
   };
 
   return [trigger, ...steps].map((step, idx) => {
-    const meta    = STEP_META[step.step_type] || STEP_META.action;
-    const isLast  = idx === steps.length; // (includes trigger at 0)
-    const sel     = _selectedStep?.id === step.id;
+    const meta   = STEP_META[step.step_type] || STEP_META.action;
+    const isLast = idx === steps.length;
+    const sel    = _selectedStep?.id === step.id;
     const assigneeLine = step.assignee_name || step.assignee_email ||
       (step.assignee_type === 'pm' ? 'Project Manager' :
        step.assignee_type === 'role' ? step.assignee_role : '—');
@@ -732,23 +775,37 @@ function renderSpine() {
           ${!isLast ? '<div class="spine-line"></div>' : ''}
         </div>
         <div class="spine-content">
-          <div class="spine-card${sel?' selected':''}" onclick="selectStep('${step.id}')">
-            ${!step._virtual ? `<button class="spine-delete" onclick="event.stopPropagation();removeStep('${step.id}')" title="Remove step">✕</button>` : ''}
+          <!-- Card header — always visible -->
+          <div class="spine-card${sel?' selected':''}" style="border-radius:${sel?'6px 6px 0 0':'6px'}"
+            onclick="selectStep('${step.id}')">
+            ${!step._virtual ? `<button class="spine-delete"
+              onclick="event.stopPropagation();removeStep('${step.id}')"
+              title="Remove step">✕</button>` : ''}
             <div class="spine-card-row">
               <div>
                 <div class="spine-card-name">${escHtml(step.name || meta.label)}</div>
                 <div class="spine-card-meta">
                   ${assigneeLine !== '—' ? `<span>👤 ${escHtml(assigneeLine)}</span>` : ''}
-                  ${step.due_days ? `<span>⏱ +${step.due_days}d</span>` : ''}
+                  ${step.due_days ? `<span>⏱ ${step.due_type==='before_completion' ? step.due_days+'d before target' : '+'+step.due_days+'d'}</span>` : ''}
                   ${step.escalate_after_days ? `<span style="color:var(--amber)">↑ escalate d${step.escalate_after_days}</span>` : ''}
+                  ${(step._attachedDocs||[]).length ? `<span style="color:var(--cad)">📄 ${step._attachedDocs.length} doc${step._attachedDocs.length>1?'s':''} · ${escHtml(step._attachedDocs[0].version||'')}</span>` : ''}
                 </div>
               </div>
-              <span class="spine-card-badge"
-                style="background:${meta.badgeColor};color:${meta.badgeText};border-color:${meta.badgeText}40">
-                ${meta.label.toUpperCase()}
-              </span>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span class="spine-card-badge"
+                  style="background:${meta.badgeColor};color:${meta.badgeText};border-color:${meta.badgeText}40">
+                  ${meta.label.toUpperCase()}
+                </span>
+                <span style="font-size:10px;color:var(--muted);transition:transform .15s;
+                  transform:rotate(${sel?'180':'0'}deg)">▼</span>
+              </div>
             </div>
             ${step.step_type === 'branch' && step.branch_conditions?.length ? renderBranchConditions(step) : ''}
+          </div>
+
+          <!-- Inline config — expands below card when selected -->
+          <div class="step-inline-cfg${sel?' open':''}" id="icfg-${step.id}">
+            ${sel && !step._virtual ? renderInlineStepConfig(step) : ''}
           </div>
         </div>
       </div>`;
@@ -768,164 +825,265 @@ function renderBranchConditions(step) {
   </div>`;
 }
 
-// ── Config panel ─────────────────────────────────────────────────────────────
-function renderConfigPanel() {
-  if (!_selectedStep || _selectedStep.id === '__trigger__') {
-    return renderTemplateConfig();
-  }
-  return renderStepConfig(_selectedStep);
-}
-
-function renderTemplateConfig() {
-  const t = _selectedTmpl;
-  return `
-    <div class="config-panel-header">Template Properties</div>
-    <div class="config-section">
-      <label class="config-label">Trigger Type</label>
-      <select class="config-select" id="tmpl-trigger-sel" onchange="markDirty()">
-        <option value="manual"${t.trigger_type==='manual'?' selected':''}>Manual Launch</option>
-        <option value="missed_milestone"${t.trigger_type==='missed_milestone'?' selected':''}>Missed Milestone</option>
-        <option value="resource_denied"${t.trigger_type==='resource_denied'?' selected':''}>Resource Request Denied</option>
-        <option value="meeting_close"${t.trigger_type==='meeting_close'?' selected':''}>Meeting Conclusion</option>
-        <option value="material_request"${t.trigger_type==='material_request'?' selected':''}>Material Request</option>
-        <option value="exception_resolved"${t.trigger_type==='exception_resolved'?' selected':''}>Exception Resolved</option>
-      </select>
-    </div>
-    <div class="config-section">
-      <label class="config-label">Description</label>
-      <textarea class="config-textarea" id="tmpl-desc-input"
-        placeholder="Describe what this workflow is for..." onchange="markDirty()">${escHtml(t.description||'')}</textarea>
-    </div>
-    <div class="config-section" style="border-bottom:none;padding-top:8px;font-size:11px;color:var(--muted)">
-      Click any step to configure it. Click the spine to add steps below.
-    </div>`;
-}
-
-function renderStepConfig(step) {
+// ── Inline step config (renders inside the spine card on expand) ──────────────
+function renderInlineStepConfig(step) {
   const meta = STEP_META[step.step_type] || STEP_META.action;
-  const isExternal = step.step_type === 'external' || step.step_type === 'signoff';
+  const docs = step._attachedDocs || [];
 
   return `
-    <div class="config-panel-header" style="color:${meta.badgeText}">
-      ${meta.icon} ${meta.label}
-    </div>
-    <div class="config-section">
-      <label class="config-label">Step Name</label>
-      <input class="config-input" id="scfg-name" value="${escHtml(step.name||'')}"
-        placeholder="${meta.label}..."
-        oninput="updateStepField('name',this.value)" />
-    </div>
-    <div class="config-section">
-      <label class="config-label">Assignee Type</label>
-      <select class="config-select" id="scfg-atype"
-        onchange="updateStepField('assignee_type',this.value);refreshConfigPanel()">
-        <option value="user"${step.assignee_type==='user'?' selected':''}>Specific User</option>
-        <option value="role"${step.assignee_type==='role'?' selected':''}>Role</option>
-        <option value="external"${step.assignee_type==='external'?' selected':''}>External (no login)</option>
-        <option value="pm"${step.assignee_type==='pm'?' selected':''}>Project Manager</option>
-      </select>
-    </div>
-    ${step.assignee_type === 'user' ? `
-    <div class="config-section">
-      <label class="config-label">User</label>
-      <select class="config-select" id="scfg-user"
-        onchange="updateStepField('assignee_user_id',this.value)">
-        <option value="">— Select user —</option>
-        ${_users_cad.map(u=>`<option value="${u.id}"${step.assignee_user_id===u.id?' selected':''}>${escHtml(u.name)}</option>`).join('')}
-      </select>
-    </div>` : ''}
-    ${step.assignee_type === 'external' ? `
-    <div class="config-section">
-      <label class="config-label">Recipient Name</label>
-      <input class="config-input" id="scfg-aname" value="${escHtml(step.assignee_name||'')}"
-        placeholder="e.g. Sandra Ng"
-        oninput="updateStepField('assignee_name',this.value)" />
-    </div>
-    <div class="config-section">
-      <label class="config-label">Recipient Email</label>
-      <input class="config-input" type="email" id="scfg-email" value="${escHtml(step.assignee_email||'')}"
-        placeholder="e.g. sandra.ng@client.com"
-        oninput="updateStepField('assignee_email',this.value)" />
-    </div>
-    <div class="config-section">
-      <label class="config-label">Organisation</label>
-      <input class="config-input" id="scfg-org" value="${escHtml(step.assignee_org||'')}"
-        placeholder="e.g. OrthoMotion Dynamics"
-        oninput="updateStepField('assignee_org',this.value)" />
-    </div>` : ''}
-    ${step.assignee_type === 'role' ? `
-    <div class="config-section">
-      <label class="config-label">Role</label>
-      <input class="config-input" id="scfg-role" value="${escHtml(step.assignee_role||'')}"
-        placeholder="e.g. Quality Lead"
-        oninput="updateStepField('assignee_role',this.value)" />
-    </div>` : ''}
-    <div class="config-section">
-      <label class="config-label">Due (Business Days from Prior Step)</label>
-      <input class="config-input" type="number" min="1" id="scfg-due"
-        value="${step.due_days||''}" placeholder="e.g. 3"
-        oninput="updateStepField('due_days',parseInt(this.value)||null)" />
-    </div>
-    <div class="config-section">
-      <label class="config-label">Escalate After (Days)</label>
-      <input class="config-input" type="number" min="1" id="scfg-esc"
-        value="${step.escalate_after_days||''}" placeholder="e.g. 2"
-        oninput="updateStepField('escalate_after_days',parseInt(this.value)||null)" />
-    </div>
-    <div class="config-section">
-      <label class="config-label">Escalate To</label>
-      <select class="config-select" id="scfg-escto"
-        onchange="updateStepField('escalate_to',this.value)">
-        <option value="pm"${step.escalate_to==='pm'?' selected':''}>Project Manager</option>
-        <option value="manager"${step.escalate_to==='manager'?' selected':''}>Assignee's Manager</option>
-        <option value="custom"${step.escalate_to==='custom'?' selected':''}>Custom</option>
-      </select>
-    </div>
-    ${step.step_type === 'approval' || step.step_type === 'external' ? `
-    <div class="config-section">
-      <label class="config-label" style="margin-bottom:8px">Parallel Reviewers</label>
-      <div class="config-toggle" onclick="updateStepField('parallel_required',!${!!step.parallel_required});refreshConfigPanel()">
-        <div class="toggle-box${step.parallel_required?' on':''}"></div>
-        <span>${step.parallel_required ? 'All must sign off' : 'First responder advances step'}</span>
+    <!-- Config fields in a 2-column grid -->
+    <div class="cfg-grid">
+
+      <!-- Step Name — full width -->
+      <div class="config-section cfg-full" style="padding-bottom:6px">
+        <label class="config-label">Step Name</label>
+        <input class="config-input" id="scfg-name-${step.id}" value="${escHtml(step.name||'')}"
+          placeholder="${meta.label}..."
+          oninput="updateStepField('name',this.value)" />
       </div>
-    </div>` : ''}
-    <div class="config-section" style="border-bottom:none">
-      <label class="config-label">Instructions to Assignee</label>
-      <textarea class="config-textarea" id="scfg-instr"
-        placeholder="Optional context shown to the assignee..."
-        oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
+
+      <!-- Assignee Type -->
+      <div class="config-section">
+        <label class="config-label">Assignee Type</label>
+        <select class="config-select" id="scfg-atype-${step.id}"
+          onchange="updateStepField('assignee_type',this.value);reRenderSpine()">
+          <option value="user"${step.assignee_type==='user'?' selected':''}>Specific User</option>
+          <option value="role"${step.assignee_type==='role'?' selected':''}>Role</option>
+          <option value="external"${step.assignee_type==='external'?' selected':''}>External (no login)</option>
+          <option value="pm"${step.assignee_type==='pm'?' selected':''}>Project Manager</option>
+        </select>
+      </div>
+
+      <!-- Assignee detail — depends on type -->
+      ${step.assignee_type === 'user' ? `
+      <div class="config-section">
+        <label class="config-label">User</label>
+        <select class="config-select" id="scfg-user-${step.id}"
+          onchange="updateStepField('assignee_user_id',this.value)">
+          <option value="">— Select user —</option>
+          ${_users_cad.map(u=>`<option value="${u.id}"${step.assignee_user_id===u.id?' selected':''}>${escHtml(u.name)}</option>`).join('')}
+        </select>
+      </div>` : ''}
+
+      ${step.assignee_type === 'role' ? `
+      <div class="config-section">
+        <label class="config-label">Role Name</label>
+        <input class="config-input" value="${escHtml(step.assignee_role||'')}"
+          placeholder="e.g. Quality Lead"
+          oninput="updateStepField('assignee_role',this.value)" />
+      </div>` : ''}
+
+      ${step.assignee_type === 'external' ? `
+      <div class="config-section">
+        <label class="config-label">Recipient Name</label>
+        <input class="config-input" value="${escHtml(step.assignee_name||'')}"
+          placeholder="e.g. Sandra Ng"
+          oninput="updateStepField('assignee_name',this.value)" />
+      </div>
+      <div class="config-section cfg-full" style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div class="config-section" style="border:none;padding:0 8px 0 0">
+          <label class="config-label">Email</label>
+          <input class="config-input" type="email" value="${escHtml(step.assignee_email||'')}"
+            placeholder="email@client.com"
+            oninput="updateStepField('assignee_email',this.value)" />
+        </div>
+        <div class="config-section" style="border:none;padding:0">
+          <label class="config-label">Organisation</label>
+          <input class="config-input" value="${escHtml(step.assignee_org||'')}"
+            placeholder="e.g. OrthoMotion Dynamics"
+            oninput="updateStepField('assignee_org',this.value)" />
+        </div>
+      </div>` : ''}
+
+      ${step.assignee_type === 'pm' ? `<div class="config-section"></div>` : ''}
+
+      <!-- Due date — type + value, full width -->
+      <div class="config-section cfg-full">
+        <label class="config-label">Due Date</label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select class="config-select" style="flex:0 0 auto;min-width:220px"
+            onchange="updateStepField('due_type',this.value);reRenderSpine()">
+            <option value="after_prior"${(step.due_type||'after_prior')==='after_prior'?' selected':''}>
+              X days after prior step completes
+            </option>
+            <option value="before_completion"${step.due_type==='before_completion'?' selected':''}>
+              X days before workflow completion date
+            </option>
+          </select>
+          <input class="config-input" type="number" min="1" style="width:70px;flex-shrink:0"
+            value="${step.due_days||''}" placeholder="days"
+            oninput="updateStepField('due_days',parseInt(this.value)||null)" />
+          <span style="font-size:11px;color:var(--muted)">
+            ${(step.due_type||'after_prior')==='after_prior'
+              ? 'business days from prior step'
+              : 'business days before target completion'}
+          </span>
+        </div>
+      </div>
+
+      <!-- Escalate after -->
+      <div class="config-section">
+        <label class="config-label">Escalate After (Days)</label>
+        <div style="display:flex;gap:5px">
+          <input class="config-input" type="number" min="1" style="flex:1"
+            value="${step.escalate_after_days||''}" placeholder="e.g. 2"
+            oninput="updateStepField('escalate_after_days',parseInt(this.value)||null)" />
+          <select class="config-select" style="flex:1"
+            onchange="updateStepField('escalate_to',this.value)">
+            <option value="pm"${step.escalate_to==='pm'?' selected':''}>→ PM</option>
+            <option value="manager"${step.escalate_to==='manager'?' selected':''}>→ Manager</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Parallel toggle (approval/external only) -->
+      ${step.step_type === 'approval' || step.step_type === 'external' || step.step_type === 'signoff' ? `
+      <div class="config-section">
+        <label class="config-label">Multi-Reviewer Rule</label>
+        <div class="config-toggle"
+          onclick="updateStepField('parallel_required',!${!!step.parallel_required});reRenderSpine()">
+          <div class="toggle-box${step.parallel_required?' on':''}"></div>
+          <span style="font-size:11px">${step.parallel_required ? 'All must sign off' : 'First response advances'}</span>
+        </div>
+      </div>` : '<div></div>'}
+
+      <!-- Instructions — full width -->
+      <div class="config-section cfg-full">
+        <label class="config-label">Instructions to Assignee</label>
+        <textarea class="config-textarea" style="min-height:52px"
+          placeholder="Optional context shown to the assignee..."
+          oninput="updateStepField('instructions',this.value)">${escHtml(step.instructions||'')}</textarea>
+      </div>
+
+    </div>
+
+    <!-- Document / Form attachment zone -->
+    <div style="padding:0 14px;margin-bottom:4px">
+      <label class="config-label" style="margin-bottom:6px">Attached Forms & Documents</label>
+    </div>
+
+    <!-- Attached docs list -->
+    <div id="attached-docs-${step.id}">
+      ${docs.map((d,i) => `
+        <div class="attached-doc">
+          <span style="color:var(--cad);flex-shrink:0">📄</span>
+          <div style="flex:1;min-width:0">
+            <div class="attached-doc-name">${escHtml(d.name)}</div>
+            <div style="font-size:10px;margin-top:1px;display:flex;gap:8px">
+              <span style="color:var(--cad);font-family:var(--font-mono)">${escHtml(d.version||'—')}</span>
+              <span style="color:var(--muted)">${escHtml(d.size||'')}</span>
+            </div>
+          </div>
+          <button class="attached-doc-remove"
+            onclick="removeAttachedDoc('${step.id}',${i})"
+            title="Remove">✕</button>
+        </div>`).join('')}
+    </div>
+
+    <!-- Drop zone -->
+    <div class="doc-drop-zone" id="dropzone-${step.id}"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="handleDocDrop(event,'${step.id}')"
+      onclick="document.getElementById('file-input-${step.id}').click()">
+      <div class="doc-drop-zone-icon">📂</div>
+      <div class="doc-drop-zone-text">
+        <strong>Drop a file here</strong> or click to browse<br/>
+        PDF, Word, Excel, or any document to attach to this step
+      </div>
+      <input type="file" id="file-input-${step.id}" style="display:none"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+        multiple onchange="handleDocFileInput(event,'${step.id}')" />
     </div>`;
 }
 
-// ── Step selection and editing ─────────────────────────────────────────────────
-function selectStep(id) {
-  if (id === '__trigger__') {
-    _selectedStep = { id: '__trigger__' };
-  } else {
-    _selectedStep = _selectedTmpl?.steps?.find(s => s.id === id) || null;
-  }
-  // Re-render spine to update selection highlight
-  const spineEl = document.getElementById('spine-wrap');
-  if (spineEl) spineEl.innerHTML = renderSpine();
-  // Re-render config panel
-  const cfg = document.getElementById('config-panel');
-  if (cfg) cfg.innerHTML = renderConfigPanel();
+// ── Document attachment handlers ──────────────────────────────────────────────
+function handleDocDrop(e, stepId) {
+  e.preventDefault();
+  document.getElementById('dropzone-' + stepId)?.classList.remove('drag-over');
+  const files = [...(e.dataTransfer?.files || [])];
+  attachFilesToStep(stepId, files);
 }
 
-function refreshConfigPanel() {
-  const cfg = document.getElementById('config-panel');
-  if (cfg) cfg.innerHTML = renderConfigPanel();
+function handleDocFileInput(e, stepId) {
+  const files = [...(e.target?.files || [])];
+  attachFilesToStep(stepId, files);
+  e.target.value = ''; // reset so same file can be re-added
+}
+
+function attachFilesToStep(stepId, files) {
+  if (!files.length) return;
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step) return;
+  if (!step._attachedDocs) step._attachedDocs = [];
+
+  files.forEach(f => {
+    if (step._attachedDocs.find(d => d.name === f.name)) return; // skip duplicate
+    const kb = f.size < 1024 ? f.size + ' B'
+             : f.size < 1048576 ? Math.round(f.size/1024) + ' KB'
+             : (f.size/1048576).toFixed(1) + ' MB';
+
+    // Prompt for document version — required for regulated industries
+    const version = prompt(
+      `Document version for "${f.name}"\n\n` +
+      `Enter the released version number (e.g. Rev C, v2.1, 2026-03-21).\n` +
+      `This must match the latest released copy on file.`,
+      ''
+    );
+    // Cancelled prompt = don't attach
+    if (version === null) return;
+
+    step._attachedDocs.push({
+      name:    f.name,
+      size:    kb,
+      version: version.trim() || 'No version specified',
+      file:    f,
+    });
+  });
+
+  _dirtySteps = true;
+  reRenderSpine();
+  const attached = files.length;
+  if (attached) cadToast(attached === 1 ? `Attached: ${files[0].name}` : `${attached} files attached`, 'success');
+}
+
+function removeAttachedDoc(stepId, idx) {
+  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
+  if (!step?._attachedDocs) return;
+  step._attachedDocs.splice(idx, 1);
+  _dirtySteps = true;
+  reRenderSpine();
+}
+
+// ── Thin re-render wrapper (replaces refreshConfigPanel) ──────────────────────
+function reRenderSpine() {
   const spineEl = document.getElementById('spine-wrap');
   if (spineEl) spineEl.innerHTML = renderSpine();
 }
+
+// ── Step selection ────────────────────────────────────────────────────────────
+function selectStep(id) {
+  // Toggle — clicking selected step collapses it
+  if (_selectedStep?.id === id) {
+    _selectedStep = null;
+  } else {
+    _selectedStep = id === '__trigger__'
+      ? { id: '__trigger__' }
+      : (_selectedTmpl?.steps?.find(s => s.id === id) || null);
+  }
+  reRenderSpine();
+}
+
+function refreshConfigPanel() { reRenderSpine(); } // backwards compat shim
 
 function updateStepField(field, value) {
   if (!_selectedStep || _selectedStep.id === '__trigger__') return;
   _selectedStep[field] = value;
   _dirtySteps = true;
-  // Live-update the spine card (just re-render it)
-  const spineEl = document.getElementById('spine-wrap');
-  if (spineEl) spineEl.innerHTML = renderSpine();
+  // Only re-render spine for fields that affect the card summary line
+  const cardFields = ['name','assignee_name','assignee_email','assignee_role',
+                      'due_days','due_type','escalate_after_days','parallel_required'];
+  if (cardFields.includes(field)) reRenderSpine();
 }
 
 function markDirty() { _dirtySteps = true; }
@@ -975,11 +1133,7 @@ function addStep(type) {
   _selectedStep = newStep;
   _dirtySteps = true;
 
-  // Refresh spine and config
-  const spineEl = document.getElementById('spine-wrap');
-  if (spineEl) spineEl.innerHTML = renderSpine();
-  const cfg = document.getElementById('config-panel');
-  if (cfg) cfg.innerHTML = renderConfigPanel();
+  reRenderSpine();
   // Hide AI banner
   document.getElementById('ai-banner')?.remove();
 }
@@ -988,14 +1142,10 @@ function removeStep(id) {
   if (!_selectedTmpl?.steps) return;
   if (!confirm('Remove this step?')) return;
   _selectedTmpl.steps = _selectedTmpl.steps.filter(s => s.id !== id);
-  // Re-sequence
   _selectedTmpl.steps.forEach((s, i) => s.sequence_order = i + 1);
   if (_selectedStep?.id === id) _selectedStep = null;
   _dirtySteps = true;
-  const spineEl = document.getElementById('spine-wrap');
-  if (spineEl) spineEl.innerHTML = renderSpine();
-  const cfg = document.getElementById('config-panel');
-  if (cfg) cfg.innerHTML = renderConfigPanel();
+  reRenderSpine();
 }
 
 // ── Save template ─────────────────────────────────────────────────────────────
@@ -1038,6 +1188,7 @@ async function saveTemplate() {
         assignee_name:       step.assignee_name || null,
         assignee_org:        step.assignee_org || null,
         due_days:            step.due_days || null,
+        due_type:            step.due_type || 'after_prior',
         escalate_after_days: step.escalate_after_days || null,
         escalate_to:         step.escalate_to || 'pm',
         parallel_required:   !!step.parallel_required,
