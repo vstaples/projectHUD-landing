@@ -1199,17 +1199,14 @@ Return ONLY a JSON array of workflow steps (no markdown, no explanation). Each s
 
 Use only the step types listed. For branches, add 2-3 conditions. Keep it to 3-6 steps maximum.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/ai-draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      body: JSON.stringify({ prompt, max_tokens: 1000 }),
     });
 
     const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `API error ${response.status}`);
     const raw  = data.content?.map(c => c.text || '').join('');
     const clean = raw.replace(/```json|```/g, '').trim();
     const draftSteps = JSON.parse(clean);
