@@ -14,6 +14,7 @@
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/sidebar.js"></script>
+<script src="/js/meetings.js"></script>
 
 <style>
 /* ── Reset & root vars (mirror projects.html) ── */
@@ -2908,25 +2909,7 @@ function toggleInstanceStep(instId, stepId) {
     }
   }
 }
-
-// ── Inline meeting card for workflow meeting steps ────────────────────────────
-// Cache: meetingId → { meeting, agenda, attendees, actionItems, minutes }
-const _cadMeetingCache = {};
-
-function _cadFmtDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-}
-function _cadFmtDateTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
-    + ', ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-}
-function _cadCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
-function _cadInitials(name) {
-  return (name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-}
+// ── Meeting step rendering — delegates entirely to MeetingCard (meetings.js) ──
 
 async function renderCadMeetingStep(inst, step) {
   const el = document.getElementById('cad-meeting-' + step.id);
@@ -2937,267 +2920,24 @@ async function renderCadMeetingStep(inst, step) {
     e.event_type === 'meeting_created' && e.template_step_id === step.id);
   const meetingId = existing?.outcome_notes || null;
 
-  // ── Phase A: no meeting record yet ──────────────────────────────────────────
   if (!meetingId) {
-    const agenda = step._meetingAgenda || [];
-    el.innerHTML = `
-      ${agenda.length ? `
-      <div style="margin-bottom:10px">
-        <div style="font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Agenda</div>
-        ${agenda.map((item,i) => `
-          <div style="display:flex;gap:8px;font-size:11px;color:var(--text2);padding:4px 0;
-            border-bottom:1px solid rgba(255,255,255,.04)">
-            <span style="color:#4fc88c;flex-shrink:0;font-weight:600">${i+1}.</span>
-            <span>${escHtml(item)}</span>
-          </div>`).join('')}
-      </div>` : ''}
-      ${step.meeting_comments ? `
-      <div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:10px;
-        padding:8px 10px;background:rgba(255,255,255,.03);border-radius:4px;
-        border-left:2px solid var(--border2)">
-        ${escHtml(step.meeting_comments)}
-      </div>` : ''}
-      <button id="cad-start-btn-${step.id}"
-        onclick="cadStartMeeting('${inst.id}','${step.id}')"
-        style="width:100%;padding:10px;background:rgba(79,200,140,.1);
-          border:1px solid rgba(79,200,140,.35);color:#4fc88c;
-          font-size:13px;font-weight:600;cursor:pointer;border-radius:5px">
-        ◉ Start Meeting
-      </button>`;
-    return;
-  }
-
-  // ── Phase B: meeting record exists — load and render inline ─────────────────
-  el.innerHTML = `<div style="font-size:11px;color:var(--muted)">Loading meeting…</div>`;
-
-  try {
-    let cached = _cadMeetingCache[meetingId];
-    if (!cached) {
-      const [meetRows, agendaRows, attendeeRows, aiRows, minsRows] = await Promise.all([
-        API.get(`meetings?id=eq.${meetingId}&limit=1`).catch(()=>[]),
-        API.get(`meeting_agenda_items?meeting_id=eq.${meetingId}&order=sequence_order`).catch(()=>[]),
-        API.get(`meeting_attendees?meeting_id=eq.${meetingId}&select=*,users(name,email)`).catch(()=>[]),
-        API.get(`meeting_action_items?meeting_id=eq.${meetingId}&order=created_at`).catch(()=>[]),
-        API.get(`meeting_minutes?meeting_id=eq.${meetingId}&limit=1`).catch(()=>[]),
-      ]);
-      cached = {
-        meeting:     meetRows?.[0] || null,
-        agenda:      agendaRows || [],
-        attendees:   attendeeRows || [],
-        actionItems: aiRows || [],
-        minutes:     minsRows?.[0] || null,
-      };
-      _cadMeetingCache[meetingId] = cached;
-    }
-
-    const { meeting, agenda, attendees, actionItems, minutes } = cached;
-    const statusColors = {
-      scheduled:   'rgba(79,142,247,.15);color:var(--accent)',
-      in_progress: 'rgba(212,144,31,.15);color:var(--amber)',
-      completed:   'rgba(255,255,255,.07);color:var(--muted)',
-      cancelled:   'rgba(192,64,74,.12);color:var(--red)',
-    };
-    const sc = statusColors[meeting?.status] || statusColors.scheduled;
-    const today = new Date().toLocaleDateString('en-CA');
-
-    // Build resource name lookup from already-loaded _resources_cad
-    const resName = id => {
-      const r = _resources_cad.find(x => x.id === id);
-      return r ? r.name : null;
-    };
-
-    el.innerHTML = `
-      <!-- meeting header row -->
-      <div style="display:flex;align-items:center;justify-content:space-between;
-        margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">
-            ${escHtml(meeting?.title || step.name || 'Meeting')}
-          </div>
-          <div style="font-size:10px;color:var(--muted)">
-            ${meeting?.meeting_date ? _cadFmtDateTime(meeting.meeting_date) : 'Date TBD'}
-            ${meeting?.scheduled_duration_minutes ? ' · ' + meeting.scheduled_duration_minutes + ' min' : ''}
-            ${meeting?.location_or_link ? ' · 📍 ' + escHtml(meeting.location_or_link) : ''}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:10px;padding:2px 8px;border-radius:5px;
-            background:${sc.split(';')[0]};${sc.split(';')[1]}">
-            ${_cadCap(meeting?.status||'scheduled')}
-          </span>
-          <a href="/meeting-minutes.html?meeting_id=${meetingId}"
-            target="_blank"
-            style="font-size:10px;padding:3px 8px;border-radius:5px;
-              border:1px solid var(--border2);background:var(--surf2);
-              color:var(--text2);text-decoration:none;white-space:nowrap">
-            ✎ Edit minutes
-          </a>
-        </div>
-      </div>
-
-      <!-- next meeting -->
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-        color:var(--muted);margin-bottom:4px">Next meeting</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px"
-        id="cad-meet-next-${meetingId}">
-        ${minutes?.next_meeting_date
-          ? `<span style="color:var(--text);font-weight:600">${_cadFmtDate(minutes.next_meeting_date)}</span>`
-          : 'None'}
-      </div>
-
-      <!-- attendees -->
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-        color:var(--muted);margin-bottom:6px">Attendees</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
-        ${attendees.length ? attendees.map(a => {
-          const name   = a.users?.name || resName(a.stakeholder_id) || 'Attendee';
-          const status = a.attendance_status || 'invited';
-          const sc2    = status === 'attended' ? '#7af0c0'
-                       : status === 'accepted' ? 'var(--accent)'
-                       : status === 'declined' ? '#f07a7a' : 'var(--muted)';
-          return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;
-            border-radius:5px;border:1px solid var(--border);font-size:11px">
-            <div style="width:18px;height:18px;border-radius:50%;background:${sc2}22;
-              color:${sc2};font-size:8px;font-weight:700;display:flex;
-              align-items:center;justify-content:center">${_cadInitials(name)}</div>
-            <span style="color:var(--text)">${escHtml(name)}</span>
-            <span style="color:${sc2};font-size:10px">${status}</span>
-          </div>`;
-        }).join('') : '<div style="font-size:11px;color:var(--muted)">No attendees recorded.</div>'}
-      </div>
-
-      <!-- agenda -->
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-        color:var(--muted);margin-bottom:6px">Agenda</div>
-      <div style="margin-bottom:12px">
-        ${agenda.length ? agenda.map(a => `
-          <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;
-            border-bottom:1px solid var(--border);font-size:12px">
-            <span style="font-size:10px;font-weight:700;color:var(--muted);
-              width:16px;text-align:right;flex-shrink:0;margin-top:1px">
-              ${a.sequence_order}.
-            </span>
-            <span style="color:var(--text);flex:1">${escHtml(a.title)}</span>
-            ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px">${escHtml(a.notes_captured)}</span>` : ''}
-          </div>`).join('')
-        : '<div style="font-size:11px;color:var(--muted)">No agenda items recorded.</div>'}
-      </div>
-
-      <!-- action items -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">
-          Action items
-        </div>
-        <button onclick="cadAddActionItem('${meetingId}','${step.id}')"
-          style="font-size:10px;padding:2px 8px;border-radius:4px;
-            border:1px solid var(--border2);background:transparent;
-            color:var(--muted);cursor:pointer">+ Add</button>
-      </div>
-      <div id="cad-ai-list-${meetingId}" style="margin-bottom:12px">
-        ${actionItems.length ? actionItems.map(ai => {
-          const done    = ai.status === 'complete';
-          const overdue = !done && ai.due_date && ai.due_date < today;
-          const aName   = resName(ai.assigned_to_resource) || '—';
-          return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 8px;
-            border-radius:5px;background:var(--surf2);border:1px solid var(--border);
-            font-size:12px;margin-bottom:4px">
-            <div style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:1px;
-              border:1px solid ${done?'var(--green)':'var(--border2)'};
-              background:${done?'var(--green)':'transparent'};
-              display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff">
-              ${done?'✓':''}
-            </div>
-            <div style="flex:1">
-              <div style="${done?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'};line-height:1.4">
-                ${escHtml(ai.description)}
-              </div>
-              <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px">
-                <span>${escHtml(aName)}</span>
-                ${ai.due_date ? `<span style="color:${overdue?'#f07a7a':'var(--muted)'}">
-                  ${overdue?'⚠ Overdue · ':'Due '}${_cadFmtDate(ai.due_date)}
-                </span>` : ''}
-                <span style="color:${done?'#7af0a0':'var(--amber)'}">
-                  ${ai.status||'open'}
-                </span>
-              </div>
-            </div>
-          </div>`;
-        }).join('') : '<div style="font-size:11px;color:var(--muted)">No action items.</div>'}
-      </div>
-
-      <!-- meeting minutes -->
-      ${meeting?.status !== 'scheduled' ? `
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-        color:var(--muted);margin-bottom:6px">Meeting minutes</div>
-      <div id="cad-minutes-block-${meetingId}">
-        ${minutes ? `
-        <div style="background:var(--surf2);border-radius:7px;padding:10px 12px;margin-bottom:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;
-              letter-spacing:.06em;color:var(--muted)">Meeting minutes</div>
-            <button onclick="cadToggleReplyThread('${meetingId}')"
-              style="background:none;border:none;font-size:11px;color:var(--muted);
-                cursor:pointer;padding:0">↩ Reply</button>
-          </div>
-          ${minutes.summary ? `
-          <div style="margin-bottom:8px">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.05em;margin-bottom:3px">Summary</div>
-            <div style="font-size:12px;color:var(--text);line-height:1.65">${escHtml(minutes.summary)}</div>
-          </div>` : ''}
-          ${minutes.discussion_notes ? `
-          <div style="margin-bottom:8px">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.05em;margin-bottom:3px">Discussion notes</div>
-            <div style="font-size:12px;color:var(--text);line-height:1.65">${escHtml(minutes.discussion_notes)}</div>
-          </div>` : ''}
-          ${minutes.decisions_made ? `
-          <div style="margin-bottom:8px">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.05em;margin-bottom:3px">Decisions &amp; next steps</div>
-            <div style="font-size:12px;color:var(--text);line-height:1.65">${escHtml(minutes.decisions_made)}</div>
-          </div>` : ''}
-          <div style="font-size:10px;color:var(--muted);margin-top:6px;padding-top:6px;
-            border-top:1px solid var(--border)">
-            Status: ${_cadCap(minutes.status||'')}
-            ${minutes.submitted_at ? ' · Submitted ' + _cadFmtDate(minutes.submitted_at) : ''}
-          </div>
-        </div>
-
-        <!-- comment thread -->
-        <div id="cad-rthread-${meetingId}" style="display:none">
-          <div id="cad-rthread-entries-${meetingId}"></div>
-          <div style="display:flex;border:1px solid var(--border2);border-radius:5px;overflow:hidden;margin-top:6px">
-            <textarea id="cad-rthread-input-${meetingId}"
-              placeholder="Add a comment… (Ctrl+Enter to send)"
-              onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();cadPostReply('${meetingId}',null)}"
-              style="flex:1;padding:8px 10px;font-size:12px;font-family:inherit;
-                background:var(--surf2);border:none;color:var(--text);
-                resize:none;min-height:48px;outline:none"></textarea>
-            <button onclick="cadPostReply('${meetingId}',null)"
-              style="padding:0 14px;background:var(--accent);border:none;
-                color:#fff;font-size:12px;font-weight:600;cursor:pointer">Send</button>
-          </div>
-        </div>`
-        : '<div style="font-size:11px;color:var(--muted);font-style:italic">No minutes on file.</div>'}
-      </div>` : ''}`;
-
-    // Load comments if minutes exist
-    if (minutes) {
-      cadLoadReplies(meetingId, step.id, inst.id);
-    }
-
-  } catch(e) {
-    el.innerHTML = `<div style="font-size:11px;color:var(--red)">Failed to load meeting: ${escHtml(e.message)}</div>`;
+    // Phase A — no meeting record yet
+    MeetingCard.renderPreLaunch(step, el, () => cadStartMeeting(inst.id, step.id));
+  } else {
+    // Phase B — meeting exists: render the canonical card
+    await MeetingCard.render(meetingId, el, {
+      editMinutesHref: `/meeting-minutes.html?meeting_id=${meetingId}`,
+    });
   }
 }
 
-// ── Start meeting: create DB record then re-render ────────────────────────────
 async function cadStartMeeting(instId, stepId) {
-  const btn = document.getElementById('cad-start-btn-' + stepId);
-  if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
   const inst = _instances.find(i => i.id === instId);
   const step = inst?._tmplSteps?.find(s => s.id === stepId);
+
+  const btn = document.getElementById('mc-start-btn-' + stepId);
+  if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
+
   try {
     const res = await API.post('meetings', {
       firm_id:                    FIRM_ID_CAD,
@@ -3211,7 +2951,7 @@ async function cadStartMeeting(instId, stepId) {
     if (!meetingId) throw new Error('No meeting ID returned');
 
     // Seed agenda items from template step
-    const agenda = step?._meetingAgenda || [];
+    const agenda = step?._meetingAgenda || step?.meeting_agenda || [];
     if (agenda.length) {
       await Promise.all(agenda.map((title, i) =>
         API.post('meeting_agenda_items', {
@@ -3223,7 +2963,7 @@ async function cadStartMeeting(instId, stepId) {
       ));
     }
 
-    // Write CoC event so the meeting_id is retrievable
+    // Write CoC event
     await API.post('workflow_step_instances', {
       instance_id:      instId,
       firm_id:          FIRM_ID_CAD,
@@ -3232,12 +2972,11 @@ async function cadStartMeeting(instId, stepId) {
       step_type:        'meeting',
       step_name:        step?.name || 'Meeting',
       outcome_notes:    meetingId,
-      event_notes:      `Meeting created: ${step?.name||'Meeting'}`,
+      event_notes:      `Meeting created: ${step?.name || 'Meeting'}`,
       created_at:       new Date().toISOString(),
     });
 
     await _reloadInstance(instId);
-    // Re-fetch inst reference after reload and re-render the card
     const freshInst = _instances.find(i => i.id === instId);
     const freshStep = freshInst?._tmplSteps?.find(s => s.id === stepId);
     if (freshInst && freshStep) renderCadMeetingStep(freshInst, freshStep);
@@ -3248,165 +2987,6 @@ async function cadStartMeeting(instId, stepId) {
   }
 }
 
-// ── Add action item inline ────────────────────────────────────────────────────
-async function cadAddActionItem(meetingId, stepId) {
-  const desc = prompt('Action item description:');
-  if (!desc?.trim()) return;
-  const resourceId = _myResourceId || null;
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 7);
-  try {
-    await API.post('meeting_action_items', {
-      meeting_id:           meetingId,
-      description:          desc.trim(),
-      assigned_to_resource: resourceId,
-      due_date:             dueDate.toLocaleDateString('en-CA'),
-      status:               'open',
-    });
-    // Bust cache and re-render
-    delete _cadMeetingCache[meetingId];
-    const inst = _instances.find(i =>
-      i._stepInsts?.some(e => e.event_type === 'meeting_created' && e.outcome_notes === meetingId));
-    const step = inst?._tmplSteps?.find(s => s.id === stepId);
-    if (inst && step) renderCadMeetingStep(inst, step);
-  } catch(e) {
-    cadToast('Failed to add action item: ' + e.message, 'error');
-  }
-}
-
-// ── Comment / reply thread for meeting minutes ────────────────────────────────
-const _cadReplyCache = {}; // meetingId → activities array
-
-async function cadLoadReplies(meetingId, stepId, instId) {
-  try {
-    // Use workflow_step_comments keyed to instId so replies live in the workflow context
-    const rows = await API.get(
-      `workflow_step_comments?instance_id=eq.${instId}&template_step_id=eq.${stepId}&order=created_at.asc`
-    ).catch(() => []);
-    _cadReplyCache[meetingId] = rows || [];
-    cadRenderReplies(meetingId);
-  } catch(e) { /* replies optional */ }
-}
-
-function cadRenderReplies(meetingId) {
-  const el = document.getElementById('cad-rthread-entries-' + meetingId);
-  if (!el) return;
-  const all = _cadReplyCache[meetingId] || [];
-  const tops = all.filter(r => !r.parent_id);
-  tops.forEach(c => { c.replies = all.filter(r => r.parent_id === c.id); });
-
-  const thread = document.getElementById('cad-rthread-' + meetingId);
-  if (tops.length > 0 && thread) thread.style.display = 'block';
-
-  if (!tops.length) { el.innerHTML = ''; return; }
-
-  el.innerHTML = tops.map(c => {
-    const subs = (c.replies||[]).map(r => `
-      <div style="margin-left:28px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-          <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;
-            background:rgba(79,142,247,.15);color:var(--accent);
-            font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">
-            ${_cadInitials(r.author_name)}
-          </div>
-          <span style="font-size:11px;font-weight:600">${escHtml(r.author_name||'Team')}</span>
-          <span style="font-size:10px;color:var(--muted)">${_cadFmtDateTime(r.created_at)}</span>
-        </div>
-        <div style="font-size:11px;color:rgba(255,255,255,.75);line-height:1.5;padding-left:26px">
-          ${escHtml(r.body)}
-        </div>
-      </div>`).join('');
-
-    return `
-      <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;
-            background:rgba(79,142,247,.15);color:var(--accent);
-            font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center">
-            ${_cadInitials(c.author_name)}
-          </div>
-          <span style="font-size:12px;font-weight:600;flex:1">${escHtml(c.author_name||'Team')}</span>
-          <span style="font-size:10px;color:var(--muted);font-family:monospace">${_cadFmtDateTime(c.created_at)}</span>
-          <button onclick="cadToggleSubReply('${meetingId}','${c.id}')"
-            style="background:none;border:none;font-size:10px;color:var(--muted);cursor:pointer;padding:0">
-            ↩ Reply
-          </button>
-        </div>
-        <div style="font-size:12px;color:rgba(255,255,255,.75);line-height:1.5;padding-left:32px">
-          ${escHtml(c.body)}
-        </div>
-        ${subs}
-        <div id="cad-sub-compose-${meetingId}-${c.id}" style="display:none;margin:6px 0 0 32px">
-          <div style="display:flex;gap:6px">
-            <textarea id="cad-sub-input-${meetingId}-${c.id}" placeholder="Reply…"
-              onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();cadPostReply('${meetingId}','${c.id}')}"
-              style="flex:1;padding:6px 8px;font-size:11px;font-family:inherit;
-                background:var(--surf2);border:1px solid var(--border2);color:var(--text);
-                resize:none;min-height:40px;border-radius:4px;outline:none"></textarea>
-            <button onclick="cadPostReply('${meetingId}','${c.id}')"
-              style="padding:0 10px;background:var(--accent);border:none;
-                color:#fff;font-size:11px;font-weight:600;cursor:pointer;border-radius:4px">Reply</button>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-function cadToggleReplyThread(meetingId) {
-  const el = document.getElementById('cad-rthread-' + meetingId);
-  if (!el) return;
-  const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  if (!open) setTimeout(() => document.getElementById('cad-rthread-input-' + meetingId)?.focus(), 50);
-}
-
-function cadToggleSubReply(meetingId, commentId) {
-  const el = document.getElementById('cad-sub-compose-' + meetingId + '-' + commentId);
-  if (!el) return;
-  const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  if (!open) setTimeout(() => document.getElementById('cad-sub-input-' + meetingId + '-' + commentId)?.focus(), 50);
-}
-
-async function cadPostReply(meetingId, parentId) {
-  const inpId = parentId
-    ? 'cad-sub-input-' + meetingId + '-' + parentId
-    : 'cad-rthread-input-' + meetingId;
-  const inp  = document.getElementById(inpId);
-  const body = inp?.value?.trim();
-  if (!body) return;
-
-  // Find instId and stepId from cache
-  let instId = null, stepId = null;
-  for (const inst of _instances) {
-    const e = inst._stepInsts?.find(ev =>
-      ev.event_type === 'meeting_created' && ev.outcome_notes === meetingId);
-    if (e) { instId = inst.id; stepId = e.template_step_id; break; }
-  }
-  if (!instId) return;
-
-  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
-  try {
-    await API.post('workflow_step_comments', {
-      firm_id:            FIRM_ID_CAD,
-      instance_id:        instId,
-      template_step_id:   stepId,
-      parent_id:          parentId || null,
-      author_resource_id: _myResourceId || null,
-      author_name:        authorName,
-      body,
-      created_at:         new Date().toISOString(),
-    });
-    if (inp) inp.value = '';
-    if (parentId) {
-      const el = document.getElementById('cad-sub-compose-' + meetingId + '-' + parentId);
-      if (el) el.style.display = 'none';
-    }
-    await cadLoadReplies(meetingId, stepId, instId);
-  } catch(e) {
-    cadToast('Comment failed: ' + e.message, 'error');
-  }
-}
 
 // ── Add assignee reassignment from resource picker ────────────────────────────
 async function addReassignment(instId, stepId) {

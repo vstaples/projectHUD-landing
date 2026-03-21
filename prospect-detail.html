@@ -1171,6 +1171,7 @@ body {
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/sidebar.js"></script>
+<script src="/js/meetings.js"></script>
 <script>
 const params   = new URLSearchParams(location.search);
 const PROSPECT_ID = params.get('id');
@@ -1928,40 +1929,6 @@ function renderMeetings() {
           </div>
         </div>
         <div class="meet-expand" id="mexpand-${m.id}" onclick="event.stopPropagation()">
-
-          <div class="mb-label">Next meeting</div>
-          <div id="mnextmeet-${m.id}" style="margin-bottom:12px;font-size:12px;color:var(--muted)">
-            None
-          </div>
-
-          <div class="mb-label">Attendees</div>
-          <div id="mattendees-${m.id}" style="margin-bottom:12px">
-            <div style="font-size:11px;color:var(--muted)">Loading…</div>
-          </div>
-
-          <div class="mb-label">Agenda</div>
-          <div class="agenda-list" id="magenda-${m.id}">
-            <div style="font-size:11px;color:var(--muted)">Loading…</div>
-          </div>
-
-          <div id="maction-wrap-${m.id}">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;margin-bottom:4px">
-              <div class="mb-label" style="margin-top:0">Action items</div>
-              <button class="btn" style="font-size:10px;padding:3px 8px;height:auto"
-                onclick="event.stopPropagation();openAddMeetingActionItem('${m.id}')">
-                + Add
-              </button>
-            </div>
-            <div id="mactions-${m.id}">
-              <div style="font-size:11px;color:var(--muted)">Loading…</div>
-            </div>
-          </div>
-
-          ${m.status !== 'scheduled' ? `
-          <div class="mb-label" style="margin-top:10px">Meeting minutes</div>
-          <div id="mminutes-${m.id}">
-            <div style="font-size:11px;color:var(--muted)">Loading…</div>
-          </div>` : ''}
         </div>
       </div>`).join('')}`;
 }
@@ -1982,149 +1949,9 @@ async function toggleMeetingCard(meetId) {
 }
 
 async function loadMeetingDetail(meetId) {
-  try {
-    const [agendaItems, minutesList, actionItems, attendees, actionResources] = await Promise.all([
-      API.get(`meeting_agenda_items?meeting_id=eq.${meetId}&order=sequence_order`),
-      API.get(`meeting_minutes?meeting_id=eq.${meetId}&limit=1`),
-      API.get(`meeting_action_items?meeting_id=eq.${meetId}&order=created_at`),
-      API.get(`meeting_attendees?meeting_id=eq.${meetId}&select=*,users(name,email)`),
-      API.get(`resources?select=id,first_name,last_name&is_active=eq.true`),
-    ]);
-
-    // Build resource lookup map
-    const resMap = {};
-    (actionResources||[]).forEach(r => { resMap[r.id] = r.first_name + ' ' + r.last_name; });
-
-    // Render attendees — resolves both user_id (Vaughn) and stakeholder_id (resource proxy)
-    const attendeesEl = document.getElementById('mattendees-' + meetId);
-    if (attendeesEl) {
-      if (!attendees?.length) {
-        attendeesEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">No attendees recorded.</div>';
-      } else {
-        attendeesEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:5px">' +
-          attendees.map(a => {
-            // Resolve name: user record, or resource via stakeholder_id, or fallback
-            const name = a.users?.name || resMap[a.stakeholder_id] || 'Attendee';
-            const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-            const status = a.attendance_status || 'invited';
-            const statusColor = status === 'attended' ? '#7af0c0'
-                              : status === 'accepted' ? 'var(--accent)'
-                              : status === 'declined' ? '#f07a7a' : 'var(--muted)';
-            return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;
-                border-radius:5px;border:1px solid var(--border);font-size:11px">
-              <div style="width:18px;height:18px;border-radius:50%;background:${statusColor}22;
-                color:${statusColor};font-size:8px;font-weight:700;display:flex;
-                align-items:center;justify-content:center">${initials}</div>
-              <span style="color:var(--text)">${escHtml(name)}</span>
-              <span style="color:${statusColor};font-size:10px">${status}</span>
-            </div>`;
-          }).join('') + '</div>';
-      }
-    }
-
-    // Render agenda
-    const agendaEl = document.getElementById('magenda-' + meetId);
-    if (agendaEl) {
-      agendaEl.innerHTML = agendaItems?.length
-        ? agendaItems.map(a => `
-            <div class="agenda-item">
-              <span class="agenda-num">${a.sequence_order}.</span>
-              <span style="color:var(--text);flex:1">${escHtml(a.title)}</span>
-              ${a.notes_captured ? `<span style="color:var(--muted);font-size:11px">${escHtml(a.notes_captured)}</span>` : ''}
-            </div>`).join('')
-        : '<div style="font-size:11px;color:var(--muted)">No agenda items recorded.</div>';
-    }
-
-    // Render action items
-    const actionsEl = document.getElementById('mactions-' + meetId);
-    if (actionsEl) {
-      if (!actionItems?.length) {
-        actionsEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">No action items.</div>';
-      } else {
-        const today = new Date().toLocaleDateString('en-CA');
-        // Merge DB data with in-memory cache so toggled statuses survive re-renders
-        if (!_meetingAICache[meetId]) _meetingAICache[meetId] = actionItems || [];
-        else {
-          // Apply cached status overrides to fresh DB data
-          (actionItems||[]).forEach(ai => {
-            const cached = _meetingAICache[meetId].find(c => c.id === ai.id);
-            if (cached) ai.status = cached.status;
-          });
-          _meetingAICache[meetId] = actionItems || [];
-        }
-        actionsEl.innerHTML = (actionItems||[]).map(ai =>
-          renderAIRow(ai, 'meeting_action_items', meetId)
-        ).join('');
-      }
-    }
-
-    // Render minutes
-    const minutesEl = document.getElementById('mminutes-' + meetId);
-    if (minutesEl) {
-      const mins = minutesList?.[0];
-      if (!mins) {
-        // Populate next meeting from minutes record even when no minutes exist
-        const nextMeetEl = document.getElementById('mnextmeet-' + meetId);
-        if (nextMeetEl && mins?.next_meeting_date) {
-          nextMeetEl.textContent = fmtDate(mins.next_meeting_date);
-          nextMeetEl.style.color = 'var(--text)';
-          nextMeetEl.style.fontWeight = '600';
-        }
-        minutesEl.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic">No minutes on file.</div>';
-      } else {
-        minutesEl.innerHTML = `
-          <div class="minutes-block">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
-                Meeting minutes
-              </div>
-              <button class="minutes-reply-btn" onclick="event.stopPropagation();openReplyThread('${meetId}')">
-                ↩ Reply
-              </button>
-            </div>
-            ${mins.summary ? `
-              <div class="mb-section">
-                <div class="mb-section-lbl">Summary</div>
-                <div class="mb-section-text">${escHtml(mins.summary)}</div>
-              </div>` : ''}
-            ${mins.discussion_notes ? `
-              <div class="mb-section">
-                <div class="mb-section-lbl">Discussion notes</div>
-                <div class="mb-section-text">${escHtml(mins.discussion_notes)}</div>
-              </div>` : ''}
-            ${mins.decisions_made ? `
-              <div class="mb-section">
-                <div class="mb-section-lbl">Decisions &amp; next steps</div>
-                <div class="mb-section-text">${escHtml(mins.decisions_made)}</div>
-              </div>` : ''}
-            <div style="font-size:10px;color:var(--muted);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
-              Status: ${capitalize(mins.status||'')}
-              ${mins.submitted_at ? ' · Submitted ' + fmtDate(mins.submitted_at) : ''}
-            </div>`;
-        // Populate next meeting field
-        const nmEl = document.getElementById('mnextmeet-' + meetId);
-        if (nmEl) {
-          if (mins.next_meeting_date) {
-            nmEl.textContent   = fmtDate(mins.next_meeting_date);
-            nmEl.style.color   = 'var(--text)';
-            nmEl.style.fontWeight = '600';
-          } else {
-            nmEl.textContent = 'None';
-          }
-        }
-        minutesEl.innerHTML += `
-            <div class="reply-thread" id="rthread-${meetId}" style="display:none" onclick="event.stopPropagation()">
-              <div id="rthread-entries-${meetId}"></div>
-              <!-- main compose injected by renderMainCompose() -->
-            </div>
-          </div>`;
-        // Load existing replies
-        loadReplies(meetId);
-      }
-    }
-  } catch(e) {
-    console.error('Failed to load meeting detail:', e);
-  }
+  const expand = document.getElementById('mexpand-' + meetId);
+  if (!expand) return;
+  await MeetingCard.render(meetId, expand, { prospectId: PROSPECT_ID });
 }
 
 // ── proposals tab ──────────────────────────────────────
@@ -2398,13 +2225,13 @@ async function saveActionItem() {
       });
       window._addAITargetMeetId = null;
       closeDrawer('ai-overlay');
-      // Re-expand the meeting card with fresh data
+      // Bust cache and re-render the meeting card with fresh data
       setTimeout(() => {
+        MeetingCard.bust(targetMeetId);
         const card   = document.getElementById('mcard-' + targetMeetId);
         const expand = document.getElementById('mexpand-' + targetMeetId);
         if (card && expand) {
           card.classList.add('open');
-          expand.style.display = 'block';
           card.dataset.loaded = '1';
           loadMeetingDetail(targetMeetId);
         }
@@ -3128,11 +2955,10 @@ async function saveEditActionItem() {
     if (returnMeetId) {
       switchTab('meetings');
       setTimeout(() => {
-        const card   = document.getElementById('mcard-' + returnMeetId);
-        const expand = document.getElementById('mexpand-' + returnMeetId);
-        if (card && expand) {
+        MeetingCard.bust(returnMeetId);
+        const card = document.getElementById('mcard-' + returnMeetId);
+        if (card) {
           card.classList.add('open');
-          expand.style.display = 'block';
           card.dataset.loaded = '1';
           loadMeetingDetail(returnMeetId);
         }
@@ -3159,11 +2985,10 @@ async function deleteActionItem() {
     if (returnMeetId2) {
       switchTab('meetings');
       setTimeout(() => {
-        const card   = document.getElementById('mcard-' + returnMeetId2);
-        const expand = document.getElementById('mexpand-' + returnMeetId2);
-        if (card && expand) {
+        MeetingCard.bust(returnMeetId2);
+        const card = document.getElementById('mcard-' + returnMeetId2);
+        if (card) {
           card.classList.add('open');
-          expand.style.display = 'block';
           card.dataset.loaded = '1';
           loadMeetingDetail(returnMeetId2);
         }
@@ -3522,206 +3347,6 @@ async function toggleMeetingAIStatus(id, currentStatus, el, table, meetId) {
 
   } catch(e) {
     console.error('toggleMeetingAIStatus error:', e);
-  }
-}
-
-// ── meeting minutes reply thread ────────────────────────
-// Replies stored as prospect_activities notes tagged [meeting:ID]
-// Sub-replies tagged [meeting:ID][replyto:INDEX]
-const _replyCache = {};
-
-function openReplyThread(meetId) {
-  const thread = document.getElementById('rthread-' + meetId);
-  if (!thread) return;
-  thread.style.display = 'block';
-  setTimeout(() => {
-    const inp = document.getElementById('rthread-input-' + meetId);
-    if (inp) inp.focus();
-  }, 50);
-}
-
-function toggleReplyThread(meetId) {
-  const thread = document.getElementById('rthread-' + meetId);
-  if (!thread) return;
-  const isOpen = thread.style.display !== 'none';
-  thread.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) setTimeout(() => {
-    const inp = document.getElementById('rthread-input-' + meetId);
-    if (inp) inp.focus();
-  }, 50);
-}
-
-function handleReplyKey(e, meetId, parentIdx) {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    e.preventDefault();
-    postReply(meetId, parentIdx);
-  }
-}
-
-async function loadReplies(meetId) {
-  try {
-    const tag = '[meeting:' + meetId + ']';
-    const acts = await API.get(
-      `prospect_activities?prospect_id=eq.${PROSPECT_ID}&type=eq.note&order=created_at`
-    );
-    _replyCache[meetId] = (acts || []).filter(a => a.summary && a.summary.includes(tag));
-    renderReplies(meetId);
-  } catch(e) { /* replies are optional */ }
-}
-
-function resolveName(resourceId) {
-  if (!resourceId) {
-    // Fallback: use currentResource if we know who posted
-    return _currentResource
-      ? _currentResource.first_name + ' ' + _currentResource.last_name
-      : 'Team member';
-  }
-  const r = resources.find(res => res.id === resourceId);
-  return r ? r.first_name + ' ' + r.last_name : 'Team member';
-}
-
-function renderReplies(meetId) {
-  const el = document.getElementById('rthread-entries-' + meetId);
-  if (!el) return;
-  const all = _replyCache[meetId] || [];
-
-  // Separate top-level replies from sub-replies
-  const tops = all.filter(r => !r.summary.includes('[replyto:'));
-  const subs = all.filter(r =>  r.summary.includes('[replyto:'));
-
-  // Auto-show thread when there are existing replies
-  const thread = document.getElementById('rthread-' + meetId);
-  if (tops.length > 0 && thread) thread.style.display = 'block';
-
-  if (!tops.length) {
-    el.innerHTML = `
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-style:italic">
-        No comments yet. Start the conversation.
-      </div>`;
-    renderMainCompose(el, meetId);
-    return;
-  }
-
-  el.innerHTML = tops.map((r, idx) => {
-    const name     = resolveName(r.created_by);
-    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-    const text     = (r.summary || '').split('[meeting:')[0].trim();
-    const myIdx    = idx;
-    const subReplies = subs.filter(s => s.summary.includes('[replyto:' + myIdx + ']'));
-
-    const subHtml = subReplies.map(s => {
-      const sName = resolveName(s.created_by);
-      const sInit = sName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-      const sText = (s.summary || '').split('[meeting:')[0].trim();
-      return `
-        <div class="reply-entry" style="margin-top:8px;margin-left:30px">
-          <div class="reply-av" style="width:18px;height:18px;font-size:7px">${sInit}</div>
-          <div class="reply-bubble" style="border-radius:0 6px 6px 6px">
-            <div class="reply-meta">
-              <span style="font-weight:600;color:var(--text)">${escHtml(sName)}</span>
-              <span>${fmtDateTime(s.created_at)}</span>
-            </div>
-            <div class="reply-text">${escHtml(sText)}</div>
-          </div>
-        </div>`;
-    }).join('');
-
-    return `
-      <div class="reply-entry" id="reply-${meetId}-${idx}">
-        <div class="reply-av">${initials}</div>
-        <div class="reply-bubble" style="flex:1">
-          <div class="reply-meta">
-            <span style="font-weight:600;color:var(--text)">${escHtml(name)}</span>
-            <span style="display:flex;align-items:center;gap:8px">
-              ${fmtDateTime(r.created_at)}
-              <button style="background:none;border:none;color:var(--muted);font-size:10px;
-                cursor:pointer;padding:0" onclick="event.stopPropagation();toggleSubReply('${meetId}',${idx})">
-                ↩ Reply
-              </button>
-            </span>
-          </div>
-          <div class="reply-text">${escHtml(text)}</div>
-          ${subHtml}
-          <div id="subreply-compose-${meetId}-${idx}" style="display:none;margin-top:8px">
-            <div class="reply-compose" onclick="event.stopPropagation()">
-              <textarea placeholder="Reply to ${escHtml(name)}…" rows="2"
-                id="subreply-input-${meetId}-${idx}"
-                onkeydown="event.stopPropagation();handleReplyKey(event,'${meetId}',${idx})"
-                onclick="event.stopPropagation()"></textarea>
-              <button class="reply-send" onclick="event.stopPropagation();postReply('${meetId}',${idx})">Send</button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-
-  // Append main compose at bottom
-  const compose = document.createElement('div');
-  renderMainCompose(compose, meetId);
-  el.appendChild(compose);
-}
-
-function renderMainCompose(container, meetId) {
-  const div = document.createElement('div');
-  div.innerHTML = `
-    <div class="reply-compose" style="margin-top:8px" onclick="event.stopPropagation()">
-      <textarea id="rthread-input-${meetId}"
-        placeholder="Add a comment… (Ctrl+Enter to send)"
-        rows="2"
-        onkeydown="event.stopPropagation();handleReplyKey(event,'${meetId}',null)"
-        onclick="event.stopPropagation()"></textarea>
-      <button class="reply-send" onclick="event.stopPropagation();postReply('${meetId}',null)">Send</button>
-    </div>`;
-  container.appendChild(div);
-}
-
-function toggleSubReply(meetId, idx) {
-  const el = document.getElementById('subreply-compose-' + meetId + '-' + idx);
-  if (!el) return;
-  const isOpen = el.style.display !== 'none';
-  el.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) setTimeout(() => {
-    const inp = document.getElementById('subreply-input-' + meetId + '-' + idx);
-    if (inp) inp.focus();
-  }, 50);
-}
-
-async function postReply(meetId, parentIdx) {
-  const isSubReply = parentIdx !== null && parentIdx !== undefined;
-  const inpId = isSubReply
-    ? 'subreply-input-' + meetId + '-' + parentIdx
-    : 'rthread-input-' + meetId;
-  const inp = document.getElementById(inpId);
-  const text = inp ? inp.value.trim() : '';
-  if (!text) return;
-
-  const resourceId = _currentResource ? _currentResource.id : null;
-  const tag = isSubReply
-    ? ' [meeting:' + meetId + '][replyto:' + parentIdx + ']'
-    : ' [meeting:' + meetId + ']';
-
-  try {
-    const payload = {
-      prospect_id: PROSPECT_ID,
-      type:        'note',
-      date:        new Date().toISOString(),
-      summary:     text + tag,
-    };
-    if (resourceId) payload.created_by = resourceId;
-    await API.post('prospect_activities', payload);
-
-    if (!_replyCache[meetId]) _replyCache[meetId] = [];
-    _replyCache[meetId].push({
-      summary:    text + tag,
-      created_by: resourceId,
-      created_at: new Date().toISOString(),
-    });
-
-    if (inp) inp.value = '';
-    renderReplies(meetId);
-  } catch(e) {
-    console.error(e);
-    alert('Failed to post comment.');
   }
 }
 
