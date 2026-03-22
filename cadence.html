@@ -1182,8 +1182,7 @@ function renderEditor() {
             cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
             margin-bottom:-1px;letter-spacing:.02em">Diagram</button>
         ${!isReleased ? `
-        <button onclick="switchEditorView('steps');requestAnimationFrame(()=>document.querySelector('.add-step-btn')?.click())"
-          id="tab-add-step-btn"
+        <button id="tab-add-step-btn" onclick="tabAddStep(event)"
           style="margin-left:auto;padding:4px 12px;font-size:10px;background:none;
             border:1px solid var(--cad-wire);border-radius:3px;color:var(--cad);
             cursor:pointer;font-family:var(--font-mono);letter-spacing:.04em">+ Add step</button>` : ''}
@@ -1575,6 +1574,7 @@ function renderDAG() {
 
   // Store hit zones for event handler
   canvas._dagHitZones = _dagHitZones;
+  const zlbl = document.getElementById('dag-zoom-label');
   if (zlbl) zlbl.textContent = Math.round(_dagScale * 100) + '%';
 
   // Build HTML decision cards
@@ -3018,8 +3018,81 @@ function _fmtSaveTime(d) {
 }
 
 // ── Step picker ───────────────────────────────────────────────────────────────
-function toggleStepPicker(e) {
+function tabAddStep(e) {
+  if (_editorView === 'diagram') {
+    // In diagram mode — show insert position picker, then step type picker
+    _dagShowInsertPicker(e);
+  } else {
+    // In list mode — open step type picker anchored to the button
+    toggleStepPicker(e);
+  }
+}
+
+// ── Diagram-mode step insertion ───────────────────────────────────────────────
+let _dagInsertAfterIdx = null; // index to insert after (-1 = prepend)
+
+function _dagShowInsertPicker(e) {
   e.stopPropagation();
+  if (!_selectedTmpl) return;
+  const steps = (_selectedTmpl.steps || [])
+    .filter(s => s.step_type !== 'trigger')
+    .sort((a, b) => a.sequence_order - b.sequence_order);
+
+  // Build a small dropdown overlay
+  let existing = document.getElementById('dag-insert-picker');
+  if (existing) { existing.remove(); return; }
+
+  const btn  = e.currentTarget;
+  const rect = btn.getBoundingClientRect();
+
+  const picker = document.createElement('div');
+  picker.id = 'dag-insert-picker';
+  picker.style.cssText = `position:fixed;z-index:300;background:var(--bg2);
+    border:1px solid var(--border2);border-radius:6px;padding:8px 0;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:220px;
+    top:${rect.bottom + 6}px;left:${rect.left}px;font-family:var(--font-ui)`;
+
+  picker.innerHTML = `
+    <div style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;
+      padding:4px 12px 6px;font-weight:600">Insert position</div>
+    <div onclick="_dagInsertAt(-1,event)"
+      style="padding:7px 12px;font-size:11px;color:var(--text2);cursor:pointer;
+        display:flex;align-items:center;gap:8px"
+      onmouseover="this.style.background='var(--surf2)'"
+      onmouseout="this.style.background=''">
+      <span style="color:var(--cad)">⊕</span> At the beginning
+    </div>
+    ${steps.map((s, i) => `
+    <div onclick="_dagInsertAt(${i},event)"
+      style="padding:7px 12px;font-size:11px;color:var(--text2);cursor:pointer;
+        display:flex;align-items:center;gap:8px"
+      onmouseover="this.style.background='var(--surf2)'"
+      onmouseout="this.style.background=''">
+      <span style="color:var(--muted);font-size:9px;font-family:var(--font-mono);
+        min-width:16px">${s.sequence_order}</span>
+      After: ${escHtml(s.name || STEP_META[s.step_type]?.label || 'Step')}
+    </div>`).join('')}`;
+
+  document.body.appendChild(picker);
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function _close() {
+      document.getElementById('dag-insert-picker')?.remove();
+      document.removeEventListener('click', _close);
+    });
+  }, 0);
+}
+
+function _dagInsertAt(afterIdx, e) {
+  e?.stopPropagation();
+  document.getElementById('dag-insert-picker')?.remove();
+  _dagInsertAfterIdx = afterIdx;
+  // Now open the step type picker anchored to the Add step button
+  const btn = document.getElementById('tab-add-step-btn');
+  if (btn) toggleStepPicker({ currentTarget: btn, stopPropagation: ()=>{} });
+}
+
+function toggleStepPicker(e) {
   const picker = document.getElementById('step-type-picker');
   if (!picker) return;
 
@@ -3096,6 +3169,22 @@ function addStep(type) {
 
   if (!_selectedTmpl.steps) _selectedTmpl.steps = [];
   _selectedTmpl.steps.push(newStep);
+
+  // If called from diagram mode with a specific insert position, reorder now
+  if (_dagInsertAfterIdx !== null) {
+    const nonTrigger = _selectedTmpl.steps
+      .filter(s => s.step_type !== 'trigger')
+      .sort((a, b) => a.sequence_order - b.sequence_order);
+    // Remove newStep from end of nonTrigger, insert at target position
+    const withoutNew = nonTrigger.filter(s => s.id !== newStep.id);
+    const insertIdx  = _dagInsertAfterIdx + 1; // -1+1=0 (beginning), 0+1=1 (after first), etc.
+    withoutNew.splice(insertIdx, 0, newStep);
+    withoutNew.forEach((s, i) => s.sequence_order = i + 1);
+    const trigger = _selectedTmpl.steps.find(s => s.step_type === 'trigger');
+    _selectedTmpl.steps = [...(trigger ? [trigger] : []), ...withoutNew];
+    _dagInsertAfterIdx = null;
+  }
+
   _selectedStep = newStep;
   _dirtySteps = true;
   _structuralChange = true;
@@ -3107,8 +3196,17 @@ function addStep(type) {
   _refreshCoCIfOpen();
 
   reRenderSpine();
-  // Hide AI banner
   document.getElementById('ai-banner')?.remove();
+
+  // In diagram mode, open the new step in the slide panel
+  if (_editorView === 'diagram') {
+    requestAnimationFrame(() => _dagJumpToStep(newStep.id, false));
+  } else {
+    // In list mode, scroll to the new step
+    requestAnimationFrame(() => {
+      document.getElementById(`sstep-${newStep.id}`)?.scrollIntoView({ behavior:'smooth', block:'center' });
+    });
+  }
 }
 
 // ── Step drag-and-drop reordering ─────────────────────────────────────────────
