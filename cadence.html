@@ -4781,18 +4781,20 @@ function renderInstanceDetail(el, inst) {
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--muted);margin-bottom:8px">Complete this step</div>
 
-                      <!-- Tier 1: Semantic outcome buttons -->
+                      <!-- Tier 1: Semantic outcome buttons — hollow dot, fills on select -->
                       <div style="display:flex;flex-direction:column;gap:5px" id="outcome-btns-${s.id}">
                         ${_getOutcomes(s).map(o => `
                         <button id="obtn-${s.id}-${o.id}"
-                          onclick="selectOutcome('${s.id}','${escHtml(o.id)}',${!!o.requiresReset})"
+                          onclick="selectOutcome('${s.id}','${escHtml(o.id)}',${!!o.requiresReset},${!!o.requiresSuspend})"
                           style="display:flex;align-items:center;gap:10px;padding:9px 12px;
                             border:1px solid ${o.color}55;border-radius:6px;
-                            background:${o.color}11;cursor:pointer;text-align:left;width:100%;
+                            background:${o.color}0a;cursor:pointer;text-align:left;width:100%;
                             transition:background .12s"
                           onmouseover="this.style.background='${o.color}22'"
-                          onmouseout="this.style.background=this.classList.contains('selected')?'${o.color}33':'${o.color}11'">
-                          <div style="width:9px;height:9px;border-radius:50%;background:${o.color};flex-shrink:0"></div>
+                          onmouseout="this.style.background=this.classList.contains('selected')?'${o.color}33':'${o.color}0a'">
+                          <div id="obtn-dot-${s.id}-${o.id}"
+                            style="width:9px;height:9px;border-radius:50%;flex-shrink:0;
+                              border:1.5px solid ${o.color};background:transparent"></div>
                           <span style="font-size:12px;font-weight:500;color:${o.color}">${escHtml(o.label)}</span>
                           ${o.holdsForActions ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7">holds until actions resolve</span>` : ''}
                           ${o.requiresSuspend ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7">suspends instance</span>` : ''}
@@ -4808,8 +4810,28 @@ function renderInstanceDetail(el, inst) {
                           placeholder="Add context, reason, or summary…"></textarea>
                       </div>
 
-                      <!-- Tier 2: Routing override — auto-expands for reset outcomes, opt-in for others -->
-                      <div id="routing-override-${s.id}" style="margin-top:10px;
+                      <!-- Routing disposition — hidden until a reset outcome is selected -->
+                      <div id="routing-disposition-${s.id}" style="display:none;margin-top:10px">
+                        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;
+                          text-transform:uppercase;color:var(--muted);margin-bottom:6px">
+                          Return workflow to
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px" id="route-options-${s.id}">
+                          <!-- Populated by selectOutcome based on prior steps -->
+                        </div>
+                      </div>
+
+                      <!-- Suspend condition — hidden until a suspend outcome is selected -->
+                      <div id="suspend-condition-wrap-${s.id}" style="display:none;margin-top:8px">
+                        <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                          text-transform:uppercase;display:block;margin-bottom:3px">
+                          Condition to re-activate</label>
+                        <input class="config-input" id="suspend-condition-${s.id}"
+                          style="font-size:11px" placeholder="e.g. Revised design package received" />
+                      </div>
+
+                      <!-- Routing override — collapsed opt-in for non-reset outcomes -->
+                      <div id="routing-override-${s.id}" style="display:none;margin-top:10px;
                         border:1px solid var(--border);border-radius:6px;overflow:hidden">
                         <button onclick="toggleRoutingOverride('${s.id}')"
                           style="width:100%;padding:8px 12px;background:var(--bg2);border:none;
@@ -4820,10 +4842,6 @@ function renderInstanceDetail(el, inst) {
                         </button>
                         <div id="routing-body-${s.id}" style="display:none;padding:10px 12px;
                           border-top:1px solid var(--border);background:var(--bg1)">
-                          <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.5">
-                            Return the workflow to a prior step instead of advancing. The selected step
-                            will be re-activated and the CoC will record the reason.
-                          </div>
                           <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
                             text-transform:uppercase;display:block;margin-bottom:4px">Return to step</label>
                           <select id="route-target-${s.id}" class="config-select" style="font-size:11px;width:100%">
@@ -4834,16 +4852,10 @@ function renderInstanceDetail(el, inst) {
                               .map(ps => `<option value="${ps.id}">${ps.sequence_order}. ${escHtml(ps.name||STEP_META[ps.step_type]?.label||'Step')}</option>`)
                               .join('')}
                           </select>
-                          <div id="suspend-condition-wrap-${s.id}" style="display:none;margin-top:8px">
-                            <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
-                              text-transform:uppercase;display:block;margin-bottom:3px">Condition to re-activate</label>
-                            <input class="config-input" id="suspend-condition-${s.id}"
-                              style="font-size:11px" placeholder="e.g. Revised design package received" />
-                          </div>
                         </div>
                       </div>
 
-                      <!-- Submit button — appears once an outcome is selected -->
+                      <!-- Submit button — appears once outcome + any required disposition is selected -->
                       <button id="complete-submit-${s.id}" style="display:none;margin-top:10px;
                         width:100%;padding:9px;border-radius:6px;border:none;
                         background:var(--cad);color:#fff;font-size:12px;font-weight:600;
@@ -5211,43 +5223,153 @@ async function startStep(instId, stepId) {
 }
 
 // ── Complete step UI helpers ──────────────────────────────────────────────────
-function selectOutcome(stepId, outcomeId, requiresReset) {
-  // Deselect all buttons
-  document.querySelectorAll(`#outcome-btns-${stepId} button`).forEach(b => {
-    b.classList.remove('selected');
-    b.style.outline = 'none';
-    b.style.boxShadow = 'none';
-  });
-  // Select clicked button
-  const btn = document.getElementById(`obtn-${stepId}-${outcomeId}`);
-  if (btn) {
-    btn.classList.add('selected');
-    btn.style.outline = '2px solid currentColor';
-    btn.style.boxShadow = 'inset 0 0 0 1px currentColor';
-  }
-  // Store selection on the container
-  const container = document.getElementById(`outcome-btns-${stepId}`);
-  if (container) container.dataset.selected = outcomeId;
-
-  // Auto-expand routing override for reset outcomes
-  if (requiresReset) {
-    const body = document.getElementById(`routing-body-${stepId}`);
-    const chevron = document.getElementById(`routing-chevron-${stepId}`);
-    if (body) body.style.display = 'block';
-    if (chevron) chevron.style.transform = 'rotate(90deg)';
-  }
-
-  // Show/hide suspend condition field based on outcome flags
-  const outcomes = _getOutcomes({ step_type: document.getElementById(`outcome-btns-${stepId}`)?.closest('[data-step-type]')?.dataset.stepType });
+function selectOutcome(stepId, outcomeId, requiresReset, requiresSuspend) {
+  // Resolve outcome definition
   const outcome = _instances.flatMap(i => i._tmplSteps||[])
     .flatMap(s => _getOutcomes(s))
     .find(o => o.id === outcomeId);
-  const suspendWrap = document.getElementById(`suspend-condition-wrap-${stepId}`);
-  if (suspendWrap) suspendWrap.style.display = outcome?.requiresSuspend ? 'block' : 'none';
 
-  // Show submit button
+  // Deselect all buttons — hollow dots
+  document.querySelectorAll(`#outcome-btns-${stepId} button`).forEach(b => {
+    b.classList.remove('selected');
+    b.style.background  = b.dataset.baseColor || '';
+    b.style.outline     = 'none';
+    b.style.boxShadow   = 'none';
+    const dot = b.querySelector('[id^="obtn-dot-"]');
+    if (dot) dot.style.background = 'transparent';
+  });
+
+  // Select clicked button — fill dot
+  const btn = document.getElementById(`obtn-${stepId}-${outcomeId}`);
+  if (btn) {
+    btn.classList.add('selected');
+    btn.style.outline   = '2px solid currentColor';
+    btn.style.boxShadow = 'inset 0 0 0 1px currentColor';
+    const dot = document.getElementById(`obtn-dot-${stepId}-${outcomeId}`);
+    if (dot) dot.style.background = dot.style.borderColor || 'currentColor';
+  }
+
+  // Store selection
+  const container = document.getElementById(`outcome-btns-${stepId}`);
+  if (container) container.dataset.selected = outcomeId;
+
+  // Hide all disposition panels first
+  const dispEl    = document.getElementById(`routing-disposition-${stepId}`);
+  const overrideEl = document.getElementById(`routing-override-${stepId}`);
+  const suspendEl = document.getElementById(`suspend-condition-wrap-${stepId}`);
+  if (dispEl)     dispEl.style.display    = 'none';
+  if (overrideEl) overrideEl.style.display = 'none';
+  if (suspendEl)  suspendEl.style.display  = 'none';
+
+  // Clear route-target hidden field
+  const hiddenRoute = document.getElementById(`route-target-${stepId}`);
+  if (hiddenRoute) hiddenRoute.value = '';
+
+  if (requiresSuspend) {
+    // Show suspend condition input — submit button confirms
+    if (suspendEl) suspendEl.style.display = 'block';
+    const submitBtn = document.getElementById(`complete-submit-${stepId}`);
+    if (submitBtn) {
+      submitBtn.style.display = 'block';
+      submitBtn.textContent   = 'Suspend instance';
+    }
+
+  } else if (requiresReset) {
+    // Progressive disclosure — show routing disposition buttons
+    if (dispEl) {
+      dispEl.style.display = 'block';
+      const inst    = _selectedInstance;
+      const currSeq = inst?._tmplSteps?.find(s => s.id === stepId)?.sequence_order || 999;
+      const prior   = (inst?._tmplSteps || [])
+        .filter(s => s.step_type !== 'trigger' && s.sequence_order < currSeq)
+        .sort((a, b) => a.sequence_order - b.sequence_order);
+
+      const optionsEl = document.getElementById(`route-options-${stepId}`);
+      if (optionsEl) {
+        // Always include "Reset to beginning" if first step isn't the only prior
+        const firstStep = prior[0];
+        const prevStep  = prior[prior.length - 1];
+
+        const makeRouteBtn = (label, stepId2, targetId) => `
+          <button onclick="selectRoute('${stepId}','${targetId || ''}')"
+            id="rbtn-${stepId}-${targetId||'first'}"
+            style="display:flex;align-items:center;gap:8px;padding:8px 12px;
+              border:1px solid var(--border);border-radius:5px;background:var(--bg2);
+              cursor:pointer;text-align:left;width:100%;font-size:11px;
+              color:var(--text2);transition:background .1s"
+            onmouseover="this.style.background='var(--surf2)'"
+            onmouseout="this.style.background=this.classList.contains('selected-route')?'var(--surf3)':'var(--bg2)'">
+            <span style="color:var(--red);font-size:10px;width:12px">↩</span>
+            ${escHtml(label)}
+          </button>`;
+
+        let html = '';
+        // Reset to beginning (first step)
+        if (firstStep) {
+          html += makeRouteBtn(`Reset to beginning — ${firstStep.name}`, stepId, firstStep.id);
+        }
+        // Back one step (if different from first)
+        if (prevStep && prevStep.id !== firstStep?.id) {
+          html += makeRouteBtn(`Back one step — ${prevStep.name}`, stepId, prevStep.id);
+        }
+        // All prior steps individually (if more than 2)
+        if (prior.length > 2) {
+          prior.slice().reverse().forEach(ps => {
+            if (ps.id !== firstStep?.id && ps.id !== prevStep?.id) {
+              html += makeRouteBtn(ps.name, stepId, ps.id);
+            }
+          });
+        }
+        optionsEl.innerHTML = html;
+      }
+    }
+    // Submit button hidden until a route is chosen
+    const submitBtn = document.getElementById(`complete-submit-${stepId}`);
+    if (submitBtn) submitBtn.style.display = 'none';
+
+  } else {
+    // Normal outcome — show optional routing override and submit button
+    if (overrideEl) overrideEl.style.display = 'block';
+    const submitBtn = document.getElementById(`complete-submit-${stepId}`);
+    if (submitBtn) {
+      submitBtn.style.display = 'block';
+      submitBtn.textContent   = 'Complete step';
+    }
+  }
+}
+
+function selectRoute(stepId, targetStepId) {
+  // Highlight selected route button
+  document.querySelectorAll(`#route-options-${stepId} button`).forEach(b => {
+    b.classList.remove('selected-route');
+    b.style.background   = 'var(--bg2)';
+    b.style.borderColor  = 'var(--border)';
+    b.style.color        = 'var(--text2)';
+  });
+  const btn = document.getElementById(`rbtn-${stepId}-${targetStepId || 'first'}`);
+  if (btn) {
+    btn.classList.add('selected-route');
+    btn.style.background  = 'var(--surf3)';
+    btn.style.borderColor = 'var(--red)';
+    btn.style.color       = 'var(--text)';
+  }
+
+  // Store the route target in the hidden select (reuse existing route-target element)
+  let hiddenRoute = document.getElementById(`route-target-${stepId}`);
+  if (!hiddenRoute) {
+    hiddenRoute = document.createElement('input');
+    hiddenRoute.type = 'hidden';
+    hiddenRoute.id   = `route-target-${stepId}`;
+    document.getElementById(`routing-disposition-${stepId}`)?.appendChild(hiddenRoute);
+  }
+  hiddenRoute.value = targetStepId || '';
+
+  // Show submit button now that route is chosen
   const submitBtn = document.getElementById(`complete-submit-${stepId}`);
-  if (submitBtn) submitBtn.style.display = 'block';
+  if (submitBtn) {
+    submitBtn.style.display = 'block';
+    submitBtn.textContent   = 'Complete step';
+  }
 }
 
 function toggleRoutingOverride(stepId) {
