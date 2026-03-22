@@ -4721,9 +4721,8 @@ function renderInstanceDetail(el, inst) {
                       </div>
                     </div>` : ''}
 
-                    <!-- Reassignment section — collapsed behind toggle for meeting steps -->
+                    <!-- Reassignment section — always collapsed behind toggle -->
                     ${canAct ? `
-                    ${s.step_type === 'meeting' ? `
                     <div style="margin-top:4px">
                       <button onclick="toggleCadReassign('${s.id}')"
                         style="background:none;border:none;cursor:pointer;padding:0;
@@ -4734,10 +4733,7 @@ function renderInstanceDetail(el, inst) {
                           style="font-size:8px;transition:transform .2s">▶</span>
                         ↻ Reassign for This Instance
                       </button>
-                      <div id="cad-reassign-panel-${s.id}" style="display:none;margin-top:8px">` : `
-                    <div>
-                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                        color:var(--accent);margin-bottom:8px">↻ Reassign for This Instance</div>`}
+                      <div id="cad-reassign-panel-${s.id}" style="display:none;margin-top:8px">
 
                       <!-- Current assignees — compact chips with ✕ on reassigned -->
                       <div id="reassign-list-${s.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:24px">
@@ -4811,7 +4807,7 @@ function renderInstanceDetail(el, inst) {
                       </div>`:''}
                       <span id="reassign-status-${s.id}" style="font-size:10px;color:var(--muted)"></span>
 
-                    ${s.step_type === 'meeting' ? `</div></div>` : `</div>`}` : `
+                    ${s.step_type === 'meeting' ? `</div></div>` : `</div></div>`}` : `
                     <div style="font-size:10px;color:var(--muted)">
                       Instance is ${inst.status} — reassignment not available.
                     </div>`}
@@ -4912,14 +4908,24 @@ function renderInstanceDetail(el, inst) {
                     ${done ? (() => {
                       const completionEvt = coc.slice().reverse().find(e =>
                         e.event_type === 'step_completed' && e.template_step_id === s.id);
-                      const outLabel = completionEvt?.outcome || 'Completed';
-                      const outColor = completionEvt?.outcome
-                        ? (_getOutcomes(s).find(o => o.id === completionEvt.outcome)?.color || 'var(--green)')
-                        : 'var(--green)';
-                      return `<div style="margin-top:8px;display:flex;align-items:center;gap:6px">
-                        <div style="width:8px;height:8px;border-radius:50%;background:${outColor};flex-shrink:0"></div>
-                        <span style="font-size:11px;color:${outColor};font-weight:500">${escHtml(outLabel)}</span>
-                        ${completionEvt?.event_notes?`<span style="font-size:10px;color:var(--muted)">· ${escHtml(completionEvt.event_notes)}</span>`:''}
+                      const outDef   = completionEvt?.outcome
+                        ? _getOutcomes(s).find(o => o.id === completionEvt.outcome)
+                        : null;
+                      const outLabel = outDef?.label || completionEvt?.outcome || 'Completed';
+                      const outColor = outDef?.color || 'var(--green)';
+                      const actor    = completionEvt?.actor_name;
+                      const notes    = completionEvt?.event_notes;
+                      const routeTo  = completionEvt?.route_to_step_name;
+                      return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:${notes||routeTo?'6px':'0'}">
+                          <div style="width:8px;height:8px;border-radius:50%;background:${outColor};flex-shrink:0"></div>
+                          <span style="font-size:12px;color:${outColor};font-weight:500">${escHtml(outLabel)}</span>
+                          ${actor?`<span style="font-size:10px;color:var(--muted);margin-left:auto">by ${escHtml(actor)}</span>`:''}
+                        </div>
+                        ${routeTo?`<div style="font-size:10px;color:var(--amber);margin-top:3px">↩ Returns to: ${escHtml(routeTo)}</div>`:''}
+                        ${notes?`<div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.4;
+                          padding:6px 8px;background:var(--bg2);border-radius:4px;
+                          border-left:2px solid ${outColor}">${escHtml(notes)}</div>`:''}
                       </div>`;
                     })() : ''}
 
