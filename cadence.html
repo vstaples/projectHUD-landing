@@ -2892,14 +2892,30 @@ function _bistBuildState(inst, steps, coc) {
       e.event_type==='step_completed' && e.template_step_id===s.id) : null;
     const loops     = coc.filter(e=>e.event_type==='step_completed'&&e.template_step_id===s.id).length;
     const actEvt    = coc.find(e=>e.event_type==='step_activated'&&e.template_step_id===s.id);
+
+    // Determine state from the LATEST CoC event for this step
+    // (a re-activated step after rejection should show 'active', not 'done')
+    const stepEvents = coc.filter(e => e.template_step_id === s.id);
+    const lastEvent  = stepEvents[stepEvents.length - 1];
+    let state;
+    if (!lastEvent)                                    state = isReady ? 'ready' : 'waiting';
+    else if (lastEvent.event_type==='step_completed')  state = 'done';
+    else if (lastEvent.event_type==='step_activated')  state = 'active';
+    else                                               state = touched ? 'active' : 'waiting';
+
+    // Last completion event for outcome
+    const lastCompletion = coc.slice().reverse()
+      .find(e=>e.event_type==='step_completed'&&e.template_step_id===s.id);
+
     stepsState[s.sequence_order] = {
       id:           s.id,
       name:         s.name,
       step_type:    s.step_type,
-      state:        done?'done':touched?'active':isReady?'ready':'waiting',
-      outcome:      cEvt?.outcome || null,
+      state,
+      outcome:      lastCompletion?.outcome || null,
+      route_to:     lastCompletion?.route_to_step_id || null,
       activated_at: actEvt?.created_at || null,
-      completed_at: cEvt?.created_at   || null,
+      completed_at: lastCompletion?.created_at || null,
       loops,
       docs: { evidence:{count:0}, authorization:{count:0}, reference:{count:0} },
     };
@@ -3026,23 +3042,27 @@ async function runBistScript(scriptId, onProgress) {
         const step  = stepBySeq[seq];
         if (!step) throw new Error(`No step at sequence ${seq}`);
         const actor = _bistResolveActor(stp.params?.actor);
+        const routeSeq  = stp.params?.route_to_seq;
+        const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
         // Write step_completed
         await API.post('workflow_step_instances', {
           instance_id: instId, firm_id: FIRM_ID_CAD,
           event_type: 'step_completed', template_step_id: step.id,
           step_type: step.step_type, step_name: step.name,
           outcome: stp.params?.outcome || null,
+          route_to_step_id:   routeStep?.id   || null,
+          route_to_step_name: routeStep ? `${routeStep.sequence_order}. ${routeStep.name}` : null,
           event_notes: stp.params?.notes || null,
           actor_name: actor.userName,
           created_at: new Date().toISOString(),
         });
-        // Auto-activate next step
-        const nextStep = stepBySeq[seq + 1];
-        if (nextStep) {
+        // Activate: route_to_seq if specified, else next step
+        const activateStep = routeStep || stepBySeq[seq + 1];
+        if (activateStep) {
           await API.post('workflow_step_instances', {
             instance_id: instId, firm_id: FIRM_ID_CAD,
-            event_type: 'step_activated', template_step_id: nextStep.id,
-            step_type: nextStep.step_type, step_name: nextStep.name,
+            event_type: 'step_activated', template_step_id: activateStep.id,
+            step_type: activateStep.step_type, step_name: activateStep.name,
             actor_name: 'System', created_at: new Date().toISOString(),
           });
         }
@@ -3469,10 +3489,11 @@ async function loadTmplTests(templateId) {
 function _bistActionDesc(action, params) {
   if (action === 'launch_instance') return `Launch instance`;
   if (action === 'complete_step') {
-    const seq = params?.step_seq ? `step ${params.step_seq}` : '';
-    const out = params?.outcome  ? ` → ${params.outcome}` : '';
-    const who = params?.actor    ? ` (${params.actor.replace(/_/g,' ')})` : '';
-    return `Complete ${seq}${out}${who}`;
+    const seq   = params?.step_seq ? `step ${params.step_seq}` : '';
+    const out   = params?.outcome   ? ` → ${params.outcome}` : '';
+    const who   = params?.actor     ? ` (${params.actor.replace(/_/g,' ')})` : '';
+    const route = params?.route_to_seq ? ` ↩ → step ${params.route_to_seq}` : '';
+    return `Complete ${seq}${out}${who}${route}`;
   }
   if (action === 'wait')        return `Wait ${params?.ms||0}ms`;
   if (action === 'assert_only') return `Check state`;
