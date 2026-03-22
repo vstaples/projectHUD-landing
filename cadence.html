@@ -5437,7 +5437,7 @@ function renderInstanceDetail(el, inst) {
           </div>
         </div>
         <!-- ── REWORK INTELLIGENCE PANEL ─────────────────────────── -->
-        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:160px">
+        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:130px">
           <!-- Scrubber row -->
           <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
             <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);white-space:nowrap">REPLAY</span>
@@ -5940,6 +5940,8 @@ function renderInstanceDetail(el, inst) {
     setTimeout(() => {
       renderInstanceDAG(inst);
       _instInitScrubber(inst);
+      // Re-render dots after layout settles so SVG width is correct
+      setTimeout(() => _instRenderDots(_instScrubEvents, _instScrubEvents.length-1), 100);
     }, 50);
   }
 }
@@ -6181,65 +6183,65 @@ function renderInstanceDAG(inst) {
   ctx.moveTo(tx+12,ty); ctx.lineTo(fp0.x,ty); ctx.stroke();
   ah(fp0.x,ty,'right','rgba(255,255,255,.3)');
 
-  // ── Rejection arcs — red dashed back-arrows below node row ───────────────
-  // Group resets by target step (the step that was reset TO, i.e. the step re-activated)
-  // We show one arc per source step that had resets, curving below
-  const resetSources = {}; // stepId → { count, targetIdx, notes[] }
-  coc.forEach(e => {
-    if (e.event_type==='step_reset' && e.template_step_id) {
-      if (!resetSources[e.template_step_id]) resetSources[e.template_step_id]={ count:0, notes:[] };
-      resetSources[e.template_step_id].count++;
-      if (e.event_notes||e.notes) resetSources[e.template_step_id].notes.push(e.event_notes||e.notes);
-    }
-  });
+  // ── Rejection arcs — FROM the rejecting step BACK TO where flow returned ──
+  // A rejection arc exists when: step X was completed with a reset outcome,
+  // and then a step Y (Y < X) was re-activated afterward.
+  // We draw one arc per unique (srcStep → tgtStep) pair, labeled with count.
+  const arcMap = {}; // key: "srcIdx->tgtIdx" → { srcIdx, tgtIdx, count }
 
-  // Find reset target — the step re-activated after each reset (earliest sequence step with later activation)
-  const resetTargets = {}; // sourceStepId → targetStepIdx
-  Object.keys(resetSources).forEach(srcId => {
-    const srcIdx = steps.findIndex(s=>s.id===srcId);
-    // Find all re-activations of steps before srcIdx after the first reset
-    const srcResets = coc.filter(e=>e.event_type==='step_reset'&&e.template_step_id===srcId);
-    if (!srcResets.length) return;
-    const firstReset = srcResets[0];
-    // Find earliest step reactivated after this reset
-    let minIdx = srcIdx;
-    coc.filter(e=>e.event_type==='step_activated'&&new Date(e.created_at)>new Date(firstReset.created_at))
-       .forEach(e => {
-         const i = steps.findIndex(s=>s.id===e.template_step_id);
-         if (i >= 0 && i < minIdx) minIdx = i;
-       });
-    resetTargets[srcId] = minIdx;
+  // Find all step_completed events with reset outcomes
+  coc.forEach(resetEvt => {
+    if (resetEvt.event_type !== 'step_completed') return;
+    const srcStep = steps.find(s => s.id === resetEvt.template_step_id);
+    if (!srcStep) return;
+    const oDef = _getOutcomes(srcStep).find(o => o.id === resetEvt.outcome);
+    if (!oDef?.requiresReset) return;
+    const srcIdx = steps.indexOf(srcStep);
+
+    // Find the step that was re-activated immediately after this rejection
+    const afterTime = new Date(resetEvt.created_at);
+    const nextAct = coc.find(e =>
+      e.event_type === 'step_activated' &&
+      e.template_step_id !== resetEvt.template_step_id &&
+      new Date(e.created_at) > afterTime
+    );
+    if (!nextAct) return;
+    const tgtIdx = steps.findIndex(s => s.id === nextAct.template_step_id);
+    if (tgtIdx < 0 || tgtIdx >= srcIdx) return; // only backward arcs
+
+    const key = `${srcIdx}->${tgtIdx}`;
+    if (!arcMap[key]) arcMap[key] = { srcIdx, tgtIdx, count: 0 };
+    arcMap[key].count++;
   });
 
   // Draw arcs
-  Object.entries(resetSources).forEach(([srcId, info]) => {
-    const srcIdx = steps.findIndex(s=>s.id===srcId);
-    if (srcIdx < 0) return;
-    const tgtIdx = resetTargets[srcId] ?? 0;
+  Object.values(arcMap).forEach((arc, i) => {
+    const { srcIdx, tgtIdx, count } = arc;
     const fp = nodePos(steps[srcIdx].id);
     const tp = nodePos(steps[tgtIdx].id);
-    const arcDepth = 55 + info.count * 8; // deeper arc for more loops
+    const arcDepth = 50 + i * 12; // stagger multiple arcs
     const x1 = fp.x + NW/2, y1 = fp.y + NH;
     const x2 = tp.x + NW/2, y2 = tp.y + NH;
     const cy = y1 + arcDepth;
-    const cx = (x1+x2)/2;
+    const cx = (x1 + x2) / 2;
 
     ctx.beginPath();
-    ctx.strokeStyle='#E24B4A'; ctx.lineWidth=Math.min(3, 1+info.count*0.4);
-    ctx.setLineDash([6,3]); ctx.globalAlpha=0.75;
+    ctx.strokeStyle = '#E24B4A';
+    ctx.lineWidth = Math.min(2.5, 1 + count * 0.5);
+    ctx.setLineDash([6, 3]); ctx.globalAlpha = 0.75;
     ctx.moveTo(x1, y1);
     ctx.bezierCurveTo(x1, cy, x2, cy, x2, y2);
-    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
-    // Left-pointing arrowhead at target
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    // Upward arrowhead at target (arc terminates back at the node bottom)
     ah(x2, y2, 'down', '#E24B4A', 0.85);
-    // Loop count badge on arc midpoint
-    const badgeX=cx, badgeY=cy+2;
-    const bw=42, bh=14;
-    ctx.fillStyle='rgba(226,75,74,.2)'; ctx.strokeStyle='#E24B4A'; ctx.lineWidth=0.8;
-    ctx.beginPath(); ctx.roundRect(badgeX-bw/2, badgeY-bh/2, bw, bh, 7); ctx.fill(); ctx.stroke();
-    ctx.fillStyle='#E24B4A'; ctx.font='600 8px system-ui,sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(`↩ ${info.count}× reset`, badgeX, badgeY);
+
+    // Count badge at arc midpoint
+    const bw = 48, bh = 14;
+    ctx.fillStyle = 'rgba(226,75,74,.18)'; ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.roundRect(cx - bw/2, cy - bh/2, bw, bh, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#E24B4A'; ctx.font = '600 9px system-ui,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`↩ ${count}× reset`, cx, cy);
   });
   function instPill(text, cx, cy, col) {
     ctx.font = '9px monospace';
@@ -6522,28 +6524,32 @@ function _instRenderDots(events, activeIdx) {
   const el = document.getElementById('inst-scrub-dots');
   if (!el || !events.length) return;
   const evtColor = {
-    instance_launched:'var(--cad)', step_activated:'#e8a838',
-    step_completed:'var(--green)', step_reset:'var(--red)',
-    instance_completed:'var(--green)', instance_cancelled:'var(--red)',
-    override:'#e8a838', step_reassigned:'var(--accent)',
+    instance_launched:'#00b9c3', step_activated:'#e8a838',
+    step_completed:'#1D9E75', step_reset:'#E24B4A',
+    instance_completed:'#1D9E75', instance_cancelled:'#E24B4A',
+    override:'#e8a838', step_reassigned:'#00b9c3',
   };
-  el.innerHTML = events.map((e, i) => {
-    const col = evtColor[e.event_type] || 'var(--muted)';
-    const pct = events.length > 1 ? (i / (events.length-1)) * 100 : 50;
+  const W = el.offsetWidth || 600;
+  const H = 24;
+  // Build SVG
+  const dots = events.map((e, i) => {
+    const col = evtColor[e.event_type] || '#666';
+    const x = events.length > 1 ? 8 + (i / (events.length-1)) * (W-16) : W/2;
     const isActive = i === activeIdx;
     const isReset = e.event_type === 'step_reset';
-    const baseSize = isReset ? 14 : 10;
-    const scale = isActive ? 2 : 1;
-    return `<div onclick="event.stopPropagation();_instDotClick(${i})" title="${e.event_type.replace(/_/g,' ')}" style="
-      position:absolute;left:${pct}%;top:50%;
-      transform:translate(-50%,-50%) scale(${scale});
-      width:${baseSize}px;height:${baseSize}px;border-radius:${isReset?'3px':'50%'};
-      ${isReset?'transform-origin:center;rotation:45deg;':''}
-      background:${col};opacity:${isActive?1:0.6};cursor:pointer;
-      box-shadow:${isActive?`0 0 0 4px ${col}55`:'none'};
-      transition:transform .15s, box-shadow .15s;
-      z-index:${isActive?10:1}"></div>`;
+    const r = isActive ? 7 : (isReset ? 5 : 4);
+    const opacity = isActive ? 1 : 0.65;
+    const glow = isActive ? `<circle cx="${x}" cy="${H/2}" r="${r+4}" fill="${col}" opacity="0.2"/>` : '';
+    const shape = isReset
+      ? `<rect x="${x-r*0.75}" y="${H/2-r*0.75}" width="${r*1.5}" height="${r*1.5}" rx="2" fill="${col}" opacity="${opacity}" transform="rotate(45 ${x} ${H/2})"/>`
+      : `<circle cx="${x}" cy="${H/2}" r="${r}" fill="${col}" opacity="${opacity}"/>`;
+    return `<g style="cursor:pointer" onclick="_instDotClick(${i})" title="${e.event_type.replace(/_/g,' ')}">${glow}${shape}</g>`;
   }).join('');
+  // Track line
+  const trackLine = events.length > 1
+    ? `<line x1="8" y1="${H/2}" x2="${W-8}" y2="${H/2}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`
+    : '';
+  el.innerHTML = `<svg width="${W}" height="${H}" style="overflow:visible">${trackLine}${dots}</svg>`;
 }
 
 function _instDotClick(idx) {
@@ -6583,27 +6589,26 @@ function _instRenderScrubNote(evt) {
     ? (_selectedInstance?._tmplSteps||[]).find(s=>s.id===evt.template_step_id)?.name || ''
     : '';
   const isReset = evt.event_type === 'step_reset';
+  const step = (_selectedInstance?._tmplSteps||[]).find(s=>s.id===evt.template_step_id);
+  const actorName = (evt.actor_name && evt.actor_name !== 'System')
+    ? evt.actor_name
+    : (step?.assignee_name || step?.assignee_email || null);
+
   el.innerHTML = `
-    <div style="display:flex;align-items:flex-start;gap:10px">
-      <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:4px"></div>
-      <div style="min-width:0;flex:1">
-        <div style="font-size:13px;font-weight:600;color:${col}">${lbl}</div>
-        ${stepName?`<div style="font-size:12px;color:var(--text2);margin-top:1px">${escHtml(stepName)}</div>`:''}
-        ${evt.outcome?`<div style="font-size:12px;color:var(--text2);margin-top:2px">Outcome: <strong>${escHtml(evt.outcome)}</strong></div>`:''}
-        ${evt.actor_name && evt.actor_name !== 'System' ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">👤 ${escHtml(evt.actor_name)}</div>` : (() => {
-          const step = (_selectedInstance?._tmplSteps||[]).find(s=>s.id===evt.template_step_id);
-          const resolved = step?.assignee_name || step?.assignee_email || null;
-          return resolved ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">👤 ${escHtml(resolved)}</div>` : '';
-        })()}
-        ${ts?`<div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:2px">${ts}</div>`:''}
-        ${(evt.event_notes||evt.notes)?`
-          <div style="margin-top:8px;padding:8px 10px;background:${isReset?'rgba(226,75,74,.08)':'var(--surf2)'};
-            border-left:3px solid ${col};border-radius:0 4px 4px 0">
-            <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:${col};margin-bottom:3px;text-transform:uppercase">Notes</div>
-            <div style="font-size:12px;color:var(--text);line-height:1.5">${escHtml(evt.event_notes||evt.notes)}</div>
-          </div>` : (isReset ? `<div style="margin-top:6px;font-size:12px;color:var(--red);font-style:italic">No notes recorded for this rejection</div>` : '')}
-      </div>
-    </div>`;
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;overflow:hidden">
+      <div style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0"></div>
+      <span style="font-size:13px;font-weight:600;color:${col};white-space:nowrap">${lbl}</span>
+      ${stepName?`<span style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">${escHtml(stepName)}</span>`:''}
+      ${evt.outcome?`<span style="font-size:11px;color:var(--text2);white-space:nowrap">→ <strong style="color:${col}">${escHtml(evt.outcome)}</strong></span>`:''}
+      ${actorName?`<span style="font-size:12px;color:var(--muted);white-space:nowrap">👤 ${escHtml(actorName)}</span>`:''}
+      ${ts?`<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap;margin-left:auto">${ts}</span>`:''}
+    </div>
+    ${(evt.event_notes||evt.notes)?`
+      <div style="margin-top:8px;padding:8px 10px;background:${isReset?'rgba(226,75,74,.08)':'var(--surf2)'};
+        border-left:3px solid ${col};border-radius:0 4px 4px 0">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:${col};margin-bottom:3px;text-transform:uppercase">Notes</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.5">${escHtml(evt.event_notes||evt.notes)}</div>
+      </div>` : (isReset ? `<div style="margin-top:5px;font-size:11px;color:var(--red);font-style:italic">No notes recorded for this rejection</div>` : '')}`;
 }
 
 function _instRenderReworkCost(inst) {
