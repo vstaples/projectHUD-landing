@@ -5898,8 +5898,22 @@ function renderInstanceDetail(el, inst) {
   _startElapsedTimer(inst);
 
   // If diagram mode, render the instance DAG after DOM settles
+  // Mirror the template DAG technique: explicitly set flex styles on container first,
+  // then let browser do a layout pass before measuring
   if (viewMode === 'diagram') {
-    setTimeout(() => renderInstanceDAG(inst), 150);
+    const wrap = document.getElementById('inst-dag-wrap');
+    if (wrap) {
+      wrap.style.display        = 'flex';
+      wrap.style.flexDirection  = 'column';
+      wrap.style.flex           = '1';
+      wrap.style.minHeight      = '0';
+    }
+    const canvasWrap = document.getElementById('inst-dag-canvas-wrap');
+    if (canvasWrap) {
+      canvasWrap.style.flex     = '1';
+      canvasWrap.style.minHeight = '0';
+    }
+    setTimeout(() => renderInstanceDAG(inst), 50);
   }
 }
 
@@ -6006,18 +6020,10 @@ function renderInstanceDAG(inst) {
     .sort((a,b) => a.sequence_order - b.sequence_order);
   const coc = inst._stepInsts || [];
 
-  const W = wrap.offsetWidth  || 0;
-  const H = wrap.offsetHeight || 0;
-  // If canvas hasn't laid out yet, retry with increasing delays
-  if (W < 50 || H < 100) {
-    setTimeout(() => renderInstanceDAG(inst), 120);
-    return;
-  }
-  // If this is a fresh fit, always recompute from actual measured dimensions
-  if (!_instDagFitted) {
-    // Force a second render after 200ms in case H was underreported on first call
-    setTimeout(() => { _instDagFitted=false; renderInstanceDAG(inst); }, 200);
-  }
+  const W = wrap.offsetWidth  || 800;
+  const H = wrap.offsetHeight || 400;
+  if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 50); return; }
+  // Don't schedule a second refit — layout is guaranteed settled before we're called
 
   canvas.width = W; canvas.height = H;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
