@@ -3466,6 +3466,31 @@ async function loadTmplTests(templateId) {
   }
 }
 
+function _bistActionDesc(action, params) {
+  if (action === 'launch_instance') return `Launch instance`;
+  if (action === 'complete_step') {
+    const seq = params?.step_seq ? `step ${params.step_seq}` : '';
+    const out = params?.outcome  ? ` → ${params.outcome}` : '';
+    const who = params?.actor    ? ` (${params.actor.replace(/_/g,' ')})` : '';
+    return `Complete ${seq}${out}${who}`;
+  }
+  if (action === 'wait')        return `Wait ${params?.ms||0}ms`;
+  if (action === 'assert_only') return `Check state`;
+  return action;
+}
+
+function _bistAssertDesc(assert) {
+  const path = assert.check || '?';
+  if (assert.eq         !== undefined) return `${path} = "${assert.eq}"`;
+  if (assert.not_eq     !== undefined) return `${path} ≠ "${assert.not_eq}"`;
+  if (assert.gte        !== undefined) return `${path} ≥ ${assert.gte}`;
+  if (assert.lte        !== undefined) return `${path} ≤ ${assert.lte}`;
+  if (assert.contains   !== undefined) return `${path} contains "${assert.contains}"`;
+  if (assert.exists     !== undefined) return `${path} exists`;
+  if (assert.not_exists !== undefined) return `${path} not exists`;
+  return path;
+}
+
 function renderTmplTests(scripts, runs) {
   const bodyEl = document.getElementById('tmpl-tests-body');
   if (!bodyEl) return;
@@ -3505,101 +3530,115 @@ function renderTmplTests(scripts, runs) {
                   : `${notRun} test${notRun>1?'s':''} not yet run against v${ver}`;
 
   const scriptRows = currentRuns.map(({ script, run }) => {
-    const stateColor = run?.status === 'passed' ? 'var(--green)'
-                     : run?.status === 'failed' ? 'var(--red)' : 'var(--muted)';
-    const stateIcon  = run?.status === 'passed' ? '✓'
-                     : run?.status === 'failed' ? '✕' : '○';
+    const spec = typeof script.script === 'string'
+      ? JSON.parse(script.script) : script.script;
+    const steps = spec?.steps || [];
 
-    const runMeta = run
-      ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">
-           v${escHtml(run.template_version||'?')} · ${run.duration_ms ? (run.duration_ms/1000).toFixed(1)+'s' : ''} · 
-           ${new Date(run.run_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
-         </span>`
-      : `<span style="font-size:9px;color:var(--muted)">Not run for v${escHtml(ver)}</span>`;
+    // Build flat list of assertions across all steps
+    const assertionRows = [];
+    steps.forEach(stp => {
+      // One row for the action itself
+      const actionDesc = _bistActionDesc(stp.action, stp.params);
+      assertionRows.push({ type: 'action', id: `${script.id}-${stp.id}-act`,
+        label: actionDesc, stepId: stp.id });
+      // One row per assertion
+      (stp.asserts||[]).forEach((a, ai) => {
+        assertionRows.push({ type: 'assert', id: `${script.id}-${stp.id}-a${ai}`,
+          label: _bistAssertDesc(a), check: a.check,
+          expected: a.eq ?? a.gte ?? a.lte ?? a.not_eq ?? '(exists)',
+          stepId: stp.id, assertIdx: ai });
+      });
+    });
 
-    // Structured failure report
-    let failDetail = '';
-    if (run?.status === 'failed') {
-      const spec       = typeof script.script === 'string' ? JSON.parse(script.script) : script.script;
-      const failedStep = spec?.steps?.find(s => s.id === run.failure_step);
-      const assert     = run.failure_assertion;
-      const [checkPath, ...rest] = (run.failure_reason||'').split(':');
-      const actualPart  = rest.join(':').trim(); // "expected X, got Y"
-      const expectedVal = actualPart.match(/expected (.+?),/)?.[1] || '—';
-      const actualVal   = actualPart.match(/got (.+)$/)?.[1]       || '—';
-
-      failDetail = `
-        <div style="margin-top:8px;border:1px solid rgba(192,64,74,.35);border-radius:5px;
-          overflow:hidden;font-size:11px">
-          <!-- Failure header -->
-          <div style="background:rgba(192,64,74,.12);padding:6px 10px;
-            display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(192,64,74,.2)">
-            <span style="color:var(--red);font-size:12px">✕</span>
-            <span style="color:var(--red);font-weight:600">Assertion failed</span>
-            ${run.failure_step ? `<span style="color:var(--muted);font-size:10px;margin-left:auto">
-              Step: ${escHtml(run.failure_step)}</span>` : ''}
-          </div>
-          <!-- Action that was executing -->
-          ${failedStep ? `
-          <div style="padding:6px 10px;border-bottom:1px solid var(--border);
-            display:flex;gap:8px;align-items:baseline">
-            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.08em;flex-shrink:0;width:52px">Action</span>
-            <span style="font-family:var(--font-mono);font-size:10px;color:var(--text2)">
-              ${escHtml(failedStep.action)}
-              ${failedStep.params?.step_seq ? ` — step ${escHtml(String(failedStep.params.step_seq))}` : ''}
-              ${failedStep.params?.outcome  ? ` → ${escHtml(failedStep.params.outcome)}` : ''}
-            </span>
-          </div>` : ''}
-          <!-- Check path -->
-          <div style="padding:6px 10px;border-bottom:1px solid var(--border);
-            display:flex;gap:8px;align-items:baseline">
-            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.08em;flex-shrink:0;width:52px">Check</span>
-            <span style="font-family:var(--font-mono);font-size:10px;color:var(--text2)">
-              ${escHtml(checkPath||run.failure_reason||'—')}
-            </span>
-          </div>
-          <!-- Expected vs actual -->
-          <div style="padding:6px 10px;border-bottom:1px solid var(--border);
-            display:flex;gap:8px;align-items:baseline">
-            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.08em;flex-shrink:0;width:52px">Expected</span>
-            <span style="font-family:var(--font-mono);font-size:10px;color:var(--green)">
-              ${escHtml(expectedVal)}
-            </span>
-          </div>
-          <div style="padding:6px 10px;display:flex;gap:8px;align-items:baseline">
-            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
-              letter-spacing:.08em;flex-shrink:0;width:52px">Got</span>
-            <span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">
-              ${escHtml(actualVal)}
-            </span>
-          </div>
-        </div>`;
+    // Determine state of each row from last run
+    function rowState(row) {
+      if (!run) return 'pending';
+      if (run.status === 'passed') return 'passed';
+      if (run.status === 'failed') {
+        if (row.stepId === run.failure_step) {
+          // This is the failed step — assertions after the failure are unknown
+          if (row.type === 'assert') {
+            const [checkPath] = (run.failure_reason||'').split(':');
+            return checkPath?.trim() === row.check ? 'failed' : 'unknown';
+          }
+          return 'failed';
+        }
+        // Steps before the failed one passed
+        const failedStepIdx = steps.findIndex(s => s.id === run.failure_step);
+        const thisStepIdx   = steps.findIndex(s => s.id === row.stepId);
+        if (thisStepIdx < failedStepIdx) return 'passed';
+        return 'unknown';
+      }
+      return 'pending';
     }
 
+    const overallColor = !run ? 'var(--muted)'
+      : run.status === 'passed' ? 'var(--green)'
+      : run.status === 'failed' ? 'var(--red)' : 'var(--muted)';
+    const overallIcon  = !run ? '○' : run.status === 'passed' ? '✓' : '✕';
+
+    const runMeta = run
+      ? `v${escHtml(run.template_version||'?')} · ${run.duration_ms?(run.duration_ms/1000).toFixed(1)+'s':''} · ${new Date(run.run_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`
+      : `Not run for v${escHtml(ver)}`;
+
+    const assertRowsHtml = assertionRows.map(row => {
+      const st = rowState(row);
+      const color = st==='passed'?'var(--green)':st==='failed'?'var(--red)':st==='unknown'?'var(--border2)':'var(--muted)';
+      const icon  = st==='passed'?'✓':st==='failed'?'✕':st==='unknown'?'—':'○';
+      const isAction = row.type === 'action';
+
+      // For failed assertion, show expected vs actual
+      let failNote = '';
+      if (st === 'failed' && run?.failure_reason) {
+        const [, ...rest] = run.failure_reason.split(':');
+        const actualPart  = rest.join(':').trim();
+        const expectedVal = actualPart.match(/expected (.+?),/)?.[1] || '—';
+        const actualVal   = actualPart.match(/got (.+)$/)?.[1]       || '—';
+        failNote = `<span style="font-family:var(--font-mono);font-size:9px;color:var(--red);margin-left:4px">
+          expected <span style="color:var(--green)">${escHtml(expectedVal)}</span>
+          got <span style="color:var(--red)">${escHtml(actualVal)}</span>
+        </span>`;
+      }
+
+      return `<div id="${row.id}"
+        style="display:flex;align-items:baseline;gap:6px;padding:3px 0 3px ${isAction?'0':'14px'};
+          border-bottom:1px solid rgba(255,255,255,.03)">
+        <span style="font-size:10px;color:${color};width:12px;flex-shrink:0;
+          font-family:var(--font-mono);${isAction?'opacity:.4':''}">${icon}</span>
+        <span style="font-size:${isAction?'10':'11'}px;
+          color:${isAction?'var(--muted)':'var(--text2)'};flex:1;
+          font-style:${isAction?'italic':'normal'}">${escHtml(row.label)}</span>
+        ${failNote}
+      </div>`;
+    }).join('');
+
     return `
-      <div id="bist-row-${script.id}"
-        style="padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="bist-icon-${script.id}" style="color:${stateColor};font-size:12px;
-            width:14px;flex-shrink:0;font-family:var(--font-mono)">${stateIcon}</span>
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:8px">
+        <!-- Script header -->
+        <div style="padding:8px 10px;background:var(--bg2);
+          display:flex;align-items:center;gap:8px">
+          <span id="bist-icon-${script.id}"
+            style="color:${overallColor};font-size:12px;width:14px;
+              flex-shrink:0;font-family:var(--font-mono)">${overallIcon}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:11px;color:var(--text);
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
-              title="${escHtml(script.name)}">${escHtml(script.name)}</div>
-            <div style="margin-top:2px">${runMeta}</div>
+            <div style="font-size:12px;font-weight:500;color:var(--text)">${escHtml(script.name)}</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:1px;font-family:var(--font-mono)">
+              ${escHtml(runMeta)}
+            </div>
           </div>
           <button onclick="runSingleTest('${script.id}')"
-            style="flex-shrink:0;padding:3px 8px;font-size:10px;background:none;
+            style="flex-shrink:0;padding:4px 10px;font-size:10px;background:none;
               border:1px solid var(--border);border-radius:4px;
               color:var(--muted);cursor:pointer">▶</button>
         </div>
-        <div id="bist-detail-${script.id}">${failDetail}</div>
+        <!-- Assertion plan rows -->
+        <div id="bist-plan-${script.id}" style="padding:4px 10px 6px">
+          ${assertRowsHtml}
+        </div>
+        <!-- Live log (hidden until run) -->
         <div id="bist-log-${script.id}" style="display:none;font-size:9px;
-          color:var(--muted);font-family:var(--font-mono);margin-top:4px;
-          padding:4px 6px;background:var(--bg2);border-radius:3px;line-height:1.6"></div>
+          color:var(--muted);font-family:var(--font-mono);padding:4px 10px 6px;
+          border-top:1px solid var(--border);line-height:1.8;background:var(--bg2)"></div>
       </div>`;
   }).join('');
 
@@ -3627,102 +3666,100 @@ function renderTmplTests(scripts, runs) {
 async function runSingleTest(scriptId) {
   const iconEl = document.getElementById(`bist-icon-${scriptId}`);
   const logEl  = document.getElementById(`bist-log-${scriptId}`);
-  const detEl  = document.getElementById(`bist-detail-${scriptId}`);
 
   if (iconEl) { iconEl.textContent = '…'; iconEl.style.color = 'var(--amber)'; }
-  if (detEl)  detEl.innerHTML = '';
-  if (logEl)  {
-    logEl.style.display = 'block';
-    logEl.innerHTML = `<span style="color:var(--muted)">Initialising…</span>`;
+  if (logEl)  { logEl.style.display = 'block'; logEl.innerHTML = ''; }
+
+  // Reset all assertion rows to pending (○ gray)
+  const planEl = document.getElementById(`bist-plan-${scriptId}`);
+  planEl?.querySelectorAll('[id^="' + scriptId + '-"]').forEach(row => {
+    const icon = row.querySelector('span:first-child');
+    if (icon) { icon.textContent = '○'; icon.style.color = 'var(--muted)'; }
+  });
+
+  // Load script spec to get step/assert IDs
+  const scripts = await API.get(
+    `bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&id=eq.${scriptId}`
+  ).catch(()=>[]);
+  const script = scripts?.[0];
+  const spec   = script ? (typeof script.script === 'string'
+    ? JSON.parse(script.script) : script.script) : null;
+
+  function tickRow(rowId, state) {
+    const rowEl = document.getElementById(rowId);
+    if (!rowEl) return;
+    const icon  = rowEl.querySelector('span:first-child');
+    if (!icon) return;
+    const color = state==='passed'?'var(--green)':state==='failed'?'var(--red)':state==='running'?'var(--amber)':'var(--muted)';
+    const glyph = state==='passed'?'✓':state==='failed'?'✕':state==='running'?'…':'—';
+    icon.textContent = glyph;
+    icon.style.color = color;
+    rowEl.scrollIntoView?.({ block:'nearest' });
   }
 
-  function logLine(html) {
-    if (!logEl) return;
-    logEl.innerHTML += (logEl.innerHTML ? '\n' : '') + html;
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
-  function actionLabel(action, params) {
-    if (action === 'launch_instance') return `Launch instance`;
-    if (action === 'complete_step') {
-      const seq = params?.step_seq ? `step ${params.step_seq}` : '';
-      const out = params?.outcome  ? ` → <span style="color:var(--cad)">${escHtml(params.outcome)}</span>` : '';
-      const who = params?.actor    ? ` <span style="color:var(--muted)">as ${escHtml(params.actor.replace(/_/g,' '))}</span>` : '';
-      return `Complete ${seq}${out}${who}`;
-    }
-    if (action === 'wait') return `Wait ${params?.ms||0}ms`;
-    return escHtml(action);
-  }
-
-  let _watchInstId = null;
+  let _currentStepId = null;
 
   const result = await runBistScript(scriptId, ({ type, action, params, stepName,
-    outcome, reason, message, instId }) => {
+    outcome, reason, message, instId, stepId }) => {
 
     if (type === 'instance_created') {
-      _watchInstId = instId;
-      // Inject Watch button into the row header
-      const row = document.getElementById(`bist-row-${scriptId}`);
-      const existing = row?.querySelector('.bist-watch-btn');
-      if (row && !existing) {
+      // Inject Watch button
+      const row = document.querySelector(`[id^="bist-icon-${scriptId}"]`)?.closest('div[style*="border:1px"]');
+      if (row && !row.querySelector('.bist-watch-btn')) {
         const watchBtn = document.createElement('button');
         watchBtn.className = 'bist-watch-btn';
-        watchBtn.style.cssText = `flex-shrink:0;padding:3px 8px;font-size:10px;
+        watchBtn.style.cssText = `flex-shrink:0;padding:4px 10px;font-size:10px;
           background:var(--cad-dim);border:1px solid var(--cad-wire);border-radius:4px;
-          color:var(--cad);cursor:pointer;margin-right:4px`;
+          color:var(--cad);cursor:pointer`;
         watchBtn.textContent = '👁 Watch';
         watchBtn.onclick = () => {
           switchTab('instances');
-          // Reload instances to pick up the test instance
           loadAll().then(() => renderTab('instances'));
         };
         const runBtn = row.querySelector('button[onclick^="runSingleTest"]');
         if (runBtn) runBtn.parentNode.insertBefore(watchBtn, runBtn);
       }
-      logEl.innerHTML = `<span style="color:var(--muted)">Instance created</span>`;
     }
 
     if (type === 'step_start') {
-      logLine(`<span style="color:var(--muted)">▶ ${actionLabel(action, params)}</span>`);
+      _currentStepId = stepId;
+      // Mark action row as running
+      tickRow(`${scriptId}-${stepId}-act`, 'running');
     }
 
     if (type === 'step_pass') {
-      // Replace last line with green pass
-      const lines = logEl.innerHTML.split('\n');
-      const label = stepName
-        ? `<span style="color:var(--green)">✓ ${actionLabel(action, params)} — ${escHtml(stepName)}</span>`
-        : `<span style="color:var(--green)">✓ ${actionLabel(action, params)}</span>`;
-      lines[lines.length - 1] = label;
-      logEl.innerHTML = lines.join('\n');
-      logEl.scrollTop = logEl.scrollHeight;
+      // Mark action row passed
+      tickRow(`${scriptId}-${stepId}-act`, 'passed');
+      // Mark all asserts for this step passed
+      const stp = spec?.steps?.find(s => s.id === stepId);
+      (stp?.asserts||[]).forEach((_, ai) => {
+        tickRow(`${scriptId}-${stepId}-a${ai}`, 'passed');
+      });
     }
 
     if (type === 'step_fail') {
-      const lines = logEl.innerHTML.split('\n');
-      lines[lines.length - 1] = `<span style="color:var(--red)">✕ ${actionLabel(action||'', params||{})} — assertion failed</span>`;
-      logEl.innerHTML = lines.join('\n');
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-
-    if (type === 'error') {
-      logLine(`<span style="color:var(--red)">Error: ${escHtml(message||'unknown')}</span>`);
+      tickRow(`${scriptId}-${_currentStepId}-act`, 'failed');
+      // Find which assertion failed from reason
+      const [checkPath] = (reason||'').split(':');
+      const stp = spec?.steps?.find(s => s.id === _currentStepId);
+      (stp?.asserts||[]).forEach((a, ai) => {
+        const state = a.check === checkPath?.trim() ? 'failed' : '—';
+        tickRow(`${scriptId}-${_currentStepId}-a${ai}`, state === 'failed' ? 'failed' : 'unknown');
+      });
     }
   });
 
+  // Final overall icon
   if (iconEl) {
     iconEl.textContent = result.status === 'passed' ? '✓' : '✕';
     iconEl.style.color = result.status === 'passed' ? 'var(--green)' : 'var(--red)';
   }
 
-  const finalLine = result.status === 'passed'
-    ? `<span style="color:var(--green);font-weight:600">Passed ✓</span>`
-    : `<span style="color:var(--red);font-weight:600">Failed ✕</span>`;
-  logLine(finalLine);
+  // Remove Watch button
+  document.querySelector(`#bist-plan-${scriptId}`)
+    ?.closest('div')?.querySelector('.bist-watch-btn')?.remove();
 
-  // Remove Watch button after run completes (instance deleted)
-  document.querySelector(`#bist-row-${scriptId} .bist-watch-btn`)?.remove();
-
-  // Refresh full panel to update gate summary and failure report
+  // Refresh full panel
   if (_selectedTmpl) await loadTmplTests(_selectedTmpl.id);
 }
 
