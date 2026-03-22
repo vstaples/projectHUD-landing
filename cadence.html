@@ -5430,8 +5430,8 @@ function renderInstanceDetail(el, inst) {
           <div id="inst-dag-canvas-wrap" style="flex:1;position:relative;overflow:hidden;cursor:grab;min-height:0">
             <canvas id="inst-dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
           </div>
-          <!-- Slide-in CoC panel -->
-          <div id="inst-dag-coc-panel" style="width:0;overflow:hidden;transition:width .22s cubic-bezier(.4,0,.2,1);
+          <!-- Slide-in CoC panel — display:none when closed so it can't affect canvas width -->
+          <div id="inst-dag-coc-panel" style="width:0;display:none;overflow:hidden;transition:width .22s cubic-bezier(.4,0,.2,1);
             border-left:0px solid var(--border);background:var(--bg1);flex-shrink:0;display:flex;flex-direction:column">
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
               <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase">Chain of Custody</span>
@@ -5925,10 +5925,12 @@ function toggleInstDagCoC(btn) {
   if (isOpen) {
     panel.style.width = '0';
     panel.style.borderLeftWidth = '0';
+    panel.style.display = 'none';
     btn.textContent = 'CoC ▸';
     btn.style.color = 'var(--muted)';
     btn.style.borderColor = 'var(--border)';
   } else {
+    panel.style.display = 'flex';
     panel.style.width = '300px';
     panel.style.borderLeftWidth = '1px';
     btn.textContent = 'CoC ▾';
@@ -5988,7 +5990,7 @@ function setInstViewMode(mode) {
   // Reset CoC panel to closed state when switching to diagram
   if (mode === 'diagram') {
     const cocPanel = document.getElementById('inst-dag-coc-panel');
-    if (cocPanel) { cocPanel.style.width='0'; cocPanel.style.borderLeftWidth='0'; }
+    if (cocPanel) { cocPanel.style.width='0'; cocPanel.style.borderLeftWidth='0'; cocPanel.style.display='none'; }
     const cocBtn = document.getElementById('inst-dag-coc-btn');
     if (cocBtn) { cocBtn.textContent='CoC ▸'; cocBtn.style.color='var(--muted)'; }
   }
@@ -6021,10 +6023,10 @@ function renderInstanceDAG(inst) {
     .sort((a,b) => a.sequence_order - b.sequence_order);
   const coc = inst._stepInsts || [];
 
-  const W = wrap.offsetWidth  || 800;
-  const H = wrap.offsetHeight || 400;
+  const rect = wrap.getBoundingClientRect();
+  const W = Math.round(rect.width)  || 800;
+  const H = Math.round(rect.height) || 400;
   if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 50); return; }
-  // Don't schedule a second refit — layout is guaranteed settled before we're called
 
   canvas.width = W; canvas.height = H;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
