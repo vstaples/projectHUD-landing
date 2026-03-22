@@ -96,7 +96,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 }
 
 /* ── Content area ── */
-.cad-content{flex:1;overflow-y:auto;display:flex;gap:0}
+.cad-content{flex:1;overflow-y:auto;display:flex;gap:0;position:relative}
 .cad-list-col{
   width:320px;flex-shrink:0;
   border-right:1px solid var(--border);
@@ -5106,7 +5106,7 @@ function renderInstancesTab(el) {
   const statusColor = { pending:'var(--muted)', in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--muted)', overridden:'var(--amber)' };
 
   el.innerHTML = `
-    <div style="display:flex;height:100%;overflow:hidden;width:100%">
+    <div style="position:absolute;inset:0;display:flex;overflow:hidden">
 
       <!-- Left: instance list -->
       <div style="width:320px;flex-shrink:0;border-right:1px solid var(--border);
@@ -5373,6 +5373,14 @@ function renderInstanceDetail(el, inst) {
           letter-spacing:.12em;margin-top:3px">Elapsed Time<br/>dd:hh:mm</div>
       </div>` : ''}
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <!-- Intelligence Briefing -->
+        <button onclick="showIntelBriefing('${inst.id}')"
+          style="padding:5px 12px;font-size:11px;font-weight:600;background:none;
+            border:1px solid rgba(0,185,195,.4);border-radius:3px;color:var(--cad);
+            cursor:pointer;letter-spacing:.04em;transition:all .15s"
+          onmouseover="this.style.background='rgba(0,185,195,.08)'"
+          onmouseout="this.style.background='none'"
+          title="Intelligence Briefing">◎ Briefing</button>
         <!-- Status badge -->
         <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
           color:${statusColor[inst.status]||'var(--muted)'};
@@ -5437,7 +5445,7 @@ function renderInstanceDetail(el, inst) {
           </div>
         </div>
         <!-- ── REWORK INTELLIGENCE PANEL ─────────────────────────── -->
-        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:130px">
+        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;min-height:120px;max-height:160px">
           <!-- Scrubber row -->
           <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
             <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);white-space:nowrap">REPLAY</span>
@@ -6461,7 +6469,265 @@ function renderInstanceDAG(inst) {
   }
 }
 
-// ── Rework Intelligence ───────────────────────────────────────────────────────
+// ── Intelligence Briefing ─────────────────────────────────────────────────────
+function showIntelBriefing(instId) {
+  const inst  = _instances.find(i=>i.id===instId) || _selectedInstance;
+  if (!inst) return;
+  const tmpl  = _templates.find(t=>t.id===inst.template_id);
+  const steps = (inst._tmplSteps||[]).filter(s=>s.step_type!=='trigger').sort((a,b)=>a.sequence_order-b.sequence_order);
+  const coc   = (inst._stepInsts||[]).slice().sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+
+  // ── Derive state ──────────────────────────────────────────────────────────
+  const latestEvt = {};
+  coc.forEach(e=>{ if(e.template_step_id) latestEvt[e.template_step_id]=e; });
+  const completedIds = new Set(Object.entries(latestEvt).filter(([,e])=>e.event_type==='step_completed').map(([id])=>id));
+  const fmt = ts => ts ? new Date(ts).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+  const fmtShort = ts => ts ? new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+  const elapsed = ms => { const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return h>0?`${h}h ${m}m`:`${m}m`; };
+
+  // Current active step
+  const activeStep = steps.find(s=>{ const e=latestEvt[s.id]; return e?.event_type==='step_activated'; });
+  const completedSteps = steps.filter(s=>completedIds.has(s.id));
+  const remainingSteps = steps.filter(s=>{ const e=latestEvt[s.id]; return !e||e.event_type==='step_reset'; });
+
+  // Rejection analysis
+  const rejectionEvents = coc.filter(e=>{
+    if(e.event_type!=='step_completed'||!e.template_step_id) return false;
+    const step=steps.find(s=>s.id===e.template_step_id);
+    if(!step) return false;
+    const oDef=_getOutcomes(step).find(o=>o.id===e.outcome);
+    return oDef?.requiresReset;
+  });
+
+  // Time calculations
+  const launchedAt = inst.launched_at ? new Date(inst.launched_at) : null;
+  const totalMs = launchedAt ? Date.now()-launchedAt : 0;
+
+  // Time in rework (reset-to-reactivation gaps)
+  let reworkMs = 0;
+  steps.forEach(s=>{
+    const resets = coc.filter(e=>e.event_type==='step_reset'&&e.template_step_id===s.id);
+    const acts   = coc.filter(e=>e.event_type==='step_activated'&&e.template_step_id===s.id);
+    resets.forEach(r=>{
+      const next=acts.find(a=>new Date(a.created_at)>new Date(r.created_at));
+      if(next) reworkMs += new Date(next.created_at)-new Date(r.created_at);
+    });
+  });
+  const reworkPct = totalMs>0 ? Math.round(reworkMs/totalMs*100) : 0;
+
+  // Per-step summaries
+  const stepSummaries = steps.map(s=>{
+    const evts   = coc.filter(e=>e.template_step_id===s.id);
+    const firstAct = evts.find(e=>e.event_type==='step_activated');
+    const lastComp = [...evts].reverse().find(e=>e.event_type==='step_completed');
+    const resets = evts.filter(e=>e.event_type==='step_reset').length;
+    const notes  = coc.filter(e=>e.template_step_id===s.id&&(e.event_notes||e.notes));
+    const state  = !evts.length ? 'pending'
+      : latestEvt[s.id]?.event_type==='step_completed' ? 'complete'
+      : latestEvt[s.id]?.event_type==='step_activated' ? 'active' : 'reset';
+    const durationMs = firstAct&&lastComp ? new Date(lastComp.created_at)-new Date(firstAct.created_at) : null;
+    return { step:s, state, firstAct, lastComp, resets, notes, durationMs };
+  });
+
+  // Build all timestamped note events across the entire workflow
+  const noteEvents = coc.filter(e=>(e.event_notes||e.notes)).map(e=>{
+    const step = steps.find(s=>s.id===e.template_step_id);
+    const oDef = step ? _getOutcomes(step).find(o=>o.id===e.outcome) : null;
+    const isRejection = oDef?.requiresReset;
+    const actor = (e.actor_name&&e.actor_name!=='System') ? e.actor_name
+      : (step?.assignee_name||step?.assignee_email||'Team Member');
+    return { ts:e.created_at, actor, note:e.event_notes||e.notes, step, isRejection,
+      evtType:e.event_type, outcome:e.outcome };
+  }).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+
+  // ── Build HTML ────────────────────────────────────────────────────────────
+  const statusColor = { in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--red)', pending:'var(--muted)' };
+  const stCol = statusColor[inst.status]||'var(--muted)';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'intel-briefing-overlay';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.7);
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)`;
+  overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+    <div style="width:min(860px,92vw);max-height:88vh;background:var(--bg1);border:1px solid var(--border2);
+      border-radius:8px;display:flex;flex-direction:column;overflow:hidden;
+      box-shadow:0 24px 64px rgba(0,0,0,.6)">
+
+      <!-- Modal header -->
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;
+        border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+        <span style="font-size:16px">◎</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600;color:var(--text)">Intelligence Briefing</div>
+          <div style="font-size:11px;color:var(--muted)">${escHtml(inst.title||tmpl?.name||'Untitled')} · Generated ${fmtShort(new Date().toISOString())}</div>
+        </div>
+        <span style="font-size:9px;font-weight:700;letter-spacing:.1em;padding:3px 8px;
+          border:1px solid ${stCol};color:${stCol};border-radius:3px">
+          ${(inst.status||'').replace('_',' ').toUpperCase()}
+        </span>
+        <button onclick="document.getElementById('intel-briefing-overlay').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;
+            padding:0 4px;line-height:1;flex-shrink:0">×</button>
+      </div>
+
+      <!-- Modal body -->
+      <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px">
+
+        <!-- ① Situation summary -->
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+            text-transform:uppercase;margin-bottom:10px">Current Status</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+            ${[
+              ['Elapsed Time', totalMs>0?elapsed(totalMs):'—', 'var(--cad)'],
+              ['Steps Complete', `${completedSteps.length} of ${steps.length}`, 'var(--green)'],
+              ['Rejections', `${rejectionEvents.length}×`, rejectionEvents.length?'var(--red)':'var(--muted)'],
+              ['Time in Rework', reworkMs>0?`${elapsed(reworkMs)} (${reworkPct}%)`:'None', reworkMs>0?'var(--red)':'var(--green)'],
+            ].map(([lbl,val,col])=>`
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${lbl}</div>
+              <div style="font-size:16px;font-weight:700;color:${col}">${val}</div>
+            </div>`).join('')}
+          </div>
+          ${activeStep ? `
+          <div style="margin-top:10px;padding:10px 14px;background:rgba(232,168,56,.08);
+            border:1px solid rgba(232,168,56,.3);border-radius:5px;
+            display:flex;align-items:center;gap:10px">
+            <div style="width:8px;height:8px;border-radius:50%;background:#e8a838;flex-shrink:0"></div>
+            <div>
+              <span style="font-size:12px;font-weight:600;color:#e8a838">Currently active: </span>
+              <span style="font-size:12px;color:var(--text)">${escHtml(activeStep.name||'—')}</span>
+              <span style="font-size:11px;color:var(--muted);margin-left:8px">
+                Assigned to ${escHtml(activeStep.assignee_name||activeStep.assignee_email||'—')}
+                ${latestEvt[activeStep.id]?.created_at ? ' · Active since '+fmtShort(latestEvt[activeStep.id].created_at) : ''}
+              </span>
+            </div>
+          </div>` : ''}
+        </div>
+
+        <!-- ② Step-by-step timeline -->
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+            text-transform:uppercase;margin-bottom:10px">Workflow Timeline</div>
+          <div style="display:flex;flex-direction:column;gap:0">
+            ${stepSummaries.map(({step,state,firstAct,lastComp,resets,durationMs},si)=>{
+              const stateCol = state==='complete'?'#1D9E75':state==='active'?'#e8a838':state==='reset'?'#E24B4A':'rgba(255,255,255,.2)';
+              const stateIcon = state==='complete'?'✓':state==='active'?'●':state==='reset'?'✕':'○';
+              const bg = state==='active'?'rgba(232,168,56,.06)':state==='complete'?'rgba(29,158,117,.04)':'transparent';
+              return `
+              <div style="display:flex;gap:14px;padding:10px 0;
+                ${si<stepSummaries.length-1?'border-bottom:1px solid var(--border)':''}">
+                <!-- Step indicator -->
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:24px">
+                  <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid ${stateCol};
+                    background:${stateCol}22;display:flex;align-items:center;justify-content:center;
+                    font-size:9px;color:${stateCol};font-weight:700">${stateIcon}</div>
+                  ${si<stepSummaries.length-1?`<div style="width:1px;flex:1;background:var(--border);margin-top:4px;min-height:12px"></div>`:''}
+                </div>
+                <!-- Step detail -->
+                <div style="flex:1;min-width:0;background:${bg};border-radius:4px;padding:2px 8px">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:600;color:var(--text)">${escHtml(step.name||'Step')}</span>
+                    <span style="font-size:10px;color:var(--muted)">${escHtml(STEP_META[step.step_type]?.label||step.step_type)}</span>
+                    ${resets?`<span style="font-size:10px;color:var(--red);font-weight:600">↩ ${resets}× rejected</span>`:''}
+                    ${durationMs!==null?`<span style="font-size:10px;color:var(--muted);margin-left:auto">${elapsed(durationMs)}</span>`:''}
+                  </div>
+                  ${firstAct?`<div style="font-size:10px;color:var(--muted);margin-top:2px">
+                    Activated: ${fmt(firstAct.created_at)}
+                    ${lastComp?` · Completed: ${fmt(lastComp.created_at)}`:''}
+                  </div>`:''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- ③ Human narrative — all notes in chronological order -->
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+            text-transform:uppercase;margin-bottom:10px">
+            Notes & Comments
+            <span style="font-weight:400;color:var(--muted);margin-left:6px">${noteEvents.length} recorded</span>
+          </div>
+          ${!noteEvents.length
+            ? `<div style="color:var(--muted);font-size:12px;font-style:italic;padding:12px 0">
+                No notes were recorded during this workflow.
+               </div>`
+            : `<div style="display:flex;flex-direction:column;gap:10px">
+              ${noteEvents.map(ev=>`
+              <div style="display:flex;gap:12px">
+                <div style="flex-shrink:0;padding-top:2px">
+                  <div style="width:8px;height:8px;border-radius:50%;
+                    background:${ev.isRejection?'#E24B4A':'#1D9E75'};margin-top:3px"></div>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+                    <span style="font-size:11px;font-weight:600;
+                      color:${ev.isRejection?'var(--red)':'var(--green)'};white-space:nowrap">
+                      ${ev.isRejection?'↩ Rejected':'✓ Completed'}
+                    </span>
+                    ${ev.step?`<span style="font-size:11px;color:var(--text2)">${escHtml(ev.step.name||'')}</span>`:''}
+                    ${ev.outcome?`<span style="font-size:10px;color:var(--muted)">· ${escHtml(ev.outcome)}</span>`:''}
+                    <span style="font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap">
+                      👤 ${escHtml(ev.actor)} · ${fmt(ev.ts)}
+                    </span>
+                  </div>
+                  <div style="padding:8px 12px;background:${ev.isRejection?'rgba(226,75,74,.07)':'var(--surf2)'};
+                    border-left:3px solid ${ev.isRejection?'#E24B4A':'#1D9E75'};
+                    border-radius:0 4px 4px 0;font-size:12px;color:var(--text);line-height:1.6">
+                    ${escHtml(ev.note)}
+                  </div>
+                </div>
+              </div>`).join('')}
+            </div>`}
+        </div>
+
+        <!-- ④ What's next -->
+        ${remainingSteps.length ? `
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+            text-transform:uppercase;margin-bottom:10px">Remaining Steps</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${remainingSteps.map((s,i)=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
+              background:var(--bg2);border-radius:4px;border:1px solid var(--border)">
+              <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);
+                min-width:18px">${s.sequence_order}</span>
+              <span style="font-size:12px;color:var(--text2)">${escHtml(s.name||'—')}</span>
+              <span style="font-size:10px;color:var(--muted);margin-left:auto">
+                ${escHtml(s.assignee_name||s.assignee_email||'—')}
+              </span>
+              ${s.due_days?`<span style="font-size:10px;color:var(--amber)">+${s.due_days}d</span>`:''}
+            </div>`).join('')}
+          </div>
+        </div>` : `
+        <div style="padding:12px 14px;background:rgba(29,158,117,.08);border:1px solid rgba(29,158,117,.3);
+          border-radius:5px;font-size:12px;color:var(--green);font-weight:600">
+          ✓ All steps complete — workflow finished
+        </div>`}
+
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;
+        background:var(--bg2);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:10px;color:var(--muted)">
+          Instance ${inst.id.substring(0,8)}… · Template: ${escHtml(tmpl?.name||'—')}
+          · Launched by ${escHtml(_users_cad.find(u=>u.id===inst.launched_by)?.name||'—')}
+          · ${fmt(inst.launched_at)}
+        </span>
+        <button onclick="document.getElementById('intel-briefing-overlay').remove()"
+          style="padding:5px 16px;font-size:11px;font-weight:600;background:var(--cad);
+            border:none;border-radius:3px;color:var(--bg0);cursor:pointer">Close</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+
 
 function instScrubLive() {
   _instScrubPos = 100;
