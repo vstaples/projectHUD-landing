@@ -5302,29 +5302,28 @@ function selectOutcome(stepId, outcomeId, requiresReset, requiresSuspend) {
   const container = document.getElementById(`outcome-btns-${stepId}`);
   if (container) container.dataset.selected = outcomeId;
 
-  // Hide all disposition panels first
-  const dispEl    = document.getElementById(`routing-disposition-${stepId}`);
+  // Hide all disposition panels and submit button first — clean slate
+  const dispEl     = document.getElementById(`routing-disposition-${stepId}`);
   const overrideEl = document.getElementById(`routing-override-${stepId}`);
-  const suspendEl = document.getElementById(`suspend-condition-wrap-${stepId}`);
-  if (dispEl)     dispEl.style.display    = 'none';
+  const suspendEl  = document.getElementById(`suspend-condition-wrap-${stepId}`);
+  const submitBtn  = document.getElementById(`complete-submit-${stepId}`);
+  if (dispEl)     dispEl.style.display     = 'none';
   if (overrideEl) overrideEl.style.display = 'none';
   if (suspendEl)  suspendEl.style.display  = 'none';
+  if (submitBtn)  submitBtn.style.display  = 'none';
 
   // Clear route-target hidden field
   const hiddenRoute = document.getElementById(`route-target-${stepId}`);
   if (hiddenRoute) hiddenRoute.value = '';
 
   if (requiresSuspend) {
-    // Show suspend condition input — submit button confirms
     if (suspendEl) suspendEl.style.display = 'block';
-    const submitBtn = document.getElementById(`complete-submit-${stepId}`);
     if (submitBtn) {
       submitBtn.style.display = 'block';
       submitBtn.textContent   = 'Suspend instance';
     }
 
   } else if (requiresReset) {
-    // Progressive disclosure — show routing disposition buttons
     if (dispEl) {
       dispEl.style.display = 'block';
       const inst    = _selectedInstance;
@@ -5335,7 +5334,6 @@ function selectOutcome(stepId, outcomeId, requiresReset, requiresSuspend) {
 
       const optionsEl = document.getElementById(`route-options-${stepId}`);
       if (optionsEl) {
-        // Always include "Reset to beginning" if first step isn't the only prior
         const firstStep = prior[0];
         const prevStep  = prior[prior.length - 1];
 
@@ -5353,15 +5351,12 @@ function selectOutcome(stepId, outcomeId, requiresReset, requiresSuspend) {
           </button>`;
 
         let html = '';
-        // Reset to beginning (first step)
         if (firstStep) {
           html += makeRouteBtn(`Reset to beginning — ${firstStep.name}`, stepId, firstStep.id);
         }
-        // Back one step (if different from first)
         if (prevStep && prevStep.id !== firstStep?.id) {
           html += makeRouteBtn(`Back one step — ${prevStep.name}`, stepId, prevStep.id);
         }
-        // All prior steps individually (if more than 2)
         if (prior.length > 2) {
           prior.slice().reverse().forEach(ps => {
             if (ps.id !== firstStep?.id && ps.id !== prevStep?.id) {
@@ -5372,14 +5367,11 @@ function selectOutcome(stepId, outcomeId, requiresReset, requiresSuspend) {
         optionsEl.innerHTML = html;
       }
     }
-    // Submit button hidden until a route is chosen
-    const submitBtn = document.getElementById(`complete-submit-${stepId}`);
-    if (submitBtn) submitBtn.style.display = 'none';
+    // submitBtn stays hidden until a route is chosen via selectRoute()
 
   } else {
     // Normal outcome — show optional routing override and submit button
     if (overrideEl) overrideEl.style.display = 'block';
-    const submitBtn = document.getElementById(`complete-submit-${stepId}`);
     if (submitBtn) {
       submitBtn.style.display = 'block';
       submitBtn.textContent   = 'Complete step';
