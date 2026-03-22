@@ -5981,11 +5981,12 @@ function toggleInstDagCoC(btn) {
 // ── Instance view mode switcher ───────────────────────────────────────────────
 function setInstViewMode(mode) {
   if (!_selectedInstance) return;
+  // Kill any running pulse animation before switching modes
+  if (_instDagPulseFrame) { cancelAnimationFrame(_instDagPulseFrame); _instDagPulseFrame = null; }
+  _instDagFitted = false;
   _selectedInstance._viewMode = mode;
-  // Reset diagram fit so it recalculates for the current canvas size
+  // Reset CoC panel to closed state when switching to diagram
   if (mode === 'diagram') {
-    _instDagFitted = false;
-    // Also reset CoC panel to closed state
     const cocPanel = document.getElementById('inst-dag-coc-panel');
     if (cocPanel) { cocPanel.style.width='0'; cocPanel.style.borderLeftWidth='0'; }
     const cocBtn = document.getElementById('inst-dag-coc-btn');
@@ -6313,9 +6314,11 @@ function renderInstanceDAG(inst) {
   const zlbl=document.getElementById('dag-zoom-label');
   if(zlbl) zlbl.textContent=Math.round(_instDagScale*100)+'%';
 
-  // Animate pulse for active step
+  // Animate pulse for active step — only schedule next frame if still fitted
+  // (prevents stale pulse frames from running before a refit)
   if(_instDagPulseFrame) cancelAnimationFrame(_instDagPulseFrame);
-  if(steps.some(s=>stepState(s)==='active') && inst._viewMode==='diagram') {
+  _instDagPulseFrame = null;
+  if(_instDagFitted && steps.some(s=>stepState(s)==='active') && inst._viewMode==='diagram') {
     _instDagPulseFrame=requestAnimationFrame(()=>renderInstanceDAG(inst));
   }
 
