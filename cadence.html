@@ -856,16 +856,16 @@ const DEFAULT_OUTCOMES = {
   approval:     [
     { id:'approved',          label:'Approved',           color:'#1D9E75', isDefault:true  },
     { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false },
-    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, isReject:true },
+    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true },
   ],
   review:       [
     { id:'accepted',          label:'Accepted',           color:'#1D9E75', isDefault:true  },
     { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false },
-    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, isReject:true },
+    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true },
   ],
   signoff:      [
     { id:'signed',            label:'Signed',             color:'#1D9E75', isDefault:true  },
-    { id:'declined',          label:'Declined',           color:'#E24B4A', isDefault:false, isReject:true },
+    { id:'declined',          label:'Declined',           color:'#E24B4A', isDefault:false, requiresReset:true },
   ],
   form:         [
     { id:'submitted',         label:'Submitted',          color:'#1D9E75', isDefault:true  },
@@ -873,7 +873,7 @@ const DEFAULT_OUTCOMES = {
   ],
   action:       [
     { id:'done',              label:'Done',               color:'#1D9E75', isDefault:true  },
-    { id:'blocked',           label:'Blocked',            color:'#E24B4A', isDefault:false, isReject:true },
+    { id:'blocked',           label:'Blocked',            color:'#E24B4A', isDefault:false, requiresReset:true },
     { id:'escalated',         label:'Escalated',          color:'#BA7517', isDefault:false },
   ],
   external:     [
@@ -4789,15 +4789,17 @@ function renderInstanceDetail(el, inst) {
                           style="display:flex;align-items:center;gap:10px;padding:9px 12px;
                             border:1px solid ${o.color}55;border-radius:6px;
                             background:${o.color}0a;cursor:pointer;text-align:left;width:100%;
-                            transition:background .12s"
-                          onmouseover="this.style.background='${o.color}22'"
-                          onmouseout="this.style.background=this.classList.contains('selected')?'${o.color}33':'${o.color}0a'">
+                            transition:background .12s;position:relative"
+                          onmouseover="if(!this.classList.contains('selected'))this.style.background='${o.color}1e'"
+                          onmouseout="if(!this.classList.contains('selected'))this.style.background='${o.color}0a'">
                           <div id="obtn-dot-${s.id}-${o.id}"
                             style="width:9px;height:9px;border-radius:50%;flex-shrink:0;
+                              pointer-events:none;
                               border:1.5px solid ${o.color};background:transparent"></div>
-                          <span style="font-size:12px;font-weight:500;color:${o.color}">${escHtml(o.label)}</span>
-                          ${o.holdsForActions ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7">holds until actions resolve</span>` : ''}
-                          ${o.requiresSuspend ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7">suspends instance</span>` : ''}
+                          <span style="font-size:12px;font-weight:500;color:${o.color};
+                            pointer-events:none">${escHtml(o.label)}</span>
+                          ${o.holdsForActions ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7;pointer-events:none">holds until actions resolve</span>` : ''}
+                          ${o.requiresSuspend ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7;pointer-events:none">suspends instance</span>` : ''}
                         </button>`).join('')}
                       </div>
 
@@ -5229,24 +5231,30 @@ function selectOutcome(stepId, outcomeId, requiresReset, requiresSuspend) {
     .flatMap(s => _getOutcomes(s))
     .find(o => o.id === outcomeId);
 
-  // Deselect all buttons — hollow dots
+  // Deselect all buttons — restore hollow dots and original backgrounds
   document.querySelectorAll(`#outcome-btns-${stepId} button`).forEach(b => {
     b.classList.remove('selected');
-    b.style.background  = b.dataset.baseColor || '';
-    b.style.outline     = 'none';
-    b.style.boxShadow   = 'none';
+    b.style.outline    = 'none';
+    b.style.boxShadow  = 'none';
+    // Restore original faint background from the button's border color
+    const borderColor = b.style.borderColor || '';
+    const hex = borderColor.replace(/55$/, '');
+    b.style.background = hex ? hex + '0a' : '';
     const dot = b.querySelector('[id^="obtn-dot-"]');
     if (dot) dot.style.background = 'transparent';
   });
 
-  // Select clicked button — fill dot
+  // Select clicked button — fill dot, outline only (no box-shadow)
   const btn = document.getElementById(`obtn-${stepId}-${outcomeId}`);
   if (btn) {
     btn.classList.add('selected');
-    btn.style.outline   = '2px solid currentColor';
-    btn.style.boxShadow = 'inset 0 0 0 1px currentColor';
+    btn.style.outline    = '2px solid currentColor';
+    btn.style.boxShadow  = 'none';
     const dot = document.getElementById(`obtn-dot-${stepId}-${outcomeId}`);
-    if (dot) dot.style.background = dot.style.borderColor || 'currentColor';
+    if (dot) {
+      const color = dot.style.borderColor || 'currentColor';
+      dot.style.background = color;
+    }
   }
 
   // Store selection
