@@ -6036,6 +6036,8 @@ function renderInstanceDAG(inst) {
   // DEBUG overlay — remove after fixing
   ctx.fillStyle='rgba(255,100,100,.8)'; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.textBaseline='top';
   ctx.fillText(`W=${W} H=${H} panX=${_instDagPanX.toFixed(0)} panY=${_instDagPanY.toFixed(0)} scale=${_instDagScale.toFixed(2)} fitted=${_instDagFitted}`, 8, 8);
+
+  if (!steps.length) {
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='13px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('No steps in this template',W/2,H/2); return;
