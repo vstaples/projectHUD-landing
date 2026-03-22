@@ -1320,7 +1320,7 @@ function renderDAG() {
   const NH      = 58;
   const PAD_L   = 48;
   const PAD_R   = 48;
-  const NODE_Y  = 60;   // more space above for edge labels
+  const NODE_Y  = 80;   // space above nodes for branch routing
   const RESET_H = 32;
 
   // Count reset edges and max forward labels per gap for spacing
@@ -1459,55 +1459,117 @@ function renderDAG() {
   });
 
   // Forward and suspend edges
+  // Forward edges with multiple outcomes: orthogonal branch tree above nodes
+  // Single outcome: simple straight arrow at node midline
   Object.values(edgeGroups).forEach(eg => {
     if (eg.type === 'reset') return;
     const fp = pos[eg.from.id];
     if (!fp) return;
 
     if (eg.type === 'forward' && eg.to) {
-      const tp = pos[eg.to.id];
+      const tp   = pos[eg.to.id];
       if (!tp) return;
-      const x1 = fp.x + NW;
-      const y1 = fp.y + NH / 2;
-      const x2 = tp.x;
-      const y2 = tp.y + NH / 2;
-      const mx  = (x1 + x2) / 2;
-      const gapW = x2 - x1;
+      const x1   = fp.x + NW;        // right edge of source
+      const x2   = tp.x;             // left edge of target
+      const midY = fp.y + NH / 2;    // vertical midline of nodes
 
-      // Use neutral green if multiple outcomes, else outcome color
-      const lineColor = eg.labels.length === 1 ? (eg.labels[0].color || '#1D9E75') : '#1D9E75';
-      _dagArrow(ctx, x1, y1, x2, y2, lineColor, false, false);
+      if (eg.labels.length === 1) {
+        // ── Single outcome: simple horizontal arrow ──────────────────────
+        const o   = eg.labels[0];
+        const col = o.color || '#1D9E75';
+        _dagArrow(ctx, x1, midY, x2, midY, col, false, false);
 
-      // Stack labels centered in the gap — with pill background
-      const totalH = eg.labels.length * LABEL_H;
-      const startY = y1 - totalH - 6;
-
-      eg.labels.forEach((o, li) => {
-        const ly      = startY + li * LABEL_H;
-        const lbl     = o.label;
-        ctx.font      = `9px var(--font-mono, monospace)`;
-        const tw      = ctx.measureText(lbl).width;
-        const pillW   = Math.min(tw + 8, gapW - 4);
-        const pillH   = 11;
-
-        // Pill background
-        ctx.fillStyle   = 'rgba(14,17,23,.85)';
+        // Label above midpoint with pill
+        const mx   = (x1 + x2) / 2;
+        ctx.font   = `9px var(--font-mono, monospace)`;
+        const tw   = ctx.measureText(o.label).width;
+        const pw   = tw + 8;
+        ctx.fillStyle   = 'rgba(14,17,23,.9)';
         ctx.globalAlpha = 0.9;
         ctx.beginPath();
-        ctx.roundRect(mx - pillW/2, ly - pillH/2, pillW, pillH, 3);
+        ctx.roundRect(mx - pw/2, midY - 18, pw, 12, 3);
         ctx.fill();
-
-        // Label text
-        ctx.fillStyle    = o.color || '#1D9E75';
+        ctx.fillStyle    = col;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         ctx.globalAlpha  = 1;
-        // Truncate if too wide
-        let txt = lbl;
-        while (txt.length > 3 && ctx.measureText(txt).width > pillW - 6) txt = txt.slice(0,-1);
-        if (txt !== lbl) txt += '…';
-        ctx.fillText(txt, mx, ly);
-      });
+        ctx.fillText(o.label, mx, midY - 12);
+
+      } else {
+        // ── Multiple outcomes: orthogonal branch tree above nodes ────────
+        // Vertical spacing: spread branches above the node row
+        const branchCount = eg.labels.length;
+        const branchSpacing = 16;  // px between branch rails
+        const baseY  = fp.y - 8;  // just above nodes
+        const riseY  = baseY - (branchCount - 1) * branchSpacing; // topmost branch
+
+        // Trunk: right out of source, rise up to baseY
+        const trunkX = x1 + 10;
+
+        eg.labels.forEach((o, li) => {
+          const branchY = riseY + li * branchSpacing;
+          const col     = o.color || '#1D9E75';
+
+          ctx.beginPath();
+          ctx.strokeStyle  = col;
+          ctx.lineWidth    = 1.5;
+          ctx.globalAlpha  = 0.7;
+          ctx.setLineDash([]);
+
+          if (li === 0) {
+            // Topmost branch — goes farthest up
+            ctx.moveTo(x1, midY);
+            ctx.lineTo(trunkX, midY);
+            ctx.lineTo(trunkX, branchY);
+            ctx.lineTo(x2 - 8, branchY);
+            ctx.stroke();
+            // Drop down to target midY
+            ctx.beginPath();
+            ctx.moveTo(x2 - 8, branchY);
+            ctx.lineTo(x2 - 8, midY);
+            ctx.lineTo(x2, midY);
+            ctx.stroke();
+          } else {
+            // Lower branches fork off the trunk at their height
+            ctx.moveTo(trunkX, branchY);
+            ctx.lineTo(x2 - 8 + li * 0, branchY); // same x2 target
+            ctx.stroke();
+            // Drop to midY
+            ctx.beginPath();
+            ctx.moveTo(x2 - 8, branchY);
+            ctx.lineTo(x2 - 8, midY);
+            ctx.stroke();
+          }
+
+          ctx.globalAlpha = 1;
+          _dagArrowHead(ctx, x2, midY, 'right', col);
+
+          // Label on the horizontal segment
+          const lx   = (trunkX + x2 - 8) / 2;
+          ctx.font   = `9px var(--font-mono, monospace)`;
+          const tw   = ctx.measureText(o.label).width;
+          const pw   = tw + 8;
+          ctx.fillStyle   = 'rgba(14,17,23,.9)';
+          ctx.globalAlpha = 0.9;
+          ctx.beginPath();
+          ctx.roundRect(lx - pw/2, branchY - 9, pw, 11, 3);
+          ctx.fill();
+          ctx.fillStyle    = col;
+          ctx.textAlign    = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.globalAlpha  = 1;
+          ctx.fillText(o.label, lx, branchY - 3);
+        });
+
+        // Draw shared trunk from source
+        ctx.beginPath();
+        ctx.strokeStyle  = 'rgba(255,255,255,.2)';
+        ctx.lineWidth    = 1;
+        ctx.moveTo(x1, midY);
+        ctx.lineTo(trunkX, midY);
+        ctx.lineTo(trunkX, riseY);
+        ctx.stroke();
+      }
       ctx.globalAlpha = 1;
 
     } else if (eg.type === 'suspend') {
