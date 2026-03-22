@@ -2983,7 +2983,8 @@ async function runBistScript(scriptId, onProgress) {
   try {
     for (let si = 0; si < spec.steps.length; si++) {
       const stp = spec.steps[si];
-      onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si, total: spec.steps.length });
+      onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si,
+        total: spec.steps.length, action: stp.action, params: stp.params });
 
       // ── Execute action ──────────────────────────────────────────────────────
       if (stp.action === 'launch_instance') {
@@ -3001,6 +3002,7 @@ async function runBistScript(scriptId, onProgress) {
         });
         instId = rows?.[0]?.id;
         if (!instId) throw new Error('Failed to create instance');
+        onProgress?.({ type:'instance_created', instId });
         // Write launch CoC event
         await API.post('workflow_step_instances', {
           instance_id: instId, firm_id: FIRM_ID_CAD,
@@ -3084,7 +3086,9 @@ async function runBistScript(scriptId, onProgress) {
       }
 
       stepsPassed++;
-      onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si });
+      const stepName = stepBySeq[stp.params?.step_seq]?.name || '';
+      onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
+        action: stp.action, stepName, outcome: stp.params?.outcome });
     }
 
     // All steps passed
@@ -3426,16 +3430,10 @@ function _refreshCoCIfOpen() {
 
 // ── Tests panel toggle ────────────────────────────────────────────────────────
 function toggleTmplTests() {
-  const panel   = document.getElementById('tmpl-tests-panel');
+  const panel    = document.getElementById('tmpl-tests-panel');
   const testsBtn = document.getElementById('tests-btn');
   if (!panel) return;
   const opening = !panel.classList.contains('open');
-  // Close CoC if open
-  if (opening) {
-    document.getElementById('tmpl-coc-panel')?.classList.remove('open');
-    const cocBtn = document.getElementById('coc-btn');
-    if (cocBtn) { cocBtn.style.color = ''; cocBtn.style.borderColor = ''; cocBtn.style.background = ''; }
-  }
   panel.classList.toggle('open');
   if (testsBtn) {
     testsBtn.style.color       = opening ? 'var(--cad)'      : '';
@@ -3627,29 +3625,104 @@ function renderTmplTests(scripts, runs) {
 }
 
 async function runSingleTest(scriptId) {
-  const iconEl  = document.getElementById(`bist-icon-${scriptId}`);
-  const logEl   = document.getElementById(`bist-log-${scriptId}`);
-  const detEl   = document.getElementById(`bist-detail-${scriptId}`);
-  if (iconEl)  { iconEl.textContent = '…'; iconEl.style.color = 'var(--muted)'; }
-  if (logEl)   { logEl.style.display = 'block'; logEl.textContent = 'Starting…'; }
-  if (detEl)   detEl.innerHTML = '';
+  const iconEl = document.getElementById(`bist-icon-${scriptId}`);
+  const logEl  = document.getElementById(`bist-log-${scriptId}`);
+  const detEl  = document.getElementById(`bist-detail-${scriptId}`);
 
-  const result = await runBistScript(scriptId, ({ type, stepIdx, total, reason, message }) => {
+  if (iconEl) { iconEl.textContent = '…'; iconEl.style.color = 'var(--amber)'; }
+  if (detEl)  detEl.innerHTML = '';
+  if (logEl)  {
+    logEl.style.display = 'block';
+    logEl.innerHTML = `<span style="color:var(--muted)">Initialising…</span>`;
+  }
+
+  function logLine(html) {
     if (!logEl) return;
-    if (type === 'step_start') logEl.textContent += `\nStep ${(stepIdx||0)+1}/${total||'?'}…`;
-    if (type === 'step_pass')  logEl.textContent += ' ✓';
-    if (type === 'step_fail')  logEl.textContent += ` ✕\n${reason||''}`;
-    if (type === 'error')      logEl.textContent += `\nError: ${message||''}`;
+    logEl.innerHTML += (logEl.innerHTML ? '\n' : '') + html;
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function actionLabel(action, params) {
+    if (action === 'launch_instance') return `Launch instance`;
+    if (action === 'complete_step') {
+      const seq = params?.step_seq ? `step ${params.step_seq}` : '';
+      const out = params?.outcome  ? ` → <span style="color:var(--cad)">${escHtml(params.outcome)}</span>` : '';
+      const who = params?.actor    ? ` <span style="color:var(--muted)">as ${escHtml(params.actor.replace(/_/g,' '))}</span>` : '';
+      return `Complete ${seq}${out}${who}`;
+    }
+    if (action === 'wait') return `Wait ${params?.ms||0}ms`;
+    return escHtml(action);
+  }
+
+  let _watchInstId = null;
+
+  const result = await runBistScript(scriptId, ({ type, action, params, stepName,
+    outcome, reason, message, instId }) => {
+
+    if (type === 'instance_created') {
+      _watchInstId = instId;
+      // Inject Watch button into the row header
+      const row = document.getElementById(`bist-row-${scriptId}`);
+      const existing = row?.querySelector('.bist-watch-btn');
+      if (row && !existing) {
+        const watchBtn = document.createElement('button');
+        watchBtn.className = 'bist-watch-btn';
+        watchBtn.style.cssText = `flex-shrink:0;padding:3px 8px;font-size:10px;
+          background:var(--cad-dim);border:1px solid var(--cad-wire);border-radius:4px;
+          color:var(--cad);cursor:pointer;margin-right:4px`;
+        watchBtn.textContent = '👁 Watch';
+        watchBtn.onclick = () => {
+          switchTab('instances');
+          // Reload instances to pick up the test instance
+          loadAll().then(() => renderTab('instances'));
+        };
+        const runBtn = row.querySelector('button[onclick^="runSingleTest"]');
+        if (runBtn) runBtn.parentNode.insertBefore(watchBtn, runBtn);
+      }
+      logEl.innerHTML = `<span style="color:var(--muted)">Instance created</span>`;
+    }
+
+    if (type === 'step_start') {
+      logLine(`<span style="color:var(--muted)">▶ ${actionLabel(action, params)}</span>`);
+    }
+
+    if (type === 'step_pass') {
+      // Replace last line with green pass
+      const lines = logEl.innerHTML.split('\n');
+      const label = stepName
+        ? `<span style="color:var(--green)">✓ ${actionLabel(action, params)} — ${escHtml(stepName)}</span>`
+        : `<span style="color:var(--green)">✓ ${actionLabel(action, params)}</span>`;
+      lines[lines.length - 1] = label;
+      logEl.innerHTML = lines.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    if (type === 'step_fail') {
+      const lines = logEl.innerHTML.split('\n');
+      lines[lines.length - 1] = `<span style="color:var(--red)">✕ ${actionLabel(action||'', params||{})} — assertion failed</span>`;
+      logEl.innerHTML = lines.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    if (type === 'error') {
+      logLine(`<span style="color:var(--red)">Error: ${escHtml(message||'unknown')}</span>`);
+    }
   });
 
   if (iconEl) {
     iconEl.textContent = result.status === 'passed' ? '✓' : '✕';
     iconEl.style.color = result.status === 'passed' ? 'var(--green)' : 'var(--red)';
   }
-  if (logEl) logEl.textContent += result.status === 'passed' ? '\nPassed ✓' : '\nFailed ✕';
 
-  // Refresh full panel to update gate summary
+  const finalLine = result.status === 'passed'
+    ? `<span style="color:var(--green);font-weight:600">Passed ✓</span>`
+    : `<span style="color:var(--red);font-weight:600">Failed ✕</span>`;
+  logLine(finalLine);
+
+  // Remove Watch button after run completes (instance deleted)
+  document.querySelector(`#bist-row-${scriptId} .bist-watch-btn`)?.remove();
+
+  // Refresh full panel to update gate summary and failure report
   if (_selectedTmpl) await loadTmplTests(_selectedTmpl.id);
 }
 
@@ -3675,12 +3748,6 @@ function toggleTmplCoC() {
   const cocBtn = document.getElementById('coc-btn');
   if (!panel) return;
   const opening = !panel.classList.contains('open');
-  // Close Tests panel if open
-  if (opening) {
-    document.getElementById('tmpl-tests-panel')?.classList.remove('open');
-    const testsBtn = document.getElementById('tests-btn');
-    if (testsBtn) { testsBtn.style.color = ''; testsBtn.style.borderColor = ''; testsBtn.style.background = ''; }
-  }
   panel.classList.toggle('open');
   if (cocBtn) {
     cocBtn.style.color       = opening ? 'var(--cad)'      : '';
@@ -5270,46 +5337,51 @@ API.get(`resources?firm_id=eq.${FIRM_ID_CAD}&is_active=eq.true&select=id,first_n
   }); })
   .catch(() => {});
 
-// ── CoC panel drag-to-resize ──────────────────────────────────────────────────
+// ── CoC + Tests panel drag-to-resize ─────────────────────────────────────────
 (function() {
-  let _cocDragging = false;
-  let _cocStartX   = 0;
-  let _cocStartW   = 0;
+  let _dragging      = false;
+  let _dragPanelId   = null;
+  let _dragHandleId  = null;
+  let _startX        = 0;
+  let _startW        = 0;
 
   document.addEventListener('mousedown', e => {
     const handle = e.target.closest('#tmpl-coc-resize, #tmpl-tests-resize');
     if (!handle) return;
-    const panelId = handle.id === 'tmpl-coc-resize' ? 'tmpl-coc-panel' : 'tmpl-tests-panel';
-    const panel = document.getElementById(panelId);
+    _dragPanelId  = handle.id === 'tmpl-coc-resize' ? 'tmpl-coc-panel' : 'tmpl-tests-panel';
+    _dragHandleId = handle.id;
+    const panel   = document.getElementById(_dragPanelId);
     if (!panel) return;
-    _cocDragging = true;
-    _cocStartX   = e.clientX;
-    _cocStartW   = panel.offsetWidth;
+    _dragging = true;
+    _startX   = e.clientX;
+    _startW   = panel.offsetWidth;
     handle.classList.add('dragging');
-    document.body.style.cursor    = 'col-resize';
+    document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
     e.preventDefault();
+    e.stopPropagation();
   });
 
   document.addEventListener('mousemove', e => {
-    if (!_cocDragging) return;
-    const panel = document.getElementById('tmpl-coc-panel');
+    if (!_dragging || !_dragPanelId) return;
+    const panel = document.getElementById(_dragPanelId);
     if (!panel) return;
-    const delta   = _cocStartX - e.clientX; // dragging left = wider
-    const newWidth = Math.max(240, Math.min(600, _cocStartW + delta));
-    panel.style.width = newWidth + 'px';
-    // Disable CSS transition while dragging for smooth feel
+    const delta    = _startX - e.clientX; // drag left = wider
+    const newWidth = Math.max(240, Math.min(600, _startW + delta));
+    panel.style.width      = newWidth + 'px';
     panel.style.transition = 'none';
   });
 
   document.addEventListener('mouseup', () => {
-    if (!_cocDragging) return;
-    _cocDragging = false;
-    document.getElementById('tmpl-coc-resize')?.classList.remove('dragging');
+    if (!_dragging) return;
+    _dragging = false;
+    document.getElementById(_dragHandleId)?.classList.remove('dragging');
     document.body.style.cursor     = '';
     document.body.style.userSelect = '';
-    const panel = document.getElementById('tmpl-coc-panel');
-    if (panel) panel.style.transition = ''; // restore CSS transition
+    const panel = document.getElementById(_dragPanelId);
+    if (panel) panel.style.transition = '';
+    _dragPanelId  = null;
+    _dragHandleId = null;
   });
 })();
 
