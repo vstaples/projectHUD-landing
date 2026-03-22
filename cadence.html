@@ -3511,16 +3511,76 @@ function renderTmplTests(scripts, runs) {
                      : run?.status === 'failed' ? 'var(--red)' : 'var(--muted)';
     const stateIcon  = run?.status === 'passed' ? '✓'
                      : run?.status === 'failed' ? '✕' : '○';
+
     const runMeta = run
       ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">
-           v${escHtml(run.template_version||'?')} · ${run.duration_ms ? (run.duration_ms/1000).toFixed(1)+'s' : ''}
+           v${escHtml(run.template_version||'?')} · ${run.duration_ms ? (run.duration_ms/1000).toFixed(1)+'s' : ''} · 
+           ${new Date(run.run_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
          </span>`
       : `<span style="font-size:9px;color:var(--muted)">Not run for v${escHtml(ver)}</span>`;
-    const failDetail = run?.status === 'failed' && run.failure_reason
-      ? `<div style="font-size:9px;color:var(--red);margin-top:2px;padding:2px 6px;
-           background:rgba(192,64,74,.08);border-left:2px solid var(--red);
-           font-family:var(--font-mono);word-break:break-all">${escHtml(run.failure_reason)}</div>`
-      : '';
+
+    // Structured failure report
+    let failDetail = '';
+    if (run?.status === 'failed') {
+      const spec       = typeof script.script === 'string' ? JSON.parse(script.script) : script.script;
+      const failedStep = spec?.steps?.find(s => s.id === run.failure_step);
+      const assert     = run.failure_assertion;
+      const [checkPath, ...rest] = (run.failure_reason||'').split(':');
+      const actualPart  = rest.join(':').trim(); // "expected X, got Y"
+      const expectedVal = actualPart.match(/expected (.+?),/)?.[1] || '—';
+      const actualVal   = actualPart.match(/got (.+)$/)?.[1]       || '—';
+
+      failDetail = `
+        <div style="margin-top:8px;border:1px solid rgba(192,64,74,.35);border-radius:5px;
+          overflow:hidden;font-size:11px">
+          <!-- Failure header -->
+          <div style="background:rgba(192,64,74,.12);padding:6px 10px;
+            display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(192,64,74,.2)">
+            <span style="color:var(--red);font-size:12px">✕</span>
+            <span style="color:var(--red);font-weight:600">Assertion failed</span>
+            ${run.failure_step ? `<span style="color:var(--muted);font-size:10px;margin-left:auto">
+              Step: ${escHtml(run.failure_step)}</span>` : ''}
+          </div>
+          <!-- Action that was executing -->
+          ${failedStep ? `
+          <div style="padding:6px 10px;border-bottom:1px solid var(--border);
+            display:flex;gap:8px;align-items:baseline">
+            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
+              letter-spacing:.08em;flex-shrink:0;width:52px">Action</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--text2)">
+              ${escHtml(failedStep.action)}
+              ${failedStep.params?.step_seq ? ` — step ${escHtml(String(failedStep.params.step_seq))}` : ''}
+              ${failedStep.params?.outcome  ? ` → ${escHtml(failedStep.params.outcome)}` : ''}
+            </span>
+          </div>` : ''}
+          <!-- Check path -->
+          <div style="padding:6px 10px;border-bottom:1px solid var(--border);
+            display:flex;gap:8px;align-items:baseline">
+            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
+              letter-spacing:.08em;flex-shrink:0;width:52px">Check</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--text2)">
+              ${escHtml(checkPath||run.failure_reason||'—')}
+            </span>
+          </div>
+          <!-- Expected vs actual -->
+          <div style="padding:6px 10px;border-bottom:1px solid var(--border);
+            display:flex;gap:8px;align-items:baseline">
+            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
+              letter-spacing:.08em;flex-shrink:0;width:52px">Expected</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--green)">
+              ${escHtml(expectedVal)}
+            </span>
+          </div>
+          <div style="padding:6px 10px;display:flex;gap:8px;align-items:baseline">
+            <span style="font-size:9px;color:var(--muted);text-transform:uppercase;
+              letter-spacing:.08em;flex-shrink:0;width:52px">Got</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">
+              ${escHtml(actualVal)}
+            </span>
+          </div>
+        </div>`;
+    }
+
     return `
       <div id="bist-row-${script.id}"
         style="padding:8px 0;border-bottom:1px solid var(--border)">
