@@ -4406,31 +4406,38 @@ function renderInstanceDetail(el, inst) {
   };
 
   const activeStepIds    = new Set(coc.map(e => e.template_step_id).filter(Boolean));
-  const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.template_step_id));
   const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.template_step_id));
 
-  // Build latest-event-per-step map to handle resets correctly
-  // A step that was completed then reset should NOT appear as done
+  // Build latest-event-per-step map — last event wins
   const latestStepEvent = {};
   coc.forEach(e => {
     if (e.template_step_id) latestStepEvent[e.template_step_id] = e;
   });
+
+  // A step is truly "done" only if its LATEST event is step_completed
+  // Steps that were completed then reset or re-activated are NOT done
+  const completedStepIds = new Set(
+    Object.entries(latestStepEvent)
+      .filter(([, e]) => e.event_type === 'step_completed')
+      .map(([id]) => id)
+  );
+
   const resetStepIds = new Set(
     Object.entries(latestStepEvent)
       .filter(([, e]) => e.event_type === 'step_reset')
       .map(([id]) => id)
   );
-  // Remove reset steps from completedStepIds so they don't show as done
-  resetStepIds.forEach(id => completedStepIds.delete(id));
 
-  // Derive the "ready" step — immediately follows the last completed step, not yet touched
+  // Derive the "ready" step — immediately follows the last completed, not yet active or reset
   const lastCompletedOrder = steps
     .filter(s => completedStepIds.has(s.id))
     .reduce((max, s) => Math.max(max, s.sequence_order), 0);
   const readyStep = steps
-    .filter(s => s.sequence_order > lastCompletedOrder
-              && !activeStepIds.has(s.id)
-              && !resetStepIds.has(s.id))
+    .filter(s => {
+      const latest = latestStepEvent[s.id];
+      return s.sequence_order > lastCompletedOrder
+          && (!latest || latest.event_type === 'step_reset');
+    })
     .sort((a, b) => a.sequence_order - b.sequence_order)[0];
   const readyStepId = readyStep?.id || null;
 
@@ -4547,9 +4554,9 @@ function renderInstanceDetail(el, inst) {
           : steps.map((s, idx) => {
               const meta     = STEP_META[s.step_type] || STEP_META.action;
               const isReset  = resetStepIds.has(s.id);
-              const done     = completedStepIds.has(s.id) && !isReset;
+              const done     = completedStepIds.has(s.id);
               const rejected = rejectedStepIds.has(s.id);
-              const touched  = activeStepIds.has(s.id) && !isReset
+              const touched  = activeStepIds.has(s.id)
                              && latestStepEvent[s.id]?.event_type === 'step_activated';
               const isSel    = selStep === s.id;
               const isLast   = idx === steps.length - 1;
