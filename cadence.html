@@ -855,12 +855,12 @@ const STEP_META = {
 const DEFAULT_OUTCOMES = {
   approval:     [
     { id:'approved',          label:'Approved',           color:'#1D9E75', isDefault:true  },
-    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false },
+    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false, requiresReset:true },
     { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true },
   ],
   review:       [
     { id:'accepted',          label:'Accepted',           color:'#1D9E75', isDefault:true  },
-    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false },
+    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false, requiresReset:true },
     { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true },
   ],
   signoff:      [
@@ -1318,10 +1318,10 @@ function renderDAG() {
   // ── Layout constants ──────────────────────────────────────────────────────
   const NW      = 150;
   const NH      = 58;
-  const PAD_L   = 48;
-  const PAD_R   = 48;
+  const PAD_L   = 64;
+  const PAD_R   = 64;
   const NODE_Y  = 80;   // space above nodes for branch routing
-  const RESET_H = 32;
+  const RESET_H = 36;
 
   // Count reset outcomes and forward labels for spacing
   let resetCount = 0;
@@ -1494,28 +1494,29 @@ function renderDAG() {
       ctx.globalAlpha  = 1;
       ctx.fillText(o.label, lx, branchY - 5);
 
-      // Three sub-options fanning out from diamond bottom
-      const subLabels = ['Revert to prior', 'Revert to start', 'Abort'];
+      // Three sub-options stacked vertically to the right of diamond
+      const subLabels = ['↩ Revert to prior', '↩ Revert to start', '✕ Abort'];
       const subColors = ['#BA7517', '#E24B4A', '#666'];
-      const subY      = dy + ds + 14;
-      const spread    = 40;
+      const subStartY = dy - ds;
+      const subX      = dx + ds + 10;
       subLabels.forEach((sub, si) => {
-        const sx2 = dx + (si - 1) * spread;
+        const sy2 = subStartY + si * 14;
+        // Connector from diamond right point
         ctx.beginPath();
         ctx.strokeStyle = subColors[si];
         ctx.lineWidth   = 1;
-        ctx.setLineDash([3, 2]);
+        ctx.setLineDash([2, 2]);
         ctx.globalAlpha = 0.4;
-        ctx.moveTo(dx, dy + ds);
-        ctx.lineTo(sx2, subY);
+        ctx.moveTo(dx + ds, dy);
+        ctx.lineTo(subX - 2, sy2 + 4);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle    = subColors[si];
         ctx.font         = `8px var(--font-mono, monospace)`;
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'top';
-        ctx.globalAlpha  = 0.55;
-        ctx.fillText(sub, sx2, subY + 2);
+        ctx.textAlign    = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha  = 0.65;
+        ctx.fillText(sub, subX, sy2 + 4);
         ctx.globalAlpha  = 1;
       });
     });
