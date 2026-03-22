@@ -1003,7 +1003,7 @@ function renderEditorEmpty() {
 }
 
 async function selectTemplate(id) {
-  _dagPanX = 0; _dagPanY = 0; _dagScale = 1; // reset diagram view
+  _dagPanX = 0; _dagPanY = 0; _dagScale = 1; _dagAutoFitted = false; // reset diagram view
   if (_dirtySteps) {
     if (!confirm('You have unsaved changes. Discard and switch templates?')) return;
     _dirtySteps = false;
@@ -1271,12 +1271,13 @@ function switchEditorView(view) {
 // ── DAG renderer ─────────────────────────────────────────────────────────────
 // ── DAG state ─────────────────────────────────────────────────────────────────
 let _dagPanX = 0, _dagPanY = 0, _dagScale = 1;
+let _dagAutoFitted = false;
 let _dagDragging = false, _dagDragStartX = 0, _dagDragStartY = 0;
 let _dagPanStartX = 0, _dagPanStartY = 0;
 
 function dagZoomIn()    { _dagScale = Math.min(3, _dagScale * 1.25); renderDAG(); }
 function dagZoomOut()   { _dagScale = Math.max(0.2, _dagScale * 0.8); renderDAG(); }
-function dagResetView() { _dagPanX = 0; _dagPanY = 0; _dagScale = 1; renderDAG(); }
+function dagResetView() { _dagPanX = 0; _dagPanY = 0; _dagScale = 1; _dagAutoFitted = false; renderDAG(); }
 
 // ── DAG renderer ─────────────────────────────────────────────────────────────
 function renderDAG() {
@@ -1315,13 +1316,13 @@ function renderDAG() {
   }
 
   // ── Layout constants ──────────────────────────────────────────────────────
-  const NW      = 170;
-  const NH      = 60;
-  const H_GAP   = 72;
-  const PAD_L   = 52;   // space for trigger node
-  const PAD_R   = 52;   // space for terminal node
-  const NODE_Y  = 40;   // y position of nodes in content space
-  const RESET_H = 28;   // height per reset edge row below nodes
+  const NW      = 160;
+  const NH      = 58;
+  const H_GAP   = 60;
+  const PAD_L   = 48;   // space for trigger node
+  const PAD_R   = 48;   // space for terminal node
+  const NODE_Y  = 36;   // y position of nodes in content space
+  const RESET_H = 30;   // height per reset edge row below nodes
 
   // Count reset edges for vertical space
   let resetCount = 0;
@@ -1330,15 +1331,16 @@ function renderDAG() {
   });
 
   const contentW = PAD_L + steps.length * NW + (steps.length - 1) * H_GAP + PAD_R;
-  const contentH = NODE_Y + NH + (resetCount > 0 ? 16 + resetCount * RESET_H : 0) + 30;
+  const contentH = NODE_Y + NH + (resetCount > 0 ? 20 + resetCount * RESET_H : 0) + 20;
 
-  // Auto-fit + center on first render
-  if (_dagPanX === 0 && _dagPanY === 0 && _dagScale === 1) {
-    if (contentW > W - 40) {
-      _dagScale = Math.max(0.25, (W - 40) / contentW);
-    }
-    _dagPanX = Math.max(0, (W - contentW * _dagScale) / 2);
-    _dagPanY = Math.max(0, (H - contentH * _dagScale) / 2);
+  // Auto-fit + center — use a flag so it only runs once per template
+  if (!_dagAutoFitted) {
+    _dagAutoFitted = true;
+    // Always fit to width first
+    _dagScale = Math.max(0.25, Math.min(1, (W - 20) / contentW));
+    // Center vertically
+    _dagPanX = Math.max(8, (W - contentW * _dagScale) / 2);
+    _dagPanY = Math.max(8, (H - contentH * _dagScale) / 2);
   }
 
   // Node positions in content-space
@@ -1351,7 +1353,6 @@ function renderDAG() {
   });
 
   // ── Build edge list ───────────────────────────────────────────────────────
-  // Each outcome → separate edge
   const edges = [];
   steps.forEach((s, i) => {
     const outcomes = _getOutcomes(s);
@@ -1359,13 +1360,12 @@ function renderDAG() {
 
     outcomes.forEach(o => {
       if (o.requiresSuspend) {
-        // Terminate — no target
         edges.push({ from: s, to: null, outcome: o, type: 'suspend' });
       } else if (o.requiresReset) {
-        // Default reset target = first step
-        edges.push({ from: s, to: steps[0], outcome: o, type: 'reset' });
+        // Reset target: back one step if prior exists, else step 0
+        const resetTarget = i > 0 ? steps[i - 1] : steps[0];
+        edges.push({ from: s, to: resetTarget, outcome: o, type: 'reset' });
       } else if (nextStep) {
-        // Forward to next step
         edges.push({ from: s, to: nextStep, outcome: o, type: 'forward' });
       }
     });
@@ -1463,28 +1463,23 @@ function renderDAG() {
       const y1 = fp.y + NH / 2;
       const x2 = tp.x;
       const y2 = tp.y + NH / 2;
+      const mx  = (x1 + x2) / 2;
 
-      // Color by outcome type
-      const isForwardOnly = eg.labels.every(o => !o.requiresReset);
-      const color = eg.labels.length === 1
-        ? (eg.labels[0].color || 'var(--green)')
-        : '#1D9E75';
-
+      // Use color of first label; if multiple use neutral green
+      const color = eg.labels.length === 1 ? (eg.labels[0].color || '#1D9E75') : '#1D9E75';
       _dagArrow(ctx, x1, y1, x2, y2, color, false, false);
 
-      // Label above the midpoint
-      const mx  = (x1 + x2) / 2;
-      const my  = y1 - 14;
-      const lbl = eg.labels.length === 1
-        ? eg.labels[0].label
-        : eg.labels.map(o => o.label).join(' / ');
-      ctx.fillStyle    = color;
+      // Stack each outcome label above the midpoint
       ctx.font         = `9px var(--font-mono, monospace)`;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
-      ctx.globalAlpha  = 0.75;
-      ctx.fillText(lbl, mx, my);
-      ctx.globalAlpha  = 1;
+      eg.labels.forEach((o, li) => {
+        const ly = y1 - 10 - (eg.labels.length - 1 - li) * 12;
+        ctx.fillStyle   = o.color || '#1D9E75';
+        ctx.globalAlpha = 0.85;
+        ctx.fillText(o.label, mx, ly);
+      });
+      ctx.globalAlpha = 1;
 
     } else if (eg.type === 'suspend') {
       // Drop below node
