@@ -1195,15 +1195,37 @@ function renderEditor() {
       </div>
 
       <!-- Diagram view -->
-      <div id="editor-view-diagram" style="display:none;flex:1;overflow:hidden;position:relative">
-        <canvas id="dag-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
-        <svg id="dag-svg" style="position:absolute;inset:0;width:100%;height:100%;
-          pointer-events:none;overflow:visible"></svg>
-        <div id="dag-nodes" style="position:absolute;inset:0;pointer-events:none"></div>
-        <div id="dag-tooltip" style="display:none;position:absolute;z-index:100;
-          pointer-events:none;background:var(--bg1);border:1px solid var(--border);
-          border-radius:5px;padding:6px 10px;font-size:10px;color:var(--text2);
-          max-width:200px;line-height:1.4"></div>
+      <div id="editor-view-diagram" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+        <!-- Diagram controls -->
+        <div style="display:flex;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);
+          flex-shrink:0;align-items:center;background:var(--bg1)">
+          <button onclick="dagZoomIn()"
+            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
+              border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">+ Zoom</button>
+          <button onclick="dagZoomOut()"
+            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
+              border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">− Zoom</button>
+          <button onclick="dagResetView()"
+            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
+              border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">⟲ Reset</button>
+          <div style="display:flex;gap:12px;margin-left:12px;align-items:center">
+            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
+              <span style="display:inline-block;width:20px;height:2px;background:var(--green);opacity:.7"></span>Forward
+            </span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
+              <span style="display:inline-block;width:20px;height:2px;background:#BA7517;opacity:.7;border-top:2px dashed #BA7517"></span>Changes
+            </span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
+              <span style="display:inline-block;width:20px;height:0;border-top:2px dashed var(--red)"></span>Reset
+            </span>
+          </div>
+          <span style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)"
+            id="dag-zoom-label">100%</span>
+        </div>
+        <!-- Canvas -->
+        <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab">
+          <canvas id="dag-canvas" style="display:block"></canvas>
+        </div>
       </div>
     </div>`;
 }
@@ -1228,7 +1250,7 @@ function switchEditorView(view) {
     diagTab.style.color         = 'var(--cad)';
     diagTab.style.borderColor   = 'var(--cad)';
     // Allow browser to finish layout before measuring dimensions
-    setTimeout(() => renderDAG(), 50);
+    setTimeout(() => { _initDagEvents(); renderDAG(); }, 50);
   } else {
     diagEl.style.display  = 'none';
     stepsEl.style.display = 'flex';
@@ -1527,6 +1549,403 @@ function dagSelectStep(stepId) {
       document.getElementById(`sstep-${stepId}`)?.scrollIntoView({ behavior:'smooth', block:'center' });
     });
   }
+}
+
+// ── DAG state ─────────────────────────────────────────────────────────────────
+let _dagPanX = 0, _dagPanY = 0, _dagScale = 1;
+let _dagDragging = false, _dagDragStartX = 0, _dagDragStartY = 0;
+let _dagPanStartX = 0, _dagPanStartY = 0;
+
+function dagZoomIn()    { _dagScale = Math.min(3, _dagScale * 1.25); renderDAG(); }
+function dagZoomOut()   { _dagScale = Math.max(0.2, _dagScale * 0.8); renderDAG(); }
+function dagResetView() { _dagPanX = 0; _dagPanY = 0; _dagScale = 1; renderDAG(); }
+
+// ── DAG renderer ─────────────────────────────────────────────────────────────
+function renderDAG() {
+  const wrap   = document.getElementById('dag-canvas-wrap');
+  const canvas = document.getElementById('dag-canvas');
+  if (!wrap || !canvas || !_selectedTmpl) return;
+
+  const steps = (_selectedTmpl.steps || [])
+    .filter(s => s.step_type !== 'trigger')
+    .sort((a, b) => a.sequence_order - b.sequence_order);
+
+  const W = wrap.offsetWidth  || 800;
+  const H = wrap.offsetHeight || 500;
+
+  canvas.width  = W;
+  canvas.height = H;
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  if (!steps.length) {
+    ctx.fillStyle = 'rgba(255,255,255,.2)';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No steps yet', W/2, H/2);
+    return;
+  }
+
+  // ── Layout constants ──────────────────────────────────────────────────────
+  const NW = 170, NH = 58;
+  const H_GAP = 80;   // horizontal gap between nodes
+  const V_OFFSET = 70; // vertical offset for back-edges below main row
+
+  // Position nodes: single row, centered vertically
+  // Center the whole diagram in the canvas
+  const totalContentW = steps.length * NW + (steps.length - 1) * H_GAP;
+  const startX = Math.max(60, (W / _dagScale - totalContentW) / 2);
+  const mainY  = Math.max(80, (H / _dagScale - NH) / 2 - V_OFFSET / 2);
+
+  const pos = {};
+  steps.forEach((s, i) => {
+    pos[s.id] = { x: startX + i * (NW + H_GAP), y: mainY };
+  });
+
+  // ── Build edge list ───────────────────────────────────────────────────────
+  // Each outcome → separate edge
+  const edges = [];
+  steps.forEach((s, i) => {
+    const outcomes = _getOutcomes(s);
+    const nextStep = steps[i + 1];
+
+    outcomes.forEach(o => {
+      if (o.requiresSuspend) {
+        // Terminate — no target
+        edges.push({ from: s, to: null, outcome: o, type: 'suspend' });
+      } else if (o.requiresReset) {
+        // Default reset target = first step
+        edges.push({ from: s, to: steps[0], outcome: o, type: 'reset' });
+      } else if (nextStep) {
+        // Forward to next step
+        edges.push({ from: s, to: nextStep, outcome: o, type: 'forward' });
+      }
+    });
+  });
+
+  // Group edges by from→to for label stacking
+  const edgeGroups = {};
+  edges.forEach(e => {
+    const key = `${e.from.id}→${e.to?.id||'end'}`;
+    if (!edgeGroups[key]) edgeGroups[key] = { ...e, labels: [] };
+    edgeGroups[key].labels.push(e.outcome);
+  });
+
+  // ── Draw ──────────────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.translate(_dagPanX, _dagPanY);
+  ctx.scale(_dagScale, _dagScale);
+
+  // Trigger node
+  const first = steps[0];
+  if (first) {
+    const fp = pos[first.id];
+    const tx = fp.x - 40;
+    const ty = fp.y + NH / 2;
+    ctx.beginPath();
+    ctx.arc(tx, ty, 14, 0, Math.PI * 2);
+    ctx.fillStyle   = 'rgba(192,64,74,.15)';
+    ctx.strokeStyle = 'rgba(192,64,74,.5)';
+    ctx.lineWidth   = 1.5;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle  = '#c0404a';
+    ctx.font       = '12px sans-serif';
+    ctx.textAlign  = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚡', tx, ty);
+    // Line to first node
+    _dagArrow(ctx, tx + 14, ty, fp.x, ty, 'rgba(255,255,255,.2)', false, false);
+  }
+
+  // Reset back-edges — drawn below nodes, staggered by depth
+  let resetDepth = 0;
+  Object.values(edgeGroups).forEach(eg => {
+    if (eg.type !== 'reset' || !eg.to) return;
+    const fp = pos[eg.from.id];
+    const tp = pos[eg.to.id];
+    if (!fp || !tp) return;
+
+    const depth    = resetDepth++;
+    const dropY    = mainY + NH + 24 + depth * 22;
+    const fromX    = fp.x + NW / 2;
+    const toX      = tp.x + NW / 2;
+    const fromBotY = mainY + NH;
+    const toBotY   = mainY + NH;
+    const label    = eg.labels.map(o => o.label).join(' / ');
+    const color    = eg.labels[0].color || '#E24B4A';
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.globalAlpha = 0.65;
+    // Orthogonal path: down → left → up → into node top
+    ctx.moveTo(fromX, fromBotY);
+    ctx.lineTo(fromX, dropY);
+    ctx.lineTo(toX,   dropY);
+    ctx.lineTo(toX,   toBotY + 4);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    // Arrowhead pointing up into target
+    _dagArrowHead(ctx, toX, toBotY, 'up', color);
+
+    // Label centered on the horizontal segment
+    const lx = (fromX + toX) / 2;
+    ctx.fillStyle   = color;
+    ctx.font        = `10px var(--font-mono, monospace)`;
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.8;
+    ctx.fillText('↩ ' + label, lx, dropY + 10);
+    ctx.globalAlpha = 1;
+  });
+
+  // Forward and suspend edges
+  Object.values(edgeGroups).forEach(eg => {
+    if (eg.type === 'reset') return;
+    const fp = pos[eg.from.id];
+    if (!fp) return;
+
+    if (eg.type === 'forward' && eg.to) {
+      const tp = pos[eg.to.id];
+      if (!tp) return;
+      const x1 = fp.x + NW;
+      const y1 = fp.y + NH / 2;
+      const x2 = tp.x;
+      const y2 = tp.y + NH / 2;
+
+      // Color by outcome type
+      const isForwardOnly = eg.labels.every(o => !o.requiresReset);
+      const color = eg.labels.length === 1
+        ? (eg.labels[0].color || 'var(--green)')
+        : '#1D9E75';
+
+      _dagArrow(ctx, x1, y1, x2, y2, color, false, false);
+
+      // Label above the midpoint
+      const mx  = (x1 + x2) / 2;
+      const my  = y1 - 14;
+      const lbl = eg.labels.length === 1
+        ? eg.labels[0].label
+        : eg.labels.map(o => o.label).join(' / ');
+      ctx.fillStyle    = color;
+      ctx.font         = `9px var(--font-mono, monospace)`;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha  = 0.75;
+      ctx.fillText(lbl, mx, my);
+      ctx.globalAlpha  = 1;
+
+    } else if (eg.type === 'suspend') {
+      // Drop below node
+      const sx  = fp.x + NW / 2;
+      const sy  = fp.y + NH;
+      const ey  = sy + 38;
+      const col = eg.labels[0]?.color || '#888';
+      ctx.beginPath();
+      ctx.strokeStyle  = col;
+      ctx.lineWidth    = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.globalAlpha  = 0.55;
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx, ey - 6);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha  = 1;
+      _dagArrowHead(ctx, sx, ey, 'down', col);
+      ctx.fillStyle    = col;
+      ctx.font         = `10px sans-serif`;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'top';
+      ctx.globalAlpha  = 0.7;
+      ctx.fillText('⏸', sx, ey + 4);
+      ctx.globalAlpha  = 1;
+    }
+  });
+
+  // Terminal node
+  if (steps.length) {
+    const lp  = pos[steps[steps.length - 1].id];
+    const tx  = lp.x + NW + 40;
+    const ty  = lp.y + NH / 2;
+    _dagArrow(ctx, lp.x + NW, ty, tx - 14, ty, 'rgba(42,157,64,.4)', false, false);
+    ctx.beginPath();
+    ctx.arc(tx, ty, 14, 0, Math.PI * 2);
+    ctx.fillStyle   = 'rgba(42,157,64,.12)';
+    ctx.strokeStyle = 'rgba(42,157,64,.4)';
+    ctx.lineWidth   = 1.5;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle    = '#7af0a0';
+    ctx.font         = '12px sans-serif';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✓', tx, ty);
+  }
+
+  // Draw nodes on top
+  steps.forEach((s, i) => {
+    const p    = pos[s.id];
+    const meta = STEP_META[s.step_type] || STEP_META.action;
+    const isSel = _selectedStep?.id === s.id;
+
+    // Node background
+    const r = 7;
+    ctx.beginPath();
+    ctx.roundRect(p.x, p.y, NW, NH, r);
+    ctx.fillStyle   = isSel ? 'rgba(0,185,195,.12)' : 'rgba(255,255,255,.04)';
+    ctx.strokeStyle = isSel ? 'rgba(0,185,195,.7)' : 'rgba(255,255,255,.15)';
+    ctx.lineWidth   = isSel ? 2 : 1;
+    ctx.fill(); ctx.stroke();
+
+    // Left accent bar
+    ctx.beginPath();
+    ctx.roundRect(p.x, p.y, 4, NH, [r, 0, 0, r]);
+    ctx.fillStyle = meta.badgeText;
+    ctx.globalAlpha = 0.6;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Step name
+    ctx.fillStyle    = 'rgba(255,255,255,.9)';
+    ctx.font         = `500 11px -apple-system, sans-serif`;
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'top';
+    const maxW = NW - 24;
+    let name = s.name || '';
+    // Truncate if needed
+    while (name.length > 3 && ctx.measureText(name).width > maxW) name = name.slice(0, -1);
+    if (name !== s.name) name += '…';
+    ctx.fillText(name, p.x + 14, p.y + 10);
+
+    // Type badge
+    ctx.fillStyle    = meta.badgeText;
+    ctx.font         = `9px var(--font-mono, monospace)`;
+    ctx.textBaseline = 'bottom';
+    ctx.globalAlpha  = 0.65;
+    ctx.fillText(meta.label.toUpperCase(), p.x + 14, p.y + NH - 8);
+    ctx.globalAlpha  = 1;
+
+    // Seq number
+    ctx.fillStyle    = 'rgba(255,255,255,.25)';
+    ctx.font         = `9px var(--font-mono, monospace)`;
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(String(s.sequence_order), p.x + NW - 8, p.y + NH - 8);
+
+    // Due days badge
+    if (s.due_days) {
+      ctx.fillStyle    = '#e8a838';
+      ctx.font         = `9px var(--font-mono, monospace)`;
+      ctx.textAlign    = 'right';
+      ctx.textBaseline = 'top';
+      ctx.globalAlpha  = 0.8;
+      ctx.fillText(`+${s.due_days}d`, p.x + NW - 8, p.y + 10);
+      ctx.globalAlpha  = 1;
+    }
+  });
+
+  ctx.restore();
+
+  // Update zoom label
+  const label = document.getElementById('dag-zoom-label');
+  if (label) label.textContent = Math.round(_dagScale * 100) + '%';
+}
+
+function _dagArrow(ctx, x1, y1, x2, y2, color, dashed, reverse) {
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5;
+  ctx.globalAlpha = 0.6;
+  if (dashed) ctx.setLineDash([5, 3]);
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  _dagArrowHead(ctx, x2, y2, 'right', color);
+}
+
+function _dagArrowHead(ctx, x, y, dir, color) {
+  const size = 7;
+  ctx.beginPath();
+  ctx.fillStyle   = color;
+  ctx.globalAlpha = 0.7;
+  if (dir === 'right') {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - size, y - size * 0.5);
+    ctx.lineTo(x - size, y + size * 0.5);
+  } else if (dir === 'up') {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - size * 0.5, y + size);
+    ctx.lineTo(x + size * 0.5, y + size);
+  } else if (dir === 'down') {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - size * 0.5, y - size);
+    ctx.lineTo(x + size * 0.5, y - size);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// ── DAG pan/zoom event wiring (called once after diagram container exists) ────
+function _initDagEvents() {
+  const wrap = document.getElementById('dag-canvas-wrap');
+  if (!wrap || wrap._dagEventsInit) return;
+  wrap._dagEventsInit = true;
+
+  wrap.addEventListener('mousedown', e => {
+    _dagDragging = true;
+    _dagDragStartX = e.clientX;
+    _dagDragStartY = e.clientY;
+    _dagPanStartX  = _dagPanX;
+    _dagPanStartY  = _dagPanY;
+    wrap.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!_dagDragging) return;
+    _dagPanX = _dagPanStartX + (e.clientX - _dagDragStartX);
+    _dagPanY = _dagPanStartY + (e.clientY - _dagDragStartY);
+    renderDAG();
+  });
+  window.addEventListener('mouseup', () => {
+    _dagDragging = false;
+    wrap.style.cursor = 'grab';
+  });
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    _dagScale = Math.max(0.2, Math.min(3, _dagScale * factor));
+    renderDAG();
+  }, { passive: false });
+
+  // Click to select step
+  wrap.addEventListener('click', e => {
+    if (Math.abs(e.clientX - _dagDragStartX) > 4) return; // was a drag
+    const steps = (_selectedTmpl?.steps||[])
+      .filter(s => s.step_type !== 'trigger')
+      .sort((a,b) => a.sequence_order - b.sequence_order);
+    const NW = 170, NH = 58, H_GAP = 80;
+    const totalContentW = steps.length * NW + (steps.length - 1) * H_GAP;
+    const canvas = document.getElementById('dag-canvas');
+    const canvasW = canvas?.width || 800;
+    const canvasH = canvas?.height || 500;
+    const startX = Math.max(60, (canvasW / _dagScale - totalContentW) / 2);
+    const mainY  = Math.max(80, (canvasH / _dagScale - NH) / 2 - 35);
+    const rect   = wrap.getBoundingClientRect();
+    const mx     = (e.clientX - rect.left - _dagPanX) / _dagScale;
+    const my     = (e.clientY - rect.top  - _dagPanY) / _dagScale;
+    steps.forEach((s, i) => {
+      const sx = startX + i * (NW + H_GAP);
+      const sy = mainY;
+      if (mx >= sx && mx <= sx + NW && my >= sy && my <= sy + NH) {
+        dagSelectStep(s.id);
+      }
+    });
+  });
 }
 
 // ── AI Draft Banner ───────────────────────────────────────────────────────────
