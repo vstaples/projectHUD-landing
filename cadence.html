@@ -5409,7 +5409,7 @@ function renderInstanceDetail(el, inst) {
         <div style="display:flex;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border);flex-shrink:0;align-items:center;background:var(--bg1)">
           <button onclick="instDagZoom(1.2)" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">+ Zoom</button>
           <button onclick="instDagZoom(0.83)" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">− Zoom</button>
-          <button onclick="instDagReset()" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">⟲ Reset</button>
+          <button onclick="instDagDiagnose()" style="padding:2px 8px;font-size:11px;background:rgba(255,100,0,.2);border:1px solid orange;border-radius:3px;color:orange;cursor:pointer">FIT?</button>
           <div style="display:flex;gap:10px;margin-left:12px;align-items:center">
             <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green)"></span>Complete</span>
             <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--amber)"></span>Active</span>
@@ -6007,8 +6007,6 @@ function instDagZoom(f) { _instDagScale=Math.max(0.2,Math.min(3,_instDagScale*f)
 function instDagReset() {
   _instDagPanX=0; _instDagPanY=0; _instDagScale=1; _instDagFitted=false;
   renderInstanceDAG(_selectedInstance);
-  // Second pass after 100ms to ensure correct dimensions
-  setTimeout(() => { _instDagFitted=false; renderInstanceDAG(_selectedInstance); }, 100);
 }
 
 // ── Instance DAG renderer ─────────────────────────────────────────────────────
@@ -6023,10 +6021,10 @@ function renderInstanceDAG(inst) {
     .sort((a,b) => a.sequence_order - b.sequence_order);
   const coc = inst._stepInsts || [];
 
-  const rect = wrap.getBoundingClientRect();
-  const W = Math.round(rect.width)  || 800;
-  const H = Math.round(rect.height) || 400;
-  if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 50); return; }
+  const W = wrap.offsetWidth  || 800;
+  const H = wrap.offsetHeight || 400;
+
+  if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 100); return; }
 
   canvas.width = W; canvas.height = H;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
@@ -6110,18 +6108,16 @@ function renderInstanceDAG(inst) {
     pending:  'rgba(255,255,255,.03)',
   };
 
-  // ── Layout ────────────────────────────────────────────────────────────────
+  // ── Layout — mirrors template DAG exactly ────────────────────────────────
   const NW=152, NH=68, HGAP=72, PAD_L=56, PAD_R=56;
-  const OWNER_H=22, NODE_Y=OWNER_H+8;  // just enough for owner strip above nodes
+  const OWNER_H=22, NODE_Y=50+OWNER_H;
   const contentW = PAD_L + steps.length*NW + (steps.length-1)*HGAP + PAD_R;
-  const contentH = NODE_Y + NH + 16;   // tight fit — no large bottom padding needed
+  const contentH = NODE_Y + NH + 30;
 
   if (!_instDagFitted) {
     _instDagFitted = true;
     const MARGIN = 48;
-    // Scale to fill width with 48px margin each side, cap at 1.0
-    _instDagScale = Math.max(0.15, Math.min(1.0, (W - MARGIN*2) / contentW));
-    // Left-pin at MARGIN, center vertically
+    _instDagScale = Math.max(0.15, Math.min(1.5, (W - MARGIN*2) / contentW));
     _instDagPanX  = MARGIN;
     const scaledH = contentH * _instDagScale;
     _instDagPanY  = scaledH < H ? (H - scaledH) / 2 : MARGIN;
