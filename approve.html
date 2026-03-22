@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Action Required — CadenceHUD</title>
+<title>Action Required v2 — CadenceHUD</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -516,12 +516,12 @@ async function loadToken(token) {
 
     // Pre-select outcome if ?outcome=reject in URL
     const preOutcome = getParam('outcome');
-    if (preOutcome === 'reject') {
+    if (preOutcome) {
       const outcomes = getOutcomes(rec);
-      const rejectOutcome = outcomes.find(o =>
-        o.requiresReset || ['rejected','declined','rejected'].includes(o.id)
-      );
-      if (rejectOutcome) selectOutcome(rejectOutcome);
+      // Match by exact ID first, then by requiresReset for generic 'reject'
+      const preSelected = outcomes.find(o => o.id === preOutcome)
+        || (preOutcome === 'reject' ? outcomes.filter(o => o.requiresReset).pop() : null);
+      if (preSelected) selectOutcome(preSelected);
     }
 
   } catch (err) {
@@ -613,7 +613,7 @@ function selectOutcome(o) {
     else activeBtn.classList.add('selected-reject');
   }
 
-  // Notes: required for resets, optional otherwises
+  // Notes: required for resets, optional otherwise
   const notesReq = document.getElementById('notes-required');
   const notesInput = document.getElementById('notes-input');
   if (o.requiresReset) {
