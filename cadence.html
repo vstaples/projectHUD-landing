@@ -1183,7 +1183,7 @@ function renderEditor() {
       </div>
 
       <!-- Steps view -->
-      <div id="editor-view-steps" class="spine-area" id="spine-area">
+      <div id="editor-view-steps" class="spine-area"
         ${!isReleased ? renderAIBanner() : ''}
         <div id="spine-wrap" class="spine-wrap">
           ${renderSpine()}
@@ -1221,19 +1221,21 @@ function switchEditorView(view) {
 
   if (view === 'diagram') {
     stepsEl.style.display = 'none';
-    diagEl.style.display  = 'flex';
-    stepsTab.style.color         = 'var(--muted)';
-    stepsTab.style.borderColor   = 'transparent';
-    diagTab.style.color          = 'var(--cad)';
-    diagTab.style.borderColor    = 'var(--cad)';
-    requestAnimationFrame(() => renderDAG());
+    diagEl.style.display  = 'block';
+    diagEl.style.flex     = '1';
+    stepsTab.style.color        = 'var(--muted)';
+    stepsTab.style.borderColor  = 'transparent';
+    diagTab.style.color         = 'var(--cad)';
+    diagTab.style.borderColor   = 'var(--cad)';
+    // Allow browser to finish layout before measuring dimensions
+    setTimeout(() => renderDAG(), 50);
   } else {
     diagEl.style.display  = 'none';
     stepsEl.style.display = 'flex';
-    stepsTab.style.color         = 'var(--cad)';
-    stepsTab.style.borderColor   = 'var(--cad)';
-    diagTab.style.color          = 'var(--muted)';
-    diagTab.style.borderColor    = 'transparent';
+    stepsTab.style.color        = 'var(--cad)';
+    stepsTab.style.borderColor  = 'var(--cad)';
+    diagTab.style.color         = 'var(--muted)';
+    diagTab.style.borderColor   = 'transparent';
   }
 }
 
@@ -1256,8 +1258,10 @@ function renderDAG() {
     return;
   }
 
-  const W = container.clientWidth  || 800;
-  const H = container.clientHeight || 500;
+  const W = container.offsetWidth  || container.clientWidth  || 800;
+  const H = container.offsetHeight || container.clientHeight || 500;
+
+  console.log('[DAG] container:', W, 'x', H, 'steps:', steps.length, 'tmpl:', _selectedTmpl?.name);
 
   // ── Layout constants ──────────────────────────────────────────────────────
   const NODE_W    = 160;
