@@ -1196,8 +1196,8 @@ function renderEditor() {
       </div>
 
       <!-- Diagram view -->
-      <div id="editor-view-diagram" style="display:none;flex:1;flex-direction:column;overflow:hidden">
-        <!-- Diagram controls — TOP -->
+      <div id="editor-view-diagram" style="display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0">
+        <!-- Controls -->
         <div style="display:flex;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);
           flex-shrink:0;align-items:center;background:var(--bg1)">
           <button onclick="dagZoomIn()"
@@ -1209,28 +1209,18 @@ function renderEditor() {
           <button onclick="dagResetView()"
             style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
               border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">⟲ Reset</button>
-          <span style="font-size:9px;color:var(--muted);margin-left:4px;font-family:var(--font-mono)">
-            Drag to pan · Ctrl+scroll to zoom
+          <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">
+            Drag · Ctrl+scroll to zoom
           </span>
-          <div style="display:flex;gap:12px;margin-left:12px;align-items:center">
-            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
-              <span style="display:inline-block;width:20px;height:2px;background:#1D9E75;opacity:.8"></span>Forward
-            </span>
-            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
-              <span style="display:inline-block;width:20px;height:0;border-top:2px dashed var(--red)"></span>Reset
-            </span>
-            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
-              <span style="display:inline-block;width:20px;height:0;border-top:2px dashed #888"></span>Suspend
-            </span>
-          </div>
-          <span style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)"
-            id="dag-zoom-label">100%</span>
+          <span id="dag-zoom-label" style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)">100%</span>
         </div>
-        <!-- Canvas — clips strictly within this div -->
-        <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;
-          cursor:grab;min-height:0">
+        <!-- Canvas -->
+        <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab;min-height:0">
           <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
         </div>
+        <!-- Decision outcome cards -->
+        <div id="dag-cards" style="display:none;flex-wrap:wrap;gap:10px;padding:10px 12px;
+          border-top:1px solid var(--border);flex-shrink:0;background:var(--bg1)"></div>
       </div>
     </div>`;
 }
@@ -1280,6 +1270,42 @@ function dagZoomOut()   { _dagScale = Math.max(0.2, _dagScale * 0.8); renderDAG(
 function dagResetView() { _dagPanX = 0; _dagPanY = 0; _dagScale = 1; _dagAutoFitted = false; renderDAG(); }
 
 // ── DAG renderer ─────────────────────────────────────────────────────────────
+
+function _dagGroupForCards(outcomes) {
+  const groups = [];
+  outcomes.forEach(o => {
+    const key = (o.options||[]).join('|');
+    const ex  = groups.find(g => g.key === key);
+    if (ex) ex.labels.push({ label: o.label, color: o.color });
+    else    groups.push({ key, labels:[{ label:o.label, color:o.color }], options: o.options||[] });
+  });
+  return groups;
+}
+
+function _dagAllCardGroups(steps) {
+  const seen = {}, groups = [];
+  steps.forEach(s => {
+    const outs = _dagResetOutcomes(s);
+    _dagGroupForCards(outs).forEach(g => {
+      if (!seen[g.key]) { seen[g.key] = true; groups.push(g); }
+    });
+  });
+  return groups;
+}
+
+function _dagResetOutcomes(s) {
+  return _getOutcomes(s).filter(o => o.requiresReset && !o.requiresSuspend && !o.isPartial)
+    .map(o => ({
+      label:   o.label,
+      color:   o.color || '#E24B4A',
+      options: ['Revert to prior step', 'Revert to start of workflow', 'Abort instance'],
+    }));
+}
+
+function _dagFwdOutcomes(s) {
+  return _getOutcomes(s).filter(o => !o.requiresReset && !o.requiresSuspend && !o.isPartial);
+}
+
 function renderDAG() {
   const wrap   = document.getElementById('dag-canvas-wrap');
   const canvas = document.getElementById('dag-canvas');
@@ -1289,503 +1315,231 @@ function renderDAG() {
     .filter(s => s.step_type !== 'trigger')
     .sort((a, b) => a.sequence_order - b.sequence_order);
 
-  const W = wrap.offsetWidth  || wrap.parentElement?.offsetWidth  || 800;
-  const H = wrap.offsetHeight || wrap.parentElement?.offsetHeight || 500;
+  const W = wrap.offsetWidth  || 800;
+  const H = wrap.offsetHeight || 400;
 
-  if (W < 10 || H < 10) {
-    // Layout not settled yet — retry once more
-    setTimeout(() => renderDAG(), 100);
-    return;
-  }
+  if (W < 10 || H < 10) { setTimeout(() => renderDAG(), 100); return; }
 
-  canvas.width  = W;
-  canvas.height = H;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
+  canvas.width  = W; canvas.height = H;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
 
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
   if (!steps.length) {
-    ctx.fillStyle = 'rgba(255,255,255,.25)';
-    ctx.font = '13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('No steps yet — add steps to see the diagram', W/2, H/2);
-    return;
+    _dagBuildCards(steps); return;
   }
 
-  // ── Layout constants ──────────────────────────────────────────────────────
-  const NW      = 150;
-  const NH      = 58;
-  const PAD_L   = 64;
-  const PAD_R   = 64;
-  const NODE_Y  = 80;   // space above nodes for branch routing
-  const RESET_H = 36;
+  // Layout constants
+  const NW = 148, NH = 62, HGAP = 72, PAD_L = 52;
+  const NODE_Y = 80, TRUNK_DROP = 22, BRANCH_GAP = 28, BRANCH_REACH = 108, DR = 8;
 
-  // Count reset outcomes and forward labels for spacing
-  let resetCount = 0;
-  let maxForwardLabels = 0;
-  steps.forEach((s, i) => {
-    const outs = _getOutcomes(s);
-    const resets   = outs.filter(o => o.requiresReset && !o.requiresSuspend && !o.isPartial).length;
-    const forwards = outs.filter(o => !o.requiresReset && !o.requiresSuspend && !o.isPartial).length;
-    resetCount = Math.max(resetCount, resets); // worst case per step (diamonds expand sideways)
-    if (i < steps.length - 1) maxForwardLabels = Math.max(maxForwardLabels, forwards);
-  });
+  const contentW = PAD_L + steps.length * NW + (steps.length - 1) * HGAP + 60;
+  let maxResets = 0;
+  steps.forEach(s => { maxResets = Math.max(maxResets, _dagResetOutcomes(s).length); });
+  const contentH = NODE_Y + NH + TRUNK_DROP + maxResets * BRANCH_GAP + 20;
 
-  // Gap wide enough to show stacked labels without overlap
-  const LABEL_H = 12;  // px per label line
-  const H_GAP   = Math.max(70, maxForwardLabels * LABEL_H + 30);
-
-  const contentW = PAD_L + steps.length * NW + (steps.length - 1) * H_GAP + PAD_R;
-  // Below nodes: trunk + branches + diamond + sub-options
-  const belowH   = resetCount > 0 ? 20 + resetCount * RESET_H + 50 : 0;
-  const contentH = NODE_Y + NH + belowH + 20;
-
-  // Auto-fit + center — use a flag so it only runs once per template
   if (!_dagAutoFitted) {
     _dagAutoFitted = true;
-    _dagScale = Math.max(0.2, Math.min(1, (W - 20) / contentW));
-    _dagPanX = Math.max(8, (W - contentW * _dagScale) / 2);
-    _dagPanY = Math.max(8, (H - contentH * _dagScale) / 2);
+    _dagScale = Math.min(1, (W - 16) / contentW);
+    _dagPanX  = Math.max(8, (W - contentW * _dagScale) / 2);
+    _dagPanY  = Math.max(8, (H - contentH * _dagScale) / 2);
   }
 
-  // Node positions in content-space
-  const pos = {};
-  steps.forEach((s, i) => {
-    pos[s.id] = {
-      x: PAD_L + i * (NW + H_GAP),
-      y: NODE_Y,
-    };
-  });
+  function nodePos(id) {
+    const i = steps.findIndex(s => s.id === id);
+    return { x: PAD_L + i * (NW + HGAP), y: NODE_Y };
+  }
+  function nodeBC(id) { const p = nodePos(id); return { x: p.x + NW/2, y: p.y + NH }; }
 
-  // ── Build edge list ───────────────────────────────────────────────────────
-  const edges = [];
-  steps.forEach((s, i) => {
-    const outcomes = _getOutcomes(s);
-    const nextStep = steps[i + 1];
+  function ah(x, y, dir, col, a=0.75) {
+    const sz=7; ctx.beginPath(); ctx.fillStyle=col; ctx.globalAlpha=a;
+    if(dir==='right'){ctx.moveTo(x,y);ctx.lineTo(x-sz,y-sz*.5);ctx.lineTo(x-sz,y+sz*.5);}
+    if(dir==='left') {ctx.moveTo(x,y);ctx.lineTo(x+sz,y-sz*.5);ctx.lineTo(x+sz,y+sz*.5);}
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+  }
 
-    outcomes.forEach(o => {
-      if (o.isPartial) return; // saved_incomplete etc — not routing outcomes
-      if (o.requiresSuspend) {
-        edges.push({ from: s, to: null, outcome: o, type: 'suspend' });
-      } else if (o.requiresReset) {
-        // Reset outcomes route to a decision diamond (target determined at runtime)
-        edges.push({ from: s, to: null, outcome: o, type: 'reset_decision' });
-      } else if (nextStep) {
-        edges.push({ from: s, to: nextStep, outcome: o, type: 'forward' });
-      }
-    });
-  });
+  function pill(text, cx, cy, col, mw) {
+    ctx.font = '9px monospace'; let t = text;
+    while (t.length > 4 && ctx.measureText(t).width > (mw||999)) t = t.slice(0,-1);
+    if (t !== text) t += '…';
+    const tw=ctx.measureText(t).width, pw=Math.min(tw+8,mw||tw+8), ph=12;
+    ctx.fillStyle='rgba(10,12,18,.9)'; ctx.globalAlpha=.92;
+    ctx.beginPath(); ctx.roundRect(cx-pw/2,cy-ph/2,pw,ph,3); ctx.fill();
+    ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha=1; ctx.fillText(t,cx,cy);
+  }
 
-  // Group forward edges by from→to
-  // Group reset_decision edges by from node (each outcome gets its own branch)
-  const edgeGroups = {};
-  edges.forEach(e => {
-    if (e.type === 'reset_decision') {
-      // Each reset outcome is its own entry
-      const key = `reset:${e.from.id}:${e.outcome.id}`;
-      edgeGroups[key] = { ...e, labels: [e.outcome] };
-    } else {
-      const key = `${e.from.id}→${e.to?.id||'end'}`;
-      if (!edgeGroups[key]) edgeGroups[key] = { ...e, labels: [] };
-      edgeGroups[key].labels.push(e.outcome);
-    }
-  });
+  function diamL(cx, cy, r, col) {
+    ctx.beginPath();
+    ctx.moveTo(cx-r,cy); ctx.lineTo(cx,cy-r*0.65); ctx.lineTo(cx+r,cy); ctx.lineTo(cx,cy+r*0.65);
+    ctx.closePath();
+    ctx.fillStyle=col+'25'; ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.globalAlpha=0.9;
+    ctx.fill(); ctx.stroke(); ctx.globalAlpha=1;
+  }
 
-  // ── Draw ──────────────────────────────────────────────────────────────────
   ctx.save();
   ctx.translate(_dagPanX, _dagPanY);
   ctx.scale(_dagScale, _dagScale);
 
-  // Trigger node
-  const first = steps[0];
-  if (first) {
-    const fp = pos[first.id];
-    const tx = fp.x - 40;
-    const ty = fp.y + NH / 2;
-    ctx.beginPath();
-    ctx.arc(tx, ty, 14, 0, Math.PI * 2);
-    ctx.fillStyle   = 'rgba(192,64,74,.15)';
-    ctx.strokeStyle = 'rgba(192,64,74,.5)';
-    ctx.lineWidth   = 1.5;
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle  = '#c0404a';
-    ctx.font       = '12px sans-serif';
-    ctx.textAlign  = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⚡', tx, ty);
-    // Line to first node
-    _dagArrow(ctx, tx + 14, ty, fp.x, ty, 'rgba(255,255,255,.2)', false, false);
-  }
+  // Trigger
+  const fp0 = nodePos(steps[0].id);
+  const tx = fp0.x - 36, ty = fp0.y + NH/2;
+  ctx.beginPath(); ctx.arc(tx,ty,12,0,Math.PI*2);
+  ctx.fillStyle='rgba(192,64,74,.12)'; ctx.strokeStyle='rgba(192,64,74,.55)'; ctx.lineWidth=1.5;
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#c0404a'; ctx.font='11px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('⚡',tx,ty);
+  ctx.beginPath(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1.2;
+  ctx.moveTo(tx+12,ty); ctx.lineTo(fp0.x,ty); ctx.stroke();
+  ah(fp0.x, ty, 'right', 'rgba(255,255,255,.25)');
 
-  // Reset decision branches — drawn below nodes as decision diamonds
-  // Group by source step so multiple reset outcomes from same step share a trunk
-  const resetByStep = {};
-  Object.values(edgeGroups).forEach(eg => {
-    if (eg.type !== 'reset_decision') return;
-    const sid = eg.from.id;
-    if (!resetByStep[sid]) resetByStep[sid] = [];
-    resetByStep[sid].push(eg);
-  });
+  // Terminal
+  const lpLast = nodePos(steps[steps.length-1].id);
+  const termX = lpLast.x + NW + HGAP/2, termY = lpLast.y + NH/2;
+  ctx.beginPath(); ctx.strokeStyle='rgba(42,157,64,.5)'; ctx.lineWidth=1.5;
+  ctx.moveTo(lpLast.x+NW,termY); ctx.lineTo(termX-14,termY); ctx.stroke();
+  ah(termX-2,termY,'right','rgba(42,157,64,.7)');
+  ctx.beginPath(); ctx.arc(termX,termY,12,0,Math.PI*2);
+  ctx.fillStyle='rgba(42,157,64,.1)'; ctx.strokeStyle='rgba(42,157,64,.5)'; ctx.lineWidth=1.5;
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#7af0a0'; ctx.font='11px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('✓',termX,termY);
 
-  Object.entries(resetByStep).forEach(([sid, egs]) => {
-    const fp    = pos[sid];
-    if (!fp) return;
-    const srcX  = fp.x + NW / 2;
-    const srcY  = fp.y + NH;
-    const baseY = srcY + 14;
-
-    // Trunk down from node bottom
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255,255,255,.15)';
-    ctx.lineWidth   = 1;
-    ctx.setLineDash([]);
-    ctx.moveTo(srcX, srcY);
-    ctx.lineTo(srcX, baseY + (egs.length - 1) * RESET_H);
-    ctx.stroke();
-
-    egs.forEach((eg, bi) => {
-      const o        = eg.labels[0];
-      const col      = o.color || '#E24B4A';
-      const branchY  = baseY + bi * RESET_H;
-      const endX     = srcX + 90;
-
-      // Horizontal branch
-      ctx.beginPath();
-      ctx.strokeStyle = col;
-      ctx.lineWidth   = 1.5;
-      ctx.setLineDash([5, 3]);
-      ctx.globalAlpha = 0.65;
-      ctx.moveTo(srcX, branchY);
-      ctx.lineTo(endX, branchY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-
-      // Decision diamond
-      const dx = endX + 12, dy = branchY, ds = 8;
-      ctx.beginPath();
-      ctx.moveTo(dx,      dy - ds);
-      ctx.lineTo(dx + ds, dy);
-      ctx.lineTo(dx,      dy + ds);
-      ctx.lineTo(dx - ds, dy);
-      ctx.closePath();
-      ctx.fillStyle   = col + '22';
-      ctx.strokeStyle = col;
-      ctx.lineWidth   = 1.5;
-      ctx.globalAlpha = 0.8;
-      ctx.fill(); ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      // Outcome label on branch
-      const lx = (srcX + endX) / 2;
-      ctx.font = `9px var(--font-mono, monospace)`;
-      const tw = ctx.measureText(o.label).width;
-      ctx.fillStyle   = 'rgba(14,17,23,.9)';
-      ctx.globalAlpha = 0.9;
-      ctx.beginPath();
-      ctx.roundRect(lx - tw/2 - 4, branchY - 11, tw + 8, 11, 3);
-      ctx.fill();
-      ctx.fillStyle    = col;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.globalAlpha  = 1;
-      ctx.fillText(o.label, lx, branchY - 5);
-
-      // Three sub-options stacked vertically to the right of diamond
-      const subLabels = ['↩ Revert to prior', '↩ Revert to start', '✕ Abort'];
-      const subColors = ['#BA7517', '#E24B4A', '#666'];
-      const subStartY = dy - ds;
-      const subX      = dx + ds + 10;
-      subLabels.forEach((sub, si) => {
-        const sy2 = subStartY + si * 14;
-        // Connector from diamond right point
-        ctx.beginPath();
-        ctx.strokeStyle = subColors[si];
-        ctx.lineWidth   = 1;
-        ctx.setLineDash([2, 2]);
-        ctx.globalAlpha = 0.4;
-        ctx.moveTo(dx + ds, dy);
-        ctx.lineTo(subX - 2, sy2 + 4);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle    = subColors[si];
-        ctx.font         = `8px var(--font-mono, monospace)`;
-        ctx.textAlign    = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.globalAlpha  = 0.65;
-        ctx.fillText(sub, subX, sy2 + 4);
-        ctx.globalAlpha  = 1;
+  // Forward edges
+  steps.forEach((s, i) => {
+    const next = steps[i+1]; if (!next) return;
+    const fp = nodePos(s.id), tp = nodePos(next.id);
+    const x1 = fp.x+NW, x2 = tp.x, my = fp.y+NH/2;
+    const fwdOuts = _dagFwdOutcomes(s);
+    // Use default color if no outcomes
+    const col = fwdOuts.length ? (fwdOuts[0].color || '#1D9E75') : '#1D9E75';
+    ctx.beginPath(); ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.globalAlpha=0.6;
+    ctx.moveTo(x1,my); ctx.lineTo(x2-8,my); ctx.stroke(); ctx.globalAlpha=1;
+    ah(x2,my,'right',col);
+    if (fwdOuts.length === 1) {
+      pill(fwdOuts[0].label, (x1+x2)/2, my-11, fwdOuts[0].color||'#1D9E75');
+    } else if (fwdOuts.length > 1) {
+      // Branch tree above for multiple fwd outcomes
+      const spacing=14, topY=fp.y-6-(fwdOuts.length-1)*spacing, trunkX=x1+10;
+      ctx.beginPath(); ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=1;
+      ctx.moveTo(x1,my); ctx.lineTo(trunkX,my); ctx.lineTo(trunkX,topY); ctx.stroke();
+      fwdOuts.forEach((o, li) => {
+        const brY = topY + li*spacing;
+        const oc  = o.color || '#1D9E75';
+        ctx.beginPath(); ctx.strokeStyle=oc; ctx.lineWidth=1.5; ctx.globalAlpha=0.7;
+        ctx.moveTo(trunkX,brY); ctx.lineTo(x2-8,brY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x2-8,brY); ctx.lineTo(x2-8,my); ctx.stroke();
+        ctx.globalAlpha=1; ah(x2,my,'right',oc);
+        pill(o.label, (trunkX+x2-8)/2, brY-9, oc);
       });
-    });
-  });
-
-  // Forward and suspend edges
-  // Forward edges with multiple outcomes: orthogonal branch tree above nodes
-  // Single outcome: simple straight arrow at node midline
-  Object.values(edgeGroups).forEach(eg => {
-    if (eg.type === 'reset') return;
-    const fp = pos[eg.from.id];
-    if (!fp) return;
-
-    if (eg.type === 'forward' && eg.to) {
-      const tp   = pos[eg.to.id];
-      if (!tp) return;
-      const x1   = fp.x + NW;        // right edge of source
-      const x2   = tp.x;             // left edge of target
-      const midY = fp.y + NH / 2;    // vertical midline of nodes
-
-      if (eg.labels.length === 1) {
-        // ── Single outcome: simple horizontal arrow ──────────────────────
-        const o   = eg.labels[0];
-        const col = o.color || '#1D9E75';
-        _dagArrow(ctx, x1, midY, x2, midY, col, false, false);
-
-        // Label above midpoint with pill
-        const mx   = (x1 + x2) / 2;
-        ctx.font   = `9px var(--font-mono, monospace)`;
-        const tw   = ctx.measureText(o.label).width;
-        const pw   = tw + 8;
-        ctx.fillStyle   = 'rgba(14,17,23,.9)';
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath();
-        ctx.roundRect(mx - pw/2, midY - 18, pw, 12, 3);
-        ctx.fill();
-        ctx.fillStyle    = col;
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.globalAlpha  = 1;
-        ctx.fillText(o.label, mx, midY - 12);
-
-      } else {
-        // ── Multiple outcomes: orthogonal branch tree above nodes ────────
-        // Vertical spacing: spread branches above the node row
-        const branchCount = eg.labels.length;
-        const branchSpacing = 16;  // px between branch rails
-        const baseY  = fp.y - 8;  // just above nodes
-        const riseY  = baseY - (branchCount - 1) * branchSpacing; // topmost branch
-
-        // Trunk: right out of source, rise up to baseY
-        const trunkX = x1 + 10;
-
-        eg.labels.forEach((o, li) => {
-          const branchY = riseY + li * branchSpacing;
-          const col     = o.color || '#1D9E75';
-
-          ctx.beginPath();
-          ctx.strokeStyle  = col;
-          ctx.lineWidth    = 1.5;
-          ctx.globalAlpha  = 0.7;
-          ctx.setLineDash([]);
-
-          if (li === 0) {
-            // Topmost branch — goes farthest up
-            ctx.moveTo(x1, midY);
-            ctx.lineTo(trunkX, midY);
-            ctx.lineTo(trunkX, branchY);
-            ctx.lineTo(x2 - 8, branchY);
-            ctx.stroke();
-            // Drop down to target midY
-            ctx.beginPath();
-            ctx.moveTo(x2 - 8, branchY);
-            ctx.lineTo(x2 - 8, midY);
-            ctx.lineTo(x2, midY);
-            ctx.stroke();
-          } else {
-            // Lower branches fork off the trunk at their height
-            ctx.moveTo(trunkX, branchY);
-            ctx.lineTo(x2 - 8 + li * 0, branchY); // same x2 target
-            ctx.stroke();
-            // Drop to midY
-            ctx.beginPath();
-            ctx.moveTo(x2 - 8, branchY);
-            ctx.lineTo(x2 - 8, midY);
-            ctx.stroke();
-          }
-
-          ctx.globalAlpha = 1;
-          _dagArrowHead(ctx, x2, midY, 'right', col);
-
-          // Label on the horizontal segment
-          const lx   = (trunkX + x2 - 8) / 2;
-          ctx.font   = `9px var(--font-mono, monospace)`;
-          const tw   = ctx.measureText(o.label).width;
-          const pw   = tw + 8;
-          ctx.fillStyle   = 'rgba(14,17,23,.9)';
-          ctx.globalAlpha = 0.9;
-          ctx.beginPath();
-          ctx.roundRect(lx - pw/2, branchY - 9, pw, 11, 3);
-          ctx.fill();
-          ctx.fillStyle    = col;
-          ctx.textAlign    = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.globalAlpha  = 1;
-          ctx.fillText(o.label, lx, branchY - 3);
-        });
-
-        // Draw shared trunk from source
-        ctx.beginPath();
-        ctx.strokeStyle  = 'rgba(255,255,255,.2)';
-        ctx.lineWidth    = 1;
-        ctx.moveTo(x1, midY);
-        ctx.lineTo(trunkX, midY);
-        ctx.lineTo(trunkX, riseY);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-
-    } else if (eg.type === 'suspend') {
-      // Drop below node
-      const sx  = fp.x + NW / 2;
-      const sy  = fp.y + NH;
-      const ey  = sy + 38;
-      const col = eg.labels[0]?.color || '#888';
-      ctx.beginPath();
-      ctx.strokeStyle  = col;
-      ctx.lineWidth    = 1.5;
-      ctx.setLineDash([4, 3]);
-      ctx.globalAlpha  = 0.55;
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx, ey - 6);
-      ctx.stroke();
       ctx.setLineDash([]);
-      ctx.globalAlpha  = 1;
-      _dagArrowHead(ctx, sx, ey, 'down', col);
-      ctx.fillStyle    = col;
-      ctx.font         = `10px sans-serif`;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'top';
-      ctx.globalAlpha  = 0.7;
-      ctx.fillText('⏸', sx, ey + 4);
-      ctx.globalAlpha  = 1;
     }
   });
 
-  // Terminal node
-  if (steps.length) {
-    const lp  = pos[steps[steps.length - 1].id];
-    const tx  = lp.x + NW + 40;
-    const ty  = lp.y + NH / 2;
-    _dagArrow(ctx, lp.x + NW, ty, tx - 14, ty, 'rgba(42,157,64,.4)', false, false);
-    ctx.beginPath();
-    ctx.arc(tx, ty, 14, 0, Math.PI * 2);
-    ctx.fillStyle   = 'rgba(42,157,64,.12)';
-    ctx.strokeStyle = 'rgba(42,157,64,.4)';
-    ctx.lineWidth   = 1.5;
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle    = '#7af0a0';
-    ctx.font         = '12px sans-serif';
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('✓', tx, ty);
-  }
+  // Reset branches — one per outcome, from node bottom-center
+  steps.forEach(s => {
+    const outs = _dagResetOutcomes(s);
+    if (!outs.length) return;
+    const bc = nodeBC(s.id);
+    const trunkX = bc.x;
+    ctx.beginPath(); ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=1;
+    ctx.moveTo(trunkX, bc.y);
+    ctx.lineTo(trunkX, bc.y + TRUNK_DROP + (outs.length-1)*BRANCH_GAP + 4);
+    ctx.stroke();
+    outs.forEach((o, bi) => {
+      const brY    = bc.y + TRUNK_DROP + bi * BRANCH_GAP;
+      const diamCX = trunkX - BRANCH_REACH;
+      const diamRX = diamCX + DR;
+      ctx.beginPath(); ctx.strokeStyle=o.color; ctx.lineWidth=1.5;
+      ctx.setLineDash([5,3]); ctx.globalAlpha=0.65;
+      ctx.moveTo(trunkX,brY); ctx.lineTo(diamRX+2,brY);
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      ctx.beginPath(); ctx.strokeStyle=o.color; ctx.lineWidth=1; ctx.globalAlpha=0.4;
+      ctx.moveTo(trunkX-3,brY); ctx.lineTo(trunkX+3,brY); ctx.stroke(); ctx.globalAlpha=1;
+      diamL(diamCX, brY, DR, o.color);
+      pill(o.label, (trunkX+diamRX)/2, brY-9, o.color, BRANCH_REACH-DR-12);
+    });
+  });
 
-  // Draw nodes on top
-  steps.forEach((s, i) => {
-    const p    = pos[s.id];
+  // Nodes on top
+  steps.forEach(s => {
     const meta = STEP_META[s.step_type] || STEP_META.action;
+    const p    = nodePos(s.id);
     const isSel = _selectedStep?.id === s.id;
-
-    // Node background
-    const r = 7;
-    ctx.beginPath();
-    ctx.roundRect(p.x, p.y, NW, NH, r);
-    ctx.fillStyle   = isSel ? 'rgba(0,185,195,.12)' : 'rgba(255,255,255,.04)';
-    ctx.strokeStyle = isSel ? 'rgba(0,185,195,.7)' : 'rgba(255,255,255,.15)';
-    ctx.lineWidth   = isSel ? 2 : 1;
-    ctx.fill(); ctx.stroke();
-
-    // Left accent bar
-    ctx.beginPath();
-    ctx.roundRect(p.x, p.y, 4, NH, [r, 0, 0, r]);
-    ctx.fillStyle = meta.badgeText;
-    ctx.globalAlpha = 0.6;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Step name
-    ctx.fillStyle    = 'rgba(255,255,255,.9)';
-    ctx.font         = `500 11px -apple-system, sans-serif`;
-    ctx.textAlign    = 'left';
-    ctx.textBaseline = 'top';
-    const maxW = NW - 24;
+    ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.roundRect(p.x+2,p.y+2,NW,NH,7); ctx.fill();
+    ctx.fillStyle='#1a1d26';
+    ctx.strokeStyle = isSel ? 'var(--cad)' : (meta.badgeText + '88');
+    ctx.lineWidth = isSel ? 2 : 1.5;
+    ctx.beginPath(); ctx.roundRect(p.x,p.y,NW,NH,7); ctx.fill(); ctx.stroke();
+    if (isSel) {
+      ctx.fillStyle='rgba(0,185,195,.08)'; ctx.beginPath(); ctx.roundRect(p.x,p.y,NW,NH,7); ctx.fill();
+    }
+    ctx.fillStyle=meta.badgeText; ctx.globalAlpha=0.65;
+    ctx.beginPath(); ctx.roundRect(p.x,p.y,4,NH,[7,0,0,7]); ctx.fill(); ctx.globalAlpha=1;
+    // Name
+    ctx.fillStyle='rgba(255,255,255,.88)'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.font='500 11px system-ui,sans-serif';
     let name = s.name || '';
-    // Truncate if needed
-    while (name.length > 3 && ctx.measureText(name).width > maxW) name = name.slice(0, -1);
-    if (name !== s.name) name += '…';
-    ctx.fillText(name, p.x + 14, p.y + 10);
-
+    if (ctx.measureText(name).width > NW-20) {
+      while (name.length > 3 && ctx.measureText(name+'…').width > NW-20) name = name.slice(0,-1);
+      name += '…';
+    }
+    ctx.fillText(name, p.x+12, p.y+NH/2-8);
     // Type badge
-    ctx.fillStyle    = meta.badgeText;
-    ctx.font         = `9px var(--font-mono, monospace)`;
-    ctx.textBaseline = 'bottom';
-    ctx.globalAlpha  = 0.65;
-    ctx.fillText(meta.label.toUpperCase(), p.x + 14, p.y + NH - 8);
-    ctx.globalAlpha  = 1;
-
-    // Seq number
-    ctx.fillStyle    = 'rgba(255,255,255,.25)';
-    ctx.font         = `9px var(--font-mono, monospace)`;
-    ctx.textAlign    = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(String(s.sequence_order), p.x + NW - 8, p.y + NH - 8);
-
-    // Due days badge
+    ctx.fillStyle=meta.badgeText; ctx.globalAlpha=0.55; ctx.font='7.5px monospace'; ctx.textBaseline='bottom';
+    ctx.fillText(meta.label.toUpperCase(), p.x+12, p.y+NH-7); ctx.globalAlpha=1;
+    // Seq
+    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='9px monospace'; ctx.textAlign='right';
+    ctx.fillText(s.sequence_order, p.x+NW-8, p.y+NH-8);
+    // Due days
     if (s.due_days) {
-      ctx.fillStyle    = '#e8a838';
-      ctx.font         = `9px var(--font-mono, monospace)`;
-      ctx.textAlign    = 'right';
-      ctx.textBaseline = 'top';
-      ctx.globalAlpha  = 0.8;
-      ctx.fillText(`+${s.due_days}d`, p.x + NW - 8, p.y + 10);
-      ctx.globalAlpha  = 1;
+      ctx.fillStyle='#e8a838'; ctx.globalAlpha=0.8; ctx.font='9px monospace';
+      ctx.textAlign='right'; ctx.textBaseline='top';
+      ctx.fillText('+'+s.due_days+'d', p.x+NW-8, p.y+10); ctx.globalAlpha=1;
     }
   });
 
   ctx.restore();
 
   // Update zoom label
-  const label = document.getElementById('dag-zoom-label');
-  if (label) label.textContent = Math.round(_dagScale * 100) + '%';
+  const zlbl = document.getElementById('dag-zoom-label');
+  if (zlbl) zlbl.textContent = Math.round(_dagScale * 100) + '%';
+
+  // Build HTML decision cards
+  _dagBuildCards(steps);
 }
 
-function _dagArrow(ctx, x1, y1, x2, y2, color, dashed, reverse) {
-  ctx.beginPath();
-  ctx.strokeStyle = color;
-  ctx.lineWidth   = 1.5;
-  ctx.globalAlpha = 0.6;
-  if (dashed) ctx.setLineDash([5, 3]);
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 1;
-  _dagArrowHead(ctx, x2, y2, 'right', color);
-}
-
-function _dagArrowHead(ctx, x, y, dir, color) {
-  const size = 7;
-  ctx.beginPath();
-  ctx.fillStyle   = color;
-  ctx.globalAlpha = 0.7;
-  if (dir === 'right') {
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - size, y - size * 0.5);
-    ctx.lineTo(x - size, y + size * 0.5);
-  } else if (dir === 'up') {
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - size * 0.5, y + size);
-    ctx.lineTo(x + size * 0.5, y + size);
-  } else if (dir === 'down') {
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - size * 0.5, y - size);
-    ctx.lineTo(x + size * 0.5, y - size);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
+function _dagBuildCards(steps) {
+  const cardsEl = document.getElementById('dag-cards');
+  if (!cardsEl) return;
+  const groups = _dagAllCardGroups(steps);
+  if (!groups.length) { cardsEl.innerHTML = ''; cardsEl.style.display = 'none'; return; }
+  cardsEl.style.display = 'flex';
+  const optColors = ['#BA7517','#E24B4A','#666'];
+  cardsEl.innerHTML = groups.map(g => {
+    const headerHTML = g.labels.map(lb =>
+      `<span style="color:${lb.color};font-weight:500;font-size:10px">${escHtml(lb.label)}</span>`
+    ).join('<span style="color:#383838;margin:0 3px">·</span>');
+    const optsHTML = g.options.map((opt, i) => {
+      const isAbort = opt.toLowerCase().includes('abort');
+      const col  = isAbort ? '#555' : optColors[Math.min(i,1)];
+      const icon = isAbort ? '✕' : '↩';
+      return `<div style="display:flex;align-items:flex-start;gap:5px;padding:3px 0;border-top:1px solid rgba(255,255,255,.06)">
+        <span style="color:${col};font-size:10px;flex-shrink:0;margin-top:1px">${icon}</span>
+        <span style="color:rgba(255,255,255,.55);font-size:9px;line-height:1.4">${escHtml(opt)}</span>
+      </div>`;
+    }).join('');
+    return `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:5px;
+      padding:8px 10px;min-width:150px;flex:1;max-width:210px">
+      <div style="font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Decision outcomes</div>
+      <div style="margin-bottom:6px;line-height:1.7">${headerHTML}</div>
+      ${optsHTML}
+    </div>`;
+  }).join('');
 }
 
 // ── DAG pan/zoom event wiring ─────────────────────────────────────────────────
@@ -1843,12 +1597,12 @@ function _initDagEvents() {
     const steps = (_selectedTmpl?.steps||[])
       .filter(s => s.step_type !== 'trigger')
       .sort((a,b) => a.sequence_order - b.sequence_order);
-    const NW = 170, NH = 60, H_GAP = 72, PAD_L = 52, NODE_Y = 40;
+    const NW = 148, NH = 62, HGAP = 72, PAD_L = 52, NODE_Y = 80;
     const rect  = wrap.getBoundingClientRect();
     const mx    = (e.clientX - rect.left  - _dagPanX) / _dagScale;
     const my    = (e.clientY - rect.top   - _dagPanY) / _dagScale;
     steps.forEach((s, i) => {
-      const sx = PAD_L + i * (NW + H_GAP);
+      const sx = PAD_L + i * (NW + HGAP);
       const sy = NODE_Y;
       if (mx >= sx && mx <= sx + NW && my >= sy && my <= sy + NH) {
         dagSelectStep(s.id);
@@ -1857,7 +1611,7 @@ function _initDagEvents() {
   });
 }
 
-// ── AI Draft Banner ───────────────────────────────────────────────────────────
+// ── AI Draft Bannerr ───────────────────────────────────────────────────────────
 function renderAIBanner() {
   if (_selectedTmpl?.steps?.length) return ''; // hide once steps exist
   return `
