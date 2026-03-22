@@ -5152,7 +5152,7 @@ function renderInstancesTab(el) {
       </div>
 
       <!-- Right: instance detail -->
-      <div id="instance-detail" style="flex:1;overflow-y:auto;min-width:0">
+      <div id="instance-detail" style="flex:1;overflow:hidden;min-width:0;display:flex;flex-direction:column">
         ${_selectedInstance
           ? '' /* filled by renderInstanceDetail() */
           : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -5401,7 +5401,7 @@ function renderInstanceDetail(el, inst) {
     </div>
 
     <!-- Body: conditional on view mode -->
-    <div style="display:flex;flex-direction:column;height:calc(100% - 65px);overflow:hidden">
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
     ${viewMode === 'diagram' ? `
       <!-- ── DIAGRAM VIEW ─────────────────────────────────────── -->
       <div id="inst-dag-wrap" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;position:relative">
@@ -5442,7 +5442,7 @@ function renderInstanceDetail(el, inst) {
       </div>
     ` : `
       <!-- ── LIST VIEW ────────────────────────────────────────── -->
-      <div style="display:flex;height:100%;overflow:hidden">
+      <div style="flex:1;display:flex;overflow:hidden;min-height:0">
 
       <!-- Workflow Steps — fills remaining width -->
       <div style="flex:1;overflow-y:auto;padding:16px 20px;min-width:0">
