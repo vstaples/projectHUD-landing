@@ -7805,7 +7805,10 @@ function toggleRoutingOverride(stepId) {
 // ── Email notification on step activation ────────────────────────────────────
 async function _notifyStepActivated(instId, step, inst, isBist = false) {
   if (isBist) return; // never notify for test runs
-  if (!step?.assignee_email && !step?.assignee_user_id) return; // no addressee
+  const hasAssignee = (step?.assignee_email && step.assignee_email.trim())
+    || (step?.assignee_user_id && step.assignee_user_id.trim())
+    || (step?.assignee_resource_id && step.assignee_resource_id.trim());
+  if (!hasAssignee) return; // no addressee
 
   // Resolve assignee email — from step directly, user record, or resource record
   let assigneeEmail = step.assignee_email || null;
