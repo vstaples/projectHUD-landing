@@ -1170,22 +1170,25 @@ function renderEditor() {
 
     <!-- Editor body — tabbed: Steps | Diagram -->
     <div class="editor-body">
-      <!-- View tab bar — also contains Add step shortcut -->
+      <!-- View tab bar -->
       <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);
         flex-shrink:0;background:var(--bg1);padding:0 16px">
+        <span style="font-size:9px;font-weight:600;letter-spacing:.1em;color:var(--muted);
+          text-transform:uppercase;margin-right:10px;white-space:nowrap">Edit Mode</span>
         <button id="view-tab-steps" onclick="switchEditorView('steps')"
-          style="padding:7px 14px;font-size:11px;font-weight:500;background:none;border:none;
+          style="padding:7px 14px;font-size:10px;font-weight:600;background:none;border:none;
             cursor:pointer;color:var(--cad);border-bottom:2px solid var(--cad);
-            margin-bottom:-1px;letter-spacing:.02em">Steps</button>
+            margin-bottom:-1px;letter-spacing:.1em;text-transform:uppercase">STEPS</button>
         <button id="view-tab-diagram" onclick="switchEditorView('diagram')"
-          style="padding:7px 14px;font-size:11px;font-weight:500;background:none;border:none;
+          style="padding:7px 14px;font-size:10px;font-weight:600;background:none;border:none;
             cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
-            margin-bottom:-1px;letter-spacing:.02em">Diagram</button>
+            margin-bottom:-1px;letter-spacing:.1em;text-transform:uppercase">DIAGRAM</button>
         ${!isReleased ? `
         <button id="tab-add-step-btn" onclick="tabAddStep(event)"
-          style="margin-left:auto;padding:4px 12px;font-size:10px;background:none;
+          style="margin-left:auto;padding:4px 12px;font-size:10px;font-weight:600;background:none;
             border:1px solid var(--cad-wire);border-radius:3px;color:var(--cad);
-            cursor:pointer;font-family:var(--font-mono);letter-spacing:.04em">+ Add step</button>` : ''}
+            cursor:pointer;font-family:var(--font-mono);letter-spacing:.08em;
+            text-transform:uppercase">+ ADD STEP</button>` : ''}
       </div>
 
       <!-- Steps view — no bottom Add step button needed; it's in the tab bar now -->
@@ -1211,8 +1214,12 @@ function renderEditor() {
           <div id="dag-canvas-wrap" style="flex:1;position:relative;overflow:hidden;cursor:grab">
             <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
           </div>
-          <!-- Slide-in panel -->
-          <div id="dag-slide-panel" style="position:absolute;top:0;right:0;bottom:0;width:380px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:20;box-shadow:-4px 0 24px rgba(0,0,0,.4)">
+          <!-- Slide-in panel — z-index covers cards row below -->
+          <div id="dag-slide-panel" style="position:absolute;top:0;right:0;bottom:0;width:380px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:30;box-shadow:-4px 0 24px rgba(0,0,0,.5)">
+            <!-- Drag-to-resize handle on left edge -->
+            <div id="dag-panel-resize" style="position:absolute;left:0;top:0;bottom:0;width:6px;cursor:ew-resize;z-index:10;background:transparent;transition:background .15s"
+              onmouseover="this.style.background='rgba(0,185,195,.3)'"
+              onmouseout="if(!_dagResizing)this.style.background='transparent'"></div>
             <div id="dag-panel-header" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
               <span id="dag-panel-icon" style="font-size:13px"></span>
               <span id="dag-panel-title" style="font-size:12px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
@@ -1371,11 +1378,16 @@ function renderDAG() {
 
   if (!_dagAutoFitted) {
     _dagAutoFitted = true;
-    _dagScale = Math.max(0.2, Math.min(1, (W - 40) / contentW));
-    _dagPanX  = Math.max(10, (W - contentW * _dagScale) / 2);
-    // Center vertically — if content taller than canvas, align to top with padding
+    // Scale to fill width with small margin
+    const scaleForWidth  = (W - 20) / contentW;
+    // Scale to fill height with margin (approximate cards row at 0 since it's outside canvas)
+    const scaleForHeight = (H - 20) / contentH;
+    // Use the smaller of the two so everything fits, cap at 1.0
+    _dagScale = Math.max(0.2, Math.min(1.0, Math.min(scaleForWidth, scaleForHeight)));
+    // Center horizontally and vertically
+    _dagPanX  = Math.max(0, (W - contentW * _dagScale) / 2);
     const scaledH = contentH * _dagScale;
-    _dagPanY = scaledH < H ? (H - scaledH) / 2 : 20;
+    _dagPanY  = scaledH < H ? (H - scaledH) / 2 : 10;
   }
 
   function nodePos(id) {
@@ -1941,7 +1953,7 @@ function renderSpine() {
           <div class="spine-card${sel?' selected':''}" style="border-radius:${sel?'6px 6px 0 0':'6px'}"
             onclick="selectStep('${step.id}')">
             <div class="spine-card-row">
-              <div>
+              <div style="flex:1;min-width:0">
                 <div class="spine-card-name">${escHtml(step.name || meta.label)}</div>
                 <div class="spine-card-meta">
                   ${assigneeLine !== '—' ? `<span>👤 ${escHtml(assigneeLine)}</span>` : ''}
@@ -3019,12 +3031,14 @@ function _fmtSaveTime(d) {
 
 // ── Step picker ───────────────────────────────────────────────────────────────
 function tabAddStep(e) {
+  e.stopPropagation();
   if (_editorView === 'diagram') {
-    // In diagram mode — show insert position picker, then step type picker
     _dagShowInsertPicker(e);
   } else {
-    // In list mode — open step type picker anchored to the button
-    toggleStepPicker(e);
+    // In list mode — ensure we're passing a proper event with currentTarget
+    // so toggleStepPicker can position the picker relative to the button
+    const btn = document.getElementById('tab-add-step-btn');
+    if (btn) toggleStepPicker({ currentTarget: btn, stopPropagation: ()=>{} });
   }
 }
 
@@ -3126,8 +3140,8 @@ function toggleStepPicker(e) {
     top = Math.max(8, vh - ph - 8);
   }
 
-  // Horizontal: prefer aligning left edge with button, clamp to viewport
-  let left = rect.left;
+  // Horizontal: right-align picker to button's right edge, clamp to viewport
+  let left = rect.right - pw;
   if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
   if (left < 8) left = 8;
 
