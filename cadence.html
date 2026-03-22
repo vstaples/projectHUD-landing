@@ -1003,6 +1003,7 @@ function renderEditorEmpty() {
 }
 
 async function selectTemplate(id) {
+  _dagPanX = 0; _dagPanY = 0; _dagScale = 1; // reset diagram view
   if (_dirtySteps) {
     if (!confirm('You have unsaved changes. Discard and switch templates?')) return;
     _dirtySteps = false;
@@ -1196,7 +1197,7 @@ function renderEditor() {
 
       <!-- Diagram view -->
       <div id="editor-view-diagram" style="display:none;flex:1;flex-direction:column;overflow:hidden">
-        <!-- Diagram controls -->
+        <!-- Diagram controls — TOP -->
         <div style="display:flex;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);
           flex-shrink:0;align-items:center;background:var(--bg1)">
           <button onclick="dagZoomIn()"
@@ -1208,23 +1209,27 @@ function renderEditor() {
           <button onclick="dagResetView()"
             style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
               border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">⟲ Reset</button>
+          <span style="font-size:9px;color:var(--muted);margin-left:4px;font-family:var(--font-mono)">
+            Drag to pan · Ctrl+scroll to zoom
+          </span>
           <div style="display:flex;gap:12px;margin-left:12px;align-items:center">
             <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
-              <span style="display:inline-block;width:20px;height:2px;background:var(--green);opacity:.7"></span>Forward
-            </span>
-            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
-              <span style="display:inline-block;width:20px;height:2px;background:#BA7517;opacity:.7;border-top:2px dashed #BA7517"></span>Changes
+              <span style="display:inline-block;width:20px;height:2px;background:#1D9E75;opacity:.8"></span>Forward
             </span>
             <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
               <span style="display:inline-block;width:20px;height:0;border-top:2px dashed var(--red)"></span>Reset
+            </span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted)">
+              <span style="display:inline-block;width:20px;height:0;border-top:2px dashed #888"></span>Suspend
             </span>
           </div>
           <span style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)"
             id="dag-zoom-label">100%</span>
         </div>
-        <!-- Canvas -->
-        <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab">
-          <canvas id="dag-canvas" style="display:block"></canvas>
+        <!-- Canvas — clips strictly within this div -->
+        <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;
+          cursor:grab;min-height:0">
+          <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
         </div>
       </div>
     </div>`;
@@ -1262,295 +1267,6 @@ function switchEditorView(view) {
 }
 
 // ── DAG renderer ─────────────────────────────────────────────────────────────
-function renderDAG() {
-  const container = document.getElementById('editor-view-diagram');
-  const svg       = document.getElementById('dag-svg');
-  const nodesEl   = document.getElementById('dag-nodes');
-  if (!container || !svg || !nodesEl || !_selectedTmpl) return;
-
-  const steps = (_selectedTmpl.steps || [])
-    .filter(s => s.step_type !== 'trigger')
-    .sort((a, b) => a.sequence_order - b.sequence_order);
-
-  if (!steps.length) {
-    nodesEl.innerHTML = `<div style="position:absolute;inset:0;display:flex;
-      align-items:center;justify-content:center;font-size:12px;color:var(--muted)">
-      No steps yet — add steps to see the diagram.</div>`;
-    svg.innerHTML = '';
-    return;
-  }
-
-  const W = container.offsetWidth  || container.clientWidth  || 800;
-  const H = container.offsetHeight || container.clientHeight || 500;
-
-  console.log('[DAG] container:', W, 'x', H, 'steps:', steps.length, 'tmpl:', _selectedTmpl?.name);
-
-  // ── Layout constants ──────────────────────────────────────────────────────
-  const NODE_W    = 160;
-  const NODE_H    = 56;
-  const COL_GAP   = 90;   // horizontal gap between nodes
-  const ROW_GAP   = 80;   // vertical gap for back-edges
-  const PAD_X     = 40;
-  const PAD_Y     = 60;
-
-  // ── Position nodes left-to-right ─────────────────────────────────────────
-  // Main forward chain: single row
-  // Back-edges (resets) curve below
-  const positions = {};
-  steps.forEach((s, i) => {
-    positions[s.id] = {
-      x: PAD_X + i * (NODE_W + COL_GAP),
-      y: PAD_Y + ROW_GAP,
-    };
-  });
-
-  // Total canvas size
-  const totalW = Math.max(W, PAD_X * 2 + steps.length * (NODE_W + COL_GAP));
-  const totalH = Math.max(H, PAD_Y * 2 + NODE_H + ROW_GAP * 3);
-
-  // Scroll container
-  container.style.overflowX = 'auto';
-  container.style.overflowY = 'auto';
-
-  // ── Build edges ───────────────────────────────────────────────────────────
-  // Forward edges: each step → next (default)
-  // Back edges: reset outcomes → target step
-  const edges = [];
-
-  steps.forEach((s, i) => {
-    const outcomes = _getOutcomes(s);
-    const nextStep = steps[i + 1];
-
-    // Forward outcomes → next step
-    const forwardOuts = outcomes.filter(o => !o.requiresReset && !o.requiresSuspend);
-    if (nextStep && forwardOuts.length) {
-      edges.push({
-        from: s.id, to: nextStep.id,
-        type: 'forward',
-        labels: forwardOuts.map(o => ({ label: o.label, color: o.color })),
-      });
-    }
-
-    // Reset outcomes → back to a prior step (default: step 1)
-    const resetOuts = outcomes.filter(o => o.requiresReset && !o.requiresSuspend);
-    if (resetOuts.length) {
-      const targetStep = steps[0]; // default reset target
-      edges.push({
-        from: s.id, to: targetStep.id,
-        type: 'reset',
-        labels: resetOuts.map(o => ({ label: o.label, color: o.color })),
-      });
-    }
-
-    // Suspend outcomes — terminate node
-    const suspendOuts = outcomes.filter(o => o.requiresSuspend);
-    if (suspendOuts.length) {
-      edges.push({
-        from: s.id, to: null,
-        type: 'suspend',
-        labels: suspendOuts.map(o => ({ label: o.label, color: o.color })),
-      });
-    }
-  });
-
-  // ── Render SVG edges ─────────────────────────────────────────────────────
-  svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
-  svg.setAttribute('width', totalW);
-  svg.setAttribute('height', totalH);
-  svg.style.width  = totalW + 'px';
-  svg.style.height = totalH + 'px';
-
-  const defs = `<defs>
-    <marker id="arrow-fwd" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L8,3 z" fill="var(--green)" opacity=".7"/>
-    </marker>
-    <marker id="arrow-reset" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L8,3 z" fill="var(--red)" opacity=".7"/>
-    </marker>
-    <marker id="arrow-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L8,3 z" fill="var(--amber)" opacity=".7"/>
-    </marker>
-    <marker id="arrow-suspend" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L8,3 z" fill="var(--muted)" opacity=".7"/>
-    </marker>
-  </defs>`;
-
-  let edgeSvg = defs;
-  const RESET_DEPTH = NODE_H + ROW_GAP * 1.5;
-
-  edges.forEach((e, ei) => {
-    const from = positions[e.from];
-    if (!from) return;
-
-    const fx = from.x + NODE_W;
-    const fy = from.y + NODE_H / 2;
-
-    if (e.type === 'forward' && e.to) {
-      const to  = positions[e.to];
-      if (!to) return;
-      const tx  = to.x;
-      const ty  = to.y + NODE_H / 2;
-      const mx  = (fx + tx) / 2;
-
-      // Label — primary outcome
-      const primaryLabel = e.labels[0];
-      const labelColor   = primaryLabel?.color || '#1D9E75';
-      const labelText    = e.labels.length > 1
-        ? `${e.labels.length} outcomes` : (primaryLabel?.label || '');
-      const lx = mx - 30;
-      const ly = fy - 14;
-
-      edgeSvg += `
-        <line x1="${fx}" y1="${fy}" x2="${tx - 8}" y2="${ty}"
-          stroke="${labelColor}" stroke-width="1.5" stroke-opacity=".5"
-          marker-end="url(#arrow-fwd)"/>
-        <text x="${lx}" y="${ly}" font-size="9" fill="${labelColor}"
-          opacity=".75" font-family="var(--font-mono)" text-anchor="middle"
-        >${escHtml(labelText)}</text>`;
-
-    } else if (e.type === 'reset' && e.to) {
-      const to   = positions[e.to];
-      if (!to) return;
-      const tx   = to.x + NODE_W / 2;
-      const ty   = to.y + NODE_H;
-      const bx   = from.x + NODE_W / 2;
-      const by   = from.y + NODE_H;
-      const cy   = from.y + RESET_DEPTH + (ei % 3) * 18; // stagger multiple resets
-      const labelColor = e.labels[0]?.color || '#E24B4A';
-      const labelText  = e.labels.length > 1
-        ? `${e.labels.length} reset paths` : (e.labels[0]?.label || 'Reset');
-      const lx = (bx + tx) / 2;
-
-      edgeSvg += `
-        <path d="M${bx},${by} C${bx},${cy} ${tx},${cy} ${tx},${ty + 6}"
-          fill="none" stroke="${labelColor}" stroke-width="1.5"
-          stroke-opacity=".55" stroke-dasharray="5,3"
-          marker-end="url(#arrow-reset)"/>
-        <text x="${lx}" y="${cy + 12}" font-size="9" fill="${labelColor}"
-          opacity=".8" font-family="var(--font-mono)" text-anchor="middle"
-        >↩ ${escHtml(labelText)}</text>`;
-
-    } else if (e.type === 'suspend') {
-      // Dashed line down to an ⏸ symbol
-      const sx = from.x + NODE_W / 2;
-      const sy = from.y + NODE_H;
-      const ey = sy + 40;
-      const labelColor = e.labels[0]?.color || '#888';
-      edgeSvg += `
-        <line x1="${sx}" y1="${sy}" x2="${sx}" y2="${ey - 8}"
-          stroke="${labelColor}" stroke-width="1.5" stroke-opacity=".45"
-          stroke-dasharray="4,3" marker-end="url(#arrow-suspend)"/>
-        <text x="${sx}" y="${ey + 14}" font-size="10" fill="${labelColor}"
-          opacity=".7" text-anchor="middle">⏸</text>
-        <text x="${sx}" y="${ey + 26}" font-size="8" fill="${labelColor}"
-          opacity=".6" font-family="var(--font-mono)" text-anchor="middle"
-        >${escHtml(e.labels[0]?.label || 'Suspend')}</text>`;
-    }
-  });
-
-  // Terminal node (complete) after last step
-  if (steps.length) {
-    const last = positions[steps[steps.length - 1].id];
-    const tx   = last.x + NODE_W + COL_GAP / 2;
-    const ty   = last.y + NODE_H / 2;
-    edgeSvg += `
-      <line x1="${last.x + NODE_W}" y1="${ty}" x2="${tx - 14}" y2="${ty}"
-        stroke="var(--green)" stroke-width="1.5" stroke-opacity=".4"
-        marker-end="url(#arrow-fwd)"/>
-      <circle cx="${tx}" cy="${ty}" r="12"
-        fill="rgba(42,157,64,.12)" stroke="rgba(42,157,64,.4)" stroke-width="1.5"/>
-      <text x="${tx}" y="${ty + 4}" font-size="10" fill="#7af0a0"
-        text-anchor="middle">✓</text>`;
-  }
-
-  svg.innerHTML = edgeSvg;
-
-  // ── Render node divs ───────────────────────────────────────────────────────
-  nodesEl.style.width  = totalW + 'px';
-  nodesEl.style.height = totalH + 'px';
-  nodesEl.style.pointerEvents = 'all';
-
-  nodesEl.innerHTML = steps.map(s => {
-    const pos   = positions[s.id];
-    const meta  = STEP_META[s.step_type] || STEP_META.action;
-    const isSel = _selectedStep?.id === s.id;
-    const outcomes = _getOutcomes(s);
-    const hasReset  = outcomes.some(o => o.requiresReset);
-    const hasForward = outcomes.some(o => !o.requiresReset && !o.requiresSuspend);
-
-    // Status indicators
-    const indicators = [];
-    if (s.due_days) indicators.push(`+${s.due_days}d`);
-    if (s.assignee_name || s.assignee_type === 'pm')
-      indicators.push(s.assignee_name || 'PM');
-
-    return `<div onclick="dagSelectStep('${s.id}')"
-      style="position:absolute;
-        left:${pos.x}px;top:${pos.y}px;
-        width:${NODE_W}px;height:${NODE_H}px;
-        background:${isSel ? 'var(--surf3)' : 'var(--bg2)'};
-        border:1.5px solid ${isSel ? 'var(--cad)' : 'var(--border2)'};
-        border-radius:7px;cursor:pointer;
-        display:flex;flex-direction:column;justify-content:center;
-        padding:0 10px;gap:3px;
-        box-shadow:${isSel ? '0 0 0 3px rgba(0,185,195,.15)' : '0 1px 4px rgba(0,0,0,.3)'};
-        transition:border-color .15s,box-shadow .15s;
-        pointer-events:all"
-      onmouseover="this.style.borderColor='var(--cad-wire)'"
-      onmouseout="this.style.borderColor='${isSel ? 'var(--cad)' : 'var(--border2)'}'">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:10px;width:16px;text-align:center;
-          color:${meta.badgeText};flex-shrink:0">${meta.icon}</span>
-        <span style="font-size:11px;font-weight:500;color:var(--text);
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1"
-          title="${escHtml(s.name)}">${escHtml(s.name)}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;padding-left:22px">
-        <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">
-          ${s.sequence_order}.
-        </span>
-        <span style="font-size:9px;padding:1px 5px;border-radius:3px;
-          background:${meta.badgeColor};color:${meta.badgeText};
-          font-size:8px;letter-spacing:.04em;text-transform:uppercase">
-          ${meta.label}
-        </span>
-        ${s.due_days ? `<span style="font-size:9px;color:var(--amber);font-family:var(--font-mono)">+${s.due_days}d</span>` : ''}
-        ${hasReset ? `<span style="font-size:9px;color:var(--red);opacity:.7" title="Has rejection paths">↩</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-
-  // Trigger node (start)
-  const first = steps[0];
-  if (first) {
-    const fp = positions[first.id];
-    const tx = fp.x - COL_GAP / 2;
-    const ty = fp.y + NODE_H / 2;
-    svg.innerHTML += `
-      <circle cx="${PAD_X - 8}" cy="${ty}" r="10"
-        fill="rgba(192,64,74,.15)" stroke="rgba(192,64,74,.4)" stroke-width="1.5"/>
-      <text x="${PAD_X - 8}" y="${ty + 4}" font-size="10" fill="#c0404a"
-        text-anchor="middle">⚡</text>
-      <line x1="${PAD_X + 2}" y1="${ty}" x2="${fp.x - 8}" y2="${ty}"
-        stroke="var(--muted)" stroke-width="1.5" stroke-opacity=".4"
-        marker-end="url(#arrow-fwd)"/>`;
-  }
-}
-
-function dagSelectStep(stepId) {
-  // Switch to steps view and select the step
-  switchEditorView('steps');
-  const step = _selectedTmpl?.steps?.find(s => s.id === stepId);
-  if (step) {
-    _selectedStep = step;
-    reRenderSpine();
-    // Scroll to the step
-    requestAnimationFrame(() => {
-      document.getElementById(`sstep-${stepId}`)?.scrollIntoView({ behavior:'smooth', block:'center' });
-    });
-  }
-}
-
 // ── DAG state ─────────────────────────────────────────────────────────────────
 let _dagPanX = 0, _dagPanY = 0, _dagScale = 1;
 let _dagDragging = false, _dagDragStartX = 0, _dagDragStartY = 0;
@@ -1575,32 +1291,55 @@ function renderDAG() {
 
   canvas.width  = W;
   canvas.height = H;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
 
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
   if (!steps.length) {
-    ctx.fillStyle = 'rgba(255,255,255,.2)';
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('No steps yet', W/2, H/2);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No steps yet — add steps to see the diagram', W/2, H/2);
     return;
   }
 
   // ── Layout constants ──────────────────────────────────────────────────────
-  const NW = 170, NH = 58;
-  const H_GAP = 80;   // horizontal gap between nodes
-  const V_OFFSET = 70; // vertical offset for back-edges below main row
+  const NW      = 170;
+  const NH      = 60;
+  const H_GAP   = 72;
+  const PAD_L   = 52;   // space for trigger node
+  const PAD_R   = 52;   // space for terminal node
+  const NODE_Y  = 40;   // y position of nodes in content space
+  const RESET_H = 28;   // height per reset edge row below nodes
 
-  // Position nodes: single row, centered vertically
-  // Center the whole diagram in the canvas
-  const totalContentW = steps.length * NW + (steps.length - 1) * H_GAP;
-  const startX = Math.max(60, (W / _dagScale - totalContentW) / 2);
-  const mainY  = Math.max(80, (H / _dagScale - NH) / 2 - V_OFFSET / 2);
+  // Count reset edges for vertical space
+  let resetCount = 0;
+  steps.forEach(s => {
+    resetCount += _getOutcomes(s).filter(o => o.requiresReset && !o.requiresSuspend).length;
+  });
 
+  const contentW = PAD_L + steps.length * NW + (steps.length - 1) * H_GAP + PAD_R;
+  const contentH = NODE_Y + NH + (resetCount > 0 ? 16 + resetCount * RESET_H : 0) + 30;
+
+  // Auto-fit + center on first render
+  if (_dagPanX === 0 && _dagPanY === 0 && _dagScale === 1) {
+    if (contentW > W - 40) {
+      _dagScale = Math.max(0.25, (W - 40) / contentW);
+    }
+    _dagPanX = Math.max(0, (W - contentW * _dagScale) / 2);
+    _dagPanY = Math.max(0, (H - contentH * _dagScale) / 2);
+  }
+
+  // Node positions in content-space
   const pos = {};
   steps.forEach((s, i) => {
-    pos[s.id] = { x: startX + i * (NW + H_GAP), y: mainY };
+    pos[s.id] = {
+      x: PAD_L + i * (NW + H_GAP),
+      y: NODE_Y,
+    };
   });
 
   // ── Build edge list ───────────────────────────────────────────────────────
@@ -1667,11 +1406,11 @@ function renderDAG() {
     if (!fp || !tp) return;
 
     const depth    = resetDepth++;
-    const dropY    = mainY + NH + 24 + depth * 22;
-    const fromX    = fp.x + NW / 2;
-    const toX      = tp.x + NW / 2;
-    const fromBotY = mainY + NH;
-    const toBotY   = mainY + NH;
+    const dropY    = NODE_Y + NH + 16 + depth * RESET_H;
+    const fromMidX = fp.x + NW / 2;
+    const toMidX   = tp.x + NW / 2;
+    const fromBotY = NODE_Y + NH;
+    const toBotY   = NODE_Y + NH;
     const label    = eg.labels.map(o => o.label).join(' / ');
     const color    = eg.labels[0].color || '#E24B4A';
 
@@ -1680,25 +1419,25 @@ function renderDAG() {
     ctx.lineWidth   = 1.5;
     ctx.setLineDash([5, 3]);
     ctx.globalAlpha = 0.65;
-    // Orthogonal path: down → left → up → into node top
-    ctx.moveTo(fromX, fromBotY);
-    ctx.lineTo(fromX, dropY);
-    ctx.lineTo(toX,   dropY);
-    ctx.lineTo(toX,   toBotY + 4);
+    // Orthogonal: down from source → horizontal → up to target bottom
+    ctx.moveTo(fromMidX, fromBotY);
+    ctx.lineTo(fromMidX, dropY);
+    ctx.lineTo(toMidX,   dropY);
+    ctx.lineTo(toMidX,   toBotY + 4);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
 
-    // Arrowhead pointing up into target
-    _dagArrowHead(ctx, toX, toBotY, 'up', color);
+    // Arrowhead pointing up into target bottom
+    _dagArrowHead(ctx, toMidX, toBotY, 'up', color);
 
     // Label centered on the horizontal segment
-    const lx = (fromX + toX) / 2;
-    ctx.fillStyle   = color;
-    ctx.font        = `10px var(--font-mono, monospace)`;
-    ctx.textAlign   = 'center';
+    const lx = (fromMidX + toMidX) / 2;
+    ctx.fillStyle    = color;
+    ctx.font         = `10px var(--font-mono, monospace)`;
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha  = 0.8;
     ctx.fillText('↩ ' + label, lx, dropY + 10);
     ctx.globalAlpha = 1;
   });
@@ -1891,19 +1630,20 @@ function _dagArrowHead(ctx, x, y, dir, color) {
   ctx.globalAlpha = 1;
 }
 
-// ── DAG pan/zoom event wiring (called once after diagram container exists) ────
+// ── DAG pan/zoom event wiring ─────────────────────────────────────────────────
 function _initDagEvents() {
   const wrap = document.getElementById('dag-canvas-wrap');
   if (!wrap || wrap._dagEventsInit) return;
   wrap._dagEventsInit = true;
 
   wrap.addEventListener('mousedown', e => {
-    _dagDragging = true;
+    _dagDragging   = true;
     _dagDragStartX = e.clientX;
     _dagDragStartY = e.clientY;
     _dagPanStartX  = _dagPanX;
     _dagPanStartY  = _dagPanY;
     wrap.style.cursor = 'grabbing';
+    e.preventDefault();
   });
   window.addEventListener('mousemove', e => {
     if (!_dagDragging) return;
@@ -1912,35 +1652,46 @@ function _initDagEvents() {
     renderDAG();
   });
   window.addEventListener('mouseup', () => {
+    if (!_dagDragging) return;
     _dagDragging = false;
     wrap.style.cursor = 'grab';
   });
   wrap.addEventListener('wheel', e => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.1 : 0.9;
-    _dagScale = Math.max(0.2, Math.min(3, _dagScale * factor));
-    renderDAG();
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd+scroll = zoom (zoom toward cursor position)
+      e.preventDefault();
+      const rect    = wrap.getBoundingClientRect();
+      const mouseX  = e.clientX - rect.left;
+      const mouseY  = e.clientY - rect.top;
+      const factor  = e.deltaY < 0 ? 1.12 : 0.89;
+      const newScale = Math.max(0.2, Math.min(3, _dagScale * factor));
+      // Adjust pan so zoom is centered on cursor
+      _dagPanX = mouseX - (mouseX - _dagPanX) * (newScale / _dagScale);
+      _dagPanY = mouseY - (mouseY - _dagPanY) * (newScale / _dagScale);
+      _dagScale = newScale;
+      renderDAG();
+    } else {
+      // Plain scroll = pan
+      e.preventDefault();
+      _dagPanX -= e.deltaX;
+      _dagPanY -= e.deltaY;
+      renderDAG();
+    }
   }, { passive: false });
 
   // Click to select step
   wrap.addEventListener('click', e => {
-    if (Math.abs(e.clientX - _dagDragStartX) > 4) return; // was a drag
+    if (Math.abs(e.clientX - _dagDragStartX) > 5) return; // was a drag
     const steps = (_selectedTmpl?.steps||[])
       .filter(s => s.step_type !== 'trigger')
       .sort((a,b) => a.sequence_order - b.sequence_order);
-    const NW = 170, NH = 58, H_GAP = 80;
-    const totalContentW = steps.length * NW + (steps.length - 1) * H_GAP;
-    const canvas = document.getElementById('dag-canvas');
-    const canvasW = canvas?.width || 800;
-    const canvasH = canvas?.height || 500;
-    const startX = Math.max(60, (canvasW / _dagScale - totalContentW) / 2);
-    const mainY  = Math.max(80, (canvasH / _dagScale - NH) / 2 - 35);
-    const rect   = wrap.getBoundingClientRect();
-    const mx     = (e.clientX - rect.left - _dagPanX) / _dagScale;
-    const my     = (e.clientY - rect.top  - _dagPanY) / _dagScale;
+    const NW = 170, NH = 60, H_GAP = 72, PAD_L = 52, NODE_Y = 40;
+    const rect  = wrap.getBoundingClientRect();
+    const mx    = (e.clientX - rect.left  - _dagPanX) / _dagScale;
+    const my    = (e.clientY - rect.top   - _dagPanY) / _dagScale;
     steps.forEach((s, i) => {
-      const sx = startX + i * (NW + H_GAP);
-      const sy = mainY;
+      const sx = PAD_L + i * (NW + H_GAP);
+      const sy = NODE_Y;
       if (mx >= sx && mx <= sx + NW && my >= sy && my <= sy + NH) {
         dagSelectStep(s.id);
       }
