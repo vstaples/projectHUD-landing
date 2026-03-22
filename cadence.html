@@ -5937,15 +5937,21 @@ function toggleInstDagCoC(btn) {
       instance_completed:'Completed', instance_cancelled:'Cancelled',
       override:'PM Override', step_reassigned:'Reassigned',
     };
+    // Build step name lookup from template steps
+    const stepNameById = {};
+    (inst._tmplSteps||[]).forEach(s => { stepNameById[s.id] = s.name || STEP_META[s.step_type]?.label || 'Step'; });
+
     body.innerHTML = coc.length ? coc.map(e => {
       const col = evtColor[e.event_type] || 'var(--muted)';
       const lbl = evtLabel[e.event_type] || e.event_type;
       const ts  = e.created_at ? new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+      // Resolve step name from lookup rather than relying on stored step_name field
+      const stepName = e.template_step_id ? stepNameById[e.template_step_id] : null;
       return `<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;margin-top:4px"></div>
         <div style="min-width:0">
           <div style="font-size:10px;font-weight:600;color:${col}">${lbl}</div>
-          ${e.step_name?`<div style="font-size:9px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(e.step_name)}</div>`:''}
+          ${stepName?`<div style="font-size:9px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(stepName)}</div>`:''}
           ${e.outcome?`<div style="font-size:9px;color:var(--text2)">${escHtml(e.outcome)}</div>`:''}
           ${e.actor_name?`<div style="font-size:9px;color:var(--muted)">${escHtml(e.actor_name)}</div>`:''}
           ${e.event_notes?`<div style="font-size:9px;color:var(--text2);margin-top:2px;padding:2px 5px;background:var(--surf2);border-left:2px solid ${col}">${escHtml(e.event_notes)}</div>`:''}
@@ -5962,6 +5968,15 @@ function toggleInstDagCoC(btn) {
 function setInstViewMode(mode) {
   if (!_selectedInstance) return;
   _selectedInstance._viewMode = mode;
+  // Reset diagram fit so it recalculates for the current canvas size
+  if (mode === 'diagram') {
+    _instDagFitted = false;
+    // Also reset CoC panel to closed state
+    const cocPanel = document.getElementById('inst-dag-coc-panel');
+    if (cocPanel) { cocPanel.style.width='0'; cocPanel.style.borderLeftWidth='0'; }
+    const cocBtn = document.getElementById('inst-dag-coc-btn');
+    if (cocBtn) { cocBtn.textContent='CoC ▸'; cocBtn.style.color='var(--muted)'; }
+  }
   const el = document.getElementById('instance-detail');
   if (el) renderInstanceDetail(el, _selectedInstance);
 }
@@ -6076,13 +6091,17 @@ function renderInstanceDAG(inst) {
   const NW=152, NH=68, HGAP=72, PAD_L=56, PAD_R=56;
   const OWNER_H=20, NODE_Y=50+OWNER_H;
   const contentW = PAD_L + steps.length*NW + (steps.length-1)*HGAP + PAD_R;
-  const contentH = NODE_Y + NH + 60;
+  const contentH = NODE_Y + NH + 80;  // extra room for edge pills above nodes
 
   if (!_instDagFitted) {
-    _instDagFitted=true;
-    _instDagScale=Math.max(0.2, Math.min(1.2, (W-40)/contentW));
-    _instDagPanX=(W-contentW*_instDagScale)/2;
-    _instDagPanY=Math.max(8,(H-contentH*_instDagScale)/2);
+    _instDagFitted = true;
+    const MARGIN = 48;
+    // Scale to fill width with 48px margin each side, cap at 1.0
+    _instDagScale = Math.max(0.15, Math.min(1.0, (W - MARGIN*2) / contentW));
+    // Left-pin at MARGIN, center vertically
+    _instDagPanX  = MARGIN;
+    const scaledH = contentH * _instDagScale;
+    _instDagPanY  = scaledH < H ? (H - scaledH) / 2 : MARGIN;
   }
 
   function nodePos(id) {
@@ -6194,8 +6213,12 @@ function renderInstanceDAG(inst) {
     ctx.fillStyle=stateCol; ctx.globalAlpha=0.8;
     ctx.beginPath(); ctx.roundRect(p.x,p.y,4,NH,[7,0,0,7]); ctx.fill(); ctx.globalAlpha=1;
 
-    // Owner above node
-    const ownerName=s.assignee_name||_users_cad?.find(u=>u.id===s.assignee_user_id)?.name||null;
+    // Owner above node — check all assignee sources
+    const ownerName = s.assignee_name
+      || _users_cad?.find(u=>u.id===s.assignee_user_id)?.name
+      || _resources_cad?.find(r=>r.id===s.assignee_resource_id)?.name
+      || (s.assignee_type==='pm' ? 'Project Manager' : null)
+      || null;
     if(ownerName) {
       const initials=ownerName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
       const ax=p.x+4+9, ay=p.y-OWNER_H/2;
