@@ -1274,7 +1274,8 @@ function dagResetView() { _dagPanX = 0; _dagPanY = 0; _dagScale = 1; _dagAutoFit
 function _dagGroupForCards(outcomes) {
   const groups = [];
   outcomes.forEach(o => {
-    const key = (o.options||[]).join('|');
+    // Group only when label AND options are identical (true duplicates across steps)
+    const key = o.label + '|' + (o.options||[]).join('|');
     const ex  = groups.find(g => g.key === key);
     if (ex) ex.labels.push({ label: o.label, color: o.color });
     else    groups.push({ key, labels:[{ label:o.label, color:o.color }], options: o.options||[] });
@@ -1295,11 +1296,27 @@ function _dagAllCardGroups(steps) {
 
 function _dagResetOutcomes(s) {
   return _getOutcomes(s).filter(o => o.requiresReset && !o.requiresSuspend && !o.isPartial)
-    .map(o => ({
-      label:   o.label,
-      color:   o.color || '#E24B4A',
-      options: ['Revert to prior step', 'Revert to start of workflow', 'Abort instance'],
-    }));
+    .map(o => {
+      // Each outcome gets specific options based on its id so cards stay distinct
+      let options;
+      switch(o.id) {
+        case 'changes_requested':
+          options = ['Return to prior step', 'Return to start of workflow', 'Abort instance'];
+          break;
+        case 'rejected':
+          options = ['Return to start of workflow', 'Abort instance'];
+          break;
+        case 'declined':
+          options = ['Return to prior step', 'Return to start of workflow', 'Abort instance'];
+          break;
+        case 'changes_required':
+          options = ['Return to prior step', 'Return to start of workflow', 'Abort instance'];
+          break;
+        default:
+          options = [o.label + ' — return to prior step', o.label + ' — return to start', 'Abort instance'];
+      }
+      return { label: o.label, color: o.color || '#E24B4A', options };
+    });
 }
 
 function _dagFwdOutcomes(s) {
