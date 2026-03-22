@@ -1173,21 +1173,21 @@ function renderEditor() {
       <!-- View tab bar -->
       <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);
         flex-shrink:0;background:var(--bg1);padding:0 16px">
-        <span style="font-size:9px;font-weight:600;letter-spacing:.1em;color:var(--muted);
-          text-transform:none;margin-right:10px;white-space:nowrap">Edit Mode:</span>
+        <span style="font-size:11px;font-weight:500;color:var(--muted);
+          margin-right:10px;white-space:nowrap">Edit Mode:</span>
         <button id="view-tab-steps" onclick="switchEditorView('steps')"
-          style="padding:7px 14px;font-size:10px;font-weight:600;background:none;border:none;
+          style="padding:7px 14px;font-size:11px;font-weight:600;background:none;border:none;
             cursor:pointer;color:var(--cad);border-bottom:2px solid var(--cad);
-            margin-bottom:-1px;letter-spacing:.1em;text-transform:uppercase">STEPS</button>
+            margin-bottom:-1px;letter-spacing:.08em;text-transform:uppercase">STEPS</button>
         <button id="view-tab-diagram" onclick="switchEditorView('diagram')"
-          style="padding:7px 14px;font-size:10px;font-weight:600;background:none;border:none;
+          style="padding:7px 14px;font-size:11px;font-weight:600;background:none;border:none;
             cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
-            margin-bottom:-1px;letter-spacing:.1em;text-transform:uppercase">DIAGRAM</button>
+            margin-bottom:-1px;letter-spacing:.08em;text-transform:uppercase">DIAGRAM</button>
         ${!isReleased ? `
         <button id="tab-add-step-btn" onclick="tabAddStep(event)"
-          style="margin-left:auto;padding:4px 12px;font-size:10px;font-weight:600;background:none;
+          style="margin-left:auto;padding:5px 14px;font-size:11px;font-weight:600;background:none;
             border:1px solid var(--cad-wire);border-radius:3px;color:var(--cad);
-            cursor:pointer;font-family:var(--font-mono);letter-spacing:.08em;
+            cursor:pointer;letter-spacing:.06em;
             text-transform:uppercase">+ ADD STEP</button>` : ''}
       </div>
 
@@ -1202,12 +1202,12 @@ function renderEditor() {
       <!-- Diagram view -->
       <div id="editor-view-diagram" style="display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0;position:relative">
         <!-- Controls bar -->
-        <div style="display:flex;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border);flex-shrink:0;align-items:center;background:var(--bg1)">
-          <button onclick="dagZoomIn()" style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">+ Zoom</button>
-          <button onclick="dagZoomOut()" style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">− Zoom</button>
-          <button onclick="dagResetView()" style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">⟲ Reset</button>
-          <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">Drag · Ctrl+scroll · Click node or ◁ to edit</span>
-          <span id="dag-zoom-label" style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)">100%</span>
+        <div style="display:flex;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);flex-shrink:0;align-items:center;background:var(--bg1)">
+          <button onclick="dagZoomIn()" style="padding:4px 12px;font-size:12px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">+ Zoom</button>
+          <button onclick="dagZoomOut()" style="padding:4px 12px;font-size:12px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">− Zoom</button>
+          <button onclick="dagResetView()" style="padding:4px 12px;font-size:12px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">⟲ Reset</button>
+          <span style="font-size:11px;color:var(--muted);margin-left:4px">Drag · Ctrl+scroll · Click node or ◁ to edit</span>
+          <span id="dag-zoom-label" style="margin-left:auto;font-size:11px;color:var(--muted);font-family:var(--font-mono)">100%</span>
         </div>
         <!-- Canvas row -->
         <div style="flex:1;min-height:0;position:relative;display:flex;overflow:hidden">
@@ -1313,19 +1313,19 @@ function _dagResetOutcomes(s) {
       let options;
       switch(o.id) {
         case 'changes_requested':
-          options = ['Return to prior step', 'Return to start of workflow', 'Abort instance'];
+          options = ['Revert to prior step', 'Revert to start of workflow', 'Abort instance'];
           break;
         case 'rejected':
-          options = ['Return to start of workflow', 'Abort instance'];
+          options = ['Revert to start of workflow', 'Abort instance'];
           break;
         case 'declined':
-          options = ['Return to prior step', 'Return to start of workflow', 'Abort instance'];
+          options = ['Revert to prior step', 'Revert to start of workflow', 'Abort instance'];
           break;
         case 'changes_required':
-          options = ['Return to prior step', 'Return to start of workflow', 'Abort instance'];
+          options = ['Revert to prior step', 'Revert to start of workflow', 'Abort instance'];
           break;
         default:
-          options = [o.label + ' — return to prior step', o.label + ' — return to start', 'Abort instance'];
+          options = ['Revert to prior step', 'Revert to start of workflow', 'Abort instance'];
       }
       return { label: o.label, color: o.color || '#E24B4A', options };
     });
@@ -1568,7 +1568,7 @@ function renderDAG() {
 
     // Type badge bottom-left
     ctx.fillStyle = meta.badgeText; ctx.globalAlpha = 0.55;
-    ctx.font = '7.5px monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+    ctx.font = '10px monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
     ctx.fillText(meta.label.toUpperCase(), p.x + 12, p.y + NH - 7); ctx.globalAlpha = 1;
     // Seq number bottom-right
     ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '9px monospace';
@@ -1614,28 +1614,30 @@ function _dagBuildCards(steps) {
 
   cardsEl.innerHTML = groups.map((g, gi) => {
     const borderCol = g.labels.length === 1 ? g.labels[0].color : '#BA7517';
+    // Title-case helper
+    const toTitleCase = s => s.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
     const headerHTML = g.labels.map(lb =>
-      `<span style="color:${lb.color};font-weight:600;font-size:10px">${escHtml(lb.label)}</span>`
-    ).join('<span style="color:#383838;margin:0 3px">·</span>');
+      `<span style="color:${lb.color};font-weight:600;font-size:12px">${escHtml(toTitleCase(lb.label))}</span>`
+    ).join('<span style="color:#383838;margin:0 4px">·</span>');
     const optsHTML = g.options.map((opt, i) => {
       const isAbort = opt.toLowerCase().includes('abort');
-      const col  = isAbort ? '#555' : optColors[Math.min(i,1)];
+      const col  = isAbort ? '#666' : optColors[Math.min(i,1)];
       const icon = isAbort ? '✕' : '↩';
-      return `<div style="display:flex;align-items:flex-start;gap:5px;padding:3px 0;border-top:1px solid rgba(255,255,255,.06)">
-        <span style="color:${col};font-size:10px;flex-shrink:0;margin-top:1px">${icon}</span>
-        <span style="color:rgba(255,255,255,.55);font-size:9px;line-height:1.4">${escHtml(opt)}</span>
+      return `<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-top:1px solid rgba(255,255,255,.06)">
+        <span style="color:${col};font-size:12px;flex-shrink:0;margin-top:1px">${icon}</span>
+        <span style="color:rgba(255,255,255,.75);font-size:11px;line-height:1.4">${escHtml(opt)}</span>
       </div>`;
     }).join('');
     return `<div id="dag-card-${gi}"
       onclick="dagCardClick(${gi})"
       style="background:var(--bg2);border:1px solid ${borderCol}44;border-radius:5px;
-        padding:8px 10px;min-width:150px;flex:1;max-width:210px;cursor:pointer;
+        padding:10px 12px;min-width:160px;flex:1;max-width:220px;cursor:pointer;
         transition:border-color .15s,background .15s"
       onmouseover="this.style.borderColor='${borderCol}99'"
       onmouseout="if(_dagActiveCard!==${gi})this.style.borderColor='${borderCol}44'">
-      <div style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;
-        margin-bottom:5px;font-weight:600">Decision outcomes</div>
-      <div style="margin-bottom:6px;line-height:1.7">${headerHTML}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.9);letter-spacing:.08em;text-transform:uppercase;
+        margin-bottom:6px;font-weight:700">Decision Outcomes</div>
+      <div style="margin-bottom:7px;line-height:1.7">${headerHTML}</div>
       ${optsHTML}
     </div>`;
   }).join('');
@@ -3527,9 +3529,10 @@ async function commitTemplate() {
 // ── Shared step persistence (used by both saveTemplate and commitTemplate) ─────
 async function _saveSteps() {
   const steps = _selectedTmpl.steps || [];
+  const templateId = _selectedTmpl.id;
 
   const buildStepPayload = (step) => ({
-    template_id:         _selectedTmpl.id,
+    template_id:         templateId,
     sequence_order:      step.sequence_order,
     step_type:           step.step_type,
     name:                step.name || null,
@@ -3560,7 +3563,7 @@ async function _saveSteps() {
     })),
   });
 
-  // Pass A: INSERT new steps
+  // Pass A: INSERT new steps (with temp high sequence_order to avoid conflicts)
   const newSteps = steps.filter(s => s._new);
   for (const step of newSteps) {
     const payload = { ...buildStepPayload(step), sequence_order: step.sequence_order + 50000 };
@@ -3568,15 +3571,31 @@ async function _saveSteps() {
     if (res?.[0]?.id) { step.id = res[0].id; delete step._new; }
   }
 
-  // Pass B: shift to temp range
-  for (const step of steps) {
-    await API.patch(`workflow_template_steps?id=eq.${step.id}`,
-      { sequence_order: step.sequence_order + 10000 });
+  // Pass A2: DELETE any steps in DB that are no longer in our in-memory list
+  // This prevents stale rows from causing unique constraint violations on sequence_order
+  const currentIds = steps.filter(s => !s._new && s.id).map(s => s.id);
+  const dbSteps = await API.get(
+    `workflow_template_steps?template_id=eq.${templateId}&select=id`
+  ).catch(() => []);
+  const dbIds = (dbSteps || []).map(s => s.id);
+  const orphanIds = dbIds.filter(id => !currentIds.includes(id));
+  for (const id of orphanIds) {
+    await API.del(`workflow_template_steps?id=eq.${id}`).catch(() => {});
   }
 
-  // Pass C: set real values
+  // Pass B: shift remaining steps to temp range to free up sequence_order space
   for (const step of steps) {
-    await API.patch(`workflow_template_steps?id=eq.${step.id}`, buildStepPayload(step));
+    if (!step._new && step.id) {
+      await API.patch(`workflow_template_steps?id=eq.${step.id}`,
+        { sequence_order: step.sequence_order + 10000 });
+    }
+  }
+
+  // Pass C: set real sequence_order values
+  for (const step of steps) {
+    if (!step._new && step.id) {
+      await API.patch(`workflow_template_steps?id=eq.${step.id}`, buildStepPayload(step));
+    }
   }
 }
 
