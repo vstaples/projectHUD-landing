@@ -5373,14 +5373,6 @@ function renderInstanceDetail(el, inst) {
           letter-spacing:.12em;margin-top:3px">Elapsed Time<br/>dd:hh:mm</div>
       </div>` : ''}
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <!-- Intelligence Briefing -->
-        <button onclick="showIntelBriefing('${inst.id}')"
-          style="padding:5px 12px;font-size:11px;font-weight:600;background:none;
-            border:1px solid rgba(0,185,195,.4);border-radius:3px;color:var(--cad);
-            cursor:pointer;letter-spacing:.04em;transition:all .15s"
-          onmouseover="this.style.background='rgba(0,185,195,.08)'"
-          onmouseout="this.style.background='none'"
-          title="Intelligence Briefing">◎ Briefing</button>
         <!-- Status badge -->
         <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
           color:${statusColor[inst.status]||'var(--muted)'};
@@ -5445,7 +5437,7 @@ function renderInstanceDetail(el, inst) {
           </div>
         </div>
         <!-- ── REWORK INTELLIGENCE PANEL ─────────────────────────── -->
-        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;min-height:120px;max-height:160px">
+        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:140px">
           <!-- Scrubber row -->
           <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
             <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);white-space:nowrap">REPLAY</span>
@@ -5458,8 +5450,14 @@ function renderInstanceDetail(el, inst) {
               oninput="instScrubChange(this.value)"
               style="width:160px;accent-color:var(--cad);cursor:pointer;flex-shrink:0"/>
             <span id="inst-scrub-label" style="font-size:11px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap;min-width:110px;text-align:right">Live ◎</span>
+            <button onclick="showIntelBriefing('${inst.id}')"
+              style="padding:5px 14px;font-size:12px;font-weight:700;background:none;
+                border:1px solid rgba(0,185,195,.5);border-radius:3px;color:var(--cad);
+                cursor:pointer;letter-spacing:.04em;white-space:nowrap;flex-shrink:0;transition:all .15s"
+              onmouseover="this.style.background='rgba(0,185,195,.1)'"
+              onmouseout="this.style.background='none'">◎ Briefing</button>
             <button onclick="instScrubLive()" id="inst-scrub-live-btn"
-              style="padding:4px 12px;font-size:11px;font-weight:700;background:var(--cad);border:none;
+              style="padding:5px 12px;font-size:12px;font-weight:700;background:var(--cad);border:none;
                 border-radius:3px;color:var(--bg0);cursor:pointer;white-space:nowrap;letter-spacing:.04em">LIVE</button>
           </div>
           <!-- Note card row -->
@@ -6393,12 +6391,14 @@ function renderInstanceDAG(inst) {
     ctx.textAlign='right'; ctx.textBaseline='bottom';
     ctx.fillText(s.sequence_order, p.x+NW-8, p.y+NH-8);
 
-    // Rework badge — prominent red pill above node top-right
+    // Rework badge — inside node, bottom-right corner above seq number
     if (loopCount[s.id]) {
       const rCount = loopCount[s.id];
-      const bw=64, bh=14, bx=p.x+NW-bw-4, by=p.y-20;
-      ctx.fillStyle='#E24B4A'; ctx.globalAlpha=0.92;
-      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 7); ctx.fill(); ctx.globalAlpha=1;
+      const bw=64, bh=13;
+      const bx = p.x + NW - bw - 6;
+      const by = p.y + NH - bh - 6;
+      ctx.fillStyle='#E24B4A'; ctx.globalAlpha=0.88;
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill(); ctx.globalAlpha=1;
       ctx.fillStyle='#fff'; ctx.font='700 8px system-ui,sans-serif';
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(`↩ ${rCount}× rejected`, bx+bw/2, by+bh/2);
@@ -6530,7 +6530,22 @@ function showIntelBriefing(instId) {
   });
 
   // Build all timestamped note events across the entire workflow
-  const noteEvents = coc.filter(e=>(e.event_notes||e.notes)).map(e=>{
+  // Only include HUMAN notes — exclude automated system events:
+  // - step_reset events (always system-generated "Reset by X" messages)
+  // - instance_launched events (system boilerplate)
+  // - Any note starting with "Reset by" or "Launched from template" or "Meeting created"
+  const isSystemNote = e => {
+    if (e.event_type === 'step_reset') return true;
+    if (e.event_type === 'instance_launched') return true;
+    if (e.event_type === 'meeting_created') return true;
+    const txt = (e.event_notes||e.notes||'').trim();
+    if (txt.startsWith('Reset by ')) return true;
+    if (txt.startsWith('Launched from template')) return true;
+    if (txt.startsWith('Meeting created')) return true;
+    return false;
+  };
+
+  const noteEvents = coc.filter(e=>(e.event_notes||e.notes) && !isSystemNote(e)).map(e=>{
     const step = steps.find(s=>s.id===e.template_step_id);
     const oDef = step ? _getOutcomes(step).find(o=>o.id===e.outcome) : null;
     const isRejection = oDef?.requiresReset;
@@ -6718,9 +6733,21 @@ function showIntelBriefing(instId) {
           · Launched by ${escHtml(_users_cad.find(u=>u.id===inst.launched_by)?.name||'—')}
           · ${fmt(inst.launched_at)}
         </span>
-        <button onclick="document.getElementById('intel-briefing-overlay').remove()"
-          style="padding:5px 16px;font-size:11px;font-weight:600;background:var(--cad);
-            border:none;border-radius:3px;color:var(--bg0);cursor:pointer">Close</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="_briefingEmail('${inst.id}')"
+            style="padding:5px 14px;font-size:11px;font-weight:600;background:none;
+              border:1px solid var(--border2);border-radius:3px;color:var(--text2);cursor:pointer">
+            ✉ Email PM
+          </button>
+          <button onclick="_briefingPDF('${inst.id}')"
+            style="padding:5px 14px;font-size:11px;font-weight:600;background:none;
+              border:1px solid var(--border2);border-radius:3px;color:var(--text2);cursor:pointer">
+            ⬇ Save PDF
+          </button>
+          <button onclick="document.getElementById('intel-briefing-overlay').remove()"
+            style="padding:5px 16px;font-size:11px;font-weight:600;background:var(--cad);
+              border:none;border-radius:3px;color:var(--bg0);cursor:pointer">Close</button>
+        </div>
       </div>
     </div>`;
 
@@ -6729,6 +6756,109 @@ function showIntelBriefing(instId) {
 
 
 
+// ── Briefing export actions ───────────────────────────────────────────────────
+function _briefingPDF(instId) {
+  const overlay = document.getElementById('intel-briefing-overlay');
+  if (!overlay) return;
+  const printWin = window.open('', '_blank', 'width=900,height=700');
+  const inst  = _instances.find(i=>i.id===instId) || _selectedInstance;
+  const tmpl  = _templates.find(t=>t.id===inst?.template_id);
+  const fmt   = ts => ts ? new Date(ts).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+
+  // Clone the modal body content as clean print HTML
+  const modal = overlay.querySelector('[style*="min(860px"]');
+  const bodyEl = modal?.querySelector('[style*="overflow-y:auto"]');
+  const bodyHTML = bodyEl ? bodyEl.innerHTML : '';
+
+  printWin.document.write(`<!DOCTYPE html><html><head>
+    <title>Intelligence Briefing — ${escHtml(inst?.title||tmpl?.name||'Instance')}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#111;background:#fff;padding:32px;max-width:800px;margin:0 auto}
+      h1{font-size:18px;font-weight:700;margin-bottom:6px}
+      .subtitle{font-size:11px;color:#666;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid #111}
+      /* strip all inline styles — let print CSS take over */
+      [style]{all:revert}
+      /* re-apply essentials */
+      div{display:block}
+      .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}
+      .stat-box{border:1px solid #ddd;border-radius:4px;padding:8px 10px}
+      .stat-lbl{font-size:10px;color:#888;margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em}
+      .stat-val{font-size:15px;font-weight:700}
+      .section-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#444;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #ddd}
+      .timeline-row{padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:11px}
+      .note-card{margin-bottom:12px;padding:8px 12px;border-left:3px solid #1D9E75;background:#f6fdf9;border-radius:0 4px 4px 0}
+      .note-card.rejection{border-left-color:#E24B4A;background:#fff5f5}
+      .note-header{font-size:10px;color:#666;margin-bottom:4px}
+      .note-body{font-size:12px;line-height:1.6;color:#111}
+      .remaining-row{padding:6px 8px;border:1px solid #eee;border-radius:3px;margin-bottom:4px;font-size:11px}
+      @media print{body{padding:16px}@page{margin:16mm}}
+    </style>
+  </head><body>
+    <h1>Intelligence Briefing</h1>
+    <div class="subtitle">
+      ${escHtml(inst?.title||tmpl?.name||'Workflow Instance')} &nbsp;·&nbsp;
+      Generated ${fmt(new Date().toISOString())} &nbsp;·&nbsp;
+      Status: ${(inst?.status||'').replace('_',' ').toUpperCase()}
+    </div>
+    ${bodyHTML}
+    <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`);
+  printWin.document.close();
+}
+
+function _briefingEmail(instId) {
+  const inst  = _instances.find(i=>i.id===instId) || _selectedInstance;
+  if (!inst) return;
+  const tmpl  = _templates.find(t=>t.id===inst.template_id);
+  const steps = (inst._tmplSteps||[]).filter(s=>s.step_type!=='trigger').sort((a,b)=>a.sequence_order-b.sequence_order);
+  const coc   = (inst._stepInsts||[]).slice().sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const fmt   = ts => ts ? new Date(ts).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+  const elapsed = ms => { const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return h>0?`${h}h ${m}m`:`${m}m`; };
+
+  const isSystemNote = e => {
+    if (['step_reset','instance_launched','meeting_created'].includes(e.event_type)) return true;
+    const txt = (e.event_notes||e.notes||'').trim();
+    return txt.startsWith('Reset by ') || txt.startsWith('Launched from template') || txt.startsWith('Meeting created');
+  };
+
+  const rejections = coc.filter(e=>{
+    if(e.event_type!=='step_completed') return false;
+    const step=steps.find(s=>s.id===e.template_step_id);
+    return step ? _getOutcomes(step).find(o=>o.id===e.outcome)?.requiresReset : false;
+  }).length;
+
+  const humanNotes = coc.filter(e=>(e.event_notes||e.notes)&&!isSystemNote(e));
+  const totalMs = inst.launched_at ? Date.now()-new Date(inst.launched_at) : 0;
+
+  let body = `INTELLIGENCE BRIEFING\n${'='.repeat(50)}\n`;
+  body += `${inst.title||tmpl?.name||'Workflow Instance'}\n`;
+  body += `Generated: ${fmt(new Date().toISOString())}\n`;
+  body += `Status: ${(inst.status||'').replace('_',' ').toUpperCase()}  |  `;
+  body += `Elapsed: ${totalMs>0?elapsed(totalMs):'—'}  |  Rejections: ${rejections}×\n\n`;
+
+  if (humanNotes.length) {
+    body += `NOTES & COMMENTS (${humanNotes.length} recorded)\n${'-'.repeat(50)}\n\n`;
+    humanNotes.forEach(e => {
+      const step  = steps.find(s=>s.id===e.template_step_id);
+      const actor = (e.actor_name&&e.actor_name!=='System') ? e.actor_name : (step?.assignee_name||'Team Member');
+      const oDef  = step ? _getOutcomes(step).find(o=>o.id===e.outcome) : null;
+      const type  = oDef?.requiresReset ? '[ REJECTED ]' : '[ COMPLETED ]';
+      body += `${type} ${step?.name||''}\n`;
+      body += `${actor}  ·  ${fmt(e.created_at)}\n`;
+      body += `  "${(e.event_notes||e.notes||'').trim()}"\n\n`;
+    });
+  } else {
+    body += `No human notes were recorded during this workflow.\n\n`;
+  }
+
+  body += `${'='.repeat(50)}\nProjectHUD · CadenceHUD Workflow Engine\n`;
+
+  const subject = encodeURIComponent(`[Briefing] ${inst.title||tmpl?.name||'Workflow'} — ${rejections} rejection${rejections!==1?'s':''}`);
+  window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
+}
+
+// ── Rework Intelligence ───────────────────────────────────────────────────────
 function instScrubLive() {
   _instScrubPos = 100;
   const s = document.getElementById('inst-scrubber');
