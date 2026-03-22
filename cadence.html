@@ -2901,6 +2901,7 @@ function _bistBuildState(inst, steps, coc) {
     if (!lastEvent)                                    state = isReady ? 'ready' : 'waiting';
     else if (lastEvent.event_type==='step_completed')  state = 'done';
     else if (lastEvent.event_type==='step_activated')  state = 'active';
+    else if (lastEvent.event_type==='step_reset')      state = 'waiting';
     else                                               state = touched ? 'active' : 'waiting';
 
     // Last completion event for outcome
@@ -4391,7 +4392,7 @@ function renderInstanceDetail(el, inst) {
     override:'var(--amber)', instance_completed:'var(--green)',
     token_issued:'var(--muted)', reminder_sent:'var(--muted)',
     step_reassigned:'var(--accent)', instance_suspended:'var(--amber)',
-    instance_cancelled:'var(--red)',
+    instance_cancelled:'var(--red)', step_reset:'var(--muted)',
   };
   const evtLabel = {
     instance_launched:'Instance Launched', step_activated:'Step Activated',
@@ -4400,6 +4401,7 @@ function renderInstanceDetail(el, inst) {
     override:'PM Override', instance_completed:'Instance Completed',
     token_issued:'Token Issued', reminder_sent:'Reminder Sent',
     step_reassigned:'Assignee Reassigned', instance_suspended:'Suspended',
+    instance_cancelled:'Cancelled', step_reset:'Step Reset',
     instance_cancelled:'Cancelled',
   };
 
@@ -4407,12 +4409,28 @@ function renderInstanceDetail(el, inst) {
   const completedStepIds = new Set(coc.filter(e => e.event_type==='step_completed').map(e => e.template_step_id));
   const rejectedStepIds  = new Set(coc.filter(e => e.event_type==='rejected').map(e => e.template_step_id));
 
+  // Build latest-event-per-step map to handle resets correctly
+  // A step that was completed then reset should NOT appear as done
+  const latestStepEvent = {};
+  coc.forEach(e => {
+    if (e.template_step_id) latestStepEvent[e.template_step_id] = e;
+  });
+  const resetStepIds = new Set(
+    Object.entries(latestStepEvent)
+      .filter(([, e]) => e.event_type === 'step_reset')
+      .map(([id]) => id)
+  );
+  // Remove reset steps from completedStepIds so they don't show as done
+  resetStepIds.forEach(id => completedStepIds.delete(id));
+
   // Derive the "ready" step — immediately follows the last completed step, not yet touched
   const lastCompletedOrder = steps
     .filter(s => completedStepIds.has(s.id))
     .reduce((max, s) => Math.max(max, s.sequence_order), 0);
   const readyStep = steps
-    .filter(s => s.sequence_order > lastCompletedOrder && !activeStepIds.has(s.id))
+    .filter(s => s.sequence_order > lastCompletedOrder
+              && !activeStepIds.has(s.id)
+              && !resetStepIds.has(s.id))
     .sort((a, b) => a.sequence_order - b.sequence_order)[0];
   const readyStepId = readyStep?.id || null;
 
@@ -4528,9 +4546,11 @@ function renderInstanceDetail(el, inst) {
           ? `<div style="font-size:12px;color:var(--muted)">Template steps not loaded.</div>`
           : steps.map((s, idx) => {
               const meta     = STEP_META[s.step_type] || STEP_META.action;
-              const done     = completedStepIds.has(s.id);
+              const isReset  = resetStepIds.has(s.id);
+              const done     = completedStepIds.has(s.id) && !isReset;
               const rejected = rejectedStepIds.has(s.id);
-              const touched  = activeStepIds.has(s.id);
+              const touched  = activeStepIds.has(s.id) && !isReset
+                             && latestStepEvent[s.id]?.event_type === 'step_activated';
               const isSel    = selStep === s.id;
               const isLast   = idx === steps.length - 1;
               const reassign = reassignments[s.id];
@@ -5522,9 +5542,27 @@ async function submitComplete(instId, stepId) {
       }).catch(() => {});
 
     } else if (routeTargetId) {
-      // ── Explicit route — activate the specified predecessor step ──────────
+      // ── Explicit route — reset intervening steps, activate target ─────────
       const targetStep = allSteps.find(s => s.id === routeTargetId);
       if (targetStep) {
+        // Reset all steps from target up to (not including) current step
+        const stepsToReset = allSteps
+          .filter(s => s.sequence_order >= targetStep.sequence_order
+                    && s.sequence_order < currOrder)
+          .sort((a, b) => a.sequence_order - b.sequence_order);
+        for (const rs of stepsToReset) {
+          await API.post('workflow_step_instances', {
+            instance_id:      instId, firm_id: FIRM_ID_CAD,
+            event_type:       'step_reset',
+            template_step_id: rs.id,
+            step_type:        rs.step_type || 'action',
+            step_name:        rs.name || null,
+            actor_name:       'System',
+            event_notes:      `Reset by ${outcomeLabel} on ${step?.name}`,
+            created_at:       new Date().toISOString(),
+          }).catch(() => {});
+        }
+        // Activate target
         await API.post('workflow_step_instances', {
           instance_id:      instId, firm_id: FIRM_ID_CAD,
           event_type:       'step_activated',
@@ -5538,11 +5576,28 @@ async function submitComplete(instId, stepId) {
       }
 
     } else if (outcomeDef?.requiresReset) {
-      // ── Reset — no explicit route, activate first non-trigger step ────────
+      // ── Implicit reset — reset all steps back to first, activate first ────
       const firstStep = allSteps
         .filter(s => s.step_type !== 'trigger')
         .sort((a, b) => a.sequence_order - b.sequence_order)[0];
       if (firstStep) {
+        // Reset all steps from first up to (not including) current
+        const stepsToReset = allSteps
+          .filter(s => s.sequence_order >= firstStep.sequence_order
+                    && s.sequence_order < currOrder)
+          .sort((a, b) => a.sequence_order - b.sequence_order);
+        for (const rs of stepsToReset) {
+          await API.post('workflow_step_instances', {
+            instance_id:      instId, firm_id: FIRM_ID_CAD,
+            event_type:       'step_reset',
+            template_step_id: rs.id,
+            step_type:        rs.step_type || 'action',
+            step_name:        rs.name || null,
+            actor_name:       'System',
+            event_notes:      `Reset by ${outcomeLabel} on ${step?.name}`,
+            created_at:       new Date().toISOString(),
+          }).catch(() => {});
+        }
         await API.post('workflow_step_instances', {
           instance_id:      instId, firm_id: FIRM_ID_CAD,
           event_type:       'step_activated',
