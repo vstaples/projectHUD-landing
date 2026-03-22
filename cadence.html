@@ -7897,8 +7897,8 @@ async function _notifyStepActivated(instId, step, inst, isBist = false) {
 
       await API.post('external_step_tokens', tokenRecord);
 
-      // Build the approve.html URLs — token is the only param needed
-      const base = `${window.location.origin}/approve.html`;
+      // Build the approve.html URLs — use explicit base to ensure correct domain
+      const base = 'https://projecthud.com/approve.html';
       approveUrl = `${base}?token=${rawToken}`;
       rejectUrl  = `${base}?token=${rawToken}&outcome=reject`;
 
