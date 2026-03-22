@@ -7836,6 +7836,77 @@ async function _notifyStepActivated(instId, step, inst, isBist = false) {
        _resources_cad.find(r => r.id === inst.launched_by)?.name || null)
     : null;
 
+  // ── External response token generation ───────────────────────────────────
+  // Generate a signed token for approval/signoff/review/external steps so
+  // the assignee can respond directly from email without logging in.
+  const _externalStepTypes = ['approval','signoff','review','external','confirmation'];
+  let approveUrl  = null;
+  let rejectUrl   = null;
+  let tokenRecord = null;
+
+  if (_externalStepTypes.includes(step.step_type)) {
+    try {
+      // Build token: UUID + HMAC-style binding string (firm:instance:step)
+      const rawToken   = crypto.randomUUID();
+      const bindingStr = `${FIRM_ID_CAD}:${instId}:${step.id}`;
+      // Simple deterministic hash for tamper detection (not cryptographic HMAC —
+      // true HMAC requires the Edge Function for secret key; this is a client-side
+      // binding signal that the Edge Function validates against the stored record)
+      const encoder  = new TextEncoder();
+      const hashBuf  = await crypto.subtle.digest('SHA-256', encoder.encode(bindingStr + rawToken));
+      const tokenHmac = Array.from(new Uint8Array(hashBuf))
+        .map(b => b.toString(16).padStart(2,'0')).join('').slice(0,32);
+
+      // Snapshot outcomes at token generation time
+      const outcomesSnapshot = _getOutcomes(step);
+
+      // PM identity
+      const pmResource = _resources_cad.find(r => r.id === _myResourceId);
+      const pmEmail    = pmResource?.email || null;
+      const pmName     = pmResource?.name  || 'Project Manager';
+
+      // Expiry: 30 days
+      const expiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+
+      tokenRecord = {
+        firm_id:           FIRM_ID_CAD,
+        instance_id:       instId,
+        template_step_id:  step.id,
+        token:             rawToken,
+        token_hmac:        tokenHmac,
+        // Legacy columns (prior schema) — keep populated for compatibility
+        token_hash:        tokenHmac,
+        recipient_email:   assigneeEmail,
+        recipient_name:    assigneeName || null,
+        assignee_email:    assigneeEmail,
+        assignee_name:     assigneeName || null,
+        outcomes_json:     outcomesSnapshot,
+        step_name:         step.name || null,
+        step_instructions: step.instructions || null,
+        instance_title:    inst?.title || null,
+        template_name:     _selectedTmpl?.name || null,
+        pm_email:          pmEmail,
+        pm_name:           pmName,
+        expires_at:        expiresAt,
+        generated_at:      new Date().toISOString(),
+        issued_at:         new Date().toISOString(),
+      };
+
+      await API.post('external_step_tokens', tokenRecord);
+
+      // Build the approve.html URLs — token is the only param needed
+      const base = `${window.location.origin}/approve.html`;
+      approveUrl = `${base}?token=${rawToken}`;
+      rejectUrl  = `${base}?token=${rawToken}&outcome=reject`;
+
+      console.log(`[ExternalToken] Generated for step "${step.name}" → ${rawToken.slice(0,8)}...`);
+    } catch (tokenErr) {
+      // Token failure is non-fatal — email still sends, just without action buttons
+      console.warn('[ExternalToken] Failed to generate token:', tokenErr);
+    }
+  }
+  // ── End token generation ──────────────────────────────────────────────────
+
   const payload = {
     instance_id:    instId,
     instance_title: inst?.title || null,
@@ -7849,6 +7920,11 @@ async function _notifyStepActivated(instId, step, inst, isBist = false) {
     due_type:       step.due_type   || null,
     launched_by:    launcher,
     is_bist:        false,
+    // External response URLs — present only for eligible step types
+    approve_url:    approveUrl,
+    reject_url:     rejectUrl,
+    has_action_buttons: !!(approveUrl && rejectUrl),
+    outcomes:       approveUrl ? _getOutcomes(step) : null,
   };
 
   await fetch(`${SUPA_URL}/functions/v1/notify-step-activated`, {

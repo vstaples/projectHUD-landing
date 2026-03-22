@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectHUD — Project Management Command Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700;800&family=Share+Tech+Mono&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060a10;
+  --bg2: #0c1628;
+  --bg3: #0a1525;
+  --cyan: #00d2ff;
+  --green: #00e5a0;
+  --amber: #ffaa00;
+  --red: #ff4757;
+  --purple: #9b59b6;
+  --text0: #eef4ff;
+  --text1: #c8dff0;
+  --text2: #7a9bbf;
+  --text3: #3a5a7a;
+  --border: rgba(0,210,255,0.12);
+  --border2: rgba(0,210,255,0.25);
+  --font-hud: 'Rajdhani', sans-serif;
+  --font-ui: 'Barlow Condensed', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-body: 'Barlow', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text1);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+/* ── GLOBAL GRID BACKGROUND ─── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0,210,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,210,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* ── PAGE SYSTEM ─── */
+.page {
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════
+   PAGE 1 — COVER
+═══════════════════════════════════════ */
+.page-1 {
+  background: var(--bg);
+  justify-content: center;
+  align-items: center;
+  padding: 60px 80px;
+  background-image:
+    /* Right-side radial glow behind callout area */
+    radial-gradient(ellipse 55% 70% at 85% 60%, rgba(0,210,255,0.045) 0%, transparent 70%),
+    /* Top-left subtle glow behind logo */
+    radial-gradient(ellipse 40% 40% at 15% 20%, rgba(0,229,160,0.03) 0%, transparent 60%),
+    /* Bottom atmospheric depth */
+    radial-gradient(ellipse 80% 40% at 50% 110%, rgba(0,210,255,0.035) 0%, transparent 60%);
+}
+
+/* Scanning line animation */
+.page-1::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  animation: scandown 6s ease-in-out infinite;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Network node SVG background layer */
+.page-1-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.22;
+}
+
+.cover-wrap { position: relative; z-index: 1; }
+
+@keyframes scandown {
+  0%   { top: 0; opacity: 0; }
+  5%   { opacity: 0.4; }
+  95%  { opacity: 0.2; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
+  50%       { opacity: 0.5; box-shadow: 0 0 16px currentColor; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.cover-wrap {
+  max-width: 900px;
+  width: 100%;
+  animation: fadeUp 0.8s ease 0.2s both;
+}
+
+.cover-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.cover-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  color: var(--green);
+  animation: pulse 2s infinite;
+}
+
+.cover-eyebrow-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--green);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.cover-logo-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.cover-logo-pre {
+  font-family: var(--font-hud);
+  font-size: 88px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text0);
+  line-height: 1;
+}
+
+.cover-logo-hud {
+  color: var(--cyan);
+}
+
+.cover-tagline {
+  font-family: var(--font-ui);
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--text2);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 48px;
+}
+
+/* Cover HUD display panels */
+.cover-hud {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.hud-stat {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-top: 2px solid;
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-stat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at top left, var(--glow, rgba(0,210,255,0.04)) 0%, transparent 60%);
+}
+
+.hud-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.hud-stat-value {
+  font-family: var(--font-hud);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.hud-stat-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text2);
+  letter-spacing: 0.1em;
+}
+
+.cover-divider {
+  height: 1px;
+  background: linear-gradient(to right, var(--cyan), rgba(0,210,255,0.1), transparent);
+  margin-bottom: 32px;
+}
+
+.cover-intro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+.cover-intro-text {
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 300;
+  color: var(--text1);
+  line-height: 1.75;
+  letter-spacing: 0.01em;
+}
+
+.cover-intro-text strong {
+  color: var(--cyan);
+  font-weight: 500;
+}
+
+.cover-callout {
+  background: rgba(0,210,255,0.05);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--cyan);
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.callout-quote {
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text0);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  margin-bottom: 12px;
+}
+
+.callout-attr {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.18em;
+}
+
+/* Corner brackets decoration */
+.bracketed { position: relative; }
+.bracketed::before, .bracketed::after,
+.bracketed .br-bl, .bracketed .br-br {
+  content: ''; position: absolute;
+  width: 12px; height: 12px;
+  pointer-events: none;
+}
+.bracketed::before  { top:-1px; left:-1px;  border-top:1px solid var(--cyan); border-left:1px solid var(--cyan); }
+.bracketed::after   { top:-1px; right:-1px; border-top:1px solid var(--cyan); border-right:1px solid var(--cyan); }
+.bracketed .br-bl   { bottom:-1px; left:-1px;  border-bottom:1px solid var(--cyan); border-left:1px solid var(--cyan); }
+.bracketed .br-br   { bottom:-1px; right:-1px; border-bottom:1px solid var(--cyan); border-right:1px solid var(--cyan); }
+
+/* Page number badge */
+.page-num {
+  position: absolute;
+  bottom: 28px;
+  right: 40px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.2em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-num::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--text3);
+}
+
+/* ═══════════════════════════════════════
+   PAGE 2 — CAPABILITIES
+═══════════════════════════════════════ */
+.page-2 {
+  background: linear-gradient(180deg, #060a10 0%, #08101a 100%);
+  padding: 60px 80px;
+}
+
+.section-header {
+  margin-bottom: 40px;
+}
+
+.section-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cyan);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-eyebrow::before {
+  content: '';
+  width: 20px;
+  height: 1px;
+  background: var(--cyan);
+}
+
+.section-title {
+  font-family: var(--font-hud);
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--text0);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+
+.section-title span { color: var(--cyan); }
+
+.caps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-bottom: 40px;
+}
+
+.cap-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 24px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.cap-card:hover {
+  border-color: var(--border2);
+}
+
+.cap-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent, var(--cyan)), transparent);
+}
+
+.cap-icon {
+  font-size: 22px;
+  margin-bottom: 12px;
+  display: block;
+  color: var(--accent, var(--cyan));
+}
+
+.cap-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text0);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.cap-desc {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+
+.cap-features {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cap-feat {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cap-feat::before {
+  content: '→';
+  color: var(--accent, var(--cyan));
+  font-size: 9px;
+}
+
+/* ═══════════════════════════════════════
+   PAGE 3 — EVM DEEP DIVE
+═══════════════════════════════════════ */
+.page-3 {
+  background: var(--bg);
+  padding: 60px 80px;
+}
+
+.evm-showcase {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+.evm-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+
+.evm-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,210,255,0.03);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: 0.18em;
+}
+
+.evm-panel-header::before {
+  content: '';
+  width: 2px; height: 12px;
+  background: var(--cyan);
+}
+
+.evm-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(100,160,220,0.06);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.evm-metric-row:hover { background: rgba(0,210,255,0.04); }
+.evm-metric-row:last-child { border-bottom: none; }
+
+.evm-metric-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text2);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.evm-hint {
+  font-size: 9px;
+  color: var(--text3);
+}
+
+.evm-metric-val {
+  font-family: var(--font-hud);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.gauge-row {
+  display: flex;
+  justify-content: space-around;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gauge-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.gauge-circle {
+  width: 60px; height: 60px;
+  position: relative;
+}
+
+.gauge-circle svg {
+  transform: rotate(-90deg);
+}
+
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-hud);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gauge-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: 0.12em;
+}
+
+.evm-callout {
+  background: rgba(0,210,255,0.04);
+  border: 1px solid var(--border2);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.evm-callout-title {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.evm-callout-body {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text1);
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+
+/* ═══════════════════════════════════════
+   PAGE 4 — PROCUREMENT + JOURNAL
+═══════════════════════════════════════ */
+.page-4 {
+  background: linear-gradient(180deg, #08101a 0%, #060a10 100%);
+  padding: 60px 80px;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+/* Mock expenditure table */
+.mock-table {
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.mock-table-header {
+  display: grid;
+  gap: 0;
+  background: rgba(0,210,255,0.04);
+  border-bottom: 1px solid var(--border);
+}
+
+.mock-thead {
+  display: flex;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.mock-th {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+
+.mock-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 8px;
+  border-bottom: 1px solid rgba(100,160,220,0.05);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.mock-row:last-child { border-bottom: none; }
+
+.status-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* Mock journal entries */
+.journal-entry {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(100,160,220,0.06);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.journal-entry:last-child { margin-bottom: 0; }
+
+.j-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.j-avatar {
+  width: 24px; height: 24px;
+  background: #1a3a5a;
+  border: 1px solid rgba(0,210,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-hud);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--cyan);
+  flex-shrink: 0;
+}
+
+.j-name  { font-family: var(--font-ui);   font-size: 12px; color: var(--text0); font-weight: 500; }
+.j-date  { font-family: var(--font-mono); font-size: 10px; color: var(--text2); }
+.j-hrs   { font-family: var(--font-mono); font-size: 10px; color: var(--cyan); font-weight: 700; }
+.j-pct   { font-family: var(--font-mono); font-size: 10px; color: var(--green); }
+.j-body  { font-family: var(--font-body);  font-size: 12px; color: var(--text1); line-height: 1.6; letter-spacing: 0.01em; }
+.j-task  { font-family: var(--font-mono); font-size: 9px; color: var(--text3); margin-bottom: 4px; letter-spacing: 0.06em; }
+
+/* ═══════════════════════════════════════
+   PAGE 5 — BENEFITS + CTA
+═══════════════════════════════════════ */
+.page-5 {
+  background: var(--bg);
+  padding: 60px 80px;
+  justify-content: center;
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 48px;
+}
+
+.benefit-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 24px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.benefit-num {
+  font-family: var(--font-hud);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent, var(--cyan));
+  opacity: 0.3;
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: right;
+}
+
+.benefit-content {}
+.benefit-title {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text0);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.benefit-desc {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+
+/* Audience band */
+.audience-band {
+  background: rgba(0,210,255,0.04);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--cyan);
+  padding: 28px 32px;
+  margin-bottom: 40px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.audience-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cyan);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
+.audience-items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.audience-item-title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text0);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audience-item-title::before {
+  content: '◆';
+  font-size: 8px;
+  color: var(--cyan);
+}
+
+.audience-item-desc {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+/* CTA block */
+.cta-block {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: center;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  padding: 32px 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-block::before {
+  content: 'PROJECT HUD';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  font-family: var(--font-hud);
+  font-size: 100px;
+  font-weight: 700;
+  color: rgba(0,210,255,0.03);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cta-title {
+  font-family: var(--font-hud);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text0);
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.cta-title span { color: var(--cyan); }
+
+.cta-body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text1);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  margin-bottom: 20px;
+}
+
+.cta-url {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cta-url::before {
+  content: '→';
+  font-size: 16px;
+}
+
+.cta-qr {
+  width: 120px; height: 120px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cta-qr-inner {
+  display: grid;
+  grid-template-columns: repeat(5, 10px);
+  grid-template-rows: repeat(5, 10px);
+  gap: 2px;
+}
+
+.qr-cell {
+  background: var(--text3);
+}
+
+.qr-cell.on { background: var(--cyan); }
+
+.cta-qr-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text3);
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+/* ── SECTION DIVIDER LINE ── */
+.page-break-line {
+  height: 1px;
+  background: linear-gradient(to right, var(--cyan), rgba(0,210,255,0.2), transparent);
+  margin-bottom: 48px;
+  position: relative;
+}
+
+.page-break-line::after {
+  content: attr(data-page);
+  position: absolute;
+  right: 0;
+  top: -8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.2em;
+  background: var(--bg);
+  padding-left: 8px;
+}
+
+/* ── NAV BAR ── */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(6,10,16,0.96);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 80px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-logo-mark {
+  font-family: var(--font-hud);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text0);
+}
+
+.nav-logo-mark span { color: var(--cyan); }
+
+.nav-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.2em;
+}
+
+.nav-items {
+  display: flex;
+  gap: 28px;
+}
+
+.nav-item {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+
+.nav-item:hover { color: var(--cyan); }
+
+/* ── FEATURE HIGHLIGHT STRIP ── */
+.feature-strip {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  margin-bottom: 40px;
+  overflow: hidden;
+}
+
+.strip-item {
+  flex: 1;
+  padding: 14px 16px;
+  border-right: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.strip-item:last-child { border-right: none; }
+
+.strip-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.18em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.strip-value {
+  font-family: var(--font-hud);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* ── PAGE FOOTER ── */
+.page-footer {
+  border-top: 1px solid var(--border);
+  padding: 14px 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(6,10,16,0.8);
+  position: relative;
+  z-index: 1;
+}
+
+.footer-brand {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+}
+
+.footer-brand span { color: var(--cyan); }
+
+.footer-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.14em;
+}
+
+/* Mock milestone timeline */
+.milestone-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(100,160,220,0.06);
+}
+
+.ms-diamond {
+  width: 10px; height: 10px;
+  flex-shrink: 0;
+  transform: rotate(45deg);
+  border: 1.5px solid;
+}
+
+.ms-name  { font-family: var(--font-ui);  font-size: 12px; color: var(--text0); flex: 1; }
+.ms-phase { font-family: var(--font-mono); font-size: 9px; color: var(--text2); }
+.ms-date  { font-family: var(--font-mono); font-size: 10px; color: var(--text2); }
+
+/* ── PROGRESS BARS ── */
+.pbar-wrap { margin-bottom: 12px; }
+.pbar-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.pbar-label { font-family: var(--font-ui); font-size: 12px; color: var(--text1); }
+.pbar-stats { font-family: var(--font-mono); font-size: 10px; color: var(--text3); }
+.pbar-track { height: 3px; background: rgba(255,255,255,0.06); }
+.pbar-fill  { height: 100%; }
+
+@media print {
+  .nav-bar { position: static; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV BAR -->
+<nav class="nav-bar">
+  <div class="nav-logo">
+    <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+      <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="#00d2ff" stroke-width="1.2"/>
+      <circle cx="14" cy="15" r="2.5" fill="#00d2ff"/>
+      <line x1="14" y1="7" x2="14" y2="12.5" stroke="#00d2ff" stroke-width="1"/>
+    </svg>
+    <div>
+      <div class="nav-logo-mark">Project<span>HUD</span></div>
+      <div class="nav-sub">PROJECT MANAGEMENT COMMAND PLATFORM</div>
+    </div>
+  </div>
+  <div class="nav-items">
+    <a class="nav-item" href="#capabilities">CAPABILITIES</a>
+    <a class="nav-item" href="#evm">EVM ENGINE</a>
+    <a class="nav-item" href="#procurement">PROCUREMENT</a>
+    <a class="nav-item" href="#cpm">CRITICAL PATH</a>
+    <a class="nav-item" href="#benefits">WHY PROJECTHUD</a>
+    <a class="nav-item" href="#contact">GET STARTED</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════
+     PAGE 1 — COVER
+═══════════════════════════════════ -->
+<section class="page page-1">
+
+  <!-- Background SVG: network nodes + Gantt bars + hex grid -->
+  <div class="page-1-bg">
+    <svg width="100%" height="100%" viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="ng1" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#00d2ff" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Hexagonal grid (right side, subtle) -->
+      <g opacity="0.18" stroke="#00d2ff" stroke-width="0.5" fill="none">
+        <!-- Row 1 -->
+        <polygon points="900,60 928,75 928,105 900,120 872,105 872,75"/>
+        <polygon points="956,60 984,75 984,105 956,120 928,105 928,75"/>
+        <polygon points="1012,60 1040,75 1040,105 1012,120 984,105 984,75"/>
+        <polygon points="1068,60 1096,75 1096,105 1068,120 1040,105 1040,75"/>
+        <polygon points="1124,60 1152,75 1152,105 1124,120 1096,105 1096,75"/>
+        <polygon points="1180,60 1208,75 1208,105 1180,120 1152,105 1152,75"/>
+        <polygon points="1236,60 1264,75 1264,105 1236,120 1208,105 1208,75"/>
+        <polygon points="1292,60 1320,75 1320,105 1292,120 1264,105 1264,75"/>
+        <!-- Row 2 offset -->
+        <polygon points="928,120 956,135 956,165 928,180 900,165 900,135"/>
+        <polygon points="984,120 1012,135 1012,165 984,180 956,165 956,135"/>
+        <polygon points="1040,120 1068,135 1068,165 1040,180 1012,165 1012,135"/>
+        <polygon points="1096,120 1124,135 1124,165 1096,180 1068,165 1068,135"/>
+        <polygon points="1152,120 1180,135 1180,165 1152,180 1124,165 1124,135"/>
+        <polygon points="1208,120 1236,135 1236,165 1208,180 1180,165 1180,135"/>
+        <polygon points="1264,120 1292,135 1292,165 1264,180 1236,165 1236,135"/>
+        <polygon points="1320,120 1348,135 1348,165 1320,180 1292,165 1292,135"/>
+        <!-- Row 3 -->
+        <polygon points="900,180 928,195 928,225 900,240 872,225 872,195"/>
+        <polygon points="956,180 984,195 984,225 956,240 928,225 928,195"/>
+        <polygon points="1012,180 1040,195 1040,225 1012,240 984,225 984,195"/>
+        <polygon points="1068,180 1096,195 1096,225 1068,240 1040,225 1040,195"/>
+        <polygon points="1124,180 1152,195 1152,225 1124,240 1096,225 1096,195"/>
+        <polygon points="1180,180 1208,195 1208,225 1180,240 1152,225 1152,195"/>
+        <polygon points="1236,180 1264,195 1264,225 1236,240 1208,225 1208,195"/>
+        <polygon points="1292,180 1320,195 1320,225 1292,240 1264,225 1264,195"/>
+      </g>
+
+      <!-- CPM-style node network (left/center area, very subtle) -->
+      <g opacity="0.25" filter="url(#glow)">
+        <!-- Edges -->
+        <line x1="80" y1="420" x2="200" y2="380" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line x1="200" y1="380" x2="360" y2="340" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line x1="360" y1="340" x2="520" y2="370" stroke="#ff4757" stroke-width="1.2"/>
+        <line x1="520" y1="370" x2="680" y2="350" stroke="#ff4757" stroke-width="1.2"/>
+        <line x1="680" y1="350" x2="820" y2="390" stroke="#ff4757" stroke-width="1.2"/>
+        <line x1="200" y1="380" x2="280" y2="470" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line x1="280" y1="470" x2="440" y2="490" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line x1="440" y1="490" x2="600" y2="460" stroke="#ffaa00" stroke-width="1"/>
+        <line x1="600" y1="460" x2="760" y2="480" stroke="#ffaa00" stroke-width="1"/>
+        <line x1="80" y1="560" x2="240" y2="540" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line x1="240" y1="540" x2="400" y2="560" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line x1="400" y1="560" x2="560" y2="545" stroke="#00d2ff" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <!-- Critical path nodes (red) -->
+        <circle cx="360" cy="340" r="6" fill="rgba(255,71,87,0.3)" stroke="#ff4757" stroke-width="1.5"/>
+        <circle cx="520" cy="370" r="6" fill="rgba(255,71,87,0.3)" stroke="#ff4757" stroke-width="1.5"/>
+        <circle cx="680" cy="350" r="6" fill="rgba(255,71,87,0.3)" stroke="#ff4757" stroke-width="1.5"/>
+        <circle cx="820" cy="390" r="6" fill="rgba(255,71,87,0.3)" stroke="#ff4757" stroke-width="1.5"/>
+        <!-- Normal nodes (cyan) -->
+        <circle cx="80"  cy="420" r="5" fill="rgba(0,210,255,0.2)" stroke="#00d2ff" stroke-width="1"/>
+        <circle cx="200" cy="380" r="5" fill="rgba(0,210,255,0.2)" stroke="#00d2ff" stroke-width="1"/>
+        <circle cx="280" cy="470" r="5" fill="rgba(0,210,255,0.2)" stroke="#00d2ff" stroke-width="1"/>
+        <circle cx="440" cy="490" r="5" fill="rgba(0,210,255,0.2)" stroke="#00d2ff" stroke-width="1"/>
+        <circle cx="600" cy="460" r="5" fill="rgba(255,170,0,0.2)" stroke="#ffaa00" stroke-width="1"/>
+        <circle cx="80"  cy="560" r="5" fill="rgba(0,210,255,0.2)" stroke="#00d2ff" stroke-width="1"/>
+        <circle cx="240" cy="540" r="5" fill="rgba(0,210,255,0.2)" stroke="#00d2ff" stroke-width="1"/>
+        <!-- Complete nodes (green) -->
+        <circle cx="80"  cy="300" r="6" fill="rgba(0,229,160,0.25)" stroke="#00e5a0" stroke-width="1.5"/>
+        <circle cx="200" cy="270" r="6" fill="rgba(0,229,160,0.25)" stroke="#00e5a0" stroke-width="1.5"/>
+        <circle cx="340" cy="250" r="6" fill="rgba(0,229,160,0.25)" stroke="#00e5a0" stroke-width="1.5"/>
+        <line x1="80"  y1="300" x2="200" y2="270" stroke="#00e5a0" stroke-width="1"/>
+        <line x1="200" y1="270" x2="340" y2="250" stroke="#00e5a0" stroke-width="1"/>
+      </g>
+
+      <!-- Gantt-style bars (bottom right, ghosted) -->
+      <g opacity="0.12" transform="translate(700, 600)">
+        <!-- Column headers -->
+        <line x1="0" y1="0" x2="600" y2="0" stroke="#00d2ff" stroke-width="0.5"/>
+        <text x="0"   y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK01</text>
+        <text x="80"  y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK02</text>
+        <text x="160" y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK03</text>
+        <text x="240" y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK04</text>
+        <text x="320" y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK05</text>
+        <text x="400" y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK06</text>
+        <text x="480" y="-6" font-family="Share Tech Mono" font-size="9" fill="#00d2ff" opacity="0.6">WK07</text>
+        <!-- Gantt row grid lines -->
+        <line x1="0" y1="20"  x2="600" y2="20"  stroke="#00d2ff" stroke-width="0.3" opacity="0.4"/>
+        <line x1="0" y1="45"  x2="600" y2="45"  stroke="#00d2ff" stroke-width="0.3" opacity="0.4"/>
+        <line x1="0" y1="70"  x2="600" y2="70"  stroke="#00d2ff" stroke-width="0.3" opacity="0.4"/>
+        <line x1="0" y1="95"  x2="600" y2="95"  stroke="#00d2ff" stroke-width="0.3" opacity="0.4"/>
+        <line x1="0" y1="120" x2="600" y2="120" stroke="#00d2ff" stroke-width="0.3" opacity="0.4"/>
+        <!-- Vertical week dividers -->
+        <line x1="80"  y1="0" x2="80"  y2="130" stroke="#00d2ff" stroke-width="0.3" opacity="0.3"/>
+        <line x1="160" y1="0" x2="160" y2="130" stroke="#00d2ff" stroke-width="0.3" opacity="0.3"/>
+        <line x1="240" y1="0" x2="240" y2="130" stroke="#00d2ff" stroke-width="0.3" opacity="0.3"/>
+        <line x1="320" y1="0" x2="320" y2="130" stroke="#00d2ff" stroke-width="0.3" opacity="0.3"/>
+        <line x1="400" y1="0" x2="400" y2="130" stroke="#00d2ff" stroke-width="0.3" opacity="0.3"/>
+        <line x1="480" y1="0" x2="480" y2="130" stroke="#00d2ff" stroke-width="0.3" opacity="0.3"/>
+        <!-- Gantt bars: complete (green) -->
+        <rect x="0"   y="6"  width="160" height="10" rx="2" fill="#00e5a0" opacity="0.7"/>
+        <rect x="0"   y="31" width="240" height="10" rx="2" fill="#00e5a0" opacity="0.7"/>
+        <!-- Gantt bars: in progress (cyan) -->
+        <rect x="80"  y="56" width="200" height="10" rx="2" fill="#00d2ff" opacity="0.6"/>
+        <rect x="160" y="81" width="160" height="10" rx="2" fill="#00d2ff" opacity="0.5"/>
+        <!-- Gantt bar: critical (red) -->
+        <rect x="240" y="56" width="280" height="10" rx="2" fill="#ff4757" opacity="0.5"/>
+        <!-- Gantt bar: pending (dim) -->
+        <rect x="320" y="106" width="200" height="10" rx="2" fill="#3a5a7a" opacity="0.6"/>
+        <!-- Diamond milestones -->
+        <polygon points="160,6 166,12 160,18 154,12" fill="#00e5a0" opacity="0.8"/>
+        <polygon points="240,56 246,62 240,68 234,62" fill="#ffaa00" opacity="0.8"/>
+        <polygon points="520,56 526,62 520,68 514,62" fill="#ff4757" opacity="0.9"/>
+      </g>
+
+      <!-- Subtle person silhouette (bottom right, referencing "man looking at Gantt") -->
+      <g opacity="0.06" transform="translate(1150, 580)">
+        <!-- Head -->
+        <circle cx="50" cy="30" r="22" fill="#00d2ff"/>
+        <!-- Body/shoulders -->
+        <path d="M20,55 Q50,48 80,55 L90,130 Q50,140 10,130 Z" fill="#00d2ff"/>
+        <!-- Arms akimbo -->
+        <path d="M20,70 Q0,80 -10,100 Q5,105 20,95 Q25,80 30,75" fill="#00d2ff"/>
+        <path d="M80,70 Q100,80 110,100 Q95,105 80,95 Q75,80 70,75" fill="#00d2ff"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="cover-wrap">
+    <div class="cover-eyebrow">
+      <div class="cover-dot"></div>
+      <div class="cover-eyebrow-text">SYSTEM ONLINE · LIVE DATA · MISSION READY</div>
+    </div>
+
+    <div class="cover-logo-line">
+      <div class="cover-logo-pre">Project<span class="cover-logo-hud">HUD</span></div>
+    </div>
+    <div class="cover-tagline">Project Management Command Platform</div>
+
+    <div class="cover-hud">
+      <div class="hud-stat bracketed" style="border-top-color:var(--cyan);--glow:rgba(0,210,255,0.05);">
+        <div class="br-bl"></div><div class="br-br"></div>
+        <div class="hud-stat-label">PROJECTS ACTIVE</div>
+        <div class="hud-stat-value" style="color:var(--cyan)">∞</div>
+        <div class="hud-stat-sub">UNLIMITED CONCURRENT PROJECTS</div>
+      </div>
+      <div class="hud-stat bracketed" style="border-top-color:var(--green);--glow:rgba(0,229,160,0.05);">
+        <div class="br-bl"></div><div class="br-br"></div>
+        <div class="hud-stat-label">EVM INDICES TRACKED</div>
+        <div class="hud-stat-value" style="color:var(--green)">13</div>
+        <div class="hud-stat-sub">BAC · PV · EV · AC · CV · SV · CPI · SPI · EAC · ETC · VAC + MORE</div>
+      </div>
+      <div class="hud-stat bracketed" style="border-top-color:var(--amber);--glow:rgba(255,170,0,0.05);">
+        <div class="br-bl"></div><div class="br-br"></div>
+        <div class="hud-stat-label">DEPLOYMENT</div>
+        <div class="hud-stat-value" style="color:var(--amber)">Live</div>
+        <div class="hud-stat-sub">CLOUD · SUPABASE · VERCEL · ZERO INSTALL</div>
+      </div>
+    </div>
+
+    <div class="cover-divider"></div>
+
+    <div class="cover-intro">
+      <div class="cover-intro-text">
+        ProjectHUD is a <strong>mission-control grade</strong> project management platform built for consulting firms, engineering teams, and regulated-industry PMOs who need more than a task list. It delivers <strong>real-time EVM analytics</strong>, full procurement lifecycle tracking, integrated task journaling, and a <strong>live client portal</strong> — all wrapped in an interface designed to make complexity visible at a glance.
+        <br><br>
+        Built on modern cloud infrastructure with <strong>row-level security</strong>, multi-client architecture, and a zero-install web deployment — ProjectHUD is operational the moment you open a browser.
+      </div>
+      <div class="cover-callout">
+        <!-- Mini dashboard illustration -->
+        <div style="border-bottom:1px solid rgba(0,210,255,0.15);padding:0;overflow:hidden;position:relative;">
+          <svg width="100%" height="140" viewBox="0 0 480 140" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+            <defs>
+              <linearGradient id="barG1" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00e5a0" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#00e5a0" stop-opacity="0.3"/>
+              </linearGradient>
+              <linearGradient id="barG2" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ff4757" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#ff4757" stop-opacity="0.2"/>
+              </linearGradient>
+              <linearGradient id="barG3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#00d2ff" stop-opacity="0.25"/>
+              </linearGradient>
+              <linearGradient id="barG4" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ffaa00" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#ffaa00" stop-opacity="0.2"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Background -->
+            <rect width="480" height="140" fill="#060a10"/>
+            <!-- Subtle grid -->
+            <line x1="0" y1="0" x2="480" y2="0" stroke="#00d2ff" stroke-width="0.3" opacity="0.2"/>
+            <line x1="0" y1="35" x2="480" y2="35" stroke="#00d2ff" stroke-width="0.3" opacity="0.08"/>
+            <line x1="0" y1="70" x2="480" y2="70" stroke="#00d2ff" stroke-width="0.3" opacity="0.08"/>
+            <line x1="0" y1="105" x2="480" y2="105" stroke="#00d2ff" stroke-width="0.3" opacity="0.08"/>
+
+            <!-- Left: 3 mini gauge rings -->
+            <!-- Gauge 1: CPI 0.71 (red) -->
+            <circle cx="50" cy="70" r="28" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="6"/>
+            <circle cx="50" cy="70" r="28" fill="none" stroke="#ff4757" stroke-width="6" stroke-linecap="round"
+              stroke-dasharray="176" stroke-dashoffset="51" transform="rotate(-90 50 70)" opacity="0.85"/>
+            <text x="50" y="67" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="11" font-weight="700" fill="#ff4757">0.71</text>
+            <text x="50" y="79" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="7" fill="#7a9bbf">CPI</text>
+
+            <!-- Gauge 2: Work % 29 (cyan) -->
+            <circle cx="130" cy="70" r="28" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="6"/>
+            <circle cx="130" cy="70" r="28" fill="none" stroke="#00d2ff" stroke-width="6" stroke-linecap="round"
+              stroke-dasharray="176" stroke-dashoffset="125" transform="rotate(-90 130 70)" opacity="0.85"/>
+            <text x="130" y="67" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="11" font-weight="700" fill="#00d2ff">29%</text>
+            <text x="130" y="79" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="7" fill="#7a9bbf">WORK</text>
+
+            <!-- Gauge 3: SPI 1.13 (green) -->
+            <circle cx="210" cy="70" r="28" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="6"/>
+            <circle cx="210" cy="70" r="28" fill="none" stroke="#00e5a0" stroke-width="6" stroke-linecap="round"
+              stroke-dasharray="176" stroke-dashoffset="55" transform="rotate(-90 210 70)" opacity="0.85"/>
+            <text x="210" y="67" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="11" font-weight="700" fill="#00e5a0">1.13</text>
+            <text x="210" y="79" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="7" fill="#7a9bbf">SPI</text>
+
+            <!-- Right: EVM metric rows -->
+            <!-- BAC -->
+            <text x="265" y="22" font-family="Share Tech Mono,monospace" font-size="8" fill="#3a5a7a">BAC (Budget at Completion)</text>
+            <text x="470" y="22" text-anchor="end" font-family="Rajdhani,sans-serif" font-size="10" font-weight="700" fill="#eef4ff">$420,000</text>
+            <line x1="265" y1="27" x2="475" y2="27" stroke="#00d2ff" stroke-width="0.3" opacity="0.15"/>
+            <!-- EV -->
+            <text x="265" y="43" font-family="Share Tech Mono,monospace" font-size="8" fill="#3a5a7a">EV (Earned Value)</text>
+            <text x="470" y="43" text-anchor="end" font-family="Rajdhani,sans-serif" font-size="10" font-weight="700" fill="#00d2ff">$121,800</text>
+            <line x1="265" y1="48" x2="475" y2="48" stroke="#00d2ff" stroke-width="0.3" opacity="0.15"/>
+            <!-- CV -->
+            <text x="265" y="64" font-family="Share Tech Mono,monospace" font-size="8" fill="#3a5a7a">CV (Cost Variance)</text>
+            <text x="470" y="64" text-anchor="end" font-family="Rajdhani,sans-serif" font-size="10" font-weight="700" fill="#ff4757">-$49,402</text>
+            <line x1="265" y1="69" x2="475" y2="69" stroke="#00d2ff" stroke-width="0.3" opacity="0.15"/>
+            <!-- EAC -->
+            <text x="265" y="85" font-family="Share Tech Mono,monospace" font-size="8" fill="#3a5a7a">EAC (Est. at Completion)</text>
+            <text x="470" y="85" text-anchor="end" font-family="Rajdhani,sans-serif" font-size="10" font-weight="700" fill="#ffaa00">$591,549</text>
+            <line x1="265" y1="90" x2="475" y2="90" stroke="#00d2ff" stroke-width="0.3" opacity="0.15"/>
+            <!-- VAC -->
+            <text x="265" y="106" font-family="Share Tech Mono,monospace" font-size="8" fill="#3a5a7a">VAC (Variance at Completion)</text>
+            <text x="470" y="106" text-anchor="end" font-family="Rajdhani,sans-serif" font-size="10" font-weight="700" fill="#ff4757">-$171,549</text>
+            <line x1="265" y1="111" x2="475" y2="111" stroke="#00d2ff" stroke-width="0.3" opacity="0.15"/>
+            <!-- Phase bars -->
+            <text x="265" y="126" font-family="Share Tech Mono,monospace" font-size="7" fill="#3a5a7a">PHASE PROGRESS</text>
+            <rect x="345" y="118" width="60" height="5" rx="1" fill="rgba(255,255,255,0.05)"/>
+            <rect x="345" y="118" width="60" height="5" rx="1" fill="url(#barG1)"/>
+            <rect x="410" y="118" width="55" height="5" rx="1" fill="rgba(255,255,255,0.05)"/>
+            <rect x="410" y="118" width="28" height="5" rx="1" fill="url(#barG3)"/>
+
+            <!-- Divider between gauges and metrics -->
+            <line x1="247" y1="10" x2="247" y2="130" stroke="#00d2ff" stroke-width="0.5" opacity="0.15"/>
+
+            <!-- Corner bracket decorations -->
+            <polyline points="0,0 12,0 12,0" stroke="#00d2ff" stroke-width="1" fill="none" opacity="0.5"/>
+            <polyline points="0,0 0,12" stroke="#00d2ff" stroke-width="1" fill="none" opacity="0.5"/>
+            <polyline points="468,0 480,0 480,12" stroke="#00d2ff" stroke-width="1" fill="none" opacity="0.5"/>
+            <polyline points="0,128 0,140 12,140" stroke="#00d2ff" stroke-width="1" fill="none" opacity="0.5"/>
+            <polyline points="468,140 480,140 480,128" stroke="#00d2ff" stroke-width="1" fill="none" opacity="0.5"/>
+          </svg>
+        </div>
+        <!-- Quote text below the illustration -->
+        <div style="padding:18px 22px;">
+          <div class="callout-quote">"Finally — a platform that speaks the language of PMI, not just sticky notes and Gantt bars."</div>
+          <div class="callout-attr">◆ DESIGNED FOR CONSULTING FIRMS · ENGINEERING PMOS · REGULATED INDUSTRIES</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-num">01 / 06</div>
+</section>
+
+<!-- ═══════════════════════════════════
+     PAGE 2 — CAPABILITIES
+═══════════════════════════════════ -->
+<section class="page page-2" id="capabilities">
+  <div class="section-header">
+    <div class="section-eyebrow">FULL PLATFORM CAPABILITIES</div>
+    <div class="section-title">Everything You Need.<br><span>Nothing You Don't.</span></div>
+  </div>
+
+  <div class="feature-strip">
+    <div class="strip-item"><div class="strip-label">ROLE-BASED ACCESS</div><div class="strip-value" style="color:var(--cyan)">5 Roles</div></div>
+    <div class="strip-item"><div class="strip-label">EVM METRICS</div><div class="strip-value" style="color:var(--green)">13 Live</div></div>
+    <div class="strip-item"><div class="strip-label">PROCUREMENT STATES</div><div class="strip-value" style="color:var(--amber)">5 Stages</div></div>
+    <div class="strip-item"><div class="strip-label">PROJECT PHASES</div><div class="strip-value" style="color:var(--purple)">Unlimited</div></div>
+    <div class="strip-item"><div class="strip-label">CLIENT PORTAL</div><div class="strip-value" style="color:var(--red)">Included</div></div>
+    <div class="strip-item"><div class="strip-label">DEPLOYMENT</div><div class="strip-value" style="color:var(--cyan)">Cloud</div></div>
+  </div>
+
+  <div class="caps-grid">
+    <div class="cap-card" style="--accent:var(--cyan)">
+      <span class="cap-icon">◈</span>
+      <div class="cap-title">Live Dashboard</div>
+      <div class="cap-desc">Firm-wide operational command center. Real-time KPIs, project health, EVM gauges, task alerts, and team workload — all from a single view.</div>
+      <div class="cap-features">
+        <div class="cap-feat">3 active project cards with CPI/SPI</div>
+        <div class="cap-feat">Live activity ticker</div>
+        <div class="cap-feat">At-risk task alerts with day count</div>
+        <div class="cap-feat">Team workload visualization</div>
+      </div>
+    </div>
+
+    <div class="cap-card" style="--accent:var(--green)">
+      <span class="cap-icon">▦</span>
+      <div class="cap-title">Project Plan</div>
+      <div class="cap-desc">Full WBS task management with phase grouping, dependency tracking, effort vs duration distinction, and six configurable column toggle groups.</div>
+      <div class="cap-features">
+        <div class="cap-feat">Task journal with daily hour logging</div>
+        <div class="cap-feat">Auto-updating actual hours via triggers</div>
+        <div class="cap-feat">% complete snapshots per entry</div>
+        <div class="cap-feat">Blocker flags and escalation</div>
+      </div>
+    </div>
+
+    <div class="cap-card" style="--accent:var(--amber)">
+      <span class="cap-icon">◉</span>
+      <div class="cap-title">EVM Engine</div>
+      <div class="cap-desc">Full PMI-compliant Earned Value Management with 13 computed indices. Click any metric for its formula, calculation breakdown, interpretation, and task-level drill-down spreadsheet.</div>
+      <div class="cap-features">
+        <div class="cap-feat">BAC · PV · EV · AC in real dollars</div>
+        <div class="cap-feat">CPI · SPI · EAC · ETC · VAC · CV · SV</div>
+        <div class="cap-feat">Interactive metric explainer popups</div>
+        <div class="cap-feat">Per-task cost variance spreadsheet</div>
+      </div>
+    </div>
+
+    <div class="cap-card" style="--accent:var(--purple)">
+      <span class="cap-icon">$</span>
+      <div class="cap-title">Procurement Tracker</div>
+      <div class="cap-desc">Full procurement lifecycle from Forecast through Received. 15-column line items matching your Excel tracker — now live, searchable, and color-coded by status.</div>
+      <div class="cap-features">
+        <div class="cap-feat">Phase · Type · Part # · Vendor PN</div>
+        <div class="cap-feat">Qty × Unit Price → auto-computed Total</div>
+        <div class="cap-feat">5 procurement states with date columns</div>
+        <div class="cap-feat">Budget vs Committed vs Received vs Pending</div>
+      </div>
+    </div>
+
+    <div class="cap-card" style="--accent:var(--red)">
+      <span class="cap-icon">⚑</span>
+      <div class="cap-title">Risk Register</div>
+      <div class="cap-desc">Weighted risk scoring with probability and cost impact. Color-coded severity bands and status tracking to keep your risk posture current.</div>
+      <div class="cap-features">
+        <div class="cap-feat">Weighted score = P × Impact</div>
+        <div class="cap-feat">Category and owner assignment</div>
+        <div class="cap-feat">Status lifecycle management</div>
+        <div class="cap-feat">Integration with project health indicators</div>
+      </div>
+    </div>
+
+    <div class="cap-card" style="--accent:var(--cyan)">
+      <span class="cap-icon">◑</span>
+      <div class="cap-title">Client Portal</div>
+      <div class="cap-desc">Secure, role-gated client access. External stakeholders see only what they're permitted — milestones, deliverables, status snapshots, and approved documents.</div>
+      <div class="cap-features">
+        <div class="cap-feat">Multi-project client user access</div>
+        <div class="cap-feat">View vs collaborate permission levels</div>
+        <div class="cap-feat">Separate client firm hierarchy</div>
+        <div class="cap-feat">Row-level security enforced in database</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-meta">PROJECT MANAGEMENT COMMAND PLATFORM · © 2026</div>
+    <div class="footer-meta">02 / 06</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     PAGE 3 — EVM DEEP DIVE
+═══════════════════════════════════ -->
+<section class="page page-3" id="evm">
+  <div class="section-header">
+    <div class="section-eyebrow">EARNED VALUE MANAGEMENT</div>
+    <div class="section-title">Real Numbers.<br><span>Real Accountability.</span></div>
+  </div>
+
+  <div class="evm-showcase">
+    <!-- Left: EVM Panel Mock -->
+    <div>
+      <div class="evm-panel bracketed" style="margin-bottom:16px;">
+        <div class="br-bl"></div><div class="br-br"></div>
+        <div class="evm-panel-header">EARNED VALUE METRICS</div>
+        <div class="gauge-row">
+          <!-- Gauge: Work % -->
+          <div class="gauge-item">
+            <div class="gauge-circle">
+              <svg viewBox="0 0 60 60" width="60" height="60">
+                <circle fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="5" cx="30" cy="30" r="22"/>
+                <circle fill="none" stroke="#00d2ff" stroke-width="5" stroke-linecap="round"
+                  cx="30" cy="30" r="22"
+                  stroke-dasharray="138.2" stroke-dashoffset="98.1"/>
+              </svg>
+              <div class="gauge-center" style="color:var(--cyan);font-size:12px;">29%</div>
+            </div>
+            <div class="gauge-label">WORK %</div>
+          </div>
+          <!-- Gauge: CPI -->
+          <div class="gauge-item">
+            <div class="gauge-circle">
+              <svg viewBox="0 0 60 60" width="60" height="60">
+                <circle fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="5" cx="30" cy="30" r="22"/>
+                <circle fill="none" stroke="#ff4757" stroke-width="5" stroke-linecap="round"
+                  cx="30" cy="30" r="22"
+                  stroke-dasharray="138.2" stroke-dashoffset="48.4"/>
+              </svg>
+              <div class="gauge-center" style="color:var(--red);font-size:11px;">0.71</div>
+            </div>
+            <div class="gauge-label">CPI</div>
+          </div>
+          <!-- Gauge: SPI -->
+          <div class="gauge-item">
+            <div class="gauge-circle">
+              <svg viewBox="0 0 60 60" width="60" height="60">
+                <circle fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="5" cx="30" cy="30" r="22"/>
+                <circle fill="none" stroke="#00e5a0" stroke-width="5" stroke-linecap="round"
+                  cx="30" cy="30" r="22"
+                  stroke-dasharray="138.2" stroke-dashoffset="60.2"/>
+              </svg>
+              <div class="gauge-center" style="color:var(--green);font-size:11px;">1.13</div>
+            </div>
+            <div class="gauge-label">SPI</div>
+          </div>
+        </div>
+        <div class="evm-metric-row"><span class="evm-metric-key">BAC (Budget at Completion) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--text0)">$420,000</span></div>
+        <div class="evm-metric-row"><span class="evm-metric-key">EV  (Earned Value) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--cyan)">$121,800</span></div>
+        <div class="evm-metric-row"><span class="evm-metric-key">AC  (Actual Cost) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--text0)">$171,202</span></div>
+        <div class="evm-metric-row"><span class="evm-metric-key">CV  (Cost Variance) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--red)">-$49,402</span></div>
+        <div class="evm-metric-row"><span class="evm-metric-key">SV  (Schedule Variance) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--green)">+$13,955</span></div>
+        <div class="evm-metric-row"><span class="evm-metric-key">EAC (Est. at Completion) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--amber)">$591,549</span></div>
+        <div class="evm-metric-row"><span class="evm-metric-key">VAC (Variance at Completion) <span class="evm-hint">ⓘ</span></span><span class="evm-metric-val" style="color:var(--red)">-$171,549</span></div>
+      </div>
+
+      <!-- Phase progress -->
+      <div class="evm-panel">
+        <div class="evm-panel-header">PHASE PROGRESS</div>
+        <div style="padding:12px 14px;">
+          <div class="pbar-wrap">
+            <div class="pbar-header"><span class="pbar-label">IQ/OQ/PQ — Production MPI EFT</span><span class="pbar-stats">5/5 · 100%</span></div>
+            <div class="pbar-track"><div class="pbar-fill" style="width:100%;background:var(--green)"></div></div>
+          </div>
+          <div class="pbar-wrap">
+            <div class="pbar-header"><span class="pbar-label">Flexscope Design Services</span><span class="pbar-stats">4/9 · 44%</span></div>
+            <div class="pbar-track"><div class="pbar-fill" style="width:44%;background:var(--cyan)"></div></div>
+          </div>
+          <div class="pbar-wrap">
+            <div class="pbar-header"><span class="pbar-label">Leak Seal Mitigation</span><span class="pbar-stats">5/11 · 45%</span></div>
+            <div class="pbar-track"><div class="pbar-fill" style="width:45%;background:var(--amber)"></div></div>
+          </div>
+          <div class="pbar-wrap">
+            <div class="pbar-header"><span class="pbar-label">Regulatory</span><span class="pbar-stats">1/9 · 11%</span></div>
+            <div class="pbar-track"><div class="pbar-fill" style="width:11%;background:var(--cyan)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: EVM narrative -->
+    <div>
+      <div class="evm-callout" style="margin-bottom:16px;">
+        <div class="evm-callout-title">◆ CLICK ANY METRIC TO UNDERSTAND IT</div>
+        <div class="evm-callout-body">Every EVM row is interactive. Click BAC, CPI, VAC — or any metric — and ProjectHUD opens a detailed explainer showing the formula, the exact numbers that went into the calculation for your project, a plain-English interpretation of what the result means, and a task-level drill-down spreadsheet showing each task's Budget Cost, Actual Cost, and Variance.</div>
+      </div>
+
+      <div class="evm-callout" style="margin-bottom:16px;--border2:rgba(0,229,160,0.25);border-left-color:var(--green);">
+        <div class="evm-callout-title" style="color:var(--green);">◆ REAL DATA. REAL HOURS. REAL COSTS.</div>
+        <div class="evm-callout-body">EVM figures aren't estimates or manual inputs. Actual Cost (AC) is computed automatically from daily task journal entries logged by your team. Budget at Completion (BAC) is locked from your project's approved budget hours. The math runs itself — you just read the results.</div>
+      </div>
+
+      <div class="evm-callout" style="--border2:rgba(255,170,0,0.25);border-left-color:var(--amber);">
+        <div class="evm-callout-title" style="color:var(--amber);">◆ MILESTONES + EVM IN ONE VIEW</div>
+        <div class="evm-callout-body">ProjectHUD tracks milestones with initial vs. current target dates, slip detection, and completion status — woven directly into the same project view as your EVM indices. Never lose the narrative thread between schedule performance and deliverable status.</div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <div class="evm-panel">
+          <div class="evm-panel-header">MILESTONES</div>
+          <div class="milestone-row">
+            <div class="ms-diamond" style="border-color:var(--green);background:var(--green)"></div>
+            <div class="ms-name">Design Review Complete &amp; Approved</div>
+            <div class="ms-phase">Flexscope</div>
+            <div><span class="status-badge" style="color:var(--green);border-color:var(--green)">● COMPLETE</span></div>
+          </div>
+          <div class="milestone-row">
+            <div class="ms-diamond" style="border-color:var(--amber)"></div>
+            <div class="ms-name">Production Readiness Review Passed</div>
+            <div class="ms-phase">Contract Mfg</div>
+            <div><span class="status-badge" style="color:var(--amber);border-color:var(--amber)">↑ SLIPPED</span></div>
+          </div>
+          <div class="milestone-row">
+            <div class="ms-diamond" style="border-color:var(--text3)"></div>
+            <div class="ms-name">Process Validation Complete</div>
+            <div class="ms-phase">BUILD #2</div>
+            <div><span class="status-badge" style="color:var(--text3);border-color:var(--text3)">● PENDING</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-meta">PROJECT MANAGEMENT COMMAND PLATFORM · © 2026</div>
+    <div class="footer-meta">03 / 06</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     PAGE 4 — PROCUREMENT + JOURNAL
+═══════════════════════════════════ -->
+<section class="page page-4" id="procurement">
+  <div class="section-header">
+    <div class="section-eyebrow">PROCUREMENT LIFECYCLE + TASK JOURNAL</div>
+    <div class="section-title">From Purchase Order<br><span>To Earned Hours.</span></div>
+  </div>
+
+  <div class="two-col">
+    <!-- Procurement -->
+    <div>
+      <div class="evm-callout" style="margin-bottom:16px;">
+        <div class="evm-callout-title">◆ FULL PROCUREMENT LIFECYCLE</div>
+        <div class="evm-callout-body">Replace your Excel procurement tracker with a live, searchable, color-coded system. Every line item progresses through 5 stages — Forecast → Requested → Approved → Ordered → Received — with individual date columns for each transition.</div>
+      </div>
+
+      <div class="mock-table">
+        <div class="evm-panel-header" style="padding:9px 12px;">EXPENDITURES — TransEnterix 510(k) Submission</div>
+        <!-- Summary -->
+        <div style="display:flex;gap:20px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg3);">
+          <div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:2px;">BUDGET</div><div style="font-family:var(--font-hud);font-size:18px;font-weight:700;color:var(--text0);">$150,000</div></div>
+          <div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:2px;">COMMITTED</div><div style="font-family:var(--font-hud);font-size:18px;font-weight:700;color:var(--cyan);">$99,850</div></div>
+          <div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:2px;">RECEIVED</div><div style="font-family:var(--font-hud);font-size:18px;font-weight:700;color:var(--green);">$87,550</div></div>
+          <div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-bottom:2px;">PENDING</div><div style="font-family:var(--font-hud);font-size:18px;font-weight:700;color:var(--amber);">$12,300</div></div>
+        </div>
+        <!-- Budget bar -->
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border);">
+          <div style="height:6px;background:rgba(255,255,255,0.05);position:relative;">
+            <div style="position:absolute;inset:0;right:34%;background:var(--green);opacity:0.7;"></div>
+            <div style="position:absolute;top:0;bottom:0;left:66%;right:26%;background:var(--amber);opacity:0.7;"></div>
+          </div>
+          <div style="display:flex;gap:14px;margin-top:4px;">
+            <span style="font-family:var(--font-mono);font-size:9px;color:var(--green);">■ Received 58%</span>
+            <span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);">■ Pending 8%</span>
+          </div>
+        </div>
+        <!-- Rows -->
+        <div class="mock-row" style="color:var(--green);">
+          <span style="flex:2;color:var(--green);">Tungsten Cable Materials</span>
+          <span style="flex:1;">Metal Specialty</span>
+          <span style="flex:0.5;text-align:right;font-weight:700;">$4,350</span>
+          <span class="status-badge" style="color:var(--green);border-color:var(--green);">RECEIVED</span>
+        </div>
+        <div class="mock-row" style="color:var(--green);">
+          <span style="flex:2;">Lighthouse Imaging — PCB Design NRE</span>
+          <span style="flex:1;">Lighthouse Imaging</span>
+          <span style="flex:0.5;text-align:right;font-weight:700;">$28,500</span>
+          <span class="status-badge" style="color:var(--green);border-color:var(--green);">RECEIVED</span>
+        </div>
+        <div class="mock-row" style="color:var(--amber);opacity:0.9;">
+          <span style="flex:2;">QCI Test Equipment — Calibrated EFT</span>
+          <span style="flex:1;">Biomedical Supply Co</span>
+          <span style="flex:0.5;text-align:right;font-weight:700;">$14,000</span>
+          <span class="status-badge" style="color:var(--amber);border-color:var(--amber);">ORDERED</span>
+        </div>
+        <div class="mock-row" style="color:var(--cyan);opacity:0.85;">
+          <span style="flex:2;">Sterilization Testing — EtO Cycle</span>
+          <span style="flex:1;">Sterility Labs</span>
+          <span style="flex:0.5;text-align:right;font-weight:700;">$5,500</span>
+          <span class="status-badge" style="color:var(--cyan);border-color:var(--cyan);">APPROVED</span>
+        </div>
+        <div class="mock-row" style="opacity:0.5;">
+          <span style="flex:2;">FDA Filing Fee — 510(k) Submission</span>
+          <span style="flex:1;">FDA / Gov</span>
+          <span style="flex:0.5;text-align:right;font-weight:700;">$7,200</span>
+          <span class="status-badge" style="color:var(--text3);border-color:var(--text3);">FORECAST</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Journal -->
+    <div>
+      <div class="evm-callout" style="margin-bottom:16px;--border2:rgba(0,229,160,0.25);border-left-color:var(--green);">
+        <div class="evm-callout-title" style="color:var(--green);">◆ DAILY TASK JOURNAL</div>
+        <div class="evm-callout-body">Every task has a running work journal. Team members log hours, accomplishments, blockers, and % complete — and ProjectHUD's database triggers automatically roll up actual hours and advance task progress. No double-entry. No spreadsheet gymnastics.</div>
+      </div>
+
+      <div class="journal-entry">
+        <div class="j-header">
+          <div class="j-avatar">AS</div>
+          <span class="j-name">A. Smith</span>
+          <span class="j-date">Aug 1, 2025</span>
+          <span class="j-hrs">6.1h</span>
+          <span class="j-pct">30%</span>
+        </div>
+        <div class="j-task">Design Services — Flexscope PCB Updates · Flexscope Design Services</div>
+        <div class="j-body">Assembly of isolation cover unit #1 completed. Leak test performed — failed at 45 PSI, spec is 60 PSI. Root cause investigation initiated. Vendor notified. Estimated 3-day delay to redesign seal interface.</div>
+      </div>
+
+      <div class="journal-entry">
+        <div class="j-header">
+          <div class="j-avatar">RW</div>
+          <span class="j-name">R. White</span>
+          <span class="j-date">Jul 28, 2025</span>
+          <span class="j-hrs">4.0h</span>
+          <span class="j-pct">100%</span>
+        </div>
+        <div class="j-task">Purchase Contract · Flexscope Contract Manufacturing</div>
+        <div class="j-body">Contract executed and countersigned. Net-30 payment terms confirmed. NDA in place. First article inspection scheduled for Aug 15. PO issued to Flexscope — PO-2025-018.</div>
+      </div>
+
+      <div class="journal-entry">
+        <div class="j-header">
+          <div class="j-avatar">VS</div>
+          <span class="j-name">V. Staples</span>
+          <span class="j-date">Jul 22, 2025</span>
+          <span class="j-hrs">2.5h</span>
+          <span class="j-pct">⚑ BLOCKER</span>
+        </div>
+        <div class="j-task">M4 Design Review · Miscellaneous</div>
+        <div class="j-body">Design review meeting completed. Three open items flagged: (1) seal interface tolerancing, (2) cable routing clearance, (3) sterilization compatibility confirmation from vendor. Review on hold pending responses.</div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.16em;margin-bottom:10px;">LABOR SUMMARY — BY RESOURCE</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="j-avatar" style="width:26px;height:26px;font-size:10px;">VS</div>
+            <div style="flex:1;">
+              <div style="font-family:var(--font-ui);font-size:12px;color:var(--text1);margin-bottom:3px;">V. Staples</div>
+              <div style="height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:45%;background:var(--purple)"></div></div>
+            </div>
+            <div style="text-align:right;"><div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);font-weight:700;">413h</div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">$72,275</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="j-avatar" style="width:26px;height:26px;font-size:10px;">AS</div>
+            <div style="flex:1;">
+              <div style="font-family:var(--font-ui);font-size:12px;color:var(--text1);margin-bottom:3px;">A. Smith</div>
+              <div style="height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:35%;background:var(--purple)"></div></div>
+            </div>
+            <div style="text-align:right;"><div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);font-weight:700;">320h</div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">$56,000</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="j-avatar" style="width:26px;height:26px;font-size:10px;">RW</div>
+            <div style="flex:1;">
+              <div style="font-family:var(--font-ui);font-size:12px;color:var(--text1);margin-bottom:3px;">R. White</div>
+              <div style="height:3px;background:rgba(255,255,255,0.06);"><div style="height:100%;width:27%;background:var(--purple)"></div></div>
+            </div>
+            <div style="text-align:right;"><div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);font-weight:700;">245h</div><div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">$42,875</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-meta">PROJECT MANAGEMENT COMMAND PLATFORM · © 2026</div>
+    <div class="footer-meta">04 / 06</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     PAGE 5 — CPM / PERT
+═══════════════════════════════════ -->
+<section class="page page-4" id="cpm" style="background:var(--bg);">
+  <div class="section-header">
+    <div class="section-eyebrow">CRITICAL PATH METHOD + PERT ANALYSIS</div>
+    <div class="section-title">See the Critical Path.<br><span>Manage It.</span></div>
+  </div>
+
+  <!-- CPM network mock diagram -->
+  <div style="margin-bottom:32px;">
+
+    <!-- Phase swim lanes mock -->
+    <div style="border:1px solid var(--border);overflow:hidden;position:relative;">
+
+      <!-- Toolbar strip -->
+      <div style="background:rgba(0,210,255,0.04);border-bottom:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.14em;">SHOW</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);border:1px solid var(--cyan);padding:2px 8px;">ALL PHASES</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">IQ/OQ/PQ</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">FLEXSCOPE DESIGN</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">CONTRACT MFG</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">LEAK SEAL</span>
+        <div style="margin-left:auto;display:flex;gap:6px;">
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">+ ZOOM IN</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">− ZOOM OUT</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 8px;border:1px solid var(--border);">⟲ RESET VIEW</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--red);border:1px solid rgba(255,71,87,0.4);padding:2px 8px;">⚑ CRITICAL PATH ONLY</span>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div style="background:rgba(0,0,0,0.2);border-bottom:1px solid var(--border);padding:6px 14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <span style="font-family:var(--font-mono);font-size:9px;display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;"></span>Critical Path Task</span>
+        <span style="font-family:var(--font-mono);font-size:9px;display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block;"></span>Near-Critical (Float ≤ 5d)</span>
+        <span style="font-family:var(--font-mono);font-size:9px;display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block;"></span>Normal Task</span>
+        <span style="font-family:var(--font-mono);font-size:9px;display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;"></span>Complete</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">ES = Early Start &nbsp; EF = Early Finish &nbsp; LS = Late Start &nbsp; LF = Late Finish &nbsp; TF = Total Float</span>
+      </div>
+
+      <!-- Swim lanes -->
+      <div style="padding:14px;background:var(--bg3);overflow:hidden;">
+
+        <!-- Phase: IQ/OQ/PQ -->
+        <div style="margin-bottom:12px;">
+          <div style="background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.1);border-left:3px solid rgba(0,210,255,0.6);padding:5px 10px;margin-bottom:8px;">
+            <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:0.12em;">IQ/OQ/PQ — PRODUCTION MPI EFT</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <!-- Node 1 -->
+            <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.4);border-top:2px solid var(--green);padding:5px 7px;min-width:110px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--green);margin-bottom:3px;"><span>ES:0</span><span>EF:4</span></div>
+              <div style="border-top:1px solid rgba(0,229,160,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Perform OPQ<br>DUR: 5d</div>
+            </div>
+            <span style="color:var(--green);font-size:10px;">→</span>
+            <!-- Node 2 -->
+            <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.4);border-top:2px solid var(--green);padding:5px 7px;min-width:110px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--green);margin-bottom:3px;"><span>ES:5</span><span>EF:9</span></div>
+              <div style="border-top:1px solid rgba(0,229,160,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Write Final Report<br>DUR: 3d</div>
+            </div>
+            <span style="color:var(--green);font-size:10px;">→</span>
+            <!-- Node 3 -->
+            <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.4);border-top:2px solid var(--green);padding:5px 7px;min-width:110px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--green);margin-bottom:3px;"><span>ES:10</span><span>EF:14</span></div>
+              <div style="border-top:1px solid rgba(0,229,160,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Review &amp; Approve<br>DUR: 2d</div>
+            </div>
+            <span style="color:var(--green);font-size:10px;">→</span>
+            <!-- Node 4 -->
+            <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.4);border-top:2px solid var(--green);padding:5px 7px;min-width:110px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--green);margin-bottom:3px;"><span>ES:15</span><span>EF:19</span></div>
+              <div style="border-top:1px solid rgba(0,229,160,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Complete DRR Document<br>DUR: 2d</div>
+            </div>
+            <span style="color:var(--green);font-size:10px;">→</span>
+            <!-- Node 5 -->
+            <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.4);border-top:2px solid var(--green);padding:5px 7px;min-width:110px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--green);margin-bottom:3px;"><span>ES:20</span><span>EF:24</span></div>
+              <div style="border-top:1px solid rgba(0,229,160,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Order Remaining CFT<br>DUR: 5d</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase: Flexscope Design Services -->
+        <div style="margin-bottom:12px;">
+          <div style="background:rgba(0,210,255,0.04);border:1px solid rgba(0,210,255,0.1);border-left:3px solid rgba(0,210,255,0.6);padding:5px 10px;margin-bottom:8px;">
+            <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:0.12em;">FLEXSCOPE DESIGN SERVICES</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+            <!-- Node: Technical Info (normal) -->
+            <div style="background:rgba(0,210,255,0.04);border:1px solid rgba(0,210,255,0.25);border-top:2px solid var(--cyan);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--cyan);margin-bottom:3px;"><span>ES:0</span><span>EF:18</span></div>
+              <div style="border-top:1px solid rgba(0,210,255,0.15);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Technical Info<br>DUR: 18d</div>
+            </div>
+            <span style="color:rgba(100,160,220,0.4);font-size:10px;">→</span>
+            <!-- Node: Qty Development (normal) -->
+            <div style="background:rgba(0,210,255,0.04);border:1px solid rgba(0,210,255,0.25);border-top:2px solid var(--cyan);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--cyan);margin-bottom:3px;"><span>ES:20</span><span>EF:38</span></div>
+              <div style="border-top:1px solid rgba(0,210,255,0.15);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Qty Development<br>DUR: 21d</div>
+            </div>
+            <span style="color:rgba(100,160,220,0.4);font-size:10px;">→</span>
+            <!-- Node: Decision to Proceed (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:40</span><span>EF:58</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Decision to Proceed<br>DUR: 1d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Purchase Contract (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:60</span><span>EF:78</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Purchase Contract<br>DUR: 18d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Design Services (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:80</span><span>EF:108</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Design Services<br>DUR: 28d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Design Review (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:110</span><span>EF:128</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Design Review<br>DUR: 1d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:rgba(100,160,220,0.4);font-size:10px;">→</span>
+            <!-- Node: PCBA Fabrication (normal) -->
+            <div style="background:rgba(0,210,255,0.04);border:1px solid rgba(0,210,255,0.25);border-top:2px solid var(--cyan);padding:5px 7px;min-width:100px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--cyan);margin-bottom:3px;"><span>ES:130</span><span>EF:148</span></div>
+              <div style="border-top:1px solid rgba(0,210,255,0.15);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">PCBA Fabrication<br>DUR: 15d</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase: Purchasing (critical) -->
+        <div>
+          <div style="background:rgba(255,71,87,0.04);border:1px solid rgba(255,71,87,0.15);border-left:3px solid rgba(255,71,87,0.6);padding:5px 10px;margin-bottom:8px;">
+            <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--red);letter-spacing:0.12em;">PURCHASING &nbsp;<span style="font-size:9px;opacity:0.7;">— CRITICAL PATH PHASE</span></span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <!-- Node: Address Hold EFT (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:108px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:0</span><span>EF:18</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Address Hold EFT<br>DUR: 14d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Quote Custom Parts (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:108px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:20</span><span>EF:38</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Quote Custom Parts<br>DUR: 10d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Issue POs (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:108px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:40</span><span>EF:58</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Issue POs for Custom<br>DUR: 7d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Purchase CATS (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:108px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:60</span><span>EF:78</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Purchase CATS<br>DUR: 12d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+            <span style="color:var(--red);font-size:10px;">→</span>
+            <!-- Node: Materials Receipt (CP) -->
+            <div style="background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.5);border-top:2px solid var(--red);padding:5px 7px;min-width:108px;font-size:9px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--red);margin-bottom:3px;"><span>ES:80</span><span>EF:98</span></div>
+              <div style="border-top:1px solid rgba(255,71,87,0.2);padding-top:3px;font-family:var(--font-ui);color:#c8dff0;font-size:9px;">Materials Receipt<br>DUR: 18d<span style="float:right;font-family:var(--font-mono);font-size:8px;color:var(--red);background:rgba(255,71,87,0.15);padding:1px 3px;">CP</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CP duration badge -->
+      <div style="background:rgba(255,71,87,0.08);border-top:1px solid rgba(255,71,87,0.2);padding:7px 14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--red);font-weight:700;">⚑ CRITICAL PATH: 108d · 5 TASKS</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">Any slip on a red node delays the project end date by the same number of days.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two column: CPM explanation + PERT -->
+  <div class="two-col">
+    <div>
+      <div class="evm-callout" style="margin-bottom:14px;">
+        <div class="evm-callout-title">◆ IF YOU CAN SEE IT, YOU CAN MANAGE IT</div>
+        <div class="evm-callout-body">Most project managers know which tasks are late. Far fewer know <em>which tasks, if delayed by even one day, will push the entire project end date.</em> That's the Critical Path — and ProjectHUD makes it visible at a glance.<br><br>Red nodes are on the critical path. Zero float. Zero tolerance. Every day of delay on a red task is a day added to your delivery date. ProjectHUD computes this automatically from your WBS and shows it as a live network diagram — phase by phase, task by task.</div>
+      </div>
+      <div class="evm-callout" style="--border2:rgba(255,170,0,0.25);border-left-color:var(--amber);">
+        <div class="evm-callout-title" style="color:var(--amber);">◆ NEAR-CRITICAL: THE WARNING ZONE</div>
+        <div class="evm-callout-body">Amber nodes have 5 days of float or less — they're not yet critical, but one small disruption puts them there. ProjectHUD surfaces these automatically so your team can intervene before a near-critical task becomes a project-breaker.</div>
+      </div>
+    </div>
+
+    <div>
+      <!-- PERT callout -->
+      <div class="evm-callout" style="margin-bottom:14px;--border2:rgba(155,89,182,0.3);border-left-color:var(--purple);">
+        <div class="evm-callout-title" style="color:var(--purple);">◆ PERT: WHAT IF THINGS GO WRONG?</div>
+        <div class="evm-callout-body">PERT (Program Evaluation & Review Technique) models schedule uncertainty using three estimates per task — Optimistic, Most Likely, and Pessimistic — to compute a probability-weighted expected duration and standard deviation.<br><br>ProjectHUD auto-seeds PERT estimates from your task durations and renders a probability distribution curve showing the likelihood of hitting key project milestones on time.</div>
+      </div>
+
+      <!-- PERT metrics table -->
+      <div style="border:1px solid var(--border);overflow:hidden;">
+        <div style="background:rgba(155,89,182,0.06);border-bottom:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:8px;">
+          <span style="width:2px;height:12px;background:var(--purple);display:inline-block;"></span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text2);letter-spacing:0.16em;">PERT ANALYSIS — CRITICAL PATH TASKS</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:6px 10px;text-align:left;letter-spacing:0.1em;">TASK</th>
+              <th style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:6px 10px;text-align:right;letter-spacing:0.1em;">OPT</th>
+              <th style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:6px 10px;text-align:right;letter-spacing:0.1em;">M.L.</th>
+              <th style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:6px 10px;text-align:right;letter-spacing:0.1em;">PESS</th>
+              <th style="font-family:var(--font-mono);font-size:9px;color:var(--purple);padding:6px 10px;text-align:right;letter-spacing:0.1em;">EXPECTED</th>
+              <th style="font-family:var(--font-mono);font-size:9px;color:var(--amber);padding:6px 10px;text-align:right;letter-spacing:0.1em;">σ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
+              <td style="font-family:var(--font-ui);font-size:10px;color:var(--red);padding:6px 10px;">Address Hold EFT</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">9.8d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">14d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">22.4d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple);padding:6px 10px;text-align:right;">14.4d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:6px 10px;text-align:right;">2.1d</td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
+              <td style="font-family:var(--font-ui);font-size:10px;color:var(--red);padding:6px 10px;">Quote Custom Parts</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">7.0d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">10d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">16.0d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple);padding:6px 10px;text-align:right;">10.5d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:6px 10px;text-align:right;">1.5d</td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
+              <td style="font-family:var(--font-ui);font-size:10px;color:var(--red);padding:6px 10px;">Issue POs for Custom</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">4.9d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">7d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">11.2d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple);padding:6px 10px;text-align:right;">7.4d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:6px 10px;text-align:right;">1.1d</td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(100,160,220,0.06);">
+              <td style="font-family:var(--font-ui);font-size:10px;color:var(--red);padding:6px 10px;">Purchase CATS</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">8.4d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">12d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">19.2d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple);padding:6px 10px;text-align:right;">12.6d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:6px 10px;text-align:right;">1.8d</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-ui);font-size:10px;color:var(--red);padding:6px 10px;">Materials Receipt</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">12.6d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">18d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--text2);padding:6px 10px;text-align:right;">28.8d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple);padding:6px 10px;text-align:right;">18.9d</td>
+              <td style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:6px 10px;text-align:right;">2.7d</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="padding:8px 12px;background:rgba(155,89,182,0.04);border-top:1px solid var(--border);">
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">PERT Expected = (O + 4M + P) / 6 &nbsp;·&nbsp; σ = (P − O) / 6 &nbsp;·&nbsp; Auto-seeded from WBS duration data</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-meta">PROJECT MANAGEMENT COMMAND PLATFORM · © 2026</div>
+    <div class="footer-meta">05 / 06</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════
+     PAGE 6 — WHY + CTA (was page 5)
+═══════════════════════════════════ -->
+<section class="page page-5" id="benefits">
+  <div class="section-header">
+    <div class="section-eyebrow">WHY PROJECTHUD</div>
+    <div class="section-title">Built for Teams That<br><span>Deliver Results.</span></div>
+  </div>
+
+  <div class="benefits-grid">
+    <div class="benefit-card">
+      <div class="benefit-num" style="--accent:var(--cyan)">01</div>
+      <div class="benefit-content">
+        <div class="benefit-title">No Spreadsheet Left Behind</div>
+        <div class="benefit-desc">Your procurement tracker, EVM workbook, task log, and status report — consolidated into one live system. What took an hour to compile now updates automatically as your team works.</div>
+      </div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-num" style="--accent:var(--green)">02</div>
+      <div class="benefit-content">
+        <div class="benefit-title">PMI-Grade Analytics, Zero Setup</div>
+        <div class="benefit-desc">Full Earned Value Management with all 13 indices — CPI, SPI, EAC, VAC, and more — computed from real logged hours. No configuration. No formulas to maintain. It just works.</div>
+      </div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-num" style="--accent:var(--amber)">03</div>
+      <div class="benefit-content">
+        <div class="benefit-title">Client-Ready in Seconds</div>
+        <div class="benefit-desc">Generate a secure client portal view in seconds. Clients see milestones, approved deliverables, and status snapshots — and nothing else. Built-in row-level security enforces it at the database level.</div>
+      </div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-num" style="--accent:var(--purple)">04</div>
+      <div class="benefit-content">
+        <div class="benefit-title">Consulting Firm Architecture</div>
+        <div class="benefit-desc">Multi-client, multi-project design from the ground up. Manage TransEnterix, NovaBio, and a dozen other clients simultaneously — each siloed, secure, and independently billable.</div>
+      </div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-num" style="--accent:var(--red)">05</div>
+      <div class="benefit-content">
+        <div class="benefit-title">Regulated Industry Ready</div>
+        <div class="benefit-desc">510(k) submissions. Quality system implementations. Device manufacturing programs. ProjectHUD was built handling medical device regulatory projects — it speaks your language from day one.</div>
+      </div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-num" style="--accent:var(--cyan)">06</div>
+      <div class="benefit-content">
+        <div class="benefit-title">Zero Infrastructure Cost</div>
+        <div class="benefit-desc">Deployed on Vercel + Supabase cloud infrastructure. No servers to maintain, no software to install, no IT overhead. Browser access from anywhere. Enterprise-grade security included.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Who It's For -->
+  <div class="audience-band" id="contact">
+    <div class="audience-label">BUILT FOR</div>
+    <div class="audience-items">
+      <div>
+        <div class="audience-item-title">Consulting Firms</div>
+        <div class="audience-item-desc">Multi-client project portfolios with client portal access, per-client invoicing, and firm-wide KPI dashboards.</div>
+      </div>
+      <div>
+        <div class="audience-item-title">Engineering PMOs</div>
+        <div class="audience-item-desc">Complex multi-phase programs with WBS tracking, dependency management, EVM reporting, and milestone accountability.</div>
+      </div>
+      <div>
+        <div class="audience-item-title">Regulated Industries</div>
+        <div class="audience-item-desc">Medical device, pharma, aerospace, and defense teams needing audit trails, document control, and formal status reporting.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-block bracketed">
+    <div class="br-bl"></div><div class="br-br"></div>
+    <div>
+      <div class="cta-title">Ready to See It <span>Live?</span></div>
+      <div class="cta-body">ProjectHUD is operational now. Request a demo, explore the live platform, or reach out to discuss how the system can be configured for your firm's specific workflow, client structure, and reporting requirements.</div>
+      <div class="cta-url">project-hud-landing.vercel.app</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="cta-qr">
+        <!-- Stylized QR-like pattern -->
+        <div style="display:grid;grid-template-columns:repeat(7,8px);grid-template-rows:repeat(7,8px);gap:2px;">
+          <div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div>
+          <div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:var(--text3)"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div>
+          <div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div>
+          <div style="background:transparent"></div><div style="background:var(--text3)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--text3)"></div><div style="background:transparent"></div>
+          <div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div>
+          <div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:var(--text3)"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div>
+          <div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div><div style="background:transparent"></div><div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div><div style="background:var(--cyan)"></div>
+        </div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.12em;text-align:center;">SCAN FOR LIVE DEMO</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-meta">© 2026 PROJECTHUD · ALL RIGHTS RESERVED · PROJECT MANAGEMENT COMMAND PLATFORM</div>
+    <div class="footer-meta">06 / 06</div>
+  </div>
+</section>
+
+</body>
+</html>

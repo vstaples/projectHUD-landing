@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Action Required — CadenceHUD</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:    #060a10;
+  --bg2:   #0c1628;
+  --bg3:   #111c2e;
+  --cyan:  #00d2ff;
+  --green: #00e5a0;
+  --amber: #ffaa00;
+  --red:   #ff4757;
+  --text0: #eef4ff;
+  --text1: #c8dff0;
+  --text2: #7a9bbf;
+  --text3: #3a5a7a;
+  --border:  rgba(0,210,255,0.12);
+  --border2: rgba(0,210,255,0.28);
+  --font-hud:  'Rajdhani', sans-serif;
+  --font-ui:   'Barlow Condensed', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-body: 'Barlow', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body {
+  background:var(--bg);
+  color:var(--text1);
+  font-family:var(--font-body);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+body::before {
+  content:'';
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,210,255,0.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,210,255,0.02) 1px,transparent 1px);
+  background-size:52px 52px;
+}
+
+/* ── Header ── */
+.hdr {
+  position:relative;z-index:1;
+  background:rgba(0,0,0,0.5);
+  border-bottom:1px solid var(--border);
+  padding:14px 24px;
+  display:flex;align-items:center;gap:14px;
+}
+.hdr-logo {
+  font-family:var(--font-hud);
+  font-size:22px;font-weight:700;
+  color:var(--text0);
+  letter-spacing:0.02em;
+}
+.hdr-logo span{color:var(--cyan)}
+.hdr-secure {
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--green);
+  letter-spacing:0.22em;
+  display:flex;align-items:center;gap:6px;
+}
+.hdr-secure::before {
+  content:'';width:6px;height:6px;
+  border-radius:50%;background:var(--green);
+}
+
+/* ── Main card ── */
+.main {
+  position:relative;z-index:1;
+  flex:1;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:40px 20px 60px;
+}
+.card {
+  width:100%;max-width:560px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+}
+.card-header {
+  padding:20px 24px;
+  border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,0.2);
+}
+.card-firm {
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--text3);
+  letter-spacing:0.22em;text-transform:uppercase;
+  margin-bottom:10px;
+}
+.card-step-name {
+  font-family:var(--font-ui);
+  font-size:22px;font-weight:700;
+  color:var(--text0);
+  letter-spacing:0.04em;
+  margin-bottom:4px;
+}
+.card-context {
+  font-family:var(--font-body);
+  font-size:13px;color:var(--text2);
+  margin-bottom:0;
+}
+.card-body {padding:22px 24px}
+
+/* ── Instructions box ── */
+.instructions {
+  background:rgba(0,210,255,0.04);
+  border:1px solid var(--border);
+  border-left:3px solid var(--cyan);
+  padding:12px 14px;
+  font-family:var(--font-body);
+  font-size:13px;color:var(--text1);
+  line-height:1.65;
+  margin-bottom:22px;
+}
+.instructions-label {
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--cyan);
+  letter-spacing:0.22em;margin-bottom:6px;
+}
+
+/* ── Outcomes ── */
+.outcomes-label {
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--text3);
+  letter-spacing:0.22em;margin-bottom:10px;
+}
+.outcomes {display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.outcome-btn {
+  border:1px solid var(--border);
+  padding:12px 16px;
+  cursor:pointer;
+  transition:all 0.15s;
+  display:flex;align-items:center;gap:12px;
+  background:transparent;
+  width:100%;text-align:left;
+}
+.outcome-btn:hover {
+  border-color:rgba(0,210,255,0.3);
+  background:rgba(0,210,255,0.04);
+}
+.outcome-btn.selected-approve {
+  border-color:rgba(0,229,160,0.5);
+  background:rgba(0,229,160,0.07);
+}
+.outcome-btn.selected-reject {
+  border-color:rgba(255,71,87,0.5);
+  background:rgba(255,71,87,0.07);
+}
+.outcome-btn.selected-change {
+  border-color:rgba(255,170,0,0.5);
+  background:rgba(255,170,0,0.07);
+}
+.outcome-dot {
+  width:12px;height:12px;border-radius:50%;
+  border:1.5px solid var(--text3);
+  flex-shrink:0;transition:all 0.15s;
+}
+.outcome-btn.selected-approve .outcome-dot {background:var(--green);border-color:var(--green)}
+.outcome-btn.selected-reject  .outcome-dot {background:var(--red);border-color:var(--red)}
+.outcome-btn.selected-change  .outcome-dot {background:var(--amber);border-color:var(--amber)}
+.outcome-text {
+  font-family:var(--font-ui);
+  font-size:15px;font-weight:600;
+  color:var(--text1);letter-spacing:0.04em;
+}
+.outcome-btn.selected-approve .outcome-text {color:var(--green)}
+.outcome-btn.selected-reject  .outcome-text {color:var(--red)}
+.outcome-btn.selected-change  .outcome-text {color:var(--amber)}
+.outcome-hint {
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--text3);
+  margin-left:auto;letter-spacing:0.1em;
+}
+
+/* ── Notes ── */
+.notes-wrap {margin-bottom:20px}
+.notes-label {
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--text3);
+  letter-spacing:0.22em;margin-bottom:8px;
+  display:flex;align-items:center;gap:8px;
+}
+.notes-required {
+  color:var(--red);
+  font-size:8px;border:1px solid rgba(255,71,87,0.3);
+  padding:1px 6px;
+}
+textarea {
+  width:100%;
+  background:rgba(0,0,0,0.3);
+  border:1px solid var(--border);
+  color:var(--text1);
+  font-family:var(--font-body);
+  font-size:13px;
+  padding:10px 12px;
+  resize:vertical;
+  min-height:80px;
+  line-height:1.6;
+  transition:border-color 0.15s;
+}
+textarea:focus {
+  outline:none;
+  border-color:rgba(0,210,255,0.35);
+}
+textarea.error {border-color:rgba(255,71,87,0.5)}
+
+/* ── Submit ── */
+.submit-btn {
+  width:100%;
+  padding:13px;
+  background:rgba(0,210,255,0.08);
+  border:1px solid rgba(0,210,255,0.35);
+  color:var(--cyan);
+  font-family:var(--font-ui);
+  font-size:16px;font-weight:700;
+  letter-spacing:0.14em;text-transform:uppercase;
+  cursor:pointer;
+  transition:all 0.15s;
+  margin-bottom:12px;
+}
+.submit-btn:hover:not(:disabled) {
+  background:rgba(0,210,255,0.15);
+  border-color:rgba(0,210,255,0.5);
+}
+.submit-btn:disabled {
+  opacity:0.4;cursor:not-allowed;
+}
+.submit-btn.approve-active {
+  background:rgba(0,229,160,0.1);
+  border-color:rgba(0,229,160,0.4);
+  color:var(--green);
+}
+.submit-btn.reject-active {
+  background:rgba(255,71,87,0.1);
+  border-color:rgba(255,71,87,0.4);
+  color:var(--red);
+}
+.submit-btn.change-active {
+  background:rgba(255,170,0,0.1);
+  border-color:rgba(255,170,0,0.4);
+  color:var(--amber);
+}
+
+/* ── Error / status ── */
+.status-msg {
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:0.12em;
+  text-align:center;
+  min-height:16px;
+  margin-bottom:8px;
+}
+.status-msg.error {color:var(--red)}
+.status-msg.info  {color:var(--text3)}
+
+/* ── Confirmation screen ── */
+.confirmation {
+  text-align:center;
+  padding:40px 24px;
+  display:none;
+}
+.confirmation.visible {display:block}
+.conf-icon {
+  font-size:48px;margin-bottom:20px;
+}
+.conf-headline {
+  font-family:var(--font-hud);
+  font-size:28px;font-weight:700;
+  color:var(--text0);
+  margin-bottom:8px;
+}
+.conf-outcome {
+  font-family:var(--font-ui);
+  font-size:18px;font-weight:600;
+  margin-bottom:16px;
+}
+.conf-detail {
+  font-family:var(--font-mono);
+  font-size:10px;color:var(--text3);
+  letter-spacing:0.14em;
+  line-height:1.8;
+}
+.conf-ref {
+  display:inline-block;
+  margin-top:16px;
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--text3);
+  border:1px solid var(--border);
+  padding:6px 14px;
+  letter-spacing:0.14em;
+}
+
+/* ── Already used / expired / invalid ── */
+.state-screen {
+  text-align:center;
+  padding:40px 24px;
+  display:none;
+}
+.state-screen.visible {display:block}
+.state-icon {font-size:36px;margin-bottom:16px;opacity:0.6}
+.state-title {
+  font-family:var(--font-ui);
+  font-size:20px;font-weight:700;
+  color:var(--text0);
+  margin-bottom:8px;
+}
+.state-body {
+  font-family:var(--font-body);
+  font-size:13px;color:var(--text2);
+  line-height:1.7;
+}
+
+/* ── Loading ── */
+.loading {
+  text-align:center;padding:60px 24px;
+  font-family:var(--font-mono);
+  font-size:10px;color:var(--text3);
+  letter-spacing:0.2em;
+}
+@keyframes blink {0%,100%{opacity:1}50%{opacity:0.3}}
+.loading span {animation:blink 1.2s ease-in-out infinite}
+
+/* ── Footer ── */
+.footer {
+  position:relative;z-index:1;
+  border-top:1px solid var(--border);
+  padding:12px 24px;
+  font-family:var(--font-mono);
+  font-size:9px;color:var(--text3);
+  letter-spacing:0.14em;
+  text-align:center;
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">Project<span>HUD</span></div>
+  <div style="flex:1"></div>
+  <div class="hdr-secure">SECURE LINK</div>
+</div>
+
+<div class="main">
+  <div class="card">
+
+    <!-- Loading state -->
+    <div class="loading" id="view-loading">
+      <div style="margin-bottom:8px">Loading step context</div>
+      <span>■ ■ ■</span>
+    </div>
+
+    <!-- Invalid token -->
+    <div class="state-screen" id="view-invalid">
+      <div class="state-icon">⊗</div>
+      <div class="state-title">This link is not valid</div>
+      <div class="state-body">Please contact your project manager if you believe this is an error.</div>
+    </div>
+
+    <!-- Expired token -->
+    <div class="state-screen" id="view-expired">
+      <div class="state-icon">⊘</div>
+      <div class="state-title">This link has expired</div>
+      <div class="state-body" id="expired-body">Please contact your project manager to request a new link.</div>
+    </div>
+
+    <!-- Already used -->
+    <div class="state-screen" id="view-used">
+      <div class="state-icon">✓</div>
+      <div class="state-title">Response already submitted</div>
+      <div class="state-body" id="used-body"></div>
+    </div>
+
+    <!-- Response form -->
+    <div id="view-form" style="display:none">
+      <div class="card-header">
+        <div class="card-firm" id="firm-context"></div>
+        <div class="card-step-name" id="step-name"></div>
+        <div class="card-context" id="step-context"></div>
+      </div>
+      <div class="card-body">
+        <div class="instructions" id="instructions-wrap" style="display:none">
+          <div class="instructions-label">INSTRUCTIONS</div>
+          <div id="instructions-text"></div>
+        </div>
+
+        <div class="outcomes-label">SELECT YOUR RESPONSE</div>
+        <div class="outcomes" id="outcomes-list"></div>
+
+        <div class="notes-wrap">
+          <div class="notes-label" id="notes-label">
+            ADD A NOTE
+            <span class="notes-required" id="notes-required" style="display:none">REQUIRED</span>
+          </div>
+          <textarea id="notes-input" placeholder="Add a note (optional)…"></textarea>
+        </div>
+
+        <div class="status-msg" id="status-msg"></div>
+        <button class="submit-btn" id="submit-btn" disabled onclick="submitResponse()">
+          SELECT A RESPONSE ABOVE
+        </button>
+        <div style="text-align:center">
+          <a href="#" style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.14em;text-decoration:none" onclick="return false">
+            This is a secure, one-time link · Powered by CadenceHUD
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation -->
+    <div class="confirmation" id="view-confirmation">
+      <div class="conf-icon" id="conf-icon"></div>
+      <div class="conf-headline">Response Recorded</div>
+      <div class="conf-outcome" id="conf-outcome"></div>
+      <div class="conf-detail" id="conf-detail"></div>
+      <div class="conf-ref" id="conf-ref"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">
+  CadenceHUD · ProjectHUD · Secure Workflow Response · This link is single-use and will expire after submission
+</div>
+
+<script>
+const SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
+
+let _token     = null;
+let _tokenRec  = null;
+let _selected  = null; // { id, label, requiresReset }
+
+// ── Parse token from URL ──────────────────────────────────────────────────
+function getParam(name) {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+// ── Show/hide views ───────────────────────────────────────────────────────
+function showView(id) {
+  ['loading','invalid','expired','used','form','confirmation'].forEach(v => {
+    const el = document.getElementById(`view-${v}`);
+    if (el) {
+      el.style.display  = 'none';
+      el.classList.remove('visible');
+    }
+  });
+  const target = document.getElementById(`view-${id}`);
+  if (target) {
+    target.style.display = 'block';
+    target.classList.add('visible');
+  }
+}
+
+// ── Load token context ────────────────────────────────────────────────────
+async function loadToken(token) {
+  try {
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/external_step_tokens?token=eq.${encodeURIComponent(token)}&select=*`,
+      { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+    );
+    const rows = await res.json();
+    if (!rows?.length) { showView('invalid'); return; }
+
+    const rec = rows[0];
+    _tokenRec = rec;
+
+    // Check expired
+    if (rec.expires_at && new Date(rec.expires_at) < new Date()) {
+      const pmContact = rec.pm_name ? `Please contact ${rec.pm_name}` : 'Please contact your project manager';
+      if (rec.pm_email) {
+        document.getElementById('expired-body').innerHTML =
+          `This link expired on ${new Date(rec.expires_at).toLocaleDateString()}. ` +
+          `<a href="mailto:${rec.pm_email}" style="color:var(--cyan)">${pmContact}</a> to request a new one.`;
+      } else {
+        document.getElementById('expired-body').textContent =
+          `This link expired on ${new Date(rec.expires_at).toLocaleDateString()}. ${pmContact} to request a new one.`;
+      }
+      showView('expired');
+      return;
+    }
+
+    // Check already used
+    if (rec.used_at || rec.submitted_at) {
+      const usedDate = new Date(rec.used_at || rec.submitted_at).toLocaleString('en-US',
+        {weekday:'short', month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+      const outcomeLabel = rec.outcome || 'submitted';
+      document.getElementById('used-body').innerHTML =
+        `Your response <strong style="color:var(--text0)">${outcomeLabel}</strong> was already recorded on ${usedDate}.<br><br>` +
+        `You cannot submit this link again. If you need to change your response, please contact the project manager.`;
+      showView('used');
+      return;
+    }
+
+    // Mark link as opened (record first open timestamp)
+    if (!rec.opened_at) {
+      fetch(`${SUPA_URL}/rest/v1/external_step_tokens?token=eq.${encodeURIComponent(token)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': `Bearer ${SUPA_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ opened_at: new Date().toISOString(), ip_at_open: 'client' }),
+      }).catch(() => {});
+    }
+
+    // Render the form
+    renderForm(rec);
+    showView('form');
+
+    // Pre-select outcome if ?outcome=reject in URL
+    const preOutcome = getParam('outcome');
+    if (preOutcome === 'reject') {
+      const outcomes = getOutcomes(rec);
+      const rejectOutcome = outcomes.find(o =>
+        o.requiresReset || ['rejected','declined','rejected'].includes(o.id)
+      );
+      if (rejectOutcome) selectOutcome(rejectOutcome);
+    }
+
+  } catch (err) {
+    console.error('Token load error:', err);
+    showView('invalid');
+  }
+}
+
+// ── Get outcomes from token record ────────────────────────────────────────
+function getOutcomes(rec) {
+  if (rec.outcomes_json && Array.isArray(rec.outcomes_json)) return rec.outcomes_json;
+  // Fallback defaults by step type (mirrors cadence.html _getOutcomes)
+  const defaults = {
+    approval:     [
+      { id:'approved',          label:'Approved',          color:'#00e5a0', isDefault:true,  requiresReset:false },
+      { id:'changes_requested', label:'Changes Requested',  color:'#BA7517', isDefault:false, requiresReset:true  },
+      { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true  },
+    ],
+    signoff:      [
+      { id:'signed_off', label:'Signed Off', color:'#00e5a0', isDefault:true,  requiresReset:false },
+      { id:'declined',   label:'Declined',   color:'#E24B4A', isDefault:false, requiresReset:true  },
+    ],
+    review:       [
+      { id:'reviewed',          label:'Reviewed — Approved', color:'#00e5a0', isDefault:true,  requiresReset:false },
+      { id:'changes_requested', label:'Changes Requested',   color:'#BA7517', isDefault:false, requiresReset:true  },
+    ],
+    external:     [
+      { id:'completed', label:'Completed', color:'#00e5a0', isDefault:true,  requiresReset:false },
+      { id:'declined',  label:'Declined',  color:'#E24B4A', isDefault:false, requiresReset:true  },
+    ],
+    confirmation: [
+      { id:'confirmed', label:'Confirmed', color:'#00e5a0', isDefault:true,  requiresReset:false },
+      { id:'rejected',  label:'Rejected',  color:'#E24B4A', isDefault:false, requiresReset:true  },
+    ],
+  };
+  return defaults[rec.step_type] || defaults.approval;
+}
+
+// ── Render the form ───────────────────────────────────────────────────────
+function renderForm(rec) {
+  // Header
+  const parts = [];
+  if (rec.template_name)  parts.push(rec.template_name);
+  if (rec.instance_title) parts.push(rec.instance_title);
+  document.getElementById('firm-context').textContent = 'Apex Consulting Group' +
+    (parts.length ? ' · ' + parts.join(' · ') : '');
+  document.getElementById('step-name').textContent    = rec.step_name || 'Action Required';
+  document.getElementById('step-context').textContent =
+    `Step assignment · ${rec.assignee_name ? 'Assigned to ' + rec.assignee_name : ''}`;
+
+  // Instructions
+  if (rec.step_instructions) {
+    document.getElementById('instructions-text').textContent = rec.step_instructions;
+    document.getElementById('instructions-wrap').style.display = 'block';
+  }
+
+  // Outcomes
+  const outcomes = getOutcomes(rec);
+  const list = document.getElementById('outcomes-list');
+  list.innerHTML = '';
+  outcomes.forEach(o => {
+    const btn = document.createElement('button');
+    btn.className = 'outcome-btn';
+    btn.dataset.outcomeId    = o.id;
+    btn.dataset.outcomeLabel = o.label;
+    btn.dataset.requiresReset = o.requiresReset ? '1' : '0';
+    btn.innerHTML = `
+      <span class="outcome-dot"></span>
+      <span class="outcome-text">${o.label}</span>
+      ${o.requiresReset ? '<span class="outcome-hint">NOTE REQUIRED</span>' : '<span class="outcome-hint">OPTIONAL NOTE</span>'}
+    `;
+    btn.onclick = () => selectOutcome(o);
+    list.appendChild(btn);
+  });
+}
+
+// ── Outcome selection ─────────────────────────────────────────────────────
+function selectOutcome(o) {
+  _selected = o;
+
+  // Update button states
+  document.querySelectorAll('.outcome-btn').forEach(btn => {
+    btn.classList.remove('selected-approve','selected-reject','selected-change');
+  });
+  const activeBtn = document.querySelector(`[data-outcome-id="${o.id}"]`);
+  if (activeBtn) {
+    if (!o.requiresReset) activeBtn.classList.add('selected-approve');
+    else if (o.id === 'changes_requested') activeBtn.classList.add('selected-change');
+    else activeBtn.classList.add('selected-reject');
+  }
+
+  // Notes: required for resets, optional otherwise
+  const notesReq = document.getElementById('notes-required');
+  const notesInput = document.getElementById('notes-input');
+  if (o.requiresReset) {
+    notesReq.style.display = 'inline';
+    notesInput.placeholder = 'Please describe what needs to change (required)…';
+  } else {
+    notesReq.style.display = 'none';
+    notesInput.placeholder = 'Add a note (optional)…';
+  }
+  notesInput.classList.remove('error');
+
+  // Update submit button
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = false;
+  submitBtn.textContent = `Submit: ${o.label}`;
+  submitBtn.className = 'submit-btn';
+  if (!o.requiresReset) submitBtn.classList.add('approve-active');
+  else if (o.id === 'changes_requested') submitBtn.classList.add('change-active');
+  else submitBtn.classList.add('reject-active');
+
+  document.getElementById('status-msg').textContent = '';
+}
+
+// ── Submit response ───────────────────────────────────────────────────────
+async function submitResponse() {
+  if (!_selected) return;
+  const notes     = document.getElementById('notes-input').value.trim();
+  const statusEl  = document.getElementById('status-msg');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // Enforce notes for reset outcomes
+  if (_selected.requiresReset && !notes) {
+    document.getElementById('notes-input').classList.add('error');
+    statusEl.className = 'status-msg error';
+    statusEl.textContent = 'A note is required when requesting changes or rejecting.';
+    document.getElementById('notes-input').focus();
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting…';
+  statusEl.className = 'status-msg info';
+  statusEl.textContent = 'Recording your response…';
+
+  try {
+    const now = new Date().toISOString();
+
+    // 1. Mark token as used
+    await fetch(
+      `${SUPA_URL}/rest/v1/external_step_tokens?token=eq.${encodeURIComponent(_token)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': `Bearer ${SUPA_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          used_at:       now,
+          submitted_at:  now,
+          outcome:       _selected.id,
+          outcome_notes: notes || null,
+          response_notes: notes || null,
+        }),
+      }
+    );
+
+    // 2. Write step_completed CoC event via respond-step Edge Function
+    // (Falls back to direct DB write if Edge Function not yet deployed)
+    let routingDone = false;
+    try {
+      const efRes = await fetch(`${SUPA_URL}/functions/v1/respond-step`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${SUPA_KEY}`,
+          'apikey':        SUPA_KEY,
+        },
+        body: JSON.stringify({
+          token:        _token,
+          outcome:      _selected.id,
+          outcome_label: _selected.label,
+          notes:        notes || null,
+          requires_reset: _selected.requiresReset,
+          responded_at: now,
+        }),
+      });
+      if (efRes.ok) routingDone = true;
+    } catch (_) { /* Edge Function not deployed yet — graceful degradation */ }
+
+    // 3. Direct CoC write fallback (if Edge Function not available)
+    if (!routingDone && _tokenRec) {
+      await fetch(`${SUPA_URL}/rest/v1/workflow_step_instances`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': `Bearer ${SUPA_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          instance_id:       _tokenRec.instance_id,
+          firm_id:           _tokenRec.firm_id,
+          event_type:        'step_completed',
+          template_step_id:  _tokenRec.template_step_id,
+          step_name:         _tokenRec.step_name,
+          outcome:           _selected.id,
+          event_notes:       notes || null,
+          actor_name:        _tokenRec.assignee_name || _tokenRec.recipient_name || 'External Respondent',
+          actor_type:        'external',
+          created_at:        now,
+        }),
+      });
+    }
+
+    // 4. Show confirmation
+    showConfirmation(notes);
+
+  } catch (err) {
+    console.error('Submit error:', err);
+    submitBtn.disabled = false;
+    submitBtn.textContent = `Submit: ${_selected.label}`;
+    statusEl.className = 'status-msg error';
+    statusEl.textContent = 'Submission failed. Please try again or contact your project manager.';
+  }
+}
+
+// ── Confirmation screen ───────────────────────────────────────────────────
+function showConfirmation(notes) {
+  const isReset = _selected.requiresReset;
+  const icon    = isReset ? '↩' : '✓';
+  const color   = isReset
+    ? (_selected.id === 'changes_requested' ? 'var(--amber)' : 'var(--red)')
+    : 'var(--green)';
+
+  document.getElementById('conf-icon').textContent       = icon;
+  document.getElementById('conf-outcome').textContent    = _selected.label;
+  document.getElementById('conf-outcome').style.color    = color;
+
+  const now = new Date().toLocaleString('en-US',
+    {weekday:'short', month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+  document.getElementById('conf-detail').innerHTML =
+    `Response recorded on ${now}<br>` +
+    `Step: ${_tokenRec?.step_name || 'Workflow step'}<br>` +
+    (notes ? `Your note has been saved to the workflow record.` : '');
+
+  document.getElementById('conf-ref').textContent =
+    `Reference: ${_token.slice(0,8).toUpperCase()}`;
+
+  showView('confirmation');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async function init() {
+  _token = getParam('token');
+  if (!_token) { showView('invalid'); return; }
+  await loadToken(_token);
+})();
+</script>
+</body>
+</html>
