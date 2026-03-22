@@ -231,8 +231,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .editor-title-input::placeholder{color:var(--text3)}
 
 /* Editor body */
-.editor-body{flex:1;overflow-y:auto}
-.spine-area{padding:16px 24px;}
+.editor-body{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.spine-area{padding:16px 24px;flex:1;overflow-y:auto;min-height:0}
 /* inline step config — replaces right panel */
 .step-inline-cfg{
   display:none;
@@ -1184,7 +1184,7 @@ function renderEditor() {
       </div>
 
       <!-- Steps view -->
-      <div id="editor-view-steps" class="spine-area"
+      <div id="editor-view-steps" class="spine-area">
         ${!isReleased ? renderAIBanner() : ''}
         <div id="spine-wrap" class="spine-wrap">
           ${renderSpine()}
