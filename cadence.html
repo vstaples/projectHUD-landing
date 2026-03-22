@@ -1248,8 +1248,10 @@ function switchEditorView(view) {
 
   if (view === 'diagram') {
     stepsEl.style.display = 'none';
-    diagEl.style.display  = 'block';
-    diagEl.style.flex     = '1';
+    diagEl.style.display        = 'flex';
+    diagEl.style.flexDirection  = 'column';
+    diagEl.style.flex           = '1';
+    diagEl.style.minHeight      = '0';
     stepsTab.style.color        = 'var(--muted)';
     stepsTab.style.borderColor  = 'transparent';
     diagTab.style.color         = 'var(--cad)';
@@ -1286,8 +1288,14 @@ function renderDAG() {
     .filter(s => s.step_type !== 'trigger')
     .sort((a, b) => a.sequence_order - b.sequence_order);
 
-  const W = wrap.offsetWidth  || 800;
-  const H = wrap.offsetHeight || 500;
+  const W = wrap.offsetWidth  || wrap.parentElement?.offsetWidth  || 800;
+  const H = wrap.offsetHeight || wrap.parentElement?.offsetHeight || 500;
+
+  if (W < 10 || H < 10) {
+    // Layout not settled yet — retry once more
+    setTimeout(() => renderDAG(), 100);
+    return;
+  }
 
   canvas.width  = W;
   canvas.height = H;
