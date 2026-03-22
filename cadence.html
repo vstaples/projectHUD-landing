@@ -5152,7 +5152,7 @@ function renderInstancesTab(el) {
       </div>
 
       <!-- Right: instance detail -->
-      <div id="instance-detail" style="flex:1;overflow:hidden;min-width:0;display:flex;flex-direction:column">
+      <div id="instance-detail" style="flex:1;overflow:hidden;min-width:0;min-height:0;display:flex;flex-direction:column">
         ${_selectedInstance
           ? '' /* filled by renderInstanceDetail() */
           : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -5323,6 +5323,7 @@ function renderInstanceDetail(el, inst) {
   const viewMode     = inst._viewMode || 'list';
 
   el.innerHTML = `
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;height:100%">
     <!-- Header -->
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);
       display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
@@ -5922,7 +5923,8 @@ function renderInstanceDetail(el, inst) {
 
     </div>
     `}
-    </div>`; // close outer body flex
+    </div>
+    </div>`; // close outer body flex and root wrapper
 
   // Start live tick for active step timers (dd:hh:mm updates every 30s)
   _startElapsedTimer(inst);
