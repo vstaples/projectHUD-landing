@@ -591,6 +591,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   animation:pulse 1.2s ease-in-out infinite;
 }
 @keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes critPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(1.6)}}
 
 </style>
 </head>
@@ -4993,7 +4994,7 @@ function launchInstance() {
   overlay.className = 'modal-overlay';
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
   overlay.innerHTML = `
-    <div class="modal">
+    <div class="modal" style="max-width:520px">
       <div class="modal-header">
         <div class="modal-title">Launch — ${escHtml(_selectedTmpl.name)}</div>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
@@ -5013,9 +5014,61 @@ function launchInstance() {
             Owner receives issue escalations and manages blocked steps.
           </div>
         </div>
-        <div style="margin-bottom:12px">
+
+        <!-- ── STAKES LAYER ─────────────────────────────────── -->
+        <div style="margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cad);text-transform:uppercase;margin-bottom:10px">Stakes & Priority</div>
+
+          <!-- Priority -->
+          <div style="margin-bottom:12px">
+            <label class="config-label">Priority</label>
+            <div style="display:flex;gap:8px" id="launch-priority-btns">
+              ${[['routine','⚪ Routine','rgba(255,255,255,.1)','rgba(255,255,255,.15)'],
+                 ['important','🟡 Important','rgba(232,168,56,.15)','rgba(232,168,56,.35)'],
+                 ['critical','🔴 Critical','rgba(226,75,74,.15)','rgba(226,75,74,.35)']].map(([val,lbl,bg,activeBg])=>`
+              <button onclick="_launchPrioritySelect('${val}')" id="lpri-${val}"
+                style="flex:1;padding:6px 0;font-size:11px;font-weight:600;
+                  background:${val==='routine'?activeBg:bg};
+                  border:1px solid ${val==='routine'?'rgba(255,255,255,.3)':'var(--border)'};
+                  border-radius:4px;color:var(--text);cursor:pointer;transition:all .15s">${lbl}</button>`).join('')}
+            </div>
+            <input type="hidden" id="launch-priority" value="routine"/>
+          </div>
+
+          <!-- Stakes description -->
+          <div style="margin-bottom:12px">
+            <label class="config-label">What's at stake? <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+            <input class="config-input" id="launch-stakes"
+              placeholder="e.g. $250K contract · FDA submission · Novel R&D — first attempt"/>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">
+              Surfaces on every task derived from this workflow so assignees understand context.
+            </div>
+          </div>
+
+          <!-- PERT estimates -->
+          <div style="margin-bottom:4px">
+            <label class="config-label">Duration Estimate (PERT) <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div>
+                <div style="font-size:10px;color:var(--green);margin-bottom:3px;font-weight:600">Optimistic (days)</div>
+                <input class="config-input" id="launch-pert-o" type="number" min="0" placeholder="Best case" style="font-size:11px"/>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--amber);margin-bottom:3px;font-weight:600">Most Likely (days)</div>
+                <input class="config-input" id="launch-pert-m" type="number" min="0" placeholder="Realistic" style="font-size:11px" oninput="_launchPertUpdate()"/>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--red);margin-bottom:3px;font-weight:600">Pessimistic (days)</div>
+                <input class="config-input" id="launch-pert-p" type="number" min="0" placeholder="Worst case" style="font-size:11px" oninput="_launchPertUpdate()"/>
+              </div>
+            </div>
+            <div id="launch-pert-result" style="margin-top:6px;font-size:10px;color:var(--muted);min-height:14px"></div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;margin-top:4px">
           <label class="config-label">Notes (optional)</label>
-          <textarea class="config-textarea" id="launch-notes" placeholder="Any context for this instance..."></textarea>
+          <textarea class="config-textarea" id="launch-notes" placeholder="Any additional context for this instance..."></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -5026,18 +5079,53 @@ function launchInstance() {
   document.body.appendChild(overlay);
 }
 
+function _launchPrioritySelect(val) {
+  document.getElementById('launch-priority').value = val;
+  const colors = { routine:['rgba(255,255,255,.15)','rgba(255,255,255,.3)'], important:['rgba(232,168,56,.35)','rgba(232,168,56,.6)'], critical:['rgba(226,75,74,.35)','rgba(226,75,74,.6)'] };
+  const borders = { routine:'rgba(255,255,255,.3)', important:'rgba(232,168,56,.6)', critical:'rgba(226,75,74,.6)' };
+  ['routine','important','critical'].forEach(p => {
+    const btn = document.getElementById(`lpri-${p}`);
+    if (!btn) return;
+    const active = p === val;
+    btn.style.background = active ? colors[p][0] : 'rgba(255,255,255,.05)';
+    btn.style.borderColor = active ? borders[p] : 'var(--border)';
+    btn.style.boxShadow = active ? `0 0 0 1px ${borders[p]}` : 'none';
+  });
+}
+
+function _launchPertUpdate() {
+  const o = parseFloat(document.getElementById('launch-pert-o')?.value)||0;
+  const m = parseFloat(document.getElementById('launch-pert-m')?.value)||0;
+  const p = parseFloat(document.getElementById('launch-pert-p')?.value)||0;
+  const el = document.getElementById('launch-pert-result');
+  if (!el) return;
+  if (!m && !p) { el.textContent=''; return; }
+  const expected = ((o + 4*m + p) / 6).toFixed(1);
+  const variance = ((p - o) / 6).toFixed(1);
+  const spread = p - o;
+  const epistemic = spread > 10 ? '⚠ High epistemic risk — wide variance suggests novel or uncertain work'
+    : spread > 4 ? '~ Moderate uncertainty'
+    : spread > 0 ? '✓ Low variance — well-understood work' : '';
+  el.innerHTML = `Expected: <strong>${expected} days</strong> · Std dev: ±${variance}d &nbsp;
+    <span style="color:${spread>10?'var(--red)':spread>4?'var(--amber)':'var(--green)'}">${epistemic}</span>`;
+}
+
 async function confirmLaunch() {
   const title      = document.getElementById('launch-title')?.value?.trim();
-  const ownerResId = document.getElementById('launch-owner')?.value;  // resource_id
+  const ownerResId = document.getElementById('launch-owner')?.value;
   const notes      = document.getElementById('launch-notes')?.value?.trim();
+  const priority   = document.getElementById('launch-priority')?.value || 'routine';
+  const stakes     = document.getElementById('launch-stakes')?.value?.trim() || null;
+  const pertO      = parseFloat(document.getElementById('launch-pert-o')?.value)||null;
+  const pertM      = parseFloat(document.getElementById('launch-pert-m')?.value)||null;
+  const pertP      = parseFloat(document.getElementById('launch-pert-p')?.value)||null;
+
   if (!title)      { cadToast('Title required', 'error'); return; }
   if (!ownerResId) { cadToast('Owner required — select who will manage this instance', 'error'); return; }
 
-  // Resolve resource_id → user_id for the launched_by FK
-  // The picker shows resources; launched_by requires a users.id
-  const ownerUser   = _users_cad.find(u => u.resource_id === ownerResId);
-  const launchedBy  = ownerUser?.id || _myUserId || null;
-  const ownerName   = _resources_cad.find(r => r.id === ownerResId)?.name || '';
+  const ownerUser  = _users_cad.find(u => u.resource_id === ownerResId);
+  const launchedBy = ownerUser?.id || _myUserId || null;
+  const ownerName  = _resources_cad.find(r => r.id === ownerResId)?.name || '';
 
   if (!launchedBy) {
     cadToast('Selected owner has no app user account — please select someone with a login', 'error');
@@ -5053,6 +5141,11 @@ async function confirmLaunch() {
       status:      'in_progress',
       launched_by: launchedBy,
       launched_at: new Date().toISOString(),
+      priority,
+      stakes,
+      pert_optimistic:  pertO,
+      pert_likely:      pertM,
+      pert_pessimistic: pertP,
     });
 
     if (res?.[0]?.id) {
@@ -5102,60 +5195,215 @@ async function confirmLaunch() {
 }
 
 // ── Instances tab ─────────────────────────────────────────────────────────────
+let _instFilter = 'all';   // 'all' | 'mine' | 'active' | 'done'
+let _instSearch = '';
+
+function _instUrgencyScore(inst) {
+  // Higher = more urgent. Priority multiplier × elapsed time × rework penalty
+  const priMult = { critical:10, important:3, routine:1 }[inst.priority||'routine'] || 1;
+  const elapsedH = inst.launched_at ? (Date.now()-new Date(inst.launched_at))/3600000 : 0;
+  const coc = inst._stepInsts || [];
+  const resets = coc.filter(e=>e.event_type==='step_reset').length;
+  return priMult * (elapsedH + resets * 8);
+}
+
+function _instThermalColor(inst) {
+  // Returns border color based on priority + elapsed time
+  const pri = inst.priority || 'routine';
+  if (pri === 'critical') return '#E24B4A';
+  if (pri === 'important') return '#e8a838';
+  // Routine — thermal based on elapsed days
+  const days = inst.launched_at ? (Date.now()-new Date(inst.launched_at))/86400000 : 0;
+  if (days > 7)  return '#E24B4A';
+  if (days > 3)  return '#e8a838';
+  return 'transparent';
+}
+
+function _instPertExpected(inst) {
+  const o=inst.pert_optimistic, m=inst.pert_likely, p=inst.pert_pessimistic;
+  if (!m && !p) return null;
+  return ((( o||0) + 4*(m||0) + (p||0)) / 6).toFixed(1);
+}
+
+function _instPertVariance(inst) {
+  const o=inst.pert_optimistic||0, p=inst.pert_pessimistic||0;
+  return p - o;
+}
+
 function renderInstancesTab(el) {
   const statusLabel = { pending:'PENDING', in_progress:'IN PROGRESS', complete:'COMPLETE', cancelled:'CANCELLED', overridden:'OVERRIDDEN' };
   const statusColor = { pending:'var(--muted)', in_progress:'var(--cad)', complete:'var(--green)', cancelled:'var(--muted)', overridden:'var(--amber)' };
+  const priIcon = { critical:'🔴', important:'🟡', routine:'⚪' };
+
+  // Filter instances
+  const myResId = _myResourceId;
+  const myUserId = _myUserId;
+
+  const filtered = _instances.filter(inst => {
+    // Search
+    if (_instSearch) {
+      const q = _instSearch.toLowerCase();
+      const tmpl = _templates.find(t=>t.id===inst.template_id);
+      const hay = `${inst.title||''} ${tmpl?.name||''} ${inst.stakes||''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    // Tab filter
+    if (_instFilter === 'mine') {
+      // Any active step assigned to me
+      const myStep = (inst._tmplSteps||[]).find(s => {
+        const evt = (inst._stepInsts||[]).slice().reverse().find(e=>e.template_step_id===s.id);
+        return evt?.event_type==='step_activated' && (s.assignee_user_id===myUserId||s.assignee_resource_id===myResId);
+      });
+      return !!myStep;
+    }
+    if (_instFilter === 'active') return inst.status==='in_progress';
+    if (_instFilter === 'done')   return inst.status==='complete'||inst.status==='cancelled';
+    return true;
+  });
+
+  // Sort: mine tab by urgency, others by launched_at desc
+  if (_instFilter === 'mine') {
+    filtered.sort((a,b) => _instUrgencyScore(b) - _instUrgencyScore(a));
+  }
+
+  // Tab counts
+  const counts = {
+    all: _instances.length,
+    mine: _instances.filter(inst => (inst._tmplSteps||[]).some(s => {
+      const evt = (inst._stepInsts||[]).slice().reverse().find(e=>e.template_step_id===s.id);
+      return evt?.event_type==='step_activated'&&(s.assignee_user_id===myUserId||s.assignee_resource_id===myResId);
+    })).length,
+    active: _instances.filter(i=>i.status==='in_progress').length,
+    done: _instances.filter(i=>i.status==='complete'||i.status==='cancelled').length,
+  };
 
   el.innerHTML = `
     <div style="position:absolute;inset:0;display:flex;overflow:hidden">
 
-      <!-- Left: instance list -->
-      <div style="width:320px;flex-shrink:0;border-right:1px solid var(--border);
-        overflow-y:auto;display:flex;flex-direction:column">
-        <div style="padding:14px 16px 10px;font-size:9px;font-weight:600;
-          letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex-shrink:0">
-          Instances
+      <!-- Left: instance list with filter + search -->
+      <div style="width:340px;flex-shrink:0;border-right:1px solid var(--border);
+        display:flex;flex-direction:column;overflow:hidden">
+
+        <!-- Filter tabs -->
+        <div style="padding:8px 10px 0;flex-shrink:0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;gap:2px;margin-bottom:8px">
+            ${[['all','All'],['mine','My Work'],['active','Active'],['done','Done']].map(([f,lbl])=>`
+            <button onclick="_setInstFilter('${f}')" id="ifilter-${f}"
+              style="flex:1;padding:5px 4px;font-size:10px;font-weight:600;border:none;
+                border-radius:3px;cursor:pointer;transition:all .15s;letter-spacing:.02em;
+                background:${_instFilter===f?'var(--cad)':'transparent'};
+                color:${_instFilter===f?'var(--bg0)':'var(--muted)'}">
+              ${lbl}${counts[f]?` <span style="opacity:.7">${counts[f]}</span>`:''}
+            </button>`).join('')}
+          </div>
+          <!-- Search -->
+          <div style="position:relative;margin-bottom:8px">
+            <input id="inst-search-input" value="${escHtml(_instSearch)}"
+              oninput="_setInstSearch(this.value)"
+              placeholder="Search instances..."
+              style="width:100%;padding:5px 8px 5px 26px;font-size:11px;background:var(--surf2);
+                border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box"/>
+            <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);
+              font-size:11px;color:var(--muted)">⌕</span>
+            ${_instSearch?`<button onclick="_setInstSearch('')"
+              style="position:absolute;right:6px;top:50%;transform:translateY(-50%);
+                background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">✕</button>`:''}
+          </div>
         </div>
-        ${!_instances.length
-          ? `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12px">
-               No instances yet. Launch a template to create one.
-             </div>`
-          : _instances.map(inst => {
-              const tmpl   = _templates.find(t => t.id === inst.template_id);
-              const active = _selectedInstance?.id === inst.id;
-              const color  = statusColor[inst.status] || 'var(--muted)';
-              return `
-              <div onclick="selectInstance('${inst.id}')"
-                style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;
-                  background:${active ? 'var(--surf2)' : 'transparent'};
-                  border-left:3px solid ${active ? 'var(--cad)' : 'transparent'};
-                  transition:background .12s">
-                <div style="font-size:13px;font-weight:500;color:var(--text);
-                  margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                  ${escHtml(inst.title||tmpl?.name||'Untitled')}
-                </div>
-                <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;align-items:center">
-                  <span style="color:${color};font-weight:600;font-size:9px;
-                    letter-spacing:.08em;text-transform:uppercase">${statusLabel[inst.status]||inst.status}</span>
-                  <span>${escHtml(tmpl?.name||'—')}</span>
-                </div>
-                <div style="font-size:10px;color:var(--muted);display:flex;
-                  justify-content:space-between;align-items:center;margin-top:3px">
-                  <span style="color:var(--text2)">
-                    👤 ${escHtml(_users_cad.find(u=>u.id===inst.launched_by)?.name || '—')}
-                  </span>
-                  <span style="font-family:var(--font-mono);font-size:9px">
-                    ${inst.launched_at ? new Date(inst.launched_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—'}
-                  </span>
-                </div>
-              </div>`;
-            }).join('')}
+
+        <!-- Instance list -->
+        <div style="flex:1;overflow-y:auto">
+          ${!filtered.length
+            ? `<div style="padding:40px 20px;text-align:center;color:var(--muted)">
+                ${_instFilter==='mine'
+                  ? `<div style="font-size:24px;margin-bottom:8px">◎</div>
+                     <div style="font-size:13px;font-weight:500;color:var(--cad)">You're all caught up</div>
+                     <div style="font-size:11px;margin-top:4px">No items waiting on you</div>`
+                  : `<div style="font-size:12px">No instances found</div>`}
+               </div>`
+            : filtered.map(inst => {
+                const tmpl   = _templates.find(t=>t.id===inst.template_id);
+                const active = _selectedInstance?.id === inst.id;
+                const color  = statusColor[inst.status] || 'var(--muted)';
+                const thermal = _instThermalColor(inst);
+                const pri    = inst.priority || 'routine';
+                const isCrit = pri==='critical';
+                const isImp  = pri==='important';
+                const pertExp = _instPertExpected(inst);
+                const pertVar = _instPertVariance(inst);
+                const highVar = pertVar > 10;
+
+                // Find active step for this user (My Work context)
+                const myActiveStep = (inst._tmplSteps||[]).find(s => {
+                  const evt = (inst._stepInsts||[]).slice().reverse().find(e=>e.template_step_id===s.id);
+                  return evt?.event_type==='step_activated';
+                });
+                const activeStepEvt = myActiveStep ? (inst._stepInsts||[]).slice().reverse().find(e=>e.template_step_id===myActiveStep?.id&&e.event_type==='step_activated') : null;
+                const waitingMs = activeStepEvt ? Date.now()-new Date(activeStepEvt.created_at) : 0;
+                const waitingH = Math.floor(waitingMs/3600000);
+                const waitingM = Math.floor((waitingMs%3600000)/60000);
+                const waitStr = waitingH>0?`${waitingH}h ${waitingM}m`:`${waitingM}m`;
+                const resets = (inst._stepInsts||[]).filter(e=>e.event_type==='step_reset'&&e.template_step_id===myActiveStep?.id).length;
+
+                return `
+                <div onclick="selectInstance('${inst.id}')"
+                  style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;
+                    background:${active?'var(--surf2)':'transparent'};
+                    border-left:3px solid ${active?'var(--cad)':thermal};
+                    transition:background .12s;position:relative">
+
+                  <!-- Priority + Stakes line -->
+                  ${inst.stakes||pri!=='routine'?`
+                  <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+                    <span style="font-size:10px">${priIcon[pri]||''}</span>
+                    ${inst.stakes?`<span style="font-size:10px;font-weight:600;
+                      color:${isCrit?'var(--red)':isImp?'var(--amber)':'var(--text2)'};
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">
+                      ${escHtml(inst.stakes)}</span>`:''}
+                    ${highVar?`<span style="font-size:9px;color:var(--red);font-weight:600;white-space:nowrap">⚠ High variance</span>`:''}
+                  </div>`:''}
+
+                  <!-- Title -->
+                  <div style="font-size:12px;font-weight:500;color:var(--text);
+                    margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    ${escHtml(inst.title||tmpl?.name||'Untitled')}
+                  </div>
+
+                  <!-- Status + template -->
+                  <div style="font-size:10px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-bottom:3px">
+                    <span style="color:${color};font-weight:600;font-size:9px;
+                      letter-spacing:.08em;text-transform:uppercase">${statusLabel[inst.status]||inst.status}</span>
+                    <span>${escHtml(tmpl?.name||'—')}</span>
+                  </div>
+
+                  <!-- Active step context -->
+                  ${myActiveStep?`
+                  <div style="font-size:10px;color:var(--text2);display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                    <span style="color:var(--amber)">●</span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px">${escHtml(myActiveStep.name||'—')}</span>
+                    <span style="color:var(--muted)">· ${waitStr}</span>
+                    ${resets?`<span style="color:var(--red);font-weight:600">↩ ${resets}×</span>`:''}
+                  </div>`:''}
+
+                  <!-- PERT expected duration -->
+                  ${pertExp?`<div style="font-size:9px;color:var(--muted);margin-top:2px">
+                    Expected: ${pertExp}d${pertVar>0?` ±${((pertVar)/6).toFixed(1)}d`:''}
+                  </div>`:''}
+
+                  <!-- Pulse animation for critical -->
+                  ${isCrit&&inst.status==='in_progress'?`
+                  <div style="position:absolute;top:8px;right:8px;width:8px;height:8px;
+                    border-radius:50%;background:var(--red);
+                    animation:critPulse 2s ease-in-out infinite"></div>`:''}
+                </div>`;
+              }).join('')}
+        </div>
       </div>
 
       <!-- Right: instance detail -->
       <div id="instance-detail" class="inst-dag-col" style="min-width:0">
         ${_selectedInstance
-          ? '' /* filled by renderInstanceDetail() */
+          ? ''
           : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
                height:100%;color:var(--muted);gap:8px">
                <div style="font-size:32px;opacity:.2">◎</div>
@@ -5165,11 +5413,22 @@ function renderInstancesTab(el) {
 
     </div>`;
 
-  // If an instance is already selected, render its detail
   if (_selectedInstance) {
     const detailEl = document.getElementById('instance-detail');
     if (detailEl) renderInstanceDetail(detailEl, _selectedInstance);
   }
+}
+
+function _setInstFilter(f) {
+  _instFilter = f;
+  const el = document.getElementById('cad-content');
+  if (el) renderInstancesTab(el);
+}
+
+function _setInstSearch(q) {
+  _instSearch = q;
+  const el = document.getElementById('cad-content');
+  if (el) renderInstancesTab(el);
 }
 
 let _selectedInstance = null;
@@ -5439,7 +5698,7 @@ function renderInstanceDetail(el, inst) {
           </div>
         </div>
         <!-- ── REWORK PANEL — flex-shrink:0 direct child, exactly like dag-cards ── -->
-        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:225px;overflow:hidden;min-height:225px;max-height:225px">
+        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:235px;overflow:hidden;min-height:235px;max-height:235px">
           <!-- Scrubber row -->
           <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
             <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);white-space:nowrap">REPLAY</span>
@@ -6589,6 +6848,27 @@ function showIntelBriefing(instId) {
           style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;
             padding:0 4px;line-height:1;flex-shrink:0">×</button>
       </div>
+
+      ${/* Stakes banner — shown when priority or stakes are set */ (inst.priority&&inst.priority!=='routine')||inst.stakes ? `
+      <div style="padding:10px 20px;flex-shrink:0;
+        background:${inst.priority==='critical'?'rgba(226,75,74,.1)':inst.priority==='important'?'rgba(232,168,56,.08)':'var(--surf2)'};
+        border-bottom:1px solid ${inst.priority==='critical'?'rgba(226,75,74,.3)':inst.priority==='important'?'rgba(232,168,56,.3)':'var(--border)'};
+        display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">${{critical:'🔴',important:'🟡',routine:'⚪'}[inst.priority||'routine']}</span>
+        <div>
+          <span style="font-size:12px;font-weight:700;
+            color:${inst.priority==='critical'?'var(--red)':inst.priority==='important'?'var(--amber)':'var(--text2)'};
+            text-transform:uppercase;letter-spacing:.06em">
+            ${(inst.priority||'routine').toUpperCase()} PRIORITY
+          </span>
+          ${inst.stakes?`<span style="font-size:13px;color:var(--text);margin-left:10px;font-weight:500">${escHtml(inst.stakes)}</span>`:''}
+          ${inst.pert_likely||inst.pert_pessimistic?`
+          <span style="font-size:11px;color:var(--muted);margin-left:12px">
+            Expected: ${(((inst.pert_optimistic||0)+4*(inst.pert_likely||0)+(inst.pert_pessimistic||0))/6).toFixed(1)}d
+            ${_instPertVariance(inst)>10?'<span style="color:var(--red);font-weight:600"> · ⚠ High variance</span>':''}
+          </span>`:''}
+        </div>
+      </div>` : ''}
 
       <!-- Modal body -->
       <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px">
