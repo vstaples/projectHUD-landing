@@ -5899,7 +5899,7 @@ function renderInstanceDetail(el, inst) {
 
   // If diagram mode, render the instance DAG after DOM settles
   if (viewMode === 'diagram') {
-    setTimeout(() => renderInstanceDAG(inst), 60);
+    setTimeout(() => renderInstanceDAG(inst), 150);
   }
 }
 
@@ -5987,7 +5987,12 @@ let _instDagDrag=false, _instDagDSX=0, _instDagDSY=0, _instDagPSX=0, _instDagPSY
 let _instDagPulseFrame=null;
 
 function instDagZoom(f) { _instDagScale=Math.max(0.2,Math.min(3,_instDagScale*f)); renderInstanceDAG(_selectedInstance); }
-function instDagReset() { _instDagPanX=0;_instDagPanY=0;_instDagScale=1;_instDagFitted=false; renderInstanceDAG(_selectedInstance); }
+function instDagReset() {
+  _instDagPanX=0; _instDagPanY=0; _instDagScale=1; _instDagFitted=false;
+  renderInstanceDAG(_selectedInstance);
+  // Second pass after 100ms to ensure correct dimensions
+  setTimeout(() => { _instDagFitted=false; renderInstanceDAG(_selectedInstance); }, 100);
+}
 
 // ── Instance DAG renderer ─────────────────────────────────────────────────────
 function renderInstanceDAG(inst) {
@@ -6001,9 +6006,18 @@ function renderInstanceDAG(inst) {
     .sort((a,b) => a.sequence_order - b.sequence_order);
   const coc = inst._stepInsts || [];
 
-  const W = wrap.offsetWidth || 800;
-  const H = wrap.offsetHeight || 400;
-  if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 80); return; }
+  const W = wrap.offsetWidth  || 0;
+  const H = wrap.offsetHeight || 0;
+  // If canvas hasn't laid out yet, retry with increasing delays
+  if (W < 50 || H < 100) {
+    setTimeout(() => renderInstanceDAG(inst), 120);
+    return;
+  }
+  // If this is a fresh fit, always recompute from actual measured dimensions
+  if (!_instDagFitted) {
+    // Force a second render after 200ms in case H was underreported on first call
+    setTimeout(() => { _instDagFitted=false; renderInstanceDAG(inst); }, 200);
+  }
 
   canvas.width = W; canvas.height = H;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
