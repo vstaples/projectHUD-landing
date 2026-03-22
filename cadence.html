@@ -6698,7 +6698,7 @@ function escHtml(s) {
 }
 
 function cadToast(msg, type='info') {
-  // Prefer shared showToast if available
+  // Prefer shared showToast if availables
   if (typeof showToast === 'function') { showToast(msg, type); return; }
   const c = document.getElementById('toast-container');
   if (!c) return;
