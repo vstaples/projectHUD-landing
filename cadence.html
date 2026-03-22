@@ -3719,9 +3719,9 @@ async function runSingleTest(scriptId) {
   if (logEl)  { logEl.style.display = 'block'; logEl.innerHTML = ''; }
 
   // Auto-expand the plan while running
-  const planEl = document.getElementById(`bist-plan-${scriptId}`);
+  const planEl    = document.getElementById(`bist-plan-${scriptId}`);
   const chevronEl = document.getElementById(`bist-chevron-${scriptId}`);
-  if (planEl) planEl.style.display = 'block';
+  if (planEl)    planEl.style.display      = 'block';
   if (chevronEl) chevronEl.style.transform = 'rotate(90deg)';
 
   // Reset all assertion rows to pending (○ gray)
@@ -3808,6 +3808,28 @@ async function runSingleTest(scriptId) {
     iconEl.style.color = result.status === 'passed' ? 'var(--green)' : 'var(--red)';
   }
 
+  // Write CoC entry for this test run
+  if (_selectedTmpl?.id) {
+    const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+    const statusIcon = result.status === 'passed' ? '✓' : '✕';
+    const note = result.status === 'passed'
+      ? `${statusIcon} Passed`
+      : `${statusIcon} Failed — ${result.reason || 'assertion error'}`;
+    await API.post('workflow_template_coc', {
+      firm_id:         FIRM_ID_CAD,
+      template_id:     _selectedTmpl.id,
+      event_type:      'bist_run',
+      changed_by:      _myResourceId || null,
+      changed_by_name: authorName,
+      field_name:      script?.name || 'Test',
+      note,
+      version_at:      _selectedTmpl.version || '0.0.0',
+      created_at:      new Date().toISOString(),
+    }).catch(() => {});
+    _cocCommittedRows = []; // force CoC reload
+    _refreshCoCIfOpen();
+  }
+
   // Remove Watch button
   document.querySelector(`#bist-plan-${scriptId}`)
     ?.closest('div')?.querySelector('.bist-watch-btn')?.remove();
@@ -3824,12 +3846,42 @@ async function runAllTests() {
     `bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&template_id=eq.${_selectedTmpl?.id}&order=created_at.asc`
   ).catch(()=>[]);
 
+  const results = [];
   for (const script of (scripts||[])) {
+    // runSingleTest writes individual CoC entries — collect outcomes for summary
     await runSingleTest(script.id);
+    // Get last bist_run CoC entry for this script to check status
+    const lastRun = await API.get(
+      `bist_runs?firm_id=eq.${FIRM_ID_CAD}&script_id=eq.${script.id}&order=run_at.desc&limit=1`
+    ).catch(()=>[]);
+    results.push({ name: script.name, status: lastRun?.[0]?.status || 'error' });
   }
 
   if (btn) { btn.textContent = '▶ Run all tests'; btn.disabled = false; }
-  // Gate summary already refreshed by last runSingleTest → loadTmplTests call
+
+  // Write suite summary CoC entry
+  if (_selectedTmpl?.id && results.length > 1) {
+    const passed   = results.filter(r => r.status === 'passed').length;
+    const total    = results.length;
+    const allPass  = passed === total;
+    const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+    const note = results.map(r =>
+      `${r.status === 'passed' ? '✓' : '✕'} ${r.name}`
+    ).join('\n');
+    await API.post('workflow_template_coc', {
+      firm_id:         FIRM_ID_CAD,
+      template_id:     _selectedTmpl.id,
+      event_type:      'bist_run',
+      changed_by:      _myResourceId || null,
+      changed_by_name: authorName,
+      field_name:      `Suite: ${passed}/${total} passing`,
+      note,
+      version_at:      _selectedTmpl.version || '0.0.0',
+      created_at:      new Date().toISOString(),
+    }).catch(() => {});
+    _cocCommittedRows = [];
+    _refreshCoCIfOpen();
+  }
 }
 
 // ── Template Chain of Custody panel ──────────────────────────────────────────
@@ -3880,6 +3932,7 @@ function renderTmplCoC(rows) {
     step_modified:  'var(--cad)',
     field_changed:  'var(--text2)',
     bist_override:  'var(--amber)',
+    bist_run:       'var(--cad)',
   };
   const evtLabel = {
     released:       'Released',
@@ -3888,6 +3941,7 @@ function renderTmplCoC(rows) {
     step_modified:  'Step Modified',
     field_changed:  'Step Modified',
     bist_override:  'Release Override',
+    bist_run:       'Tests Run',
   };
 
   function fmtTs(ts) {
