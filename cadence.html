@@ -912,7 +912,7 @@ async function loadAll() {
     const [tmpls, insts, users] = await Promise.all([
       API.get(`workflow_templates?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc`).catch(()=>[]),
       API.get(`workflow_instances?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc&limit=50`).catch(()=>[]),
-      API.get('users?is_active=eq.true&select=id,name,title,resource_id').catch(()=>[]),
+      API.get('users?is_active=eq.true&select=id,name,title,resource_id,email').catch(()=>[]),
     ]);
     _templates = tmpls || [];
     _instances = insts || [];
@@ -5178,6 +5178,7 @@ async function startStep(instId, stepId) {
       step_name:        step?.name || null,
       created_at:       new Date().toISOString(),
     });
+    _notifyStepActivated(instId, step, inst).catch(() => {});
     await _reloadInstance(instId);
     cadToast('Step started — elapsed timer running', 'success');
   } catch(e) {
@@ -5232,6 +5233,79 @@ function toggleRoutingOverride(stepId) {
   const open = body.style.display !== 'none';
   body.style.display    = open ? 'none' : 'block';
   if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+// ── Email notification on step activation ────────────────────────────────────
+async function _notifyStepActivated(instId, step, inst, isBist = false) {
+  if (isBist) return; // never notify for test runs
+  if (!step?.assignee_email && !step?.assignee_user_id) return; // no addressee
+
+  // Resolve assignee email — from step directly, user record, or resource record
+  let assigneeEmail = step.assignee_email || null;
+  let assigneeName  = step.assignee_name  || null;
+
+  if (!assigneeEmail && step.assignee_user_id) {
+    const u = _users_cad.find(u => u.id === step.assignee_user_id);
+    assigneeEmail = u?.email || null;
+    if (!assigneeName) {
+      const r = _resources_cad.find(r => r.id === u?.resource_id);
+      assigneeName  = r?.name || u?.name || null;
+      assigneeEmail = assigneeEmail || r?.email || null;
+    }
+  }
+
+  // Final fallback — look up resource directly by assignee_resource_id
+  if (!assigneeEmail && step.assignee_resource_id) {
+    const r = _resources_cad.find(r => r.id === step.assignee_resource_id);
+    assigneeEmail = r?.email || null;
+    if (!assigneeName) assigneeName = r?.name || null;
+  }
+
+  if (!assigneeEmail) return; // still no email — skip silently
+
+  // Resolve launcher name
+  const launcher = inst?.launched_by
+    ? (_users_cad.find(u => u.id === inst.launched_by)?.name ||
+       _resources_cad.find(r => r.id === inst.launched_by)?.name || null)
+    : null;
+
+  const payload = {
+    instance_id:    instId,
+    instance_title: inst?.title || null,
+    template_name:  _selectedTmpl?.name || null,
+    step_id:        step.id,
+    step_name:      step.name,
+    step_type:      step.step_type,
+    assignee_name:  assigneeName,
+    assignee_email: assigneeEmail,
+    due_days:       step.due_days   || null,
+    due_type:       step.due_type   || null,
+    launched_by:    launcher,
+    is_bist:        false,
+  };
+
+  await fetch(`${SUPA_URL}/functions/v1/notify-step-activated`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'apikey':        SUPA_KEY,
+    },
+    body: JSON.stringify(payload),
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.error) {
+      console.warn('Notification error:', data);
+      cadToast(`Notification failed: ${JSON.stringify(data.error||data)}`, 'error');
+    } else if (data.skipped) {
+      console.log('Notification skipped:', data.skipped);
+    } else {
+      cadToast(`Email sent to ${assigneeEmail}`, 'info');
+    }
+  }).catch(err => {
+    console.warn('Notification fetch failed:', err);
+    cadToast('Notification fetch failed: ' + err.message, 'error');
+  });
 }
 
 async function submitComplete(instId, stepId) {
@@ -5291,6 +5365,7 @@ async function submitComplete(instId, stepId) {
           actor_name:       'System',
           created_at:       new Date().toISOString(),
         }).catch(() => {}); // non-fatal
+        _notifyStepActivated(instId, nextStep, inst).catch(() => {});
       }
     }
 
