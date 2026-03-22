@@ -5560,7 +5560,7 @@ async function submitComplete(instId, stepId) {
             actor_name:       'System',
             event_notes:      `Reset by ${outcomeLabel} on ${step?.name}`,
             created_at:       new Date().toISOString(),
-          }).catch(() => {});
+          });
         }
         // Activate target
         await API.post('workflow_step_instances', {
@@ -5596,7 +5596,7 @@ async function submitComplete(instId, stepId) {
             actor_name:       'System',
             event_notes:      `Reset by ${outcomeLabel} on ${step?.name}`,
             created_at:       new Date().toISOString(),
-          }).catch(() => {});
+          });
         }
         await API.post('workflow_step_instances', {
           instance_id:      instId, firm_id: FIRM_ID_CAD,
