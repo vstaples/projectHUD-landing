@@ -4428,9 +4428,16 @@ function renderInstanceDetail(el, inst) {
       .map(([id]) => id)
   );
 
-  // Derive the "ready" step — immediately follows the last completed, not yet active or reset
+  // Derive the "ready" step — immediately follows the last FORWARD completion
+  // Exclude steps completed with a reset outcome (rejected, declined, etc.)
   const lastCompletedOrder = steps
-    .filter(s => completedStepIds.has(s.id))
+    .filter(s => {
+      if (!completedStepIds.has(s.id)) return false;
+      const evt = latestStepEvent[s.id];
+      if (evt?.event_type !== 'step_completed') return false;
+      const oDef = _getOutcomes(s).find(o => o.id === evt.outcome);
+      return !oDef?.requiresReset; // only count forward completions
+    })
     .reduce((max, s) => Math.max(max, s.sequence_order), 0);
   const readyStep = steps
     .filter(s => {
@@ -4562,16 +4569,23 @@ function renderInstanceDetail(el, inst) {
               const isLast   = idx === steps.length - 1;
               const reassign = reassignments[s.id];
 
-              // Resolve outcome color for completed steps
+              // Resolve outcome for completed steps
               const completionEvt = done
                 ? coc.slice().reverse().find(e => e.event_type==='step_completed' && e.template_step_id===s.id)
                 : null;
+              const outcomeDef = completionEvt?.outcome
+                ? _getOutcomes(s).find(o => o.id === completionEvt.outcome)
+                : null;
+              const isRejectedOutcome = !!(outcomeDef?.requiresReset);
+
               const isReady  = s.id === readyStepId;
-              const outcomeColor = completionEvt?.outcome
-                ? (_getOutcomes(s).find(o => o.id === completionEvt.outcome)?.color || 'var(--green)')
-                : done ? 'var(--green)' : null;
+              const outcomeColor = outcomeDef?.color || (done ? 'var(--green)' : null);
               const nodeColor = outcomeColor || (rejected?'var(--red)':touched?'var(--cad)':isReady?'var(--accent)':'var(--surf3)');
               const textColor = outcomeColor || (done?'var(--green)':rejected?'var(--red)':touched?'var(--text)':isReady?'var(--accent)':'var(--muted)');
+              // Node icon: ✕ for rejected/reset outcomes, ✓ for clean completions
+              const nodeIcon  = done
+                ? (isRejectedOutcome ? '✕' : '✓')
+                : rejected ? '✕' : meta.icon;
 
               // Current assignee — from reassignment CoC or template definition
               const assigneeDisplay = reassign
@@ -4590,7 +4604,7 @@ function renderInstanceDetail(el, inst) {
                     font-size:11px;color:${done||rejected||touched?'#fff':meta.badgeText};
                     cursor:pointer;flex-shrink:0;font-family:var(--font-hud)"
                     onclick="toggleInstanceStep('${inst.id}','${s.id}')">
-                    ${done?'✓':rejected?'✕':meta.icon}
+                    ${nodeIcon}
                   </div>
                   ${!isLast?`<div style="width:2px;flex:1;min-height:${isSel?'0':'24'}px;background:${touched?'var(--border2)':'var(--border)'};margin:2px 0"></div>`:''}
                 </div>
