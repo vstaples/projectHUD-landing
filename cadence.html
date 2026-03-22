@@ -5437,30 +5437,30 @@ function renderInstanceDetail(el, inst) {
           </div>
         </div>
         <!-- ── REWORK INTELLIGENCE PANEL ─────────────────────────── -->
-        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;max-height:220px">
+        <div id="inst-rework-panel" style="flex-shrink:0;border-top:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;height:160px">
           <!-- Scrubber row -->
           <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-            <span style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--muted);white-space:nowrap">REPLAY</span>
+            <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);white-space:nowrap">REPLAY</span>
             <!-- Event dot track -->
-            <div id="inst-scrub-dots" style="position:relative;flex:1;height:20px;cursor:pointer" onclick="instScrubClick(event)">
+            <div id="inst-scrub-dots" style="position:relative;flex:1;height:24px;cursor:pointer" onclick="instScrubClick(event)">
               <!-- dots rendered by JS -->
             </div>
             <!-- Scrubber input -->
             <input type="range" id="inst-scrubber" min="0" max="100" value="100"
               oninput="instScrubChange(this.value)"
               style="width:160px;accent-color:var(--cad);cursor:pointer;flex-shrink:0"/>
-            <span id="inst-scrub-label" style="font-size:9px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap;min-width:90px;text-align:right">Live ◎</span>
+            <span id="inst-scrub-label" style="font-size:11px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap;min-width:110px;text-align:right">Live ◎</span>
             <button onclick="instScrubLive()" id="inst-scrub-live-btn"
-              style="padding:2px 8px;font-size:9px;font-weight:700;background:var(--cad);border:none;
+              style="padding:4px 12px;font-size:11px;font-weight:700;background:var(--cad);border:none;
                 border-radius:3px;color:var(--bg0);cursor:pointer;white-space:nowrap;letter-spacing:.04em">LIVE</button>
           </div>
           <!-- Note card row -->
           <div style="display:flex;gap:0;flex:1;overflow:hidden;min-height:0">
             <!-- Rework cost summary -->
-            <div id="inst-rework-cost" style="width:260px;flex-shrink:0;border-right:1px solid var(--border);
-              padding:10px 14px;overflow-y:auto;font-size:10px"></div>
+            <div id="inst-rework-cost" style="width:280px;flex-shrink:0;border-right:1px solid var(--border);
+              padding:10px 14px;overflow-y:auto;font-size:12px"></div>
             <!-- Active event note -->
-            <div id="inst-scrub-note" style="flex:1;padding:10px 14px;overflow-y:auto;min-width:0"></div>
+            <div id="inst-scrub-note" style="flex:1;padding:10px 14px;overflow-y:auto;min-width:0;font-size:12px"></div>
           </div>
         </div>
       </div>
@@ -6532,12 +6532,17 @@ function _instRenderDots(events, activeIdx) {
     const pct = events.length > 1 ? (i / (events.length-1)) * 100 : 50;
     const isActive = i === activeIdx;
     const isReset = e.event_type === 'step_reset';
-    return `<div onclick="event.stopPropagation();_instDotClick(${i})" style="
-      position:absolute;left:${pct}%;top:50%;transform:translate(-50%,-50%);
-      width:${isReset?10:7}px;height:${isReset?10:7}px;border-radius:50%;
-      background:${col};opacity:${isActive?1:0.55};cursor:pointer;
-      box-shadow:${isActive?`0 0 0 3px ${col}44`:'none'};
-      transition:all .1s;z-index:${isActive?2:1}"></div>`;
+    const baseSize = isReset ? 14 : 10;
+    const scale = isActive ? 2 : 1;
+    return `<div onclick="event.stopPropagation();_instDotClick(${i})" title="${e.event_type.replace(/_/g,' ')}" style="
+      position:absolute;left:${pct}%;top:50%;
+      transform:translate(-50%,-50%) scale(${scale});
+      width:${baseSize}px;height:${baseSize}px;border-radius:${isReset?'3px':'50%'};
+      ${isReset?'transform-origin:center;rotation:45deg;':''}
+      background:${col};opacity:${isActive?1:0.6};cursor:pointer;
+      box-shadow:${isActive?`0 0 0 4px ${col}55`:'none'};
+      transition:transform .15s, box-shadow .15s;
+      z-index:${isActive?10:1}"></div>`;
   }).join('');
 }
 
@@ -6582,17 +6587,21 @@ function _instRenderScrubNote(evt) {
     <div style="display:flex;align-items:flex-start;gap:10px">
       <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:4px"></div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:11px;font-weight:600;color:${col}">${lbl}</div>
-        ${stepName?`<div style="font-size:11px;color:var(--text2);margin-top:1px">${escHtml(stepName)}</div>`:''}
-        ${evt.outcome?`<div style="font-size:10px;color:var(--text2);margin-top:2px">Outcome: <strong>${escHtml(evt.outcome)}</strong></div>`:''}
-        ${evt.actor_name?`<div style="font-size:10px;color:var(--muted);margin-top:2px">👤 ${escHtml(evt.actor_name)}</div>`:''}
-        ${ts?`<div style="font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-top:2px">${ts}</div>`:''}
+        <div style="font-size:13px;font-weight:600;color:${col}">${lbl}</div>
+        ${stepName?`<div style="font-size:12px;color:var(--text2);margin-top:1px">${escHtml(stepName)}</div>`:''}
+        ${evt.outcome?`<div style="font-size:12px;color:var(--text2);margin-top:2px">Outcome: <strong>${escHtml(evt.outcome)}</strong></div>`:''}
+        ${evt.actor_name && evt.actor_name !== 'System' ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">👤 ${escHtml(evt.actor_name)}</div>` : (() => {
+          const step = (_selectedInstance?._tmplSteps||[]).find(s=>s.id===evt.template_step_id);
+          const resolved = step?.assignee_name || step?.assignee_email || null;
+          return resolved ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">👤 ${escHtml(resolved)}</div>` : '';
+        })()}
+        ${ts?`<div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:2px">${ts}</div>`:''}
         ${(evt.event_notes||evt.notes)?`
           <div style="margin-top:8px;padding:8px 10px;background:${isReset?'rgba(226,75,74,.08)':'var(--surf2)'};
             border-left:3px solid ${col};border-radius:0 4px 4px 0">
-            <div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:${col};margin-bottom:3px;text-transform:uppercase">Notes</div>
-            <div style="font-size:11px;color:var(--text);line-height:1.5">${escHtml(evt.event_notes||evt.notes)}</div>
-          </div>` : (isReset ? `<div style="margin-top:6px;font-size:10px;color:var(--red);font-style:italic">No notes recorded for this rejection</div>` : '')}
+            <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:${col};margin-bottom:3px;text-transform:uppercase">Notes</div>
+            <div style="font-size:12px;color:var(--text);line-height:1.5">${escHtml(evt.event_notes||evt.notes)}</div>
+          </div>` : (isReset ? `<div style="margin-top:6px;font-size:12px;color:var(--red);font-style:italic">No notes recorded for this rejection</div>` : '')}
       </div>
     </div>`;
 }
@@ -6641,20 +6650,20 @@ function _instRenderReworkCost(inst) {
 
   const stepsWithRework = steps.filter(s=>resetsByStep[s.id]);
   el.innerHTML = `
-    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--red);margin-bottom:8px">REWORK COST</div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--red);margin-bottom:8px">REWORK COST</div>
     <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-      <span style="font-size:10px;color:var(--muted)">Total loops</span>
-      <span style="font-size:11px;font-weight:600;color:var(--red)">${totalResets}×</span>
+      <span style="font-size:12px;color:var(--muted)">Total loops</span>
+      <span style="font-size:13px;font-weight:600;color:var(--red)">${totalResets}×</span>
     </div>
     <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-      <span style="font-size:10px;color:var(--muted)">Time in rework</span>
-      <span style="font-size:11px;font-weight:600;color:var(--red)">${reworkStr}</span>
+      <span style="font-size:12px;color:var(--muted)">Time in rework</span>
+      <span style="font-size:13px;font-weight:600;color:var(--red)">${reworkStr}</span>
     </div>
     ${stepsWithRework.map(s => `
-    <div style="padding:5px 8px;background:rgba(226,75,74,.07);border-radius:4px;
+    <div style="padding:6px 8px;background:rgba(226,75,74,.07);border-radius:4px;
       border-left:3px solid var(--red);margin-bottom:5px">
-      <div style="font-size:10px;font-weight:600;color:var(--text2)">${escHtml(s.name||'Step')}</div>
-      <div style="font-size:10px;color:var(--red)">${resetsByStep[s.id]}× rejected</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2)">${escHtml(s.name||'Step')}</div>
+      <div style="font-size:11px;color:var(--red)">${resetsByStep[s.id]}× rejected</div>
     </div>`).join('')}`;
 }
 
