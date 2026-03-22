@@ -1217,11 +1217,10 @@ function renderEditor() {
           <span id="dag-zoom-label" style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)">100%</span>
         </div>
         <!-- Canvas + slide panel container -->
-        <div style="flex:1;overflow:hidden;position:relative;min-height:0;display:flex;flex-direction:column">
-          <div style="flex:1;overflow:hidden;position:relative;min-height:0;display:flex">
-            <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab;min-height:0">
-              <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
-            </div>
+        <div style="flex:1;overflow:hidden;position:relative;min-height:0;display:flex">
+          <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab;min-height:0">
+            <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
+          </div>
             <!-- Slide-in step config panel -->
             <div id="dag-slide-panel" style="
               position:absolute;top:0;right:0;bottom:0;width:340px;
@@ -1252,10 +1251,11 @@ function renderEditor() {
               </div>
             </div>
           </div>
-          <!-- Decision outcome cards — inside the flex column, below canvas -->
-          <div id="dag-cards" style="display:none;flex-wrap:wrap;gap:10px;padding:10px 12px;
-            border-top:1px solid var(--border);flex-shrink:0;background:var(--bg1);max-height:160px;overflow-y:auto"></div>
         </div>
+        <!-- Decision outcome cards — below canvas row -->
+        <div id="dag-cards" style="display:none;flex-wrap:wrap;gap:10px;padding:10px 12px;
+          border-top:1px solid var(--border);flex-shrink:0;background:var(--bg1);
+          max-height:150px;overflow-y:auto"></div>
       </div>
     </div>`;
 }
@@ -1386,18 +1386,24 @@ function renderDAG() {
   }
 
   // Layout constants
-  const NW = 148, NH = 62, HGAP = 72, PAD_L = 52;
-  const NODE_Y = 80, TRUNK_DROP = 22, BRANCH_GAP = 28, BRANCH_REACH = 108, DR = 8;
+  // Taller node to accommodate name only (owner goes above)
+  const NW = 152, NH = 58, HGAP = 72;
+  // PAD accounts for trigger circle (24r+gap) on left and terminal on right, plus owner label space above
+  const PAD_L = 56, PAD_R = 56;
+  const OWNER_H = 22;   // height of owner strip above each node
+  const NODE_Y  = 50 + OWNER_H;  // nodes start below owner strip space
+  const TRUNK_DROP = 22, BRANCH_GAP = 30, BRANCH_REACH = 108, DR = 8;
 
-  const contentW = PAD_L + steps.length * NW + (steps.length - 1) * HGAP + 60;
+  const contentW = PAD_L + steps.length * NW + (steps.length - 1) * HGAP + PAD_R;
   let maxResets = 0;
   steps.forEach(s => { maxResets = Math.max(maxResets, _dagResetOutcomes(s).length); });
-  const contentH = NODE_Y + NH + TRUNK_DROP + maxResets * BRANCH_GAP + 20;
+  const contentH = NODE_Y + NH + TRUNK_DROP + maxResets * BRANCH_GAP + 30;
 
   if (!_dagAutoFitted) {
     _dagAutoFitted = true;
-    _dagScale = Math.min(1, (W - 16) / contentW);
-    _dagPanX  = Math.max(8, (W - contentW * _dagScale) / 2);
+    // Fit so left bookend (~PAD_L-20) and right bookend (~contentW-PAD_R+20) touch canvas edges with 20px margin
+    _dagScale = Math.max(0.2, Math.min(1, (W - 40) / contentW));
+    _dagPanX  = (W - contentW * _dagScale) / 2;
     _dagPanY  = Math.max(8, (H - contentH * _dagScale) / 2);
   }
 
@@ -1536,44 +1542,46 @@ function renderDAG() {
     }
     ctx.fillStyle=meta.badgeText; ctx.globalAlpha=0.65;
     ctx.beginPath(); ctx.roundRect(p.x,p.y,4,NH,[7,0,0,7]); ctx.fill(); ctx.globalAlpha=1;
-    // Owner strip at top of node — avatar circle + name, left-justified
+
+    // ── Owner strip ABOVE the node rect ──────────────────────────────────────
     const ownerName = s.assignee_name ||
       _users_cad?.find(u => u.id === s.assignee_user_id)?.name ||
       _resources_cad?.find(r => r.id === s.assignee_resource_id)?.name || null;
     if (ownerName) {
       const initials = ownerName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      const avatarR  = 7;
-      const ax = p.x + 12 + avatarR, ay = p.y + 10 + avatarR;
+      const avatarR  = 9;
+      const ax = p.x + 4 + avatarR;
+      const ay = p.y - OWNER_H/2;   // centered in the space above the node
       // Avatar circle
       ctx.beginPath(); ctx.arc(ax, ay, avatarR, 0, Math.PI*2);
-      ctx.fillStyle = meta.badgeText + '33'; ctx.strokeStyle = meta.badgeText + '77'; ctx.lineWidth = 1;
+      ctx.fillStyle = meta.badgeText + '40'; ctx.strokeStyle = meta.badgeText + '88'; ctx.lineWidth = 1;
       ctx.fill(); ctx.stroke();
-      ctx.fillStyle = meta.badgeText; ctx.font = '600 7px system-ui,sans-serif';
+      // Initials
+      ctx.fillStyle = meta.badgeText; ctx.font = '600 9px system-ui,sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.globalAlpha = 0.95;
       ctx.fillText(initials, ax, ay); ctx.globalAlpha = 1;
-      // Name text next to avatar
-      const nameX = ax + avatarR + 5;
+      // Name
+      const nameX = ax + avatarR + 6;
       let nameStr = ownerName;
-      ctx.font = '9px system-ui,sans-serif';
-      const maxNameW = NW - nameX + p.x - 10;
+      ctx.font = '500 10px system-ui,sans-serif';
+      const maxNameW = NW - (nameX - p.x) - 6;
       while (nameStr.length > 2 && ctx.measureText(nameStr).width > maxNameW)
         nameStr = nameStr.slice(0, -1);
       if (nameStr !== ownerName) nameStr += '…';
-      ctx.fillStyle = meta.badgeText; ctx.globalAlpha = 0.7;
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(nameStr, nameX, ay); ctx.globalAlpha = 1;
+      ctx.fillText(nameStr, nameX, ay);
     }
 
-    // Step name — positioned below owner strip if owner exists, else centered
-    const nameTopY = ownerName ? p.y + 10 + 14 + 4 : p.y + 10;
-    ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    // ── Step name inside node ─────────────────────────────────────────────────
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.font = '500 11px system-ui,sans-serif';
     let name = s.name || '';
-    if (ctx.measureText(name).width > NW - 20) {
-      while (name.length > 3 && ctx.measureText(name + '…').width > NW - 20) name = name.slice(0, -1);
+    if (ctx.measureText(name).width > NW - 22) {
+      while (name.length > 3 && ctx.measureText(name + '…').width > NW - 22) name = name.slice(0, -1);
       name += '…';
     }
-    ctx.fillText(name, p.x + 12, nameTopY);
+    ctx.fillText(name, p.x + 12, p.y + NH/2 - 6);
 
     // Type badge bottom-left
     ctx.fillStyle = meta.badgeText; ctx.globalAlpha = 0.55;
@@ -1583,15 +1591,11 @@ function renderDAG() {
     ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '9px monospace';
     ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
     ctx.fillText(s.sequence_order, p.x + NW - 8, p.y + NH - 8);
-    // Due days top-right (only if no owner strip, otherwise it overlaps)
-    if (s.due_days && !ownerName) {
-      ctx.fillStyle = '#e8a838'; ctx.globalAlpha = 0.8; ctx.font = '9px monospace';
+    // Due days — top right inside node
+    if (s.due_days) {
+      ctx.fillStyle = '#e8a838'; ctx.globalAlpha = 0.85; ctx.font = '9px monospace';
       ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-      ctx.fillText('+' + s.due_days + 'd', p.x + NW - 8, p.y + 10); ctx.globalAlpha = 1;
-    } else if (s.due_days && ownerName) {
-      ctx.fillStyle = '#e8a838'; ctx.globalAlpha = 0.7; ctx.font = '8px monospace';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-      ctx.fillText('+' + s.due_days + 'd', p.x + 12, p.y + NH - 7 - 11); ctx.globalAlpha = 1;
+      ctx.fillText('+' + s.due_days + 'd', p.x + NW - 8, p.y + 8); ctx.globalAlpha = 1;
     }
   });
 
@@ -1708,33 +1712,46 @@ function _initDagEvents() {
 
   wrap.addEventListener('mousemove', e => {
     if (_dagDragging) return;
+    const cv   = document.getElementById('dag-canvas');
     const rect = wrap.getBoundingClientRect();
     const mx   = (e.clientX - rect.left  - _dagPanX) / _dagScale;
     const my   = (e.clientY - rect.top   - _dagPanY) / _dagScale;
-    const zones = canvas._dagHitZones || [];
-    const hit   = zones.find(z => Math.hypot(mx - z.cx, my - z.cy) <= z.r);
-    wrap.style.cursor = hit ? 'pointer' : 'grab';
+    // Check diamond zones
+    const zones  = cv?._dagHitZones || [];
+    const diamHit = zones.find(z => Math.hypot(mx - z.cx, my - z.cy) <= z.r);
+    if (diamHit) { wrap.style.cursor = 'pointer'; return; }
+    // Check node zones
+    const steps = (_selectedTmpl?.steps||[]).filter(s=>s.step_type!=='trigger')
+      .sort((a,b)=>a.sequence_order-b.sequence_order);
+    const NW=152, NH=58, HGAP=72, PAD_L=56, OWNER_H=22, NODE_Y=50+OWNER_H;
+    const nodeHit = steps.some((s,i) => {
+      const sx=PAD_L+i*(NW+HGAP), sy=NODE_Y;
+      return mx>=sx && mx<=sx+NW && my>=sy && my<=sy+NH;
+    });
+    wrap.style.cursor = nodeHit ? 'pointer' : 'grab';
   });
 
   wrap.addEventListener('click', e => {
     // Only fire if mousedown and click are within 5px (genuine click, not a drag)
     if (Math.abs(e.clientX - _dagDragStartX) > 5 ||
         Math.abs(e.clientY - _dagDragStartY) > 5) return;
+    const cv   = document.getElementById('dag-canvas');
     const steps = (_selectedTmpl?.steps||[])
       .filter(s => s.step_type !== 'trigger')
       .sort((a,b) => a.sequence_order - b.sequence_order);
-    const NW = 148, NH = 62, HGAP = 72, PAD_L = 52, NODE_Y = 80;
+    // Must match renderDAG layout constants exactly
+    const NW=152, NH=58, HGAP=72, PAD_L=56, OWNER_H=22, NODE_Y=50+OWNER_H;
     const rect = wrap.getBoundingClientRect();
     const mx   = (e.clientX - rect.left  - _dagPanX) / _dagScale;
     const my   = (e.clientY - rect.top   - _dagPanY) / _dagScale;
     // Diamond hit zones first
-    const zones   = canvas._dagHitZones || [];
+    const zones   = cv?._dagHitZones || [];
     const diamHit = zones.find(z => Math.hypot(mx - z.cx, my - z.cy) <= z.r);
     if (diamHit) { _dagJumpToStep(diamHit.stepId, true); return; }
     // Node hit zones
     steps.forEach((s, i) => {
-      const sx = PAD_L + i * (NW + HGAP), sy = NODE_Y;
-      if (mx >= sx && mx <= sx + NW && my >= sy && my <= sy + NH) {
+      const sx = PAD_L + i*(NW+HGAP), sy = NODE_Y;
+      if (mx >= sx && mx <= sx+NW && my >= sy && my <= sy+NH) {
         _dagJumpToStep(s.id, false);
       }
     });
