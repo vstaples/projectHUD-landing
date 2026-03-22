@@ -1378,16 +1378,16 @@ function renderDAG() {
 
   if (!_dagAutoFitted) {
     _dagAutoFitted = true;
-    // Scale to fill width with small margin
-    const scaleForWidth  = (W - 20) / contentW;
-    // Scale to fill height with margin (approximate cards row at 0 since it's outside canvas)
-    const scaleForHeight = (H - 20) / contentH;
-    // Use the smaller of the two so everything fits, cap at 1.0
-    _dagScale = Math.max(0.2, Math.min(1.0, Math.min(scaleForWidth, scaleForHeight)));
-    // Center horizontally and vertically
-    _dagPanX  = Math.max(0, (W - contentW * _dagScale) / 2);
+    // Target: ~48px margin each side from outermost elements (trigger circle left, terminal circle right)
+    // The outermost visual elements are at x≈16 (trigger circle left edge) and x≈contentW-16 (terminal right edge)
+    // So visual width = contentW - 32, and we want it to fit in W - 96 (48px margin each side)
+    const MARGIN = 48;
+    _dagScale = Math.max(0.15, Math.min(1.5, (W - MARGIN * 2) / contentW));
+    // Position so left margin is exactly MARGIN px
+    _dagPanX = MARGIN;
+    // Center vertically in available canvas height
     const scaledH = contentH * _dagScale;
-    _dagPanY  = scaledH < H ? (H - scaledH) / 2 : 10;
+    _dagPanY = scaledH < H ? (H - scaledH) / 2 : MARGIN;
   }
 
   function nodePos(id) {
