@@ -2989,7 +2989,7 @@ async function runBistScript(scriptId, onProgress) {
     if (!instId) return null;
     const [instArr, coc] = await Promise.all([
       API.get(`workflow_instances?id=eq.${instId}`).catch(()=>[]),
-      API.get(`workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`).catch(()=>[]),
+      API.get(`workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc,id.asc,id.asc`).catch(()=>[]),
     ]);
     const inst = instArr?.[0];
     if (!inst) return null;
@@ -4351,7 +4351,7 @@ async function selectInstance(id) {
 
   try {
     const [stepInsts, tmplSteps] = await Promise.all([
-      API.get(`workflow_step_instances?instance_id=eq.${id}&order=created_at.asc`).catch(()=>[]),
+      API.get(`workflow_step_instances?instance_id=eq.${id}&order=created_at.asc,id.asc`).catch(()=>[]),
       (() => {
         const tmpl = _templates.find(t => t.id === _selectedInstance.template_id);
         return tmpl
@@ -5143,7 +5143,7 @@ async function addReassignment(instId, stepId) {
     // Reload CoC
     if (inst) {
       inst._stepInsts = await API.get(
-        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc,id.asc`
       ).catch(() => inst._stepInsts);
     }
 
@@ -5185,7 +5185,7 @@ async function removeReassignment(instId, stepId, cocEventId) {
     // Reload CoC and re-render
     if (inst) {
       inst._stepInsts = await API.get(
-        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc,id.asc`
       ).catch(() => inst._stepInsts);
     }
     cadToast('Assignee removed', 'success');
@@ -5213,7 +5213,7 @@ async function overrideTemplateAssignee(instId, stepId) {
     });
     if (inst) {
       inst._stepInsts = await API.get(
-        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc,id.asc`
       ).catch(() => inst._stepInsts);
     }
     cadToast('Template assignee removed', 'success');
@@ -5545,12 +5545,13 @@ async function submitComplete(instId, stepId) {
       // ── Explicit route — reset intervening steps, activate target ─────────
       const targetStep = allSteps.find(s => s.id === routeTargetId);
       if (targetStep) {
-        // Reset all steps from target up to (not including) current step
+        const now = Date.now();
         const stepsToReset = allSteps
           .filter(s => s.sequence_order >= targetStep.sequence_order
                     && s.sequence_order < currOrder)
           .sort((a, b) => a.sequence_order - b.sequence_order);
-        for (const rs of stepsToReset) {
+        for (let i = 0; i < stepsToReset.length; i++) {
+          const rs = stepsToReset[i];
           await API.post('workflow_step_instances', {
             instance_id:      instId, firm_id: FIRM_ID_CAD,
             event_type:       'step_reset',
@@ -5559,10 +5560,10 @@ async function submitComplete(instId, stepId) {
             step_name:        rs.name || null,
             actor_name:       'System',
             event_notes:      `Reset by ${outcomeLabel} on ${step?.name}`,
-            created_at:       new Date().toISOString(),
+            created_at:       new Date(now + i + 1).toISOString(),
           });
         }
-        // Activate target
+        // Activate target — timestamp after all resets
         await API.post('workflow_step_instances', {
           instance_id:      instId, firm_id: FIRM_ID_CAD,
           event_type:       'step_activated',
@@ -5570,7 +5571,7 @@ async function submitComplete(instId, stepId) {
           step_type:        targetStep.step_type || 'action',
           step_name:        targetStep.name || null,
           actor_name:       'System',
-          created_at:       new Date().toISOString(),
+          created_at:       new Date(now + stepsToReset.length + 2).toISOString(),
         }).catch(() => {});
         _notifyStepActivated(instId, targetStep, inst).catch(() => {});
       }
@@ -5581,12 +5582,13 @@ async function submitComplete(instId, stepId) {
         .filter(s => s.step_type !== 'trigger')
         .sort((a, b) => a.sequence_order - b.sequence_order)[0];
       if (firstStep) {
-        // Reset all steps from first up to (not including) current
+        const now = Date.now();
         const stepsToReset = allSteps
           .filter(s => s.sequence_order >= firstStep.sequence_order
                     && s.sequence_order < currOrder)
           .sort((a, b) => a.sequence_order - b.sequence_order);
-        for (const rs of stepsToReset) {
+        for (let i = 0; i < stepsToReset.length; i++) {
+          const rs = stepsToReset[i];
           await API.post('workflow_step_instances', {
             instance_id:      instId, firm_id: FIRM_ID_CAD,
             event_type:       'step_reset',
@@ -5595,7 +5597,7 @@ async function submitComplete(instId, stepId) {
             step_name:        rs.name || null,
             actor_name:       'System',
             event_notes:      `Reset by ${outcomeLabel} on ${step?.name}`,
-            created_at:       new Date().toISOString(),
+            created_at:       new Date(now + i + 1).toISOString(),
           });
         }
         await API.post('workflow_step_instances', {
@@ -5605,7 +5607,7 @@ async function submitComplete(instId, stepId) {
           step_type:        firstStep.step_type || 'action',
           step_name:        firstStep.name || null,
           actor_name:       'System',
-          created_at:       new Date().toISOString(),
+          created_at:       new Date(now + stepsToReset.length + 2).toISOString(),
         }).catch(() => {});
         _notifyStepActivated(instId, firstStep, inst).catch(() => {});
       }
@@ -5758,7 +5760,7 @@ async function _reloadInstance(instId) {
       _selectedInstance = _instances[idx];
       // Reload CoC
       _selectedInstance._stepInsts = await API.get(
-        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc`
+        `workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc,id.asc`
       ).catch(() => _selectedInstance._stepInsts || []);
     }
   }
