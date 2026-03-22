@@ -3725,7 +3725,6 @@ async function runSingleTest(scriptId) {
   if (chevronEl) chevronEl.style.transform = 'rotate(90deg)';
 
   // Reset all assertion rows to pending (○ gray)
-  const planEl = document.getElementById(`bist-plan-${scriptId}`);
   planEl?.querySelectorAll('[id^="' + scriptId + '-"]').forEach(row => {
     const icon = row.querySelector('span:first-child');
     if (icon) { icon.textContent = '○'; icon.style.color = 'var(--muted)'; }
