@@ -869,7 +869,7 @@ const DEFAULT_OUTCOMES = {
   ],
   form:         [
     { id:'submitted',         label:'Submitted',          color:'#1D9E75', isDefault:true  },
-    { id:'saved_incomplete',  label:'Saved (incomplete)', color:'#BA7517', isDefault:false },
+    { id:'saved_incomplete',  label:'Saved (incomplete)', color:'#BA7517', isDefault:false, isPartial:true },
   ],
   action:       [
     { id:'done',              label:'Done',               color:'#1D9E75', isDefault:true  },
@@ -1323,14 +1323,14 @@ function renderDAG() {
   const NODE_Y  = 80;   // space above nodes for branch routing
   const RESET_H = 32;
 
-  // Count reset edges and max forward labels per gap for spacing
+  // Count reset outcomes and forward labels for spacing
   let resetCount = 0;
   let maxForwardLabels = 0;
   steps.forEach((s, i) => {
     const outs = _getOutcomes(s);
-    const resets   = outs.filter(o => o.requiresReset && !o.requiresSuspend).length;
-    const forwards = outs.filter(o => !o.requiresReset && !o.requiresSuspend).length;
-    resetCount += resets;
+    const resets   = outs.filter(o => o.requiresReset && !o.requiresSuspend && !o.isPartial).length;
+    const forwards = outs.filter(o => !o.requiresReset && !o.requiresSuspend && !o.isPartial).length;
+    resetCount = Math.max(resetCount, resets); // worst case per step (diamonds expand sideways)
     if (i < steps.length - 1) maxForwardLabels = Math.max(maxForwardLabels, forwards);
   });
 
@@ -1339,7 +1339,9 @@ function renderDAG() {
   const H_GAP   = Math.max(70, maxForwardLabels * LABEL_H + 30);
 
   const contentW = PAD_L + steps.length * NW + (steps.length - 1) * H_GAP + PAD_R;
-  const contentH = NODE_Y + NH + (resetCount > 0 ? 20 + resetCount * RESET_H : 0) + 20;
+  // Below nodes: trunk + branches + diamond + sub-options
+  const belowH   = resetCount > 0 ? 20 + resetCount * RESET_H + 50 : 0;
+  const contentH = NODE_Y + NH + belowH + 20;
 
   // Auto-fit + center — use a flag so it only runs once per template
   if (!_dagAutoFitted) {
@@ -1365,26 +1367,31 @@ function renderDAG() {
     const nextStep = steps[i + 1];
 
     outcomes.forEach(o => {
+      if (o.isPartial) return; // saved_incomplete etc — not routing outcomes
       if (o.requiresSuspend) {
         edges.push({ from: s, to: null, outcome: o, type: 'suspend' });
       } else if (o.requiresReset) {
-        // Smart reset target: go back 2 steps for approval/signoff, 1 step otherwise
-        // This is the diagram default — actual routing uses route_to_step_id from CoC
-        const stepsBack = (s.step_type === 'meeting') ? Math.min(i, steps.length - 1) : 1;
-        const resetTarget = steps[Math.max(0, i - stepsBack)];
-        edges.push({ from: s, to: resetTarget, outcome: o, type: 'reset' });
+        // Reset outcomes route to a decision diamond (target determined at runtime)
+        edges.push({ from: s, to: null, outcome: o, type: 'reset_decision' });
       } else if (nextStep) {
         edges.push({ from: s, to: nextStep, outcome: o, type: 'forward' });
       }
     });
   });
 
-  // Group edges by from→to for label stacking
+  // Group forward edges by from→to
+  // Group reset_decision edges by from node (each outcome gets its own branch)
   const edgeGroups = {};
   edges.forEach(e => {
-    const key = `${e.from.id}→${e.to?.id||'end'}`;
-    if (!edgeGroups[key]) edgeGroups[key] = { ...e, labels: [] };
-    edgeGroups[key].labels.push(e.outcome);
+    if (e.type === 'reset_decision') {
+      // Each reset outcome is its own entry
+      const key = `reset:${e.from.id}:${e.outcome.id}`;
+      edgeGroups[key] = { ...e, labels: [e.outcome] };
+    } else {
+      const key = `${e.from.id}→${e.to?.id||'end'}`;
+      if (!edgeGroups[key]) edgeGroups[key] = { ...e, labels: [] };
+      edgeGroups[key].labels.push(e.outcome);
+    }
   });
 
   // ── Draw ──────────────────────────────────────────────────────────────────
@@ -1413,49 +1420,105 @@ function renderDAG() {
     _dagArrow(ctx, tx + 14, ty, fp.x, ty, 'rgba(255,255,255,.2)', false, false);
   }
 
-  // Reset back-edges — drawn below nodes, staggered by depth
-  let resetDepth = 0;
+  // Reset decision branches — drawn below nodes as decision diamonds
+  // Group by source step so multiple reset outcomes from same step share a trunk
+  const resetByStep = {};
   Object.values(edgeGroups).forEach(eg => {
-    if (eg.type !== 'reset' || !eg.to) return;
-    const fp = pos[eg.from.id];
-    const tp = pos[eg.to.id];
-    if (!fp || !tp) return;
+    if (eg.type !== 'reset_decision') return;
+    const sid = eg.from.id;
+    if (!resetByStep[sid]) resetByStep[sid] = [];
+    resetByStep[sid].push(eg);
+  });
 
-    const depth    = resetDepth++;
-    const dropY    = NODE_Y + NH + 16 + depth * RESET_H;
-    const fromMidX = fp.x + NW / 2;
-    const toMidX   = tp.x + NW / 2;
-    const fromBotY = NODE_Y + NH;
-    const toBotY   = NODE_Y + NH;
-    const label    = eg.labels.map(o => o.label).join(' / ');
-    const color    = eg.labels[0].color || '#E24B4A';
+  Object.entries(resetByStep).forEach(([sid, egs]) => {
+    const fp    = pos[sid];
+    if (!fp) return;
+    const srcX  = fp.x + NW / 2;
+    const srcY  = fp.y + NH;
+    const baseY = srcY + 14;
 
+    // Trunk down from node bottom
     ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = 1.5;
-    ctx.setLineDash([5, 3]);
-    ctx.globalAlpha = 0.65;
-    // Orthogonal: down from source → horizontal → up to target bottom
-    ctx.moveTo(fromMidX, fromBotY);
-    ctx.lineTo(fromMidX, dropY);
-    ctx.lineTo(toMidX,   dropY);
-    ctx.lineTo(toMidX,   toBotY + 4);
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.15)';
+    ctx.lineWidth   = 1;
     ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
+    ctx.moveTo(srcX, srcY);
+    ctx.lineTo(srcX, baseY + (egs.length - 1) * RESET_H);
+    ctx.stroke();
 
-    // Arrowhead pointing up into target bottom
-    _dagArrowHead(ctx, toMidX, toBotY, 'up', color);
+    egs.forEach((eg, bi) => {
+      const o        = eg.labels[0];
+      const col      = o.color || '#E24B4A';
+      const branchY  = baseY + bi * RESET_H;
+      const endX     = srcX + 90;
 
-    // Label centered on the horizontal segment
-    const lx = (fromMidX + toMidX) / 2;
-    ctx.fillStyle    = color;
-    ctx.font         = `10px var(--font-mono, monospace)`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.globalAlpha  = 0.8;
-    ctx.fillText('↩ ' + label, lx, dropY + 10);
-    ctx.globalAlpha = 1;
+      // Horizontal branch
+      ctx.beginPath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.5;
+      ctx.setLineDash([5, 3]);
+      ctx.globalAlpha = 0.65;
+      ctx.moveTo(srcX, branchY);
+      ctx.lineTo(endX, branchY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+
+      // Decision diamond
+      const dx = endX + 12, dy = branchY, ds = 8;
+      ctx.beginPath();
+      ctx.moveTo(dx,      dy - ds);
+      ctx.lineTo(dx + ds, dy);
+      ctx.lineTo(dx,      dy + ds);
+      ctx.lineTo(dx - ds, dy);
+      ctx.closePath();
+      ctx.fillStyle   = col + '22';
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.5;
+      ctx.globalAlpha = 0.8;
+      ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Outcome label on branch
+      const lx = (srcX + endX) / 2;
+      ctx.font = `9px var(--font-mono, monospace)`;
+      const tw = ctx.measureText(o.label).width;
+      ctx.fillStyle   = 'rgba(14,17,23,.9)';
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.roundRect(lx - tw/2 - 4, branchY - 11, tw + 8, 11, 3);
+      ctx.fill();
+      ctx.fillStyle    = col;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha  = 1;
+      ctx.fillText(o.label, lx, branchY - 5);
+
+      // Three sub-options fanning out from diamond bottom
+      const subLabels = ['Revert to prior', 'Revert to start', 'Abort'];
+      const subColors = ['#BA7517', '#E24B4A', '#666'];
+      const subY      = dy + ds + 14;
+      const spread    = 40;
+      subLabels.forEach((sub, si) => {
+        const sx2 = dx + (si - 1) * spread;
+        ctx.beginPath();
+        ctx.strokeStyle = subColors[si];
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([3, 2]);
+        ctx.globalAlpha = 0.4;
+        ctx.moveTo(dx, dy + ds);
+        ctx.lineTo(sx2, subY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle    = subColors[si];
+        ctx.font         = `8px var(--font-mono, monospace)`;
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'top';
+        ctx.globalAlpha  = 0.55;
+        ctx.fillText(sub, sx2, subY + 2);
+        ctx.globalAlpha  = 1;
+      });
+    });
   });
 
   // Forward and suspend edges
