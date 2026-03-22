@@ -5175,6 +5175,10 @@ function renderInstancesTab(el) {
 let _selectedInstance = null;
 
 async function selectInstance(id) {
+  _instDagFitted=false; _instDagPanX=0; _instDagPanY=0; _instDagScale=1;
+  if(_instDagPulseFrame) { cancelAnimationFrame(_instDagPulseFrame); _instDagPulseFrame=null; }
+  const wrap=document.getElementById('inst-dag-canvas-wrap');
+  if(wrap) wrap._instDagEventsInit=false;
   _selectedInstance = _instances.find(i => i.id === id) || null;
   if (!_selectedInstance) return;
 
@@ -5317,6 +5321,7 @@ function renderInstanceDetail(el, inst) {
   const isCancelled  = inst.status === 'cancelled';
   const isComplete   = inst.status === 'complete';
   const canAct       = !isCancelled && !isComplete;
+  const viewMode     = inst._viewMode || 'list';
 
   el.innerHTML = `
     <!-- Header -->
@@ -5334,6 +5339,20 @@ function renderInstanceDetail(el, inst) {
             : '—'}</strong></span>
           <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
         </div>
+      </div>
+
+      <!-- View Mode tabs -->
+      <div style="display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;flex-shrink:0">
+        <button onclick="setInstViewMode('list')"
+          style="padding:5px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;
+            background:${viewMode==='list'?'var(--cad)':'transparent'};
+            color:${viewMode==='list'?'var(--bg0)':'var(--muted)'};
+            border:none;cursor:pointer;transition:all .12s">LIST</button>
+        <button onclick="setInstViewMode('diagram')"
+          style="padding:5px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;
+            background:${viewMode==='diagram'?'var(--cad)':'transparent'};
+            color:${viewMode==='diagram'?'var(--bg0)':'var(--muted)'};
+            border:none;border-left:1px solid var(--border);cursor:pointer;transition:all .12s">DIAGRAM</button>
       </div>
 
       <!-- Digital elapsed clock — dd:hh:mm since launch -->
@@ -5382,8 +5401,32 @@ function renderInstanceDetail(el, inst) {
       </div>
     </div>
 
-    <!-- Body: steps flex:1 + CoC fixed 300px -->
-    <div style="display:flex;height:calc(100% - 65px);overflow:hidden">
+    <!-- Body: conditional on view mode -->
+    <div style="display:flex;flex-direction:column;height:calc(100% - 65px);overflow:hidden">
+    ${viewMode === 'diagram' ? `
+      <!-- ── DIAGRAM VIEW ─────────────────────────────────────── -->
+      <div id="inst-dag-wrap" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;position:relative">
+        <!-- Diagram controls -->
+        <div style="display:flex;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border);flex-shrink:0;align-items:center;background:var(--bg1)">
+          <button onclick="instDagZoom(1.2)" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">+ Zoom</button>
+          <button onclick="instDagZoom(0.83)" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">− Zoom</button>
+          <button onclick="instDagReset()" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer">⟲ Reset</button>
+          <div style="display:flex;gap:10px;margin-left:12px;align-items:center">
+            <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green)"></span>Complete</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--amber)"></span>Active</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red)"></span>Rejected</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--muted)"></span>Pending</span>
+          </div>
+          <span style="margin-left:auto;font-size:10px;color:var(--muted)">Click a node to act</span>
+        </div>
+        <!-- Canvas -->
+        <div id="inst-dag-canvas-wrap" style="flex:1;position:relative;overflow:hidden;cursor:grab;min-height:0">
+          <canvas id="inst-dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
+        </div>
+      </div>
+    ` : `
+      <!-- ── LIST VIEW ────────────────────────────────────────── -->
+      <div style="display:flex;height:100%;overflow:hidden">
 
       <!-- Workflow Steps — fills remaining width -->
       <div style="flex:1;overflow-y:auto;padding:16px 20px;min-width:0">
@@ -5829,10 +5872,379 @@ function renderInstanceDetail(el, inst) {
             }).join('')}
       </div>
 
-    </div>`;
+      </div>
+
+    </div>
+    `}
+    </div>`; // close outer body flex
 
   // Start live tick for active step timers (dd:hh:mm updates every 30s)
   _startElapsedTimer(inst);
+
+  // If diagram mode, render the instance DAG after DOM settles
+  if (viewMode === 'diagram') {
+    setTimeout(() => renderInstanceDAG(inst), 60);
+  }
+}
+
+// ── Instance view mode switcher ───────────────────────────────────────────────
+function setInstViewMode(mode) {
+  if (!_selectedInstance) return;
+  _selectedInstance._viewMode = mode;
+  const el = document.getElementById('instance-detail');
+  if (el) renderInstanceDetail(el, _selectedInstance);
+}
+
+// ── Instance DAG state ────────────────────────────────────────────────────────
+let _instDagPanX=0, _instDagPanY=0, _instDagScale=1, _instDagFitted=false;
+let _instDagDrag=false, _instDagDSX=0, _instDagDSY=0, _instDagPSX=0, _instDagPSY=0;
+let _instDagPulseFrame=null;
+
+function instDagZoom(f) { _instDagScale=Math.max(0.2,Math.min(3,_instDagScale*f)); renderInstanceDAG(_selectedInstance); }
+function instDagReset() { _instDagPanX=0;_instDagPanY=0;_instDagScale=1;_instDagFitted=false; renderInstanceDAG(_selectedInstance); }
+
+// ── Instance DAG renderer ─────────────────────────────────────────────────────
+function renderInstanceDAG(inst) {
+  if (!inst) return;
+  const wrap   = document.getElementById('inst-dag-canvas-wrap');
+  const canvas = document.getElementById('inst-dag-canvas');
+  if (!wrap || !canvas) return;
+
+  const steps = (inst._tmplSteps || [])
+    .filter(s => s.step_type !== 'trigger')
+    .sort((a,b) => a.sequence_order - b.sequence_order);
+  const coc = inst._stepInsts || [];
+
+  const W = wrap.offsetWidth || 800;
+  const H = wrap.offsetHeight || 400;
+  if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 80); return; }
+
+  canvas.width = W; canvas.height = H;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  if (!steps.length) {
+    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='13px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('No steps in this template',W/2,H/2); return;
+  }
+
+  // ── Derive state from CoC ─────────────────────────────────────────────────
+  const latestEvt = {};
+  coc.forEach(e => { if (e.template_step_id) latestEvt[e.template_step_id] = e; });
+
+  const completedIds = new Set(
+    Object.entries(latestEvt).filter(([,e])=>e.event_type==='step_completed').map(([id])=>id)
+  );
+  const resetIds = new Set(
+    Object.entries(latestEvt).filter(([,e])=>e.event_type==='step_reset').map(([id])=>id)
+  );
+  const activeIds = new Set(
+    Object.entries(latestEvt).filter(([,e])=>e.event_type==='step_activated').map(([id])=>id)
+  );
+
+  // Rejection loops count per step
+  const loopCount = {};
+  coc.forEach(e => {
+    if (e.event_type==='step_reset' && e.template_step_id) {
+      loopCount[e.template_step_id] = (loopCount[e.template_step_id]||0)+1;
+    }
+  });
+
+  // Activation timestamps for elapsed time
+  const activatedAt = {};
+  coc.filter(e=>e.event_type==='step_activated'&&e.template_step_id)
+     .forEach(e=>{ if(!activatedAt[e.template_step_id]) activatedAt[e.template_step_id]=e.created_at; });
+  const completedAt = {};
+  coc.filter(e=>e.event_type==='step_completed'&&e.template_step_id)
+     .forEach(e=>{ completedAt[e.template_step_id]=e.created_at; });
+
+  // Latest outcome per step
+  const stepOutcome = {};
+  coc.filter(e=>e.event_type==='step_completed'&&e.template_step_id&&e.outcome)
+     .forEach(e=>{ stepOutcome[e.template_step_id]=e.outcome; });
+
+  // Which edges were actually traversed
+  const traversedEdges = new Set();
+  coc.filter(e=>e.event_type==='step_activated'&&e.template_step_id)
+     .forEach(e=>{
+       const idx=steps.findIndex(s=>s.id===e.template_step_id);
+       if(idx>0) traversedEdges.add(`${steps[idx-1].id}->${e.template_step_id}`);
+     });
+
+  // Derive step state
+  function stepState(s) {
+    const e = latestEvt[s.id];
+    if (!e) return 'pending';
+    if (e.event_type==='step_completed') {
+      const oDef = _getOutcomes(s).find(o=>o.id===stepOutcome[s.id]);
+      return oDef?.requiresReset ? 'rejected' : 'complete';
+    }
+    if (e.event_type==='step_activated') return 'active';
+    if (e.event_type==='step_reset')     return 'reset';
+    return 'pending';
+  }
+
+  const STATE_COLORS = {
+    complete: '#1D9E75',
+    active:   '#e8a838',
+    rejected: '#E24B4A',
+    reset:    '#BA7517',
+    pending:  'rgba(255,255,255,.2)',
+  };
+  const STATE_BG = {
+    complete: 'rgba(29,158,117,.12)',
+    active:   'rgba(232,168,56,.1)',
+    rejected: 'rgba(226,75,74,.12)',
+    reset:    'rgba(186,117,23,.08)',
+    pending:  'rgba(255,255,255,.03)',
+  };
+
+  // ── Layout ────────────────────────────────────────────────────────────────
+  const NW=152, NH=68, HGAP=72, PAD_L=56, PAD_R=56;
+  const OWNER_H=20, NODE_Y=50+OWNER_H;
+  const contentW = PAD_L + steps.length*NW + (steps.length-1)*HGAP + PAD_R;
+  const contentH = NODE_Y + NH + 60;
+
+  if (!_instDagFitted) {
+    _instDagFitted=true;
+    _instDagScale=Math.max(0.2, Math.min(1.2, (W-40)/contentW));
+    _instDagPanX=(W-contentW*_instDagScale)/2;
+    _instDagPanY=Math.max(8,(H-contentH*_instDagScale)/2);
+  }
+
+  function nodePos(id) {
+    const i=steps.findIndex(s=>s.id===id);
+    return {x:PAD_L+i*(NW+HGAP), y:NODE_Y};
+  }
+
+  function ah(x,y,dir,col,a=0.8) {
+    const sz=7; ctx.beginPath(); ctx.fillStyle=col; ctx.globalAlpha=a;
+    if(dir==='right'){ctx.moveTo(x,y);ctx.lineTo(x-sz,y-sz*.5);ctx.lineTo(x-sz,y+sz*.5);}
+    if(dir==='left') {ctx.moveTo(x,y);ctx.lineTo(x+sz,y-sz*.5);ctx.lineTo(x+sz,y+sz*.5);}
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+  }
+
+  ctx.save();
+  ctx.translate(_instDagPanX, _instDagPanY);
+  ctx.scale(_instDagScale, _instDagScale);
+
+  // ── Trigger ───────────────────────────────────────────────────────────────
+  const fp0=nodePos(steps[0].id);
+  const tx=fp0.x-36, ty=fp0.y+NH/2;
+  ctx.beginPath(); ctx.arc(tx,ty,12,0,Math.PI*2);
+  ctx.fillStyle='rgba(192,64,74,.15)'; ctx.strokeStyle='rgba(192,64,74,.6)'; ctx.lineWidth=1.5;
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#c0404a'; ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('⚡',tx,ty);
+  ctx.beginPath(); ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1.2;
+  ctx.moveTo(tx+12,ty); ctx.lineTo(fp0.x,ty); ctx.stroke();
+  ah(fp0.x,ty,'right','rgba(255,255,255,.3)');
+
+  // ── Edges ─────────────────────────────────────────────────────────────────
+  steps.forEach((s,i) => {
+    const next=steps[i+1]; if(!next) return;
+    const fp=nodePos(s.id), tp=nodePos(next.id);
+    const x1=fp.x+NW, x2=tp.x, my=fp.y+NH/2;
+    const traversed=traversedEdges.has(`${s.id}->${next.id}`);
+    const state=stepState(s);
+    const edgeCol=traversed
+      ? (state==='rejected'?'#E24B4A':state==='complete'?'#1D9E75':'#e8a838')
+      : 'rgba(255,255,255,.12)';
+    ctx.beginPath(); ctx.strokeStyle=edgeCol; ctx.lineWidth=traversed?2:1;
+    ctx.setLineDash(traversed?[]:[4,4]);
+    ctx.globalAlpha=traversed?.85:.4;
+    ctx.moveTo(x1,my); ctx.lineTo(x2-8,my); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+    if(traversed) ah(x2,my,'right',edgeCol,0.85);
+  });
+
+  // ── Terminal ──────────────────────────────────────────────────────────────
+  const lp=nodePos(steps[steps.length-1].id);
+  const termX=lp.x+NW+HGAP/2, termY=lp.y+NH/2;
+  const instDone=inst.status==='complete';
+  ctx.beginPath(); ctx.strokeStyle=instDone?'rgba(42,157,64,.7)':'rgba(255,255,255,.15)'; ctx.lineWidth=1.5;
+  ctx.moveTo(lp.x+NW,termY); ctx.lineTo(termX-14,termY); ctx.stroke();
+  if(instDone) ah(termX-2,termY,'right','rgba(42,157,64,.8)');
+  ctx.beginPath(); ctx.arc(termX,termY,12,0,Math.PI*2);
+  ctx.fillStyle=instDone?'rgba(42,157,64,.2)':'rgba(255,255,255,.04)';
+  ctx.strokeStyle=instDone?'rgba(42,157,64,.6)':'rgba(255,255,255,.15)'; ctx.lineWidth=1.5;
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle=instDone?'#7af0a0':'rgba(255,255,255,.2)'; ctx.font='12px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(instDone?'✓':'◎',termX,termY);
+
+  // ── Nodes ─────────────────────────────────────────────────────────────────
+  const now=Date.now();
+  steps.forEach(s => {
+    const meta=STEP_META[s.step_type]||STEP_META.action;
+    const p=nodePos(s.id);
+    const state=stepState(s);
+    const stateCol=STATE_COLORS[state]||STATE_COLORS.pending;
+    const stateBg=STATE_BG[state]||STATE_BG.pending;
+
+    // Pulse ring for active step
+    if(state==='active') {
+      const pulse=(Math.sin(now/600)+1)/2;
+      ctx.beginPath(); ctx.arc(p.x+NW/2,p.y+NH/2,Math.max(NW,NH)/2+6+pulse*8,0,Math.PI*2);
+      ctx.strokeStyle='#e8a838'; ctx.lineWidth=1.5; ctx.globalAlpha=0.2+pulse*0.3;
+      ctx.stroke(); ctx.globalAlpha=1;
+    }
+
+    // Node shadow
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.roundRect(p.x+2,p.y+2,NW,NH,7); ctx.fill();
+
+    // Node body
+    ctx.fillStyle=stateBg; ctx.strokeStyle=stateCol; ctx.lineWidth=state==='active'?2:1.5;
+    ctx.beginPath(); ctx.roundRect(p.x,p.y,NW,NH,7); ctx.fill(); ctx.stroke();
+
+    // Left accent bar
+    ctx.fillStyle=stateCol; ctx.globalAlpha=0.8;
+    ctx.beginPath(); ctx.roundRect(p.x,p.y,4,NH,[7,0,0,7]); ctx.fill(); ctx.globalAlpha=1;
+
+    // Owner above node
+    const ownerName=s.assignee_name||_users_cad?.find(u=>u.id===s.assignee_user_id)?.name||null;
+    if(ownerName) {
+      const initials=ownerName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const ax=p.x+4+9, ay=p.y-OWNER_H/2;
+      ctx.beginPath(); ctx.arc(ax,ay,9,0,Math.PI*2);
+      ctx.fillStyle=stateCol+'40'; ctx.strokeStyle=stateCol+'88'; ctx.lineWidth=1; ctx.fill(); ctx.stroke();
+      ctx.fillStyle=stateCol; ctx.font='600 9px system-ui,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.globalAlpha=0.95;
+      ctx.fillText(initials,ax,ay); ctx.globalAlpha=1;
+      let nm=ownerName; ctx.font='500 10px system-ui,sans-serif';
+      const nmX=ax+9+6, maxW=NW-(nmX-p.x)-6;
+      while(nm.length>2&&ctx.measureText(nm).width>maxW) nm=nm.slice(0,-1);
+      if(nm!==ownerName) nm+='…';
+      ctx.fillStyle='rgba(255,255,255,.7)'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(nm,nmX,ay);
+    }
+
+    // Step name
+    ctx.fillStyle='rgba(255,255,255,.92)'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.font='500 11px system-ui,sans-serif';
+    let name=s.name||'';
+    if(ctx.measureText(name).width>NW-22){
+      while(name.length>3&&ctx.measureText(name+'…').width>NW-22) name=name.slice(0,-1);
+      name+='…';
+    }
+    ctx.fillText(name,p.x+12,p.y+NH/2-6);
+
+    // State badge bottom-left
+    const stateLabel={complete:'✓ Complete',active:'● Active',rejected:'✕ Rejected',reset:'↩ Reset',pending:'Pending'};
+    ctx.fillStyle=stateCol; ctx.globalAlpha=0.8; ctx.font='8px monospace'; ctx.textBaseline='bottom'; ctx.textAlign='left';
+    ctx.fillText(stateLabel[state]||state, p.x+12, p.y+NH-7); ctx.globalAlpha=1;
+
+    // Seq num bottom-right
+    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='9px monospace'; ctx.textAlign='right'; ctx.textBaseline='bottom';
+    ctx.fillText(s.sequence_order, p.x+NW-8, p.y+NH-8);
+
+    // Outcome pill top-right (completed steps)
+    if(stepOutcome[s.id]) {
+      const oDef=_getOutcomes(s).find(o=>o.id===stepOutcome[s.id]);
+      const oLabel=oDef?.label||stepOutcome[s.id];
+      const oCol=oDef?.color||stateCol;
+      ctx.font='8px monospace';
+      const tw=ctx.measureText(oLabel).width;
+      const pw=tw+8, ph=12;
+      ctx.fillStyle=oCol+'22'; ctx.strokeStyle=oCol+'88'; ctx.lineWidth=1; ctx.globalAlpha=0.9;
+      ctx.beginPath(); ctx.roundRect(p.x+NW-pw-6,p.y+6,pw,ph,3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=oCol; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.globalAlpha=1;
+      ctx.fillText(oLabel,p.x+NW-pw/2-6+pw/2,p.y+6+ph/2);
+    }
+
+    // Elapsed time for completed steps
+    if(activatedAt[s.id] && completedAt[s.id]) {
+      const ms=new Date(completedAt[s.id])-new Date(activatedAt[s.id]);
+      const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+      const elapsed=h>0?`${h}h ${m}m`:`${m}m`;
+      ctx.fillStyle='rgba(255,255,255,.3)'; ctx.font='8px monospace';
+      ctx.textAlign='right'; ctx.textBaseline='top';
+      ctx.fillText(elapsed,p.x+NW-8,p.y+8);
+    }
+    // Live elapsed for active step
+    if(state==='active' && activatedAt[s.id]) {
+      const ms=now-new Date(activatedAt[s.id]);
+      const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+      const elapsed=h>0?`${h}h ${m}m`:`${m}m`;
+      ctx.fillStyle='#e8a838'; ctx.globalAlpha=0.8; ctx.font='8px monospace';
+      ctx.textAlign='right'; ctx.textBaseline='top';
+      ctx.fillText('⏱ '+elapsed,p.x+NW-8,p.y+8); ctx.globalAlpha=1;
+    }
+
+    // Rejection loop count badge
+    if(loopCount[s.id]) {
+      const lbl=`↩ ${loopCount[s.id]}`;
+      ctx.fillStyle='rgba(226,75,74,.15)'; ctx.strokeStyle='rgba(226,75,74,.5)'; ctx.lineWidth=1;
+      ctx.globalAlpha=0.9;
+      ctx.beginPath(); ctx.roundRect(p.x+12,p.y+NH-22,30,12,3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#E24B4A'; ctx.font='8px monospace'; ctx.textAlign='center';
+      ctx.textBaseline='middle'; ctx.globalAlpha=1;
+      ctx.fillText(lbl,p.x+27,p.y+NH-16);
+    }
+  });
+
+  ctx.restore();
+
+  // Update zoom label if present
+  const zlbl=document.getElementById('dag-zoom-label');
+  if(zlbl) zlbl.textContent=Math.round(_instDagScale*100)+'%';
+
+  // Animate pulse for active step
+  if(_instDagPulseFrame) cancelAnimationFrame(_instDagPulseFrame);
+  if(steps.some(s=>stepState(s)==='active') && inst._viewMode==='diagram') {
+    _instDagPulseFrame=requestAnimationFrame(()=>renderInstanceDAG(inst));
+  }
+
+  // Wire events (once)
+  if(!wrap._instDagEventsInit) {
+    wrap._instDagEventsInit=true;
+    wrap.addEventListener('mousedown',e=>{
+      _instDagDrag=true; _instDagDSX=e.clientX; _instDagDSY=e.clientY;
+      _instDagPSX=_instDagPanX; _instDagPSY=_instDagPanY;
+      wrap.style.cursor='grabbing'; e.preventDefault();
+    });
+    window.addEventListener('mousemove',e=>{
+      if(!_instDagDrag) return;
+      _instDagPanX=_instDagPSX+(e.clientX-_instDagDSX);
+      _instDagPanY=_instDagPSY+(e.clientY-_instDagDSY);
+      renderInstanceDAG(inst);
+    });
+    window.addEventListener('mouseup',()=>{ _instDagDrag=false; wrap.style.cursor='grab'; });
+    wrap.addEventListener('wheel',e=>{
+      e.preventDefault();
+      if(e.ctrlKey||e.metaKey){
+        const r=wrap.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+        const f=e.deltaY<0?1.12:0.89,ns=Math.max(0.2,Math.min(3,_instDagScale*f));
+        _instDagPanX=mx-(mx-_instDagPanX)*(ns/_instDagScale);
+        _instDagPanY=my-(my-_instDagPanY)*(ns/_instDagScale);
+        _instDagScale=ns;
+      } else { _instDagPanX-=e.deltaX; _instDagPanY-=e.deltaY; }
+      renderInstanceDAG(inst);
+    },{passive:false});
+    // Click node to open step completion in list view
+    wrap.addEventListener('click',e=>{
+      if(Math.abs(e.clientX-_instDagDSX)>5||Math.abs(e.clientY-_instDagDSY)>5) return;
+      const r=wrap.getBoundingClientRect();
+      const mx=(e.clientX-r.left-_instDagPanX)/_instDagScale;
+      const my=(e.clientY-r.top-_instDagPanY)/_instDagScale;
+      steps.forEach((s,i)=>{
+        const px=PAD_L+i*(NW+HGAP), py=NODE_Y;
+        if(mx>=px&&mx<=px+NW&&my>=py&&my<=py+NH) {
+          // Switch to list mode and select this step
+          _selectedInstance._viewMode='list';
+          _selectedInstance._selectedStep=s.id;
+          const el=document.getElementById('instance-detail');
+          if(el) renderInstanceDetail(el,_selectedInstance);
+          // Scroll to step
+          requestAnimationFrame(()=>{
+            document.getElementById(`inst-step-${s.id}`)?.scrollIntoView({behavior:'smooth',block:'center'});
+          });
+        }
+      });
+    });
+  }
 }
 
 // ── Elapsed timer engine ──────────────────────────────────────────────────────
