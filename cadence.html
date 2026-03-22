@@ -1316,19 +1316,27 @@ function renderDAG() {
   }
 
   // ── Layout constants ──────────────────────────────────────────────────────
-  const NW      = 160;
+  const NW      = 150;
   const NH      = 58;
-  const H_GAP   = 60;
-  const PAD_L   = 48;   // space for trigger node
-  const PAD_R   = 48;   // space for terminal node
-  const NODE_Y  = 36;   // y position of nodes in content space
-  const RESET_H = 30;   // height per reset edge row below nodes
+  const PAD_L   = 48;
+  const PAD_R   = 48;
+  const NODE_Y  = 60;   // more space above for edge labels
+  const RESET_H = 32;
 
-  // Count reset edges for vertical space
+  // Count reset edges and max forward labels per gap for spacing
   let resetCount = 0;
-  steps.forEach(s => {
-    resetCount += _getOutcomes(s).filter(o => o.requiresReset && !o.requiresSuspend).length;
+  let maxForwardLabels = 0;
+  steps.forEach((s, i) => {
+    const outs = _getOutcomes(s);
+    const resets   = outs.filter(o => o.requiresReset && !o.requiresSuspend).length;
+    const forwards = outs.filter(o => !o.requiresReset && !o.requiresSuspend).length;
+    resetCount += resets;
+    if (i < steps.length - 1) maxForwardLabels = Math.max(maxForwardLabels, forwards);
   });
+
+  // Gap wide enough to show stacked labels without overlap
+  const LABEL_H = 12;  // px per label line
+  const H_GAP   = Math.max(70, maxForwardLabels * LABEL_H + 30);
 
   const contentW = PAD_L + steps.length * NW + (steps.length - 1) * H_GAP + PAD_R;
   const contentH = NODE_Y + NH + (resetCount > 0 ? 20 + resetCount * RESET_H : 0) + 20;
@@ -1336,9 +1344,7 @@ function renderDAG() {
   // Auto-fit + center — use a flag so it only runs once per template
   if (!_dagAutoFitted) {
     _dagAutoFitted = true;
-    // Always fit to width first
-    _dagScale = Math.max(0.25, Math.min(1, (W - 20) / contentW));
-    // Center vertically
+    _dagScale = Math.max(0.2, Math.min(1, (W - 20) / contentW));
     _dagPanX = Math.max(8, (W - contentW * _dagScale) / 2);
     _dagPanY = Math.max(8, (H - contentH * _dagScale) / 2);
   }
@@ -1362,8 +1368,10 @@ function renderDAG() {
       if (o.requiresSuspend) {
         edges.push({ from: s, to: null, outcome: o, type: 'suspend' });
       } else if (o.requiresReset) {
-        // Reset target: back one step if prior exists, else step 0
-        const resetTarget = i > 0 ? steps[i - 1] : steps[0];
+        // Smart reset target: go back 2 steps for approval/signoff, 1 step otherwise
+        // This is the diagram default — actual routing uses route_to_step_id from CoC
+        const stepsBack = (s.step_type === 'meeting') ? Math.min(i, steps.length - 1) : 1;
+        const resetTarget = steps[Math.max(0, i - stepsBack)];
         edges.push({ from: s, to: resetTarget, outcome: o, type: 'reset' });
       } else if (nextStep) {
         edges.push({ from: s, to: nextStep, outcome: o, type: 'forward' });
@@ -1464,20 +1472,41 @@ function renderDAG() {
       const x2 = tp.x;
       const y2 = tp.y + NH / 2;
       const mx  = (x1 + x2) / 2;
+      const gapW = x2 - x1;
 
-      // Use color of first label; if multiple use neutral green
-      const color = eg.labels.length === 1 ? (eg.labels[0].color || '#1D9E75') : '#1D9E75';
-      _dagArrow(ctx, x1, y1, x2, y2, color, false, false);
+      // Use neutral green if multiple outcomes, else outcome color
+      const lineColor = eg.labels.length === 1 ? (eg.labels[0].color || '#1D9E75') : '#1D9E75';
+      _dagArrow(ctx, x1, y1, x2, y2, lineColor, false, false);
 
-      // Stack each outcome label above the midpoint
-      ctx.font         = `9px var(--font-mono, monospace)`;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
+      // Stack labels centered in the gap — with pill background
+      const totalH = eg.labels.length * LABEL_H;
+      const startY = y1 - totalH - 6;
+
       eg.labels.forEach((o, li) => {
-        const ly = y1 - 10 - (eg.labels.length - 1 - li) * 12;
-        ctx.fillStyle   = o.color || '#1D9E75';
-        ctx.globalAlpha = 0.85;
-        ctx.fillText(o.label, mx, ly);
+        const ly      = startY + li * LABEL_H;
+        const lbl     = o.label;
+        ctx.font      = `9px var(--font-mono, monospace)`;
+        const tw      = ctx.measureText(lbl).width;
+        const pillW   = Math.min(tw + 8, gapW - 4);
+        const pillH   = 11;
+
+        // Pill background
+        ctx.fillStyle   = 'rgba(14,17,23,.85)';
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.roundRect(mx - pillW/2, ly - pillH/2, pillW, pillH, 3);
+        ctx.fill();
+
+        // Label text
+        ctx.fillStyle    = o.color || '#1D9E75';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha  = 1;
+        // Truncate if too wide
+        let txt = lbl;
+        while (txt.length > 3 && ctx.measureText(txt).width > pillW - 6) txt = txt.slice(0,-1);
+        if (txt !== lbl) txt += '…';
+        ctx.fillText(txt, mx, ly);
       });
       ctx.globalAlpha = 1;
 
