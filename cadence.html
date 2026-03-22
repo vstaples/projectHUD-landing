@@ -3932,16 +3932,20 @@ function renderTmplCoC(rows) {
     step_modified:  'var(--cad)',
     field_changed:  'var(--text2)',
     bist_override:  'var(--amber)',
-    bist_run:       'var(--cad)',
+    bist_run:            'var(--cad)',
+    instance_completed:  'var(--green)',
+    instance_suspended:  'var(--amber)',
   };
   const evtLabel = {
-    released:       'Released',
-    archived:       'Archived',
-    status_changed: 'Status Changed',
-    step_modified:  'Step Modified',
-    field_changed:  'Step Modified',
-    bist_override:  'Release Override',
-    bist_run:       'Tests Run',
+    released:            'Released',
+    archived:            'Archived',
+    status_changed:      'Status Changed',
+    step_modified:       'Step Modified',
+    field_changed:       'Step Modified',
+    bist_override:       'Release Override',
+    bist_run:            'Tests Run',
+    instance_completed:  'Instance Completed',
+    instance_suspended:  'Instance Suspended',
   };
 
   function fmtTs(ts) {
@@ -5366,32 +5370,124 @@ async function submitComplete(instId, stepId) {
       created_at:         new Date().toISOString(),
     });
 
-    // Auto-activate next step if outcome advances normally (no reset/suspend/manual route)
-    const advancesNormally = !outcomeDef?.requiresReset && !outcomeDef?.requiresSuspend && !routeTargetId;
-    if (advancesNormally) {
-      const allSteps  = inst?._tmplSteps || [];
-      const currOrder = step?.sequence_order || 0;
-      const nextStep  = allSteps
+    // ── Layer 2 routing engine ────────────────────────────────────────────────
+    const allSteps   = inst?._tmplSteps || [];
+    const currOrder  = step?.sequence_order || 0;
+
+    if (outcomeDef?.requiresSuspend) {
+      // ── Suspend instance ──────────────────────────────────────────────────
+      await API.patch(`workflow_instances?id=eq.${instId}`, {
+        status:     'overridden',
+        notes:      suspendCondition || `Suspended by ${authorName} — ${outcomeLabel}`,
+        updated_at: new Date().toISOString(),
+      }).catch(() => {});
+      await API.post('workflow_step_instances', {
+        instance_id: instId, firm_id: FIRM_ID_CAD,
+        event_type:  'instance_suspended',
+        step_name:   'Instance suspended',
+        step_type:   'trigger',
+        event_notes: suspendCondition || outcomeLabel,
+        actor_name:  authorName,
+        created_at:  new Date().toISOString(),
+      }).catch(() => {});
+
+    } else if (routeTargetId) {
+      // ── Explicit route — activate the specified predecessor step ──────────
+      const targetStep = allSteps.find(s => s.id === routeTargetId);
+      if (targetStep) {
+        await API.post('workflow_step_instances', {
+          instance_id:      instId, firm_id: FIRM_ID_CAD,
+          event_type:       'step_activated',
+          template_step_id: targetStep.id,
+          step_type:        targetStep.step_type || 'action',
+          step_name:        targetStep.name || null,
+          actor_name:       'System',
+          created_at:       new Date().toISOString(),
+        }).catch(() => {});
+        _notifyStepActivated(instId, targetStep, inst).catch(() => {});
+      }
+
+    } else if (outcomeDef?.requiresReset) {
+      // ── Reset — no explicit route, activate first non-trigger step ────────
+      const firstStep = allSteps
+        .filter(s => s.step_type !== 'trigger')
+        .sort((a, b) => a.sequence_order - b.sequence_order)[0];
+      if (firstStep) {
+        await API.post('workflow_step_instances', {
+          instance_id:      instId, firm_id: FIRM_ID_CAD,
+          event_type:       'step_activated',
+          template_step_id: firstStep.id,
+          step_type:        firstStep.step_type || 'action',
+          step_name:        firstStep.name || null,
+          actor_name:       'System',
+          created_at:       new Date().toISOString(),
+        }).catch(() => {});
+        _notifyStepActivated(instId, firstStep, inst).catch(() => {});
+      }
+
+    } else {
+      // ── Normal forward progression ────────────────────────────────────────
+      const nextStep = allSteps
         .filter(s => s.sequence_order > currOrder)
         .sort((a, b) => a.sequence_order - b.sequence_order)[0];
+
       if (nextStep) {
+        // More steps remain — activate next
         await API.post('workflow_step_instances', {
-          instance_id:      instId,
-          firm_id:          FIRM_ID_CAD,
+          instance_id:      instId, firm_id: FIRM_ID_CAD,
           event_type:       'step_activated',
           template_step_id: nextStep.id,
           step_type:        nextStep.step_type || 'action',
           step_name:        nextStep.name || null,
           actor_name:       'System',
           created_at:       new Date().toISOString(),
-        }).catch(() => {}); // non-fatal
+        }).catch(() => {});
         _notifyStepActivated(instId, nextStep, inst).catch(() => {});
+      } else {
+        // Last step completed — mark instance complete
+        await API.patch(`workflow_instances?id=eq.${instId}`, {
+          status:       'complete',
+          completed_at: new Date().toISOString(),
+          updated_at:   new Date().toISOString(),
+        }).catch(() => {});
+        await API.post('workflow_step_instances', {
+          instance_id: instId, firm_id: FIRM_ID_CAD,
+          event_type:  'instance_completed',
+          step_name:   'Instance completed',
+          step_type:   'trigger',
+          event_notes: `All steps completed`,
+          actor_name:  authorName,
+          created_at:  new Date().toISOString(),
+        }).catch(() => {});
       }
     }
 
     await _reloadInstance(instId);
-    const suffix = routeTargetStep ? ` → returning to ${routeTargetStep.name}` : '';
-    cadToast(`Step completed — ${outcomeLabel}${suffix}`, 'success');
+    updateBadges();
+
+    // Update instance list to reflect new status
+    const listEl = document.getElementById('inst-list');
+    if (listEl) {
+      const updatedInst = _instances.find(i => i.id === instId);
+      if (updatedInst) {
+        const freshInsts = await API.get(
+          `workflow_instances?id=eq.${instId}`
+        ).catch(() => []);
+        if (freshInsts?.[0]) {
+          Object.assign(updatedInst, freshInsts[0]);
+          renderTab('instances');
+        }
+      }
+    }
+
+    const toastMsg = outcomeDef?.requiresSuspend
+      ? `Instance suspended — ${outcomeLabel}`
+      : routeTargetStep
+        ? `${outcomeLabel} — returning to: ${routeTargetStep.name}`
+        : outcomeDef?.requiresReset
+          ? `${outcomeLabel} — resetting to step 1`
+          : `Step completed — ${outcomeLabel}`;
+    cadToast(toastMsg, 'success');
   } catch(e) {
     cadToast('Failed to complete step: ' + e.message, 'error');
     if (submitBtn) { submitBtn.textContent = 'Complete step'; submitBtn.disabled = false; }
