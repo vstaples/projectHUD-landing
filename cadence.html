@@ -3635,9 +3635,9 @@ function renderTmplTests(scripts, runs) {
 
     return `
       <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:8px">
-        <!-- Script header -->
-        <div style="padding:8px 10px;background:var(--bg2);
-          display:flex;align-items:center;gap:8px">
+        <!-- Script header — click to expand/collapse -->
+        <div onclick="bistTogglePlan('${script.id}')" style="padding:8px 10px;background:var(--bg2);
+          display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
           <span id="bist-icon-${script.id}"
             style="color:${overallColor};font-size:12px;width:14px;
               flex-shrink:0;font-family:var(--font-mono)">${overallIcon}</span>
@@ -3647,13 +3647,17 @@ function renderTmplTests(scripts, runs) {
               ${escHtml(runMeta)}
             </div>
           </div>
-          <button onclick="runSingleTest('${script.id}')"
+          <span id="bist-chevron-${script.id}"
+            style="font-size:9px;color:var(--muted);transition:transform .15s;
+              flex-shrink:0;margin-right:4px">▶</span>
+          <button onclick="event.stopPropagation();runSingleTest('${script.id}')"
             style="flex-shrink:0;padding:4px 10px;font-size:10px;background:none;
               border:1px solid var(--border);border-radius:4px;
               color:var(--muted);cursor:pointer">▶</button>
         </div>
-        <!-- Assertion plan rows -->
-        <div id="bist-plan-${script.id}" style="padding:4px 10px 6px">
+        <!-- Assertion plan rows — collapsed by default -->
+        <div id="bist-plan-${script.id}" style="display:none;padding:4px 10px 6px;
+          border-top:1px solid var(--border)">
           ${assertRowsHtml}
         </div>
         <!-- Live log (hidden until run) -->
@@ -3671,17 +3675,40 @@ function renderTmplTests(scripts, runs) {
       <span style="color:${gateColor};font-size:13px">${gateIcon}</span>
       <span style="font-size:11px;color:${gateColor};font-weight:500">${gateText}</span>
     </div>
-    <!-- Run all button -->
+    <!-- Run all + expand/collapse controls -->
     <div style="padding:8px 0 4px;display:flex;gap:6px;align-items:center">
       <button id="bist-run-all-btn" onclick="runAllTests()"
         style="flex:1;padding:7px;background:var(--cad);color:#fff;border:none;
           border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
         ▶ Run all tests
       </button>
+      <button onclick="bistExpandAll()" title="Expand all"
+        style="padding:5px 8px;background:none;border:1px solid var(--border);
+          border-radius:4px;font-size:10px;color:var(--muted);cursor:pointer">↕</button>
       <span style="font-size:9px;color:var(--muted)">v${escHtml(ver)}</span>
     </div>
     <!-- Script rows -->
     <div style="padding:4px 0">${scriptRows}</div>`;
+}
+
+function bistTogglePlan(scriptId) {
+  const plan    = document.getElementById(`bist-plan-${scriptId}`);
+  const chevron = document.getElementById(`bist-chevron-${scriptId}`);
+  if (!plan) return;
+  const open = plan.style.display !== 'none';
+  plan.style.display    = open ? 'none' : 'block';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function bistExpandAll() {
+  const body = document.getElementById('tmpl-tests-body');
+  if (!body) return;
+  const plans   = body.querySelectorAll('[id^="bist-plan-"]');
+  const chevrons = body.querySelectorAll('[id^="bist-chevron-"]');
+  // If any are collapsed, expand all. If all expanded, collapse all.
+  const anyCollapsed = [...plans].some(p => p.style.display === 'none');
+  plans.forEach(p    => { p.style.display = anyCollapsed ? 'block' : 'none'; });
+  chevrons.forEach(c => { c.style.transform = anyCollapsed ? 'rotate(90deg)' : ''; });
 }
 
 async function runSingleTest(scriptId) {
@@ -3690,6 +3717,12 @@ async function runSingleTest(scriptId) {
 
   if (iconEl) { iconEl.textContent = '…'; iconEl.style.color = 'var(--amber)'; }
   if (logEl)  { logEl.style.display = 'block'; logEl.innerHTML = ''; }
+
+  // Auto-expand the plan while running
+  const planEl = document.getElementById(`bist-plan-${scriptId}`);
+  const chevronEl = document.getElementById(`bist-chevron-${scriptId}`);
+  if (planEl) planEl.style.display = 'block';
+  if (chevronEl) chevronEl.style.transform = 'rotate(90deg)';
 
   // Reset all assertion rows to pending (○ gray)
   const planEl = document.getElementById(`bist-plan-${scriptId}`);
