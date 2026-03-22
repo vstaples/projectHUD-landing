@@ -5226,15 +5226,15 @@ function renderInstanceDetail(el, inst) {
     complete:'var(--green)', cancelled:'var(--red)', overridden:'var(--amber)'
   };
   const evtColor  = {
-    instance_launched:'var(--cad)', step_activated:'var(--accent)',
+    instance_launched:'var(--cad)', step_activated:'#e8a838',
     step_action:'var(--green)', step_completed:'var(--green)',
-    rejected:'var(--red)', escalation_triggered:'var(--amber)',
-    override:'var(--amber)', instance_completed:'var(--green)',
+    rejected:'var(--red)', escalation_triggered:'#e8a838',
+    override:'#e8a838', instance_completed:'var(--green)',
     token_issued:'var(--muted)', reminder_sent:'var(--muted)',
-    step_reassigned:'var(--accent)', instance_suspended:'var(--amber)',
+    step_reassigned:'var(--accent)', instance_suspended:'#e8a838',
     instance_cancelled:'var(--red)', step_reset:'var(--muted)',
   };
-  const evtLabel = {
+  const evtLabel  = {
     instance_launched:'Instance Launched', step_activated:'Step Activated',
     step_action:'Action Taken', step_completed:'Step Completed',
     rejected:'Rejected', escalation_triggered:'Escalation Triggered',
@@ -5926,10 +5926,10 @@ function toggleInstDagCoC(btn) {
     if (!body || !inst) return;
     const coc = (inst._stepInsts || []).slice().reverse();
     const evtColor = {
-      instance_launched:'var(--cad)', step_activated:'var(--accent)',
+      instance_launched:'var(--cad)', step_activated:'#e8a838',
       step_completed:'var(--green)', step_reset:'var(--muted)',
       instance_completed:'var(--green)', instance_cancelled:'var(--red)',
-      override:'var(--amber)', step_reassigned:'var(--accent)',
+      override:'#e8a838', step_reassigned:'var(--accent)',
     };
     const evtLabel = {
       instance_launched:'Launched', step_activated:'Activated',
@@ -6113,7 +6113,20 @@ function renderInstanceDAG(inst) {
   ctx.moveTo(tx+12,ty); ctx.lineTo(fp0.x,ty); ctx.stroke();
   ah(fp0.x,ty,'right','rgba(255,255,255,.3)');
 
-  // ── Edges ─────────────────────────────────────────────────────────────────
+  // ── Edges with outcome pills ──────────────────────────────────────────────
+  function instPill(text, cx, cy, col) {
+    ctx.font = '9px monospace';
+    let t = text;
+    const maxW = HGAP - 8;
+    while (t.length > 3 && ctx.measureText(t).width > maxW) t = t.slice(0,-1);
+    if (t !== text) t += '…';
+    const tw = ctx.measureText(t).width, pw = tw+8, ph = 13;
+    ctx.fillStyle = 'rgba(10,12,18,.92)'; ctx.globalAlpha = .95;
+    ctx.beginPath(); ctx.roundRect(cx-pw/2, cy-ph/2, pw, ph, 3); ctx.fill();
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 1; ctx.fillText(t, cx, cy);
+  }
+
   steps.forEach((s,i) => {
     const next=steps[i+1]; if(!next) return;
     const fp=nodePos(s.id), tp=nodePos(next.id);
@@ -6129,6 +6142,13 @@ function renderInstanceDAG(inst) {
     ctx.moveTo(x1,my); ctx.lineTo(x2-8,my); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha=1;
     if(traversed) ah(x2,my,'right',edgeCol,0.85);
+    // Outcome pill on the edge line for traversed edges with an outcome
+    if(traversed && stepOutcome[s.id]) {
+      const oDef=_getOutcomes(s).find(o=>o.id===stepOutcome[s.id]);
+      const oLabel=oDef?.label||stepOutcome[s.id];
+      const oCol=oDef?.color||edgeCol;
+      instPill(oLabel, (x1+x2)/2, my-11, oCol);
+    }
   });
 
   // ── Terminal ──────────────────────────────────────────────────────────────
@@ -6219,25 +6239,6 @@ function renderInstanceDAG(inst) {
       ctx.font='600 11px system-ui,sans-serif';
       ctx.fillStyle=elapsedCol; ctx.textAlign='left'; ctx.textBaseline='middle';
       ctx.fillText(elapsedStr, p.x+12, p.y+NH/2+6);
-    }
-
-    // Outcome pill — anchored bottom-center, above state badge
-    if(stepOutcome[s.id]) {
-      const oDef=_getOutcomes(s).find(o=>o.id===stepOutcome[s.id]);
-      const oLabel=oDef?.label||stepOutcome[s.id];
-      const oCol=oDef?.color||stateCol;
-      ctx.font='8px monospace';
-      const tw=ctx.measureText(oLabel).width;
-      const pw=Math.min(tw+10, NW-24), ph=13;
-      const px2=p.x+12, py2=p.y+NH-26;
-      ctx.fillStyle=oCol+'25'; ctx.strokeStyle=oCol+'77'; ctx.lineWidth=1; ctx.globalAlpha=0.95;
-      ctx.beginPath(); ctx.roundRect(px2,py2,pw,ph,3); ctx.fill(); ctx.stroke();
-      ctx.fillStyle=oCol; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.globalAlpha=1;
-      // Truncate if needed
-      let ol=oLabel;
-      while(ol.length>2&&ctx.measureText(ol).width>pw-6) ol=ol.slice(0,-1);
-      if(ol!==oLabel) ol+='…';
-      ctx.fillText(ol, px2+5, py2+ph/2);
     }
 
     // State label bottom-left
