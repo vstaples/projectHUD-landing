@@ -1170,8 +1170,8 @@ function renderEditor() {
 
     <!-- Editor body — tabbed: Steps | Diagram -->
     <div class="editor-body">
-      <!-- View tab bar -->
-      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);
+      <!-- View tab bar — also contains Add step shortcut -->
+      <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);
         flex-shrink:0;background:var(--bg1);padding:0 16px">
         <button id="view-tab-steps" onclick="switchEditorView('steps')"
           style="padding:7px 14px;font-size:11px;font-weight:500;background:none;border:none;
@@ -1181,82 +1181,81 @@ function renderEditor() {
           style="padding:7px 14px;font-size:11px;font-weight:500;background:none;border:none;
             cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
             margin-bottom:-1px;letter-spacing:.02em">Diagram</button>
+        ${!isReleased ? `
+        <button onclick="switchEditorView('steps');requestAnimationFrame(()=>document.querySelector('.add-step-btn')?.click())"
+          id="tab-add-step-btn"
+          style="margin-left:auto;padding:4px 12px;font-size:10px;background:none;
+            border:1px solid var(--cad-wire);border-radius:3px;color:var(--cad);
+            cursor:pointer;font-family:var(--font-mono);letter-spacing:.04em">+ Add step</button>` : ''}
       </div>
 
-      <!-- Steps view -->
+      <!-- Steps view — no bottom Add step button needed; it's in the tab bar now -->
       <div id="editor-view-steps" class="spine-area">
         ${!isReleased ? renderAIBanner() : ''}
         <div id="spine-wrap" class="spine-wrap">
           ${renderSpine()}
         </div>
-        ${!isReleased ? `
-        <button class="add-step-btn" onclick="toggleStepPicker(event)">
-          <span style="font-size:16px;line-height:1">+</span> Add step
-        </button>` : ''}
       </div>
 
       <!-- Diagram view -->
       <div id="editor-view-diagram" style="display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0;position:relative">
-        <!-- Controls -->
-        <div style="display:flex;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);
+        <!-- Compact diagram controls — zoom/pan hints only -->
+        <div style="display:flex;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border);
           flex-shrink:0;align-items:center;background:var(--bg1)">
           <button onclick="dagZoomIn()"
-            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
+            style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);
               border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">+ Zoom</button>
           <button onclick="dagZoomOut()"
-            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
+            style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);
               border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">− Zoom</button>
           <button onclick="dagResetView()"
-            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--border);
+            style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);
               border-radius:3px;color:var(--muted);cursor:pointer;font-family:var(--font-mono)">⟲ Reset</button>
           <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">
             Drag · Ctrl+scroll · Click node or ◁ to edit
           </span>
           <span id="dag-zoom-label" style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--font-mono)">100%</span>
-          ${!isReleased ? `
-          <button onclick="switchEditorView('steps');requestAnimationFrame(()=>toggleStepPicker(event))"
-            style="padding:3px 10px;font-size:10px;background:none;border:1px solid var(--cad-wire);
-              border-radius:3px;color:var(--cad);cursor:pointer;font-family:var(--font-mono);
-              margin-left:8px">+ Add step</button>` : ''}
         </div>
         <!-- Canvas + slide panel container -->
-        <div style="flex:1;overflow:hidden;position:relative;min-height:0;display:flex">
-          <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab;min-height:0">
-            <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
-          </div>
-          <!-- Slide-in step config panel -->
-          <div id="dag-slide-panel" style="
-            position:absolute;top:0;right:0;bottom:0;width:340px;
-            background:var(--bg1);border-left:1px solid var(--border);
-            display:flex;flex-direction:column;overflow:hidden;
-            transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);
-            z-index:20;box-shadow:-4px 0 24px rgba(0,0,0,.4)">
-            <!-- Panel header -->
-            <div id="dag-panel-header" style="display:flex;align-items:center;gap:8px;
-              padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-              <span id="dag-panel-icon" style="font-size:13px"></span>
-              <span id="dag-panel-title" style="font-size:12px;font-weight:500;color:var(--text);flex:1;
-                overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-              ${!isReleased ? `
-              <button id="dag-panel-del-btn" onclick="dagPanelDeleteStep()"
-                style="background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;
-                  font-size:12px;padding:2px 6px;border-radius:4px;flex-shrink:0;transition:all .15s"
-                onmouseover="this.style.borderColor='rgba(192,64,74,.4)';this.style.color='var(--red)'"
-                onmouseout="this.style.borderColor='transparent';this.style.color='var(--muted)'"
-                title="Delete step">🗑</button>` : ''}
-              <button onclick="dagClosePanel()"
-                style="background:none;border:none;color:var(--muted);cursor:pointer;
-                  font-size:16px;padding:0 2px;line-height:1;flex-shrink:0"
-                title="Close (Esc)">×</button>
+        <div style="flex:1;overflow:hidden;position:relative;min-height:0;display:flex;flex-direction:column">
+          <div style="flex:1;overflow:hidden;position:relative;min-height:0;display:flex">
+            <div id="dag-canvas-wrap" style="flex:1;overflow:hidden;position:relative;cursor:grab;min-height:0">
+              <canvas id="dag-canvas" style="display:block;position:absolute;top:0;left:0"></canvas>
             </div>
-            <!-- Panel body — scrollable step config -->
-            <div id="dag-panel-body" style="flex:1;overflow-y:auto;padding:14px 14px 20px">
+            <!-- Slide-in step config panel -->
+            <div id="dag-slide-panel" style="
+              position:absolute;top:0;right:0;bottom:0;width:340px;
+              background:var(--bg1);border-left:1px solid var(--border);
+              display:flex;flex-direction:column;overflow:hidden;
+              transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);
+              z-index:20;box-shadow:-4px 0 24px rgba(0,0,0,.4)">
+              <!-- Panel header -->
+              <div id="dag-panel-header" style="display:flex;align-items:center;gap:8px;
+                padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+                <span id="dag-panel-icon" style="font-size:13px"></span>
+                <span id="dag-panel-title" style="font-size:12px;font-weight:500;color:var(--text);flex:1;
+                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                ${!isReleased ? `
+                <button id="dag-panel-del-btn" onclick="dagPanelDeleteStep()"
+                  style="background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;
+                    font-size:12px;padding:2px 6px;border-radius:4px;flex-shrink:0;transition:all .15s"
+                  onmouseover="this.style.borderColor='rgba(192,64,74,.4)';this.style.color='var(--red)'"
+                  onmouseout="this.style.borderColor='transparent';this.style.color='var(--muted)'"
+                  title="Delete step">🗑</button>` : ''}
+                <button onclick="dagClosePanel()"
+                  style="background:none;border:none;color:var(--muted);cursor:pointer;
+                    font-size:16px;padding:0 2px;line-height:1;flex-shrink:0"
+                  title="Close (Esc)">×</button>
+              </div>
+              <!-- Panel body — scrollable step config -->
+              <div id="dag-panel-body" style="flex:1;overflow-y:auto;padding:14px 14px 20px">
+              </div>
             </div>
           </div>
+          <!-- Decision outcome cards — inside the flex column, below canvas -->
+          <div id="dag-cards" style="display:none;flex-wrap:wrap;gap:10px;padding:10px 12px;
+            border-top:1px solid var(--border);flex-shrink:0;background:var(--bg1);max-height:160px;overflow-y:auto"></div>
         </div>
-        <!-- Decision outcome cards -->
-        <div id="dag-cards" style="display:none;flex-wrap:wrap;gap:10px;padding:10px 12px;
-          border-top:1px solid var(--border);flex-shrink:0;background:var(--bg1)"></div>
       </div>
     </div>`;
 }
@@ -1298,7 +1297,7 @@ function switchEditorView(view) {
 // ── DAG state ─────────────────────────────────────────────────────────────────
 let _dagPanX = 0, _dagPanY = 0, _dagScale = 1;
 let _dagAutoFitted = false;
-let _dagDragging = false, _dagDragStartX = 0, _dagDragStartY = 0;
+let _dagDragging = false, _dagDragStartX = -999, _dagDragStartY = -999;
 let _dagPanStartX = 0, _dagPanStartY = 0;
 
 function dagZoomIn()    { _dagScale = Math.min(3, _dagScale * 1.25); renderDAG(); }
@@ -1537,40 +1536,62 @@ function renderDAG() {
     }
     ctx.fillStyle=meta.badgeText; ctx.globalAlpha=0.65;
     ctx.beginPath(); ctx.roundRect(p.x,p.y,4,NH,[7,0,0,7]); ctx.fill(); ctx.globalAlpha=1;
-    // Name
-    ctx.fillStyle='rgba(255,255,255,.88)'; ctx.textAlign='left'; ctx.textBaseline='top';
-    ctx.font='500 11px system-ui,sans-serif';
-    let name = s.name || '';
-    if (ctx.measureText(name).width > NW-20) {
-      while (name.length > 3 && ctx.measureText(name+'…').width > NW-20) name = name.slice(0,-1);
-      name += '…';
-    }
-    ctx.fillText(name, p.x+12, p.y+NH/2-8);
-    // Type badge
-    ctx.fillStyle=meta.badgeText; ctx.globalAlpha=0.55; ctx.font='7.5px monospace'; ctx.textBaseline='bottom';
-    ctx.fillText(meta.label.toUpperCase(), p.x+12, p.y+NH-7); ctx.globalAlpha=1;
-    // Seq
-    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='9px monospace'; ctx.textAlign='right';
-    ctx.fillText(s.sequence_order, p.x+NW-8, p.y+NH-8);
-    // Due days
-    if (s.due_days) {
-      ctx.fillStyle='#e8a838'; ctx.globalAlpha=0.8; ctx.font='9px monospace';
-      ctx.textAlign='right'; ctx.textBaseline='top';
-      ctx.fillText('+'+s.due_days+'d', p.x+NW-8, p.y+10); ctx.globalAlpha=1;
-    }
-    // Owner initials badge (top-left)
+    // Owner strip at top of node — avatar circle + name, left-justified
     const ownerName = s.assignee_name ||
       _users_cad?.find(u => u.id === s.assignee_user_id)?.name ||
       _resources_cad?.find(r => r.id === s.assignee_resource_id)?.name || null;
     if (ownerName) {
       const initials = ownerName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      const bx = p.x + NW - 22, by = p.y + 8, br = 8;
-      ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2);
-      ctx.fillStyle = meta.badgeText + '33'; ctx.strokeStyle = meta.badgeText + '66'; ctx.lineWidth = 1;
+      const avatarR  = 7;
+      const ax = p.x + 12 + avatarR, ay = p.y + 10 + avatarR;
+      // Avatar circle
+      ctx.beginPath(); ctx.arc(ax, ay, avatarR, 0, Math.PI*2);
+      ctx.fillStyle = meta.badgeText + '33'; ctx.strokeStyle = meta.badgeText + '77'; ctx.lineWidth = 1;
       ctx.fill(); ctx.stroke();
-      ctx.fillStyle = meta.badgeText; ctx.font = '6.5px system-ui,sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.globalAlpha = 0.9;
-      ctx.fillText(initials, bx, by); ctx.globalAlpha = 1;
+      ctx.fillStyle = meta.badgeText; ctx.font = '600 7px system-ui,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.globalAlpha = 0.95;
+      ctx.fillText(initials, ax, ay); ctx.globalAlpha = 1;
+      // Name text next to avatar
+      const nameX = ax + avatarR + 5;
+      let nameStr = ownerName;
+      ctx.font = '9px system-ui,sans-serif';
+      const maxNameW = NW - nameX + p.x - 10;
+      while (nameStr.length > 2 && ctx.measureText(nameStr).width > maxNameW)
+        nameStr = nameStr.slice(0, -1);
+      if (nameStr !== ownerName) nameStr += '…';
+      ctx.fillStyle = meta.badgeText; ctx.globalAlpha = 0.7;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(nameStr, nameX, ay); ctx.globalAlpha = 1;
+    }
+
+    // Step name — positioned below owner strip if owner exists, else centered
+    const nameTopY = ownerName ? p.y + 10 + 14 + 4 : p.y + 10;
+    ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.font = '500 11px system-ui,sans-serif';
+    let name = s.name || '';
+    if (ctx.measureText(name).width > NW - 20) {
+      while (name.length > 3 && ctx.measureText(name + '…').width > NW - 20) name = name.slice(0, -1);
+      name += '…';
+    }
+    ctx.fillText(name, p.x + 12, nameTopY);
+
+    // Type badge bottom-left
+    ctx.fillStyle = meta.badgeText; ctx.globalAlpha = 0.55;
+    ctx.font = '7.5px monospace'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+    ctx.fillText(meta.label.toUpperCase(), p.x + 12, p.y + NH - 7); ctx.globalAlpha = 1;
+    // Seq number bottom-right
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '9px monospace';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    ctx.fillText(s.sequence_order, p.x + NW - 8, p.y + NH - 8);
+    // Due days top-right (only if no owner strip, otherwise it overlaps)
+    if (s.due_days && !ownerName) {
+      ctx.fillStyle = '#e8a838'; ctx.globalAlpha = 0.8; ctx.font = '9px monospace';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillText('+' + s.due_days + 'd', p.x + NW - 8, p.y + 10); ctx.globalAlpha = 1;
+    } else if (s.due_days && ownerName) {
+      ctx.fillStyle = '#e8a838'; ctx.globalAlpha = 0.7; ctx.font = '8px monospace';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText('+' + s.due_days + 'd', p.x + 12, p.y + NH - 7 - 11); ctx.globalAlpha = 1;
     }
   });
 
@@ -1696,7 +1717,9 @@ function _initDagEvents() {
   });
 
   wrap.addEventListener('click', e => {
-    if (Math.abs(e.clientX - _dagDragStartX) > 5) return;
+    // Only fire if mousedown and click are within 5px (genuine click, not a drag)
+    if (Math.abs(e.clientX - _dagDragStartX) > 5 ||
+        Math.abs(e.clientY - _dagDragStartY) > 5) return;
     const steps = (_selectedTmpl?.steps||[])
       .filter(s => s.step_type !== 'trigger')
       .sort((a,b) => a.sequence_order - b.sequence_order);
