@@ -4230,6 +4230,26 @@ async function confirmLaunch() {
 
       _instances.unshift(res[0]);
       updateBadges();
+
+      // Activate first step and notify assignee
+      const firstStep = (_selectedTmpl.steps || [])
+        .slice().sort((a,b) => a.sequence_order - b.sequence_order)
+        .find(s => s.step_type !== 'trigger');
+      if (firstStep) {
+        await API.post('workflow_step_instances', {
+          instance_id:      instanceId,
+          firm_id:          FIRM_ID_CAD,
+          event_type:       'step_activated',
+          template_step_id: firstStep.id,
+          step_type:        firstStep.step_type || 'action',
+          step_name:        firstStep.name || null,
+          actor_name:       'System',
+          created_at:       new Date().toISOString(),
+        }).catch(() => {});
+        const fakeInst = { ...res[0], title };
+        _notifyStepActivated(instanceId, firstStep, fakeInst).catch(() => {});
+      }
+
       document.querySelector('.modal-overlay')?.remove();
       cadToast('Workflow launched', 'success');
       switchTab('instances');
