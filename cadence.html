@@ -6025,12 +6025,17 @@ function renderInstanceDAG(inst) {
   if (W < 10 || H < 10) { setTimeout(() => renderInstanceDAG(inst), 50); return; }
   // Don't schedule a second refit — layout is guaranteed settled before we're called
 
+  // DEBUG — remove after fixing
+  console.log(`[InstDAG] wrap=${wrap.id} W=${W} H=${H} fitted=${_instDagFitted} scale=${_instDagScale.toFixed(2)} panY=${_instDagPanY.toFixed(0)}`);
+
   canvas.width = W; canvas.height = H;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0,0,W,H);
 
-  if (!steps.length) {
+  // DEBUG overlay — remove after fixing
+  ctx.fillStyle='rgba(255,100,100,.8)'; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(`W=${W} H=${H} panX=${_instDagPanX.toFixed(0)} panY=${_instDagPanY.toFixed(0)} scale=${_instDagScale.toFixed(2)} fitted=${_instDagFitted}`, 8, 8);
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='13px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('No steps in this template',W/2,H/2); return;
