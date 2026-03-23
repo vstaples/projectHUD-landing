@@ -7391,16 +7391,6 @@ function _getOrCreateTooltip() {
       'font-family:var(--font-body)',
       'box-shadow:0 8px 32px rgba(0,0,0,0.7)',
     ].join(';');
-    // Become sticky on mouseenter — stay open until X clicked
-    el.addEventListener('mouseenter', () => {
-      clearTimeout(_tooltipTimer);
-      _tooltipSticky = true;
-      el.style.pointerEvents = 'auto';
-    });
-    el.addEventListener('mouseleave', () => {
-      // Only hide if not sticky (sticky requires X click)
-      if (!_tooltipSticky) _hideStepTooltip();
-    });
     document.body.appendChild(el);
   }
   return el;
@@ -7543,12 +7533,14 @@ function _renderStepTooltip(stepId, event) {
   if (ty + TH > vh - 10) ty = vh - TH - 10;
   if (ty < 10) ty = 10;
 
-  el.style.left    = tx + 'px';
-  el.style.top     = ty + 'px';
-  el.style.display = 'flex';
+  el.style.left         = tx + 'px';
+  el.style.top          = ty + 'px';
+  el.style.display      = 'flex';
+  el.style.pointerEvents = 'auto';  // enable scroll immediately
 
   _tooltipVisible = true;
   _tooltipStepId  = stepId;
+  _tooltipSticky  = true;  // sticky immediately — close only via X button
 }
 
 // ── async version of instScrubLive ────────────────────────────────────────────
