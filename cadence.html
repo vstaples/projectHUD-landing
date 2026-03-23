@@ -7142,7 +7142,11 @@ function _briefingEmail(instId) {
 }
 
 // ── Rework Intelligence ───────────────────────────────────────────────────────
-function instScrubLive() {
+async function instScrubLive() {
+  // Reload fresh data from DB first
+  if (_selectedInstance?.id) {
+    await _reloadInstance(_selectedInstance.id).catch(() => {});
+  }
   _instScrubPos = 100;
   const s = document.getElementById('inst-scrubber');
   if (s) s.value = 100;
