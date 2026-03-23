@@ -6923,12 +6923,6 @@ function renderInstanceDAG(inst) {
     }
   });
 
-  ctx.restore();
-
-  // Update zoom label if present
-  const zlbl=document.getElementById('dag-zoom-label');
-  if(zlbl) zlbl.textContent=Math.round(_instDagScale*100)+'%';
-
   // ── Swimlane dot cluster overlay ─────────────────────────────────────────
   _swimlaneClusters = [];
   if (_swimlaneActive) {
@@ -7002,6 +6996,12 @@ function renderInstanceDAG(inst) {
       });
     });
   }
+
+  ctx.restore();
+
+  // Update zoom label if present
+  const zlbl=document.getElementById('dag-zoom-label');
+  if(zlbl) zlbl.textContent=Math.round(_instDagScale*100)+'%';
 
   // Animate pulse for active step — only schedule next frame if still fitted
   // (prevents stale pulse frames from running before a refit)
