@@ -7318,14 +7318,14 @@ function _showIntelBriefingModal(inst) {
             AI-generated situation analysis &amp; recommended action
           </span>`}
           ${inst.briefing_narrative ? `
-          <button onclick="event.stopPropagation();_regenerateAIBriefing('${instId}')"
+          <button onclick="event.stopPropagation();_regenerateAIBriefing('${inst.id}')"
             style="margin-left:auto;font-size:10px;color:var(--muted);background:none;
               border:1px solid var(--border);border-radius:3px;padding:3px 10px;cursor:pointer"
             onmouseenter="this.style.borderColor='var(--cad)';this.style.color='var(--cad)'"
             onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
             &#8635; Regenerate
           </button>` : `
-          <button onclick="event.stopPropagation();_generateAIBriefing('${instId}')"
+          <button onclick="event.stopPropagation();_generateAIBriefing('${inst.id}')"
             style="margin-left:auto;font-size:10px;font-weight:600;padding:4px 14px;
               background:var(--cad);color:var(--bg0);border:none;
               border-radius:4px;cursor:pointer;letter-spacing:.04em">
@@ -9181,7 +9181,7 @@ async function _generateAIBriefing(instId) {
             text-transform:uppercase;margin-bottom:3px">&#10022; AI Narrative</div>
           <div style="font-size:10px;color:var(--red)">
             Generation failed: ${escHtml(e.message || 'unknown error')} — 
-            <button onclick="_generateAIBriefing('${instId}')"
+            <button onclick="_generateAIBriefing('${inst.id}')"
               style="color:var(--accent);background:none;border:none;cursor:pointer;
                 font-size:10px;text-decoration:underline;padding:0">retry</button>
           </div>
