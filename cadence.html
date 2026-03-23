@@ -7872,12 +7872,14 @@ function _renderCommentThread(stepId) {
           <span style="font-size:9px;color:var(--muted)">${ts}</span>
           ${confBadge}${hoursBadge}
           <div style="flex:1"></div>
-          ${!isReply && canPromote ? `<button onclick="promoteToActionItem('${c.id}','${stepId}')"
-            style="font-size:9px;color:var(--accent);background:none;border:none;
-              cursor:pointer;padding:0;opacity:.7"
-            onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.7'">
-            &#8679; Promote
-          </button>` : ''}
+          ${!isReply && canPromote ? (c.is_promoted
+            ? `<span style="font-size:9px;color:var(--muted);font-style:italic">&#128274; Promoted</span>`
+            : `<button onclick="promoteToActionItem('${c.id}','${stepId}')"
+                style="font-size:9px;color:var(--accent);background:none;border:none;
+                  cursor:pointer;padding:0;opacity:.7"
+                onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.7'">
+                &#8679; Promote
+              </button>`) : ''}
           <button onclick="showReplyInput('${c.id}','${stepId}')"
             style="font-size:9px;color:var(--muted);background:none;border:none;
               cursor:pointer;padding:0;opacity:.7"
@@ -7910,78 +7912,149 @@ function _renderActionItems(stepId) {
 
   const statusColor = { open:'var(--accent)', in_progress:'var(--amber)', resolved:'var(--green)', cancelled:'var(--muted)' };
   const statusLabel = { open:'Open', in_progress:'In Progress', resolved:'Resolved', cancelled:'Cancelled' };
-  const prioColor   = { low:'var(--muted)', normal:'var(--text2)', high:'var(--amber)', critical:'var(--red)' };
 
   el.innerHTML = `
     <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-      color:var(--muted);margin:8px 0 6px;display:flex;align-items:center;gap:6px">
-      <span>&#9654; Action Items</span>
+      color:var(--muted);margin:10px 0 6px;display:flex;align-items:center;gap:6px">
+      &#9654; Action Items
     </div>` +
     items.map(a => {
-      const sc = statusColor[a.status] || 'var(--muted)';
-      const sl = statusLabel[a.status] || a.status;
-      const pc = prioColor[a.priority] || 'var(--text2)';
-      const due = a.due_date ? new Date(a.due_date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+      const sc  = statusColor[a.status] || 'var(--muted)';
+      const sl  = statusLabel[a.status] || a.status;
+      const due = a.due_date ? new Date(a.due_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
       const resolved = a.status === 'resolved' || a.status === 'cancelled';
+      const attachments = Array.isArray(a.attachments) ? a.attachments : [];
+
       return `
-        <div style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;
-          background:var(--bg2);margin-bottom:5px;
-          ${resolved ? 'opacity:0.6;' : ''}">
-          <div style="display:flex;align-items:flex-start;gap:8px">
+        <div id="action-item-card-${a.id}"
+          style="border:1px solid var(--border);border-radius:5px;
+            background:var(--bg2);margin-bottom:6px;overflow:hidden">
+          <!-- Header row -->
+          <div style="padding:8px 10px;display:flex;align-items:flex-start;gap:8px">
             <div style="width:8px;height:8px;border-radius:50%;background:${sc};
               flex-shrink:0;margin-top:4px"></div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:11px;font-weight:600;color:var(--text);
-                ${resolved ? 'text-decoration:line-through;' : ''}">
+              <div style="font-size:11px;font-weight:700;color:var(--text);
+                ${resolved ? 'text-decoration:line-through;opacity:.6;' : ''}">
                 ${escHtml(a.title)}
               </div>
               <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap;align-items:center">
                 <span style="font-size:9px;color:${sc}">${sl}</span>
-                ${a.priority !== 'normal' ? `<span style="font-size:9px;color:${pc}">${a.priority}</span>` : ''}
-                ${a.owner_name ? `<span style="font-size:9px;color:var(--text2)">&#128100; ${escHtml(a.owner_name)}</span>` : ''}
+                ${a.owner_name ? `<span style="font-size:9px;color:var(--text2)">&#128100; ${escHtml(a.owner_name)}</span>` : '<span style="font-size:9px;color:var(--muted)">Unassigned</span>'}
                 ${due ? `<span style="font-size:9px;color:var(--muted)">&#128197; ${due}</span>` : ''}
+                ${attachments.length ? `<span style="font-size:9px;color:var(--muted)">&#128206; ${attachments.length} file${attachments.length>1?'s':''}</span>` : ''}
               </div>
-              ${a.resolution_note ? `<div style="font-size:10px;color:var(--green);margin-top:4px;
-                padding:3px 6px;background:rgba(29,158,117,.08);border-radius:3px;
-                border-left:2px solid var(--green)">${escHtml(a.resolution_note)}</div>` : ''}
             </div>
-            ${!resolved ? `
-            <button onclick="resolveActionItem('${a.id}','${stepId}')"
-              style="font-size:9px;color:var(--green);background:none;border:1px solid rgba(29,158,117,.3);
-                border-radius:3px;padding:2px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0"
-              onmouseenter="this.style.background='rgba(29,158,117,.1)'"
-              onmouseleave="this.style.background='none'">
-              &#10003; Resolve
-            </button>` : ''}
+            <div style="display:flex;gap:5px;flex-shrink:0">
+              ${!resolved ? `
+              <button onclick="editActionItem('${a.id}','${stepId}')"
+                style="font-size:9px;color:var(--muted);background:none;
+                  border:1px solid var(--border);border-radius:3px;
+                  padding:2px 8px;cursor:pointer;white-space:nowrap"
+                onmouseenter="this.style.borderColor='var(--cad)';this.style.color='var(--cad)'"
+                onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+                &#9998; Edit
+              </button>
+              <button onclick="resolveActionItem('${a.id}','${stepId}')"
+                style="font-size:9px;color:var(--green);background:none;
+                  border:1px solid rgba(29,158,117,.3);border-radius:3px;
+                  padding:2px 8px;cursor:pointer;white-space:nowrap"
+                onmouseenter="this.style.background='rgba(29,158,117,.1)'"
+                onmouseleave="this.style.background='none'">
+                &#10003; Resolve
+              </button>` : ''}
+            </div>
           </div>
+          <!-- Instructions -->
+          ${a.instructions ? `
+          <div style="padding:0 10px 8px 26px;font-size:10px;color:var(--text2);
+            line-height:1.5;border-top:1px solid var(--border);padding-top:6px">
+            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+              color:var(--muted);display:block;margin-bottom:3px">Instructions</span>
+            ${escHtml(a.instructions)}
+          </div>` : ''}
+          <!-- Attachments -->
+          ${attachments.length ? `
+          <div style="padding:0 10px 8px 26px;border-top:1px solid var(--border)">
+            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+              color:var(--muted);display:block;margin:6px 0 4px">Attachments</span>
+            ${attachments.map(f => `
+              <a href="${escHtml(f.url)}" target="_blank"
+                style="display:inline-flex;align-items:center;gap:5px;font-size:10px;
+                  color:var(--accent);text-decoration:none;margin-right:8px;margin-bottom:3px">
+                &#128206; ${escHtml(f.name)}
+              </a>`).join('')}
+          </div>` : ''}
+          <!-- Resolution note -->
+          ${a.resolution_note ? `
+          <div style="padding:5px 10px 8px 26px;border-top:1px solid var(--border)">
+            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+              color:var(--green);display:block;margin-bottom:3px">Resolution</span>
+            <div style="font-size:10px;color:var(--green);line-height:1.5">
+              ${escHtml(a.resolution_note)}
+            </div>
+          </div>` : ''}
         </div>`;
     }).join('');
 }
 
-// Promote comment to action item — shows inline form below the promote button
+// Promote comment to action item — marks comment as promoted (read-only) and shows create form
 function promoteToActionItem(commentId, stepId) {
   const inst = _selectedInstance;
   if (!inst) return;
   const comment = (inst._stepComments || []).find(c => c.id === commentId);
   if (!comment) return;
   if (document.getElementById(`promote-form-${commentId}`)) return;
-  const threadEl = document.getElementById(`comment-thread-${stepId}`);
-  if (!threadEl) return;
 
   const ownerOpts = renderResourceOptions('', '— Unassigned —');
+  const threadEl  = document.getElementById(`comment-thread-${stepId}`);
+  if (!threadEl) return;
+
   const formHtml = `
     <div id="promote-form-${commentId}"
       style="margin:6px 0 8px;padding:10px 12px;border:1px solid rgba(79,142,247,.3);
         border-radius:5px;background:rgba(79,142,247,.06)">
       <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-        color:var(--accent);margin-bottom:8px">Create Action Item</div>
+        color:var(--accent);margin-bottom:8px">&#9650; Create Action Item</div>
+
+      <!-- Source comment — read-only -->
+      <div style="margin-bottom:8px;padding:7px 10px;background:var(--bg1);border-radius:4px;
+        border-left:3px solid var(--border)">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+          color:var(--muted);margin-bottom:3px">From comment</div>
+        <div style="font-size:10px;color:var(--text2);line-height:1.4;font-style:italic">
+          ${escHtml(comment.body)}
+        </div>
+      </div>
+
+      <!-- Title -->
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Title</label>
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Title <span style="color:var(--red)">*</span>
+        </label>
         <input id="ai-title-${commentId}" value="${escHtml(comment.body.slice(0,80))}"
+          oninput="_validateActionItemForm('${commentId}')"
           style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
             background:var(--bg1);border:1px solid var(--border);border-radius:3px;
             color:var(--text);font-family:var(--font-body)" />
       </div>
+
+      <!-- Instructions — required -->
+      <div style="margin-bottom:6px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Instructions <span style="color:var(--red)">*</span>
+          <span style="font-weight:400;font-style:italic;color:var(--muted)"> — describe what needs to be done</span>
+        </label>
+        <textarea id="ai-instructions-${commentId}"
+          oninput="_validateActionItemForm('${commentId}')"
+          placeholder="Describe the specific actions required to complete this item…"
+          style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
+            min-height:64px;resize:vertical;background:var(--bg1);
+            border:1px solid var(--border);border-radius:3px;
+            color:var(--text);font-family:var(--font-body)"></textarea>
+      </div>
+
+      <!-- Owner + Due Date -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <div>
           <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
@@ -7996,38 +8069,117 @@ function promoteToActionItem(commentId, stepId) {
               background:var(--bg1);border:1px solid var(--border);border-radius:3px;color:var(--text)" />
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:6px">
-        <button onclick="document.getElementById('promote-form-${commentId}').remove()"
-          style="font-size:10px;padding:4px 12px;background:none;border:1px solid var(--border);
-            border-radius:4px;color:var(--muted);cursor:pointer">Cancel</button>
-        <button onclick="createActionItem('${commentId}','${stepId}')"
-          style="font-size:10px;font-weight:600;padding:4px 14px;background:var(--accent);
-            color:#fff;border:none;border-radius:4px;cursor:pointer">Create</button>
+
+      <!-- Attachments -->
+      <div style="margin-bottom:8px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Attachments <span style="font-weight:400;color:var(--muted)">(optional)</span>
+        </label>
+        <input id="ai-files-${commentId}" type="file" multiple
+          onchange="_previewActionItemFiles('${commentId}')"
+          style="font-size:10px;color:var(--text2);width:100%" />
+        <div id="ai-file-preview-${commentId}" style="margin-top:4px"></div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <span id="ai-form-status-${commentId}" style="font-size:10px;color:var(--red)">
+          Instructions required
+        </span>
+        <div style="display:flex;gap:6px">
+          <button onclick="document.getElementById('promote-form-${commentId}').remove()"
+            style="font-size:10px;padding:4px 12px;background:none;border:1px solid var(--border);
+              border-radius:4px;color:var(--muted);cursor:pointer">Cancel</button>
+          <button id="ai-create-btn-${commentId}" onclick="createActionItem('${commentId}','${stepId}')"
+            disabled style="font-size:10px;font-weight:600;padding:4px 14px;background:var(--accent);
+              color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.4">
+            Create Action Item
+          </button>
+        </div>
       </div>
     </div>`;
-  threadEl.insertAdjacentHTML('beforeend', formHtml);
+
+  const commentRow = document.getElementById(`comment-row-${commentId}`);
+  if (commentRow) commentRow.insertAdjacentHTML('afterend', formHtml);
+  else threadEl.insertAdjacentHTML('beforeend', formHtml);
+}
+
+function _validateActionItemForm(commentId) {
+  const titleEl = document.getElementById(`ai-title-${commentId}`);
+  const instrEl = document.getElementById(`ai-instructions-${commentId}`);
+  const btn     = document.getElementById(`ai-create-btn-${commentId}`);
+  const status  = document.getElementById(`ai-form-status-${commentId}`);
+  const hasTitle = (titleEl?.value || '').trim().length > 0;
+  const hasInstr = (instrEl?.value || '').trim().length > 0;
+  if (btn) {
+    btn.disabled = !(hasTitle && hasInstr);
+    btn.style.opacity = (hasTitle && hasInstr) ? '1' : '.4';
+  }
+  if (status) {
+    status.textContent = !hasTitle ? 'Title required'
+      : !hasInstr ? 'Instructions required' : '';
+  }
+}
+
+function _previewActionItemFiles(commentId) {
+  const input   = document.getElementById(`ai-files-${commentId}`);
+  const preview = document.getElementById(`ai-file-preview-${commentId}`);
+  if (!input || !preview) return;
+  const files = Array.from(input.files || []);
+  preview.innerHTML = files.map(f =>
+    `<div style="font-size:10px;color:var(--text2);padding:2px 0">
+      &#128206; ${escHtml(f.name)} <span style="color:var(--muted)">(${(f.size/1024).toFixed(1)} KB)</span>
+    </div>`
+  ).join('');
+}
+
+async function _uploadActionItemFiles(commentId, actionItemId) {
+  const input = document.getElementById(`ai-files-${commentId}`);
+  if (!input?.files?.length) return [];
+  const files = Array.from(input.files);
+  const uploaded = [];
+  for (const file of files) {
+    try {
+      const token = await Auth.getToken();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `action-items/${actionItemId}/${Date.now()}_${safeName}`;
+      const res = await fetch(`${SUPA_URL}/storage/v1/object/workflow-documents/${path}`, {
+        method: 'POST',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': file.type },
+        body: file,
+      });
+      if (res.ok) {
+        uploaded.push({ name: file.name, path, url: `${SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`, size: file.size });
+      }
+    } catch(e) { console.warn('File upload failed:', file.name, e); }
+  }
+  return uploaded;
 }
 
 async function createActionItem(commentId, stepId) {
-  const inst = _selectedInstance;
+  const inst     = _selectedInstance;
   if (!inst) return;
   const comment  = (inst._stepComments || []).find(c => c.id === commentId);
   const titleEl  = document.getElementById(`ai-title-${commentId}`);
+  const instrEl  = document.getElementById(`ai-instructions-${commentId}`);
   const ownerEl  = document.getElementById(`ai-owner-${commentId}`);
   const dueEl    = document.getElementById(`ai-due-${commentId}`);
-  const createBtn = document.querySelector(`button[onclick="createActionItem('${commentId}','${stepId}')"]`);
+  const btn      = document.getElementById(`ai-create-btn-${commentId}`);
 
-  const title = titleEl?.value.trim();
-  if (!title) { cadToast('Title is required', 'error'); return; }
+  const title        = titleEl?.value.trim();
+  const instructions = instrEl?.value.trim();
+  if (!title || !instructions) { cadToast('Title and instructions are required', 'error'); return; }
 
-  // Get owner name from the selected option text
   const ownerResId = ownerEl?.value || null;
-  const ownerName  = ownerResId
-    ? (_resources_cad.find(r => r.id === ownerResId)?.name || '')
-    : '';
-  const dueDate = dueEl?.value || null;
+  const ownerName  = ownerResId ? (_resources_cad.find(r => r.id === ownerResId)?.name || '') : '';
+  const dueDate    = dueEl?.value || null;
 
-  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Creating…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+
+  const newId = crypto.randomUUID();
+
+  // Upload files first if any
+  const attachments = await _uploadActionItemFiles(commentId, newId);
 
   const row = {
     firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
@@ -8035,25 +8187,212 @@ async function createActionItem(commentId, stepId) {
     template_step_id:  stepId,
     source_comment_id: commentId,
     title,
-    body:              comment?.body || '',
+    instructions,
+    attachments:       attachments.length ? attachments : [],
     priority:          'normal',
     created_by_name:   _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
   };
-  if (ownerResId)  row.owner_resource_id = ownerResId;
-  if (ownerName)   row.owner_name        = ownerName;
-  if (dueDate)     row.due_date          = dueDate;
+  if (ownerResId) row.owner_resource_id = ownerResId;
+  if (ownerName)  row.owner_name        = ownerName;
+  if (dueDate)    row.due_date          = dueDate;
 
   try {
     await API.post('workflow_action_items', row);
+
+    // Mark source comment as promoted (read-only)
+    if (comment) {
+      comment.is_promoted = true;
+      await API.patch(`step_comments?id=eq.${commentId}`, { is_promoted: true }).catch(() => {});
+    }
+
     if (!inst._actionItems) inst._actionItems = [];
-    inst._actionItems.push({ ...row, id: crypto.randomUUID(), status: 'open', created_at: new Date().toISOString() });
+    inst._actionItems.push({ ...row, id: newId, status: 'open', created_at: new Date().toISOString() });
+
     document.getElementById(`promote-form-${commentId}`)?.remove();
+    _renderCommentThread(stepId);
     _renderActionItems(stepId);
     cadToast('Action item created', 'info');
   } catch(e) {
     cadToast('Failed to create action item: ' + (e.message || 'unknown error'), 'error');
-    if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Create Action Item'; }
   }
+}
+
+// Edit action item — inline form replacing the card
+function editActionItem(actionItemId, stepId) {
+  if (document.getElementById(`edit-form-${actionItemId}`)) return;
+  const inst = _selectedInstance;
+  if (!inst) return;
+  const a = (inst._actionItems || []).find(i => i.id === actionItemId);
+  if (!a) return;
+
+  const ownerOpts = renderResourceOptions(a.owner_resource_id || '', '— Unassigned —');
+  const card      = document.getElementById(`action-item-card-${actionItemId}`);
+  if (!card) return;
+
+  const formHtml = `
+    <div id="edit-form-${actionItemId}"
+      style="border:1px solid var(--cad-wire);border-radius:5px;
+        background:var(--bg1);padding:10px 12px;margin-bottom:6px">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--cad);margin-bottom:8px">&#9998; Edit Action Item</div>
+
+      <div style="margin-bottom:6px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Title</label>
+        <input id="edit-title-${actionItemId}" value="${escHtml(a.title)}"
+          style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
+            background:var(--bg2);border:1px solid var(--border);border-radius:3px;
+            color:var(--text);font-family:var(--font-body)" />
+      </div>
+
+      <div style="margin-bottom:6px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Instructions <span style="color:var(--red)">*</span>
+        </label>
+        <textarea id="edit-instructions-${actionItemId}"
+          style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
+            min-height:64px;resize:vertical;background:var(--bg2);
+            border:1px solid var(--border);border-radius:3px;
+            color:var(--text);font-family:var(--font-body)">${escHtml(a.instructions || '')}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <div>
+          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
+          <select id="edit-owner-${actionItemId}" class="config-select" style="font-size:11px;width:100%">
+            ${ownerOpts}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
+          <input id="edit-due-${actionItemId}" type="date" value="${a.due_date || ''}"
+            style="width:100%;font-size:11px;padding:5px 8px;
+              background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text)" />
+        </div>
+      </div>
+
+      <!-- Add more attachments -->
+      <div style="margin-bottom:8px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Add Attachments
+        </label>
+        <input id="edit-files-${actionItemId}" type="file" multiple
+          onchange="_previewEditFiles('${actionItemId}')"
+          style="font-size:10px;color:var(--text2);width:100%" />
+        <div id="edit-file-preview-${actionItemId}" style="margin-top:4px"></div>
+      </div>
+
+      <!-- Existing attachments -->
+      ${(Array.isArray(a.attachments) && a.attachments.length) ? `
+      <div style="margin-bottom:8px">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+          color:var(--muted);margin-bottom:4px">Existing Attachments</div>
+        ${a.attachments.map((f,i) => `
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <a href="${escHtml(f.url)}" target="_blank"
+              style="font-size:10px;color:var(--accent);text-decoration:none;flex:1">
+              &#128206; ${escHtml(f.name)}
+            </a>
+            <button onclick="_removeEditAttachment('${actionItemId}',${i})"
+              style="font-size:9px;color:var(--red);background:none;border:none;cursor:pointer">
+              &#10005;
+            </button>
+          </div>`).join('')}
+      </div>` : ''}
+
+      <div style="display:flex;justify-content:flex-end;gap:6px">
+        <button onclick="document.getElementById('edit-form-${actionItemId}').remove()"
+          style="font-size:10px;padding:4px 12px;background:none;border:1px solid var(--border);
+            border-radius:4px;color:var(--muted);cursor:pointer">Cancel</button>
+        <button onclick="saveActionItemEdit('${actionItemId}','${stepId}')"
+          style="font-size:10px;font-weight:600;padding:4px 14px;background:var(--cad);
+            color:#fff;border:none;border-radius:4px;cursor:pointer">Save Changes</button>
+      </div>
+    </div>`;
+
+  card.insertAdjacentHTML('afterend', formHtml);
+  card.style.display = 'none';
+}
+
+function _previewEditFiles(actionItemId) {
+  const input   = document.getElementById(`edit-files-${actionItemId}`);
+  const preview = document.getElementById(`edit-file-preview-${actionItemId}`);
+  if (!input || !preview) return;
+  preview.innerHTML = Array.from(input.files || []).map(f =>
+    `<div style="font-size:10px;color:var(--text2);padding:2px 0">
+      &#128206; ${escHtml(f.name)} <span style="color:var(--muted)">(${(f.size/1024).toFixed(1)} KB)</span>
+    </div>`).join('');
+}
+
+function _removeEditAttachment(actionItemId, idx) {
+  const inst = _selectedInstance;
+  const a    = (inst?._actionItems || []).find(i => i.id === actionItemId);
+  if (!a || !Array.isArray(a.attachments)) return;
+  a.attachments.splice(idx, 1);
+  // Re-open edit form to reflect change
+  document.getElementById(`edit-form-${actionItemId}`)?.remove();
+  document.getElementById(`action-item-card-${actionItemId}`)?.remove();
+  editActionItem(actionItemId, a.template_step_id);
+}
+
+async function saveActionItemEdit(actionItemId, stepId) {
+  const inst   = _selectedInstance;
+  const a      = (inst?._actionItems || []).find(i => i.id === actionItemId);
+  if (!inst || !a) return;
+
+  const title        = document.getElementById(`edit-title-${actionItemId}`)?.value.trim();
+  const instructions = document.getElementById(`edit-instructions-${actionItemId}`)?.value.trim();
+  const ownerResId   = document.getElementById(`edit-owner-${actionItemId}`)?.value || null;
+  const ownerName    = ownerResId ? (_resources_cad.find(r => r.id === ownerResId)?.name || '') : '';
+  const dueDate      = document.getElementById(`edit-due-${actionItemId}`)?.value || null;
+
+  if (!instructions) { cadToast('Instructions are required', 'error'); return; }
+
+  // Upload any new files
+  const newFiles  = await _uploadEditFiles(actionItemId);
+  const existing  = Array.isArray(a.attachments) ? a.attachments : [];
+  const attachments = [...existing, ...newFiles];
+
+  const updates = {
+    title:        title || a.title,
+    instructions,
+    attachments,
+    owner_resource_id: ownerResId || null,
+    owner_name:        ownerName  || null,
+    due_date:          dueDate    || null,
+  };
+
+  try {
+    await API.patch(`workflow_action_items?id=eq.${actionItemId}`, updates);
+    Object.assign(a, updates);
+    document.getElementById(`edit-form-${actionItemId}`)?.remove();
+    document.getElementById(`action-item-card-${actionItemId}`)?.remove();
+    _renderActionItems(stepId);
+    cadToast('Action item updated', 'info');
+  } catch(e) {
+    cadToast('Failed to save: ' + (e.message || 'unknown error'), 'error');
+  }
+}
+
+async function _uploadEditFiles(actionItemId) {
+  const input = document.getElementById(`edit-files-${actionItemId}`);
+  if (!input?.files?.length) return [];
+  const files = Array.from(input.files);
+  const uploaded = [];
+  for (const file of files) {
+    try {
+      const token = await Auth.getToken();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `action-items/${actionItemId}/${Date.now()}_${safeName}`;
+      const res = await fetch(`${SUPA_URL}/storage/v1/object/workflow-documents/${path}`, {
+        method: 'POST',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': file.type },
+        body: file,
+      });
+      if (res.ok) uploaded.push({ name: file.name, path, url: `${SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`, size: file.size });
+    } catch(e) { console.warn('Upload failed:', file.name, e); }
+  }
+  return uploaded;
 }
 
 async function resolveActionItem(actionItemId, stepId) {
@@ -8062,9 +8401,7 @@ async function resolveActionItem(actionItemId, stepId) {
   const note = prompt('Resolution note (optional):') ?? '';
   try {
     await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
-      status:          'resolved',
-      resolved_at:     new Date().toISOString(),
-      resolution_note: note || null,
+      status: 'resolved', resolved_at: new Date().toISOString(), resolution_note: note || null,
     });
     const item = (inst._actionItems || []).find(a => a.id === actionItemId);
     if (item) { item.status = 'resolved'; item.resolved_at = new Date().toISOString(); item.resolution_note = note || null; }
@@ -8119,6 +8456,8 @@ async function postReply(parentCommentId, stepId) {
     parent_comment_id: parentCommentId,
     author_name:       authorName,
     body,
+    flag_type:         'none',
+    confidence:        null,
   };
 
   try {
