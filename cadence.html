@@ -6274,6 +6274,17 @@ function renderInstanceDetail(el, inst) {
                       display:flex;align-items:center;gap:8px">
                       <span>&#9997; Comments</span>
                       <span id="comment-count-${s.id}" style="color:var(--text2);font-weight:400"></span>
+                      <div style="flex:1"></div>
+                      <button onclick="openDirectActionItem('${s.id}')"
+                        style="font-size:9px;font-weight:600;letter-spacing:.08em;
+                          text-transform:uppercase;padding:3px 10px;
+                          background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.35);
+                          border-radius:3px;color:var(--accent);cursor:pointer;
+                          white-space:nowrap;transition:all .12s"
+                        onmouseenter="this.style.background='rgba(79,142,247,.2)'"
+                        onmouseleave="this.style.background='rgba(79,142,247,.1)'">
+                        &#43; Add Action Item
+                      </button>
                     </div>
 
                     <!-- Existing comments -->
@@ -8798,6 +8809,149 @@ function promoteToActionItem(commentId, stepId) {
   const commentRow = document.getElementById(`comment-row-${commentId}`);
   if (commentRow) commentRow.insertAdjacentHTML('afterend', formHtml);
   else threadEl.insertAdjacentHTML('beforeend', formHtml);
+}
+
+// Direct action item from step — no comment required
+function openDirectActionItem(stepId) {
+  const inst = _selectedInstance;
+  if (!inst) return;
+
+  const formKey = `direct-${stepId}`;
+  if (document.getElementById(`promote-form-${formKey}`)) {
+    document.getElementById(`promote-form-${formKey}`).remove();
+    return;
+  }
+
+  const ownerOpts = renderResourceOptions('', '— Unassigned —');
+  const aiEl = document.getElementById(`action-items-${stepId}`);
+  if (!aiEl) return;
+
+  const formHtml = `
+    <div id="promote-form-${formKey}"
+      style="margin:0 0 8px;padding:10px 12px;border:1px solid rgba(79,142,247,.3);
+        border-radius:5px;background:rgba(79,142,247,.06)">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--accent);margin-bottom:8px">&#43; New Action Item</div>
+
+      <!-- Title -->
+      <div style="margin-bottom:6px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Title <span style="color:var(--red)">*</span>
+        </label>
+        <input id="ai-title-${formKey}" placeholder="What needs to be done?"
+          oninput="_validateDirectActionItemForm('${formKey}')"
+          style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
+            background:var(--bg1);border:1px solid var(--border);border-radius:3px;
+            color:var(--text);font-family:var(--font-body)" />
+      </div>
+
+      <!-- Instructions -->
+      <div style="margin-bottom:6px">
+        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          Instructions
+          <span style="font-weight:400;font-style:italic;color:var(--muted)"> — optional detail</span>
+        </label>
+        <textarea id="ai-instructions-${formKey}"
+          placeholder="Describe the specific actions required…"
+          style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
+            min-height:52px;resize:vertical;background:var(--bg1);
+            border:1px solid var(--border);border-radius:3px;
+            color:var(--text);font-family:var(--font-body)"></textarea>
+      </div>
+
+      <!-- Owner + Due Date -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div>
+          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
+          <select id="ai-owner-${formKey}" class="config-select" style="font-size:11px;width:100%">
+            ${ownerOpts}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
+          <input id="ai-due-${formKey}" type="date"
+            style="width:100%;font-size:11px;padding:5px 8px;
+              background:var(--bg1);border:1px solid var(--border);border-radius:3px;
+              color:var(--text);color-scheme:dark" />
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+        <button onclick="document.getElementById('promote-form-${formKey}').remove()"
+          style="font-size:10px;padding:4px 12px;background:none;border:1px solid var(--border);
+            border-radius:4px;color:var(--muted);cursor:pointer">Cancel</button>
+        <button id="ai-create-btn-${formKey}"
+          onclick="createDirectActionItem('${formKey}','${stepId}')"
+          disabled
+          style="font-size:10px;font-weight:600;padding:4px 14px;background:var(--accent);
+            color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.4">
+          Create Action Item
+        </button>
+      </div>
+    </div>`;
+
+  aiEl.insertAdjacentHTML('beforebegin', formHtml);
+  document.getElementById(`ai-title-${formKey}`)?.focus();
+}
+
+function _validateDirectActionItemForm(formKey) {
+  const titleEl = document.getElementById(`ai-title-${formKey}`);
+  const btn     = document.getElementById(`ai-create-btn-${formKey}`);
+  const hasTitle = (titleEl?.value || '').trim().length > 0;
+  if (btn) {
+    btn.disabled = !hasTitle;
+    btn.style.opacity = hasTitle ? '1' : '.4';
+  }
+}
+
+async function createDirectActionItem(formKey, stepId) {
+  const inst     = _selectedInstance;
+  if (!inst) return;
+  const titleEl  = document.getElementById(`ai-title-${formKey}`);
+  const instrEl  = document.getElementById(`ai-instructions-${formKey}`);
+  const ownerEl  = document.getElementById(`ai-owner-${formKey}`);
+  const dueEl    = document.getElementById(`ai-due-${formKey}`);
+  const btn      = document.getElementById(`ai-create-btn-${formKey}`);
+
+  const title        = titleEl?.value.trim();
+  const instructions = instrEl?.value.trim() || '';
+  if (!title) { cadToast('Title is required', 'error'); return; }
+
+  const ownerResId = ownerEl?.value || null;
+  const ownerName  = ownerResId ? (_resources_cad.find(r => r.id === ownerResId)?.name || '') : '';
+  const dueDate    = dueEl?.value || null;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+
+  const newId = crypto.randomUUID();
+  const row = {
+    id:                newId,
+    firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
+    instance_id:       inst.id,
+    template_step_id:  stepId,
+    source_comment_id: null,
+    title,
+    instructions,
+    attachments:       [],
+    priority:          'normal',
+    created_by_name:   _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
+  };
+  if (ownerResId) row.owner_resource_id = ownerResId;
+  if (ownerName)  row.owner_name        = ownerName;
+  if (dueDate)    row.due_date          = dueDate;
+
+  try {
+    await API.post('workflow_action_items', row);
+    if (!inst._actionItems) inst._actionItems = [];
+    inst._actionItems.push({ ...row, status: 'open', created_at: new Date().toISOString() });
+    document.getElementById(`promote-form-${formKey}`)?.remove();
+    _renderActionItems(stepId);
+    cadToast('Action item created', 'info');
+  } catch(e) {
+    cadToast('Failed to create action item: ' + (e.message || 'unknown error'), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Create Action Item'; }
+  }
 }
 
 function _validateActionItemForm(commentId) {
