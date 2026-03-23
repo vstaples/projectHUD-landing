@@ -6926,40 +6926,76 @@ function renderInstanceDAG(inst) {
   // ── Swimlane dot cluster overlay ─────────────────────────────────────────
   _swimlaneClusters = [];
   if (_swimlaneActive) {
-    const siblings = _instances.filter(i =>
+
+    // ── Dot color palette — distinct from amber node borders ─────────────
+    // in_progress siblings: cyan-blue  / selected instance: white outline
+    // completed instances:  bright teal
+    const SW_COLORS = {
+      active:    '#00d2ff',   // cyan — in-progress siblings
+      red:       '#ff5f6b',   // bright red — blocked/rejected siblings
+      completed: '#26e8a0',   // bright teal — fully completed instances
+      selected:  '#ffffff',   // white outline — the currently viewed instance
+      gray:      '#6a8aaa',   // muted blue-gray — stalled
+    };
+
+    // Build step → instance map
+    // Layer 1: in-progress siblings (excluding selected instance)
+    const byStep = {};
+
+    _instances.filter(i =>
       i.template_id === inst.template_id &&
       i.id          !== inst.id &&
       i.status      === 'in_progress' &&
       i.current_step_id
-    );
-
-    // Group siblings by step
-    const byStep = {};
-    siblings.forEach(sib => {
+    ).forEach(sib => {
       const sid = sib.current_step_id;
       if (!byStep[sid]) byStep[sid] = [];
-      byStep[sid].push(sib);
+      byStep[sid].push({ inst: sib, type: 'sibling' });
     });
 
-    Object.entries(byStep).forEach(([stepId, sibs]) => {
+    // Layer 2: selected instance — add it to its own current step cluster
+    const selActiveEvt = (inst._stepInsts || []).slice().reverse()
+      .find(e => e.event_type === 'step_activated');
+    if (selActiveEvt?.template_step_id) {
+      const sid = selActiveEvt.template_step_id;
+      if (!byStep[sid]) byStep[sid] = [];
+      byStep[sid].unshift({ inst, type: 'selected' }); // first position
+    }
+
+    // Layer 3: completed instances — dot on their final completed step
+    _instances.filter(i =>
+      i.template_id === inst.template_id &&
+      i.id          !== inst.id &&
+      i.status      === 'complete'
+    ).forEach(sib => {
+      // Find last step_completed event
+      const lastDone = (sib._stepInsts || []).slice().reverse()
+        .find(e => e.event_type === 'step_completed');
+      if (!lastDone?.template_step_id) return;
+      const sid = lastDone.template_step_id;
+      if (!byStep[sid]) byStep[sid] = [];
+      byStep[sid].push({ inst: sib, type: 'completed' });
+    });
+
+    Object.entries(byStep).forEach(([stepId, entries]) => {
       const p = nodePos(stepId);
       if (!p || p.x < 0) return;
 
       const DOT_R   = 4.5;
       const DOT_GAP = 11;
       const MAX_DOTS = 5;
-      const shown    = sibs.slice(0, MAX_DOTS);
+      const shown    = entries.slice(0, MAX_DOTS);
       const clusterW = shown.length * DOT_GAP + 8;
       const clusterH = 18;
 
       // Position: top-right corner of node, overlapping the border
-      const bx = p.x + NW - clusterW/2;   // centred on right edge
-      const by = p.y - clusterH/2;          // centred on top edge (overlaps border)
+      const bx = p.x + NW - clusterW/2;
+      const by = p.y - clusterH/2;
 
-      // Badge background
+      // Badge background — distinct dark panel with cyan border
       ctx.save();
-      ctx.fillStyle   = 'rgba(10,18,32,0.95)';
-      ctx.strokeStyle = '#e8a838';
+      ctx.fillStyle   = 'rgba(6,14,28,0.96)';
+      ctx.strokeStyle = '#00d2ff';
       ctx.lineWidth   = 1;
       ctx.beginPath();
       ctx.roundRect(bx, by, clusterW, clusterH, 5);
@@ -6967,30 +7003,52 @@ function renderInstanceDAG(inst) {
       ctx.restore();
 
       // Dots
-      shown.forEach((sib, i) => {
-        const health = _instanceHealth(sib);
-        const col    = _SW_DOT_COLORS[health] || _SW_DOT_COLORS.gray;
+      shown.forEach((entry, i) => {
         const dx = bx + 4 + i * DOT_GAP + DOT_R;
         const dy = by + clusterH / 2;
-        ctx.beginPath();
-        ctx.arc(dx, dy, DOT_R, 0, Math.PI * 2);
-        ctx.fillStyle = col;
-        ctx.fill();
+        if (entry.type === 'selected') {
+          // White outline ring — "you are here"
+          ctx.beginPath();
+          ctx.arc(dx, dy, DOT_R, 0, Math.PI * 2);
+          ctx.strokeStyle = SW_COLORS.selected;
+          ctx.lineWidth   = 1.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(dx, dy, DOT_R - 2, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          ctx.fill();
+        } else if (entry.type === 'completed') {
+          ctx.beginPath();
+          ctx.arc(dx, dy, DOT_R, 0, Math.PI * 2);
+          ctx.fillStyle = SW_COLORS.completed;
+          ctx.fill();
+        } else {
+          // in-progress sibling — color by health
+          const health = _instanceHealth(entry.inst);
+          const col = health === 'red'   ? SW_COLORS.red
+                    : health === 'green' ? SW_COLORS.completed
+                    : health === 'gray'  ? SW_COLORS.gray
+                    : SW_COLORS.active;
+          ctx.beginPath();
+          ctx.arc(dx, dy, DOT_R, 0, Math.PI * 2);
+          ctx.fillStyle = col;
+          ctx.fill();
+        }
       });
 
       // Overflow count
-      if (sibs.length > MAX_DOTS) {
-        ctx.fillStyle = '#e8a838';
+      if (entries.length > MAX_DOTS) {
+        ctx.fillStyle = '#00d2ff';
         ctx.font = 'bold 7px sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText('+' + (sibs.length - MAX_DOTS), bx + clusterW - 10, by + clusterH / 2);
+        ctx.fillText('+' + (entries.length - MAX_DOTS), bx + clusterW - 10, by + clusterH / 2);
       }
 
-      // Store hit region in content-space coords (before scale/translate)
+      // Store hit region — siblings array for popup (all types)
       _swimlaneClusters.push({
         stepId,
-        siblings: sibs,
+        siblings: entries.map(e => e.inst),
         x: bx, y: by,
         w: clusterW, h: clusterH,
       });
@@ -9249,7 +9307,7 @@ async function _swLoadSiblingData(inst) {
   const siblings = _instances.filter(i =>
     i.template_id === inst.template_id &&
     i.id          !== inst.id &&
-    i.status      === 'in_progress'
+    (i.status === 'in_progress' || i.status === 'complete')
   );
   for (const sib of siblings) {
     if (sib._stepInsts) continue; // already loaded
