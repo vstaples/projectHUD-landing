@@ -7821,53 +7821,79 @@ function _renderCommentThread(stepId) {
   const countEl  = document.getElementById(`comment-count-${stepId}`);
   if (!threadEl) return;
 
-  const comments = (inst._stepComments || [])
+  // Separate top-level comments from replies
+  const allComments = (inst._stepComments || [])
     .filter(c => c.template_step_id === stepId && !c.is_deleted)
     .sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
 
-  if (countEl) countEl.textContent = comments.length ? `(${comments.length})` : '';
+  const topLevel = allComments.filter(c => !c.parent_comment_id);
+  const replies  = allComments.filter(c => !!c.parent_comment_id);
 
-  if (!comments.length) {
+  const total = allComments.length;
+  if (countEl) countEl.textContent = total ? `(${total})` : '';
+
+  if (!topLevel.length) {
     threadEl.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px 0 6px;font-style:italic">No comments yet.</div>';
     return;
   }
 
-  const confColor = { green: 'var(--green)', yellow: 'var(--amber)', red: 'var(--red)' };
-  const confIcon  = { green: '&#9679;', yellow: '&#9679;', red: '&#9679;' };
-  const confLabel = { green: 'On track', yellow: 'Uncertain', red: 'Blocked' };
+  const confColor = { green:'var(--green)', yellow:'var(--amber)', red:'var(--red)' };
+  const confLabel = { green:'On track', yellow:'Uncertain', red:'Blocked' };
+  const canPromote = inst.status === 'in_progress';
 
-  threadEl.innerHTML = comments.map(c => {
+  const renderComment = (c, isReply) => {
     const ts = c.created_at ? new Date(c.created_at).toLocaleString('en-US',
       {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '';
     const conf = c.confidence;
-    const confDot = conf
-      ? `<span style="color:${confColor[conf]};font-size:8px;margin-right:3px">${confIcon[conf]}</span>
-         <span style="font-size:9px;color:${confColor[conf]};margin-right:6px">${confLabel[conf]}</span>`
+    const confBadge = conf
+      ? `<span style="font-size:9px;color:${confColor[conf]};padding:1px 6px;
+           border:1px solid ${confColor[conf]}44;border-radius:10px;background:${confColor[conf]}11">
+           &#9679; ${confLabel[conf]}
+         </span>`
       : '';
-    const hours = c.hours_logged
-      ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">&#9201; ${c.hours_logged}h</span>`
+    const hoursBadge = c.hours_logged
+      ? `<span style="font-size:9px;color:var(--amber);font-family:var(--font-mono);
+           padding:1px 6px;border:1px solid rgba(232,168,56,.3);border-radius:10px;
+           background:rgba(232,168,56,.08)">
+           &#9201; ${c.hours_logged}h
+         </span>`
       : '';
-    const canPromote = _selectedInstance?.status === 'in_progress';
+    const replyCount = replies.filter(r => r.parent_comment_id === c.id).length;
+    const threadReplies = replies.filter(r => r.parent_comment_id === c.id)
+      .map(r => renderComment(r, true)).join('');
+
     return `
-      <div style="padding:7px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
-          ${confDot}
-          <span style="font-size:10px;font-weight:600;color:var(--text2)">${escHtml(c.author_name||'Unknown')}</span>
-          <span style="font-size:9px;color:var(--muted);margin-left:auto">${ts}</span>
-          ${hours}
-          ${canPromote ? `<button onclick="promoteToActionItem('${c.id}','${stepId}')"
-            title="Promote to action item"
+      <div id="comment-row-${c.id}"
+        style="${isReply
+          ? 'margin-left:16px;padding:6px 0 6px 10px;border-left:2px solid var(--border)'
+          : 'padding:8px 0'}">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-size:10px;font-weight:700;color:var(--text)">${escHtml(c.author_name||'Unknown')}</span>
+          <span style="font-size:9px;color:var(--muted)">${ts}</span>
+          ${confBadge}${hoursBadge}
+          <div style="flex:1"></div>
+          ${!isReply && canPromote ? `<button onclick="promoteToActionItem('${c.id}','${stepId}')"
             style="font-size:9px;color:var(--accent);background:none;border:none;
-              cursor:pointer;padding:0 2px;opacity:.7"
+              cursor:pointer;padding:0;opacity:.7"
             onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.7'">
             &#8679; Promote
           </button>` : ''}
+          <button onclick="showReplyInput('${c.id}','${stepId}')"
+            style="font-size:9px;color:var(--muted);background:none;border:none;
+              cursor:pointer;padding:0;opacity:.7"
+            onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.7'">
+            &#8617; Reply${replyCount ? ' ('+replyCount+')' : ''}
+          </button>
         </div>
-        <div style="font-size:11px;color:var(--text);line-height:1.5;padding-left:2px">
+        <div style="font-size:11px;color:var(--text);line-height:1.5">
           ${escHtml(c.body)}
         </div>
-      </div>`;
-  }).join('');
+        ${threadReplies}
+      </div>
+      ${!isReply ? '<div style="height:1px;background:var(--border);margin:2px 0"></div>' : ''}`;
+  };
+
+  threadEl.innerHTML = topLevel.map(c => renderComment(c, false)).join('');
 }
 
 function _renderActionItems(stepId) {
@@ -7938,13 +7964,11 @@ function promoteToActionItem(commentId, stepId) {
   if (!inst) return;
   const comment = (inst._stepComments || []).find(c => c.id === commentId);
   if (!comment) return;
-
-  // Don't double-render
   if (document.getElementById(`promote-form-${commentId}`)) return;
-
   const threadEl = document.getElementById(`comment-thread-${stepId}`);
   if (!threadEl) return;
 
+  const ownerOpts = renderResourceOptions('', '— Unassigned —');
   const formHtml = `
     <div id="promote-form-${commentId}"
       style="margin:6px 0 8px;padding:10px 12px;border:1px solid rgba(79,142,247,.3);
@@ -7961,13 +7985,8 @@ function promoteToActionItem(commentId, stepId) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <div>
           <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
-          <select id="ai-owner-${commentId}"
-            style="width:100%;font-size:11px;padding:5px 8px;
-              background:var(--bg1);border:1px solid var(--border);border-radius:3px;color:var(--text)">
-            <option value="">— Unassigned —</option>
-            ${(_resources_cad || []).map(r =>
-              `<option value="${r.id}" data-name="${escHtml(r.first_name+' '+r.last_name)}">${escHtml(r.first_name+' '+r.last_name)}</option>`
-            ).join('')}
+          <select id="ai-owner-${commentId}" class="config-select" style="font-size:11px;width:100%">
+            ${ownerOpts}
           </select>
         </div>
         <div>
@@ -7986,26 +8005,29 @@ function promoteToActionItem(commentId, stepId) {
             color:#fff;border:none;border-radius:4px;cursor:pointer">Create</button>
       </div>
     </div>`;
-
-  // Insert the form after the thread's last child
   threadEl.insertAdjacentHTML('beforeend', formHtml);
 }
 
 async function createActionItem(commentId, stepId) {
   const inst = _selectedInstance;
   if (!inst) return;
-  const comment = (inst._stepComments || []).find(c => c.id === commentId);
-  const titleEl = document.getElementById(`ai-title-${commentId}`);
-  const ownerEl = document.getElementById(`ai-owner-${commentId}`);
-  const dueEl   = document.getElementById(`ai-due-${commentId}`);
+  const comment  = (inst._stepComments || []).find(c => c.id === commentId);
+  const titleEl  = document.getElementById(`ai-title-${commentId}`);
+  const ownerEl  = document.getElementById(`ai-owner-${commentId}`);
+  const dueEl    = document.getElementById(`ai-due-${commentId}`);
+  const createBtn = document.querySelector(`button[onclick="createActionItem('${commentId}','${stepId}')"]`);
 
   const title = titleEl?.value.trim();
-  if (!title) return;
+  if (!title) { cadToast('Title is required', 'error'); return; }
 
-  const ownerOpt = ownerEl?.options[ownerEl.selectedIndex];
-  const ownerName = ownerOpt?.dataset.name || '';
+  // Get owner name from the selected option text
   const ownerResId = ownerEl?.value || null;
+  const ownerName  = ownerResId
+    ? (_resources_cad.find(r => r.id === ownerResId)?.name || '')
+    : '';
   const dueDate = dueEl?.value || null;
+
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Creating…'; }
 
   const row = {
     firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
@@ -8014,23 +8036,23 @@ async function createActionItem(commentId, stepId) {
     source_comment_id: commentId,
     title,
     body:              comment?.body || '',
-    owner_resource_id: ownerResId || undefined,
-    owner_name:        ownerName || undefined,
-    due_date:          dueDate || undefined,
     priority:          'normal',
-    created_by_name:   inst._pmName || 'Vaughn W. Staples',
+    created_by_name:   _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member',
   };
+  if (ownerResId)  row.owner_resource_id = ownerResId;
+  if (ownerName)   row.owner_name        = ownerName;
+  if (dueDate)     row.due_date          = dueDate;
 
   try {
-    const result = await API.post('workflow_action_items', row);
+    await API.post('workflow_action_items', row);
     if (!inst._actionItems) inst._actionItems = [];
-    inst._actionItems.push({ ...row, id: result?.id || crypto.randomUUID(), created_at: new Date().toISOString() });
-
-    // Remove promote form and re-render
+    inst._actionItems.push({ ...row, id: crypto.randomUUID(), status: 'open', created_at: new Date().toISOString() });
     document.getElementById(`promote-form-${commentId}`)?.remove();
     _renderActionItems(stepId);
+    cadToast('Action item created', 'info');
   } catch(e) {
-    alert('Failed to create action item. Try again.');
+    cadToast('Failed to create action item: ' + (e.message || 'unknown error'), 'error');
+    if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create'; }
   }
 }
 
@@ -8038,18 +8060,75 @@ async function resolveActionItem(actionItemId, stepId) {
   const inst = _selectedInstance;
   if (!inst) return;
   const note = prompt('Resolution note (optional):') ?? '';
-
   try {
     await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
-      status: 'resolved',
-      resolved_at: new Date().toISOString(),
+      status:          'resolved',
+      resolved_at:     new Date().toISOString(),
       resolution_note: note || null,
     });
     const item = (inst._actionItems || []).find(a => a.id === actionItemId);
     if (item) { item.status = 'resolved'; item.resolved_at = new Date().toISOString(); item.resolution_note = note || null; }
     _renderActionItems(stepId);
   } catch(e) {
-    alert('Failed to resolve. Try again.');
+    cadToast('Failed to resolve: ' + (e.message || 'unknown error'), 'error');
+  }
+}
+
+// Show reply input under a comment
+function showReplyInput(commentId, stepId) {
+  if (document.getElementById(`reply-input-${commentId}`)) {
+    document.getElementById(`reply-input-${commentId}`).remove();
+    return;
+  }
+  const commentEl = document.getElementById(`comment-row-${commentId}`);
+  if (!commentEl) return;
+  const replyHtml = `
+    <div id="reply-input-${commentId}"
+      style="margin:4px 0 4px 18px;padding:8px 10px;
+        border:1px solid var(--border);border-radius:4px;background:var(--bg2)">
+      <textarea id="reply-body-${commentId}"
+        placeholder="Write a reply…"
+        style="width:100%;box-sizing:border-box;font-size:11px;padding:4px 6px;
+          min-height:44px;resize:vertical;background:transparent;border:none;
+          color:var(--text);font-family:var(--font-body);outline:none"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+        <button onclick="document.getElementById('reply-input-${commentId}').remove()"
+          style="font-size:10px;padding:3px 10px;background:none;border:1px solid var(--border);
+            border-radius:3px;color:var(--muted);cursor:pointer">Cancel</button>
+        <button onclick="postReply('${commentId}','${stepId}')"
+          style="font-size:10px;font-weight:600;padding:3px 12px;background:var(--cad);
+            color:#fff;border:none;border-radius:3px;cursor:pointer">Reply</button>
+      </div>
+    </div>`;
+  commentEl.insertAdjacentHTML('afterend', replyHtml);
+  document.getElementById(`reply-body-${commentId}`)?.focus();
+}
+
+async function postReply(parentCommentId, stepId) {
+  const bodyEl = document.getElementById(`reply-body-${parentCommentId}`);
+  const body   = (bodyEl?.value || '').trim();
+  if (!body) return;
+
+  const inst       = _selectedInstance;
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+
+  const row = {
+    firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
+    instance_id:       inst.id,
+    template_step_id:  stepId,
+    parent_comment_id: parentCommentId,
+    author_name:       authorName,
+    body,
+  };
+
+  try {
+    await API.post('step_comments', row);
+    if (!inst._stepComments) inst._stepComments = [];
+    inst._stepComments.push({ ...row, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+    document.getElementById(`reply-input-${parentCommentId}`)?.remove();
+    _renderCommentThread(stepId);
+  } catch(e) {
+    cadToast('Failed to post reply', 'error');
   }
 }
 
