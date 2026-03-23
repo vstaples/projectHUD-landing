@@ -7775,6 +7775,7 @@ async function postStepComment(instId, stepId) {
     return;
   }
   const inst  = _selectedInstance;
+  const conf  = _commentConf[stepId] || null;
   const authorName = inst?._pmName || 'Vaughn W. Staples';
 
   if (statusEl) statusEl.textContent = 'Posting…';
