@@ -6310,16 +6310,24 @@ function toggleInstDagCoC(btn) {
     setTimeout(() => { _instDagFitted=false; renderInstanceDAG(inst); }, 250);
   }
 
-  // Wire tooltip hover via event delegation on the detail container
-  // (avoids inline event attribute issues inside template literals)
-  el.onmouseover = function(e) {
+  // Wire tooltip hover via event delegation — use capture phase to beat onclick handlers
+  el.onmouseover = null;
+  el.onmouseout  = null;
+  if (el._tipOver) el.removeEventListener('mouseover', el._tipOver, true);
+  if (el._tipOut)  el.removeEventListener('mouseout',  el._tipOut,  true);
+
+  el._tipOver = function(e) {
+    if (_tooltipSticky) return;
     const row = e.target.closest('[data-tipstep]');
     if (row) _showStepTooltip(row.dataset.tipstep, e);
   };
-  el.onmouseout = function(e) {
+  el._tipOut = function(e) {
+    if (_tooltipSticky) return;
     const row = e.target.closest('[data-tipstep]');
     if (row && !row.contains(e.relatedTarget)) _hideStepTooltip();
   };
+  el.addEventListener('mouseover', el._tipOver, true);
+  el.addEventListener('mouseout',  el._tipOut,  true);
 
   // Populate rework badges after DOM settles
   setTimeout(_populateReworkBadges, 150);
@@ -6428,11 +6436,18 @@ function renderInstanceDAG(inst) {
     Object.entries(latestEvt).filter(([,e])=>e.event_type==='step_activated').map(([id])=>id)
   );
 
-  // Rejection loops count per step
+  // Rejection loops count per step — resets + direct requiresReset completions
   const loopCount = {};
   coc.forEach(e => {
-    if (e.event_type==='step_reset' && e.template_step_id) {
-      loopCount[e.template_step_id] = (loopCount[e.template_step_id]||0)+1;
+    if (e.event_type === 'step_reset' && e.template_step_id) {
+      loopCount[e.template_step_id] = (loopCount[e.template_step_id]||0) + 1;
+    }
+    if (e.event_type === 'step_completed' && e.template_step_id && e.outcome) {
+      const stepDef = steps.find(s => s.id === e.template_step_id);
+      const oDef = stepDef ? _getOutcomes(stepDef).find(o => o.id === e.outcome) : null;
+      if (oDef?.requiresReset) {
+        loopCount[e.template_step_id] = (loopCount[e.template_step_id]||0) + 1;
+      }
     }
   });
 
@@ -6741,7 +6756,7 @@ function renderInstanceDAG(inst) {
       ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill(); ctx.globalAlpha=1;
       ctx.fillStyle='#fff'; ctx.font='700 8px system-ui,sans-serif';
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(`↩ ${rCount}× rejected`, bx+bw/2, by+bh/2);
+      ctx.fillText(`\u21a9 ${rCount}\u00d7 rework`, bx+bw/2, by+bh/2);
     }
   });
 
@@ -7021,7 +7036,7 @@ function showIntelBriefing(instId) {
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <span style="font-size:12px;font-weight:600;color:var(--text)">${escHtml(step.name||'Step')}</span>
                     <span style="font-size:10px;color:var(--muted)">${escHtml(STEP_META[step.step_type]?.label||step.step_type)}</span>
-                    ${resets?`<span style="font-size:10px;color:var(--red);font-weight:600">↩ ${resets}× rejected</span>`:''}
+                    ${resets?`<span style="font-size:10px;color:var(--red);font-weight:600">↩ ${resets}× rework</span>`:''}
                     ${durationMs!==null?`<span style="font-size:10px;color:var(--muted);margin-left:auto">${elapsed(durationMs)}</span>`:''}
                   </div>
                   ${firstAct?`<div style="font-size:10px;color:var(--muted);margin-top:2px">
@@ -7352,6 +7367,7 @@ async function _onExternalCoCEvent(instId) {
 let _tooltipTimer   = null;
 let _tooltipVisible = false;
 let _tooltipStepId  = null;
+let _tooltipSticky  = false;  // true once user scrolls or clicks into tooltip
 
 function _getOrCreateTooltip() {
   let el = document.getElementById('coc-hover-tooltip');
@@ -7361,8 +7377,8 @@ function _getOrCreateTooltip() {
     el.style.cssText = [
       'position:fixed',
       'z-index:9999',
-      'width:360px',
-      'max-height:340px',
+      'width:380px',
+      'max-height:420px',
       'background:#060a10',
       'border:1px solid rgba(0,210,255,0.28)',
       'border-radius:6px',
@@ -7371,19 +7387,25 @@ function _getOrCreateTooltip() {
       'display:none',
       'flex-direction:column',
       'font-family:var(--font-body)',
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6)',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.7)',
     ].join(';');
+    // Become sticky on mouseenter — stay open until X clicked
     el.addEventListener('mouseenter', () => {
-      el.style.pointerEvents = 'auto';
       clearTimeout(_tooltipTimer);
+      _tooltipSticky = true;
+      el.style.pointerEvents = 'auto';
     });
-    el.addEventListener('mouseleave', () => _hideStepTooltip());
+    el.addEventListener('mouseleave', () => {
+      // Only hide if not sticky (sticky requires X click)
+      if (!_tooltipSticky) _hideStepTooltip();
+    });
     document.body.appendChild(el);
   }
   return el;
 }
 
 function _showStepTooltip(stepId, event) {
+  if (_tooltipSticky) return;  // don't interrupt a sticky tooltip
   if (_tooltipStepId === stepId && _tooltipVisible) return;
   clearTimeout(_tooltipTimer);
   _tooltipTimer = setTimeout(() => {
@@ -7391,14 +7413,21 @@ function _showStepTooltip(stepId, event) {
   }, 350);
 }
 
-function _hideStepTooltip() {
+function _hideStepTooltip(force) {
+  if (_tooltipSticky && !force) return;  // sticky — ignore hover-away
   clearTimeout(_tooltipTimer);
   _tooltipTimer = setTimeout(() => {
     const el = document.getElementById('coc-hover-tooltip');
-    if (el) { el.style.display = 'none'; }
+    if (el) { el.style.display = 'none'; el.style.pointerEvents = 'none'; }
     _tooltipVisible = false;
     _tooltipStepId  = null;
+    _tooltipSticky  = false;
   }, 180);
+}
+
+function _closeStepTooltip() {
+  _tooltipSticky = false;
+  _hideStepTooltip(true);
 }
 
 function _renderStepTooltip(stepId, event) {
@@ -7487,12 +7516,19 @@ function _renderStepTooltip(stepId, event) {
         ${escHtml(step.name || 'Step')}
       </div>
       ${reworkCount ? `<div style="font-family:var(--font-mono);font-size:10px;
-        color:#E24B4A;flex-shrink:0">↩ ${reworkCount}× rework</div>` : ''}
+        color:#E24B4A;flex-shrink:0">\u21a9 ${reworkCount}\u00d7 rework</div>` : ''}
+      <button onclick="_closeStepTooltip()"
+        style="background:none;border:none;color:rgba(0,210,255,0.5);cursor:pointer;
+          font-size:16px;line-height:1;padding:0 0 0 4px;flex-shrink:0;
+          transition:color .15s"
+        onmouseenter="this.style.color='#eef4ff'"
+        onmouseleave="this.style.color='rgba(0,210,255,0.5)'"
+        title="Close">&#10005;</button>
     </div>
     <div style="overflow-y:auto;flex:1">${evtRows}${more}</div>`;
 
   // Position tooltip — avoid viewport edges
-  const TW = 360, TH = Math.min(340, 56 + coc.slice(0,18).length * 38);
+  const TW = 380, TH = Math.min(420, 56 + coc.slice(0,18).length * 42);
   const vw = window.innerWidth, vh = window.innerHeight;
   let tx = event.clientX + 14;
   let ty = event.clientY - 20;
@@ -7718,7 +7754,7 @@ function _instRenderReworkCost(inst) {
     <div style="padding:6px 8px;background:rgba(226,75,74,.07);border-radius:4px;
       border-left:3px solid var(--red);margin-bottom:5px">
       <div style="font-size:12px;font-weight:600;color:var(--text2)">${escHtml(s.name||'Step')}</div>
-      <div style="font-size:11px;color:var(--red)">${resetsByStep[s.id]}× rejected</div>
+      <div style="font-size:11px;color:var(--red)">${resetsByStep[s.id]}× rework</div>
     </div>`).join('')}`;
 }
 
