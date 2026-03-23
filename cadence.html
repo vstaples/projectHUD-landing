@@ -5639,6 +5639,19 @@ function renderInstanceDetail(el, inst) {
             border:none;border-left:1px solid var(--border);cursor:pointer;transition:all .12s">DIAGRAM</button>
       </div>
 
+      <!-- Swimlane toggle — Option D: always visible, grayed in list mode -->
+      <button id="sw-toggle-btn" onclick="_toggleSwimlane()"
+        style="padding:5px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;
+          background:${_swimlaneActive?'var(--cad)':'transparent'};
+          color:${_swimlaneActive?'var(--bg0)':'var(--muted)'};
+          border:1px solid var(--border);border-radius:5px;cursor:pointer;
+          transition:all .12s;flex-shrink:0;
+          opacity:${viewMode==='diagram'?'1':'0.35'};
+          pointer-events:${viewMode==='diagram'?'auto':'none'}"
+        title="Toggle portfolio swimlane overlay">
+        ◉ Swimlane
+      </button>
+
       <!-- Digital elapsed clock — dd:hh:mm since launch -->
       ${inst.launched_at && canAct ? `
       <div style="flex-shrink:0;text-align:center;
@@ -5716,6 +5729,14 @@ function renderInstanceDetail(el, inst) {
               border:1px solid var(--border);border-radius:3px;color:var(--muted);
               cursor:pointer;letter-spacing:.04em;margin-left:8px;transition:all .15s">CoC ▸</button>
         </div>
+        <!-- Bottleneck banner — shown by _swUpdateBottleneckBanner() -->
+        <div id="sw-bottleneck-banner" style="display:none;padding:7px 16px;
+          background:rgba(226,75,74,.08);border-bottom:1px solid rgba(226,75,74,.3);
+          flex-shrink:0;align-items:center;gap:8px;font-size:11px;color:var(--text)">
+          <div style="width:7px;height:7px;border-radius:50%;background:#E24B4A;flex-shrink:0"></div>
+          <span id="sw-bottleneck-text"></span>
+        </div>
+
         <!-- Canvas row — flex:1 min-height:0 exactly like template dag-cards parent -->
         <div style="flex:1;min-height:0;position:relative;display:flex;overflow:hidden">
           <div id="inst-dag-canvas-wrap" style="flex:1;position:relative;overflow:hidden;cursor:grab">
@@ -6442,10 +6463,14 @@ function setInstViewMode(mode) {
     if (cocPanel) { cocPanel.style.width='0'; cocPanel.style.borderLeftWidth='0'; cocPanel.style.display='none'; }
     const cocBtn = document.getElementById('inst-dag-coc-btn');
     if (cocBtn) { cocBtn.textContent='CoC ▸'; cocBtn.style.color='var(--muted)'; }
+    // Lazy-load sibling CoCs for swimlane health classification
+    if (_swimlaneActive) _swLoadSiblingData(_selectedInstance);
   }
   const el = document.getElementById('instance-detail');
   if (el) renderInstanceDetail(el, _selectedInstance);
   setTimeout(_populateReworkBadges, 50);
+  // Update bottleneck banner
+  setTimeout(() => _swUpdateBottleneckBanner(_selectedInstance), 100);
 }
 
 // ── Instance DAG state ────────────────────────────────────────────────────────
@@ -6453,6 +6478,50 @@ let _instDagPanX=0, _instDagPanY=0, _instDagScale=1, _instDagFitted=false;
 let _instDagDrag=false, _instDagDSX=0, _instDagDSY=0, _instDagPSX=0, _instDagPSY=0;
 let _instDagPulseFrame=null;
 let _instScrubPos=100;   // 0–100, 100 = live/present
+
+// ── Swimlane state ─────────────────────────────────────────────────────────────
+let _swimlaneActive  = false;
+let _swimlanePopup   = null;  // currently visible popup el
+let _swimlaneHideTimer = null;
+let _swimlaneDwellTimer = null;
+let _swimlaneDwellRow   = null;
+// Stores cluster hit regions for the current DAG frame: [{stepId, x, y, r}]
+let _swimlaneClusters = [];
+
+function _toggleSwimlane() {
+  const inst = _selectedInstance;
+  if (!inst || inst._viewMode !== 'diagram') return;
+  _swimlaneActive = !_swimlaneActive;
+  // Update toggle button appearance
+  const btn = document.getElementById('sw-toggle-btn');
+  if (btn) {
+    btn.style.background = _swimlaneActive ? 'var(--cad)' : 'transparent';
+    btn.style.color      = _swimlaneActive ? 'var(--bg0)' : 'var(--muted)';
+  }
+  // Hide popup if turning off
+  if (!_swimlaneActive) _swHidePopup(true);
+  // Load sibling CoCs if turning on
+  if (_swimlaneActive) _swLoadSiblingData(inst);
+  renderInstanceDAG(inst);
+  _swUpdateBottleneckBanner(inst);
+}
+
+function _instanceHealth(inst) {
+  if (!inst) return 'gray';
+  if (inst.status === 'suspended') return 'gray';
+  const coc  = inst._stepInsts || [];
+  const last = coc[coc.length - 1];
+  if (!last) return 'amber';
+  if (last.event_type === 'step_completed') {
+    const stepDef = (inst._tmplSteps || []).find(s => s.id === last.template_step_id);
+    const oDef    = stepDef ? _getOutcomes(stepDef).find(o => o.id === last.outcome) : null;
+    return oDef?.requiresReset ? 'red' : 'green';
+  }
+  if (last.event_type === 'step_activated') return 'amber';
+  return 'gray';
+}
+
+const _SW_DOT_COLORS = { amber:'#e8a838', red:'#E24B4A', green:'#1D9E75', gray:'#4a6070' };
 let _instScrubEvents=[];  // sorted CoC events for current instance
 
 function instDagZoom(f) { _instDagScale=Math.max(0.2,Math.min(3,_instDagScale*f)); renderInstanceDAG(_selectedInstance); }
@@ -6850,6 +6919,77 @@ function renderInstanceDAG(inst) {
   const zlbl=document.getElementById('dag-zoom-label');
   if(zlbl) zlbl.textContent=Math.round(_instDagScale*100)+'%';
 
+  // ── Swimlane dot cluster overlay ─────────────────────────────────────────
+  _swimlaneClusters = [];
+  if (_swimlaneActive) {
+    const siblings = _instances.filter(i =>
+      i.template_id === inst.template_id &&
+      i.id          !== inst.id &&
+      i.status      === 'in_progress' &&
+      i.current_step_id
+    );
+    // Group siblings by step
+    const byStep = {};
+    siblings.forEach(sib => {
+      const sid = sib.current_step_id;
+      if (!byStep[sid]) byStep[sid] = [];
+      byStep[sid].push(sib);
+    });
+
+    Object.entries(byStep).forEach(([stepId, sibs]) => {
+      const p = nodePos(stepId);
+      if (!p || p.x < 0) return;
+
+      const CLUSTER_X = p.x + NW - 4;
+      const CLUSTER_Y = p.y - 4;
+      const DOT_R = 4.5;
+      const DOT_GAP = 11;
+      const MAX_DOTS = 5;
+      const shown = sibs.slice(0, MAX_DOTS);
+      const clusterW = shown.length * DOT_GAP + 6;
+      const clusterH = 18;
+
+      // Badge background
+      ctx.fillStyle   = 'rgba(12,22,40,.9)';
+      ctx.strokeStyle = 'rgba(42,64,96,.8)';
+      ctx.lineWidth   = 0.8;
+      const bx = CLUSTER_X - clusterW;
+      const by = CLUSTER_Y;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, clusterW, clusterH, 4);
+      ctx.fill(); ctx.stroke();
+
+      // Dots
+      shown.forEach((sib, i) => {
+        const health = _instanceHealth(sib);
+        const col    = _SW_DOT_COLORS[health] || _SW_DOT_COLORS.gray;
+        const dx = bx + 4 + i * DOT_GAP + DOT_R;
+        const dy = by + clusterH / 2;
+        ctx.beginPath();
+        ctx.arc(dx, dy, DOT_R, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+      });
+
+      // Overflow count badge
+      if (sibs.length > MAX_DOTS) {
+        ctx.fillStyle = 'rgba(232,168,56,.8)';
+        ctx.font = 'bold 7px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('+' + (sibs.length - MAX_DOTS), bx + clusterW - 12, by + clusterH / 2);
+      }
+
+      // Store hit region (in unscaled/untranslated content coords)
+      _swimlaneClusters.push({
+        stepId,
+        siblings: sibs,
+        x: bx, y: by,
+        w: clusterW, h: clusterH,
+      });
+    });
+  }
+
   // Animate pulse for active step — only schedule next frame if still fitted
   // (prevents stale pulse frames from running before a refit)
   if(_instDagPulseFrame) cancelAnimationFrame(_instDagPulseFrame);
@@ -6892,6 +7032,20 @@ function renderInstanceDAG(inst) {
       const r   = wrap.getBoundingClientRect();
       const mx  = (e.clientX - r.left  - _instDagPanX) / _instDagScale;
       const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
+
+      // Swimlane cluster hover
+      if (_swimlaneActive) {
+        const hit = _swimlaneClusters.find(c =>
+          mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h);
+        if (hit) {
+          wrap.style.cursor = 'pointer';
+          _swShowPopup(hit, e.clientX, e.clientY, wrap);
+          return;
+        } else {
+          _swStartHidePopup();
+        }
+      }
+
       let hit = false;
       steps.forEach((s, i) => {
         const px = PAD_L + i * (NW + HGAP), py = NODE_Y;
@@ -6899,7 +7053,10 @@ function renderInstanceDAG(inst) {
       });
       wrap.style.cursor = hit ? 'default' : 'grab';
     });
-    wrap.addEventListener('mouseleave', () => { wrap.style.cursor = 'grab'; });
+    wrap.addEventListener('mouseleave', () => {
+      wrap.style.cursor = 'grab';
+      _swStartHidePopup();
+    });
     // Click node to open step completion in list view
     wrap.addEventListener('click',e=>{
       const r=wrap.getBoundingClientRect();
@@ -9008,6 +9165,253 @@ function instScrubChange(val) {
   _instRenderDots(events, idx);
 }
 
+// ── Swimlane sibling data loader ──────────────────────────────────────────────
+// Lazy-loads _stepInsts for sibling instances so health classification works.
+// Called when entering Diagram mode with Swimlane active.
+async function _swLoadSiblingData(inst) {
+  if (!inst) return;
+  const siblings = _instances.filter(i =>
+    i.template_id === inst.template_id &&
+    i.id          !== inst.id &&
+    i.status      === 'in_progress'
+  );
+  for (const sib of siblings) {
+    if (sib._stepInsts) continue; // already loaded
+    try {
+      const [stepInsts, tmplSteps] = await Promise.all([
+        API.get(`workflow_step_instances?instance_id=eq.${sib.id}&order=created_at.asc,id.asc`).catch(()=>[]),
+        sib._tmplSteps ? Promise.resolve(null) : (
+          API.get(`workflow_template_steps?template_id=eq.${inst.template_id}&order=sequence_order.asc`).catch(()=>[])
+        ),
+      ]);
+      sib._stepInsts = stepInsts || [];
+      if (tmplSteps) sib._tmplSteps = tmplSteps.map(s=>({...s,
+        _attachedDocs: (s.attached_docs||[]).map(d=>({name:d.name,path:d.path||null,url:d.url||null})),
+        _meetingAgenda: Array.isArray(s.meeting_agenda)?s.meeting_agenda:[],
+      }));
+    } catch(e) {
+      console.warn('Swimlane: failed to load sibling CoC for', sib.id, e);
+    }
+  }
+  // Re-render clusters now that health data is available
+  if (_swimlaneActive && _selectedInstance?.id === inst.id) {
+    renderInstanceDAG(inst);
+    _swUpdateBottleneckBanner(inst);
+  }
+}
+
+// ── Swimlane sibling data loader ──────────────────────────────────────────────
+
+function _swCanvasCoords(e, wrap) {
+  const r = wrap.getBoundingClientRect();
+  return {
+    mx: (e.clientX - r.left  - _instDagPanX) / _instDagScale,
+    my: (e.clientY - r.top   - _instDagPanY) / _instDagScale,
+    cx: e.clientX, cy: e.clientY,
+  };
+}
+
+function _swShowPopup(cluster, clientX, clientY, wrap) {
+  clearTimeout(_swimlaneHideTimer);
+  const existingId = _swimlanePopup?.dataset?.clusterId;
+  if (existingId === cluster.stepId) return; // already showing for this cluster
+  _swHidePopup(true);
+
+  const popup = document.createElement('div');
+  popup.dataset.clusterId = cluster.stepId;
+  popup.style.cssText = `
+    position:fixed;z-index:2000;
+    background:var(--bg1);border:1px solid var(--border2);border-radius:8px;
+    overflow:hidden;width:270px;
+    box-shadow:0 8px 24px rgba(0,0,0,.5)`;
+
+  // Header
+  const stepName = cluster.siblings[0]?.current_step_name || 'This step';
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)';
+  hdr.textContent = `${cluster.siblings.length} instance${cluster.siblings.length>1?'s':''} · ${stepName}`;
+  popup.appendChild(hdr);
+
+  // Rows
+  cluster.siblings.forEach(sib => {
+    const health = _instanceHealth(sib);
+    const col    = _SW_DOT_COLORS[health] || _SW_DOT_COLORS.gray;
+    const coc    = sib._stepInsts || [];
+    const rework = coc.filter(e => {
+      if (e.event_type === 'step_reset') return true;
+      if (e.event_type === 'step_completed' && e.template_step_id === sib.current_step_id) {
+        const step = (sib._tmplSteps||[]).find(s=>s.id===e.template_step_id);
+        const out  = step ? _getOutcomes(step).find(o=>o.id===e.outcome) : null;
+        return out?.requiresReset;
+      }
+      return false;
+    }).length;
+
+    // Elapsed at current step
+    const activEvt = coc.slice().reverse().find(e =>
+      e.event_type==='step_activated' && e.template_step_id===sib.current_step_id);
+    let elapsed = '—';
+    if (activEvt?.created_at) {
+      const ms = Date.now() - new Date(activEvt.created_at);
+      const m=Math.floor(ms/60000), h=Math.floor(m/60), d=Math.floor(h/24);
+      elapsed = d>0 ? `${d}d ${h%24}h` : h>0 ? `${h}h ${m%60}m` : `${m}m`;
+    }
+
+    const prio = sib.priority || 'normal';
+    const prioHtml = prio==='critical'
+      ? `<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;color:#E24B4A;border:0.5px solid rgba(226,75,74,.4)">CRIT</span>`
+      : prio==='important'
+      ? `<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;color:var(--amber);border:0.5px solid rgba(232,168,56,.4)">HIGH</span>`
+      : '';
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-bottom:0.5px solid var(--border);position:relative;overflow:hidden;transition:background .12s';
+    row.innerHTML = `
+      <div style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div class="sw-rname" style="font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .1s">${escHtml(sib.title||'Untitled')}</div>
+        <div style="font-size:10px;color:var(--muted)">${elapsed}</div>
+      </div>
+      ${rework>0?`<span style="font-size:9px;font-weight:700;color:#E24B4A">↩ ${rework}×</span>`:''}
+      ${prioHtml}
+      <div class="sw-dbar" style="position:absolute;bottom:0;left:0;height:2px;background:var(--cad);width:0;border-radius:0"></div>`;
+
+    row.addEventListener('mouseenter', () => {
+      row.style.background = 'rgba(232,168,56,.1)';
+      row.querySelector('.sw-rname').style.color = 'var(--cad)';
+      _swStartDwell(row, sib.id);
+    });
+    row.addEventListener('mouseleave', () => {
+      row.style.background = 'transparent';
+      row.querySelector('.sw-rname').style.color = 'var(--text)';
+      _swCancelDwell(row);
+    });
+    popup.appendChild(row);
+  });
+
+  // "Hold 1.5s" hint
+  const hint = document.createElement('div');
+  hint.style.cssText = 'padding:5px 12px;font-size:9px;color:var(--muted);font-style:italic;background:var(--bg2)';
+  hint.textContent = 'Hold 1.5s on any row to open Intelligence Briefing';
+  popup.appendChild(hint);
+
+  // Keep popup alive when cursor is over it
+  popup.addEventListener('mouseenter', () => clearTimeout(_swimlaneHideTimer));
+  popup.addEventListener('mouseleave', () => _swStartHidePopup());
+
+  // Position near cluster — prefer below-right, flip if off-screen
+  document.body.appendChild(popup);
+  const pw = 270, ph = popup.offsetHeight || 200;
+  let px = clientX + 12, py = clientY - 20;
+  if (px + pw > window.innerWidth  - 8) px = clientX - pw - 12;
+  if (py + ph > window.innerHeight - 8) py = window.innerHeight - ph - 8;
+  popup.style.left = px + 'px';
+  popup.style.top  = py + 'px';
+
+  _swimlanePopup = popup;
+}
+
+function _swStartHidePopup() {
+  clearTimeout(_swimlaneHideTimer);
+  _swimlaneHideTimer = setTimeout(() => _swHidePopup(false), 280);
+}
+
+function _swHidePopup(immediate) {
+  clearTimeout(_swimlaneHideTimer);
+  _swCancelDwell(null);
+  if (_swimlanePopup) {
+    if (immediate) {
+      _swimlanePopup.remove();
+    } else {
+      _swimlanePopup.style.transition = 'opacity .15s';
+      _swimlanePopup.style.opacity = '0';
+      setTimeout(() => _swimlanePopup?.remove(), 160);
+    }
+    _swimlanePopup = null;
+  }
+}
+
+function _swStartDwell(row, instId) {
+  _swCancelDwell(null); // cancel any prior dwell
+  _swimlaneDwellRow = row;
+  const bar = row.querySelector('.sw-dbar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = 'width 1.6s linear';
+      bar.style.width = '100%';
+    }));
+  }
+  _swimlaneDwellTimer = setTimeout(() => {
+    _swHidePopup(true);
+    showIntelBriefing(instId);
+  }, 1600);
+}
+
+function _swCancelDwell(row) {
+  clearTimeout(_swimlaneDwellTimer);
+  _swimlaneDwellTimer = null;
+  const target = row || _swimlaneDwellRow;
+  if (target) {
+    const bar = target.querySelector('.sw-dbar');
+    if (bar) { bar.style.transition = 'none'; bar.style.width = '0%'; }
+  }
+  _swimlaneDwellRow = null;
+}
+
+function _swUpdateBottleneckBanner(inst) {
+  const banner  = document.getElementById('sw-bottleneck-banner');
+  const textEl  = document.getElementById('sw-bottleneck-text');
+  if (!banner || !textEl) return;
+
+  if (!_swimlaneActive || !inst) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const siblings = _instances.filter(i =>
+    i.template_id === inst.template_id &&
+    i.id          !== inst.id &&
+    i.status      === 'in_progress' &&
+    i.current_step_id
+  );
+  const total = siblings.length + 1; // include current instance
+
+  // Group by step
+  const byStep = {};
+  siblings.forEach(s => {
+    byStep[s.current_step_id] = (byStep[s.current_step_id]||0) + 1;
+  });
+
+  // Find step with most siblings (check if current instance is also there)
+  const instActiveStep = (inst._stepInsts||[]).slice().reverse()
+    .find(e=>e.event_type==='step_activated');
+  if (instActiveStep) {
+    byStep[instActiveStep.template_step_id] =
+      (byStep[instActiveStep.template_step_id]||0) + 1;
+  }
+
+  const maxEntry = Object.entries(byStep).sort((a,b)=>b[1]-a[1])[0];
+  if (!maxEntry) { banner.style.display='none'; return; }
+
+  const [stepId, count] = maxEntry;
+  const pct = count / Math.max(total, 1);
+
+  if (pct < 0.4 || count < 2) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const stepName = siblings.find(s=>s.current_step_id===stepId)?.current_step_name
+    || (inst._tmplSteps||[]).find(s=>s.id===stepId)?.name
+    || 'a step';
+
+  textEl.innerHTML = `<strong>Bottleneck detected</strong> — ${count} of ${total} instances clustered at <strong>${escHtml(stepName)}</strong>`;
+  banner.style.display = 'flex';
+}
+
+
 function instScrubClick(e) {
   const el = document.getElementById('inst-scrub-dots');
   if (!el) return;
@@ -9455,6 +9859,17 @@ async function startStep(instId, stepId) {
       step_name:        step?.name || null,
       created_at:       new Date().toISOString(),
     });
+    // Update current_step_id for Swimlane tracking
+    API.patch(`workflow_instances?id=eq.${instId}`, {
+      current_step_id:   stepId,
+      current_step_name: step?.name || null,
+      current_step_type: step?.step_type || null,
+    }).catch(() => {});
+    if (inst) {
+      inst.current_step_id   = stepId;
+      inst.current_step_name = step?.name || null;
+      inst.current_step_type = step?.step_type || null;
+    }
     _notifyStepActivated(instId, step, inst).catch(() => {});
     await _reloadInstance(instId);
     cadToast('Step started — elapsed timer running', 'success');
