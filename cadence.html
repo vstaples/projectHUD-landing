@@ -5859,10 +5859,7 @@ function renderInstanceDetail(el, inst) {
                         const monoStyle    = 'font-family:var(--font-mono);font-size:13px;letter-spacing:.04em';
                         const labelStyle   = 'font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px';
                         const reworkBadge  = stepRejectionCount[s.id]
-                          ? `<div style="text-align:right;flex-shrink:0;margin-right:12px">
-                               <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#E24B4A;letter-spacing:.04em">↩ ${stepRejectionCount[s.id]}×</div>
-                               <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px;color:#E24B4A">Rework</div>
-                             </div>`
+                          ? '<div style="text-align:right;flex-shrink:0;margin-right:12px"><div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#E24B4A;letter-spacing:.04em">&#8629; ' + stepRejectionCount[s.id] + '&times;</div><div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px;color:#E24B4A">Rework</div></div>'
                           : '';
                         function calcElapsed(from, to) {
                           const ms = (to ? new Date(to) : new Date()) - new Date(from);
