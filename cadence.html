@@ -5811,13 +5811,13 @@ function renderInstanceDetail(el, inst) {
                 color:#ff5f6b;white-space:nowrap">&#8629; HISTORY</span>
               <div style="display:flex;align-items:center;gap:14px;margin-left:8px;flex-wrap:wrap">
                 <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
-                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#6a9abf"></span>Low (1–3)
+                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#5f78c8"></span>Low (1–3)
                 </span>
                 <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
-                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#EF9F27"></span>Moderate (4–9)
+                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#8c50c8"></span>Moderate (4–9)
                 </span>
                 <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
-                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#ff5f6b"></span>High (10+) ▲ bottleneck
+                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#b432dc"></span>High (10+) ▲ bottleneck
                 </span>
               </div>
               <span style="margin-left:auto;font-size:10px;color:var(--muted);font-style:italic">
@@ -6568,11 +6568,12 @@ let _historyActive    = false;
 let _historyClusters  = []; // hit regions: [{stepId, heat, x, y, w, h}]
 let _historyPopup     = null;
 let _historyHideTimer = null;
+let _confDots         = []; // hit regions for confidence signal dots: [{stepId, conf, author, ts, x, y, r}]
 
 const HEAT_COLORS = {
-  low:      { fill:'rgba(42,80,128,.25)',  stroke:'#1a3a5a', text:'#6a9abf' },
-  moderate: { fill:'rgba(133,79,11,.25)',  stroke:'#BA7517', text:'#EF9F27' },
-  high:     { fill:'rgba(163,45,45,.25)',  stroke:'#E24B4A', text:'#ff5f6b' },
+  low:      { fill:'rgba(95,120,200,.2)',  stroke:'#5f78c8', text:'#9aaeee' },
+  moderate: { fill:'rgba(140,80,200,.2)', stroke:'#8c50c8', text:'#c490f0' },
+  high:     { fill:'rgba(180,50,220,.25)', stroke:'#b432dc', text:'#d86ef5' },
 };
 
 function _heatLevel(n) {
@@ -6628,6 +6629,15 @@ function _toggleHistory() {
   if (!inDiagram) { cadToast('Switch to Diagram mode first', 'info'); return; }
   inst._viewMode  = 'diagram';
   _historyActive  = !_historyActive;
+  // Swimlane and History are mutually exclusive
+  if (_historyActive && _swimlaneActive) {
+    _swimlaneActive = false;
+    const swBtn = document.getElementById('sw-toggle-btn');
+    if (swBtn) { swBtn.style.background='transparent'; swBtn.style.color='var(--muted)'; }
+    const swPanel = document.getElementById('sw-info-panel');
+    if (swPanel) swPanel.style.display = 'none';
+    _swHidePopup(true);
+  }
   const btn = document.getElementById('hx-toggle-btn');
   if (btn) {
     btn.style.background = _historyActive ? '#ff5f6b'      : 'transparent';
@@ -6658,6 +6668,15 @@ function _toggleSwimlane() {
   // Ensure _viewMode is set so subsequent checks work
   inst._viewMode = 'diagram';
   _swimlaneActive = !_swimlaneActive;
+  // Swimlane and History are mutually exclusive
+  if (_swimlaneActive && _historyActive) {
+    _historyActive = false;
+    const hxBtn = document.getElementById('hx-toggle-btn');
+    if (hxBtn) { hxBtn.style.background='transparent'; hxBtn.style.color='var(--muted)'; hxBtn.style.borderColor='var(--border)'; }
+    const hxPanel = document.getElementById('hx-info-panel');
+    if (hxPanel) hxPanel.style.display = 'none';
+    _hxHidePopup(true);
+  }
   // Update toggle button appearance
   const btn = document.getElementById('sw-toggle-btn');
   if (btn) {
@@ -6979,6 +6998,18 @@ function renderInstanceDAG(inst) {
       ctx.stroke(); ctx.globalAlpha=1;
     }
 
+    // History card click highlight — bright purple ring that fades
+    if (_hxHighlightStep === s.id) {
+      const pulse = (Math.sin(now/400)+1)/2;
+      ctx.beginPath(); ctx.arc(p.x+NW/2, p.y+NH/2, Math.max(NW,NH)/2+8+pulse*6, 0, Math.PI*2);
+      ctx.strokeStyle='#b432dc'; ctx.lineWidth=2.5; ctx.globalAlpha=0.4+pulse*0.5;
+      ctx.stroke(); ctx.globalAlpha=1;
+      // Solid outline
+      ctx.beginPath(); ctx.roundRect(p.x-3, p.y-3, NW+6, NH+6, 9);
+      ctx.strokeStyle='#b432dc'; ctx.lineWidth=2; ctx.globalAlpha=0.6;
+      ctx.stroke(); ctx.globalAlpha=1;
+    }
+
     // Node shadow
     ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.roundRect(p.x+2,p.y+2,NW,NH,7); ctx.fill();
 
@@ -7067,6 +7098,20 @@ function renderInstanceDAG(inst) {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI*2); ctx.stroke();
+
+      // Store hit region for hover tooltip
+      const latestComment = (inst._stepComments || [])
+        .filter(c => c.template_step_id === s.id && c.confidence && !c.is_deleted)
+        .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      _confDots.push({
+        stepId: s.id,
+        stepName: s.name || s.step_type,
+        conf: latestConf,
+        author: latestComment?.author_name || 'Unknown',
+        body: latestComment?.body || '',
+        ts: latestComment?.created_at || null,
+        x: cx, y: cy, r: 8, // slightly larger hit radius
+      });
     }
 
     // Rework badge — inside node, bottom-right corner above seq number
@@ -7085,6 +7130,7 @@ function renderInstanceDAG(inst) {
 
   // ── Swimlane dot cluster overlay ─────────────────────────────────────────
   _swimlaneClusters = [];
+  _confDots = [];
   if (_swimlaneActive) {
 
     // ── Dot color palette — distinct from amber node borders ─────────────
@@ -7231,7 +7277,7 @@ function renderInstanceDAG(inst) {
       // Node border color override for high heat
       if (level === 'high') {
         ctx.save();
-        ctx.strokeStyle = '#E24B4A';
+        ctx.strokeStyle = '#b432dc';
         ctx.lineWidth   = 2;
         ctx.beginPath();
         ctx.roundRect(p.x, p.y, NW, NH, 7);
@@ -7239,7 +7285,7 @@ function renderInstanceDAG(inst) {
         ctx.restore();
       } else if (level === 'moderate') {
         ctx.save();
-        ctx.strokeStyle = '#BA7517';
+        ctx.strokeStyle = '#8c50c8';
         ctx.lineWidth   = 1.5;
         ctx.beginPath();
         ctx.roundRect(p.x, p.y, NW, NH, 7);
@@ -7247,11 +7293,11 @@ function renderInstanceDAG(inst) {
         ctx.restore();
       }
 
-      // Heat badge — bottom-center of node
-      const label  = `\u21a9 ${heat.total}\u00d7`;
-      const bw     = 42, bh = 16;
-      const bx     = p.x + NW/2 - bw/2;
-      const by     = p.y + NH + 5;
+      // Heat badge — bottom-LEFT corner of node, below and clear of return arcs
+      const label  = `\u21a9 ${heat.total}\u00d7${heat.total === maxHeat && heat.total >= 10 ? ' \u25b2' : ''}`;
+      const bw     = heat.total >= 10 ? 52 : 44, bh = 16;
+      const bx     = p.x;            // left-aligned with node left edge
+      const by     = p.y - bh - 6;   // above node top, clear of arcs below
 
       ctx.save();
       ctx.fillStyle   = cols.fill;
@@ -7262,21 +7308,13 @@ function renderInstanceDAG(inst) {
       ctx.fill(); ctx.stroke();
 
       ctx.fillStyle    = cols.text;
-      ctx.font         = 'bold 8px sans-serif';
-      ctx.textAlign    = 'center';
+      ctx.font         = `bold 8px sans-serif`;
+      ctx.textAlign    = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, bx + bw/2, by + bh/2);
-
-      // Bottleneck flag — highest heat node above threshold
-      if (heat.total === maxHeat && heat.total >= 10) {
-        ctx.fillStyle = '#ff5f6b';
-        ctx.font      = 'bold 8px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('\u25b2', bx + bw - 4, by + bh/2);
-      }
+      ctx.fillText(label, bx + 5, by + bh/2);
       ctx.restore();
 
-      // Store hit region
+      // Store hit region with generous padding
       _historyClusters.push({ stepId: s.id, heat, x: bx, y: by, w: bw, h: bh });
     });
   }
@@ -7291,7 +7329,7 @@ function renderInstanceDAG(inst) {
   // (prevents stale pulse frames from running before a refit)
   if(_instDagPulseFrame) cancelAnimationFrame(_instDagPulseFrame);
   _instDagPulseFrame = null;
-  if(_instDagFitted && steps.some(s=>stepState(s)==='active') && inst._viewMode==='diagram') {
+  if(_instDagFitted && (steps.some(s=>stepState(s)==='active') || _hxHighlightStep) && inst._viewMode==='diagram') {
     _instDagPulseFrame=requestAnimationFrame(()=>renderInstanceDAG(inst));
   }
 
@@ -7329,6 +7367,19 @@ function renderInstanceDAG(inst) {
       const r   = wrap.getBoundingClientRect();
       const mx  = (e.clientX - r.left  - _instDagPanX) / _instDagScale;
       const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
+
+      // Confidence signal dot hover
+      if (_confDots.length) {
+        const confHit = _confDots.find(d => {
+          const dx = mx - d.x, dy = my - d.y;
+          return Math.sqrt(dx*dx + dy*dy) <= d.r;
+        });
+        if (confHit) {
+          wrap.style.cursor = 'default';
+          _showConfDotTooltip(confHit, e.clientX, e.clientY);
+          return;
+        }
+      }
 
       // History heat badge hover
       if (_historyActive && _historyClusters.length) {
@@ -7371,6 +7422,7 @@ function renderInstanceDAG(inst) {
       wrap.style.cursor = 'grab';
       _swStartHidePopup();
       _hxStartHidePopup();
+      _hideConfDotTooltip();
     });
     // Click node to open step completion in list view
     wrap.addEventListener('click',e=>{
@@ -9541,6 +9593,64 @@ function instScrubChange(val) {
   _instRenderDots(events, idx);
 }
 
+// ── Confidence dot tooltip ────────────────────────────────────────────────────
+let _confTooltipEl = null;
+let _confTooltipTimer = null;
+
+function _showConfDotTooltip(dot, clientX, clientY) {
+  _hideConfDotTooltip();
+  const confLabels = { green:'Confident', yellow:'Some uncertainty', red:'Concerned' };
+  const confColors = { green:'#1D9E75',   yellow:'#e8a838',          red:'#E24B4A'  };
+  const confIcons  = { green:'&#9679;',   yellow:'&#9679;',           red:'&#9679;' };
+  const col   = confColors[dot.conf] || '#888';
+  const label = confLabels[dot.conf] || dot.conf;
+  const ts    = dot.ts ? new Date(dot.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+
+  const tip = document.createElement('div');
+  tip.style.cssText = `position:fixed;z-index:2002;background:var(--bg1);
+    border:1px solid var(--border2);border-radius:7px;overflow:hidden;
+    width:240px;pointer-events:none`;
+  tip.innerHTML = `
+    <div style="padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:7px">
+      <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--muted)">Confidence signal</span>
+    </div>
+    <div style="padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:14px;color:${col}">${confIcons[dot.conf]||'&#9679;'}</span>
+        <span style="font-size:13px;font-weight:500;color:${col}">${label}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text);line-height:1.5;margin-bottom:5px">
+        ${dot.body ? `"${escHtml(dot.body.slice(0,80))}${dot.body.length>80?'…':''}"` : '<em style="color:var(--muted)">No comment text</em>'}
+      </div>
+      <div style="font-size:10px;color:var(--muted)">
+        ${escHtml(dot.author)}${ts ? ' · ' + ts : ''}
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;font-style:italic">
+        Latest signal on ${escHtml(dot.stepName)}
+      </div>
+    </div>`;
+
+  document.body.appendChild(tip);
+  const tw = 240, th = tip.offsetHeight || 130;
+  let px = clientX + 14, py = clientY - 20;
+  if (px + tw > window.innerWidth  - 8) px = clientX - tw - 14;
+  if (py + th > window.innerHeight - 8) py = window.innerHeight - th - 8;
+  tip.style.left = px + 'px';
+  tip.style.top  = py + 'px';
+  _confTooltipEl = tip;
+
+  // Auto-hide after 3s of no movement
+  clearTimeout(_confTooltipTimer);
+  _confTooltipTimer = setTimeout(_hideConfDotTooltip, 3000);
+}
+
+function _hideConfDotTooltip() {
+  clearTimeout(_confTooltipTimer);
+  if (_confTooltipEl) { _confTooltipEl.remove(); _confTooltipEl = null; }
+}
+
 // ── Rework History Layer — popup, panel, tooltip ──────────────────────────────
 
 function _hxShowPopup(cluster, clientX, clientY, inst) {
@@ -9635,41 +9745,95 @@ function _hxPopulatePanel(inst) {
   const maxTotal = Math.max(...Object.values(heatMap).map(h=>h.total), 1);
 
   body.innerHTML = steps.map(s => {
-    const heat  = heatMap[s.id] || { total:0, typeA:0, typeB:0, byInstance:{} };
+    const heat  = heatMap[s.id] || { total:0, typeA:0, typeB:0, byInstance:{}, stepName:s.name };
+    heat.stepName = heat.stepName || s.name;
     const level = _heatLevel(heat.total);
     const cols  = HEAT_COLORS[level];
     const pct   = Math.round(heat.total / maxTotal * 100);
     const isBot = heat.total >= 10 && heat.total === maxTotal;
 
     const causeStr = heat.total === 0
-      ? '<span style="color:var(--green);font-size:9px">&#10003; Clean</span>'
+      ? '<span style="color:var(--green);font-size:10px">&#10003; Clean — no rejections</span>'
       : heat.typeB > heat.typeA
-      ? `<span style="font-size:9px;color:#BA7517">&#8629; ${heat.typeB}&#215; upstream reset</span>`
-      : `<span style="font-size:9px;color:#ff5f6b">&#8629; ${heat.typeA}&#215; own failure</span>`;
+      ? `<span style="font-size:10px;color:#8c50c8">&#8629; ${heat.typeB}&#215; upstream reset</span>`
+      : `<span style="font-size:10px;color:#b432dc">&#8629; ${heat.typeA}&#215; own failure</span>`;
 
     const instLines = Object.entries(heat.byInstance).sort((a,b)=>b[1]-a[1])
       .map(([id, cnt]) => {
         const nm = _instances.find(i=>i.id===id)?.title || id.slice(0,8);
-        return `<div style="font-size:9px;color:var(--muted)">${escHtml(nm.split('·')[0].trim())}: ${cnt}&#215;</div>`;
+        return `<div style="font-size:10px;color:var(--muted)">${escHtml(nm.split('·')[0].trim())}: ${cnt}&#215;</div>`;
       }).join('');
 
-    return `<div style="flex:1;min-width:150px;max-width:220px;background:var(--bg2);
-      border:${heat.total>=10?'2px':'1px'} solid ${cols?cols.stroke:'var(--border)'};
-      border-radius:6px;padding:10px 12px;cursor:default">
-      <div style="font-size:10px;font-weight:500;color:var(--text);margin-bottom:5px;
+    const heatDataAttr = encodeURIComponent(JSON.stringify({
+      stepId: s.id, stepName: s.name,
+      total: heat.total, typeA: heat.typeA, typeB: heat.typeB,
+      byInstance: heat.byInstance
+    }));
+
+    return `<div
+      data-step-id="${s.id}"
+      data-heat="${heatDataAttr}"
+      onclick="_hxCardClick('${s.id}')"
+      onmouseenter="_hxCardHover(this, event)"
+      onmouseleave="_hxCardLeave()"
+      style="flex:1;min-width:160px;max-width:230px;background:var(--bg2);
+        border:${heat.total>=10?'2px':'1px'} solid ${cols?cols.stroke:'var(--border)'};
+        border-radius:6px;padding:10px 12px;cursor:pointer;transition:border-color .12s,background .12s"
+      onmousedown="this.style.background='var(--surf2)'"
+      onmouseup="this.style.background='var(--bg2)'">
+      <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:5px;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-        ${isBot?'<span style="color:#ff5f6b">&#9650; </span>':''}${escHtml(s.name||s.step_type)}
+        ${isBot?`<span style="color:#b432dc">&#9650; </span>`:''}${escHtml(s.name||s.step_type)}
       </div>
-      <div style="font-size:18px;font-weight:500;color:${cols?cols.text:'var(--green)'};margin-bottom:4px">
-        ${heat.total}<span style="font-size:11px;color:var(--muted)">&#215;</span>
+      <div style="font-size:20px;font-weight:500;color:${cols?cols.text:'var(--green)'};margin-bottom:4px">
+        ${heat.total}<span style="font-size:12px;color:var(--muted)">&#215;</span>
       </div>
-      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:5px">
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px">
         <div style="height:4px;border-radius:2px;background:${cols?cols.stroke:'var(--green)'};width:${pct}%"></div>
       </div>
       <div style="margin-bottom:4px">${causeStr}</div>
       ${instLines}
     </div>`;
   }).join('');
+}
+
+// ── History card interactions ─────────────────────────────────────────────────
+
+let _hxHighlightTimer = null;
+let _hxHighlightStep  = null;
+
+function _hxCardClick(stepId) {
+  // Flash-highlight the node on the DAG canvas for 2.5s
+  clearTimeout(_hxHighlightTimer);
+  _hxHighlightStep = stepId;
+  const inst = _selectedInstance;
+  if (inst) renderInstanceDAG(inst);
+  _hxHighlightTimer = setTimeout(() => {
+    _hxHighlightStep = null;
+    if (_selectedInstance) renderInstanceDAG(_selectedInstance);
+  }, 2500);
+}
+
+function _hxCardHover(el, event) {
+  // Show the same breakdown popup as hovering the badge on the canvas
+  try {
+    const heatData = JSON.parse(decodeURIComponent(el.dataset.heat));
+    const cluster  = {
+      stepId: heatData.stepId,
+      heat:   {
+        total:      heatData.total,
+        typeA:      heatData.typeA,
+        typeB:      heatData.typeB,
+        byInstance: heatData.byInstance,
+        stepName:   heatData.stepName,
+      },
+    };
+    _hxShowPopup(cluster, event.clientX, event.clientY, _selectedInstance);
+  } catch(e) {}
+}
+
+function _hxCardLeave() {
+  _hxStartHidePopup();
 }
 
 function _swPopulateInfoPanel(inst) {
