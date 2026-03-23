@@ -6310,24 +6310,24 @@ function toggleInstDagCoC(btn) {
     setTimeout(() => { _instDagFitted=false; renderInstanceDAG(inst); }, 250);
   }
 
-  // Wire tooltip hover via event delegation — use capture phase to beat onclick handlers
-  el.onmouseover = null;
-  el.onmouseout  = null;
+  // Wire tooltip hover directly on each step row after render
   if (el._tipOver) el.removeEventListener('mouseover', el._tipOver, true);
   if (el._tipOut)  el.removeEventListener('mouseout',  el._tipOut,  true);
+  el._tipOver = null;
+  el._tipOut  = null;
 
-  el._tipOver = function(e) {
-    if (_tooltipSticky) return;
-    const row = e.target.closest('[data-tipstep]');
-    if (row) _showStepTooltip(row.dataset.tipstep, e);
-  };
-  el._tipOut = function(e) {
-    if (_tooltipSticky) return;
-    const row = e.target.closest('[data-tipstep]');
-    if (row && !row.contains(e.relatedTarget)) _hideStepTooltip();
-  };
-  el.addEventListener('mouseover', el._tipOver, true);
-  el.addEventListener('mouseout',  el._tipOut,  true);
+  setTimeout(() => {
+    document.querySelectorAll('[data-tipstep]').forEach(row => {
+      row.addEventListener('mouseenter', function(e) {
+        if (_tooltipSticky) return;
+        _showStepTooltip(this.dataset.tipstep, e);
+      });
+      row.addEventListener('mouseleave', function(e) {
+        if (_tooltipSticky) return;
+        _hideStepTooltip();
+      });
+    });
+  }, 0);
 
   // Populate rework badges after DOM settles
   setTimeout(_populateReworkBadges, 150);
@@ -6821,7 +6821,7 @@ function renderInstanceDAG(inst) {
         _hideStepTooltip();
       }
     });
-    wrap.addEventListener('mouseleave', () => _hideStepTooltip());
+    wrap.addEventListener('mouseleave', () => { if (!_tooltipSticky) _hideStepTooltip(); });
     // Click node to open step completion in list view
     wrap.addEventListener('click',e=>{
       const r=wrap.getBoundingClientRect();
