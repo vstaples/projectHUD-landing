@@ -7069,6 +7069,57 @@ function showIntelBriefing(instId) {
         </div>
       </div>` : ''}
 
+      <!-- ── AI Narrative section ──────────────────────────────────────────── -->
+      <div id="briefing-ai-section" style="flex-shrink:0;border-bottom:1px solid var(--border)">
+        ${inst.briefing_narrative ? `
+        <!-- Cached narrative -->
+        <div style="padding:16px 20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+              text-transform:uppercase">&#10022; AI Narrative</span>
+            <span style="font-size:9px;color:var(--muted)">
+              Generated ${inst.briefing_generated_at
+                ? new Date(inst.briefing_generated_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
+                : ''}
+            </span>
+            <button onclick="_regenerateAIBriefing('${instId}')"
+              style="margin-left:auto;font-size:9px;color:var(--muted);background:none;
+                border:1px solid var(--border);border-radius:3px;padding:2px 10px;
+                cursor:pointer;letter-spacing:.04em"
+              onmouseenter="this.style.borderColor='var(--cad)';this.style.color='var(--cad)'"
+              onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+              &#8635; Regenerate
+            </button>
+          </div>
+          <div id="briefing-ai-narrative"
+            style="font-size:12px;color:var(--text);line-height:1.8;
+              white-space:pre-wrap;font-family:var(--font-body)">
+            ${escHtml(inst.briefing_narrative)}
+          </div>
+        </div>
+        ` : `
+        <!-- Generate prompt -->
+        <div style="padding:14px 20px;display:flex;align-items:center;gap:14px">
+          <div style="flex:1">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+              text-transform:uppercase;margin-bottom:3px">&#10022; AI Narrative</div>
+            <div style="font-size:10px;color:var(--muted)">
+              AI-generated situation analysis, rework classification, and recommended action.
+            </div>
+          </div>
+          <button id="briefing-generate-btn" onclick="_generateAIBriefing('${instId}')"
+            style="font-size:10px;font-weight:600;padding:7px 18px;
+              background:var(--cad);color:var(--bg0);border:none;
+              border-radius:5px;cursor:pointer;letter-spacing:.04em;flex-shrink:0;
+              transition:opacity .15s"
+            onmouseenter="this.style.opacity='.85'"
+            onmouseleave="this.style.opacity='1'">
+            &#9654; Generate Briefing
+          </button>
+        </div>
+        `}
+      </div>
+
       <!-- Modal body -->
       <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px">
 
@@ -8590,6 +8641,283 @@ function _populateAllCommentThreads() {
   const stepId = inst._selectedStep;
   _renderCommentThread(stepId);
   _renderActionItems(stepId);
+}
+
+// ── AI Intelligence Briefing ──────────────────────────────────────────────────
+
+function _assembleBriefingPrompt(inst) {
+  const tmpl   = _templates.find(t => t.id === inst.template_id);
+  const steps  = (inst._tmplSteps  || []).filter(s => s.step_type !== 'trigger')
+                  .sort((a,b) => a.sequence_order - b.sequence_order);
+  const coc    = (inst._stepInsts  || []).slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const comments = (inst._stepComments || []).filter(c => !c.is_deleted)
+                    .sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const actions  = (inst._actionItems  || []);
+
+  const latestEvt = {};
+  coc.forEach(e => { if (e.template_step_id) latestEvt[e.template_step_id] = e; });
+  const activeStep = steps.find(s => latestEvt[s.id]?.event_type === 'step_activated');
+
+  // Elapsed
+  const launchedMs = inst.launched_at ? new Date(inst.launched_at) : null;
+  const elapsedMs  = launchedMs ? Date.now() - launchedMs : 0;
+  const elapsedStr = elapsedMs > 0
+    ? `${Math.floor(elapsedMs/86400000)}d ${Math.floor((elapsedMs%86400000)/3600000)}h`
+    : 'unknown';
+
+  // PERT
+  const pert = (inst.pert_optimistic || inst.pert_likely || inst.pert_pessimistic)
+    ? `Optimistic: ${inst.pert_optimistic||'?'}d  Likely: ${inst.pert_likely||'?'}d  Pessimistic: ${inst.pert_pessimistic||'?'}d`
+    : 'Not estimated';
+
+  // Rework per step
+  const reworkByStep = {};
+  coc.forEach(e => {
+    if (e.event_type === 'step_reset' && e.template_step_id)
+      reworkByStep[e.template_step_id] = (reworkByStep[e.template_step_id] || 0) + 1;
+    if (e.event_type === 'step_completed' && e.outcome && e.template_step_id) {
+      const step = steps.find(s => s.id === e.template_step_id);
+      const oDef = step ? _getOutcomes(step).find(o => o.id === e.outcome) : null;
+      if (oDef?.requiresReset)
+        reworkByStep[e.template_step_id] = (reworkByStep[e.template_step_id] || 0) + 1;
+    }
+  });
+
+  const reworkLines = steps
+    .filter(s => reworkByStep[s.id])
+    .map(s => {
+      const lastRej = coc.slice().reverse().find(e =>
+        e.event_type === 'step_completed' && e.template_step_id === s.id && e.event_notes);
+      return `  - ${s.name||s.step_type}: ${reworkByStep[s.id]}x rework${lastRej?.event_notes ? `\n    Last rejection note: "${lastRej.event_notes.slice(0,120)}"` : ''}`;
+    }).join('\n') || '  None';
+
+  // Confidence trajectory
+  const confLines = steps.map(s => {
+    const sc = comments.filter(c => c.template_step_id === s.id && c.confidence);
+    if (!sc.length) return null;
+    const traj = sc.map(c => c.confidence === 'green' ? 'G' : c.confidence === 'yellow' ? 'Y' : 'R').join('→');
+    const last = sc[sc.length - 1];
+    return `  - ${s.name||s.step_type}: ${traj}\n    Last signal: "${last.body?.slice(0,100)||''}" [${last.confidence}]`;
+  }).filter(Boolean).join('\n') || '  No confidence signals recorded';
+
+  // Hours actuals
+  const hoursLines = steps.map(s => {
+    const hc = comments.filter(c => c.template_step_id === s.id && c.hours_logged > 0);
+    if (!hc.length) return null;
+    const total = hc.reduce((sum, c) => sum + (c.hours_logged || 0), 0);
+    // Detect degrading confidence = discovery work
+    const hasRed  = hc.some(c => c.confidence === 'red');
+    const pattern = hasRed ? 'discovery (degrading confidence)' : 'execution';
+    return `  - ${s.name||s.step_type}: ${total.toFixed(1)}h across ${hc.length} entries — pattern: ${pattern}`;
+  }).filter(Boolean).join('\n') || '  No hours logged';
+
+  // Open action items
+  const openItems = actions.filter(a => a.status === 'open' || a.status === 'in_progress');
+  const actionLines = openItems.map(a => {
+    const step = steps.find(s => s.id === a.template_step_id);
+    const created = a.created_at ? new Date(a.created_at) : null;
+    const daysOpen = created ? Math.floor((Date.now() - created) / 86400000) : '?';
+    return `  - "${a.title}" — Owner: ${a.owner_name||'Unassigned'}, Age: ${daysOpen}d, Step: ${step?.name||'?'}\n    Instructions: ${(a.instructions||'').slice(0,100)}`;
+  }).join('\n') || '  None';
+
+  // Human rejection notes
+  const noteLines = coc
+    .filter(e => e.event_type === 'step_completed' && e.event_notes)
+    .slice(-12)
+    .map(e => {
+      const step = steps.find(s => s.id === e.template_step_id);
+      const ts   = e.created_at ? new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+      return `  [${ts}] ${e.actor_name||'Unknown'} on ${step?.name||'?'}:\n  "${e.event_notes.slice(0,150)}"`;
+    }).join('\n') || '  No notes recorded';
+
+  // Step comments (non-confidence)
+  const commentLines = comments
+    .filter(c => c.body && !c.parent_comment_id)
+    .slice(-10)
+    .map(c => {
+      const step = steps.find(s => s.id === c.template_step_id);
+      const ts   = c.created_at ? new Date(c.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+      const conf = c.confidence ? ` [${c.confidence.toUpperCase()}]` : '';
+      const hrs  = c.hours_logged ? ` — ${c.hours_logged}h logged` : '';
+      return `  [${ts}] ${c.author_name||'Unknown'} on ${step?.name||'?'}${conf}${hrs}:\n  "${c.body.slice(0,120)}"`;
+    }).join('\n') || '  None';
+
+  const stakesTone = {
+    critical:  'CRITICAL — Use urgent register. Escalation is assumed if action is not taken.',
+    important: 'HIGH — Alert register. Clear recommendations. Time-sensitivity noted.',
+    routine:   'ROUTINE — Calm efficiency register. Observations rather than warnings.',
+  }[inst.priority] || 'NORMAL — Professional register. Measured recommendations.';
+
+  return `You are a project intelligence analyst embedded in a workflow management system.
+Analyze this workflow instance and produce a concise professional briefing.
+
+WORKFLOW: ${escHtml(tmpl?.name || inst.title || 'Untitled')}
+STATUS: ${inst.status || 'unknown'} — ${activeStep ? `"${activeStep.name}" active` : 'no active step'}
+STEPS: ${steps.filter(s => latestEvt[s.id]?.event_type === 'step_completed').length} of ${steps.length} complete
+PRIORITY / STAKES TONE: ${stakesTone}
+ELAPSED: ${elapsedStr}
+PERT ESTIMATE: ${pert}
+
+REWORK ANALYSIS:
+${reworkLines}
+
+CONFIDENCE TRAJECTORY (pre-rejection signals):
+${confLines}
+
+HOURS ACTUALS:
+${hoursLines}
+
+OPEN ACTION ITEMS (${openItems.length} total):
+${actionLines}
+
+HUMAN REJECTION NOTES (most recent first):
+${noteLines}
+
+STEP COMMENTS:
+${commentLines}
+
+Produce a briefing with exactly these four sections. Write in prose only — no bullet points, no headers, no markdown. Use plain paragraph breaks between sections.
+
+SITUATION: What is this workflow, where is it now, what is the immediate context. 2-3 sentences. Conclusion-first.
+
+REWORK ANALYSIS: What the rejection pattern means. Classify as exactly one of: Process Quality Failure / Dependency Failure / Human Performance Issue / Novel Work. Cite specific notes as evidence. 2-3 sentences.
+
+RISK ASSESSMENT: What could go wrong from here. Reference PERT variance, open action items, and confidence signals where relevant. 2 sentences.
+
+RECOMMENDED ACTION: What the PM should do right now. Specific and direct. No corporate filler. 1-2 sentences.
+
+Tone: ${stakesTone.split(' — ')[1] || 'Professional'} No preamble. Start directly with the situation.`;
+}
+
+async function _generateAIBriefing(instId) {
+  const inst = _instances.find(i => i.id === instId) || _selectedInstance;
+  if (!inst) return;
+
+  const section = document.getElementById('briefing-ai-section');
+  if (!section) return;
+
+  // Replace section content with streaming display
+  section.innerHTML = `
+    <div style="padding:16px 20px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+          text-transform:uppercase">&#10022; AI Narrative</span>
+        <span style="font-size:9px;color:var(--muted);font-style:italic">Generating…</span>
+      </div>
+      <div id="briefing-ai-narrative"
+        style="font-size:12px;color:var(--text);line-height:1.8;
+          font-family:var(--font-body);min-height:48px">
+        <span class="briefing-cursor" style="display:inline-block;width:2px;height:14px;
+          background:var(--cad);animation:briefingBlink 1s infinite;vertical-align:text-bottom"></span>
+      </div>
+    </div>`;
+
+  // Add blink keyframes if not already present
+  if (!document.getElementById('briefing-blink-style')) {
+    const style = document.createElement('style');
+    style.id = 'briefing-blink-style';
+    style.textContent = '@keyframes briefingBlink{0%,100%{opacity:1}50%{opacity:0}}';
+    document.head.appendChild(style);
+  }
+
+  const narrativeEl = document.getElementById('briefing-ai-narrative');
+  const prompt = _assembleBriefingPrompt(inst);
+  let full = '';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        stream:     true,
+        messages:   [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) throw new Error(`API error ${response.status}`);
+
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n').filter(l => l.startsWith('data: '));
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'content_block_delta' && data.delta?.text) {
+            full += data.delta.text;
+            narrativeEl.innerHTML = full.replace(/\n\n/g, '</p><p style="margin-top:10px">').replace(/\n/g, '<br>') +
+              '<span class="briefing-cursor" style="display:inline-block;width:2px;height:14px;' +
+              'background:var(--cad);animation:briefingBlink 1s infinite;vertical-align:text-bottom"></span>';
+          }
+        } catch(e) {}
+      }
+    }
+
+    // Final render — no cursor
+    narrativeEl.innerHTML = '<p style="margin:0">' +
+      full.replace(/\n\n/g, '</p><p style="margin-top:10px">').replace(/\n/g, '<br>') +
+      '</p>';
+
+    // Add regenerate button
+    section.innerHTML = `
+      <div style="padding:16px 20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+            text-transform:uppercase">&#10022; AI Narrative</span>
+          <span style="font-size:9px;color:var(--muted)">
+            Generated ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+          </span>
+          <button onclick="_regenerateAIBriefing('${instId}')"
+            style="margin-left:auto;font-size:9px;color:var(--muted);background:none;
+              border:1px solid var(--border);border-radius:3px;padding:2px 10px;cursor:pointer"
+            onmouseenter="this.style.borderColor='var(--cad)';this.style.color='var(--cad)'"
+            onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+            &#8635; Regenerate
+          </button>
+        </div>
+        <div id="briefing-ai-narrative"
+          style="font-size:12px;color:var(--text);line-height:1.8;font-family:var(--font-body)">
+          <p style="margin:0">${full.replace(/\n\n/g, '</p><p style="margin-top:10px">').replace(/\n/g, '<br>')}</p>
+        </div>
+      </div>`;
+
+    // Cache to DB
+    inst.briefing_narrative    = full;
+    inst.briefing_generated_at = new Date().toISOString();
+    API.patch(`workflow_instances?id=eq.${instId}`, {
+      briefing_narrative:    full,
+      briefing_generated_at: inst.briefing_generated_at,
+    }).catch(e => console.warn('Briefing cache failed:', e));
+
+  } catch(e) {
+    section.innerHTML = `
+      <div style="padding:14px 20px;display:flex;align-items:center;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+            text-transform:uppercase;margin-bottom:3px">&#10022; AI Narrative</div>
+          <div style="font-size:10px;color:var(--red)">
+            Generation failed: ${escHtml(e.message || 'unknown error')} — 
+            <button onclick="_generateAIBriefing('${instId}')"
+              style="color:var(--accent);background:none;border:none;cursor:pointer;
+                font-size:10px;text-decoration:underline;padding:0">retry</button>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
+function _regenerateAIBriefing(instId) {
+  const inst = _instances.find(i => i.id === instId) || _selectedInstance;
+  if (!inst) return;
+  // Clear cache locally — the generate fn will overwrite DB on completion
+  inst.briefing_narrative    = null;
+  inst.briefing_generated_at = null;
+  _generateAIBriefing(instId);
 }
 
 // ── async version of instScrubLive ────────────────────────────────────────────
