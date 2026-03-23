@@ -7707,6 +7707,21 @@ function _renderStepTooltipAll(stepId) {
   el.style.maxHeight = '80vh';
 }
 
+// ── Resource avatar helper ────────────────────────────────────────────────────
+// Returns an HTML string: colored circle with initials, consistent per-name color
+function _avatarHtml(name, size) {
+  size = size || 22;
+  const initials = (name || '?').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const colors   = ['#4F8EF7','#1D9E75','#e8a838','#E24B4A','#9b59b6','#00b8d4','#e67e22','#2ecc71'];
+  const hue      = (name || '').split('').reduce((a,c) => a + c.charCodeAt(0), 0) % colors.length;
+  const bg       = colors[hue];
+  const fs       = Math.round(size * 0.42);
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-size:${fs}px;font-weight:700;color:#fff;font-family:var(--font-hud);
+    letter-spacing:.02em">${initials}</div>`;
+}
+
 // ── Step Comment System ───────────────────────────────────────────────────────
 
 // Per-step comment state (confidence selection)
@@ -7868,6 +7883,7 @@ function _renderCommentThread(stepId) {
           ? 'margin-left:16px;padding:6px 0 6px 10px;border-left:2px solid var(--border)'
           : 'padding:8px 0'}">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+          ${_avatarHtml(c.author_name, 20)}
           <span style="font-size:10px;font-weight:700;color:var(--text)">${escHtml(c.author_name||'Unknown')}</span>
           <span style="font-size:9px;color:var(--muted)">${ts}</span>
           ${confBadge}${hoursBadge}
@@ -7940,7 +7956,7 @@ function _renderActionItems(stepId) {
               </div>
               <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap;align-items:center">
                 <span style="font-size:9px;color:${sc}">${sl}</span>
-                ${a.owner_name ? `<span style="font-size:9px;color:var(--text2)">&#128100; ${escHtml(a.owner_name)}</span>` : '<span style="font-size:9px;color:var(--muted)">Unassigned</span>'}
+                ${a.owner_name ? `<span style="display:inline-flex;align-items:center;gap:4px">${_avatarHtml(a.owner_name,16)}<span style="font-size:9px;color:var(--text2)">${escHtml(a.owner_name)}</span></span>` : '<span style="font-size:9px;color:var(--muted)">Unassigned</span>'}
                 ${due ? `<span style="font-size:9px;color:var(--muted)">&#128197; ${due}</span>` : ''}
                 ${attachments.length ? `<span style="font-size:9px;color:var(--muted)">&#128206; ${attachments.length} file${attachments.length>1?'s':''}</span>` : ''}
               </div>
@@ -8066,18 +8082,27 @@ function promoteToActionItem(commentId, stepId) {
           <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
           <input id="ai-due-${commentId}" type="date"
             style="width:100%;font-size:11px;padding:5px 8px;
-              background:var(--bg1);border:1px solid var(--border);border-radius:3px;color:var(--text)" />
+              background:var(--bg1);border:1px solid var(--border);border-radius:3px;
+              color:var(--text);color-scheme:dark" />
         </div>
       </div>
 
-      <!-- Attachments -->
+      <!-- Attachments — DnD dropzone -->
       <div style="margin-bottom:8px">
         <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
           Attachments <span style="font-weight:400;color:var(--muted)">(optional)</span>
         </label>
-        <input id="ai-files-${commentId}" type="file" multiple
-          onchange="_previewActionItemFiles('${commentId}')"
-          style="font-size:10px;color:var(--text2);width:100%" />
+        <div class="doc-drop-zone" id="ai-dropzone-${commentId}"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="_handleActionItemDrop(event,'${commentId}')"
+          onclick="document.getElementById('ai-files-${commentId}').click()"
+          style="padding:10px;margin:0">
+          <div class="doc-drop-zone-icon">📂</div>
+          <div class="doc-drop-zone-text"><strong>Drop files here</strong> or click to browse</div>
+          <input type="file" id="ai-files-${commentId}" style="display:none" multiple
+            onchange="_previewActionItemFiles('${commentId}')" />
+        </div>
         <div id="ai-file-preview-${commentId}" style="margin-top:4px"></div>
       </div>
 
@@ -8121,16 +8146,47 @@ function _validateActionItemForm(commentId) {
   }
 }
 
+function _handleActionItemDrop(event, commentId) {
+  event.preventDefault();
+  document.getElementById(`ai-dropzone-${commentId}`)?.classList.remove('drag-over');
+  const input = document.getElementById(`ai-files-${commentId}`);
+  if (!input) return;
+  const dt = new DataTransfer();
+  Array.from(input.files || []).forEach(f => dt.items.add(f));
+  Array.from(event.dataTransfer?.files || []).forEach(f => dt.items.add(f));
+  input.files = dt.files;
+  _previewActionItemFiles(commentId);
+}
+
+function _handleEditDrop(event, actionItemId) {
+  event.preventDefault();
+  document.getElementById(`edit-dropzone-${actionItemId}`)?.classList.remove('drag-over');
+  const input = document.getElementById(`edit-files-${actionItemId}`);
+  if (!input) return;
+  const dt = new DataTransfer();
+  Array.from(input.files || []).forEach(f => dt.items.add(f));
+  Array.from(event.dataTransfer?.files || []).forEach(f => dt.items.add(f));
+  input.files = dt.files;
+  _previewEditFiles(actionItemId);
+}
+
 function _previewActionItemFiles(commentId) {
   const input   = document.getElementById(`ai-files-${commentId}`);
   const preview = document.getElementById(`ai-file-preview-${commentId}`);
+  const zone    = document.getElementById(`ai-dropzone-${commentId}`);
   if (!input || !preview) return;
   const files = Array.from(input.files || []);
   preview.innerHTML = files.map(f =>
-    `<div style="font-size:10px;color:var(--text2);padding:2px 0">
-      &#128206; ${escHtml(f.name)} <span style="color:var(--muted)">(${(f.size/1024).toFixed(1)} KB)</span>
+    `<div style="font-size:10px;color:var(--text2);padding:2px 0;display:flex;align-items:center;gap:5px">
+      <span style="color:var(--cad)">&#128206;</span>
+      <span>${escHtml(f.name)}</span>
+      <span style="color:var(--muted)">(${(f.size/1024).toFixed(1)} KB)</span>
     </div>`
   ).join('');
+  if (zone && files.length) {
+    const zt = zone.querySelector('.doc-drop-zone-text');
+    if (zt) zt.innerHTML = `<strong style="color:var(--green)">${files.length} file${files.length>1?'s':''} ready</strong> — drop more or click to add`;
+  }
 }
 
 async function _uploadActionItemFiles(commentId, actionItemId) {
@@ -8267,18 +8323,27 @@ function editActionItem(actionItemId, stepId) {
           <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
           <input id="edit-due-${actionItemId}" type="date" value="${a.due_date || ''}"
             style="width:100%;font-size:11px;padding:5px 8px;
-              background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text)" />
+              background:var(--bg2);border:1px solid var(--border);border-radius:3px;
+              color:var(--text);color-scheme:dark" />
         </div>
       </div>
 
-      <!-- Add more attachments -->
+      <!-- Add more attachments — DnD dropzone -->
       <div style="margin-bottom:8px">
         <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
           Add Attachments
         </label>
-        <input id="edit-files-${actionItemId}" type="file" multiple
-          onchange="_previewEditFiles('${actionItemId}')"
-          style="font-size:10px;color:var(--text2);width:100%" />
+        <div class="doc-drop-zone" id="edit-dropzone-${actionItemId}"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="_handleEditDrop(event,'${actionItemId}')"
+          onclick="document.getElementById('edit-files-${actionItemId}').click()"
+          style="padding:10px;margin:0">
+          <div class="doc-drop-zone-icon">📂</div>
+          <div class="doc-drop-zone-text"><strong>Drop files here</strong> or click to browse</div>
+          <input type="file" id="edit-files-${actionItemId}" style="display:none" multiple
+            onchange="_previewEditFiles('${actionItemId}')" />
+        </div>
         <div id="edit-file-preview-${actionItemId}" style="margin-top:4px"></div>
       </div>
 
@@ -8317,11 +8382,19 @@ function editActionItem(actionItemId, stepId) {
 function _previewEditFiles(actionItemId) {
   const input   = document.getElementById(`edit-files-${actionItemId}`);
   const preview = document.getElementById(`edit-file-preview-${actionItemId}`);
+  const zone    = document.getElementById(`edit-dropzone-${actionItemId}`);
   if (!input || !preview) return;
-  preview.innerHTML = Array.from(input.files || []).map(f =>
-    `<div style="font-size:10px;color:var(--text2);padding:2px 0">
-      &#128206; ${escHtml(f.name)} <span style="color:var(--muted)">(${(f.size/1024).toFixed(1)} KB)</span>
+  const files = Array.from(input.files || []);
+  preview.innerHTML = files.map(f =>
+    `<div style="font-size:10px;color:var(--text2);padding:2px 0;display:flex;align-items:center;gap:5px">
+      <span style="color:var(--cad)">&#128206;</span>
+      <span>${escHtml(f.name)}</span>
+      <span style="color:var(--muted)">(${(f.size/1024).toFixed(1)} KB)</span>
     </div>`).join('');
+  if (zone && files.length) {
+    const zt = zone.querySelector('.doc-drop-zone-text');
+    if (zt) zt.innerHTML = `<strong style="color:var(--green)">${files.length} file${files.length>1?'s':''} ready</strong> — drop more or click to add`;
+  }
 }
 
 function _removeEditAttachment(actionItemId, idx) {
