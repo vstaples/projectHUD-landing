@@ -5832,9 +5832,11 @@ function renderInstanceDetail(el, inst) {
                 <div style="flex:1;min-width:0;padding:3px 0 0 10px">
                   <!-- Step card — clickable -->
                   <div onclick="toggleInstanceStep('${inst.id}','${s.id}')"
-                    style="cursor:pointer;padding:6px 10px;border-radius:${isSel?'5px 5px 0 0':'5px'};
-                      background:${isSel?'var(--surf2)':'var(--bg2)'};
-                      border:1px solid ${isSel?'var(--cad-wire)':'var(--border)'};
+                    style="cursor:pointer;padding:6px 10px;
+                      border-radius:${isSel?'5px 5px 0 0':'5px'};
+                      background:${isSel?'var(--surf2)':touched&&!done&&!rejected?'rgba(0,210,255,0.04)':'var(--bg2)'};
+                      border:1px solid ${isSel?'var(--cad-wire)':touched&&!done&&!rejected?'var(--cad-wire)':'var(--border)'};
+                      border-left:${touched&&!done&&!rejected?'3px solid var(--cad)':'1px solid '+(isSel?'var(--cad-wire)':'var(--border)')};
                       margin-bottom:0;transition:all .12s">
                     <div style="display:flex;align-items:center;gap:8px">
                       <!-- Step name + meta — grows to fill -->
@@ -5853,7 +5855,7 @@ function renderInstanceDetail(el, inst) {
                               return '<span style="color:'+oColor+'">&#10003; '+escHtml(oLabel)+'</span>';
                             })() :
                             rejected ? '<span style="color:var(--red)">&#10005; Rejected</span>' :
-                            touched&&!done&&!rejected ? '<span style="color:var(--cad)">&#9679; Active</span>' :
+                            touched&&!done&&!rejected ? '<span style="font-size:9px;font-weight:700;color:var(--cad);padding:1px 7px;border:1px solid var(--cad);border-radius:10px;background:rgba(0,210,255,0.1);letter-spacing:.04em">&#9679; Active</span>' :
                             isReady&&!touched ? '<span style="color:var(--accent)">&#9679; Ready</span>' : ''
                           }</span>
                           <span style="color:var(--muted);font-size:10px;white-space:nowrap">${s.due_days!=null?'&#9201; '+(s.due_type==='before_completion'?s.due_days+'d before':'&#43;'+s.due_days+'d'):''}</span>
@@ -7707,6 +7709,31 @@ function _renderStepTooltipAll(stepId) {
   el.style.maxHeight = '80vh';
 }
 
+// ── Attachment viewer — Option C: generate signed URL on demand ───────────────
+// Stores path permanently; signed URL generated fresh on each view (1hr token).
+// File lives forever in storage — link never goes stale.
+async function _viewAttachment(path, name) {
+  if (!path) { cadToast('Attachment path missing', 'error'); return; }
+  try {
+    const token   = await Auth.getToken();
+    const signRes = await fetch(
+      `${SUPA_URL}/storage/v1/object/sign/${STORAGE_BUCKET}/${path}`,
+      {
+        method:  'POST',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+                   'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: 3600 }), // 1-hour token — fresh each view
+      }
+    );
+    const data = await signRes.json();
+    if (!data.signedURL) throw new Error(data.message || 'Could not generate link');
+    const url = `${SUPA_URL}/storage/v1${data.signedURL}`;
+    window.open(url, '_blank');
+  } catch(e) {
+    cadToast('Could not open attachment: ' + (e.message || 'unknown error'), 'error');
+  }
+}
+
 // ── Resource avatar helper ────────────────────────────────────────────────────
 // Returns an HTML string: colored circle with initials, consistent per-name color
 function _avatarHtml(name, size) {
@@ -7996,11 +8023,12 @@ function _renderActionItems(stepId) {
             <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
               color:var(--muted);display:block;margin:6px 0 4px">Attachments</span>
             ${attachments.map(f => `
-              <a href="${escHtml(f.url)}" target="_blank"
+              <button onclick="_viewAttachment('${escHtml(f.path)}','${escHtml(f.name)}')"
                 style="display:inline-flex;align-items:center;gap:5px;font-size:10px;
-                  color:var(--accent);text-decoration:none;margin-right:8px;margin-bottom:3px">
+                  color:var(--accent);background:none;border:none;cursor:pointer;
+                  text-decoration:underline;margin-right:8px;margin-bottom:3px;padding:0">
                 &#128206; ${escHtml(f.name)}
-              </a>`).join('')}
+              </button>`).join('')}
           </div>` : ''}
           <!-- Resolution note -->
           ${a.resolution_note ? `
@@ -8200,17 +8228,18 @@ async function _uploadActionItemFiles(commentId, actionItemId) {
   const uploaded = [];
   for (const file of files) {
     try {
-      const token = await Auth.getToken();
+      const token    = await Auth.getToken();
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `action-items/${actionItemId}/${Date.now()}_${safeName}`;
-      const res = await fetch(`${SUPA_URL}/storage/v1/object/workflow-documents/${path}`, {
-        method: 'POST',
-        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': file.type },
+      const path     = `action-items/${actionItemId}/${Date.now()}_${safeName}`;
+      const res = await fetch(`${SUPA_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+        method:  'POST',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+                   'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
         body: file,
       });
-      if (res.ok) {
-        uploaded.push({ name: file.name, path, url: `${SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`, size: file.size });
-      }
+      if (!res.ok) { console.warn('Upload failed:', file.name, res.status); continue; }
+      // Store path only — URL generated on demand via _viewAttachment (Option C)
+      uploaded.push({ name: file.name, path, size: file.size });
     } catch(e) { console.warn('File upload failed:', file.name, e); }
   }
   return uploaded;
@@ -8358,10 +8387,11 @@ function editActionItem(actionItemId, stepId) {
           color:var(--muted);margin-bottom:4px">Existing Attachments</div>
         ${a.attachments.map((f,i) => `
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-            <a href="${escHtml(f.url)}" target="_blank"
-              style="font-size:10px;color:var(--accent);text-decoration:none;flex:1">
+            <button onclick="_viewAttachment('${escHtml(f.path)}','${escHtml(f.name)}')"
+              style="font-size:10px;color:var(--accent);background:none;border:none;
+                cursor:pointer;text-decoration:underline;flex:1;text-align:left;padding:0">
               &#128206; ${escHtml(f.name)}
-            </a>
+            </button>
             <button onclick="_removeEditAttachment('${actionItemId}',${i})"
               style="font-size:9px;color:var(--red);background:none;border:none;cursor:pointer">
               &#10005;
@@ -8458,15 +8488,18 @@ async function _uploadEditFiles(actionItemId) {
   const uploaded = [];
   for (const file of files) {
     try {
-      const token = await Auth.getToken();
+      const token    = await Auth.getToken();
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `action-items/${actionItemId}/${Date.now()}_${safeName}`;
-      const res = await fetch(`${SUPA_URL}/storage/v1/object/workflow-documents/${path}`, {
-        method: 'POST',
-        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': file.type },
+      const path     = `action-items/${actionItemId}/${Date.now()}_${safeName}`;
+      const res = await fetch(`${SUPA_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+        method:  'POST',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token,
+                   'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
         body: file,
       });
-      if (res.ok) uploaded.push({ name: file.name, path, url: `${SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`, size: file.size });
+      if (!res.ok) { console.warn('Upload failed:', file.name, res.status); continue; }
+      // Store path only — URL generated on demand via _viewAttachment (Option C)
+      uploaded.push({ name: file.name, path, size: file.size });
     } catch(e) { console.warn('Upload failed:', file.name, e); }
   }
   return uploaded;
