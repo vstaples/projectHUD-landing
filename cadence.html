@@ -7032,7 +7032,7 @@ function showIntelBriefing(instId) {
   overlay.innerHTML = `
     <div style="width:min(860px,92vw);max-height:88vh;background:var(--bg1);border:1px solid var(--border2);
       border-radius:8px;display:flex;flex-direction:column;overflow:hidden;
-      box-shadow:0 24px 64px rgba(0,0,0,.6)">
+      box-shadow:0 24px 64px rgba(0,0,0,.6);min-height:0">
 
       <!-- Modal header -->
       <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;
@@ -7073,7 +7073,7 @@ function showIntelBriefing(instId) {
       </div>` : ''}
 
       <!-- ── AI Narrative section ──────────────────────────────────────────── -->
-      <div id="briefing-ai-section" style="flex-shrink:0;border-bottom:1px solid var(--border)">
+      <div id="briefing-ai-section" style="flex-shrink:0;border-bottom:1px solid var(--border);overflow-y:auto;max-height:40vh">
         ${inst.briefing_narrative ? `
         <!-- Cached narrative -->
         <div style="padding:16px 20px">
@@ -7128,7 +7128,7 @@ function showIntelBriefing(instId) {
 
         <!-- ① Situation summary -->
         <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#FFD700;
             text-transform:uppercase;margin-bottom:10px">Current Status</div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
             ${[
@@ -7160,7 +7160,7 @@ function showIntelBriefing(instId) {
 
         <!-- ② Step-by-step timeline -->
         <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#FFD700;
             text-transform:uppercase;margin-bottom:10px">Workflow Timeline</div>
           <div style="display:flex;flex-direction:column;gap:0">
             ${stepSummaries.map(({step,state,firstAct,lastComp,resets,durationMs},si)=>{
@@ -7197,7 +7197,7 @@ function showIntelBriefing(instId) {
 
         <!-- ③ Human narrative — all notes in chronological order -->
         <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#FFD700;
             text-transform:uppercase;margin-bottom:10px">
             Notes & Comments
             <span style="font-weight:400;color:var(--muted);margin-left:6px">${noteEvents.length} recorded</span>
@@ -7238,7 +7238,7 @@ function showIntelBriefing(instId) {
         <!-- ④ What's next -->
         ${remainingSteps.length ? `
         <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cad);
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#FFD700;
             text-transform:uppercase;margin-bottom:10px">Remaining Steps</div>
           <div style="display:flex;flex-direction:column;gap:6px">
             ${remainingSteps.map((s,i)=>`
@@ -8649,10 +8649,10 @@ function _populateAllCommentThreads() {
 // ── Briefing narrative formatter ──────────────────────────────────────────────
 function _formatBriefingNarrative(text) {
   if (!text) return '';
-  const sectionStyle = 'font-size:9px;font-weight:700;letter-spacing:.12em;' +
-    'color:var(--cad);text-transform:uppercase;margin:14px 0 6px;display:block';
-  const bulletStyle = 'margin:3px 0;padding-left:12px;position:relative;' +
-    'font-size:11px;color:var(--text);line-height:1.6';
+  const sectionStyle = 'font-size:11px;font-weight:700;letter-spacing:.12em;' +
+    'color:#FFD700;text-transform:uppercase;margin:14px 0 6px;display:block';
+  const bulletStyle = 'margin:4px 0;padding-left:14px;position:relative;' +
+    'font-size:13px;color:var(--text);line-height:1.7';
 
   const lines = text.split('\n');
   let html = '';
@@ -8678,7 +8678,7 @@ function _formatBriefingNarrative(text) {
     }
 
     // Plain text fallback
-    html += `<div style="font-size:11px;color:var(--text);line-height:1.6;margin:3px 0">${escHtml(trimmed)}</div>`;
+    html += `<div style="font-size:13px;color:var(--text);line-height:1.7;margin:4px 0">${escHtml(trimmed)}</div>`;
   });
 
   return html;
@@ -8921,7 +8921,7 @@ async function _generateAIBriefing(instId) {
           </button>
         </div>
         <div id="briefing-ai-narrative"
-          style="font-size:12px;color:var(--text);line-height:1.8;font-family:var(--font-body)">
+          style="font-size:13px;color:var(--text);line-height:1.7;font-family:var(--font-body)">
           <p style="margin:0">${_formatBriefingNarrative(full)}</p>
         </div>
       </div>`;
