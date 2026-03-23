@@ -5652,6 +5652,20 @@ function renderInstanceDetail(el, inst) {
         ◉ Swimlane
       </button>
 
+      <!-- History toggle — rework heat layer -->
+      <button id="hx-toggle-btn" onclick="_toggleHistory()"
+        style="padding:5px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;
+          background:${_historyActive?'#ff5f6b':'transparent'};
+          color:${_historyActive?'#fff':'var(--muted)'};
+          border:1px solid ${_historyActive?'#ff5f6b':'var(--border)'};
+          border-radius:5px;cursor:pointer;
+          transition:all .12s;flex-shrink:0;
+          opacity:${viewMode==='diagram'?'1':'0.35'};
+          pointer-events:${viewMode==='diagram'?'auto':'none'}"
+        title="Toggle rework history heat layer">
+        ↩ History
+      </button>
+
       <!-- Digital elapsed clock — dd:hh:mm since launch -->
       ${inst.launched_at && canAct ? `
       <div style="flex-shrink:0;text-align:center;
@@ -5783,6 +5797,35 @@ function renderInstanceDetail(el, inst) {
             </div>
             <!-- Swimlane instance list -->
             <div id="sw-info-body" style="flex:1;overflow-y:auto;padding:10px 14px;
+              display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start"></div>
+          </div>
+
+          <!-- ── History heat zone — shown when _historyActive ── -->
+          <div id="hx-info-panel" style="display:none;position:absolute;inset:0;z-index:11;
+            background:var(--bg1);border-top:1px solid var(--border);
+            flex-direction:column;overflow:hidden">
+            <!-- History header -->
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;
+              border-bottom:1px solid var(--border);flex-shrink:0">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.1em;
+                color:#ff5f6b;white-space:nowrap">&#8629; HISTORY</span>
+              <div style="display:flex;align-items:center;gap:14px;margin-left:8px;flex-wrap:wrap">
+                <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
+                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#6a9abf"></span>Low (1–3)
+                </span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
+                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#EF9F27"></span>Moderate (4–9)
+                </span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)">
+                  <span style="display:inline-block;width:28px;height:6px;border-radius:3px;background:#ff5f6b"></span>High (10+) ▲ bottleneck
+                </span>
+              </div>
+              <span style="margin-left:auto;font-size:10px;color:var(--muted);font-style:italic">
+                Hover badge on diagram for breakdown
+              </span>
+            </div>
+            <!-- Heat zone cards -->
+            <div id="hx-info-body" style="flex:1;overflow-y:auto;padding:10px 14px;
               display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start"></div>
           </div>
           <!-- Scrubber row -->
@@ -6520,6 +6563,87 @@ let _swimlaneDwellRow   = null;
 // Stores cluster hit regions for the current DAG frame: [{stepId, x, y, r}]
 let _swimlaneClusters = [];
 
+// ── Rework History Layer state ────────────────────────────────────────────────
+let _historyActive    = false;
+let _historyClusters  = []; // hit regions: [{stepId, heat, x, y, w, h}]
+let _historyPopup     = null;
+let _historyHideTimer = null;
+
+const HEAT_COLORS = {
+  low:      { fill:'rgba(42,80,128,.25)',  stroke:'#1a3a5a', text:'#6a9abf' },
+  moderate: { fill:'rgba(133,79,11,.25)',  stroke:'#BA7517', text:'#EF9F27' },
+  high:     { fill:'rgba(163,45,45,.25)',  stroke:'#E24B4A', text:'#ff5f6b' },
+};
+
+function _heatLevel(n) {
+  if (n === 0) return 'cold';
+  if (n <= 3)  return 'low';
+  if (n <= 9)  return 'moderate';
+  return 'high';
+}
+
+function _buildReworkHeatMap(inst) {
+  const allInsts = _instances.filter(i =>
+    i.template_id === inst.template_id &&
+    (i.status === 'in_progress' || i.status === 'complete')
+  );
+  const map = {}; // stepId → {total, byInstance:{id→count}, typeA, typeB}
+
+  allInsts.forEach(sib => {
+    (sib._stepInsts || []).forEach(e => {
+      const sid = e.template_step_id;
+      if (!sid) return;
+      if (!map[sid]) map[sid] = { total:0, byInstance:{}, typeA:0, typeB:0, stepName:null };
+
+      if (e.event_type === 'step_reset') {
+        map[sid].total++;
+        map[sid].byInstance[sib.id] = (map[sid].byInstance[sib.id]||0) + 1;
+        map[sid].stepName = map[sid].stepName || e.step_name || null;
+        const note = (e.event_notes||'').toLowerCase();
+        if (note.includes('reset by')) map[sid].typeB++;
+        else map[sid].typeA++;
+      }
+
+      if (e.event_type === 'step_completed' && e.outcome) {
+        const stepDef = (inst._tmplSteps||[]).find(s=>s.id===sid);
+        const oDef    = stepDef ? _getOutcomes(stepDef).find(o=>o.id===e.outcome) : null;
+        if (oDef?.requiresReset) {
+          map[sid].total++;
+          map[sid].byInstance[sib.id] = (map[sid].byInstance[sib.id]||0) + 1;
+          map[sid].stepName = map[sid].stepName || e.step_name || null;
+          map[sid].typeA++;
+        }
+      }
+    });
+  });
+  return map;
+}
+
+function _toggleHistory() {
+  const inst = _selectedInstance;
+  if (!inst) return;
+  const dagWrap   = document.getElementById('inst-dag-wrap');
+  const inDiagram = inst._viewMode === 'diagram' ||
+    (dagWrap && getComputedStyle(dagWrap).display !== 'none');
+  if (!inDiagram) { cadToast('Switch to Diagram mode first', 'info'); return; }
+  inst._viewMode  = 'diagram';
+  _historyActive  = !_historyActive;
+  const btn = document.getElementById('hx-toggle-btn');
+  if (btn) {
+    btn.style.background = _historyActive ? '#ff5f6b'      : 'transparent';
+    btn.style.color      = _historyActive ? '#fff'         : 'var(--muted)';
+    btn.style.borderColor= _historyActive ? '#ff5f6b'      : 'var(--border)';
+  }
+  if (!_historyActive) _hxHidePopup(true);
+  if (_historyActive) _swLoadSiblingData(inst); // reuse sibling loader
+  const panel = document.getElementById('hx-info-panel');
+  if (panel) {
+    panel.style.display = _historyActive ? 'flex' : 'none';
+    if (_historyActive) _hxPopulatePanel(inst);
+  }
+  renderInstanceDAG(inst);
+}
+
 function _toggleSwimlane() {
   const inst = _selectedInstance;
   if (!inst) return;
@@ -7091,6 +7215,72 @@ function renderInstanceDAG(inst) {
     });
   }
 
+  // ── Rework History heat layer ─────────────────────────────────────────────
+  _historyClusters = [];
+  if (_historyActive) {
+    const heatMap = _buildReworkHeatMap(inst);
+    const maxHeat = Math.max(...Object.values(heatMap).map(h => h.total), 1);
+
+    steps.forEach(s => {
+      const heat = heatMap[s.id];
+      if (!heat || heat.total === 0) return;
+      const level = _heatLevel(heat.total);
+      const cols  = HEAT_COLORS[level];
+      const p     = nodePos(s.id);
+
+      // Node border color override for high heat
+      if (level === 'high') {
+        ctx.save();
+        ctx.strokeStyle = '#E24B4A';
+        ctx.lineWidth   = 2;
+        ctx.beginPath();
+        ctx.roundRect(p.x, p.y, NW, NH, 7);
+        ctx.stroke();
+        ctx.restore();
+      } else if (level === 'moderate') {
+        ctx.save();
+        ctx.strokeStyle = '#BA7517';
+        ctx.lineWidth   = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(p.x, p.y, NW, NH, 7);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Heat badge — bottom-center of node
+      const label  = `\u21a9 ${heat.total}\u00d7`;
+      const bw     = 42, bh = 16;
+      const bx     = p.x + NW/2 - bw/2;
+      const by     = p.y + NH + 5;
+
+      ctx.save();
+      ctx.fillStyle   = cols.fill;
+      ctx.strokeStyle = cols.stroke;
+      ctx.lineWidth   = level === 'high' ? 1.5 : 1;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 4);
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle    = cols.text;
+      ctx.font         = 'bold 8px sans-serif';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, bx + bw/2, by + bh/2);
+
+      // Bottleneck flag — highest heat node above threshold
+      if (heat.total === maxHeat && heat.total >= 10) {
+        ctx.fillStyle = '#ff5f6b';
+        ctx.font      = 'bold 8px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('\u25b2', bx + bw - 4, by + bh/2);
+      }
+      ctx.restore();
+
+      // Store hit region
+      _historyClusters.push({ stepId: s.id, heat, x: bx, y: by, w: bw, h: bh });
+    });
+  }
+
   ctx.restore();
 
   // Update zoom label if present
@@ -7140,6 +7330,21 @@ function renderInstanceDAG(inst) {
       const mx  = (e.clientX - r.left  - _instDagPanX) / _instDagScale;
       const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
 
+      // History heat badge hover
+      if (_historyActive && _historyClusters.length) {
+        const PAD = 4;
+        const hxHit = _historyClusters.find(c =>
+          mx >= c.x - PAD && mx <= c.x + c.w + PAD &&
+          my >= c.y - PAD && my <= c.y + c.h + PAD);
+        if (hxHit) {
+          wrap.style.cursor = 'pointer';
+          _hxShowPopup(hxHit, e.clientX, e.clientY, inst);
+          return;
+        } else {
+          _hxStartHidePopup();
+        }
+      }
+
       // Swimlane cluster hover
       if (_swimlaneActive && _swimlaneClusters.length) {
         const PAD = 4; // tolerance px
@@ -7165,6 +7370,7 @@ function renderInstanceDAG(inst) {
     wrap.addEventListener('mouseleave', () => {
       wrap.style.cursor = 'grab';
       _swStartHidePopup();
+      _hxStartHidePopup();
     });
     // Click node to open step completion in list view
     wrap.addEventListener('click',e=>{
@@ -9335,6 +9541,137 @@ function instScrubChange(val) {
   _instRenderDots(events, idx);
 }
 
+// ── Rework History Layer — popup, panel, tooltip ──────────────────────────────
+
+function _hxShowPopup(cluster, clientX, clientY, inst) {
+  clearTimeout(_historyHideTimer);
+  const existingId = _historyPopup?.dataset?.stepId;
+  if (existingId === cluster.stepId) return;
+  _hxHidePopup(true);
+
+  const heat     = cluster.heat;
+  const level    = _heatLevel(heat.total);
+  const cols     = HEAT_COLORS[level] || HEAT_COLORS.low;
+  const stepName = heat.stepName
+    || (inst._tmplSteps||[]).find(s=>s.id===cluster.stepId)?.name
+    || 'This step';
+
+  const maxCount = Math.max(...Object.values(heat.byInstance));
+  const typeNote = heat.typeB > heat.typeA
+    ? `<div style="font-size:9px;color:#BA7517;padding:4px 12px 0;font-style:italic">
+        &#8629; ${heat.typeB} reset${heat.typeB>1?'s':''} caused by upstream rejection/decline
+       </div>`
+    : heat.typeA > 0
+    ? `<div style="font-size:9px;color:#ff5f6b;padding:4px 12px 0;font-style:italic">
+        &#8629; ${heat.typeA} own failure${heat.typeA>1?'s':''} at this step
+       </div>`
+    : '';
+
+  const rowsHtml = Object.entries(heat.byInstance).sort((a,b)=>b[1]-a[1]).map(([sibId, cnt]) => {
+    const sib  = _instances.find(i=>i.id===sibId);
+    const name = sib?.title || sibId.slice(0,8)+'…';
+    const pct  = Math.round(cnt/maxCount*100);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;
+        border-bottom:0.5px solid var(--border)">
+      <div style="font-size:11px;font-weight:500;color:var(--text);flex:1;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</div>
+      <div style="width:60px;height:5px;background:var(--border);border-radius:3px;flex-shrink:0">
+        <div style="height:5px;border-radius:3px;background:${cols.stroke};width:${pct}%"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:${cols.text};white-space:nowrap">${cnt}&#215;</div>
+    </div>`;
+  }).join('');
+
+  const popup = document.createElement('div');
+  popup.dataset.stepId = cluster.stepId;
+  popup.style.cssText = `position:fixed;z-index:2001;background:var(--bg1);
+    border:1px solid var(--border2);border-radius:8px;overflow:hidden;width:280px;`;
+  popup.innerHTML = `
+    <div style="padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);
+      font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${cols.text}">
+      ${escHtml(stepName)} — ${heat.total} total rejections
+    </div>
+    ${typeNote}
+    ${rowsHtml}`;
+
+  popup.addEventListener('mouseenter', () => clearTimeout(_historyHideTimer));
+  popup.addEventListener('mouseleave', () => _hxStartHidePopup());
+
+  document.body.appendChild(popup);
+  const pw = 280, ph = popup.offsetHeight || 160;
+  let px = clientX + 12, py = clientY - 20;
+  if (px + pw > window.innerWidth  - 8) px = clientX - pw - 12;
+  if (py + ph > window.innerHeight - 8) py = window.innerHeight - ph - 8;
+  popup.style.left = px + 'px';
+  popup.style.top  = py + 'px';
+  _historyPopup = popup;
+}
+
+function _hxStartHidePopup() {
+  clearTimeout(_historyHideTimer);
+  _historyHideTimer = setTimeout(() => _hxHidePopup(false), 280);
+}
+
+function _hxHidePopup(immediate) {
+  clearTimeout(_historyHideTimer);
+  if (_historyPopup) {
+    if (immediate) {
+      _historyPopup.remove();
+    } else {
+      _historyPopup.style.transition = 'opacity .15s';
+      _historyPopup.style.opacity = '0';
+      setTimeout(() => _historyPopup?.remove(), 160);
+    }
+    _historyPopup = null;
+  }
+}
+
+function _hxPopulatePanel(inst) {
+  const body = document.getElementById('hx-info-body');
+  if (!body) return;
+  const heatMap  = _buildReworkHeatMap(inst);
+  const steps    = (inst._tmplSteps||[]).filter(s=>s.step_type!=='trigger')
+                     .sort((a,b)=>a.sequence_order-b.sequence_order);
+  const maxTotal = Math.max(...Object.values(heatMap).map(h=>h.total), 1);
+
+  body.innerHTML = steps.map(s => {
+    const heat  = heatMap[s.id] || { total:0, typeA:0, typeB:0, byInstance:{} };
+    const level = _heatLevel(heat.total);
+    const cols  = HEAT_COLORS[level];
+    const pct   = Math.round(heat.total / maxTotal * 100);
+    const isBot = heat.total >= 10 && heat.total === maxTotal;
+
+    const causeStr = heat.total === 0
+      ? '<span style="color:var(--green);font-size:9px">&#10003; Clean</span>'
+      : heat.typeB > heat.typeA
+      ? `<span style="font-size:9px;color:#BA7517">&#8629; ${heat.typeB}&#215; upstream reset</span>`
+      : `<span style="font-size:9px;color:#ff5f6b">&#8629; ${heat.typeA}&#215; own failure</span>`;
+
+    const instLines = Object.entries(heat.byInstance).sort((a,b)=>b[1]-a[1])
+      .map(([id, cnt]) => {
+        const nm = _instances.find(i=>i.id===id)?.title || id.slice(0,8);
+        return `<div style="font-size:9px;color:var(--muted)">${escHtml(nm.split('·')[0].trim())}: ${cnt}&#215;</div>`;
+      }).join('');
+
+    return `<div style="flex:1;min-width:150px;max-width:220px;background:var(--bg2);
+      border:${heat.total>=10?'2px':'1px'} solid ${cols?cols.stroke:'var(--border)'};
+      border-radius:6px;padding:10px 12px;cursor:default">
+      <div style="font-size:10px;font-weight:500;color:var(--text);margin-bottom:5px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        ${isBot?'<span style="color:#ff5f6b">&#9650; </span>':''}${escHtml(s.name||s.step_type)}
+      </div>
+      <div style="font-size:18px;font-weight:500;color:${cols?cols.text:'var(--green)'};margin-bottom:4px">
+        ${heat.total}<span style="font-size:11px;color:var(--muted)">&#215;</span>
+      </div>
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:5px">
+        <div style="height:4px;border-radius:2px;background:${cols?cols.stroke:'var(--green)'};width:${pct}%"></div>
+      </div>
+      <div style="margin-bottom:4px">${causeStr}</div>
+      ${instLines}
+    </div>`;
+  }).join('');
+}
+
 function _swPopulateInfoPanel(inst) {
   const body = document.getElementById('sw-info-body');
   if (!body) return;
@@ -9429,11 +9766,11 @@ async function _swLoadSiblingData(inst) {
       console.warn('Swimlane: failed to load sibling CoC for', sib.id, e);
     }
   }
-  // Re-render clusters and info panel now that health data is available
-  if (_swimlaneActive && _selectedInstance?.id === inst.id) {
-    renderInstanceDAG(inst);
-    _swUpdateBottleneckBanner(inst);
-    _swPopulateInfoPanel(inst);
+  // Re-render clusters and panels now that health data is available
+  if (_selectedInstance?.id === inst.id) {
+    if (_swimlaneActive || _historyActive) renderInstanceDAG(inst);
+    if (_swimlaneActive) { _swUpdateBottleneckBanner(inst); _swPopulateInfoPanel(inst); }
+    if (_historyActive)  { _hxPopulatePanel(inst); }
   }
 }
 
