@@ -6317,19 +6317,25 @@ function toggleInstDagCoC(btn) {
     if (row && !row.contains(e.relatedTarget)) _hideStepTooltip();
   };
 
-  // Populate rework badges safely after innerHTML is set
-  (inst._tmplSteps || []).forEach(s => {
-    const badge = document.getElementById('rwbadge-' + s.id);
-    const count = stepRejectionCount[s.id];
-    console.log('[rwbadge] step:', s.name?.slice(0,20), 'badge found:', !!badge, 'count:', count);
-    if (!badge) return;
-    if (count) {
-      badge.style.cssText = 'font-family:var(--font-mono);font-size:9px;color:#E24B4A;' +
-        'padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;' +
-        'background:rgba(226,75,74,0.08);margin-left:2px';
-      badge.textContent = '\u21a9 ' + count + '\u00d7';
-    }
-  });
+  // Populate rework badges after DOM settles
+  setTimeout(() => {
+    (inst._tmplSteps || []).forEach(s => {
+      const badge = document.getElementById('rwbadge-' + s.id);
+      if (!badge) return;
+      const resets = (inst._stepInsts || []).filter(e => e.event_type === 'step_reset' && e.template_step_id === s.id).length;
+      const rejections = (inst._stepInsts || []).filter(e =>
+        e.event_type === 'step_completed' && e.template_step_id === s.id &&
+        (() => { const o = _getOutcomes(s).find(o => o.id === e.outcome); return !!(o?.requiresReset); })()
+      ).length;
+      const count = resets + rejections;
+      if (count) {
+        badge.style.cssText = 'font-family:var(--font-mono);font-size:11px;font-weight:700;color:#E24B4A;' +
+          'padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;' +
+          'background:rgba(226,75,74,0.08);margin-left:4px';
+        badge.textContent = '\u21a9 ' + count + '\u00d7';
+      }
+    });
+  }, 0);
 }
 
 // ── Instance view mode switcher ───────────────────────────────────────────────
