@@ -6940,24 +6940,26 @@ function renderInstanceDAG(inst) {
       const p = nodePos(stepId);
       if (!p || p.x < 0) return;
 
-      const CLUSTER_X = p.x + NW - 4;
-      const CLUSTER_Y = p.y - 4;
-      const DOT_R = 4.5;
+      const DOT_R   = 4.5;
       const DOT_GAP = 11;
       const MAX_DOTS = 5;
-      const shown = sibs.slice(0, MAX_DOTS);
-      const clusterW = shown.length * DOT_GAP + 6;
+      const shown    = sibs.slice(0, MAX_DOTS);
+      const clusterW = shown.length * DOT_GAP + 8;
       const clusterH = 18;
 
+      // Position: top-right corner of node, overlapping the border
+      const bx = p.x + NW - clusterW/2;   // centred on right edge
+      const by = p.y - clusterH/2;          // centred on top edge (overlaps border)
+
       // Badge background
-      ctx.fillStyle   = 'rgba(12,22,40,.9)';
-      ctx.strokeStyle = 'rgba(42,64,96,.8)';
-      ctx.lineWidth   = 0.8;
-      const bx = CLUSTER_X - clusterW;
-      const by = CLUSTER_Y;
+      ctx.save();
+      ctx.fillStyle   = 'rgba(10,18,32,0.95)';
+      ctx.strokeStyle = '#e8a838';
+      ctx.lineWidth   = 1;
       ctx.beginPath();
-      ctx.roundRect(bx, by, clusterW, clusterH, 4);
+      ctx.roundRect(bx, by, clusterW, clusterH, 5);
       ctx.fill(); ctx.stroke();
+      ctx.restore();
 
       // Dots
       shown.forEach((sib, i) => {
@@ -6971,16 +6973,16 @@ function renderInstanceDAG(inst) {
         ctx.fill();
       });
 
-      // Overflow count badge
+      // Overflow count
       if (sibs.length > MAX_DOTS) {
-        ctx.fillStyle = 'rgba(232,168,56,.8)';
+        ctx.fillStyle = '#e8a838';
         ctx.font = 'bold 7px sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText('+' + (sibs.length - MAX_DOTS), bx + clusterW - 12, by + clusterH / 2);
+        ctx.fillText('+' + (sibs.length - MAX_DOTS), bx + clusterW - 10, by + clusterH / 2);
       }
 
-      // Store hit region (in unscaled/untranslated content coords)
+      // Store hit region in content-space coords (before scale/translate)
       _swimlaneClusters.push({
         stepId,
         siblings: sibs,
@@ -7034,9 +7036,11 @@ function renderInstanceDAG(inst) {
       const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
 
       // Swimlane cluster hover
-      if (_swimlaneActive) {
+      if (_swimlaneActive && _swimlaneClusters.length) {
+        const PAD = 4; // tolerance px
         const hit = _swimlaneClusters.find(c =>
-          mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h);
+          mx >= c.x - PAD && mx <= c.x + c.w + PAD &&
+          my >= c.y - PAD && my <= c.y + c.h + PAD);
         if (hit) {
           wrap.style.cursor = 'pointer';
           _swShowPopup(hit, e.clientX, e.clientY, wrap);
@@ -7084,6 +7088,31 @@ function renderInstanceDAG(inst) {
 function showIntelBriefing(instId) {
   const inst  = _instances.find(i=>i.id===instId) || _selectedInstance;
   if (!inst) return;
+  // If sibling instance hasn't had full data loaded yet, fetch it first
+  if (!inst._stepInsts && inst.id !== _selectedInstance?.id) {
+    const tmplId = inst.template_id;
+    Promise.all([
+      API.get(`workflow_step_instances?instance_id=eq.${inst.id}&order=created_at.asc,id.asc`).catch(()=>[]),
+      inst._tmplSteps ? Promise.resolve(null) :
+        API.get(`workflow_template_steps?template_id=eq.${tmplId}&order=sequence_order.asc`).catch(()=>[]),
+      API.get(`step_comments?instance_id=eq.${inst.id}&is_deleted=eq.false`).catch(()=>[]),
+      API.get(`workflow_action_items?instance_id=eq.${inst.id}`).catch(()=>[]),
+    ]).then(([si, ts, sc, ai]) => {
+      inst._stepInsts    = si || [];
+      inst._stepComments = sc || [];
+      inst._actionItems  = ai || [];
+      if (ts) inst._tmplSteps = ts.map(s=>({...s,
+        _attachedDocs: (s.attached_docs||[]).map(d=>({name:d.name,path:d.path||null,url:d.url||null})),
+        _meetingAgenda: Array.isArray(s.meeting_agenda)?s.meeting_agenda:[],
+      }));
+      _showIntelBriefingModal(inst);
+    }).catch(() => _showIntelBriefingModal(inst));
+    return;
+  }
+  _showIntelBriefingModal(inst);
+}
+
+function _showIntelBriefingModal(inst) {
   const tmpl  = _templates.find(t=>t.id===inst.template_id);
   const steps = (inst._tmplSteps||[]).filter(s=>s.step_type!=='trigger').sort((a,b)=>a.sequence_order-b.sequence_order);
   const coc   = (inst._stepInsts||[]).slice().sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
