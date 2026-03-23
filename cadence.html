@@ -5580,6 +5580,17 @@ function renderInstanceDetail(el, inst) {
   coc.filter(e => e.event_type === 'step_completed' && e.template_step_id)
      .forEach(e => { stepCompletedAt[e.template_step_id] = e.created_at; });
 
+  // Build map of step_id → rejection count (step_completed with requiresReset outcome)
+  const stepRejectionCount = {};
+  coc.filter(e => e.event_type === 'step_completed' && e.template_step_id && e.outcome)
+     .forEach(e => {
+       const stepDef = steps.find(s => s.id === e.template_step_id);
+       const oDef = stepDef ? _getOutcomes(stepDef).find(o => o.id === e.outcome) : null;
+       if (oDef?.requiresReset) {
+         stepRejectionCount[e.template_step_id] = (stepRejectionCount[e.template_step_id] || 0) + 1;
+       }
+     });
+
   // Map step_id → latest reassignment CoC event
   const reassignments = {};
   coc.filter(e => e.event_type === 'step_reassigned').forEach(e => {
@@ -5830,6 +5841,7 @@ function renderInstanceDetail(el, inst) {
                           ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
                           ${isReady&&!touched?`<span style="color:var(--accent)">● Ready</span>`:''}
+                          ${stepRejectionCount[s.id] ? `<span style="color:var(--red);font-family:var(--font-mono);font-size:9px;padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;background:rgba(226,75,74,0.08)">↩ ${stepRejectionCount[s.id]}×</span>` : ''}
                         </div>
                       </div>
                       <!-- Elapsed timer — right justified, dd:hh:mm -->
