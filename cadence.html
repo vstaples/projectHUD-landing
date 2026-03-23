@@ -5479,6 +5479,8 @@ async function selectInstance(id) {
     if (_selectedInstance.status === 'in_progress') {
       _startExternalEventDetection(id);
     }
+    // Populate rework badges after data and DOM are both ready
+    setTimeout(_populateReworkBadges, 100);
   } catch(e) {
     detailEl.innerHTML = `<div style="padding:40px;color:var(--red)">Failed to load: ${escHtml(e.message)}</div>`;
   }
@@ -6318,7 +6320,7 @@ function toggleInstDagCoC(btn) {
   };
 
   // Populate rework badges after DOM settles
-  setTimeout(_populateReworkBadges, 50);
+  setTimeout(_populateReworkBadges, 150);
 }
 
 // ── Rework badge population ───────────────────────────────────────────────────
