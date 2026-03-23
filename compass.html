@@ -111,7 +111,7 @@
 .tab-badge {
   background: var(--compass-red);
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
   font-family: var(--font-mono);
   padding: 1px 5px;
   border-radius: 8px;
@@ -127,7 +127,7 @@
   align-items: center;
   gap: 5px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--compass-green);
   letter-spacing: .1em;
   margin-right: 12px;
@@ -206,7 +206,7 @@
 
 .stat-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--text3);
@@ -223,7 +223,7 @@
 
 .stat-sub {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text3);
   margin-top: 3px;
 }
@@ -253,7 +253,7 @@
 
 .panel-title {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text3);
@@ -261,7 +261,7 @@
 
 .panel-badge {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   padding: 2px 7px;
   font-weight: 700;
 }
@@ -390,7 +390,7 @@
 /* ── Buttons ─────────────────────────────────────────────── */
 .cmp-btn {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: .08em;
   text-transform: uppercase;
   padding: 4px 12px;
@@ -423,7 +423,7 @@
 /* ── Status badges ───────────────────────────────────────── */
 .status-badge {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   padding: 2px 7px;
   flex-shrink: 0;
 }
@@ -502,7 +502,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-hud);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -619,7 +619,7 @@
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text3);
   margin-bottom: 6px;
 }
@@ -706,7 +706,7 @@
 
 .rejection-context-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--compass-red);
@@ -723,7 +723,7 @@
 
 .rejection-context-meta {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text3);
   margin-top: 3px;
 }
@@ -737,7 +737,7 @@
   background: var(--bg2);
   border-top: 1px solid var(--border);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: .04em;
   color: var(--text3);
   line-height: 1.5;
@@ -874,7 +874,7 @@
 
     <!-- Cadence link -->
     <a href="/cadence.html"
-      style="font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+      style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
         color:var(--text3);text-decoration:none;padding:0 10px;transition:color .12s"
       onmouseenter="this.style.color='var(--compass-cyan)'"
       onmouseleave="this.style.color='var(--text3)'"
@@ -1217,7 +1217,7 @@ async function loadUserView() {
                   <div class="row-title">${esc(w.title)}</div>
                   <div class="row-sub">${proj ? esc(proj.name) + ' · ' : ''}${w.current_step_name ? 'At: ' + esc(w.current_step_name) : 'Active'}</div>
                 </div>
-                <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3)">▶</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">▶</span>
               </div>`;
             }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active instances</div>'}
           </div>
@@ -1340,14 +1340,14 @@ async function loadPMView() {
                   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
                     ${projInsts.slice(0, 3).map(w => `
                       <a href="/cadence.html" onclick="event.stopPropagation()"
-                        style="font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;
+                        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;
                           color:var(--compass-cyan);border:1px solid rgba(0,210,255,.25);
                           padding:2px 8px;text-decoration:none;transition:background .1s"
                         onmouseenter="this.style.background='rgba(0,210,255,.08)'"
                         onmouseleave="this.style.background=''">
                         ▶ ${esc(w.title)}${w.current_step_name ? ' — ' + esc(w.current_step_name) : ''}
                       </a>`).join('')}
-                    ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 6px">+${projInsts.length - 3} more</span>` : ''}
+                    ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:2px 6px">+${projInsts.length - 3} more</span>` : ''}
                   </div>` : ''}
                 </div>`;
               }).join('')
@@ -1667,15 +1667,15 @@ async function loadExecutiveView() {
               <span class="panel-badge pb-cyan">AI · Generated</span>
             </div>
             <div style="border-left:3px solid var(--compass-amber);margin:10px 13px;padding:9px 11px;background:rgba(239,159,39,.05)">
-              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:6px;text-transform:uppercase">Situation</div>
+              <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:6px;text-transform:uppercase">Situation</div>
               <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
                 ${activeProjects.length} project${activeProjects.length !== 1 ? 's' : ''} active · ${wfInstances.length} workflow instance${wfInstances.length !== 1 ? 's' : ''} running · ${reworkCount} rework cycles recorded.
               </div>
-              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Financial signal</div>
+              <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Financial signal</div>
               <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
                 Estimated rework cost: <span style="color:${reworkCost > 500000 ? 'var(--compass-red)' : 'var(--text0)'};font-weight:600">${formatYen(reworkCost)}</span> at current volume. ${reworkCount > 10 ? 'Above healthy threshold — workflow template review recommended.' : 'Within acceptable range.'}
               </div>
-              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Recommended attention</div>
+              <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Recommended attention</div>
               <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55">
                 ${resourceReqs.length > 0 ? `${resourceReqs.length} resource request${resourceReqs.length > 1 ? 's' : ''} pending your approval. ` : ''}${atRiskProjs.length > 0 ? `${atRiskProjs.length} project${atRiskProjs.length > 1 ? 's' : ''} approaching target date within 60 days.` : 'No immediate executive action required.'}
               </div>

@@ -5061,6 +5061,22 @@ function launchInstance() {
         </div>
 
         <div style="margin-bottom:12px;margin-top:4px">
+          <label class="config-label">Link to project &amp; task <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+            <select class="config-select" id="launch-project" style="font-size:11px"
+              onchange="_launchProjectChanged()">
+              <option value="">— No project —</option>
+            </select>
+            <select class="config-select" id="launch-task" style="font-size:11px" disabled>
+              <option value="">— Select project first —</option>
+            </select>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">
+            When linked: task status mirrors instance — <em>in progress</em> while running, <em>complete</em> when instance closes.
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;margin-top:4px">
           <label class="config-label">Notes (optional)</label>
           <textarea class="config-textarea" id="launch-notes" placeholder="Any additional context for this instance..."></textarea>
         </div>
@@ -5071,6 +5087,17 @@ function launchInstance() {
       </div>
     </div>`;
   document.body.appendChild(overlay);
+
+  // Populate project dropdown asynchronously after modal is in DOM
+  API.get(`projects?firm_id=eq.${FIRM_ID_CAD}&status=eq.active&select=id,name&order=name.asc`)
+    .then(projects => {
+      const sel = document.getElementById('launch-project');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— No project —</option>' +
+        (projects || []).map(p =>
+          `<option value="${p.id}">${escHtml(p.name)}</option>`
+        ).join('');
+    }).catch(() => {});
 }
 
 function _launchPrioritySelect(val) {
@@ -5104,6 +5131,37 @@ function _launchPertUpdate() {
     <span style="color:${spread>10?'var(--red)':spread>4?'var(--amber)':'var(--green)'}">${epistemic}</span>`;
 }
 
+function _launchProjectChanged() {
+  const projSel = document.getElementById('launch-project');
+  const taskSel = document.getElementById('launch-task');
+  if (!projSel || !taskSel) return;
+
+  const projId = projSel.value;
+  taskSel.innerHTML = '<option value="">Loading…</option>';
+  taskSel.disabled = true;
+
+  if (!projId) {
+    taskSel.innerHTML = '<option value="">— Select project first —</option>';
+    return;
+  }
+
+  API.get(`tasks?project_id=eq.${projId}&status=not.in.(complete,cancelled)&select=id,name,status&order=name.asc`)
+    .then(tasks => {
+      if (!taskSel) return;
+      if (!tasks?.length) {
+        taskSel.innerHTML = '<option value="">— No open tasks —</option>';
+        taskSel.disabled = true;
+        return;
+      }
+      taskSel.innerHTML = '<option value="">— No task link —</option>' +
+        tasks.map(t => `<option value="${t.id}">${escHtml(t.name)}</option>`).join('');
+      taskSel.disabled = false;
+    }).catch(() => {
+      taskSel.innerHTML = '<option value="">— Failed to load —</option>';
+      taskSel.disabled = true;
+    });
+}
+
 async function confirmLaunch() {
   const title      = document.getElementById('launch-title')?.value?.trim();
   const ownerResId = document.getElementById('launch-owner')?.value;
@@ -5113,6 +5171,8 @@ async function confirmLaunch() {
   const pertO      = parseFloat(document.getElementById('launch-pert-o')?.value)||null;
   const pertM      = parseFloat(document.getElementById('launch-pert-m')?.value)||null;
   const pertP      = parseFloat(document.getElementById('launch-pert-p')?.value)||null;
+  const projectId  = document.getElementById('launch-project')?.value || null;
+  const taskId     = document.getElementById('launch-task')?.value    || null;
 
   if (!title)      { cadToast('Title required', 'error'); return; }
   if (!ownerResId) { cadToast('Owner required — select who will manage this instance', 'error'); return; }
@@ -5140,10 +5200,20 @@ async function confirmLaunch() {
       pert_optimistic:  pertO,
       pert_likely:      pertM,
       pert_pessimistic: pertP,
+      ...(projectId ? { project_id:     projectId } : {}),
+      ...(taskId    ? { source_task_id: taskId    } : {}),
     });
 
     if (res?.[0]?.id) {
       const instanceId = res[0].id;
+
+      // If bound to a task — mark it in_progress
+      if (taskId) {
+        API.patch(`tasks?id=eq.${taskId}`, {
+          status:     'in_progress',
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       // Write launch CoC event
       await API.post('workflow_step_instances', {
@@ -5377,6 +5447,18 @@ function renderInstancesTab(el) {
                     <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px">${escHtml(myActiveStep.name||'—')}</span>
                     <span style="color:var(--muted)">· ${waitStr}</span>
                     ${resets?`<span style="color:var(--red);font-weight:600">↩ ${resets}×</span>`:''}
+                  </div>`:''}
+
+                  <!-- Task binding badge -->
+                  ${inst.source_task_id?`
+                  <div style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;
+                    padding:2px 7px;font-size:10px;font-family:var(--font-mono);
+                    color:var(--cad);border:1px solid rgba(79,142,247,.3);
+                    background:rgba(79,142,247,.07);border-radius:3px;
+                    cursor:pointer;white-space:nowrap"
+                    onclick="event.stopPropagation();_openLinkedTask('${inst.source_task_id}','${inst.project_id||''}')"
+                    title="Open linked task">
+                    ⛓ Linked task
                   </div>`:''}
 
                   <!-- PERT expected duration -->
@@ -5621,7 +5703,12 @@ function renderInstanceDetail(el, inst) {
           <span>Launched: <strong style="color:var(--text2)">${inst.launched_at
             ? new Date(inst.launched_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
             : '—'}</strong></span>
-          <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
+          ${inst.source_task_id ? `
+          <span id="inst-task-binding-${inst.id}" style="color:var(--cad);cursor:pointer"
+            onclick="_openLinkedTask('${inst.source_task_id}','${inst.project_id||''}')">
+            ⛓ <span id="inst-task-name-${inst.id}">Linked task</span>
+          </span>` : ''}
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${inst.id.substring(0,8)}…</span>
         </div>
       </div>
 
@@ -6442,6 +6529,11 @@ function renderInstanceDetail(el, inst) {
   // Populate rework badges after DOM settles
   setTimeout(_populateReworkBadges, 150);
   setTimeout(_populateAllCommentThreads, 100);
+
+  // Resolve linked task name asynchronously if bound
+  if (inst.source_task_id) {
+    setTimeout(() => _resolveLinkedTaskName(inst.id, inst.source_task_id), 80);
+  }
 }
 
 // ── Instance DAG CoC panel toggle ─────────────────────────────────────────────
@@ -8514,6 +8606,85 @@ function _renderCommentThread(stepId) {
   const countEl  = document.getElementById(`comment-count-${stepId}`);
   if (!threadEl) return;
 
+  // ── Rejection context cards ───────────────────────────────────────────────
+  // Find all step_reset events that landed on this step, then walk back through
+  // the CoC to find the step_completed (requiresReset) event that caused each one,
+  // and surface its event_notes as a pinned read-only context card.
+  const coc = (inst._stepInsts || [])
+    .slice()
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const steps = inst._tmplSteps || [];
+
+  // Collect all (rejection → this step) pairs, deduplicating by note text
+  // so repeated rework loops don't flood the thread — show only the most
+  // recent rejection from each source step.
+  const rejectionMap = {}; // key: rejecting step_id → most recent rejection event
+
+  coc.forEach((evt, idx) => {
+    if (evt.event_type !== 'step_completed') return;
+    const srcStep = steps.find(s => s.id === evt.template_step_id);
+    if (!srcStep) return;
+    const oDef = _getOutcomes(srcStep).find(o => o.id === evt.outcome);
+    if (!oDef?.requiresReset) return;
+    if (!evt.event_notes?.trim()) return;
+
+    // Find the step_activated event immediately after this rejection
+    const afterMs = new Date(evt.created_at).getTime();
+    const nextActivation = coc.slice(idx + 1).find(e =>
+      e.event_type === 'step_activated'
+    );
+    if (!nextActivation) return;
+    if (nextActivation.template_step_id !== stepId) return;
+
+    // This rejection sent flow back to our step — record it
+    rejectionMap[srcStep.id] = {
+      note:       evt.event_notes.trim(),
+      actor:      evt.actor_name && evt.actor_name !== 'System' ? evt.actor_name : null,
+      stepName:   srcStep.name || srcStep.step_type,
+      outcomeLabel: oDef.label || oDef.id,
+      createdAt:  evt.created_at,
+    };
+  });
+
+  const rejections = Object.values(rejectionMap)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // most recent first
+
+  // Build rejection context HTML
+  const rejectionHtml = rejections.map(r => {
+    const ts = r.createdAt
+      ? new Date(r.createdAt).toLocaleString('en-US', {
+          month: 'short', day: 'numeric',
+          hour: 'numeric', minute: '2-digit'
+        })
+      : '';
+    return `
+      <div style="display:flex;gap:8px;padding:9px 10px;margin-bottom:6px;
+        background:rgba(226,75,74,.07);
+        border:1px solid rgba(226,75,74,.25);
+        border-left:3px solid var(--red);">
+        <div style="color:var(--red);font-size:14px;flex-shrink:0;line-height:1.2">&#8617;</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+            color:var(--red);margin-bottom:4px">
+            Returned from ${escHtml(r.stepName)}
+            <span style="font-weight:400;letter-spacing:0;text-transform:none;
+              color:rgba(226,75,74,.7)"> — ${escHtml(r.outcomeLabel)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text);line-height:1.5;font-style:italic">
+            "${escHtml(r.note)}"
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">
+            ${r.actor ? escHtml(r.actor) + ' · ' : ''}${ts}
+            <span style="margin-left:6px;font-style:italic;color:rgba(226,75,74,.6)">
+              Read-only context — from Chain of Custody
+            </span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // ── Comment thread ────────────────────────────────────────────────────────
   // Separate top-level comments from replies
   const allComments = (inst._stepComments || [])
     .filter(c => c.template_step_id === stepId && !c.is_deleted)
@@ -8526,7 +8697,10 @@ function _renderCommentThread(stepId) {
   if (countEl) countEl.textContent = total ? `(${total})` : '';
 
   if (!topLevel.length) {
-    threadEl.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px 0 6px;font-style:italic">No comments yet.</div>';
+    threadEl.innerHTML = rejectionHtml +
+      (rejections.length
+        ? ''
+        : '<div style="font-size:10px;color:var(--muted);padding:4px 0 6px;font-style:italic">No comments yet.</div>');
     return;
   }
 
@@ -8589,7 +8763,7 @@ function _renderCommentThread(stepId) {
       ${!isReply ? '<div style="height:1px;background:var(--border);margin:2px 0"></div>' : ''}`;
   };
 
-  threadEl.innerHTML = topLevel.map(c => renderComment(c, false)).join('');
+  threadEl.innerHTML = rejectionHtml + topLevel.map(c => renderComment(c, false)).join('');
 }
 
 function _renderActionItems(stepId) {
@@ -9575,17 +9749,31 @@ ${noteLines}
 STEP COMMENTS:
 ${commentLines}
 
-Produce a briefing with exactly these four sections. Be ruthlessly succinct — every word must earn its place. Use short bullet points, not prose paragraphs.
+OUTPUT FORMAT — follow exactly, no deviation:
 
-SITUATION: 2-3 bullets. Where is this workflow right now. Conclusion-first. No background, no context-setting.
+SITUATION
+- [bullet]
+- [bullet]
 
-REWORK ANALYSIS: 2-3 bullets. Classify as exactly one of: Process Quality Failure / Dependency Failure / Human Performance Issue / Novel Work. One bullet states the classification and why. Remaining bullets cite specific evidence from notes.
+REWORK ANALYSIS
+- [bullet]
+- [bullet]
 
-RISK ASSESSMENT: 2 bullets maximum. The most credible risks only. Reference open action items and confidence signals if relevant.
+RISK
+- [bullet]
 
-RECOMMENDED ACTION: 1-2 bullets. Specific actions the PM should take today. Owner and deadline if known. No corporate filler.
+RECOMMENDED ACTION
+- [bullet]
 
-Format rules: Start each bullet with a dash. No bold, no markdown headers, no sub-bullets. Label each section in ALL CAPS on its own line. No preamble — start with SITUATION immediately.
+RULES — violations will be penalised:
+1. Each bullet is 12 words or fewer. Count the words. Cut ruthlessly.
+2. Start with the conclusion. Never start with context or background. Bad: "This workflow has been running for 14 days and has encountered..." Good: "Design Review is the rework bottleneck — 3 of 4 rejections trace here."
+3. Do NOT restate metrics visible on screen: step count, elapsed time, PERT numbers, status. The reader already sees those. Only add what they cannot see.
+4. REWORK ANALYSIS must state a classification on its first bullet: exactly one of — Process Quality Failure / Dependency Failure / Human Performance Issue / Novel Work. No other classifications.
+5. RISK: 1 bullet only. The single most credible risk right now.
+6. RECOMMENDED ACTION: 1 bullet only. One specific action. Include owner and deadline if known.
+7. No bold, no markdown, no sub-bullets. Dashes only. Section labels in ALL CAPS with no colon.
+8. No preamble. Output starts with SITUATION on the first line. Nothing before it.
 
 Tone: ${stakesTone.split(' — ')[1] || 'Professional'}`;
 }
@@ -11246,6 +11434,14 @@ async function submitComplete(instId, stepId) {
           created_at:       new Date(now + stepsToReset.length + 2).toISOString(),
         }).catch(() => {});
         _notifyStepActivated(instId, targetStep, inst).catch(() => {});
+
+        // ── Task binding: rejection puts linked task back to in_progress ──
+        if (inst?.source_task_id) {
+          API.patch(`tasks?id=eq.${inst.source_task_id}`, {
+            status:     'in_progress',
+            updated_at: new Date().toISOString(),
+          }).catch(() => {});
+        }
       }
 
     } else if (outcomeDef?.requiresReset) {
@@ -11282,6 +11478,14 @@ async function submitComplete(instId, stepId) {
           created_at:       new Date(now + stepsToReset.length + 2).toISOString(),
         }).catch(() => {});
         _notifyStepActivated(instId, firstStep, inst).catch(() => {});
+
+        // ── Task binding: rejection puts linked task back to in_progress ──
+        if (inst?.source_task_id) {
+          API.patch(`tasks?id=eq.${inst.source_task_id}`, {
+            status:     'in_progress',
+            updated_at: new Date().toISOString(),
+          }).catch(() => {});
+        }
       }
 
     } else {
@@ -11318,6 +11522,15 @@ async function submitComplete(instId, stepId) {
           actor_name:  authorName,
           created_at:  new Date().toISOString(),
         }).catch(() => {});
+
+        // ── Task binding: mark linked task complete ───────────────────────
+        if (inst?.source_task_id) {
+          API.patch(`tasks?id=eq.${inst.source_task_id}`, {
+            status:      'complete',
+            pct_complete: 100,
+            updated_at:  new Date().toISOString(),
+          }).catch(() => {});
+        }
       }
     }
 
@@ -11423,6 +11636,27 @@ async function deleteInstance(instId) {
 }
 
 // ── Reload instance after status changes ──────────────────────────────────────
+// ── Workflow-to-Task binding helpers ─────────────────────────────────────────
+
+function _openLinkedTask(taskId, projectId) {
+  if (!taskId) return;
+  const url = projectId
+    ? `/project-detail.html?id=${projectId}&task=${taskId}`
+    : `/project-detail.html?task=${taskId}`;
+  window.open(url, '_blank');
+}
+
+// Called after renderInstanceDetail to fill in the task name asynchronously
+function _resolveLinkedTaskName(instId, taskId) {
+  if (!taskId) return;
+  const el = document.getElementById(`inst-task-name-${instId}`);
+  if (!el) return;
+  API.get(`tasks?id=eq.${taskId}&select=id,name`).then(rows => {
+    const name = rows?.[0]?.name;
+    if (name && el) el.textContent = escHtml(name);
+  }).catch(() => {});
+}
+
 async function _reloadInstance(instId) {
   const fresh = await API.get(`workflow_instances?id=eq.${instId}&select=*`).catch(()=>[]);
   if (fresh?.[0]) {
