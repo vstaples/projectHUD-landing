@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compass — Operational Intelligence</title>
+<link rel="stylesheet" href="/css/hud.css">
+<style>
+/* ── Compass shell variables ─────────────────────────────── */
+:root {
+  --compass-cyan:   #00D2FF;
+  --compass-amber:  #EF9F27;
+  --compass-green:  #1D9E75;
+  --compass-red:    #E24B4A;
+  --compass-purple: #8B5CF6;
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
+#compass-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg0, #060a10);
+}
+
+/* ── Top nav bar ─────────────────────────────────────────── */
+#compass-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 44px;
+  background: var(--bg1, #0c1628);
+  border-bottom: 1px solid var(--border, rgba(0,210,255,.12));
+  padding: 0 16px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.compass-logo-mark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 20px;
+  text-decoration: none;
+}
+
+.compass-wordmark {
+  font-family: var(--font-hud, 'Rajdhani', sans-serif);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--text0, #eef4ff);
+}
+
+.compass-wordmark span {
+  color: var(--compass-cyan);
+}
+
+.nav-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 16px;
+}
+
+/* Role tab buttons */
+.role-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 44px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2, #7a9bbf);
+  font-family: var(--font-mono, 'Share Tech Mono', monospace);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+}
+
+.role-tab:hover {
+  color: var(--text0);
+  background: rgba(255,255,255,.03);
+}
+
+.role-tab.active {
+  color: var(--compass-cyan);
+  border-bottom-color: var(--compass-cyan);
+}
+
+.role-tab .tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .5;
+}
+
+.role-tab.active .tab-dot {
+  opacity: 1;
+}
+
+/* Badge on role tabs */
+.tab-badge {
+  background: var(--compass-red);
+  color: #fff;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* Nav right side */
+.nav-spacer { flex: 1; }
+
+.nav-live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--compass-green);
+  letter-spacing: .1em;
+  margin-right: 12px;
+}
+
+.nav-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--compass-green);
+  animation: pulse-live 2s infinite;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .35; }
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+
+.nav-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0,210,255,.15);
+  border: 1px solid rgba(0,210,255,.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-hud);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--compass-cyan);
+}
+
+/* ── View panels ─────────────────────────────────────────── */
+.compass-view {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.compass-view.active {
+  display: block;
+}
+
+/* ── Common inner layout ─────────────────────────────────── */
+.view-body {
+  padding: 20px 22px;
+  max-width: 1600px;
+}
+
+/* ── Stat strip ──────────────────────────────────────────── */
+.stat-strip {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-strip-4 { grid-template-columns: repeat(4, 1fr); }
+.stat-strip-6 { grid-template-columns: repeat(6, 1fr); }
+
+.stat-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  padding: 10px 13px;
+  cursor: default;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-family: var(--font-hud);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text0);
+  line-height: 1;
+}
+
+.stat-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 3px;
+}
+
+.sv-cyan   { color: var(--compass-cyan); }
+.sv-amber  { color: var(--compass-amber); }
+.sv-green  { color: var(--compass-green); }
+.sv-red    { color: var(--compass-red); }
+.sv-purple { color: var(--compass-purple); }
+
+/* ── Panel card ──────────────────────────────────────────── */
+.cmp-panel {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.cmp-panel:last-child { margin-bottom: 0; }
+
+.panel-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+.panel-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  font-weight: 700;
+}
+
+.pb-red    { background: rgba(226,75,74,.15);  color: var(--compass-red);    border: 1px solid rgba(226,75,74,.3); }
+.pb-amber  { background: rgba(239,159,39,.12); color: var(--compass-amber);  border: 1px solid rgba(239,159,39,.3); }
+.pb-green  { background: rgba(29,158,117,.12); color: var(--compass-green);  border: 1px solid rgba(29,158,117,.3); }
+.pb-cyan   { background: rgba(0,210,255,.08);  color: var(--compass-cyan);   border: 1px solid rgba(0,210,255,.25); }
+
+/* ── Two-column grid ─────────────────────────────────────── */
+.two-col { display: grid; grid-template-columns: 1fr minmax(0, 320px); gap: 14px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr minmax(0, 280px); gap: 14px; }
+
+/* ── Row items ───────────────────────────────────────────── */
+.cmp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .1s;
+}
+
+.cmp-row:last-child { border-bottom: none; }
+.cmp-row:hover { background: var(--bg2); }
+
+.row-title {
+  font-family: var(--font-ui, 'Barlow Condensed', sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text0);
+  flex: 1;
+  min-width: 0;
+}
+
+.row-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+/* ── Action rows ─────────────────────────────────────────── */
+.action-row {
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .1s;
+}
+
+.action-row:last-child { border-bottom: none; }
+.action-row:hover { background: var(--bg2); }
+
+.action-row.urgent { border-left: 3px solid var(--compass-red); }
+.action-row.warning { border-left: 3px solid var(--compass-amber); }
+
+.ar-hdr {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 4px;
+}
+
+.ar-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.ari-red    { background: rgba(226,75,74,.15);  color: var(--compass-red); }
+.ari-amber  { background: rgba(239,159,39,.12); color: var(--compass-amber); }
+.ari-cyan   { background: rgba(0,210,255,.1);   color: var(--compass-cyan); }
+.ari-green  { background: rgba(29,158,117,.12); color: var(--compass-green); }
+
+.ar-title {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text0);
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.ar-due {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.ar-due.red   { color: var(--compass-red); }
+.ar-due.amber { color: var(--compass-amber); }
+
+.ar-body {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin: 3px 0 6px 35px;
+}
+
+.ar-warn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 5px 8px;
+  background: rgba(239,159,39,.08);
+  border: 1px solid rgba(239,159,39,.2);
+  color: var(--compass-amber);
+  margin: 3px 0 6px 35px;
+  letter-spacing: .03em;
+}
+
+.ar-acts {
+  display: flex;
+  gap: 6px;
+  margin-left: 35px;
+  flex-wrap: wrap;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.cmp-btn {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: opacity .12s;
+  white-space: nowrap;
+}
+
+.cmp-btn:hover { opacity: .75; }
+
+.btn-approve { border-color: rgba(29,158,117,.5);  background: rgba(29,158,117,.1);  color: var(--compass-green); }
+.btn-reject  { border-color: rgba(226,75,74,.5);   background: none;                 color: var(--compass-red); }
+.btn-respond { border-color: rgba(0,210,255,.4);   background: rgba(0,210,255,.08);  color: var(--compass-cyan); }
+.btn-ghost   { border-color: var(--border);        background: none;                 color: var(--text2); }
+
+/* ── Milestone dot ───────────────────────────────────────── */
+.ms-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ms-done   { background: var(--compass-green); }
+.ms-active { background: var(--compass-amber); }
+.ms-risk   { background: var(--compass-red); }
+.ms-future { background: none; border: 1.5px solid var(--border); }
+
+/* ── Status badges ───────────────────────────────────────── */
+.status-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+
+.sb-done   { background: rgba(29,158,117,.12);  color: var(--compass-green); border: 1px solid rgba(29,158,117,.3); }
+.sb-risk   { background: rgba(226,75,74,.12);   color: var(--compass-red);   border: 1px solid rgba(226,75,74,.3); }
+.sb-warn   { background: rgba(239,159,39,.1);   color: var(--compass-amber); border: 1px solid rgba(239,159,39,.25); }
+.sb-future { background: rgba(255,255,255,.04); color: var(--text3);         border: 1px solid var(--border); }
+.sb-cyan   { background: rgba(0,210,255,.08);   color: var(--compass-cyan);  border: 1px solid rgba(0,210,255,.25); }
+
+/* ── Progress bar ────────────────────────────────────────── */
+.progress-track {
+  height: 4px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width .5s;
+}
+
+/* ── Budget bar ──────────────────────────────────────────── */
+.budget-row {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-row:last-child { border-bottom: none; }
+
+.budget-header {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  margin-bottom: 5px;
+}
+
+.budget-value {
+  font-weight: 700;
+  color: var(--text1);
+}
+
+.budget-track {
+  height: 6px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+
+.budget-fill {
+  height: 100%;
+  transition: width .6s;
+}
+
+/* ── Update / thread rows ────────────────────────────────── */
+.update-row {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.update-row:last-child { border-bottom: none; }
+
+.ur-hdr {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.ur-av {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-hud);
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.av-cyan   { background: rgba(0,210,255,.15);   border: 1px solid rgba(0,210,255,.3);   color: var(--compass-cyan); }
+.av-amber  { background: rgba(239,159,39,.15);  border: 1px solid rgba(239,159,39,.3);  color: var(--compass-amber); }
+.av-green  { background: rgba(29,158,117,.15);  border: 1px solid rgba(29,158,117,.3);  color: var(--compass-green); }
+
+.ur-name {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text0);
+  flex: 1;
+}
+
+.ur-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.ur-body {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin-left: 29px;
+}
+
+.ur-flagged {
+  border-left: 2px solid var(--compass-amber);
+  padding-left: 8px;
+  margin-left: 29px;
+  color: var(--text1);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── Thread input ────────────────────────────────────────── */
+.thread-in {
+  padding: 9px 13px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.thread-in input {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 6px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text1);
+  outline: none;
+  transition: border-color .15s;
+}
+
+.thread-in input:focus { border-color: rgba(0,210,255,.4); }
+
+/* ── Document rows ───────────────────────────────────────── */
+.doc-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .1s;
+}
+
+.doc-row:last-child { border-bottom: none; }
+.doc-row:hover { background: var(--bg2); }
+
+.doc-icon {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.doc-info { flex: 1; min-width: 0; }
+
+.doc-name {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+
+/* ── Scrubber ────────────────────────────────────────────── */
+.scrubber-wrap {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scrubber-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+
+.scrubber-date-active {
+  color: var(--compass-cyan);
+  font-weight: 700;
+}
+
+.scrubber-track {
+  position: relative;
+  height: 4px;
+  background: var(--bg2);
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.scrubber-fill {
+  height: 100%;
+  background: var(--compass-cyan);
+  transition: width .1s;
+}
+
+.scrubber-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background: var(--bg1);
+  border: 2px solid var(--compass-cyan);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  transition: left .1s;
+}
+
+.scrubber-dots {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.sdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform .1s;
+}
+
+.sdot:hover { transform: scale(1.5); }
+
+.scrubber-snapshot {
+  padding: 8px 10px;
+  background: var(--bg2);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.5;
+  min-height: 38px;
+  margin-top: 6px;
+  border-left: 2px solid var(--compass-cyan);
+}
+
+/* ── Rejection context card ──────────────────────────────── */
+.rejection-context {
+  display: flex;
+  gap: 9px;
+  padding: 9px 10px;
+  background: rgba(226,75,74,.07);
+  border: 1px solid rgba(226,75,74,.25);
+  border-left: 3px solid var(--compass-red);
+  margin-bottom: 8px;
+}
+
+.rejection-context-icon {
+  font-size: 13px;
+  color: var(--compass-red);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.rejection-context-body { flex: 1; min-width: 0; }
+
+.rejection-context-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--compass-red);
+  margin-bottom: 3px;
+}
+
+.rejection-context-text {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text1);
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.rejection-context-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 3px;
+}
+
+/* ── Privacy note ────────────────────────────────────────── */
+.privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 13px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .04em;
+  color: var(--text3);
+  line-height: 1.5;
+}
+
+/* ── Toast ───────────────────────────────────────────────── */
+#compass-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--text0);
+  padding: 9px 20px;
+  opacity: 0;
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+}
+
+#compass-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Loading state ───────────────────────────────────────── */
+#compass-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 12px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--compass-cyan);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .two-col, .three-col { grid-template-columns: 1fr; }
+  .stat-strip-6 { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 720px) {
+  .stat-strip-4, .stat-strip-6 { grid-template-columns: repeat(2, 1fr); }
+  .role-tab span.tab-label { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="compass-app">
+
+  <!-- ── Top navigation bar ──────────────────────────────── -->
+  <nav id="compass-nav">
+
+    <!-- Logo -->
+    <a class="compass-logo-mark" href="/dashboard.html" title="Back to dashboard">
+      <!-- Compass rose mini icon -->
+      <svg width="22" height="22" viewBox="-30 -30 60 60" style="flex-shrink:0">
+        <circle r="28" fill="none" stroke="#00D2FF" stroke-width="1" opacity=".2"/>
+        <circle r="22" fill="none" stroke="#00D2FF" stroke-width="1" opacity=".38"/>
+        <circle r="15" fill="#0c1628"/>
+        <circle r="15" fill="none" stroke="#00D2FF" stroke-width="1.2"/>
+        <!-- Cardinal ticks -->
+        <line x1="0" y1="-12" x2="0" y2="-15" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
+        <line x1="0" y1="12" x2="0" y2="15" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
+        <line x1="-12" y1="0" x2="-15" y2="0" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
+        <line x1="12" y1="0" x2="15" y2="0" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
+        <!-- 45° ticks -->
+        <line x1="8" y1="-8" x2="10" y2="-10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
+        <line x1="-8" y1="-8" x2="-10" y2="-10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
+        <line x1="8" y1="8" x2="10" y2="10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
+        <line x1="-8" y1="8" x2="-10" y2="10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
+        <!-- Wind rose: N cyan -->
+        <path d="M0,-13 L2.5,-3 L0,-1.5 L-2.5,-3Z" fill="#00D2FF"/>
+        <!-- Amber north tip -->
+        <path d="M0,-13 L1.5,-9 L0,-8 L-1.5,-9Z" fill="#EF9F27"/>
+        <!-- S dark -->
+        <path d="M0,13 L2,3 L0,1.5 L-2,3Z" fill="#0c1628" stroke="#00D2FF" stroke-width=".5"/>
+        <!-- E/W -->
+        <path d="M13,0 L3,2.5 L1.5,0 L3,-2.5Z" fill="#00D2FF" opacity=".45"/>
+        <path d="M-13,0 L-3,2 L-1.5,0 L-3,-2Z" fill="#0c1628" stroke="#00D2FF" stroke-width=".4"/>
+        <!-- Center -->
+        <circle r="1.8" fill="#00D2FF"/>
+        <circle r=".8" fill="#0c1628"/>
+      </svg>
+      <div class="compass-wordmark">COM<span>PASS</span></div>
+    </a>
+
+    <div class="nav-sep"></div>
+
+    <!-- Role tabs -->
+    <button class="role-tab" id="tab-user"       onclick="switchView('user')"       title="My Work">
+      <div class="tab-dot"></div>
+      <span class="tab-label">My Work</span>
+    </button>
+    <button class="role-tab" id="tab-pm"         onclick="switchView('pm')"         title="Project Manager">
+      <div class="tab-dot"></div>
+      <span class="tab-label">PM View</span>
+    </button>
+    <button class="role-tab" id="tab-management" onclick="switchView('management')" title="Management">
+      <div class="tab-dot"></div>
+      <span class="tab-label">Management</span>
+    </button>
+    <button class="role-tab" id="tab-executive"  onclick="switchView('executive')"  title="Executive">
+      <div class="tab-dot"></div>
+      <span class="tab-label">Executive</span>
+    </button>
+    <button class="role-tab" id="tab-client"     onclick="switchView('client')"     title="Client Portal">
+      <div class="tab-dot"></div>
+      <span class="tab-label">Client Portal</span>
+    </button>
+
+    <div class="nav-sep"></div>
+
+    <!-- Cadence link -->
+    <a href="/cadence.html"
+      style="font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--text3);text-decoration:none;padding:0 10px;transition:color .12s"
+      onmouseenter="this.style.color='var(--compass-cyan)'"
+      onmouseleave="this.style.color='var(--text3)'"
+      title="Open Cadence workflow canvas">
+      &#9656; Cadence
+    </a>
+
+    <div class="nav-spacer"></div>
+
+    <!-- Live indicator -->
+    <div class="nav-live">
+      <div class="nav-live-dot"></div>
+      LIVE
+    </div>
+
+    <!-- Date -->
+    <div id="compass-date" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-right:14px;letter-spacing:.05em"></div>
+
+    <!-- User -->
+    <div class="nav-user">
+      <div class="nav-avatar" id="compass-user-av">VS</div>
+      <span id="compass-user-name" style="display:none"></span>
+    </div>
+
+  </nav>
+
+  <!-- ── View: My Work (Individual Contributor) ──────────── -->
+  <div class="compass-view" id="view-user">
+    <div class="view-body">
+      <div id="compass-loading">
+        <div class="loading-spinner"></div>
+        LOADING MY WORK
+      </div>
+      <div id="user-content" style="display:none">
+        <!-- Populated by loadUserView() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: PM Portfolio ──────────────────────────────── -->
+  <div class="compass-view" id="view-pm">
+    <div class="view-body">
+      <div id="pm-content">
+        <!-- Populated by loadPMView() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Management ────────────────────────────────── -->
+  <div class="compass-view" id="view-management">
+    <div class="view-body">
+      <div id="mgmt-content">
+        <!-- Populated by loadManagementView() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Executive ─────────────────────────────────── -->
+  <div class="compass-view" id="view-executive">
+    <div class="view-body">
+      <div id="exec-content">
+        <!-- Populated by loadExecutiveView() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View: Client Portal ─────────────────────────────── -->
+  <div class="compass-view" id="view-client">
+    <div class="view-body">
+      <div id="client-content">
+        <!-- Populated by loadClientView() -->
+      </div>
+    </div>
+  </div>
+
+</div><!-- #compass-app -->
+
+<!-- Toast -->
+<div id="compass-toast"></div>
+
+<!-- ── Shared scripts — same order as dashboard.html ─────── -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/ticker.js"></script>
+<script src="/js/sidebar.js"></script>
+<script src="/js/project-drawer.js"></script>
+<script src="/js/hud-recorder.js"></script>
+
+<script>
+'use strict';
+
+// ── Constants ─────────────────────────────────────────────
+const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
+
+// ── State ─────────────────────────────────────────────────
+let _projects   = [];
+let _tasks      = [];
+let _resources  = [];
+let _users      = [];
+let _myResource = null;
+let _currentView = null;
+let _viewLoaded  = {};   // which views have been fetched
+
+// ── Init ──────────────────────────────────────────────────
+document.getElementById('compass-date').textContent =
+  new Date().toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+  }).toUpperCase();
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadBaseData();
+  // Default view: PM
+  const saved = sessionStorage.getItem('compass-view') || 'pm';
+  switchView(saved);
+});
+
+// ── Load shared base data ─────────────────────────────────
+async function loadBaseData() {
+  try {
+    [_projects, _tasks, _resources, _users] = await Promise.all([
+      API.getProjects().catch(() => []),
+      API.getTasks().catch(() => []),
+      API.get('resources?select=id,name,email,role,is_active&is_active=eq.true&firm_id=eq.' + FIRM_ID).catch(() => []),
+      API.getUsers().catch(() => []),
+    ]);
+
+    // Identify current user resource
+    const currentUser = _users.find(u => u.id === Auth?.userId);
+    _myResource = currentUser
+      ? _resources.find(r => r.id === currentUser.resource_id) || null
+      : null;
+
+    // Update avatar/name in nav
+    if (_myResource?.name) {
+      const initials = _myResource.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+      document.getElementById('compass-user-av').textContent = initials;
+    }
+  } catch (e) {
+    console.error('[Compass] loadBaseData failed:', e);
+  }
+}
+
+// ── View switcher ─────────────────────────────────────────
+function switchView(viewId) {
+  // Hide all views
+  document.querySelectorAll('.compass-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+
+  // Show target
+  const viewEl = document.getElementById('view-' + viewId);
+  const tabEl  = document.getElementById('tab-' + viewId);
+  if (!viewEl) return;
+
+  viewEl.classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+
+  _currentView = viewId;
+  sessionStorage.setItem('compass-view', viewId);
+
+  // Lazy-load view data on first activation
+  if (!_viewLoaded[viewId]) {
+    _viewLoaded[viewId] = true;
+    switch (viewId) {
+      case 'user':       loadUserView();       break;
+      case 'pm':         loadPMView();         break;
+      case 'management': loadManagementView(); break;
+      case 'executive':  loadExecutiveView();  break;
+      case 'client':     loadClientView();     break;
+    }
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────
+function compassToast(msg, duration = 2200) {
+  const el = document.getElementById('compass-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ── Escape HTML ───────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Date formatting ───────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric'
+  });
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+  });
+}
+
+function daysOverdue(dateStr) {
+  if (!dateStr) return 0;
+  const diff = Date.now() - new Date(dateStr + 'T00:00:00').getTime();
+  return Math.max(0, Math.floor(diff / 86400000));
+}
+
+// ── Avatar HTML ───────────────────────────────────────────
+function avatarHtml(name, size = 24, cls = 'av-cyan') {
+  const initials = (name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  return `<div class="ur-av ${cls}" style="width:${size}px;height:${size}px;font-size:${Math.floor(size*0.4)}px">${initials}</div>`;
+}
+
+
+// ══════════════════════════════════════════════════════════
+// VIEW: MY WORK (Individual Contributor)
+// ══════════════════════════════════════════════════════════
+async function loadUserView() {
+  const loading = document.getElementById('compass-loading');
+  const content = document.getElementById('user-content');
+
+  try {
+    // Fetch my tasks + workflow step instances assigned to me
+    const [myTasks, myActionItems, wfInstances] = await Promise.all([
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,effort_days&assigned_resource_id=eq.${_myResource?.id || 'none'}&status=not.in.(complete,cancelled)&order=due_date.asc`).catch(() => []),
+      API.get(`workflow_action_items?owner_resource_id=eq.${_myResource?.id || 'none'}&status=eq.open&order=due_date.asc`).catch(() => []),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
+    ]);
+
+    const today = new Date().toLocaleDateString('en-CA');
+
+    // Build unified work list
+    const workItems = [];
+
+    // Tasks
+    myTasks.forEach(t => {
+      const proj = _projects.find(p => p.id === t.project_id);
+      const overdue = t.due_date && t.due_date < today;
+      workItems.push({
+        type: 'task',
+        id: t.id,
+        title: t.name,
+        project: proj?.name || 'Unknown project',
+        due: t.due_date,
+        overdue,
+        pct: t.pct_complete || 0,
+        urgency: overdue ? 0 : (t.due_date ? 1 : 2),
+      });
+    });
+
+    // Action items
+    myActionItems.forEach(a => {
+      const overdue = a.due_date && a.due_date < today;
+      workItems.push({
+        type: 'action',
+        id: a.id,
+        title: a.title,
+        project: 'Action item',
+        due: a.due_date,
+        overdue,
+        urgency: overdue ? 0 : 1,
+      });
+    });
+
+    // Sort by urgency (overdue first, then by due date)
+    workItems.sort((a, b) => {
+      if (a.urgency !== b.urgency) return a.urgency - b.urgency;
+      if (a.due && b.due) return a.due.localeCompare(b.due);
+      return 0;
+    });
+
+    const overdueCount = workItems.filter(w => w.overdue).length;
+    const totalCount   = workItems.length;
+
+    content.innerHTML = `
+      <div class="stat-strip stat-strip-4" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-label">Work items today</div>
+          <div class="stat-value">${totalCount}</div>
+          <div class="stat-sub">tasks + action items</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Overdue</div>
+          <div class="stat-value ${overdueCount > 0 ? 'sv-red' : 'sv-green'}">${overdueCount}</div>
+          <div class="stat-sub">past due date</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active workflows</div>
+          <div class="stat-value sv-cyan">${wfInstances.length}</div>
+          <div class="stat-sub">firm-wide</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Open action items</div>
+          <div class="stat-value sv-amber">${myActionItems.length}</div>
+          <div class="stat-sub">assigned to you</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="cmp-panel">
+            <div class="panel-hdr">
+              <div class="panel-title">My work — today</div>
+              ${overdueCount > 0 ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>` : '<span class="panel-badge pb-green">All current</span>'}
+            </div>
+            ${workItems.length === 0
+              ? `<div style="padding:20px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No open items assigned to you</div>`
+              : workItems.map(w => `
+              <div class="cmp-row" onclick="compassToast('Opening ${esc(w.title)}…')">
+                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="row-title">${esc(w.title)}</div>
+                  <div class="row-sub">${esc(w.project)} · ${w.type === 'task' ? 'Task' : 'Action item'}${w.due ? ' · Due ' + fmtDate(w.due) : ''}</div>
+                  ${w.type === 'task' && w.pct > 0 ? `
+                  <div class="progress-track" style="margin-top:5px;width:120px">
+                    <div class="progress-fill" style="width:${w.pct}%;background:var(--compass-cyan)"></div>
+                  </div>` : ''}
+                </div>
+                ${w.overdue ? `<span class="status-badge sb-risk">${daysOverdue(w.due)}d overdue</span>` : ''}
+                <button class="cmp-btn btn-approve" style="padding:3px 10px" onclick="event.stopPropagation();compassToast('Completion panel opening…')">Complete</button>
+              </div>`).join('')
+            }
+          </div>
+        </div>
+
+        <div>
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Active workflows you're on</div>
+            </div>
+            ${wfInstances.slice(0, 5).map(w => {
+              const proj = _projects.find(p => p.id === w.project_id);
+              return `
+              <div class="cmp-row" onclick="window.location.href='/cadence.html'">
+                <div style="width:7px;height:7px;border-radius:50%;background:var(--compass-amber);flex-shrink:0"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="row-title">${esc(w.title)}</div>
+                  <div class="row-sub">${proj ? esc(proj.name) + ' · ' : ''}${w.current_step_name ? 'At: ' + esc(w.current_step_name) : 'Active'}</div>
+                </div>
+                <span style="font-family:var(--font-mono);font-size:9px;color:var(--text3)">▶</span>
+              </div>`;
+            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active instances</div>'}
+          </div>
+
+          <div class="cmp-panel">
+            <div class="panel-hdr"><div class="panel-title">Quick actions</div></div>
+            <div class="cmp-row" onclick="window.location.href='/cadence.html'">
+              <div class="row-title">Open Cadence canvas →</div>
+              <div class="row-sub">View and advance workflow instances</div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/project-detail.html'">
+              <div class="row-title">Open project tasks →</div>
+              <div class="row-sub">Update task progress and log hours</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    if (loading) loading.style.display = 'none';
+    content.style.display = 'block';
+
+  } catch (e) {
+    console.error('[Compass] loadUserView error:', e);
+    if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-mono);font-size:11px">Failed to load — check console</div>';
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// VIEW: PM PORTFOLIO
+// ══════════════════════════════════════════════════════════
+async function loadPMView() {
+  const content = document.getElementById('pm-content');
+
+  try {
+    const [wfInstances, actionItems, resources] = await Promise.all([
+      API.get(`workflow_instances?select=id,title,status,current_step_name,current_step_id,project_id,launched_at&status=eq.active&order=launched_at.desc&limit=50`).catch(() => []),
+      API.get(`workflow_action_items?status=eq.open&order=due_date.asc&limit=100`).catch(() => []),
+      _resources.length ? Promise.resolve(_resources) :
+        API.get('resources?select=id,name,email,role,is_active&is_active=eq.true').catch(() => []),
+    ]);
+
+    const activeProjects = _projects.filter(p => p.status === 'active');
+    const today = new Date().toLocaleDateString('en-CA');
+
+    // Compute per-project stats
+    const projStats = activeProjects.map(p => {
+      const projTasks = _tasks.filter(t => t.project_id === p.id);
+      const overdue   = projTasks.filter(t => t.due_date && t.due_date < today && !['complete','cancelled'].includes(t.status));
+      const projInsts = wfInstances.filter(w => w.project_id === p.id);
+      const projAIs   = actionItems.filter(a => projInsts.some(i => i.id === a.instance_id));
+      const overdueAIs= projAIs.filter(a => a.due_date && a.due_date < today);
+
+      // Simple urgency score
+      const urgency = overdue.length * 3 + overdueAIs.length * 2 + projInsts.length;
+
+      return { proj: p, projTasks, overdue, projInsts, projAIs, overdueAIs, urgency };
+    }).sort((a, b) => b.urgency - a.urgency);
+
+    const totalOverdue = projStats.reduce((s, p) => s + p.overdue.length, 0);
+    const totalInsts   = wfInstances.length;
+    const totalAIs     = actionItems.filter(a => a.due_date && a.due_date < today).length;
+
+    content.innerHTML = `
+      <!-- Stat strip -->
+      <div class="stat-strip stat-strip-4" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-label">Active projects</div>
+          <div class="stat-value sv-cyan">${activeProjects.length}</div>
+          <div class="stat-sub">firm-wide</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Overdue tasks</div>
+          <div class="stat-value ${totalOverdue > 0 ? 'sv-red' : 'sv-green'}">${totalOverdue}</div>
+          <div class="stat-sub">across all projects</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active workflows</div>
+          <div class="stat-value sv-amber">${totalInsts}</div>
+          <div class="stat-sub">instances running</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Action items overdue</div>
+          <div class="stat-value ${totalAIs > 0 ? 'sv-red' : 'sv-green'}">${totalAIs}</div>
+          <div class="stat-sub">past due date</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <!-- Project cards — urgency ordered -->
+          <div class="cmp-panel">
+            <div class="panel-hdr">
+              <div class="panel-title">Portfolio — by urgency</div>
+              <span class="panel-badge pb-cyan">${activeProjects.length} active</span>
+            </div>
+            ${projStats.length === 0
+              ? `<div style="padding:20px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active projects</div>`
+              : projStats.map(({ proj: p, overdue, projInsts, projAIs, overdueAIs }) => {
+                const hasRisk = overdue.length > 0 || overdueAIs.length > 0;
+                const targetDate = p.target_date ? fmtDate(p.target_date) : '—';
+                return `
+                <div style="border-bottom:1px solid var(--border);border-left:3px solid ${hasRisk ? 'var(--compass-red)' : overdue.length === 0 && projInsts.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'};padding:12px 13px;cursor:pointer;transition:background .1s"
+                  onmouseenter="this.style.background='var(--bg2)'"
+                  onmouseleave="this.style.background=''"
+                  onclick="window.location.href='/project-detail.html?id=${p.id}'">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+                    <div>
+                      <div style="font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text0)">${esc(p.name)}</div>
+                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">${esc(p.client_name || '')} · Target: ${targetDate}</div>
+                    </div>
+                    <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+                      ${overdue.length > 0 ? `<span class="status-badge sb-risk">${overdue.length} overdue</span>` : ''}
+                      ${projInsts.length > 0 ? `<span class="status-badge sb-warn">${projInsts.length} workflow${projInsts.length > 1 ? 's' : ''}</span>` : ''}
+                      ${overdueAIs.length > 0 ? `<span class="status-badge sb-risk">${overdueAIs.length} AI overdue</span>` : ''}
+                    </div>
+                  </div>
+                  <!-- Workflow instances for this project -->
+                  ${projInsts.length > 0 ? `
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+                    ${projInsts.slice(0, 3).map(w => `
+                      <a href="/cadence.html" onclick="event.stopPropagation()"
+                        style="font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;
+                          color:var(--compass-cyan);border:1px solid rgba(0,210,255,.25);
+                          padding:2px 8px;text-decoration:none;transition:background .1s"
+                        onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+                        onmouseleave="this.style.background=''">
+                        ▶ ${esc(w.title)}${w.current_step_name ? ' — ' + esc(w.current_step_name) : ''}
+                      </a>`).join('')}
+                    ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);padding:2px 6px">+${projInsts.length - 3} more</span>` : ''}
+                  </div>` : ''}
+                </div>`;
+              }).join('')
+            }
+          </div>
+        </div>
+
+        <div>
+          <!-- Open action items -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Open action items</div>
+              ${totalAIs > 0 ? `<span class="panel-badge pb-red">${totalAIs} overdue</span>` : '<span class="panel-badge pb-green">All current</span>'}
+            </div>
+            ${actionItems.slice(0, 8).map(a => {
+              const overdue = a.due_date && a.due_date < today;
+              return `
+              <div class="cmp-row">
+                <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${overdue ? 'var(--compass-red)' : 'var(--compass-amber)'}"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="row-title">${esc(a.title)}</div>
+                  <div class="row-sub">${a.owner_name ? esc(a.owner_name) : 'Unassigned'}${a.due_date ? ' · Due ' + fmtDate(a.due_date) : ''}</div>
+                </div>
+                ${overdue ? `<span class="status-badge sb-risk">Overdue</span>` : ''}
+              </div>`;
+            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No open action items</div>'}
+          </div>
+
+          <!-- Quick nav -->
+          <div class="cmp-panel">
+            <div class="panel-hdr"><div class="panel-title">Quick access</div></div>
+            <div class="cmp-row" onclick="window.location.href='/cadence.html'">
+              <div style="flex:1"><div class="row-title">Cadence — Workflow Canvas →</div><div class="row-sub">Manage instances, advance steps, view DAG</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/projects.html'">
+              <div style="flex:1"><div class="row-title">Projects →</div><div class="row-sub">Full project list with EVM metrics</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/resources.html'">
+              <div style="flex:1"><div class="row-title">Resources →</div><div class="row-sub">Team allocation and capacity</div></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+  } catch (e) {
+    console.error('[Compass] loadPMView error:', e);
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load PM view — check console</div>';
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// VIEW: MANAGEMENT
+// ══════════════════════════════════════════════════════════
+async function loadManagementView() {
+  const content = document.getElementById('mgmt-content');
+
+  try {
+    const [wfInstances, resourceReqs, cocEvents] = await Promise.all([
+      API.get('workflow_instances?select=id,title,status,project_id,current_step_name&status=eq.active&limit=50').catch(() => []),
+      API.get('resource_requests?select=id,project_id,role_requested,status,created_at,requesting_resource_id&status=eq.pending&order=created_at.asc&limit=20').catch(() => []),
+      API.get('workflow_step_instances?select=id,instance_id,event_type,outcome,created_at,template_step_id&event_type=in.(step_completed,step_reset)&order=created_at.desc&limit=200').catch(() => []),
+    ]);
+
+    const activeProjects = _projects.filter(p => p.status === 'active');
+
+    // Compute rework counts per project
+    const reworkByProject = {};
+    cocEvents.forEach(e => {
+      const inst = wfInstances.find(w => w.id === e.instance_id);
+      if (!inst?.project_id) return;
+      if (!reworkByProject[inst.project_id]) reworkByProject[inst.project_id] = 0;
+      if (e.event_type === 'step_reset') reworkByProject[inst.project_id]++;
+    });
+
+    const pendingReqs = resourceReqs.length;
+    const totalRework = Object.values(reworkByProject).reduce((s, v) => s + v, 0);
+
+    content.innerHTML = `
+      <div class="stat-strip stat-strip-4" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-label">Decisions pending</div>
+          <div class="stat-value ${pendingReqs > 0 ? 'sv-red' : 'sv-green'}">${pendingReqs}</div>
+          <div class="stat-sub">resource requests</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active projects</div>
+          <div class="stat-value sv-cyan">${activeProjects.length}</div>
+          <div class="stat-sub">firm-wide</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active workflows</div>
+          <div class="stat-value sv-amber">${wfInstances.length}</div>
+          <div class="stat-sub">running instances</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Rework cycles — recent</div>
+          <div class="stat-value ${totalRework > 5 ? 'sv-red' : totalRework > 2 ? 'sv-amber' : 'sv-green'}">${totalRework}</div>
+          <div class="stat-sub">step resets / rejections</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <!-- Portfolio health grid -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Portfolio health</div>
+              <span class="panel-badge pb-cyan">${activeProjects.length} projects</span>
+            </div>
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border)">
+                    <th style="padding:7px 13px;text-align:left;color:var(--text3);font-weight:600;letter-spacing:.08em">PROJECT</th>
+                    <th style="padding:7px 8px;text-align:center;color:var(--text3);font-weight:600;letter-spacing:.08em">WORKFLOWS</th>
+                    <th style="padding:7px 8px;text-align:center;color:var(--text3);font-weight:600;letter-spacing:.08em">REWORK</th>
+                    <th style="padding:7px 8px;text-align:center;color:var(--text3);font-weight:600;letter-spacing:.08em">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${activeProjects.map(p => {
+                    const insts   = wfInstances.filter(w => w.project_id === p.id);
+                    const rework  = reworkByProject[p.id] || 0;
+                    const healthy = insts.length === 0 && rework === 0;
+                    const atRisk  = rework > 2 || insts.length > 3;
+                    const statusColor = atRisk ? 'var(--compass-red)' : healthy ? 'var(--compass-green)' : 'var(--compass-amber)';
+                    return `
+                    <tr style="border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s"
+                      onmouseenter="this.style.background='var(--bg2)'"
+                      onmouseleave="this.style.background=''"
+                      onclick="window.location.href='/project-detail.html?id=${p.id}'">
+                      <td style="padding:8px 13px;color:var(--text0);font-family:var(--font-ui);font-size:12px;font-weight:500">${esc(p.name)}</td>
+                      <td style="padding:8px;text-align:center;color:${insts.length > 0 ? 'var(--compass-amber)' : 'var(--text3)'}">${insts.length || '—'}</td>
+                      <td style="padding:8px;text-align:center;color:${rework > 0 ? 'var(--compass-red)' : 'var(--text3)'}">${rework > 0 ? rework : '—'}</td>
+                      <td style="padding:8px;text-align:center">
+                        <div style="width:10px;height:10px;border-radius:50%;background:${statusColor};margin:0 auto"></div>
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Pending resource requests -->
+          <div class="cmp-panel">
+            <div class="panel-hdr">
+              <div class="panel-title">Resource requests pending approval</div>
+              ${pendingReqs > 0 ? `<span class="panel-badge pb-red">${pendingReqs} pending</span>` : '<span class="panel-badge pb-green">None pending</span>'}
+            </div>
+            ${resourceReqs.length === 0
+              ? '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No pending resource requests</div>'
+              : resourceReqs.map(r => {
+                const proj = _projects.find(p => p.id === r.project_id);
+                const ageDays = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000);
+                return `
+                <div class="action-row ${ageDays > 2 ? 'urgent' : 'warning'}">
+                  <div class="ar-hdr">
+                    <div class="ar-icon ari-amber">&#9679;</div>
+                    <div style="flex:1">
+                      <div class="ar-title">${esc(proj?.name || 'Unknown project')} — ${esc(r.role_requested || 'Resource request')}</div>
+                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">Requested ${ageDays}d ago</div>
+                    </div>
+                    <span class="ar-due ${ageDays > 2 ? 'red' : 'amber'}">${ageDays}d pending</span>
+                  </div>
+                  <div class="ar-acts">
+                    <button class="cmp-btn btn-approve" onclick="approveResourceRequest('${r.id}',this)">Approve</button>
+                    <button class="cmp-btn btn-reject" onclick="compassToast('Rejection flow opening…')">Reject</button>
+                    <a href="/resource-requests.html" class="cmp-btn btn-ghost" style="text-decoration:none">View details →</a>
+                  </div>
+                </div>`;
+              }).join('')
+            }
+          </div>
+        </div>
+
+        <div>
+          <!-- Quick nav to existing pages -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr"><div class="panel-title">Management surfaces</div></div>
+            <div class="cmp-row" onclick="window.location.href='/cadence.html'">
+              <div style="flex:1"><div class="row-title">Cadence — Workflow Intelligence →</div><div class="row-sub">DAG canvas, rework history, AI briefing</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/resources.html'">
+              <div style="flex:1"><div class="row-title">Resources →</div><div class="row-sub">Team allocation, capacity, utilization</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/resource-requests.html'">
+              <div style="flex:1"><div class="row-title">Resource requests →</div><div class="row-sub">All pending and historical requests</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/risk-register.html'">
+              <div style="flex:1"><div class="row-title">Risk register →</div><div class="row-sub">Firm-wide risk landscape</div></div>
+            </div>
+          </div>
+
+          <!-- Rework summary by project -->
+          <div class="cmp-panel">
+            <div class="panel-hdr"><div class="panel-title">Rework cycles — by project</div></div>
+            ${Object.entries(reworkByProject).length === 0
+              ? '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No rework cycles recorded</div>'
+              : Object.entries(reworkByProject)
+                  .sort(([,a],[,b]) => b - a)
+                  .slice(0, 6)
+                  .map(([projId, count]) => {
+                    const proj = _projects.find(p => p.id === projId);
+                    const max  = Math.max(...Object.values(reworkByProject));
+                    const pct  = max > 0 ? Math.round((count / max) * 100) : 0;
+                    return `
+                    <div class="budget-row">
+                      <div class="budget-header">
+                        <span>${esc(proj?.name || 'Unknown')}</span>
+                        <span class="budget-value" style="color:${count > 3 ? 'var(--compass-red)' : 'var(--compass-amber)'}">${count} cycle${count !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div class="budget-track">
+                        <div class="budget-fill" style="width:${pct}%;background:${count > 3 ? 'var(--compass-red)' : 'var(--compass-amber)'}"></div>
+                      </div>
+                    </div>`;
+                  }).join('')
+            }
+          </div>
+        </div>
+      </div>`;
+
+  } catch (e) {
+    console.error('[Compass] loadManagementView error:', e);
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load management view</div>';
+  }
+}
+
+async function approveResourceRequest(reqId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Approving…'; }
+  try {
+    await API.patch(`resource_requests?id=eq.${reqId}`, { status: 'approved' });
+    compassToast('Resource request approved');
+    const row = btn?.closest('.action-row');
+    if (row) { row.style.transition = 'opacity .3s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
+  } catch (e) {
+    compassToast('Failed to approve — check console');
+    if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// VIEW: EXECUTIVE
+// ══════════════════════════════════════════════════════════
+async function loadExecutiveView() {
+  const content = document.getElementById('exec-content');
+
+  try {
+    const [wfInstances, cocEvents, resourceReqs] = await Promise.all([
+      API.get('workflow_instances?select=id,title,status,project_id&status=eq.active&limit=100').catch(() => []),
+      API.get('workflow_step_instances?select=id,instance_id,event_type,outcome,created_at&event_type=in.(step_completed,step_reset)&order=created_at.desc&limit=500').catch(() => []),
+      API.get('resource_requests?select=id,status,created_at&status=eq.pending').catch(() => []),
+    ]);
+
+    const activeProjects = _projects.filter(p => p.status === 'active');
+    const today = new Date().toLocaleDateString('en-CA');
+
+    // Rework cost estimation (placeholder rate ¥8,000/hr, avg 2h per rework cycle)
+    const HOURLY_RATE = 8000;
+    const HRS_PER_REWORK = 2;
+    const reworkCount = cocEvents.filter(e => e.event_type === 'step_reset').length;
+    const reworkCost  = reworkCount * HRS_PER_REWORK * HOURLY_RATE;
+
+    // On-time milestone check
+    const projsWithTarget = activeProjects.filter(p => p.target_date);
+    const atRiskProjs = projsWithTarget.filter(p => {
+      const today60 = new Date(); today60.setDate(today60.getDate() + 60);
+      return new Date(p.target_date + 'T00:00:00') < today60;
+    });
+
+    const formatYen = (n) => n >= 1000000
+      ? '¥' + (n / 1000000).toFixed(1) + 'M'
+      : '¥' + Math.round(n / 1000) + 'k';
+
+    content.innerHTML = `
+      <div class="stat-strip stat-strip-6" style="margin-bottom:16px">
+        <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
+          <div class="stat-label">Active projects</div>
+          <div class="stat-value sv-cyan">${activeProjects.length}</div>
+          <div class="stat-sub">in execution</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid var(--compass-amber)">
+          <div class="stat-label">Active workflows</div>
+          <div class="stat-value sv-amber">${wfInstances.length}</div>
+          <div class="stat-sub">running instances</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid ${reworkCount > 10 ? 'var(--compass-red)' : 'var(--compass-amber)'}">
+          <div class="stat-label">Rework cycles</div>
+          <div class="stat-value ${reworkCount > 10 ? 'sv-red' : 'sv-amber'}">${reworkCount}</div>
+          <div class="stat-sub">step resets recorded</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid ${reworkCost > 500000 ? 'var(--compass-red)' : 'var(--compass-amber)'}">
+          <div class="stat-label">Est. rework cost</div>
+          <div class="stat-value ${reworkCost > 500000 ? 'sv-red' : 'sv-amber'}">${formatYen(reworkCost)}</div>
+          <div class="stat-sub">@¥8k/hr · 2h avg</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid ${atRiskProjs.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}">
+          <div class="stat-label">Projects near target</div>
+          <div class="stat-value ${atRiskProjs.length > 0 ? 'sv-amber' : 'sv-green'}">${atRiskProjs.length}</div>
+          <div class="stat-sub">within 60 days</div>
+        </div>
+        <div class="stat-card" style="border-top:2px solid ${resourceReqs.length > 0 ? 'var(--compass-red)' : 'var(--compass-green)'}">
+          <div class="stat-label">Decisions pending</div>
+          <div class="stat-value ${resourceReqs.length > 0 ? 'sv-red' : 'sv-green'}">${resourceReqs.length}</div>
+          <div class="stat-sub">resource requests</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <!-- Morning brief placeholder -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Executive brief — ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+              <span class="panel-badge pb-cyan">AI · Generated</span>
+            </div>
+            <div style="border-left:3px solid var(--compass-amber);margin:10px 13px;padding:9px 11px;background:rgba(239,159,39,.05)">
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:6px;text-transform:uppercase">Situation</div>
+              <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
+                ${activeProjects.length} project${activeProjects.length !== 1 ? 's' : ''} active · ${wfInstances.length} workflow instance${wfInstances.length !== 1 ? 's' : ''} running · ${reworkCount} rework cycles recorded.
+              </div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Financial signal</div>
+              <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
+                Estimated rework cost: <span style="color:${reworkCost > 500000 ? 'var(--compass-red)' : 'var(--text0)'};font-weight:600">${formatYen(reworkCost)}</span> at current volume. ${reworkCount > 10 ? 'Above healthy threshold — workflow template review recommended.' : 'Within acceptable range.'}
+              </div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Recommended attention</div>
+              <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55">
+                ${resourceReqs.length > 0 ? `${resourceReqs.length} resource request${resourceReqs.length > 1 ? 's' : ''} pending your approval. ` : ''}${atRiskProjs.length > 0 ? `${atRiskProjs.length} project${atRiskProjs.length > 1 ? 's' : ''} approaching target date within 60 days.` : 'No immediate executive action required.'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Project financial overview -->
+          <div class="cmp-panel">
+            <div class="panel-hdr">
+              <div class="panel-title">Portfolio — all active projects</div>
+            </div>
+            ${activeProjects.map(p => {
+              const insts  = wfInstances.filter(w => w.project_id === p.id);
+              const near   = p.target_date && new Date(p.target_date + 'T00:00:00') < new Date(Date.now() + 60 * 86400000);
+              return `
+              <div class="cmp-row" onclick="window.location.href='/project-detail.html?id=${p.id}'">
+                <div style="flex:1;min-width:0">
+                  <div class="row-title">${esc(p.name)}</div>
+                  <div class="row-sub">${esc(p.client_name || '')} · Target: ${fmtDate(p.target_date)}${near ? ' · <span style="color:var(--compass-amber)">Near target</span>' : ''}</div>
+                </div>
+                ${insts.length > 0 ? `<span class="status-badge sb-warn">${insts.length} workflow${insts.length > 1 ? 's' : ''}</span>` : ''}
+                <span class="status-badge ${near ? 'sb-warn' : 'sb-future'}">
+                  ${p.status === 'active' ? 'Active' : esc(p.status)}
+                </span>
+              </div>`;
+            }).join('') || '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active projects</div>'}
+          </div>
+        </div>
+
+        <div>
+          <!-- Key metrics -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr"><div class="panel-title">Rework cost by project</div></div>
+            ${(() => {
+              const byProj = {};
+              cocEvents.filter(e => e.event_type === 'step_reset').forEach(e => {
+                const inst = wfInstances.find(w => w.id === e.instance_id);
+                if (!inst?.project_id) return;
+                byProj[inst.project_id] = (byProj[inst.project_id] || 0) + 1;
+              });
+              const entries = Object.entries(byProj).sort(([,a],[,b]) => b - a);
+              if (entries.length === 0) return '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No rework recorded</div>';
+              const maxV = Math.max(...entries.map(([,v]) => v));
+              return entries.map(([pid, count]) => {
+                const proj = _projects.find(p => p.id === pid);
+                const cost = count * HRS_PER_REWORK * HOURLY_RATE;
+                return `
+                <div class="budget-row">
+                  <div class="budget-header">
+                    <span>${esc(proj?.name || 'Unknown')}</span>
+                    <span class="budget-value" style="color:${count > 3 ? 'var(--compass-red)' : 'var(--compass-amber)'}">
+                      ${formatYen(cost)} · ${count} cycle${count !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div class="budget-track">
+                    <div class="budget-fill" style="width:${Math.round((count/maxV)*100)}%;background:${count > 3 ? 'var(--compass-red)' : 'var(--compass-amber)'}"></div>
+                  </div>
+                </div>`;
+              }).join('');
+            })()}
+          </div>
+
+          <!-- Quick nav -->
+          <div class="cmp-panel">
+            <div class="panel-hdr"><div class="panel-title">Executive access</div></div>
+            <div class="cmp-row" onclick="window.location.href='/dashboard.html'">
+              <div style="flex:1"><div class="row-title">Dashboard →</div><div class="row-sub">Firm-wide KPI overview</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/projects.html'">
+              <div style="flex:1"><div class="row-title">Projects →</div><div class="row-sub">Portfolio with EVM metrics</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/cpm-pert.html'">
+              <div style="flex:1"><div class="row-title">CPM / PERT →</div><div class="row-sub">Schedule confidence and critical path</div></div>
+            </div>
+            <div class="cmp-row" onclick="window.location.href='/pipeline.html'">
+              <div style="flex:1"><div class="row-title">Pipeline →</div><div class="row-sub">Business development and prospects</div></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+  } catch (e) {
+    console.error('[Compass] loadExecutiveView error:', e);
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load executive view</div>';
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// VIEW: CLIENT PORTAL
+// ══════════════════════════════════════════════════════════
+async function loadClientView() {
+  const content = document.getElementById('client-content');
+
+  // Client portal uses the Flexscope project as demo
+  // In production: project determined by client auth token / URL param
+  const clientProjectId = new URLSearchParams(window.location.search).get('project') || null;
+  const clientProject = clientProjectId
+    ? _projects.find(p => p.id === clientProjectId)
+    : _projects.find(p => p.status === 'active') || null;
+
+  if (!clientProject) {
+    content.innerHTML = `
+      <div style="padding:40px 20px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+        No active project found for client portal demo.<br>
+        <span style="color:var(--text2)">Add ?project=&lt;id&gt; to the URL to specify a project.</span>
+      </div>`;
+    return;
+  }
+
+  try {
+    const [projTasks, wfInstances, actionItems] = await Promise.all([
+      API.get(`tasks?select=id,name,status,due_date,pct_complete,milestone_date&project_id=eq.${clientProject.id}&order=due_date.asc`).catch(() => []),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,current_step_id&project_id=eq.${clientProject.id}&status=eq.active`).catch(() => []),
+      API.get(`workflow_action_items?status=eq.open&order=due_date.asc&limit=20`).catch(() => []),
+    ]);
+
+    const today    = new Date().toLocaleDateString('en-CA');
+    const milestones = projTasks.filter(t => t.milestone_date || t.status === 'complete').slice(0, 7);
+    const overdueTasks = projTasks.filter(t => t.due_date && t.due_date < today && !['complete','cancelled'].includes(t.status));
+    const completedTasks = projTasks.filter(t => t.status === 'complete');
+    const pct = projTasks.length > 0 ? Math.round((completedTasks.length / projTasks.length) * 100) : 0;
+
+    // Pending actions for client (action items with no owner or overdue)
+    const pendingActions = actionItems.filter(a => wfInstances.some(w => w.id === a.instance_id)).slice(0, 3);
+
+    content.innerHTML = `
+      <!-- Client portal header -->
+      <div style="background:var(--bg1);border:1px solid var(--border);padding:12px 16px;
+        display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--text0)">${esc(clientProject.name)}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">
+            ${esc(clientProject.client_name || 'Client')} · PM: ${esc(clientProject.pm_name || 'Project Manager')} · Target: ${fmtDate(clientProject.target_date)}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}"></div>
+          <span style="font-family:var(--font-mono);font-size:10px;color:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}">
+            ${overdueTasks.length > 0 ? 'Monitor' : 'On Track'}
+          </span>
+        </div>
+      </div>
+
+      <div class="stat-strip stat-strip-4" style="margin-bottom:14px">
+        <div class="stat-card"><div class="stat-label">Progress</div><div class="stat-value sv-cyan">${pct}%</div><div class="stat-sub">${completedTasks.length} of ${projTasks.length} tasks</div></div>
+        <div class="stat-card"><div class="stat-label">Target date</div><div class="stat-value" style="font-size:18px;color:var(--text0)">${fmtDate(clientProject.target_date)}</div></div>
+        <div class="stat-card"><div class="stat-label">Actions pending</div><div class="stat-value ${pendingActions.length > 0 ? 'sv-red' : 'sv-green'}">${pendingActions.length}</div><div class="stat-sub">require your input</div></div>
+        <div class="stat-card"><div class="stat-label">Active workflows</div><div class="stat-value sv-amber">${wfInstances.length}</div><div class="stat-sub">in progress</div></div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <!-- Actions for client -->
+          ${pendingActions.length > 0 ? `
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Actions requiring your input</div>
+              <span class="panel-badge pb-red">${pendingActions.length} pending</span>
+            </div>
+            ${pendingActions.map(a => {
+              const overdue = a.due_date && a.due_date < today;
+              return `
+              <div class="action-row ${overdue ? 'urgent' : 'warning'}">
+                <div class="ar-hdr">
+                  <div class="ar-icon ari-red">&#9679;</div>
+                  <div style="flex:1"><div class="ar-title">${esc(a.title)}</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">${a.due_date ? 'Due ' + fmtDate(a.due_date) : 'No due date'}</div></div>
+                  ${overdue ? `<span class="ar-due red">Overdue</span>` : ''}
+                </div>
+                ${a.instructions ? `<div class="ar-body">${esc(a.instructions)}</div>` : ''}
+                <div class="ar-acts">
+                  <button class="cmp-btn btn-approve" onclick="compassToast('Response recorded')">Confirm</button>
+                  <button class="cmp-btn btn-ghost" onclick="compassToast('Comment form opening…')">Comment</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
+
+          <!-- Milestone timeline -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Project timeline</div>
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">${pct}% complete</span>
+            </div>
+            <div class="progress-track" style="margin:8px 13px 10px;height:3px">
+              <div class="progress-fill" style="width:${pct}%;background:var(--compass-green)"></div>
+            </div>
+            ${projTasks.slice(0, 7).map(t => {
+              const done = t.status === 'complete';
+              const overdue = !done && t.due_date && t.due_date < today;
+              return `
+              <div class="cmp-row">
+                <div class="ms-dot ${done ? 'ms-done' : overdue ? 'ms-risk' : 'ms-future'}"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="row-title">${esc(t.name)}</div>
+                </div>
+                <span style="font-family:var(--font-mono);font-size:10px;color:${overdue ? 'var(--compass-red)' : 'var(--text3)'};flex-shrink:0">${fmtDate(t.due_date)}</span>
+                <span class="status-badge ${done ? 'sb-done' : overdue ? 'sb-risk' : 'sb-future'}" style="margin-left:6px">
+                  ${done ? 'Complete' : overdue ? 'Overdue' : 'Pending'}
+                </span>
+              </div>`;
+            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No tasks found</div>'}
+          </div>
+        </div>
+
+        <div>
+          <!-- Active workflows -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Active workflows</div>
+              <span class="panel-badge pb-amber">${wfInstances.length} running</span>
+            </div>
+            ${wfInstances.map(w => `
+              <div class="cmp-row">
+                <div style="width:7px;height:7px;border-radius:50%;background:var(--compass-amber);flex-shrink:0"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="row-title">${esc(w.title)}</div>
+                  ${w.current_step_name ? `<div class="row-sub">At: ${esc(w.current_step_name)}</div>` : ''}
+                </div>
+              </div>`).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active workflows</div>'}
+          </div>
+
+          <!-- PM contact -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr"><div class="panel-title">Your PM contact</div></div>
+            <div style="padding:12px 13px;display:flex;align-items:center;gap:10px">
+              ${avatarHtml(clientProject.pm_name || 'PM', 32, 'av-cyan')}
+              <div style="flex:1">
+                <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">${esc(clientProject.pm_name || 'Project Manager')}</div>
+                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">Apex Consulting Group</div>
+              </div>
+              <button class="cmp-btn btn-ghost" onclick="compassToast('Opening email…')">Email →</button>
+            </div>
+          </div>
+
+          <!-- Send message -->
+          <div class="cmp-panel">
+            <div class="panel-hdr"><div class="panel-title">Send a message</div></div>
+            <div class="thread-in" style="border-top:none;padding:12px 13px">
+              <input type="text" id="client-msg" placeholder="Message your PM…" />
+              <button class="cmp-btn btn-respond" onclick="sendClientMessage()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Privacy note -->
+      <div class="privacy-note" style="margin-top:14px">
+        &#9432;&nbsp; This portal shows only information relevant to your project. Internal workflow detail, team performance data, and cost structure are not visible here. All access and activity is logged.
+      </div>`;
+
+  } catch (e) {
+    console.error('[Compass] loadClientView error:', e);
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load client portal</div>';
+  }
+}
+
+function sendClientMessage() {
+  const inp = document.getElementById('client-msg');
+  const msg = (inp?.value || '').trim();
+  if (!msg) return;
+  compassToast('Message sent to project manager');
+  if (inp) inp.value = '';
+}
+
+</script>
+</body>
+</html>
