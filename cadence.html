@@ -7193,15 +7193,16 @@ function showIntelBriefing(instId) {
         </div>
 
         <!-- ③ Human narrative — all notes in chronological order -->
-        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
-          <!-- Collapsible header -->
-          <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.bc-chev').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(90deg)'"
-            style="padding:10px 14px;display:flex;align-items:center;gap:8px;
-              cursor:pointer;background:var(--bg2)"
-            onmouseenter="this.style.background='var(--surf2)'"
-            onmouseleave="this.style.background='var(--bg2)'">
-            <span class="bc-chev" style="font-size:10px;color:#FFD700;
-              transition:transform .2s;display:inline-block">&#9654;</span>
+        <div>
+          <!-- Collapsible header — matches AI Narrative style -->
+          <div onclick="_toggleBriefingSection('briefing-notes-body','briefing-notes-chev')"
+            style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer"
+            onmouseenter="this.style.opacity='.8'"
+            onmouseleave="this.style.opacity='1'">
+            <span id="briefing-notes-chev"
+              style="font-size:10px;color:#FFD700;transition:transform .2s;display:inline-block">
+              &#9654;
+            </span>
             <span style="font-size:11px;font-weight:700;letter-spacing:.12em;
               color:#FFD700;text-transform:uppercase">Notes &amp; Comments</span>
             <span style="font-weight:400;color:var(--muted);font-size:11px;margin-left:4px">
@@ -7209,7 +7210,7 @@ function showIntelBriefing(instId) {
             </span>
           </div>
           <!-- Collapsible body — collapsed by default -->
-          <div style="display:none;padding:14px">
+          <div id="briefing-notes-body" style="display:none">
           ${!noteEvents.length
             ? `<div style="color:var(--muted);font-size:12px;font-style:italic;padding:4px 0">
                 No notes were recorded during this workflow.
@@ -8656,6 +8657,15 @@ function _populateAllCommentThreads() {
 }
 
 // ── Briefing narrative formatter ──────────────────────────────────────────────
+function _toggleBriefingSection(bodyId, chevId) {
+  const body  = document.getElementById(bodyId);
+  const chev  = document.getElementById(chevId);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+
 function _toggleAINarrative() {
   const body    = document.getElementById('briefing-ai-body');
   const chevron = document.getElementById('briefing-ai-chevron');
