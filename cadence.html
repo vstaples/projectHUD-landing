@@ -5838,21 +5838,22 @@ function renderInstanceDetail(el, inst) {
                         <div style="font-size:12px;font-weight:700;color:var(--text)">
                           ${escHtml(s.name||meta.label)}
                         </div>
-                        <div style="font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
-                          <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;text-transform:uppercase">${meta.label}</span>
-                          ${s.due_days!=null?`<span>⏱ ${s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+'d'}</span>`:''}
-                          <span style="color:var(--text2)">👤 ${assigneeDisplay}</span>
-                          ${done ? (() => {
-                            const cEvt = coc.slice().reverse().find(e => e.event_type==='step_completed' && e.template_step_id===s.id);
-                            const oLabel = cEvt?.outcome ? (_getOutcomes(s).find(o=>o.id===cEvt.outcome)?.label || cEvt.outcome) : 'Complete';
-                            const oColor = cEvt?.outcome ? (_getOutcomes(s).find(o=>o.id===cEvt.outcome)?.color || 'var(--green)') : 'var(--green)';
-                            return `<span style="color:${oColor}">✓ ${escHtml(oLabel)}</span>`;
-                          })() : ''}
-                          ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
-                          ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
-                          ${isReady&&!touched?`<span style="color:var(--accent)">● Ready</span>`:''}
-                        </div>
-                      </div>
+                        <div style="display:grid;grid-template-columns:130px 150px 100px 80px;gap:0 12px;margin-top:3px;align-items:center">
+                          <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${meta.label}</span>
+                          <span style="color:var(--text2);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${assigneeDisplay}</span>
+                          <span style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${
+                            done ? (() => {
+                              const cEvt = coc.slice().reverse().find(e => e.event_type==='step_completed' && e.template_step_id===s.id);
+                              const oLabel = cEvt?.outcome ? (_getOutcomes(s).find(o=>o.id===cEvt.outcome)?.label || cEvt.outcome) : 'Complete';
+                              const oColor = cEvt?.outcome ? (_getOutcomes(s).find(o=>o.id===cEvt.outcome)?.color || 'var(--green)') : 'var(--green)';
+                              return '<span style="color:'+oColor+'">&#10003; '+escHtml(oLabel)+'</span>';
+                            })() :
+                            rejected ? '<span style="color:var(--red)">&#10005; Rejected</span>' :
+                            touched&&!done&&!rejected ? '<span style="color:var(--cad)">&#9679; Active</span>' :
+                            isReady&&!touched ? '<span style="color:var(--accent)">&#9679; Ready</span>' : ''
+                          }</span>
+                          <span style="color:var(--muted);font-size:10px;white-space:nowrap">${s.due_days!=null?'&#9201; '+(s.due_type==='before_completion'?s.due_days+'d before':'&#43;'+s.due_days+'d'):''}</span>
+                        </div>                      </div>
                       <!-- Rework badge — right side, left of timer -->
                       <span id="rwbadge-${s.id}" style="flex-shrink:0;margin-right:10px;text-align:right"></span>
                       <!-- Elapsed timer — right justified, dd:hh:mm -->
@@ -6345,9 +6346,9 @@ function _populateReworkBadges() {
     const count = resets + rejections;
     if (count) {
       badge.innerHTML =
-        '<div style="font-family:var(--font-mono);font-size:13px;font-weight:700;' +
+        '<div style="font-family:var(--font-hud);font-size:14px;font-weight:700;' +
         'color:#E24B4A;letter-spacing:.04em;text-align:right">\u21a9 ' + count + '\u00d7</div>' +
-        '<div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;' +
+        '<div style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:.1em;' +
         'margin-top:1px;color:#E24B4A;text-align:right">Rework</div>';
     }
   });
