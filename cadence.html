@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD — Workflow Engine</title>
+<title>CadenceHUD — Workflow Engine · S8.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -5849,6 +5849,8 @@ function renderInstanceDetail(el, inst) {
                           ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
                           ${isReady&&!touched?`<span style="color:var(--accent)">● Ready</span>`:''}
+                          <span id="rwbadge-${s.id}"></span>
+                        </div>
                       </div>
                       <!-- Elapsed timer — right justified, dd:hh:mm -->
                       ${(() => {
@@ -5856,9 +5858,7 @@ function renderInstanceDetail(el, inst) {
                         const completedAt  = stepCompletedAt[s.id];
                         const monoStyle    = 'font-family:var(--font-mono);font-size:13px;letter-spacing:.04em';
                         const labelStyle   = 'font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px';
-                        const reworkBadge  = stepRejectionCount[s.id]
-                          ? '<div style="text-align:right;flex-shrink:0;margin-right:12px"><div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#E24B4A;letter-spacing:.04em">&#8629; ' + stepRejectionCount[s.id] + '&times;</div><div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px;color:#E24B4A">Rework</div></div>'
-                          : '';
+                        
                         function calcElapsed(from, to) {
                           const ms = (to ? new Date(to) : new Date()) - new Date(from);
                           if (ms < 0) return '00:00:00';
@@ -5867,7 +5867,7 @@ function renderInstanceDetail(el, inst) {
                         }
                         if (done && activatedAt) {
                           const elapsed = calcElapsed(activatedAt, completedAt);
-                          return `${reworkBadge}<div style="text-align:right;flex-shrink:0">
+                          return `<div style="text-align:right;flex-shrink:0">
                             <div style="${monoStyle};color:var(--green)">${elapsed}</div>
                             <div style="${labelStyle};color:var(--green)">Elapsed</div>
                           </div>`;
@@ -5875,13 +5875,13 @@ function renderInstanceDetail(el, inst) {
                           const elapsed = calcElapsed(activatedAt, null);
                           const timerColor = touched ? 'var(--cad)' : 'var(--accent)';
                           const timerLabel = touched ? 'Elapsed' : 'Pending';
-                          return `${reworkBadge}<div style="text-align:right;flex-shrink:0">
+                          return `<div style="text-align:right;flex-shrink:0">
                             <div id="timer-${s.id}" data-from="${activatedAt}"
                               style="${monoStyle};color:${timerColor}">${elapsed}</div>
                             <div style="${labelStyle};color:${timerColor}">${timerLabel}</div>
                           </div>`;
                         } else {
-                          return `${reworkBadge}<div style="text-align:right;flex-shrink:0">
+                          return `<div style="text-align:right;flex-shrink:0">
                             <div style="${monoStyle};color:${isReady?'var(--accent)':'var(--muted)'}">--:--:--</div>
                             <div style="${labelStyle};color:${isReady?'var(--accent)':'var(--muted)'}">
                               ${isReady ? 'Ready' : 'Waiting'}
@@ -6316,6 +6316,19 @@ function toggleInstDagCoC(btn) {
     const row = e.target.closest('[data-tipstep]');
     if (row && !row.contains(e.relatedTarget)) _hideStepTooltip();
   };
+
+  // Populate rework badges safely after innerHTML is set
+  (inst._tmplSteps || []).forEach(s => {
+    const badge = document.getElementById('rwbadge-' + s.id);
+    if (!badge) return;
+    const count = stepRejectionCount[s.id];
+    if (count) {
+      badge.style.cssText = 'font-family:var(--font-mono);font-size:9px;color:#E24B4A;' +
+        'padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;' +
+        'background:rgba(226,75,74,0.08);margin-left:2px';
+      badge.textContent = '\u21a9 ' + count + '\u00d7';
+    }
+  });
 }
 
 // ── Instance view mode switcher ───────────────────────────────────────────────
