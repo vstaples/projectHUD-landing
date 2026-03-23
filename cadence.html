@@ -5580,8 +5580,16 @@ function renderInstanceDetail(el, inst) {
   coc.filter(e => e.event_type === 'step_completed' && e.template_step_id)
      .forEach(e => { stepCompletedAt[e.template_step_id] = e.created_at; });
 
-  // Build map of step_id → rejection count (step_completed with requiresReset outcome)
+  // Build map of step_id → rework count
+  // A step's rework count = how many times it was reset (step_reset events)
+  // This captures both direct rejections AND resets caused by upstream rejections
   const stepRejectionCount = {};
+  // Count step_reset events per step (each reset = one rework loop)
+  coc.filter(e => e.event_type === 'step_reset' && e.template_step_id)
+     .forEach(e => {
+       stepRejectionCount[e.template_step_id] = (stepRejectionCount[e.template_step_id] || 0) + 1;
+     });
+  // Also count direct rejections on the step itself (requiresReset completions)
   coc.filter(e => e.event_type === 'step_completed' && e.template_step_id && e.outcome)
      .forEach(e => {
        const stepDef = steps.find(s => s.id === e.template_step_id);
@@ -5803,7 +5811,9 @@ function renderInstanceDetail(el, inst) {
                   || '—';
 
               return `
-              <div style="display:flex;gap:0;margin-bottom:0" id="istep-${s.id}">
+              <div style="display:flex;gap:0;margin-bottom:0" id="istep-${s.id}"
+                onmouseenter="_showStepTooltip('${s.id}',event)"
+                onmouseleave="_hideStepTooltip()">
                 <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
                   <div style="width:26px;height:26px;border-radius:50%;
                     background:${nodeColor};border:1.5px solid ${nodeColor};
@@ -5841,8 +5851,6 @@ function renderInstanceDetail(el, inst) {
                           ${rejected?`<span style="color:var(--red)">✕ Rejected</span>`:''}
                           ${touched&&!done&&!rejected?`<span style="color:var(--cad)">● Active</span>`:''}
                           ${isReady&&!touched?`<span style="color:var(--accent)">● Ready</span>`:''}
-                          ${stepRejectionCount[s.id] ? `<span style="color:var(--red);font-family:var(--font-mono);font-size:9px;padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;background:rgba(226,75,74,0.08)">↩ ${stepRejectionCount[s.id]}×</span>` : ''}
-                        </div>
                       </div>
                       <!-- Elapsed timer — right justified, dd:hh:mm -->
                       ${(() => {
@@ -5850,6 +5858,12 @@ function renderInstanceDetail(el, inst) {
                         const completedAt  = stepCompletedAt[s.id];
                         const monoStyle    = 'font-family:var(--font-mono);font-size:13px;letter-spacing:.04em';
                         const labelStyle   = 'font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px';
+                        const reworkBadge  = stepRejectionCount[s.id]
+                          ? `<div style="text-align:right;flex-shrink:0;margin-right:12px">
+                               <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#E24B4A;letter-spacing:.04em">↩ ${stepRejectionCount[s.id]}×</div>
+                               <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px;color:#E24B4A">Rework</div>
+                             </div>`
+                          : '';
                         function calcElapsed(from, to) {
                           const ms = (to ? new Date(to) : new Date()) - new Date(from);
                           if (ms < 0) return '00:00:00';
@@ -5858,7 +5872,7 @@ function renderInstanceDetail(el, inst) {
                         }
                         if (done && activatedAt) {
                           const elapsed = calcElapsed(activatedAt, completedAt);
-                          return `<div style="text-align:right;flex-shrink:0">
+                          return `${reworkBadge}<div style="text-align:right;flex-shrink:0">
                             <div style="${monoStyle};color:var(--green)">${elapsed}</div>
                             <div style="${labelStyle};color:var(--green)">Elapsed</div>
                           </div>`;
@@ -5866,13 +5880,13 @@ function renderInstanceDetail(el, inst) {
                           const elapsed = calcElapsed(activatedAt, null);
                           const timerColor = touched ? 'var(--cad)' : 'var(--accent)';
                           const timerLabel = touched ? 'Elapsed' : 'Pending';
-                          return `<div style="text-align:right;flex-shrink:0">
+                          return `${reworkBadge}<div style="text-align:right;flex-shrink:0">
                             <div id="timer-${s.id}" data-from="${activatedAt}"
                               style="${monoStyle};color:${timerColor}">${elapsed}</div>
                             <div style="${labelStyle};color:${timerColor}">${timerLabel}</div>
                           </div>`;
                         } else {
-                          return `<div style="text-align:right;flex-shrink:0">
+                          return `${reworkBadge}<div style="text-align:right;flex-shrink:0">
                             <div style="${monoStyle};color:${isReady?'var(--accent)':'var(--muted)'}">--:--:--</div>
                             <div style="${labelStyle};color:${isReady?'var(--accent)':'var(--muted)'}">
                               ${isReady ? 'Ready' : 'Waiting'}
@@ -6728,9 +6742,23 @@ function renderInstanceDAG(inst) {
       } else { _instDagPanX-=e.deltaX; _instDagPanY-=e.deltaY; }
       renderInstanceDAG(inst);
     },{passive:false});
+    // Mousemove — show step tooltip on node hover
+    wrap.addEventListener('mousemove', e => {
+      if (_instDagDrag) { _hideStepTooltip(); return; }
+      const r   = wrap.getBoundingClientRect();
+      const mx  = (e.clientX - r.left  - _instDagPanX) / _instDagScale;
+      const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
+      let hit = null;
+      steps.forEach((s, i) => {
+        const px = PAD_L + i * (NW + HGAP), py = NODE_Y;
+        if (mx >= px && mx <= px + NW && my >= py && my <= py + NH) hit = s.id;
+      });
+      if (hit) _showStepTooltip(hit, e);
+      else _hideStepTooltip();
+    });
+    wrap.addEventListener('mouseleave', () => _hideStepTooltip());
     // Click node to open step completion in list view
     wrap.addEventListener('click',e=>{
-      if(Math.abs(e.clientX-_instDagDSX)>5||Math.abs(e.clientY-_instDagDSY)>5) return;
       const r=wrap.getBoundingClientRect();
       const mx=(e.clientX-r.left-_instDagPanX)/_instDagScale;
       const my=(e.clientY-r.top-_instDagPanY)/_instDagScale;
@@ -7275,6 +7303,166 @@ async function _onExternalCoCEvent(instId) {
   // Re-init scrubber with fresh events
   if (typeof _instInitScrubber === 'function') _instInitScrubber(_selectedInstance);
   cadToast('Workflow updated — external response received', 'info');
+}
+
+// ── Step history hover tooltip ────────────────────────────────────────────────
+let _tooltipTimer   = null;
+let _tooltipVisible = false;
+let _tooltipStepId  = null;
+
+function _getOrCreateTooltip() {
+  let el = document.getElementById('coc-hover-tooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'coc-hover-tooltip';
+    el.style.cssText = [
+      'position:fixed',
+      'z-index:9999',
+      'width:360px',
+      'max-height:340px',
+      'background:#060a10',
+      'border:1px solid rgba(0,210,255,0.28)',
+      'border-radius:6px',
+      'overflow:hidden',
+      'pointer-events:none',
+      'display:none',
+      'flex-direction:column',
+      'font-family:var(--font-body)',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.6)',
+    ].join(';');
+    el.addEventListener('mouseenter', () => {
+      el.style.pointerEvents = 'auto';
+      clearTimeout(_tooltipTimer);
+    });
+    el.addEventListener('mouseleave', () => _hideStepTooltip());
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function _showStepTooltip(stepId, event) {
+  if (_tooltipStepId === stepId && _tooltipVisible) return;
+  clearTimeout(_tooltipTimer);
+  _tooltipTimer = setTimeout(() => {
+    _renderStepTooltip(stepId, event);
+  }, 350);
+}
+
+function _hideStepTooltip() {
+  clearTimeout(_tooltipTimer);
+  _tooltipTimer = setTimeout(() => {
+    const el = document.getElementById('coc-hover-tooltip');
+    if (el) { el.style.display = 'none'; }
+    _tooltipVisible = false;
+    _tooltipStepId  = null;
+  }, 180);
+}
+
+function _renderStepTooltip(stepId, event) {
+  const inst  = _selectedInstance;
+  if (!inst) return;
+  const step  = (inst._tmplSteps || []).find(s => s.id === stepId);
+  if (!step)  return;
+  const coc   = (inst._stepInsts || [])
+    .filter(e => e.template_step_id === stepId &&
+                 e.event_type !== 'step_reset' &&
+                 e.event_type !== 'instance_launched')
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (!coc.length) return;
+
+  const reworkCount = (inst._stepInsts || [])
+    .filter(e => e.template_step_id === stepId && e.event_type === 'step_reset').length;
+
+  const fmtTs = ts => {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ', ' +
+           d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  };
+
+  const evtColor = type => ({
+    step_completed: null,
+    step_activated: '#00d2ff',
+  }[type] || '#7a9bbf');
+
+  const evtRows = coc.slice(0, 18).map(e => {
+    const isRej = (() => {
+      if (e.event_type !== 'step_completed' || !e.outcome) return false;
+      const oDef = _getOutcomes(step).find(o => o.id === e.outcome);
+      return !!(oDef?.requiresReset);
+    })();
+    const color = e.event_type === 'step_activated'
+      ? '#00d2ff'
+      : isRej ? '#E24B4A' : '#00e5a0';
+    const icon  = e.event_type === 'step_activated'
+      ? '●' : isRej ? '↩' : '✓';
+    const label = e.event_type === 'step_activated'
+      ? 'Activated'
+      : isRej
+        ? (_getOutcomes(step).find(o => o.id === e.outcome)?.label || 'Rejected')
+        : (_getOutcomes(step).find(o => o.id === e.outcome)?.label || 'Completed');
+    const actor = (e.actor_name && e.actor_name !== 'System')
+      ? e.actor_name : 'System';
+    const note  = (e.event_notes || '').trim();
+    return `
+      <div style="padding:7px 12px;border-bottom:1px solid rgba(100,160,220,0.06);
+        display:flex;gap:8px;align-items:flex-start">
+        <div style="width:7px;height:7px;border-radius:50%;background:${color};
+          flex-shrink:0;margin-top:5px"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:${note?'3':'0'}px">
+            <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;
+              color:${color}">${icon} ${escHtml(label)}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:#7a9bbf">
+              ${escHtml(actor)}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:#3a5a7a;
+              margin-left:auto;white-space:nowrap">${fmtTs(e.created_at)}</span>
+          </div>
+          ${note ? `<div style="font-size:11px;color:#c8dff0;line-height:1.5;
+            font-style:italic;border-left:2px solid rgba(0,210,255,0.2);
+            padding-left:6px;overflow:hidden;display:-webkit-box;
+            -webkit-line-clamp:2;-webkit-box-orient:vertical">
+            ${escHtml(note)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  const more = coc.length > 18
+    ? `<div style="padding:5px 12px;font-family:var(--font-mono);font-size:10px;
+        color:#3a5a7a;text-align:center;border-top:1px solid rgba(100,160,220,0.06)">
+        + ${coc.length - 18} earlier events</div>`
+    : '';
+
+  const el = _getOrCreateTooltip();
+  el.innerHTML = `
+    <div style="padding:8px 12px;background:rgba(0,0,0,0.4);
+      border-bottom:1px solid rgba(0,210,255,0.12);
+      display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <div style="font-family:var(--font-ui);font-size:12px;font-weight:700;
+        color:#eef4ff;letter-spacing:0.04em;flex:1;min-width:0;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${escHtml(step.name || 'Step')}
+      </div>
+      ${reworkCount ? `<div style="font-family:var(--font-mono);font-size:10px;
+        color:#E24B4A;flex-shrink:0">↩ ${reworkCount}× rework</div>` : ''}
+    </div>
+    <div style="overflow-y:auto;flex:1">${evtRows}${more}</div>`;
+
+  // Position tooltip — avoid viewport edges
+  const TW = 360, TH = Math.min(340, 56 + coc.slice(0,18).length * 38);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let tx = event.clientX + 14;
+  let ty = event.clientY - 20;
+  if (tx + TW > vw - 10) tx = event.clientX - TW - 14;
+  if (ty + TH > vh - 10) ty = vh - TH - 10;
+  if (ty < 10) ty = 10;
+
+  el.style.left    = tx + 'px';
+  el.style.top     = ty + 'px';
+  el.style.display = 'flex';
+
+  _tooltipVisible = true;
+  _tooltipStepId  = stepId;
 }
 
 // ── async version of instScrubLive ────────────────────────────────────────────
