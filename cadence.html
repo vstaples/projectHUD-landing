@@ -5836,7 +5836,7 @@ function renderInstanceDetail(el, inst) {
                       border-radius:${isSel?'5px 5px 0 0':'5px'};
                       background:${isSel?'var(--surf2)':touched&&!done&&!rejected?'rgba(0,210,255,0.04)':'var(--bg2)'};
                       border:1px solid ${isSel?'var(--cad-wire)':touched&&!done&&!rejected?'var(--cad-wire)':'var(--border)'};
-                      border-left:${touched&&!done&&!rejected?'3px solid var(--cad)':'1px solid '+(isSel?'var(--cad-wire)':'var(--border)')};
+                      border-left:${touched&&!done&&!rejected?'5px solid var(--cad)':'1px solid '+(isSel?'var(--cad-wire)':'var(--border)')};
                       margin-bottom:0;transition:all .12s">
                     <div style="display:flex;align-items:center;gap:8px">
                       <!-- Step name + meta — grows to fill -->
@@ -5855,7 +5855,7 @@ function renderInstanceDetail(el, inst) {
                               return '<span style="color:'+oColor+'">&#10003; '+escHtml(oLabel)+'</span>';
                             })() :
                             rejected ? '<span style="color:var(--red)">&#10005; Rejected</span>' :
-                            touched&&!done&&!rejected ? '<span style="font-size:9px;font-weight:700;color:var(--cad);padding:1px 7px;border:1px solid var(--cad);border-radius:10px;background:rgba(0,210,255,0.1);letter-spacing:.04em">&#9679; Active</span>' :
+                            touched&&!done&&!rejected ? '<span style="font-size:9px;font-weight:700;color:var(--bg0);padding:2px 8px;border-radius:4px;background:var(--cad);letter-spacing:.06em">ACTIVE</span>' :
                             isReady&&!touched ? '<span style="color:var(--accent)">&#9679; Ready</span>' : ''
                           }</span>
                           <span style="color:var(--muted);font-size:10px;white-space:nowrap">${s.due_days!=null?'&#9201; '+(s.due_type==='before_completion'?s.due_days+'d before':'&#43;'+s.due_days+'d'):''}</span>
