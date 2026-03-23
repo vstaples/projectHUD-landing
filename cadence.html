@@ -8646,6 +8646,44 @@ function _populateAllCommentThreads() {
   _renderActionItems(stepId);
 }
 
+// ── Briefing narrative formatter ──────────────────────────────────────────────
+function _formatBriefingNarrative(text) {
+  if (!text) return '';
+  const sectionStyle = 'font-size:9px;font-weight:700;letter-spacing:.12em;' +
+    'color:var(--cad);text-transform:uppercase;margin:14px 0 6px;display:block';
+  const bulletStyle = 'margin:3px 0;padding-left:12px;position:relative;' +
+    'font-size:11px;color:var(--text);line-height:1.6';
+
+  const lines = text.split('\n');
+  let html = '';
+  const sectionLabels = ['SITUATION', 'REWORK ANALYSIS', 'RISK ASSESSMENT', 'RECOMMENDED ACTION'];
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    // Section label
+    if (sectionLabels.some(s => trimmed.toUpperCase().startsWith(s))) {
+      const label = sectionLabels.find(s => trimmed.toUpperCase().startsWith(s));
+      if (i > 0) html += '<div style="height:4px"></div>';
+      html += `<span style="${sectionStyle}">${label}</span>`;
+      return;
+    }
+
+    // Bullet line
+    if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
+      const bulletText = trimmed.replace(/^[-•]\s*/, '');
+      html += `<div style="${bulletStyle}"><span style="position:absolute;left:0;color:var(--cad)">–</span>${escHtml(bulletText)}</div>`;
+      return;
+    }
+
+    // Plain text fallback
+    html += `<div style="font-size:11px;color:var(--text);line-height:1.6;margin:3px 0">${escHtml(trimmed)}</div>`;
+  });
+
+  return html;
+}
+
 // ── AI Intelligence Briefing ──────────────────────────────────────────────────
 
 function _assembleBriefingPrompt(inst) {
@@ -8779,17 +8817,19 @@ ${noteLines}
 STEP COMMENTS:
 ${commentLines}
 
-Produce a briefing with exactly these four sections. Write in prose only — no bullet points, no headers, no markdown. Use plain paragraph breaks between sections.
+Produce a briefing with exactly these four sections. Be ruthlessly succinct — every word must earn its place. Use short bullet points, not prose paragraphs.
 
-SITUATION: What is this workflow, where is it now, what is the immediate context. 2-3 sentences. Conclusion-first.
+SITUATION: 2-3 bullets. Where is this workflow right now. Conclusion-first. No background, no context-setting.
 
-REWORK ANALYSIS: What the rejection pattern means. Classify as exactly one of: Process Quality Failure / Dependency Failure / Human Performance Issue / Novel Work. Cite specific notes as evidence. 2-3 sentences.
+REWORK ANALYSIS: 2-3 bullets. Classify as exactly one of: Process Quality Failure / Dependency Failure / Human Performance Issue / Novel Work. One bullet states the classification and why. Remaining bullets cite specific evidence from notes.
 
-RISK ASSESSMENT: What could go wrong from here. Reference PERT variance, open action items, and confidence signals where relevant. 2 sentences.
+RISK ASSESSMENT: 2 bullets maximum. The most credible risks only. Reference open action items and confidence signals if relevant.
 
-RECOMMENDED ACTION: What the PM should do right now. Specific and direct. No corporate filler. 1-2 sentences.
+RECOMMENDED ACTION: 1-2 bullets. Specific actions the PM should take today. Owner and deadline if known. No corporate filler.
 
-Tone: ${stakesTone.split(' — ')[1] || 'Professional'} No preamble. Start directly with the situation.`;
+Format rules: Start each bullet with a dash. No bold, no markdown headers, no sub-bullets. Label each section in ALL CAPS on its own line. No preamble — start with SITUATION immediately.
+
+Tone: ${stakesTone.split(' — ')[1] || 'Professional'}`;
 }
 
 async function _generateAIBriefing(instId) {
@@ -8852,7 +8892,7 @@ async function _generateAIBriefing(instId) {
           const data = JSON.parse(line.slice(6));
           if (data.type === 'content_block_delta' && data.delta?.text) {
             full += data.delta.text;
-            narrativeEl.innerHTML = full.replace(/\n\n/g, '</p><p style="margin-top:10px">').replace(/\n/g, '<br>') +
+            narrativeEl.innerHTML = _formatBriefingNarrative(full) +
               '<span class="briefing-cursor" style="display:inline-block;width:2px;height:14px;' +
               'background:var(--cad);animation:briefingBlink 1s infinite;vertical-align:text-bottom"></span>';
           }
@@ -8861,9 +8901,7 @@ async function _generateAIBriefing(instId) {
     }
 
     // Final render — no cursor
-    narrativeEl.innerHTML = '<p style="margin:0">' +
-      full.replace(/\n\n/g, '</p><p style="margin-top:10px">').replace(/\n/g, '<br>') +
-      '</p>';
+    narrativeEl.innerHTML = _formatBriefingNarrative(full);
 
     // Add regenerate button
     section.innerHTML = `
@@ -8884,7 +8922,7 @@ async function _generateAIBriefing(instId) {
         </div>
         <div id="briefing-ai-narrative"
           style="font-size:12px;color:var(--text);line-height:1.8;font-family:var(--font-body)">
-          <p style="margin:0">${full.replace(/\n\n/g, '</p><p style="margin-top:10px">').replace(/\n/g, '<br>')}</p>
+          <p style="margin:0">${_formatBriefingNarrative(full)}</p>
         </div>
       </div>`;
 
