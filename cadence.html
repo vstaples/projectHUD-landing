@@ -2547,22 +2547,9 @@ async function _uploadToStorage(file, stepId) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `Storage upload failed: ${res.status}`);
   }
-  // Build signed URL (1 year expiry for template docs)
-  const signRes = await fetch(
-    `${SUPA_URL}/storage/v1/object/sign/${STORAGE_BUCKET}/${path}`,
-    {
-      method: 'POST',
-      headers: {
-        'apikey':        SUPA_KEY,
-        'Authorization': 'Bearer ' + token,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify({ expiresIn: 31536000 }), // 1 year
-    }
-  );
-  const signData = await signRes.json();
-  const url = `${SUPA_URL}/storage/v1${signData.signedURL}`;
-  return { path, url };
+  // Store path only — URL generated on demand via _viewAttachment (Option C)
+  // This ensures links never expire regardless of when the file is accessed.
+  return { path, url: null };
 }
 
 // ── Delete file from Supabase Storage ────────────────────────────────────────
@@ -2681,8 +2668,11 @@ function viewAttachedDoc(stepId, idx) {
     } else {
       _downloadDoc(doc);
     }
+  } else if (doc.path) {
+    // Option C — generate fresh 1-hour signed URL on demand, never expires
+    _viewAttachment(doc.path, doc.name);
   } else if (doc.url) {
-    // Reload from Storage URL
+    // Legacy — pre-existing docs with stored URLs (may eventually expire)
     if (isPdf || isDocx) {
       window.open(doc.url, '_blank');
     } else {
