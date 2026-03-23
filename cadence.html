@@ -5811,9 +5811,7 @@ function renderInstanceDetail(el, inst) {
                   || '—';
 
               return `
-              <div style="display:flex;gap:0;margin-bottom:0" id="istep-${s.id}"
-                onmouseenter="_showStepTooltip('${s.id}',event)"
-                onmouseleave="_hideStepTooltip()">
+              <div style="display:flex;gap:0;margin-bottom:0" id="istep-${s.id}" data-tipstep="${s.id}">
                 <div style="width:36px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
                   <div style="width:26px;height:26px;border-radius:50%;
                     background:${nodeColor};border:1.5px solid ${nodeColor};
@@ -6307,6 +6305,17 @@ function toggleInstDagCoC(btn) {
     // Trigger DAG refit since canvas width changed
     setTimeout(() => { _instDagFitted=false; renderInstanceDAG(inst); }, 250);
   }
+
+  // Wire tooltip hover via event delegation on the detail container
+  // (avoids inline event attribute issues inside template literals)
+  el.onmouseover = function(e) {
+    const row = e.target.closest('[data-tipstep]');
+    if (row) _showStepTooltip(row.dataset.tipstep, e);
+  };
+  el.onmouseout = function(e) {
+    const row = e.target.closest('[data-tipstep]');
+    if (row && !row.contains(e.relatedTarget)) _hideStepTooltip();
+  };
 }
 
 // ── Instance view mode switcher ───────────────────────────────────────────────
