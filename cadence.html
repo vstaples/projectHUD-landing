@@ -6790,6 +6790,7 @@ function renderInstanceDAG(inst) {
     });
     window.addEventListener('mouseup',()=>{ _instDagDrag=false; wrap.style.cursor='grab'; });
     wrap.addEventListener('wheel',e=>{
+      if (_tooltipSticky) return; // don't pan when tooltip is open and being scrolled
       e.preventDefault();
       if(e.ctrlKey||e.metaKey){
         const r=wrap.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
@@ -6803,6 +6804,7 @@ function renderInstanceDAG(inst) {
     // Mousemove — show step tooltip on node hover
     wrap.addEventListener('mousemove', e => {
       if (_instDagDrag) { _hideStepTooltip(); return; }
+      if (_tooltipSticky) return; // don't interfere while tooltip is open
       const r   = wrap.getBoundingClientRect();
       const mx  = (e.clientX - r.left  - _instDagPanX) / _instDagScale;
       const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
@@ -6811,8 +6813,13 @@ function renderInstanceDAG(inst) {
         const px = PAD_L + i * (NW + HGAP), py = NODE_Y;
         if (mx >= px && mx <= px + NW && my >= py && my <= py + NH) hit = s.id;
       });
-      if (hit) _showStepTooltip(hit, e);
-      else _hideStepTooltip();
+      if (hit) {
+        wrap.style.cursor = 'default';
+        _showStepTooltip(hit, e);
+      } else {
+        wrap.style.cursor = 'grab';
+        _hideStepTooltip();
+      }
     });
     wrap.addEventListener('mouseleave', () => _hideStepTooltip());
     // Click node to open step completion in list view
@@ -7443,8 +7450,13 @@ function _renderStepTooltip(stepId, event) {
 
   if (!coc.length) return;
 
-  const reworkCount = (inst._stepInsts || [])
-    .filter(e => e.template_step_id === stepId && e.event_type === 'step_reset').length;
+  const stepInsts = inst._stepInsts || [];
+  const reworkCount = stepInsts.filter(e => e.template_step_id === stepId && e.event_type === 'step_reset').length
+    + stepInsts.filter(e => {
+        if (e.event_type !== 'step_completed' || e.template_step_id !== stepId || !e.outcome) return false;
+        const oDef = _getOutcomes(step).find(o => o.id === e.outcome);
+        return !!(oDef?.requiresReset);
+      }).length;
 
   const fmtTs = ts => {
     const d = new Date(ts);
