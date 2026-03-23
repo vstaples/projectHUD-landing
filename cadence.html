@@ -9663,46 +9663,84 @@ function _hxShowPopup(cluster, clientX, clientY, inst) {
   const level    = _heatLevel(heat.total);
   const cols     = HEAT_COLORS[level] || HEAT_COLORS.low;
   const stepName = heat.stepName
-    || (inst._tmplSteps||[]).find(s=>s.id===cluster.stepId)?.name
+    || (inst?._tmplSteps||[]).find(s=>s.id===cluster.stepId)?.name
     || 'This step';
 
-  const maxCount = Math.max(...Object.values(heat.byInstance));
+  const maxCount = Math.max(...Object.values(heat.byInstance), 1);
   const typeNote = heat.typeB > heat.typeA
-    ? `<div style="font-size:9px;color:#BA7517;padding:4px 12px 0;font-style:italic">
+    ? `<div style="font-size:9px;color:#8c50c8;padding:4px 12px 0;font-style:italic">
         &#8629; ${heat.typeB} reset${heat.typeB>1?'s':''} caused by upstream rejection/decline
        </div>`
     : heat.typeA > 0
-    ? `<div style="font-size:9px;color:#ff5f6b;padding:4px 12px 0;font-style:italic">
+    ? `<div style="font-size:9px;color:#b432dc;padding:4px 12px 0;font-style:italic">
         &#8629; ${heat.typeA} own failure${heat.typeA>1?'s':''} at this step
        </div>`
     : '';
-
-  const rowsHtml = Object.entries(heat.byInstance).sort((a,b)=>b[1]-a[1]).map(([sibId, cnt]) => {
-    const sib  = _instances.find(i=>i.id===sibId);
-    const name = sib?.title || sibId.slice(0,8)+'…';
-    const pct  = Math.round(cnt/maxCount*100);
-    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;
-        border-bottom:0.5px solid var(--border)">
-      <div style="font-size:11px;font-weight:500;color:var(--text);flex:1;
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</div>
-      <div style="width:60px;height:5px;background:var(--border);border-radius:3px;flex-shrink:0">
-        <div style="height:5px;border-radius:3px;background:${cols.stroke};width:${pct}%"></div>
-      </div>
-      <div style="font-size:10px;font-weight:700;color:${cols.text};white-space:nowrap">${cnt}&#215;</div>
-    </div>`;
-  }).join('');
 
   const popup = document.createElement('div');
   popup.dataset.stepId = cluster.stepId;
   popup.style.cssText = `position:fixed;z-index:2001;background:var(--bg1);
     border:1px solid var(--border2);border-radius:8px;overflow:hidden;width:280px;`;
+
   popup.innerHTML = `
     <div style="padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);
       font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${cols.text}">
       ${escHtml(stepName)} — ${heat.total} total rejections
     </div>
     ${typeNote}
-    ${rowsHtml}`;
+    <div id="hx-popup-rows"></div>
+    <div style="padding:5px 12px;font-size:9px;color:var(--muted);font-style:italic;
+      background:var(--bg2);border-top:0.5px solid var(--border)">
+      Hold 1.5s on any row to open Intelligence Briefing
+    </div>`;
+
+  // Build rows as DOM elements so we can attach dwell handlers
+  const rowsEl = popup.querySelector('#hx-popup-rows');
+  const dwellTimers = {};
+
+  Object.entries(heat.byInstance).sort((a,b)=>b[1]-a[1]).forEach(([sibId, cnt]) => {
+    const sib  = _instances.find(i=>i.id===sibId);
+    const name = sib?.title || sibId.slice(0,8)+'…';
+    const pct  = Math.round(cnt/maxCount*100);
+
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex;align-items:center;gap:8px;padding:7px 12px;
+      border-bottom:0.5px solid var(--border);cursor:pointer;
+      position:relative;overflow:hidden;transition:background .12s`;
+
+    row.innerHTML = `
+      <div style="font-size:11px;font-weight:500;color:var(--text);flex:1;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</div>
+      <div style="width:60px;height:5px;background:var(--border);border-radius:3px;flex-shrink:0">
+        <div style="height:5px;border-radius:3px;background:${cols.stroke};width:${pct}%"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:${cols.text};white-space:nowrap">${cnt}&#215;</div>
+      <div class="hx-row-dbar" style="position:absolute;bottom:0;left:0;height:2px;
+        background:#b432dc;width:0;border-radius:0"></div>`;
+
+    row.addEventListener('mouseenter', () => {
+      row.style.background = 'rgba(180,50,220,.1)';
+      row.querySelector('.hx-row-dbar').style.transition = 'none';
+      row.querySelector('.hx-row-dbar').style.width = '0%';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        row.querySelector('.hx-row-dbar').style.transition = 'width 1.5s linear';
+        row.querySelector('.hx-row-dbar').style.width = '100%';
+      }));
+      dwellTimers[sibId] = setTimeout(() => {
+        _hxHidePopup(true);
+        showIntelBriefing(sibId);
+      }, 1500);
+    });
+
+    row.addEventListener('mouseleave', () => {
+      row.style.background = 'transparent';
+      const bar = row.querySelector('.hx-row-dbar');
+      bar.style.transition = 'none'; bar.style.width = '0%';
+      clearTimeout(dwellTimers[sibId]);
+    });
+
+    rowsEl.appendChild(row);
+  });
 
   popup.addEventListener('mouseenter', () => clearTimeout(_historyHideTimer));
   popup.addEventListener('mouseleave', () => _hxStartHidePopup());
