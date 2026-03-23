@@ -7497,9 +7497,18 @@ function _renderStepTooltip(stepId, event) {
   }).join('');
 
   const more = coc.length > 18
-    ? `<div style="padding:5px 12px;font-family:var(--font-mono);font-size:10px;
-        color:#3a5a7a;text-align:center;border-top:1px solid rgba(100,160,220,0.06)">
-        + ${coc.length - 18} earlier events</div>`
+    ? `<div style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;
+        text-align:center;border-top:1px solid rgba(100,160,220,0.06)">
+        <button onclick="_renderStepTooltipAll('${stepId}')"
+          style="background:none;border:1px solid rgba(0,210,255,0.25);
+            color:#00d2ff;font-family:var(--font-mono);font-size:10px;
+            padding:4px 16px;cursor:pointer;letter-spacing:0.1em;
+            border-radius:3px;transition:all .15s"
+          onmouseenter="this.style.background='rgba(0,210,255,0.08)'"
+          onmouseleave="this.style.background='none'">
+          &#9660; Show all ${coc.length - 18} more events
+        </button>
+      </div>`
     : '';
 
   const el = _getOrCreateTooltip();
@@ -7541,6 +7550,73 @@ function _renderStepTooltip(stepId, event) {
   _tooltipVisible = true;
   _tooltipStepId  = stepId;
   _tooltipSticky  = true;  // sticky immediately — close only via X button
+}
+
+function _renderStepTooltipAll(stepId) {
+  const inst = _selectedInstance;
+  if (!inst) return;
+  const step = (inst._tmplSteps || []).find(s => s.id === stepId);
+  if (!step) return;
+
+  // Re-render the scroll body with all events
+  const el = document.getElementById('coc-hover-tooltip');
+  if (!el) return;
+
+  const coc = (inst._stepInsts || [])
+    .filter(e => e.template_step_id === stepId &&
+                 e.event_type !== 'step_reset' &&
+                 e.event_type !== 'instance_launched')
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const fmtTs = ts => {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ', ' +
+           d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  };
+
+  const evtRows = coc.map(e => {
+    const isRej = (() => {
+      if (e.event_type !== 'step_completed' || !e.outcome) return false;
+      const oDef = _getOutcomes(step).find(o => o.id === e.outcome);
+      return !!(oDef?.requiresReset);
+    })();
+    const color = e.event_type === 'step_activated'
+      ? '#00d2ff' : isRej ? '#E24B4A' : '#00e5a0';
+    const icon  = e.event_type === 'step_activated' ? '\u25cf'
+      : isRej ? '\u21a9' : '\u2713';
+    const label = e.event_type === 'step_activated' ? 'Activated'
+      : isRej ? (_getOutcomes(step).find(o => o.id === e.outcome)?.label || 'Rejected')
+      : (_getOutcomes(step).find(o => o.id === e.outcome)?.label || 'Completed');
+    const actor = (e.actor_name && e.actor_name !== 'System') ? e.actor_name : 'System';
+    const note  = (e.event_notes || '').trim();
+    return `<div style="padding:7px 12px;border-bottom:1px solid rgba(100,160,220,0.06);
+        display:flex;gap:8px;align-items:flex-start">
+        <div style="width:7px;height:7px;border-radius:50%;background:${color};
+          flex-shrink:0;margin-top:5px"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:${note?'3':'0'}px">
+            <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;
+              color:${color}">${icon} ${escHtml(label)}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:#7a9bbf">
+              ${escHtml(actor)}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:#3a5a7a;
+              margin-left:auto;white-space:nowrap">${fmtTs(e.created_at)}</span>
+          </div>
+          ${note ? `<div style="font-size:11px;color:#c8dff0;line-height:1.5;
+            font-style:italic;border-left:2px solid rgba(0,210,255,0.2);
+            padding-left:6px;overflow:hidden;display:-webkit-box;
+            -webkit-line-clamp:2;-webkit-box-orient:vertical">
+            ${escHtml(note)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Replace just the scroll body
+  const body = el.querySelector('div[style*="overflow-y:auto"]');
+  if (body) body.innerHTML = evtRows;
+
+  // Expand height to show more
+  el.style.maxHeight = '80vh';
 }
 
 // ── async version of instScrubLive ────────────────────────────────────────────
