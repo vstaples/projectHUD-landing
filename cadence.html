@@ -7795,7 +7795,9 @@ async function postStepComment(instId, stepId) {
 
   if (statusEl) statusEl.textContent = 'Posting…';
 
+  const newCommentId = crypto.randomUUID();
   const row = {
+    id:                newCommentId,
     firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
     instance_id:       instId,
     template_step_id:  stepId,
@@ -7807,12 +7809,11 @@ async function postStepComment(instId, stepId) {
   };
 
   try {
-    const result = await API.post('step_comments', row);
-    if (!result) throw new Error('No response');
+    await API.post('step_comments', row);
 
-    // Append to local cache
+    // Append to local cache with the pre-generated ID
     if (!inst._stepComments) inst._stepComments = [];
-    inst._stepComments.push({ ...row, id: result.id || crypto.randomUUID(), created_at: new Date().toISOString() });
+    inst._stepComments.push({ ...row, created_at: new Date().toISOString() });
 
     // Reset input
     bodyEl.value = '';
@@ -8070,40 +8071,43 @@ function promoteToActionItem(commentId, stepId) {
             color:var(--text);font-family:var(--font-body)"></textarea>
       </div>
 
-      <!-- Owner + Due Date -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-        <div>
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
-          <select id="ai-owner-${commentId}" class="config-select" style="font-size:11px;width:100%">
-            ${ownerOpts}
-          </select>
+      <!-- Owner / Due Date (left) + Attachments (right) — two columns -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;align-items:start">
+        <!-- Left: Owner + Due Date stacked -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div>
+            <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
+            <select id="ai-owner-${commentId}" class="config-select" style="font-size:11px;width:100%">
+              ${ownerOpts}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
+            <input id="ai-due-${commentId}" type="date"
+              style="width:100%;font-size:11px;padding:5px 8px;
+                background:var(--bg1);border:1px solid var(--border);border-radius:3px;
+                color:var(--text);color-scheme:dark" />
+          </div>
         </div>
-        <div>
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
-          <input id="ai-due-${commentId}" type="date"
-            style="width:100%;font-size:11px;padding:5px 8px;
-              background:var(--bg1);border:1px solid var(--border);border-radius:3px;
-              color:var(--text);color-scheme:dark" />
+        <!-- Right: Attachments DnD -->
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+            Attachments <span style="font-weight:400;color:var(--muted)">(optional)</span>
+          </label>
+          <div class="doc-drop-zone" id="ai-dropzone-${commentId}"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="_handleActionItemDrop(event,'${commentId}')"
+            onclick="document.getElementById('ai-files-${commentId}').click()"
+            style="padding:10px;margin:0;height:100%;min-height:72px;
+              display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div class="doc-drop-zone-icon">📂</div>
+            <div class="doc-drop-zone-text"><strong>Drop files here</strong><br>or click to browse</div>
+            <input type="file" id="ai-files-${commentId}" style="display:none" multiple
+              onchange="_previewActionItemFiles('${commentId}')" />
+          </div>
+          <div id="ai-file-preview-${commentId}" style="margin-top:2px"></div>
         </div>
-      </div>
-
-      <!-- Attachments — DnD dropzone -->
-      <div style="margin-bottom:8px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
-          Attachments <span style="font-weight:400;color:var(--muted)">(optional)</span>
-        </label>
-        <div class="doc-drop-zone" id="ai-dropzone-${commentId}"
-          ondragover="event.preventDefault();this.classList.add('drag-over')"
-          ondragleave="this.classList.remove('drag-over')"
-          ondrop="_handleActionItemDrop(event,'${commentId}')"
-          onclick="document.getElementById('ai-files-${commentId}').click()"
-          style="padding:10px;margin:0">
-          <div class="doc-drop-zone-icon">📂</div>
-          <div class="doc-drop-zone-text"><strong>Drop files here</strong> or click to browse</div>
-          <input type="file" id="ai-files-${commentId}" style="display:none" multiple
-            onchange="_previewActionItemFiles('${commentId}')" />
-        </div>
-        <div id="ai-file-preview-${commentId}" style="margin-top:4px"></div>
       </div>
 
       <!-- Buttons -->
@@ -8522,7 +8526,9 @@ async function postReply(parentCommentId, stepId) {
   const inst       = _selectedInstance;
   const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
 
+  const newReplyId = crypto.randomUUID();
   const row = {
+    id:                newReplyId,
     firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
     instance_id:       inst.id,
     template_step_id:  stepId,
@@ -8536,7 +8542,7 @@ async function postReply(parentCommentId, stepId) {
   try {
     await API.post('step_comments', row);
     if (!inst._stepComments) inst._stepComments = [];
-    inst._stepComments.push({ ...row, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+    inst._stepComments.push({ ...row, created_at: new Date().toISOString() });
     document.getElementById(`reply-input-${parentCommentId}`)?.remove();
     _renderCommentThread(stepId);
   } catch(e) {
