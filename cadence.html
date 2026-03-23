@@ -6318,24 +6318,35 @@ function toggleInstDagCoC(btn) {
   };
 
   // Populate rework badges after DOM settles
-  setTimeout(() => {
-    (inst._tmplSteps || []).forEach(s => {
-      const badge = document.getElementById('rwbadge-' + s.id);
-      if (!badge) return;
-      const resets = (inst._stepInsts || []).filter(e => e.event_type === 'step_reset' && e.template_step_id === s.id).length;
-      const rejections = (inst._stepInsts || []).filter(e =>
-        e.event_type === 'step_completed' && e.template_step_id === s.id &&
-        (() => { const o = _getOutcomes(s).find(o => o.id === e.outcome); return !!(o?.requiresReset); })()
-      ).length;
-      const count = resets + rejections;
-      if (count) {
-        badge.style.cssText = 'font-family:var(--font-mono);font-size:11px;font-weight:700;color:#E24B4A;' +
-          'padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;' +
-          'background:rgba(226,75,74,0.08);margin-left:4px';
-        badge.textContent = '\u21a9 ' + count + '\u00d7';
-      }
-    });
-  }, 0);
+  setTimeout(_populateReworkBadges, 50);
+}
+
+// ── Rework badge population ───────────────────────────────────────────────────
+function _populateReworkBadges() {
+  const inst = _selectedInstance;
+  if (!inst) return;
+  (inst._tmplSteps || []).forEach(s => {
+    const badge = document.getElementById('rwbadge-' + s.id);
+    if (!badge) return;
+    const stepInsts = inst._stepInsts || [];
+    const resets = stepInsts.filter(e =>
+      e.event_type === 'step_reset' && e.template_step_id === s.id
+    ).length;
+    const rejections = stepInsts.filter(e => {
+      if (e.event_type !== 'step_completed') return false;
+      if (e.template_step_id !== s.id) return false;
+      if (!e.outcome) return false;
+      const oDef = _getOutcomes(s).find(o => o.id === e.outcome);
+      return !!(oDef?.requiresReset);
+    }).length;
+    const count = resets + rejections;
+    if (count) {
+      badge.style.cssText = 'font-family:var(--font-mono);font-size:11px;font-weight:700;color:#E24B4A;' +
+        'padding:1px 6px;border:1px solid rgba(226,75,74,0.4);border-radius:3px;' +
+        'background:rgba(226,75,74,0.08);margin-left:4px';
+      badge.textContent = '\u21a9 ' + count + '\u00d7';
+    }
+  });
 }
 
 // ── Instance view mode switcher ───────────────────────────────────────────────
@@ -6354,6 +6365,7 @@ function setInstViewMode(mode) {
   }
   const el = document.getElementById('instance-detail');
   if (el) renderInstanceDetail(el, _selectedInstance);
+  setTimeout(_populateReworkBadges, 50);
 }
 
 // ── Instance DAG state ────────────────────────────────────────────────────────
@@ -8604,6 +8616,7 @@ async function _reloadInstance(instId) {
   renderInstancesTab(document.getElementById('cad-content'));
   const detailEl = document.getElementById('instance-detail');
   if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
+  setTimeout(_populateReworkBadges, 50);
 }
 
 // ── Forms tab placeholder ─────────────────────────────────────────────────────
