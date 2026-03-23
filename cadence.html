@@ -7193,14 +7193,25 @@ function showIntelBriefing(instId) {
         </div>
 
         <!-- ③ Human narrative — all notes in chronological order -->
-        <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#FFD700;
-            text-transform:uppercase;margin-bottom:10px">
-            Notes & Comments
-            <span style="font-weight:400;color:var(--muted);margin-left:6px">${noteEvents.length} recorded</span>
+        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+          <!-- Collapsible header -->
+          <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.bc-chev').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(90deg)'"
+            style="padding:10px 14px;display:flex;align-items:center;gap:8px;
+              cursor:pointer;background:var(--bg2)"
+            onmouseenter="this.style.background='var(--surf2)'"
+            onmouseleave="this.style.background='var(--bg2)'">
+            <span class="bc-chev" style="font-size:10px;color:#FFD700;
+              transition:transform .2s;display:inline-block">&#9654;</span>
+            <span style="font-size:11px;font-weight:700;letter-spacing:.12em;
+              color:#FFD700;text-transform:uppercase">Notes &amp; Comments</span>
+            <span style="font-weight:400;color:var(--muted);font-size:11px;margin-left:4px">
+              ${noteEvents.length} recorded
+            </span>
           </div>
+          <!-- Collapsible body — collapsed by default -->
+          <div style="display:none;padding:14px">
           ${!noteEvents.length
-            ? `<div style="color:var(--muted);font-size:12px;font-style:italic;padding:12px 0">
+            ? `<div style="color:var(--muted);font-size:12px;font-style:italic;padding:4px 0">
                 No notes were recorded during this workflow.
                </div>`
             : `<div style="display:flex;flex-direction:column;gap:10px">
@@ -7230,6 +7241,7 @@ function showIntelBriefing(instId) {
                 </div>
               </div>`).join('')}
             </div>`}
+          </div>
         </div>
 
         <!-- ④ What's next -->
