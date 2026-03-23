@@ -17,9 +17,11 @@ const Sidebar = (() => {
     videolibrary: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="20" height="16" rx="2"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>`,
     pipeline:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="4" height="14" rx="1"/><rect x="8" y="8" width="4" height="11" rx="1"/><rect x="14" y="3" width="4" height="16" rx="1"/><rect x="20" y="10" width="2" height="9" rx="1"/></svg>`,
     cadence:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
+    compass:      `<svg viewBox="-28 -28 56 56" fill="none"><circle r="26" stroke="currentColor" stroke-width="1.4" opacity=".35"/><circle r="21" stroke="currentColor" stroke-width="1.2" opacity=".6"/><circle r="15" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="0" y1="-11.5" x2="0" y2="-15" stroke="currentColor" stroke-width="1.6" opacity=".9"/><line x1="0" y1="11.5" x2="0" y2="15" stroke="currentColor" stroke-width="1.6" opacity=".9"/><line x1="-11.5" y1="0" x2="-15" y2="0" stroke="currentColor" stroke-width="1.6" opacity=".9"/><line x1="11.5" y1="0" x2="15" y2="0" stroke="currentColor" stroke-width="1.6" opacity=".9"/><line x1="8" y1="-8" x2="10.5" y2="-10.5" stroke="currentColor" stroke-width="1.1" opacity=".55"/><line x1="-8" y1="-8" x2="-10.5" y2="-10.5" stroke="currentColor" stroke-width="1.1" opacity=".55"/><line x1="8" y1="8" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.1" opacity=".55"/><line x1="-8" y1="8" x2="-10.5" y2="10.5" stroke="currentColor" stroke-width="1.1" opacity=".55"/><path d="M0,-13 L2.8,-3.5 L0,-2 L-2.8,-3.5Z" fill="currentColor"/><path d="M0,-13 L1.6,-9.5 L0,-8.5 L-1.6,-9.5Z" fill="#EF9F27"/><path d="M0,13 L2,3.5 L0,2 L-2,3.5Z" fill="none" stroke="currentColor" stroke-width=".8"/><path d="M13,0 L3.5,2.5 L2,0 L3.5,-2.5Z" fill="currentColor" opacity=".45"/><path d="M-13,0 L-3.5,2 L-2,0 L-3.5,-2Z" fill="none" stroke="currentColor" stroke-width=".8"/><circle r="2" fill="currentColor"/><circle r=".9" fill="#060a10"/></svg>`,
   };
 
   const TOOLBAR_ITEMS = [
+    { key: 'compass',      label: 'Compass',      href: '/compass.html' },
     { key: 'pipeline',     label: 'Pipeline',     href: '/pipeline.html' },
     { key: 'cadence',      label: 'CadenceHUD',   href: '/cadence.html' },
     { key: 'projects',     label: 'Projects',     href: '/projects.html' },
@@ -140,8 +142,9 @@ const Sidebar = (() => {
   function render(activePage, firmName, currentUser, notifCount, showToolbar) {
     const currentPath = window.location.pathname;
     const NAV_ITEMS = [
-      { href: '/dashboard.html',          icon: '◈', label: 'Dashboard',  section: 'main'  },
-      { href: '/pipeline.html',           icon: '▥', label: 'Pipeline',   section: 'main'  },
+      { href: '/compass.html',             icon: '◈', label: 'Compass',    section: 'main'  },
+      { href: '/dashboard.html',           icon: '◈', label: 'Dashboard',  section: 'main'  },
+      { href: '/pipeline.html',            icon: '▥', label: 'Pipeline',   section: 'main'  },
       { href: '/resources.html',          icon: '◎', label: 'Resources',  section: 'main'  },
       { href: '/resource-requests.html',  icon: '⬡', label: 'Requests',    section: 'main'  },
       { href: '/cadence.html',            icon: '⬡', label: 'CadenceHUD',  section: 'main'  },
