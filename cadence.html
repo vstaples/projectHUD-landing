@@ -6246,6 +6246,23 @@ function renderInstanceDetail(el, inst) {
       setTimeout(() => _instRenderDots(_instScrubEvents, _instScrubEvents.length-1), 100);
     }, 50);
   }
+
+  // Wire tooltip hover directly on each step row after render
+  setTimeout(() => {
+    document.querySelectorAll('[data-tipstep]').forEach(row => {
+      row.addEventListener('mouseenter', function(e) {
+        if (_tooltipSticky) return;
+        _showStepTooltip(this.dataset.tipstep, e);
+      });
+      row.addEventListener('mouseleave', function() {
+        if (_tooltipSticky) return;
+        _hideStepTooltip();
+      });
+    });
+  }, 50);
+
+  // Populate rework badges after DOM settles
+  setTimeout(_populateReworkBadges, 150);
 }
 
 // ── Instance DAG CoC panel toggle ─────────────────────────────────────────────
@@ -6309,28 +6326,6 @@ function toggleInstDagCoC(btn) {
     // Trigger DAG refit since canvas width changed
     setTimeout(() => { _instDagFitted=false; renderInstanceDAG(inst); }, 250);
   }
-
-  // Wire tooltip hover directly on each step row after render
-  if (el._tipOver) el.removeEventListener('mouseover', el._tipOver, true);
-  if (el._tipOut)  el.removeEventListener('mouseout',  el._tipOut,  true);
-  el._tipOver = null;
-  el._tipOut  = null;
-
-  setTimeout(() => {
-    document.querySelectorAll('[data-tipstep]').forEach(row => {
-      row.addEventListener('mouseenter', function(e) {
-        if (_tooltipSticky) return;
-        _showStepTooltip(this.dataset.tipstep, e);
-      });
-      row.addEventListener('mouseleave', function(e) {
-        if (_tooltipSticky) return;
-        _hideStepTooltip();
-      });
-    });
-  }, 0);
-
-  // Populate rework badges after DOM settles
-  setTimeout(_populateReworkBadges, 150);
 }
 
 // ── Rework badge population ───────────────────────────────────────────────────
