@@ -6490,8 +6490,21 @@ let _swimlaneClusters = [];
 
 function _toggleSwimlane() {
   const inst = _selectedInstance;
-  if (!inst || inst._viewMode !== 'diagram') return;
+  if (!inst) return;
+  // Check actual diagram visibility — _viewMode may not be set on fresh load
+  const dagWrap = document.getElementById('inst-dag-wrap');
+  const inDiagram = inst._viewMode === 'diagram' ||
+    (dagWrap && dagWrap.style.display !== 'none' && getComputedStyle(dagWrap).display !== 'none');
+  if (!inDiagram) {
+    cadToast('Switch to Diagram mode first', 'info');
+    return;
+  }
+  // Ensure _viewMode is set so subsequent checks work
+  inst._viewMode = 'diagram';
   _swimlaneActive = !_swimlaneActive;
+  console.log('[Swimlane] active:', _swimlaneActive, '| inst:', inst.id, '| _instances count:', _instances.length);
+  const sibCount = _instances.filter(i => i.template_id === inst.template_id && i.id !== inst.id && i.status === 'in_progress').length;
+  console.log('[Swimlane] siblings with same template + in_progress:', sibCount);
   // Update toggle button appearance
   const btn = document.getElementById('sw-toggle-btn');
   if (btn) {
@@ -6928,6 +6941,7 @@ function renderInstanceDAG(inst) {
       i.status      === 'in_progress' &&
       i.current_step_id
     );
+    console.log('[Swimlane] draw pass — siblings with current_step_id:', siblings.length, siblings.map(s=>({id:s.id.slice(0,8), step:s.current_step_name, status:s.status})));
     // Group siblings by step
     const byStep = {};
     siblings.forEach(sib => {
