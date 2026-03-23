@@ -7293,11 +7293,11 @@ function renderInstanceDAG(inst) {
         ctx.restore();
       }
 
-      // Heat badge — bottom-LEFT corner of node, below and clear of return arcs
+      // Heat badge — outside lower-left corner, shifted left of arc paths
       const label  = `\u21a9 ${heat.total}\u00d7${heat.total === maxHeat && heat.total >= 10 ? ' \u25b2' : ''}`;
-      const bw     = heat.total >= 10 ? 52 : 44, bh = 16;
-      const bx     = p.x;            // left-aligned with node left edge
-      const by     = p.y - bh - 6;   // above node top, clear of arcs below
+      const bw     = heat.total >= 10 ? 52 : 44, bh = 14;
+      const bx     = p.x;            // flush with node left edge
+      const by     = p.y + NH + 6;   // 6px below node bottom, left of arc center
 
       ctx.save();
       ctx.fillStyle   = cols.fill;
@@ -9778,9 +9778,12 @@ function _hxPopulatePanel(inst) {
       onmouseleave="_hxCardLeave()"
       style="flex:1;min-width:160px;max-width:230px;background:var(--bg2);
         border:${heat.total>=10?'2px':'1px'} solid ${cols?cols.stroke:'var(--border)'};
-        border-radius:6px;padding:10px 12px;cursor:pointer;transition:border-color .12s,background .12s"
+        border-radius:6px;padding:10px 12px;cursor:pointer;transition:border-color .12s,background .12s;
+        position:relative;overflow:hidden"
       onmousedown="this.style.background='var(--surf2)'"
       onmouseup="this.style.background='var(--bg2)'">
+      <div class="hx-dbar" style="position:absolute;bottom:0;left:0;height:2px;
+        background:#b432dc;width:0;border-radius:0;transition:none"></div>
       <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:5px;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         ${isBot?`<span style="color:#b432dc">&#9650; </span>`:''}${escHtml(s.name||s.step_type)}
@@ -9801,6 +9804,7 @@ function _hxPopulatePanel(inst) {
 
 let _hxHighlightTimer = null;
 let _hxHighlightStep  = null;
+let _hxCardDwellTimer = null;
 
 function _hxCardClick(stepId) {
   // Flash-highlight the node on the DAG canvas for 2.5s
@@ -9815,24 +9819,32 @@ function _hxCardClick(stepId) {
 }
 
 function _hxCardHover(el, event) {
-  // Show the same breakdown popup as hovering the badge on the canvas
-  try {
-    const heatData = JSON.parse(decodeURIComponent(el.dataset.heat));
-    const cluster  = {
-      stepId: heatData.stepId,
-      heat:   {
-        total:      heatData.total,
-        typeA:      heatData.typeA,
-        typeB:      heatData.typeB,
-        byInstance: heatData.byInstance,
-        stepName:   heatData.stepName,
-      },
-    };
-    _hxShowPopup(cluster, event.clientX, event.clientY, _selectedInstance);
-  } catch(e) {}
+  clearTimeout(_hxCardDwellTimer);
+  // Animate a dwell bar if present
+  const bar = el.querySelector('.hx-dbar');
+  if (bar) {
+    bar.style.transition = 'none'; bar.style.width = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = 'width 1.5s linear'; bar.style.width = '100%';
+    }));
+  }
+  _hxCardDwellTimer = setTimeout(() => {
+    try {
+      const heatData = JSON.parse(decodeURIComponent(el.dataset.heat));
+      const cluster  = {
+        stepId: heatData.stepId,
+        heat: {
+          total: heatData.total, typeA: heatData.typeA, typeB: heatData.typeB,
+          byInstance: heatData.byInstance, stepName: heatData.stepName,
+        },
+      };
+      _hxShowPopup(cluster, event.clientX, event.clientY, _selectedInstance);
+    } catch(e) {}
+  }, 1500);
 }
 
 function _hxCardLeave() {
+  clearTimeout(_hxCardDwellTimer);
   _hxStartHidePopup();
 }
 
