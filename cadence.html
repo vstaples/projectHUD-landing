@@ -7099,8 +7099,10 @@ function renderInstanceDAG(inst) {
 function showIntelBriefing(instId) {
   const inst  = _instances.find(i=>i.id===instId) || _selectedInstance;
   if (!inst) return;
-  // If sibling instance hasn't had full data loaded yet, fetch it first
+  // If sibling instance hasn't had full data loaded yet, show loading modal then fetch
   if (!inst._stepInsts && inst.id !== _selectedInstance?.id) {
+    // Show modal immediately with loading state
+    _showBriefingLoadingModal(inst);
     const tmplId = inst.template_id;
     Promise.all([
       API.get(`workflow_step_instances?instance_id=eq.${inst.id}&order=created_at.asc,id.asc`).catch(()=>[]),
@@ -7116,12 +7118,46 @@ function showIntelBriefing(instId) {
         _attachedDocs: (s.attached_docs||[]).map(d=>({name:d.name,path:d.path||null,url:d.url||null})),
         _meetingAgenda: Array.isArray(s.meeting_agenda)?s.meeting_agenda:[],
       }));
+      // Replace loading modal with full briefing
+      document.getElementById('intel-briefing-overlay')?.remove();
       _showIntelBriefingModal(inst);
-    }).catch(() => _showIntelBriefingModal(inst));
+    }).catch(() => {
+      document.getElementById('intel-briefing-overlay')?.remove();
+      _showIntelBriefingModal(inst);
+    });
     return;
   }
   _showIntelBriefingModal(inst);
 }
+
+function _showBriefingLoadingModal(inst) {
+  const existing = document.getElementById('intel-briefing-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'intel-briefing-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div style="width:min(860px,92vw);background:var(--bg1);border:1px solid var(--border2);
+      border-radius:8px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.6)">
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;
+        border-bottom:1px solid var(--border);background:var(--bg2)">
+        <span style="font-size:16px">◎</span>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:600;color:var(--text)">${escHtml(inst.title||'Intelligence Briefing')}</div>
+          <div style="font-size:11px;color:var(--muted)">Loading briefing data…</div>
+        </div>
+        <button onclick="document.getElementById('intel-briefing-overlay').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;padding:0 4px;line-height:1">×</button>
+      </div>
+      <div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">
+        <div style="font-size:24px;margin-bottom:12px;opacity:.5">◎</div>
+        Fetching workflow data…
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
 
 function _showIntelBriefingModal(inst) {
   const tmpl  = _templates.find(t=>t.id===inst.template_id);
