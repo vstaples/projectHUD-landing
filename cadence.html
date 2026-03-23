@@ -5860,6 +5860,18 @@ function renderInstanceDetail(el, inst) {
                         </div>                      </div>
                       <!-- Rework badge — right side, left of timer -->
                       <span id="rwbadge-${s.id}" style="flex-shrink:0;margin-right:10px;text-align:right"></span>
+                      <!-- History button -->
+                      <button onclick="event.stopPropagation();_showStepTooltip('${s.id}',event)"
+                        title="Step history"
+                        style="flex-shrink:0;margin-right:8px;width:26px;height:26px;
+                          border-radius:4px;border:1px solid var(--border);
+                          background:var(--bg1);color:var(--muted);cursor:pointer;
+                          font-size:12px;display:flex;align-items:center;justify-content:center;
+                          transition:all .12s"
+                        onmouseenter="this.style.borderColor='var(--cad)';this.style.color='var(--cad)'"
+                        onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+                        &#128336;
+                      </button>
                       <!-- Elapsed timer — right justified, dd:hh:mm -->
                       ${(() => {
                         const activatedAt  = stepActivatedAt[s.id];
@@ -6199,12 +6211,12 @@ function renderInstanceDetail(el, inst) {
                           title="Blocked"
                           style="width:18px;height:18px;border-radius:50%;border:2px solid var(--red);
                             background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-                        <div style="width:1px;height:14px;background:var(--border);margin:0 2px"></div>
+                        <div style="width:1px;height:14px;background:var(--border);margin:0 4px"></div>
                         <span style="font-size:9px;color:var(--muted);letter-spacing:.06em;
-                          text-transform:uppercase;margin-right:2px">Hours</span>
+                          text-transform:uppercase;margin-right:4px">Hours Worked</span>
                         <input id="comment-hours-${s.id}" type="number" min="0" max="24" step="0.25"
-                          placeholder="0.0"
-                          style="width:48px;font-size:11px;padding:2px 6px;
+                          placeholder="0.0" oninput="_validateCommentPost('${s.id}')"
+                          style="width:52px;font-size:11px;padding:2px 6px;
                             background:var(--bg1);border:1px solid var(--border);
                             border-radius:3px;color:var(--text);font-family:var(--font-mono)" />
                         <div style="flex:1"></div>
@@ -6213,6 +6225,7 @@ function renderInstanceDetail(el, inst) {
                       <!-- Text area -->
                       <textarea id="comment-body-${s.id}"
                         placeholder="Add a note, flag a risk, log progress…"
+                        oninput="_validateCommentPost('${s.id}')"
                         style="width:100%;box-sizing:border-box;padding:8px 10px;
                           font-size:11px;line-height:1.5;resize:vertical;min-height:56px;
                           background:transparent;border:none;color:var(--text);
@@ -6324,23 +6337,9 @@ function renderInstanceDetail(el, inst) {
     }, 50);
   }
 
-  // Wire tooltip hover directly on each step row after render
-  setTimeout(() => {
-    document.querySelectorAll('[data-tipstep]').forEach(row => {
-      row.addEventListener('mouseenter', function(e) {
-        if (_tooltipSticky) return;
-        _showStepTooltip(this.dataset.tipstep, e);
-      });
-      row.addEventListener('mouseleave', function() {
-        if (_tooltipSticky) return;
-        _hideStepTooltip();
-      });
-    });
-    _populateAllCommentThreads();
-  }, 50);
-
   // Populate rework badges after DOM settles
   setTimeout(_populateReworkBadges, 150);
+  setTimeout(_populateAllCommentThreads, 100);
 }
 
 // ── Instance DAG CoC panel toggle ─────────────────────────────────────────────
@@ -6891,27 +6890,21 @@ function renderInstanceDAG(inst) {
       } else { _instDagPanX-=e.deltaX; _instDagPanY-=e.deltaY; }
       renderInstanceDAG(inst);
     },{passive:false});
-    // Mousemove — show step tooltip on node hover
+    // Mousemove — cursor change on node hover only (history via button, not hover)
     wrap.addEventListener('mousemove', e => {
-      if (_instDagDrag) { _hideStepTooltip(); return; }
-      if (_tooltipSticky) return; // don't interfere while tooltip is open
+      if (_instDagDrag) return;
+      if (_tooltipSticky) return;
       const r   = wrap.getBoundingClientRect();
       const mx  = (e.clientX - r.left  - _instDagPanX) / _instDagScale;
       const my  = (e.clientY - r.top   - _instDagPanY) / _instDagScale;
-      let hit = null;
+      let hit = false;
       steps.forEach((s, i) => {
         const px = PAD_L + i * (NW + HGAP), py = NODE_Y;
-        if (mx >= px && mx <= px + NW && my >= py && my <= py + NH) hit = s.id;
+        if (mx >= px && mx <= px + NW && my >= py && my <= py + NH) hit = true;
       });
-      if (hit) {
-        wrap.style.cursor = 'default';
-        _showStepTooltip(hit, e);
-      } else {
-        wrap.style.cursor = 'grab';
-        _hideStepTooltip();
-      }
+      wrap.style.cursor = hit ? 'default' : 'grab';
     });
-    wrap.addEventListener('mouseleave', () => { if (!_tooltipSticky) _hideStepTooltip(); });
+    wrap.addEventListener('mouseleave', () => { wrap.style.cursor = 'grab'; });
     // Click node to open step completion in list view
     wrap.addEventListener('click',e=>{
       const r=wrap.getBoundingClientRect();
@@ -7492,12 +7485,12 @@ function _getOrCreateTooltip() {
 }
 
 function _showStepTooltip(stepId, event) {
-  if (_tooltipSticky) return;  // don't interrupt a sticky tooltip
-  if (_tooltipStepId === stepId && _tooltipVisible) return;
+  if (_tooltipStepId === stepId && _tooltipVisible) {
+    _closeStepTooltip(); // toggle — click again to close
+    return;
+  }
   clearTimeout(_tooltipTimer);
-  _tooltipTimer = setTimeout(() => {
-    _renderStepTooltip(stepId, event);
-  }, 600);
+  _renderStepTooltip(stepId, event);
 }
 
 function _hideStepTooltip(force) {
@@ -7719,6 +7712,41 @@ function _renderStepTooltipAll(stepId) {
 // Per-step comment state (confidence selection)
 const _commentConf = {};  // stepId -> 'green'|'yellow'|'red'|null
 
+function _validateCommentPost(stepId) {
+  const bodyEl   = document.getElementById(`comment-body-${stepId}`);
+  const hoursEl  = document.getElementById(`comment-hours-${stepId}`);
+  const submitBtn = document.querySelector(`button[onclick="postStepComment('${stepId.replace(/'/g,"\\'")}','${stepId.replace(/'/g,"\\'")}')"]`);
+  const statusEl = document.getElementById(`comment-status-${stepId}`);
+  // Find the submit button more reliably
+  const allBtns = document.querySelectorAll(`[onclick*="postStepComment"][onclick*="${stepId}"]`);
+  const btn = allBtns[0];
+  if (!btn) return;
+
+  const body  = (bodyEl?.value || '').trim();
+  const hours = hoursEl?.value ? parseFloat(hoursEl.value) : 0;
+  const hasHours = hours > 0;
+  const MIN_CHARS_WITH_HOURS = 20;
+
+  if (hasHours && body.length < MIN_CHARS_WITH_HOURS) {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    if (statusEl) statusEl.textContent = `Describe work completed to log hours (${body.length}/${MIN_CHARS_WITH_HOURS} chars)`;
+  } else if (!body) {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    if (statusEl) statusEl.textContent = '';
+  } else {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    if (statusEl && hasHours) {
+      statusEl.textContent = `Logging ${hours}h`;
+      statusEl.style.color = 'var(--amber)';
+    } else if (statusEl) {
+      statusEl.textContent = '';
+    }
+  }
+}
+
 function setCommentConf(stepId, conf) {
   const current = _commentConf[stepId];
   const next = current === conf ? null : conf;
@@ -7739,10 +7767,13 @@ async function postStepComment(instId, stepId) {
   const hoursEl = document.getElementById(`comment-hours-${stepId}`);
   const statusEl = document.getElementById(`comment-status-${stepId}`);
   const body = (bodyEl?.value || '').trim();
-  if (!body) { if (statusEl) { statusEl.textContent = 'Note is empty.'; setTimeout(() => statusEl.textContent='', 2000); } return; }
-
-  const conf  = _commentConf[stepId] || null;
   const hours = hoursEl?.value ? parseFloat(hoursEl.value) : null;
+
+  if (!body) { if (statusEl) { statusEl.textContent = 'Note is empty.'; setTimeout(() => statusEl.textContent='', 2000); } return; }
+  if (hours && hours > 0 && body.length < 20) {
+    if (statusEl) { statusEl.textContent = 'Describe the work completed to log hours.'; setTimeout(() => statusEl.textContent='', 3000); }
+    return;
+  }
   const inst  = _selectedInstance;
   const authorName = inst?._pmName || 'Vaughn W. Staples';
 
