@@ -1339,98 +1339,84 @@ async function loadUserView() {
     _teEntries = myTimeEntries;
     if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null; // reset if stale
 
-    // ── Speedometer gauges ────────────────────────────────────────────
+    // ── Ring gauges (EVM style — matches UI.gauge in ui.js) ──────────
+    // Full-circle stroke-dasharray ring. r=26, circumference=163.4
     const gaugeMax = Math.max(maxDayHours, 8);
+    const gR  = 26;
+    const gC  = +(2 * Math.PI * gR).toFixed(1); // 163.4
 
-    // SVG arc helper — half-circle from 180° (left) to 0° (right)
-    // deg=0 → left end, deg=180 → right end, maps to 0–8h
-    function arcD(cx, cy, rad, startDeg, endDeg) {
-      const toRad = a => (a - 180) * Math.PI / 180;
-      const x1 = cx + rad * Math.cos(toRad(startDeg));
-      const y1 = cy + rad * Math.sin(toRad(startDeg));
-      const x2 = cx + rad * Math.cos(toRad(endDeg));
-      const y2 = cy + rad * Math.sin(toRad(endDeg));
-      const large = (endDeg - startDeg) > 180 ? 1 : 0;
-      return `M${x1.toFixed(1)},${y1.toFixed(1)} A${rad},${rad} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)}`;
-    }
-
-    // Gauge panel width is dynamic — use 97px per gauge in a 680px SVG viewBox
-    const gVB = 680;
-    const gW  = Math.floor(gVB / 7); // ~97px
-    const gCY = 80;  // vertical center of arcs
-    const gR  = 32;  // arc radius
-
-    const gauges = weekDays.map((d, i) => {
+    const barChart = `<div style="display:flex;justify-content:space-around;padding:10px 8px 4px">` +
+    weekDays.map((d, i) => {
       const hrs     = hoursByDay[d]    || 0;
       const bill    = billableByDay[d] || 0;
       const nonBill = hrs - bill;
       const isToday  = d === today;
       const isActive = _teFilter === d;
 
-      const cx = gW * i + gW / 2;
+      const pct      = Math.min(hrs / gaugeMax, 1);
+      const billPct  = Math.min(bill / gaugeMax, 1);
+      const nbPct    = Math.min(nonBill / gaugeMax, 1);
 
-      const billColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#1D9E75';
-      const nbColor    = isActive ? 'rgba(239,159,39,.3)' : 'rgba(255,255,255,.18)';
-      const labelColor = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#90B8D8';
-      const metaColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#6A94B8';
-      const needleColor = billColor;
+      // stroke-dashoffset: full circle minus filled arc
+      const billOffset = +(gC * (1 - billPct)).toFixed(1);
+      const nbOffset   = +(gC * (1 - nbPct)).toFixed(1);
+      const totOffset  = +(gC * (1 - pct)).toFixed(1);
 
-      const billDeg    = (bill    / gaugeMax) * 180;
-      const totalDeg   = (hrs     / gaugeMax) * 180;
+      const ringColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : hrs > 0 ? '#1D9E75' : 'rgba(255,255,255,0)';
+      const nbColor    = isActive ? 'rgba(239,159,39,.35)' : 'rgba(255,255,255,.2)';
+      const pillColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : hrs > 0 ? '#1D9E75' : 'var(--text3)';
+      const dayColor   = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#6A94B8';
+      const fw         = isToday || isActive ? '600' : '400';
 
-      // Needle endpoint
-      const needleRad = (totalDeg - 180) * Math.PI / 180;
-      const nx = (cx + (gR - 5) * Math.cos(needleRad)).toFixed(1);
-      const ny = (gCY + (gR - 5) * Math.sin(needleRad)).toFixed(1);
+      // Non-billable ring rotated to start where billable ends
+      // rotation in degrees: billPct × 360 - 90 (SVG starts at top)
+      const nbRotate = (billPct * 360 - 90).toFixed(1);
 
       return `
-        <g class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
-          style="cursor:${hrs > 0 ? 'pointer' : 'default'}">
+      <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
+        style="display:flex;flex-direction:column;align-items:center;gap:4px;
+          cursor:${hrs > 0 ? 'pointer' : 'default'};min-width:0;flex:1">
 
-          <!-- Track -->
-          <path d="${arcD(cx, gCY, gR, 0, 179.9)}"
-            fill="none" stroke="rgba(255,255,255,.07)" stroke-width="5" stroke-linecap="round"/>
+        <div style="position:relative;width:58px;height:58px">
+          <svg viewBox="0 0 58 58" width="58" height="58" style="transform:rotate(-90deg)">
+            <!-- Track -->
+            <circle fill="none" stroke="rgba(255,255,255,.07)" stroke-width="5"
+              cx="29" cy="29" r="${gR}"/>
+            ${hrs > 0 ? `
+            <!-- Billable arc -->
+            <circle fill="none" stroke="${ringColor}" stroke-width="5" stroke-linecap="butt"
+              cx="29" cy="29" r="${gR}"
+              stroke-dasharray="${gC}" stroke-dashoffset="${billOffset}"/>
+            ${nonBill > 0 ? `
+            <!-- Non-billable arc (rotated to start after billable) -->
+            <circle fill="none" stroke="${nbColor}" stroke-width="5" stroke-linecap="butt"
+              cx="29" cy="29" r="${gR}"
+              stroke-dasharray="${gC}" stroke-dashoffset="${nbOffset}"
+              transform="rotate(${nbRotate} 29 29)"/>` : ''}
+            ` : ''}
+          </svg>
 
-          ${hrs > 0 ? `
-          <!-- Billable arc -->
-          ${bill > 0 ? `<path d="${arcD(cx, gCY, gR, 0, Math.min(billDeg, 179.9))}"
-            fill="none" stroke="${billColor}" stroke-width="5" stroke-linecap="round"/>` : ''}
+          <!-- Pill: hours value -->
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;
+            align-items:center;justify-content:center;gap:1px">
+            <div style="font-family:var(--font-mono);font-size:11px;font-weight:600;
+              color:${pillColor};background:var(--bg2);
+              padding:1px 6px;border-radius:8px;
+              border:1px solid ${hrs > 0 ? ringColor : 'rgba(255,255,255,.08)'};
+              line-height:1.4;min-width:26px;text-align:center">
+              ${hrs > 0 ? hrs.toFixed(1) : '—'}
+            </div>
+          </div>
+        </div>
 
-          <!-- Non-billable arc -->
-          ${nonBill > 0 ? `<path d="${arcD(cx, gCY, gR, billDeg, Math.min(totalDeg, 179.9))}"
-            fill="none" stroke="${nbColor}" stroke-width="5" stroke-linecap="round"/>` : ''}
-
-          <!-- Needle -->
-          <line x1="${cx}" y1="${gCY}" x2="${nx}" y2="${ny}"
-            stroke="${needleColor}" stroke-width="1.5" stroke-linecap="round"/>
-          ` : ''}
-
-          <!-- Hub dot -->
-          <circle cx="${cx}" cy="${gCY}" r="3"
-            fill="${hrs > 0 ? billColor : 'rgba(255,255,255,.12)'}"/>
-
-          <!-- Hours label above arc -->
-          <text x="${cx}" y="${gCY - gR - 6}" text-anchor="middle"
-            font-family="var(--font-mono)" font-size="11"
-            font-weight="${hrs > 0 ? '600' : '400'}"
-            fill="${hrs > 0 ? labelColor : 'rgba(255,255,255,.15)'}">
-            ${hrs > 0 ? hrs.toFixed(1) : ''}
-          </text>
-
-          <!-- Day letter -->
-          <text x="${cx}" y="${gCY + 15}" text-anchor="middle"
-            font-family="var(--font-mono)" font-size="11"
-            font-weight="${isToday || isActive ? '600' : '400'}"
-            fill="${metaColor}">${weekLabels[i]}</text>
-
-          <!-- Date number -->
-          <text x="${cx}" y="${gCY + 28}" text-anchor="middle"
-            font-family="var(--font-mono)" font-size="11"
-            fill="#6A94B8">${new Date(d + 'T00:00:00').getDate()}</text>
-        </g>`;
-    }).join('');
-
-    const barChart = `<svg viewBox="0 0 ${gVB} 120" style="width:100%;display:block">${gauges}</svg>`;
+        <!-- Day + date below ring -->
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:${fw};
+          color:${dayColor};text-align:center;line-height:1.3">
+          ${weekLabels[i]}<br>
+          <span style="font-weight:400;color:#6A94B8">${new Date(d + 'T00:00:00').getDate()}</span>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
 
     const barLegend = `
       <div style="display:flex;align-items:center;gap:12px;padding:0 13px 6px;
