@@ -1005,6 +1005,10 @@ let _teSelected  = null;   // id of currently selected time log row
 let _wfStatus    = 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
 let _wfProject   = '';     // project id | '' = all
 let _wfDateRange = 'week'; // 'today' | 'week' | '30d' | 'all'
+let _wfType      = 'all';  // 'all' | 'task' | 'action'  [Session 16]
+let _doneToday   = [];     // session-persistent completed items  [Session 16]
+let _activeGauge = null;   // clicked gauge date key | null  [Session 16]
+let _dwellTimer  = null;   // gauge hover dwell timer  [Session 16]
 
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('compass-date').textContent =
