@@ -2059,6 +2059,21 @@ async function loadPMView() {
       /* Exceptions / Team / Action items tab panels */
       .pm-tabpanel{display:none;overflow-y:auto;flex:1;padding:12px}
       .pm-tabpanel.on{display:block}
+      /* Tooltip */
+      .pm-tooltip{position:fixed;z-index:9999;background:#0d1e35;border:1px solid rgba(0,210,255,.3);
+        box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px 13px;min-width:200px;max-width:320px;
+        pointer-events:none;opacity:0;transition:opacity .12s}
+      .pm-tooltip.show{opacity:1}
+      .pm-tt-hdr{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+        text-transform:uppercase;color:#3A5C80;margin-bottom:6px}
+      .pm-tt-row{display:flex;justify-content:space-between;gap:12px;font-family:var(--font-head);
+        font-size:11px;color:#C8DFF0;margin-bottom:3px}
+      .pm-tt-row span:last-child{font-family:var(--font-display);font-weight:700}
+      .pm-tt-bar{height:3px;background:rgba(255,255,255,.08);margin:5px 0 7px;border-radius:2px;overflow:hidden}
+      .pm-tt-bar-fill{height:100%;background:var(--compass-cyan);border-radius:2px}
+      .pm-tt-person{display:flex;justify-content:space-between;gap:8px;font-family:var(--font-head);
+        font-size:11px;padding:3px 0;border-bottom:1px solid rgba(0,210,255,.06)}
+      .pm-tt-person:last-child{border-bottom:none}
     `;
     document.head.appendChild(s);
   }
@@ -2148,17 +2163,40 @@ async function loadPMView() {
     }
 
     // ── Day grid HTML ────────────────────────────────────
-    function dayGridHtml(hoursByDay) {
+    function dayGridHtml(hoursByDay, projId) {
       return dayLabels.map((lbl,i)=>{
         const d = weekDays[i];
         const hrs = hoursByDay[d]||0;
         const isToday = d===today;
+        const dayEntries = (weekEntries||[]).filter(e=>e.project_id===projId&&e.date===d);
+        const bill = dayEntries.filter(e=>e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+        const nonbill = hrs - bill;
+        const billPct = hrs>0 ? Math.round(bill/hrs*100) : 0;
         const dotColor = hrs>8?'#E24B4A':hrs>0?'#1D9E75':isToday?'#00D2FF':'#2A4060';
         const hrsColor = hrs>8?'var(--compass-red)':hrs>0?'var(--compass-green)':isToday?'var(--compass-cyan)':'#2A4060';
-        return `<div class="pm-dcell">
+        // Build per-person tooltip data
+        const byResource = {};
+        dayEntries.forEach(e=>{
+          if(!byResource[e.resource_id]) byResource[e.resource_id]={bill:0,nonbill:0};
+          if(e.is_billable) byResource[e.resource_id].bill+=parseFloat(e.hours||0);
+          else byResource[e.resource_id].nonbill+=parseFloat(e.hours||0);
+        });
+        const personRows = Object.entries(byResource).map(([rid,v])=>{
+          const res=_resources.find(r=>r.id===rid);
+          const name=res?res.first_name+' '+res.last_name:'Unknown';
+          const tot=(v.bill+v.nonbill).toFixed(1);
+          return name+'|'+tot+'|'+v.bill.toFixed(1)+'|'+v.nonbill.toFixed(1);
+        }).join(';');
+        const ttData = JSON.stringify({d,hrs:hrs.toFixed(1),bill:bill.toFixed(1),nonbill:nonbill.toFixed(1),billPct,persons:personRows});
+        return `<div class="pm-dcell" data-tt='${ttData.replace(/'/g,"&#39;")}' data-date="${d}"
+          onmouseenter="pmShowDayTip(event,this)"
+          onmouseleave="pmHideTip()">
           <div class="pm-dlbl">${lbl}</div>
           <div class="pm-dot" style="background:${dotColor}"></div>
           <div class="pm-dhrs" style="color:${hrsColor}">${hrs>0?hrs.toFixed(1)+'h':'—'}</div>
+          ${hrs>0?`<div style="height:3px;background:rgba(255,255,255,.08);margin-top:3px;border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${billPct}%;background:var(--compass-cyan);border-radius:2px"></div>
+          </div>`:'<div style="height:3px;margin-top:3px"></div>'}
         </div>`;
       }).join('');
     }
@@ -2202,7 +2240,7 @@ async function loadPMView() {
 
         <!-- Day grid: individual boxed cells like mockup -->
         <div class="pm-dgrid">
-          ${dayGridHtml(hoursByDay)}
+          ${dayGridHtml(hoursByDay, p.id)}
         </div>
 
         <!-- Progress bar — full width, colored -->
@@ -2238,8 +2276,12 @@ async function loadPMView() {
 
         <!-- Chip row: overdue + requests + red signal + P50 right-aligned -->
         <div class="pm-chiprow">
-          ${overdueTasks.length>0?`<span class="pm-chip pm-chip-r">${overdueTasks.length} overdue</span>`:''}
-          ${projReqs.length>0?`<span class="pm-chip pm-chip-a">${projReqs.length} request${projReqs.length>1?'s':''}</span>`:''}
+          ${overdueTasks.length>0?`<span class="pm-chip pm-chip-r" style="cursor:pointer"
+            data-tt='${JSON.stringify({type:"overdue",items:overdueTasks.slice(0,8).map(t=>({n:(t.name||t.title||'—').slice(0,40),d:t.due_date||''}))}).replace(/'/g,"&#39;")}'
+            onmouseenter="pmShowOverdueTip(event,this)" onmouseleave="pmHideTip()">${overdueTasks.length} overdue</span>`:''}
+          ${projReqs.length>0?`<span class="pm-chip pm-chip-a" style="cursor:pointer"
+            data-tt='${JSON.stringify({type:"reqs",items:projReqs.slice(0,6).map(r=>({d:r.submitted_at||'',p:(_projects.find(x=>x.id===r.project_id)?.name||'—').slice(0,30)}))}).replace(/'/g,"&#39;")}'
+            onmouseenter="pmShowReqsTip(event,this)" onmouseleave="pmHideTip()">${projReqs.length} request${projReqs.length>1?'s':''}</span>`:''}
           ${projFlags.length>0?`<span class="pm-chip pm-chip-r">${projFlags.length} red signal${projFlags.length>1?'s':''}</span>`:''}
           <span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#4A6E90">
             P50 <strong style="color:${barColor}">${p.target_date?fmtDate(p.target_date):'—'}</strong>
@@ -2264,7 +2306,7 @@ async function loadPMView() {
           <span class="pm-alert-proj">${esc(f.projName)}</span>
           <span class="pm-alert-msg">${actorLabel}${noteLabel}</span>
           <span class="pm-alert-age">${_timeAgo(f.created_at)}</span>
-          <button class="pm-btn pm-btn-red">Acknowledge</button>
+          <button class="pm-btn pm-btn-red" onclick="pmAcknowledge('${f.instance_id}',null,this)">Acknowledge</button>
           <button class="pm-btn pm-btn-cyan" onclick="event.stopPropagation();pmOpenDrawer('${f.projId}')">Open instance →</button>
         </div>`);
       });
@@ -2279,8 +2321,8 @@ async function loadPMView() {
           <span class="pm-alert-proj">${esc(proj?.name||'—')}</span>
           <span class="pm-alert-msg">Resource request — pending ${hrs}h with no response</span>
           <span class="pm-alert-age">${_timeAgo(r.submitted_at)}</span>
-          <button class="pm-btn pm-btn-red">Acknowledge</button>
-          <button class="pm-btn pm-btn-cyan">Open request →</button>
+          <button class="pm-btn pm-btn-red" onclick="pmAcknowledge(null,'${r.id}',this)">Acknowledge</button>
+          <button class="pm-btn pm-btn-cyan" onclick="window.location.href='/resource-requests.html'">Open request →</button>
         </div>`);
       });
       return alerts.length ? `<div class="pm-alertrail">${alerts.join('')}</div>` : '';
@@ -2445,6 +2487,118 @@ async function loadPMView() {
         </div>
       </div>
     </div>`;
+
+    // ── Tooltip engine ───────────────────────────────────
+    (function() {
+      let tip = null;
+      function getTip() {
+        if (!tip) {
+          tip = document.createElement('div');
+          tip.className = 'pm-tooltip';
+          document.body.appendChild(tip);
+        }
+        return tip;
+      }
+      function pos(ev) {
+        const t=getTip(), W=window.innerWidth, H=window.innerHeight;
+        const x = ev.clientX + 14, y = ev.clientY - 10;
+        t.style.left = (x + t.offsetWidth > W-16 ? ev.clientX - t.offsetWidth - 14 : x) + 'px';
+        t.style.top  = (y + t.offsetHeight > H-16 ? ev.clientY - t.offsetHeight - 6 : y) + 'px';
+      }
+      window.pmHideTip = function() {
+        const t = getTip(); t.classList.remove('show'); t.innerHTML = '';
+      };
+      window.pmShowDayTip = function(ev, el) {
+        try {
+          const d = JSON.parse(el.dataset.tt.replace(/&#39;/g,"'"));
+          const t = getTip();
+          const dateLabel = new Date(d.d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+          let html = `<div class="pm-tt-hdr">${dateLabel}</div>`;
+          if (parseFloat(d.hrs) > 0) {
+            html += `<div class="pm-tt-row"><span>Total</span><span style="color:var(--compass-cyan)">${d.hrs}h</span></div>`;
+            html += `<div class="pm-tt-bar"><div class="pm-tt-bar-fill" style="width:${d.billPct}%"></div></div>`;
+            html += `<div class="pm-tt-row"><span style="color:var(--compass-cyan)">Billable</span><span style="color:var(--compass-cyan)">${d.bill}h (${d.billPct}%)</span></div>`;
+            html += `<div class="pm-tt-row"><span style="color:#8B5CF6">Non-bill</span><span style="color:#8B5CF6">${d.nonbill}h (${100-d.billPct}%)</span></div>`;
+            if (d.persons) {
+              html += `<div style="margin-top:8px;border-top:1px solid rgba(0,210,255,.12);padding-top:6px">`;
+              html += `<div class="pm-tt-hdr" style="margin-bottom:4px">Per person</div>`;
+              d.persons.split(';').filter(Boolean).forEach(row => {
+                const [name,tot,bill,nb] = row.split('|');
+                const bp = tot>0?Math.round(bill/tot*100):0;
+                html += `<div class="pm-tt-person">
+                  <span style="color:#C8DFF0">${name}</span>
+                  <span style="color:var(--compass-cyan)">${tot}h</span>
+                  <span style="color:#3A5C80">${bp}% bill</span>
+                </div>`;
+              });
+              html += '</div>';
+            }
+          } else {
+            html += `<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">No time logged</div>`;
+          }
+          t.innerHTML = html;
+          t.classList.add('show');
+          pos(ev);
+        } catch(e) {}
+      };
+      window.pmShowOverdueTip = function(ev, el) {
+        try {
+          const d = JSON.parse(el.dataset.tt.replace(/&#39;/g,"'"));
+          const t = getTip();
+          let html = `<div class="pm-tt-hdr">Overdue tasks (${d.items.length}${d.items.length===8?'+':''})</div>`;
+          d.items.forEach(item => {
+            const days = item.d ? Math.floor((Date.now()-new Date(item.d+'T00:00:00').getTime())/86400000) : null;
+            html += `<div class="pm-tt-person">
+              <span style="color:#C8DFF0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.n}</span>
+              ${days!==null?`<span style="color:#E24B4A;flex-shrink:0;margin-left:8px">${days}d ago</span>`:''}
+            </div>`;
+          });
+          t.innerHTML = html; t.classList.add('show'); pos(ev);
+        } catch(e) {}
+      };
+      window.pmShowReqsTip = function(ev, el) {
+        try {
+          const d = JSON.parse(el.dataset.tt.replace(/&#39;/g,"'"));
+          const t = getTip();
+          let html = `<div class="pm-tt-hdr">Pending requests (${d.items.length})</div>`;
+          d.items.forEach(item => {
+            const age = item.d ? Math.floor((Date.now()-new Date(item.d).getTime())/3600000) : null;
+            html += `<div class="pm-tt-person">
+              <span style="color:#C8DFF0">${item.p}</span>
+              ${age!==null?`<span style="color:${age>48?'#E24B4A':'#EF9F27'};flex-shrink:0">${age}h ago</span>`:''}
+            </div>`;
+          });
+          t.innerHTML = html; t.classList.add('show'); pos(ev);
+        } catch(e) {}
+      };
+      document.addEventListener('mousemove', function(ev) {
+        const t = getTip(); if (!t.classList.contains('show')) return;
+        pos(ev);
+      });
+    })();
+
+    // ── Acknowledge handler ───────────────────────────────
+    window.pmAcknowledge = function(instanceId, reqId, el) {
+      const row = el.closest('.pm-alert');
+      row.style.transition = 'opacity .3s';
+      row.style.opacity = '0.3';
+      if (instanceId) {
+        API.post('workflow_step_instances', {
+          event_type: 'flag_acknowledged',
+          instance_id: instanceId,
+          created_at: new Date().toISOString(),
+          firm_id: 'aaaaaaaa-0001-0001-0001-000000000001'
+        }).catch(()=>{});
+      }
+      setTimeout(() => {
+        row.style.maxHeight = row.offsetHeight + 'px';
+        row.style.overflow = 'hidden';
+        row.style.transition = 'max-height .25s ease, padding .25s ease, opacity .1s';
+        row.style.maxHeight = '0';
+        row.style.padding = '0';
+        setTimeout(() => row.remove(), 280);
+      }, 200);
+    };
 
     // ── Tab switcher ─────────────────────────────────────
     window.pmSwitchTab = function(el, panelId) {
