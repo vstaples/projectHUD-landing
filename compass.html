@@ -1221,7 +1221,7 @@ async function loadUserView() {
     const resId = _myResource.id;
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries] = await Promise.all([
-      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${resId}&status=not.in.(complete,cancelled)&order=due_date.asc`).catch(() => []),
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${resId}&status=neq.complete&order=due_date.asc`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&order=due_date.asc`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
