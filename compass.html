@@ -890,7 +890,7 @@
 
     <!-- Cadence link -->
     <a href="/cadence.html"
-      style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+      style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
         color:var(--text3);text-decoration:none;padding:0 10px;transition:color .12s"
       onmouseenter="this.style.color='var(--compass-cyan)'"
       onmouseleave="this.style.color='var(--text3)'"
@@ -907,7 +907,7 @@
     </div>
 
     <!-- Date -->
-    <div id="compass-date" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-right:14px;letter-spacing:.05em"></div>
+    <div id="compass-date" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-right:14px;letter-spacing:.05em"></div>
 
     <!-- User -->
     <div class="nav-user">
@@ -1000,6 +1000,11 @@ let _teFilter    = null;   // date string 'YYYY-MM-DD' | null — filters time l
 let _teEntries   = [];     // cached time entries for current user view session
 let _wiItems     = [];     // cached work items for drawer access
 let _teSelected  = null;   // id of currently selected time log row
+
+// My Work filter state
+let _wfStatus    = 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
+let _wfProject   = '';     // project id | '' = all
+let _wfDateRange = 'week'; // 'today' | 'week' | '30d' | 'all'
 
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('compass-date').textContent =
@@ -1203,13 +1208,13 @@ async function loadUserView() {
     const d = _identityDebug;
     content.innerHTML = `
       <div style="padding:40px 20px;text-align:center">
-        <div style="font-family:var(--font-mono);font-size:10px;color:var(--compass-red);
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--compass-red);
           margin-bottom:12px;letter-spacing:.12em">⚠ IDENTITY NOT RESOLVED</div>
 
         <!-- What we found -->
         <div style="display:inline-block;text-align:left;background:var(--bg1);
           border:1px solid var(--border);padding:14px 20px;margin-bottom:16px;
-          font-family:var(--font-mono);font-size:10px;line-height:2;min-width:320px">
+          font-family:var(--font-mono);font-size:11px;line-height:2;min-width:320px">
           <div style="color:var(--text3);letter-spacing:.08em;margin-bottom:4px">SESSION DETAILS</div>
           <div><span style="color:var(--text3)">Auth email&nbsp;&nbsp;&nbsp;</span>
             <span style="color:${d.authEmail ? 'var(--compass-cyan)' : 'var(--compass-red)'}">
@@ -1235,13 +1240,13 @@ async function loadUserView() {
             : `No email found in session token. Try logging out and back in.`}
         </div>
 
-        <a href="/users.html" style="font-family:var(--font-mono);font-size:10px;
+        <a href="/users.html" style="font-family:var(--font-mono);font-size:11px;
           letter-spacing:.1em;color:var(--compass-cyan);text-decoration:none;
           border:1px solid rgba(0,210,255,.3);padding:6px 16px;margin-right:8px">
           USER MGMT →
         </a>
         <button onclick="_viewLoaded['user']=false;loadUserView()"
-          style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
             color:var(--text2);background:none;border:1px solid var(--border);
             padding:6px 16px;cursor:pointer">
           RETRY
@@ -1256,7 +1261,7 @@ async function loadUserView() {
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=due_date.asc`).catch(() => []),
-      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&order=due_date.asc`).catch(() => []),
+      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
@@ -1349,7 +1354,7 @@ async function loadUserView() {
         <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
           style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
             cursor:${hrs > 0 ? 'pointer' : 'default'}">
-          <div style="font-family:var(--font-mono);font-size:10px;
+          <div style="font-family:var(--font-mono);font-size:11px;
             color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
             ${hrs > 0 ? hrs.toFixed(1) : ''}
           </div>
@@ -1357,10 +1362,10 @@ async function loadUserView() {
             <div style="width:80%;height:${Math.max(pct, hrs > 0 ? 4 : 0)}%;background:${barColor};
               border-radius:2px 2px 0 0;transition:all .2s;min-height:${hrs > 0 ? '2px' : '0'}"></div>
           </div>
-          <div style="font-family:var(--font-mono);font-size:10px;
+          <div style="font-family:var(--font-mono);font-size:11px;
             color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'};
             font-weight:${isToday || isActive ? '600' : '400'}">${weekLabels[i]}</div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
             ${new Date(d + 'T00:00:00').getDate()}
           </div>
         </div>`;
@@ -1405,7 +1410,7 @@ async function loadUserView() {
           <div class="cmp-panel" style="margin-bottom:14px">
             <div class="panel-hdr">
               <div class="panel-title">This week — hours by day</div>
-              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
                 ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
                 –
                 ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
@@ -1418,7 +1423,7 @@ async function loadUserView() {
 
           <!-- My work list -->
           <div class="cmp-panel">
-            <div class="panel-hdr">
+            <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
               <div class="panel-title">My work</div>
               <div style="display:flex;align-items:center;gap:8px">
                 ${overdueCount > 0
@@ -1426,59 +1431,78 @@ async function loadUserView() {
                   : '<span class="panel-badge pb-green">All current</span>'}
               </div>
             </div>
-            <!-- Column header row -->
-            <div style="display:flex;align-items:center;gap:8px;padding:4px 13px 4px;
+
+            <!-- Filter bar -->
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 13px;
+              border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg2)">
+              <div style="display:flex;gap:3px">
+                ${['all','not_started','in_progress','blocked'].map(s => {
+                  const labels = {all:'All',not_started:'Not started',in_progress:'In progress',blocked:'Blocked'};
+                  const active = _wfStatus === s;
+                  return '<button class="wf-status-btn" data-status="'+s+'" style="font-family:var(--font-mono);font-size:11px;padding:3px 9px;background:'+(active?'var(--compass-cyan)':'none')+';color:'+(active?'#060a10':'var(--text2)')+';border:1px solid '+(active?'var(--compass-cyan)':'var(--border)')+';cursor:pointer">'+labels[s]+'</button>';
+                }).join('')}
+              </div>
+              <div style="display:flex;gap:3px">
+                ${[['today','Today'],['week','Week'],['30d','30d'],['all','All time']].map(([v,l]) => {
+                  const active = _wfDateRange === v;
+                  return '<button class="wf-date-btn" data-range="'+v+'" style="font-family:var(--font-mono);font-size:11px;padding:3px 9px;background:'+(active?'rgba(239,159,39,.2)':'none')+';color:'+(active?'var(--compass-amber)':'var(--text2)')+';border:1px solid '+(active?'var(--compass-amber)':'var(--border)')+';cursor:pointer">'+l+'</button>';
+                }).join('')}
+              </div>
+              <select class="wf-proj-sel" style="font-family:var(--font-mono);font-size:11px;padding:3px 8px;background:var(--bg1);color:var(--text1);border:1px solid ${_wfProject ? 'var(--compass-cyan)' : 'var(--border)'};cursor:pointer;flex:1;min-width:120px;max-width:180px">
+                <option value="">All projects</option>
+                ${[...new Set(workItems.filter(w=>w.projectId).map(w=>w.projectId))].map(pid => {
+                  const p = _projects.find(p => p.id === pid);
+                  return p ? '<option value="'+p.id+'" '+(_wfProject === p.id ? 'selected' : '')+'>'+esc(p.name)+'</option>' : '';
+                }).join('')}
+              </select>
+            </div>
+
+            <!-- Column headers -->
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 13px;
               border-bottom:1px solid var(--border);
               font-family:var(--font-mono);font-size:11px;color:var(--text3);
               letter-spacing:.08em;text-transform:uppercase">
               <div style="width:8px;flex-shrink:0"></div>
               <div style="flex:1">Task / Action item</div>
-              <div style="width:200px;flex-shrink:0;display:flex;align-items:center;gap:5px">Progress</div>
-              <div style="width:60px;text-align:center;flex-shrink:0;
-                ${overdueCount > 0 ? 'color:var(--compass-red)' : ''}">
-                ${overdueCount > 0 ? overdueCount + ' overdue' : 'Status'}
-              </div>
-              <div style="width:74px;text-align:center;flex-shrink:0"></div>
+              <div style="width:200px;text-align:center;flex-shrink:0">Progress</div>
+              <div style="width:60px;text-align:center;flex-shrink:0;${overdueCount > 0 ? 'color:var(--compass-red)' : ''}">${overdueCount > 0 ? overdueCount+' overdue' : 'Status'}</div>
+              <div style="width:74px;flex-shrink:0"></div>
             </div>
-            ${workItems.length === 0
-              ? `<div style="padding:18px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No open items assigned to you</div>`
-              : workItems.map(w => `
-              <div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
-                data-wi-projectid="${w.projectId || ''}"
-                style="align-items:center;gap:8px">
-                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
-                  background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
+
+            ${(() => {
+              const today = new Date().toLocaleDateString('en-CA');
+              const cutoff30d = new Date(Date.now() + 30*86400000).toLocaleDateString('en-CA');
+              const filtered = workItems.filter(w => {
+                if (_wfStatus !== 'all') {
+                  if (w.type === 'action') { if (_wfStatus !== 'in_progress') return false; }
+                  else if (w.status !== _wfStatus) return false;
+                }
+                if (_wfProject && w.projectId !== _wfProject) return false;
+                if (_wfDateRange === 'today') return !w.due || w.due === today || w.overdue;
+                if (_wfDateRange === 'week')  return !w.due || w.due <= weekDays[6] || w.overdue;
+                if (_wfDateRange === '30d')   return !w.due || w.due <= cutoff30d || w.overdue;
+                return true;
+              });
+              if (filtered.length === 0) return '<div style="padding:18px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No items match the current filters</div>';
+              return filtered.map(w => `
+              <div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}" data-wi-projectid="${w.projectId || ''}" style="align-items:center;gap:8px">
+                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(w.title)}</div>
                   <div class="row-sub">${esc(w.project)} · ${w.type === 'task' ? 'Task' : 'Action item'}${w.due ? ' · Due ' + fmtDate(w.due) : ''}</div>
                 </div>
-                <!-- Progress column — fixed 200px, bar + % inline -->
                 <div style="width:200px;flex-shrink:0;display:flex;align-items:center;gap:6px">
-                  ${w.type === 'task' ? `
-                  <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
-                    <div style="height:100%;width:${Math.min(w.pct,100)}%;
-                      background:${w.pct >= 80 ? 'var(--compass-green)' : w.pct >= 40 ? 'var(--compass-cyan)' : w.pct > 0 ? 'var(--text3)' : 'transparent'};
-                      border-radius:3px;transition:width .3s"></div>
-                  </div>
-                  <span style="font-family:var(--font-mono);font-size:11px;flex-shrink:0;width:34px;text-align:right;
-                    color:${w.pct >= 80 ? 'var(--compass-green)' : w.pct > 0 ? 'var(--compass-cyan)' : 'var(--text3)'}">
-                    ${w.pct}%</span>` : `<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>`}
+                  ${w.type === 'task' ? `<div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(w.pct,100)}%;background:${w.pct >= 80 ? 'var(--compass-green)' : w.pct >= 40 ? 'var(--compass-cyan)' : w.pct > 0 ? 'var(--text3)' : 'transparent'};border-radius:3px;transition:width .3s"></div></div><span style="font-family:var(--font-mono);font-size:11px;flex-shrink:0;width:34px;text-align:right;color:${w.pct >= 80 ? 'var(--compass-green)' : w.pct > 0 ? 'var(--compass-cyan)' : 'var(--text3)'}">${w.pct}%</span>` : '<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>'}
                 </div>
-                <!-- Overdue column — fixed 60px -->
                 <div style="width:60px;flex-shrink:0;text-align:center">
-                  ${w.overdue ? `<span class="status-badge sb-risk" style="font-size:10px">${daysOverdue(w.due)}d</span>` : ''}
+                  ${w.overdue ? `<span class="status-badge sb-risk" style="font-size:11px">${daysOverdue(w.due)}d</span>` : ''}
                 </div>
-                <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}"
-                  data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}"
-                  style="padding:3px 10px;width:74px;flex-shrink:0;font-size:10px">
-                  ${w.type === 'action' ? 'Resolve'
-                    : w.status === 'not_started' ? 'Start'
-                    : w.status === 'blocked'     ? 'Unblock'
-                    : 'Mark done'}
+                <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}" data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}" style="padding:3px 10px;width:74px;flex-shrink:0;font-size:11px">
+                  ${w.type === 'action' ? 'Resolve' : w.status === 'not_started' ? 'Start' : w.status === 'blocked' ? 'Unblock' : 'Mark done'}
                 </button>
-              </div>`).join('')}
+              </div>`).join('');
+            })()}
           </div>
-        </div>
 
         <div>
           <!-- Timesheet week status + time log -->
@@ -1494,24 +1518,24 @@ async function loadUserView() {
             border:1px solid ${ws === 'rejected' ? 'rgba(226,75,74,.25)' : ws === 'approved' ? 'rgba(29,158,117,.25)' : ws === 'submitted' ? 'rgba(0,210,255,.15)' : 'var(--border)'};
             border-bottom:none">
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+              <span style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
                 text-transform:uppercase;color:${wsColor}">● ${wsLabel}</span>
-              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
                 Week of ${new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
                 · ${weekTotal.toFixed(1)}h
               </span>
               ${ws === 'rejected' && week.rejection_reason ? `
-              <span style="font-family:var(--font-ui);font-size:10px;color:var(--compass-red);
+              <span style="font-family:var(--font-ui);font-size:11px;color:var(--compass-red);
                 font-style:italic">"${esc(week.rejection_reason)}"</span>` : ''}
               ${ws === 'approved' ? `
-              <span style="font-family:var(--font-mono);font-size:10px;color:var(--compass-green)">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--compass-green)">
                 by ${esc(week.approver_name || '—')}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px">
               ${ws === 'draft' || ws === 'rejected' || ws === 'amended' ? `
               <button class="ts-submit-btn" data-week-id="${week?.id || ''}"
                 data-week-start="${weekStartDate}" data-week-hours="${weekTotal.toFixed(1)}"
-                style="font-family:var(--font-mono);font-size:10px;font-weight:600;
+                style="font-family:var(--font-mono);font-size:11px;font-weight:600;
                   letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;
                   background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer;
                   transition:opacity .12s"
@@ -1520,7 +1544,7 @@ async function loadUserView() {
                 Submit week →
               </button>` : ''}
               ${ws === 'submitted' ? `
-              <span style="font-family:var(--font-mono);font-size:10px;color:var(--compass-cyan)">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--compass-cyan)">
                 Awaiting approval
               </span>` : ''}
             </div>
@@ -1532,16 +1556,16 @@ async function loadUserView() {
               <div class="panel-title">Time log${filterLabel ? ` — ${filterLabel}` : ' — recent'}</div>
               <div style="display:flex;gap:8px;align-items:center">
                 ${filterLabel ? `<button class="te-clear-filter"
-                  style="font-family:var(--font-mono);font-size:10px;color:var(--compass-amber);
+                  style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber);
                     background:none;border:none;cursor:pointer;padding:0">✕ clear</button>` : ''}
                 <button class="te-new-btn"
-                  style="font-family:var(--font-mono);font-size:10px;font-weight:600;
+                  style="font-family:var(--font-mono);font-size:11px;font-weight:600;
                     letter-spacing:.06em;color:var(--compass-cyan);background:none;
                     border:1px solid rgba(0,210,255,.25);padding:3px 8px;cursor:pointer;
                     transition:background .12s"
                   onmouseenter="this.style.background='rgba(0,210,255,.08)'"
                   onmouseleave="this.style.background='none'">+ Log time</button>
-                <a href="/resources.html" style="font-family:var(--font-mono);font-size:10px;
+                <a href="/resources.html" style="font-family:var(--font-mono);font-size:11px;
                   color:var(--text3);text-decoration:none">Full view →</a>
               </div>
             </div>
@@ -1606,9 +1630,9 @@ async function loadUserView() {
                   <div class="row-title">${esc(w.title)}</div>
                   <div class="row-sub">${proj ? esc(proj.name) + ' · ' : ''}${w.current_step_name ? esc(w.current_step_name) : 'Active'}</div>
                 </div>
-                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">▶</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">▶</span>
               </div>`;
-            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active instances</div>'}
+            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active instances</div>'}
           </div>
 
           <!-- Quick actions -->
@@ -1739,7 +1763,7 @@ async function loadPMView() {
       ${redFlags.length > 0 ? `
       <div style="background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.3);
         border-left:3px solid var(--compass-red);padding:8px 13px;margin-bottom:14px">
-        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
           text-transform:uppercase;color:var(--compass-red);margin-bottom:6px">
           ⚑ Red flags — last 48h
         </div>
@@ -1747,7 +1771,7 @@ async function loadPMView() {
           ${redFlags.map(f => `
           <a href="/cadence.html?instance=${f.instance_id}"
             style="display:inline-flex;align-items:center;gap:5px;
-            font-family:var(--font-mono);font-size:10px;color:var(--compass-red);
+            font-family:var(--font-mono);font-size:11px;color:var(--compass-red);
             border:1px solid rgba(226,75,74,.35);padding:3px 9px;
             text-decoration:none;background:rgba(226,75,74,.06);transition:background .1s"
             onmouseenter="this.style.background='rgba(226,75,74,.14)'"
@@ -1795,7 +1819,7 @@ async function loadPMView() {
                     </div>
 
                     <!-- Target date -->
-                    <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:6px">
+                    <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:6px">
                       Target: ${p.target_date ? fmtDate(p.target_date) : '—'}
                     </div>
 
@@ -1804,14 +1828,14 @@ async function loadPMView() {
                     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
                       ${projInsts.slice(0, 3).map(w => `
                         <a href="/cadence.html?instance=${w.id}" onclick="event.stopPropagation()"
-                          style="font-family:var(--font-mono);font-size:10px;
+                          style="font-family:var(--font-mono);font-size:11px;
                             color:var(--compass-cyan);border:1px solid rgba(0,210,255,.22);
                             padding:2px 7px;text-decoration:none;transition:background .1s;white-space:nowrap"
                           onmouseenter="this.style.background='rgba(0,210,255,.08)'"
                           onmouseleave="this.style.background=''">
                           ▶ ${esc(w.title)}${w.current_step_name ? ' — ' + esc(w.current_step_name) : ''}
                         </a>`).join('')}
-                      ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">+${projInsts.length - 3}</span>` : ''}
+                      ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">+${projInsts.length - 3}</span>` : ''}
                     </div>` : ''}
 
                     <!-- Recent CoC events for this project -->
@@ -1821,7 +1845,7 @@ async function loadPMView() {
                         const isRej = e.event_type === 'step_reset';
                         const isDone = e.event_type === 'step_completed';
                         const col = isRej ? 'var(--compass-red)' : isDone ? 'var(--compass-green)' : 'var(--compass-amber)';
-                        return `<div style="font-family:var(--font-mono);font-size:10px;
+                        return `<div style="font-family:var(--font-mono);font-size:11px;
                           color:${col};display:flex;gap:5px;align-items:baseline;margin-bottom:2px">
                           <span>${isRej ? '↩' : isDone ? '✓' : '●'}</span>
                           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">
@@ -1843,11 +1867,11 @@ async function loadPMView() {
               <div class="panel-title">Live feed</div>
               <div style="display:flex;align-items:center;gap:4px">
                 <div style="width:6px;height:6px;border-radius:50%;background:var(--compass-green);animation:pulse-live 2s infinite"></div>
-                <span style="font-family:var(--font-mono);font-size:10px;color:var(--compass-green)">LIVE</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:var(--compass-green)">LIVE</span>
               </div>
             </div>
             ${feedEvents.length === 0
-              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No recent workflow activity</div>`
+              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No recent workflow activity</div>`
               : feedEvents.map(({ e, proj, color, icon, age, isRejection }) => `
               <div style="display:flex;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);
                 cursor:pointer;transition:background .1s"
@@ -1861,13 +1885,13 @@ async function loadPMView() {
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                     ${proj ? `<span style="color:var(--text3)">${esc(proj.name)} — </span>` : ''}${esc(e.step_name || '—')}
                   </div>
-                  ${e.event_notes && isRejection ? `<div style="font-family:var(--font-ui);font-size:10px;
+                  ${e.event_notes && isRejection ? `<div style="font-family:var(--font-ui);font-size:11px;
                     color:var(--compass-red);margin-top:1px;font-style:italic;
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                     "${esc(e.event_notes.slice(0,80))}"
                   </div>` : ''}
                 </div>
-                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+                <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
                   flex-shrink:0;align-self:center">${age}</div>
               </div>`).join('')}
           </div>
@@ -1890,7 +1914,7 @@ async function loadPMView() {
                 </div>
                 ${overdue ? `<span class="status-badge sb-risk">Overdue</span>` : ''}
               </div>`;
-            }).join('') || `<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No open action items</div>`}
+            }).join('') || `<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No open action items</div>`}
           </div>
 
           <!-- Quick nav -->
@@ -1979,7 +2003,7 @@ async function loadManagementView() {
               <span class="panel-badge pb-cyan">${activeProjects.length} projects</span>
             </div>
             <div style="overflow-x:auto">
-              <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px">
+              <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px">
                 <thead>
                   <tr style="border-bottom:1px solid var(--border)">
                     <th style="padding:7px 13px;text-align:left;color:var(--text3);font-weight:600;letter-spacing:.08em">PROJECT</th>
@@ -2020,7 +2044,7 @@ async function loadManagementView() {
               ${pendingReqs > 0 ? `<span class="panel-badge pb-red">${pendingReqs} pending</span>` : '<span class="panel-badge pb-green">None pending</span>'}
             </div>
             ${resourceReqs.length === 0
-              ? '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No pending resource requests</div>'
+              ? '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No pending resource requests</div>'
               : resourceReqs.map(r => {
                 const proj = _projects.find(p => p.id === r.project_id);
                 const ageDays = Math.floor((Date.now() - new Date(r.submitted_at || r.created_at).getTime()) / 86400000);
@@ -2067,7 +2091,7 @@ async function loadManagementView() {
           <div class="cmp-panel">
             <div class="panel-hdr"><div class="panel-title">Rework cycles — by project</div></div>
             ${Object.entries(reworkByProject).length === 0
-              ? '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No rework cycles recorded</div>'
+              ? '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No rework cycles recorded</div>'
               : Object.entries(reworkByProject)
                   .sort(([,a],[,b]) => b - a)
                   .slice(0, 6)
@@ -2187,15 +2211,15 @@ async function loadExecutiveView() {
               <span class="panel-badge pb-cyan">AI · Generated</span>
             </div>
             <div style="border-left:3px solid var(--compass-amber);margin:10px 13px;padding:9px 11px;background:rgba(239,159,39,.05)">
-              <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:6px;text-transform:uppercase">Situation</div>
+              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:6px;text-transform:uppercase">Situation</div>
               <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
                 ${activeProjects.length} project${activeProjects.length !== 1 ? 's' : ''} active · ${wfInstances.length} workflow instance${wfInstances.length !== 1 ? 's' : ''} running · ${reworkCount} rework cycles recorded.
               </div>
-              <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Financial signal</div>
+              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Financial signal</div>
               <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
                 Estimated rework cost: <span style="color:${reworkCost > 500000 ? 'var(--compass-red)' : 'var(--text0)'};font-weight:600">${formatYen(reworkCost)}</span> at current volume. ${reworkCount > 10 ? 'Above healthy threshold — workflow template review recommended.' : 'Within acceptable range.'}
               </div>
-              <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Recommended attention</div>
+              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Recommended attention</div>
               <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55">
                 ${resourceReqs.length > 0 ? `${resourceReqs.length} resource request${resourceReqs.length > 1 ? 's' : ''} pending your approval. ` : ''}${atRiskProjs.length > 0 ? `${atRiskProjs.length} project${atRiskProjs.length > 1 ? 's' : ''} approaching target date within 60 days.` : 'No immediate executive action required.'}
               </div>
@@ -2221,7 +2245,7 @@ async function loadExecutiveView() {
                   ${p.status === 'active' ? 'Active' : esc(p.status)}
                 </span>
               </div>`;
-            }).join('') || '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active projects</div>'}
+            }).join('') || '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active projects</div>'}
           </div>
         </div>
 
@@ -2237,7 +2261,7 @@ async function loadExecutiveView() {
                 byProj[inst.project_id] = (byProj[inst.project_id] || 0) + 1;
               });
               const entries = Object.entries(byProj).sort(([,a],[,b]) => b - a);
-              if (entries.length === 0) return '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No rework recorded</div>';
+              if (entries.length === 0) return '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No rework recorded</div>';
               const maxV = Math.max(...entries.map(([,v]) => v));
               return entries.map(([pid, count]) => {
                 const proj = _projects.find(p => p.id === pid);
@@ -2328,13 +2352,13 @@ async function loadClientView() {
         display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div>
           <div style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--text0)">${esc(clientProject.name)}</div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">
             ${esc(clientProject.client_name || clientProject.client_id || 'Client')} · PM: ${esc(clientProject.pm_name || 'Project Manager')} · Target: ${fmtDate(clientProject.target_date)}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:8px;height:8px;border-radius:50%;background:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}"></div>
-          <span style="font-family:var(--font-mono);font-size:10px;color:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}">
+          <span style="font-family:var(--font-mono);font-size:11px;color:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}">
             ${overdueTasks.length > 0 ? 'Monitor' : 'On Track'}
           </span>
         </div>
@@ -2379,7 +2403,7 @@ async function loadClientView() {
           <div class="cmp-panel" style="margin-bottom:14px">
             <div class="panel-hdr">
               <div class="panel-title">Project timeline</div>
-              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">${pct}% complete</span>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${pct}% complete</span>
             </div>
             <div class="progress-track" style="margin:8px 13px 10px;height:3px">
               <div class="progress-fill" style="width:${pct}%;background:var(--compass-green)"></div>
@@ -2393,12 +2417,12 @@ async function loadClientView() {
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(t.name)}</div>
                 </div>
-                <span style="font-family:var(--font-mono);font-size:10px;color:${overdue ? 'var(--compass-red)' : 'var(--text3)'};flex-shrink:0">${fmtDate(t.due_date)}</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:${overdue ? 'var(--compass-red)' : 'var(--text3)'};flex-shrink:0">${fmtDate(t.due_date)}</span>
                 <span class="status-badge ${done ? 'sb-done' : overdue ? 'sb-risk' : 'sb-future'}" style="margin-left:6px">
                   ${done ? 'Complete' : overdue ? 'Overdue' : 'Pending'}
                 </span>
               </div>`;
-            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No tasks found</div>'}
+            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No tasks found</div>'}
           </div>
         </div>
 
@@ -2416,7 +2440,7 @@ async function loadClientView() {
                   <div class="row-title">${esc(w.title)}</div>
                   ${w.current_step_name ? `<div class="row-sub">At: ${esc(w.current_step_name)}</div>` : ''}
                 </div>
-              </div>`).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active workflows</div>'}
+              </div>`).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active workflows</div>'}
           </div>
 
           <!-- PM contact -->
@@ -2426,7 +2450,7 @@ async function loadClientView() {
               ${avatarHtml(clientProject.pm_name || 'PM', 32, 'av-cyan')}
               <div style="flex:1">
                 <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">${esc(clientProject.pm_name || 'Project Manager')}</div>
-                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">Apex Consulting Group</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">Apex Consulting Group</div>
               </div>
               <button class="cmp-btn btn-ghost" onclick="compassToast('Opening email…')">Email →</button>
             </div>
@@ -2511,7 +2535,7 @@ function openCompletionPanel(item) {
       <!-- Header -->
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
         <div>
-          <div style="font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;
+          <div style="font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.1em;
             text-transform:uppercase;color:var(--compass-cyan,#00D2FF);margin-bottom:3px">
             ${item.type === 'task' ? 'Complete task' : 'Resolve action item'}
           </div>
@@ -2531,7 +2555,7 @@ function openCompletionPanel(item) {
 
         <!-- Hours -->
         <div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Hours</div>
           <input id="cmp-hours" type="number" min="0" max="24" step="0.25"
             placeholder="0.0"
@@ -2546,7 +2570,7 @@ function openCompletionPanel(item) {
 
         <!-- Note -->
         <div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Note</div>
           <input id="cmp-note" type="text"
             placeholder="What did you complete? (required to log hours)"
@@ -2560,7 +2584,7 @@ function openCompletionPanel(item) {
 
         <!-- Signal -->
         <div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Signal</div>
           <div style="display:flex;gap:6px;align-items:center;padding-top:4px">
             <button id="cmp-sig-green" onclick="setCmpSignal('green')"
@@ -2593,17 +2617,17 @@ function openCompletionPanel(item) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;
-            font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+            font-family:var(--font-mono);font-size:11px;color:var(--text3)">
             <input id="cmp-billable" type="checkbox" checked
               style="accent-color:var(--compass-cyan)"/>
             Billable
           </label>
-          <span id="cmp-status" style="font-family:var(--font-mono);font-size:10px;
+          <span id="cmp-status" style="font-family:var(--font-mono);font-size:11px;
             color:var(--compass-amber);min-height:14px"></span>
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="closeCompletionPanel()"
-            style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+            style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
               text-transform:uppercase;padding:7px 16px;background:none;
               border:1px solid var(--border);color:var(--text3);cursor:pointer;
               transition:all .12s"
@@ -2612,7 +2636,7 @@ function openCompletionPanel(item) {
             Skip
           </button>
           <button id="cmp-submit" onclick="submitCompletion()"
-            style="font-family:var(--font-mono);font-size:10px;font-weight:600;
+            style="font-family:var(--font-mono);font-size:11px;font-weight:600;
               letter-spacing:.08em;text-transform:uppercase;padding:7px 20px;
               background:var(--compass-cyan,#00D2FF);color:#060a10;
               border:none;cursor:pointer;transition:opacity .12s"
@@ -2735,9 +2759,27 @@ function filterTimeLog(date) {
 }
 
 // ── Permanent delegated listener for My Work interactions ─
+document.addEventListener('change', function(ev) {
+  const projSel = ev.target.closest('.wf-proj-sel');
+  if (projSel) {
+    _wfProject = projSel.value;
+    _viewLoaded['user'] = false; loadUserView();
+  }
+});
 // Wired once at load — survives innerHTML re-renders because
 // it lives on document, not on the content container.
 document.addEventListener('click', function(ev) {
+  // My Work filter buttons
+  const statusBtn = ev.target.closest('.wf-status-btn');
+  if (statusBtn) {
+    _wfStatus = statusBtn.dataset.status;
+    _viewLoaded['user'] = false; loadUserView(); return;
+  }
+  const dateBtn = ev.target.closest('.wf-date-btn');
+  if (dateBtn) {
+    _wfDateRange = dateBtn.dataset.range;
+    _viewLoaded['user'] = false; loadUserView(); return;
+  }
   // Week total footer — opens full weekly timesheet
   if (ev.target.closest('.te-week-footer')) {
     const anyEntry = _teEntries[0];
@@ -2872,7 +2914,7 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;
       padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div>
-        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
           text-transform:uppercase;color:var(--compass-cyan);margin-bottom:3px">
           ${isDirect ? 'Edit entry' : 'Entry detail'}</div>
         <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">${title}</div>
@@ -2890,13 +2932,13 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
     <div style="flex:1;overflow-y:auto;padding:16px">
       ${!isDirect ? `
       <div style="background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);
-        padding:9px 12px;margin-bottom:14px;font-family:var(--font-mono);font-size:10px;
+        padding:9px 12px;margin-bottom:14px;font-family:var(--font-mono);font-size:11px;
         color:var(--compass-amber);line-height:1.6">
         Created via ${entry.source_type === 'step_comment' ? 'Cadence' : 'import'} — edit in source system.
       </div>` : ''}
       <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;margin-bottom:14px">
         <div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Hours</div>
           <input id="te-hours" type="number" min="0.25" max="24" step="0.25"
             value="${parseFloat(entry.hours).toFixed(2)}" ${roAttr}
@@ -2906,7 +2948,7 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
               outline:none;box-sizing:border-box;${roStyle}" />
         </div>
         <div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Notes</div>
           <textarea id="te-notes" rows="3" ${roAttr}
             style="width:100%;font-family:var(--font-ui);font-size:12px;padding:7px 8px;
@@ -2918,7 +2960,7 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
       <label style="display:flex;align-items:center;gap:8px;cursor:${isDirect ? 'pointer' : 'default'};margin-bottom:14px">
         <input id="te-billable" type="checkbox" ${billChk} ${disAttr}
           style="accent-color:var(--compass-cyan);width:14px;height:14px" />
-        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
           letter-spacing:.08em;text-transform:uppercase">Billable</span>
       </label>
     </div>
@@ -2927,23 +2969,23 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
       display:flex;gap:8px;align-items:center;flex-shrink:0">
       ${isDirect ? `
       <button id="te-del-btn"
-        style="font-family:var(--font-mono);font-size:10px;padding:6px 12px;background:none;
+        style="font-family:var(--font-mono);font-size:11px;padding:6px 12px;background:none;
           border:1px solid rgba(226,75,74,.35);color:var(--compass-red);cursor:pointer"
         onmouseenter="this.style.background='rgba(226,75,74,.1)'"
         onmouseleave="this.style.background='none'">Delete</button>` : ''}
       <div style="flex:1"></div>
-      <div class="te-week-link" style="font-family:var(--font-mono);font-size:10px;
+      <div class="te-week-link" style="font-family:var(--font-mono);font-size:11px;
         color:var(--compass-cyan);cursor:pointer;text-decoration:underline;
         text-underline-offset:2px">
         ↗ Week (${weekTotal.toFixed(1)}h)
       </div>
       ${isDirect ? `
       <button id="te-save-btn"
-        style="font-family:var(--font-mono);font-size:10px;font-weight:600;padding:6px 18px;
+        style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:6px 18px;
           background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer"
         onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save →</button>` :
       `<button onclick="document.getElementById('te-edit-drawer').remove();_teSelected=null;"
-        style="font-family:var(--font-mono);font-size:10px;padding:6px 16px;background:none;
+        style="font-family:var(--font-mono);font-size:11px;padding:6px 16px;background:none;
           border:1px solid var(--border);color:var(--text3);cursor:pointer">Close</button>`}
     </div>
   `;
@@ -3048,10 +3090,10 @@ function openWeeklyTimesheet(entry) {
         </label>
         ${isDirect
           ? `<button data-save="${e.id}"
-              style="font-family:var(--font-mono);font-size:10px;font-weight:600;padding:5px 0;
+              style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 0;
                 background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer;width:100%"
               onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save</button>`
-          : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:center">${srcIcon}</span>`}
+          : `<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);text-align:center">${srcIcon}</span>`}
       </div>
     </div>`;
   }).join('');
@@ -3060,7 +3102,7 @@ function openWeeklyTimesheet(entry) {
     <div style="display:flex;align-items:center;justify-content:space-between;
       padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div>
-        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
           text-transform:uppercase;color:var(--compass-cyan);margin-bottom:2px">Timesheet</div>
         <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">
           Week of ${weekLabel}</div>
@@ -3075,7 +3117,7 @@ function openWeeklyTimesheet(entry) {
     </div>
     <div style="display:grid;grid-template-columns:68px 1fr 24px 48px;gap:6px;
       padding:5px 16px;border-bottom:1px solid var(--border);flex-shrink:0;
-      font-family:var(--font-mono);font-size:10px;color:var(--text3);
+      font-family:var(--font-mono);font-size:11px;color:var(--text3);
       letter-spacing:.07em;text-transform:uppercase">
       <span>Hours</span><span>Notes</span>
       <span style="text-align:center">Bill</span><span></span>
@@ -3086,13 +3128,13 @@ function openWeeklyTimesheet(entry) {
     <div style="padding:10px 16px;border-top:1px solid var(--border);
       display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <button class="te-new-btn"
-        style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.06em;
+        style="font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.06em;
           color:var(--compass-cyan);background:none;border:1px solid rgba(0,210,255,.25);
           padding:5px 12px;cursor:pointer"
         onmouseenter="this.style.background='rgba(0,210,255,.08)'"
         onmouseleave="this.style.background='none'">+ Log time</button>
       <button onclick="document.getElementById('te-edit-drawer').remove()"
-        style="font-family:var(--font-mono);font-size:10px;padding:5px 14px;background:none;
+        style="font-family:var(--font-mono);font-size:11px;padding:5px 14px;background:none;
           border:1px solid var(--border);color:var(--text3);cursor:pointer">Close</button>
     </div>`;
 
@@ -3157,13 +3199,13 @@ function openWorkItemDrawer(item) {
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
           <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${dotColor}"></div>
-          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+          <span style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
             text-transform:uppercase;color:var(--text3)">${typeLabel}</span>
           ${item.overdue ? `<span class="status-badge sb-risk">${daysOverdue(item.due)}d overdue</span>` : ''}
         </div>
         <div style="font-family:var(--font-ui);font-size:14px;font-weight:600;
           color:var(--text0);line-height:1.3">${esc(item.title)}</div>
-        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:4px">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:4px">
           ${esc(item.project)}${item.due ? ' · Due ' + fmtDate(item.due) : ''}
         </div>
       </div>
@@ -3179,7 +3221,7 @@ function openWorkItemDrawer(item) {
       ${item.pct > 0 ? `
       <div style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;
-          font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:5px">
+          font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:5px">
           <span>Progress</span><span style="color:var(--compass-cyan)">${item.pct}%</span>
         </div>
         <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden">
@@ -3190,13 +3232,13 @@ function openWorkItemDrawer(item) {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
         <div style="background:var(--bg2);padding:10px 12px;border:1px solid var(--border)">
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">Status</div>
           <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
             color:var(--text0);text-transform:capitalize">${(item.status || 'open').replace('_',' ')}</div>
         </div>
         <div style="background:var(--bg2);padding:10px 12px;border:1px solid var(--border)">
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">Due date</div>
           <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
             color:${item.overdue ? 'var(--compass-red)' : 'var(--text0)'}">
@@ -3205,13 +3247,13 @@ function openWorkItemDrawer(item) {
         </div>
       </div>
 
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
         letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Actions</div>
 
       <button onclick="openCompletionPanel(${JSON.stringify({
         id: item.id, type: item.type, title: item.title, projectId: item.projectId || null
       })});document.getElementById('wi-drawer').remove()"
-        style="width:100%;font-family:var(--font-mono);font-size:10px;font-weight:600;
+        style="width:100%;font-family:var(--font-mono);font-size:11px;font-weight:600;
           letter-spacing:.08em;text-transform:uppercase;padding:9px;
           background:var(--compass-cyan);color:#060a10;border:none;
           cursor:pointer;margin-bottom:8px;transition:opacity .12s"
@@ -3223,7 +3265,7 @@ function openWorkItemDrawer(item) {
       ${itemUrl ? `
       <a href="${itemUrl}"
         style="display:block;width:100%;box-sizing:border-box;text-align:center;
-          font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+          font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
           text-transform:uppercase;padding:9px;color:var(--compass-cyan);
           border:1px solid rgba(0,210,255,.3);text-decoration:none;
           transition:background .12s;margin-bottom:8px"
@@ -3233,7 +3275,7 @@ function openWorkItemDrawer(item) {
       </a>` : ''}
 
       <button onclick="openTimeEntryEdit(null, '${item.id}', '${item.projectId || ''}')"
-        style="width:100%;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+        style="width:100%;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
           text-transform:uppercase;padding:9px;background:none;
           border:1px solid var(--border);color:var(--text2);cursor:pointer;
           transition:all .12s"
@@ -3278,7 +3320,7 @@ function openNewTimeEntry(taskId = null, projectId = null) {
     <div style="display:flex;align-items:center;justify-content:space-between;
       padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div>
-        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+        <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
           text-transform:uppercase;color:var(--compass-cyan);margin-bottom:3px">Log time</div>
         <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">
           New time entry</div>
@@ -3320,22 +3362,22 @@ function openNewTimeEntry(taskId = null, projectId = null) {
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
           <input id="te-new-billable" type="checkbox" checked
             style="accent-color:var(--compass-cyan);width:14px;height:14px" />
-          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase">Billable</span>
         </label>
       </div>
-      <span id="te-new-status" style="font-family:var(--font-mono);font-size:10px;
+      <span id="te-new-status" style="font-family:var(--font-mono);font-size:11px;
         color:var(--compass-amber);display:block;min-height:14px;margin-bottom:10px"></span>
     </div>
 
     <div style="padding:12px 16px;border-top:1px solid var(--border);
       display:flex;gap:8px;flex-shrink:0">
       <button onclick="document.getElementById('te-edit-drawer').remove()"
-        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+        style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
           text-transform:uppercase;padding:7px 14px;background:none;
           border:1px solid var(--border);color:var(--text3);cursor:pointer">Cancel</button>
       <button onclick="saveNewTimeEntry('${taskId || ''}','${projectId || ''}')"
-        style="flex:1;font-family:var(--font-mono);font-size:10px;font-weight:600;
+        style="flex:1;font-family:var(--font-mono);font-size:11px;font-weight:600;
           letter-spacing:.08em;text-transform:uppercase;padding:7px;
           background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer"
         onmouseenter="this.style.opacity='.85'"
