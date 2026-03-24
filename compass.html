@@ -983,6 +983,7 @@ let _identityDebug = {};
 let _teFilter    = null;   // date string 'YYYY-MM-DD' | null — filters time log by day
 let _teEntries   = [];     // cached time entries for current user view session
 let _wiItems     = [];     // cached work items for drawer access
+let _teSelected  = null;   // id of currently selected time log row
 
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('compass-date').textContent =
@@ -1311,7 +1312,13 @@ async function loadUserView() {
       const isToday  = d === today;
       const isFuture = d > today;
       const isActive = _teFilter === d;
-      const barColor = isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : isFuture ? 'var(--border)' : hrs > 0 ? 'var(--compass-green)' : 'var(--border)';
+      const barColor = isActive
+        ? 'var(--compass-amber)'
+        : isToday
+          ? 'var(--compass-cyan)'
+          : hrs > 0
+            ? 'var(--compass-green)'
+            : 'var(--border)';
       return `
         <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
           style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
@@ -1519,9 +1526,11 @@ async function loadUserView() {
                   return `
                   <div class="te-row" data-te-id="${e.id}" data-te-cadence="${isCadence}"
                     style="display:flex;align-items:center;gap:8px;padding:7px 13px;
-                      border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s"
+                      border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;
+                      border-left:2px solid ${_teSelected === e.id ? 'var(--compass-cyan)' : 'transparent'};
+                      background:${_teSelected === e.id ? 'rgba(0,210,255,.04)' : ''}"
                     onmouseenter="this.style.background='var(--bg2)'"
-                    onmouseleave="this.style.background=''">
+                    onmouseleave="this.style.background='${_teSelected === e.id ? 'rgba(0,210,255,.04)' : ''}'">
                     <div style="font-size:13px;color:${sourceColor};flex-shrink:0">${sourceIcon}</div>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
@@ -1539,9 +1548,12 @@ async function loadUserView() {
                     </div>
                   </div>`;
                 }).join('')}
-            <div style="padding:8px 13px;display:flex;justify-content:space-between;
-              font-family:var(--font-mono);font-size:10px">
-              <span style="color:var(--text3)">${filterLabel ? filterLabel + ' total' : 'Week total'}</span>
+            <div class="te-week-footer" style="padding:8px 13px;display:flex;justify-content:space-between;
+              align-items:center;font-family:var(--font-mono);font-size:11px;
+              cursor:pointer;transition:background .1s;border-top:1px solid var(--border)"
+              onmouseenter="this.style.background='var(--bg2)'"
+              onmouseleave="this.style.background=''">
+              <span style="color:var(--text3)">${filterLabel ? filterLabel + ' total' : '↗ Week of ' + new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
               <span style="font-weight:600;color:var(--compass-cyan)">
                 ${filterLabel
                   ? displayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0).toFixed(1)
@@ -2695,6 +2707,12 @@ function filterTimeLog(date) {
 // Wired once at load — survives innerHTML re-renders because
 // it lives on document, not on the content container.
 document.addEventListener('click', function(ev) {
+  // Week total footer — opens full weekly timesheet
+  if (ev.target.closest('.te-week-footer')) {
+    const anyEntry = _teEntries[0];
+    if (anyEntry) openWeeklyTimesheet(anyEntry);
+    return;
+  }
   // Clear filter button
   if (ev.target.closest('.te-clear-filter')) {
     filterTimeLog(null);
@@ -2711,6 +2729,16 @@ document.addEventListener('click', function(ev) {
   if (teRow) {
     const teId  = teRow.dataset.teId;
     const isCad = teRow.dataset.teCadence === 'true';
+
+    // Update selected state and visual highlight
+    _teSelected = teId;
+    document.querySelectorAll('.te-row').forEach(r => {
+      const isThis = r.dataset.teId === teId;
+      r.style.borderLeft = isThis ? '2px solid var(--compass-cyan)' : '2px solid transparent';
+      r.style.background = isThis ? 'rgba(0,210,255,.04)' : '';
+      r.onmouseleave = () => { r.style.background = isThis ? 'rgba(0,210,255,.04)' : ''; };
+    });
+
     if (isCad) {
       window.location.href = '/cadence.html';
       return;
@@ -2724,6 +2752,8 @@ document.addEventListener('click', function(ev) {
         notes:        entry.notes || '',
         is_billable:  entry.is_billable,
         date:         entry.date,
+        week_start_date: entry.week_start_date,
+        project_id:   entry.project_id,
         project_name: proj?.name || '—',
         step_name:    entry.step_name || null,
         source_type:  entry.source_type,
@@ -2772,32 +2802,26 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
   if (!entry) { openNewTimeEntry(taskId, projectId); return; }
   document.getElementById('te-edit-drawer')?.remove();
 
-  // Show all entries for the same week — mini weekly timesheet
+  _teSelected = entry.id;
+  document.querySelectorAll('.te-row').forEach(r => {
+    const isSel = r.dataset.teId === entry.id;
+    r.style.borderLeft = isSel ? '2px solid var(--compass-cyan)' : '2px solid transparent';
+    r.style.background = isSel ? 'rgba(0,210,255,.04)' : '';
+    r.onmouseleave = () => { r.style.background = isSel ? 'rgba(0,210,255,.04)' : ''; };
+  });
+
+  const isDirect = entry.source_type === 'direct';
+  const proj     = _projects.find(p => p.id === entry.project_id);
+  const title    = esc(entry.step_name || proj?.name || '—');
+  const roAttr   = isDirect ? '' : 'readonly';
+  const roStyle  = isDirect ? '' : 'opacity:.5;cursor:not-allowed';
+  const disAttr  = isDirect ? '' : 'disabled';
+  const billChk  = entry.is_billable ? 'checked' : '';
   const weekEntries = _teEntries.filter(e =>
-    entry.week_start_date
-      ? e.week_start_date === entry.week_start_date
-      : e.date && entry.date && e.date.slice(0,7) === entry.date.slice(0,7)
-  ).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-
-  const weekTotal = weekEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-  const weekLabel = (() => {
-    if (!entry.week_start_date) return fmtDate(entry.date);
-    const ws = new Date(entry.week_start_date + 'T00:00:00');
-    const we = new Date(ws.getTime() + 6 * 86400000);
-    return ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})
-      + ' – ' + we.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  })();
-
-  const drawer = document.createElement('div');
-  drawer.id = 'te-edit-drawer';
-  drawer.style.cssText = `
-    position:fixed;top:0;right:0;bottom:0;width:440px;z-index:600;
-    background:var(--bg1,#0c1628);
-    border-left:1px solid var(--border,rgba(0,210,255,.12));
-    box-shadow:-8px 0 32px rgba(0,0,0,.5);
-    display:flex;flex-direction:column;
-    animation:te-slide-in .2s ease;
-  `;
+    entry.week_start_date ? e.week_start_date === entry.week_start_date
+      : e.date?.slice(0,7) === entry.date?.slice(0,7)
+  );
+  const weekTotal = weekEntries.reduce((s,e) => s + parseFloat(e.hours||0), 0);
 
   if (!document.getElementById('te-style')) {
     const s = document.createElement('style');
@@ -2806,63 +2830,194 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
     document.head.appendChild(s);
   }
 
+  const drawer = document.createElement('div');
+  drawer.id = 'te-edit-drawer';
+  drawer.style.cssText = 'position:fixed;top:0;right:0;bottom:0;width:360px;z-index:600;background:var(--bg1,#0c1628);border-left:1px solid var(--border,rgba(0,210,255,.12));box-shadow:-8px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:te-slide-in .2s ease;';
+
+  drawer.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;
+      padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--compass-cyan);margin-bottom:3px">
+          ${isDirect ? 'Edit entry' : 'Entry detail'}</div>
+        <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">${title}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px">
+          ${new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+          · ${entry.is_billable ? 'Billable' : 'Non-billable'}
+          · ${entry.source_type === 'step_comment' ? 'via Cadence' : 'Direct'}
+        </div>
+      </div>
+      <button onclick="document.getElementById('te-edit-drawer').remove();_teSelected=null;"
+        style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0;line-height:1"
+        onmouseenter="this.style.color='var(--text0)'" onmouseleave="this.style.color='var(--text3)'">✕</button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:16px">
+      ${!isDirect ? `
+      <div style="background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);
+        padding:9px 12px;margin-bottom:14px;font-family:var(--font-mono);font-size:10px;
+        color:var(--compass-amber);line-height:1.6">
+        Created via ${entry.source_type === 'step_comment' ? 'Cadence' : 'import'} — edit in source system.
+      </div>` : ''}
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+            letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Hours</div>
+          <input id="te-hours" type="number" min="0.25" max="24" step="0.25"
+            value="${parseFloat(entry.hours).toFixed(2)}" ${roAttr}
+            style="width:100%;font-family:var(--font-mono);font-size:16px;font-weight:600;
+              padding:7px 8px;background:var(--bg2);text-align:center;
+              border:1px solid rgba(0,210,255,.3);color:var(--compass-cyan);
+              outline:none;box-sizing:border-box;${roStyle}" />
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+            letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Notes</div>
+          <textarea id="te-notes" rows="3" ${roAttr}
+            style="width:100%;font-family:var(--font-ui);font-size:12px;padding:7px 8px;
+              background:var(--bg2);border:1px solid rgba(0,210,255,.15);color:var(--text1);
+              outline:none;resize:vertical;min-height:60px;box-sizing:border-box;${roStyle}"
+            placeholder="What did you work on?">${esc(entry.notes || '')}</textarea>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:${isDirect ? 'pointer' : 'default'};margin-bottom:14px">
+        <input id="te-billable" type="checkbox" ${billChk} ${disAttr}
+          style="accent-color:var(--compass-cyan);width:14px;height:14px" />
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+          letter-spacing:.08em;text-transform:uppercase">Billable</span>
+      </label>
+    </div>
+
+    <div style="padding:10px 16px;border-top:1px solid var(--border);
+      display:flex;gap:8px;align-items:center;flex-shrink:0">
+      ${isDirect ? `
+      <button id="te-del-btn"
+        style="font-family:var(--font-mono);font-size:10px;padding:6px 12px;background:none;
+          border:1px solid rgba(226,75,74,.35);color:var(--compass-red);cursor:pointer"
+        onmouseenter="this.style.background='rgba(226,75,74,.1)'"
+        onmouseleave="this.style.background='none'">Delete</button>` : ''}
+      <div style="flex:1"></div>
+      <div class="te-week-link" style="font-family:var(--font-mono);font-size:10px;
+        color:var(--compass-cyan);cursor:pointer;text-decoration:underline;
+        text-underline-offset:2px">
+        ↗ Week (${weekTotal.toFixed(1)}h)
+      </div>
+      ${isDirect ? `
+      <button id="te-save-btn"
+        style="font-family:var(--font-mono);font-size:10px;font-weight:600;padding:6px 18px;
+          background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer"
+        onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save →</button>` :
+      `<button onclick="document.getElementById('te-edit-drawer').remove();_teSelected=null;"
+        style="font-family:var(--font-mono);font-size:10px;padding:6px 16px;background:none;
+          border:1px solid var(--border);color:var(--text3);cursor:pointer">Close</button>`}
+    </div>
+  `;
+
+  document.body.appendChild(drawer);
+
+  drawer.querySelector('#te-save-btn')?.addEventListener('click', async () => {
+    const hours = parseFloat(drawer.querySelector('#te-hours')?.value);
+    const notes = drawer.querySelector('#te-notes')?.value?.trim() || null;
+    const bill  = drawer.querySelector('#te-billable')?.checked ?? true;
+    if (!hours || hours <= 0) { compassToast('Hours must be > 0', 2000); return; }
+    const btn = drawer.querySelector('#te-save-btn');
+    btn.textContent = '…'; btn.disabled = true;
+    try {
+      await API.patch('time_entries?id=eq.'+entry.id, { hours, notes, is_billable: bill, updated_at: new Date().toISOString() });
+      compassToast('Saved'); drawer.remove(); _teSelected = null;
+      _viewLoaded['user'] = false; loadUserView();
+    } catch(e) { btn.textContent = 'Save →'; btn.disabled = false; compassToast('Failed', 2000); }
+  });
+
+  drawer.querySelector('#te-del-btn')?.addEventListener('click', async () => {
+    if (!confirm('Delete this entry?')) return;
+    try {
+      await API.del('time_entries?id=eq.'+entry.id);
+      compassToast('Deleted'); drawer.remove(); _teSelected = null;
+      _viewLoaded['user'] = false; loadUserView();
+    } catch(e) { compassToast('Failed', 2000); }
+  });
+
+  drawer.querySelector('.te-week-link')?.addEventListener('click', () => {
+    drawer.remove(); _teSelected = null;
+    openWeeklyTimesheet(entry);
+  });
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', function closeTES(ev) {
+      if (!drawer.contains(ev.target)) {
+        drawer.remove(); _teSelected = null;
+        document.querySelectorAll('.te-row').forEach(r => { r.style.borderLeft='2px solid transparent'; r.style.background=''; });
+        document.removeEventListener('mousedown', closeTES);
+      }
+    });
+  }, 50);
+}
+
+function openWeeklyTimesheet(entry) {
+  document.getElementById('te-edit-drawer')?.remove();
+
+  const weekEntries = _teEntries.filter(e =>
+    entry.week_start_date ? e.week_start_date === entry.week_start_date
+      : e.date?.slice(0,7) === entry.date?.slice(0,7)
+  ).sort((a,b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+  const weekTotal = weekEntries.reduce((s,e) => s + parseFloat(e.hours||0), 0);
+  const weekLabel = (() => {
+    if (!entry.week_start_date) return fmtDate(entry.date);
+    const ws = new Date(entry.week_start_date+'T00:00:00');
+    return ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      + ' – ' + new Date(ws.getTime()+6*86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  })();
+
+  const drawer = document.createElement('div');
+  drawer.id = 'te-edit-drawer';
+  drawer.style.cssText = 'position:fixed;top:0;right:0;bottom:0;width:460px;z-index:600;background:var(--bg1,#0c1628);border-left:1px solid var(--border,rgba(0,210,255,.12));box-shadow:-8px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:te-slide-in .2s ease;';
+
   const rowHtml = weekEntries.map(e => {
-    const proj     = _projects.find(p => p.id === e.project_id);
+    const proj    = _projects.find(p => p.id === e.project_id);
     const isDirect = e.source_type === 'direct';
-    const srcIcon  = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
+    const srcIcon  = e.source_type === 'step_comment' ? '◈' : '●';
     const srcColor = e.source_type === 'step_comment' ? 'var(--compass-cyan)' : 'var(--text3)';
-    const isActive = e.id === entry.id;
-    const dayName  = new Date(e.date + 'T00:00:00').toLocaleDateString('en-US',{weekday:'short'});
-    const dayNum   = new Date(e.date + 'T00:00:00').getDate();
-    return `<div style="border-bottom:1px solid var(--border);padding:10px 16px;
-        background:${isActive ? 'rgba(0,210,255,.04)' : ''};
-        border-left:3px solid ${isActive ? 'var(--compass-cyan)' : 'transparent'}">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-        <span style="font-size:12px;color:${srcColor};flex-shrink:0">${srcIcon}</span>
-        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
-          color:var(--text0);flex-shrink:0;min-width:48px">${dayName} ${dayNum}</span>
+    const dayName  = new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short'});
+    return `<div style="border-bottom:1px solid var(--border);padding:9px 16px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+        <span style="font-size:11px;color:${srcColor};flex-shrink:0">${srcIcon}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text0);flex-shrink:0">${dayName}</span>
         <span style="font-family:var(--font-ui);font-size:11px;color:var(--text2);
           flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           ${esc(e.step_name || proj?.name || '—')}</span>
-        ${isDirect ? `<button data-te-del="${e.id}"
-          style="background:none;border:none;color:rgba(226,75,74,.4);font-size:13px;
+        ${isDirect ? `<button data-del="${e.id}"
+          style="background:none;border:none;color:rgba(226,75,74,.4);font-size:12px;
             cursor:pointer;padding:0;line-height:1;flex-shrink:0"
           onmouseenter="this.style.color='var(--compass-red)'"
-          onmouseleave="this.style.color='rgba(226,75,74,.4)'" title="Delete">✕</button>` : ''}
+          onmouseleave="this.style.color='rgba(226,75,74,.4)'">✕</button>` : ''}
       </div>
-      <div style="display:grid;grid-template-columns:72px 1fr 28px 52px;gap:6px;align-items:center">
+      <div style="display:grid;grid-template-columns:68px 1fr 24px 48px;gap:6px;align-items:center">
         <input type="number" min="0.25" max="24" step="0.25"
-          value="${parseFloat(e.hours).toFixed(2)}"
-          ${!isDirect ? 'readonly' : ''}
-          data-te-field="hours" data-te-id="${e.id}"
-          style="font-family:var(--font-mono);font-size:13px;font-weight:600;
-            padding:5px 6px;background:var(--bg2);text-align:center;
-            border:1px solid ${isActive ? 'rgba(0,210,255,.35)' : 'var(--border)'};
-            color:${e.is_billable ? 'var(--compass-cyan)' : 'var(--text2)'};
-            outline:none;width:100%;box-sizing:border-box;
-            ${!isDirect ? 'opacity:.5;cursor:not-allowed' : ''}"/>
-        <input type="text"
-          value="${esc(e.notes || '')}"
-          ${!isDirect ? 'readonly' : ''}
-          data-te-field="notes" data-te-id="${e.id}"
-          placeholder="${isDirect ? 'Notes…' : '—'}"
-          style="font-family:var(--font-ui);font-size:11px;
-            padding:5px 8px;background:var(--bg2);
-            border:1px solid ${isActive ? 'rgba(0,210,255,.35)' : 'var(--border)'};
-            color:var(--text1);outline:none;width:100%;box-sizing:border-box;
-            ${!isDirect ? 'opacity:.5;cursor:not-allowed' : ''}"/>
-        <label style="display:flex;align-items:center;justify-content:center;cursor:${isDirect ? 'pointer' : 'default'}">
-          <input type="checkbox" ${e.is_billable ? 'checked' : ''}
-            ${!isDirect ? 'disabled' : ''}
-            data-te-field="billable" data-te-id="${e.id}"
+          value="${parseFloat(e.hours).toFixed(2)}" ${!isDirect ? 'readonly' : ''}
+          data-id="${e.id}" data-f="hours"
+          style="font-family:var(--font-mono);font-size:13px;font-weight:600;padding:5px 6px;
+            background:var(--bg2);text-align:center;
+            border:1px solid var(--border);color:${e.is_billable ? 'var(--compass-cyan)' : 'var(--text2)'};
+            outline:none;width:100%;box-sizing:border-box;${!isDirect ? 'opacity:.5;cursor:not-allowed' : ''}"/>
+        <input type="text" value="${esc(e.notes||'')}" ${!isDirect ? 'readonly' : ''}
+          data-id="${e.id}" data-f="notes" placeholder="${isDirect ? 'Notes…' : '—'}"
+          style="font-family:var(--font-ui);font-size:11px;padding:5px 7px;
+            background:var(--bg2);border:1px solid var(--border);color:var(--text1);
+            outline:none;width:100%;box-sizing:border-box;${!isDirect ? 'opacity:.5;cursor:not-allowed' : ''}"/>
+        <label style="display:flex;justify-content:center;cursor:${isDirect ? 'pointer' : 'default'}">
+          <input type="checkbox" ${e.is_billable ? 'checked' : ''} ${!isDirect ? 'disabled' : ''}
+            data-id="${e.id}" data-f="billable"
             style="accent-color:var(--compass-cyan);width:13px;height:13px"/>
         </label>
-        ${isDirect ? `<button data-te-save="${e.id}"
-          style="font-family:var(--font-mono);font-size:10px;font-weight:600;
-            padding:5px 0;background:var(--compass-cyan);color:#060a10;
-            border:none;cursor:pointer;width:100%"
-          onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save</button>` :
-          `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:center">${srcIcon}</span>`}
+        ${isDirect
+          ? `<button data-save="${e.id}"
+              style="font-family:var(--font-mono);font-size:10px;font-weight:600;padding:5px 0;
+                background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer;width:100%"
+              onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save</button>`
+          : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:center">${srcIcon}</span>`}
       </div>
     </div>`;
   }).join('');
@@ -2877,29 +3032,29 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
           Week of ${weekLabel}</div>
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">
           ${weekEntries.length} ${weekEntries.length === 1 ? 'entry' : 'entries'} ·
-          <span style="color:var(--compass-cyan);font-weight:600">${weekTotal.toFixed(1)}h total</span>
+          <span style="color:var(--compass-cyan);font-weight:600">${weekTotal.toFixed(1)}h</span>
         </div>
       </div>
       <button onclick="document.getElementById('te-edit-drawer').remove()"
-        style="background:none;border:none;color:var(--text3);font-size:18px;
-          cursor:pointer;padding:0;line-height:1"
-        onmouseenter="this.style.color='var(--text0)'"
-        onmouseleave="this.style.color='var(--text3)'">✕</button>
+        style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0;line-height:1"
+        onmouseenter="this.style.color='var(--text0)'" onmouseleave="this.style.color='var(--text3)'">✕</button>
     </div>
-    <div style="display:grid;grid-template-columns:60px 1fr 28px 52px;gap:6px;
+    <div style="display:grid;grid-template-columns:68px 1fr 24px 48px;gap:6px;
       padding:5px 16px;border-bottom:1px solid var(--border);flex-shrink:0;
-      font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase">
-      <span>Hours</span><span>Notes</span><span style="text-align:center">Bill</span><span></span>
+      font-family:var(--font-mono);font-size:10px;color:var(--text3);
+      letter-spacing:.07em;text-transform:uppercase">
+      <span>Hours</span><span>Notes</span>
+      <span style="text-align:center">Bill</span><span></span>
     </div>
     <div style="flex:1;overflow-y:auto">
-      ${rowHtml || '<div style="padding:20px 16px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No entries for this week</div>'}
+      ${rowHtml || '<div style="padding:20px 16px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No entries this week</div>'}
     </div>
     <div style="padding:10px 16px;border-top:1px solid var(--border);
       display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <button class="te-new-btn"
-        style="font-family:var(--font-mono);font-size:10px;font-weight:600;
-          letter-spacing:.06em;color:var(--compass-cyan);background:none;
-          border:1px solid rgba(0,210,255,.25);padding:5px 12px;cursor:pointer"
+        style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.06em;
+          color:var(--compass-cyan);background:none;border:1px solid rgba(0,210,255,.25);
+          padding:5px 12px;cursor:pointer"
         onmouseenter="this.style.background='rgba(0,210,255,.08)'"
         onmouseleave="this.style.background='none'">+ Log time</button>
       <button onclick="document.getElementById('te-edit-drawer').remove()"
@@ -2910,12 +3065,12 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
   document.body.appendChild(drawer);
 
   drawer.addEventListener('click', async ev => {
-    const saveBtn = ev.target.closest('[data-te-save]');
+    const saveBtn = ev.target.closest('[data-save]');
     if (saveBtn) {
-      const id    = saveBtn.dataset.teSave;
-      const hours = parseFloat(drawer.querySelector('[data-te-field="hours"][data-te-id="'+id+'"]')?.value);
-      const notes = drawer.querySelector('[data-te-field="notes"][data-te-id="'+id+'"]')?.value?.trim() || null;
-      const bill  = drawer.querySelector('[data-te-field="billable"][data-te-id="'+id+'"]')?.checked ?? true;
+      const id    = saveBtn.dataset.save;
+      const hours = parseFloat(drawer.querySelector('[data-id="'+id+'"][data-f="hours"]')?.value);
+      const notes = drawer.querySelector('[data-id="'+id+'"][data-f="notes"]')?.value?.trim() || null;
+      const bill  = drawer.querySelector('[data-id="'+id+'"][data-f="billable"]')?.checked ?? true;
       if (!hours || hours <= 0) { compassToast('Hours must be > 0', 2000); return; }
       saveBtn.textContent = '…'; saveBtn.disabled = true;
       try {
@@ -2923,11 +3078,11 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
         compassToast('Saved'); _viewLoaded['user'] = false; drawer.remove(); loadUserView();
       } catch(e) { saveBtn.textContent = 'Save'; saveBtn.disabled = false; compassToast('Failed', 2000); }
     }
-    const delBtn = ev.target.closest('[data-te-del]');
+    const delBtn = ev.target.closest('[data-del]');
     if (delBtn) {
       if (!confirm('Delete this entry?')) return;
       try {
-        await API.del('time_entries?id=eq.'+delBtn.dataset.teDel);
+        await API.del('time_entries?id=eq.'+delBtn.dataset.del);
         compassToast('Deleted'); _viewLoaded['user'] = false; drawer.remove(); loadUserView();
       } catch(e) { compassToast('Failed', 2000); }
     }
