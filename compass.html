@@ -3132,7 +3132,7 @@ async function loadManagementView() {
     const [wfInstances, cocEvents, resourceReqs, confSignals, weekEntries, actionItems] = await Promise.all([
       API.get('workflow_instances?select=id,title,status,current_step_name,project_id,launched_at&status=eq.active&limit=50').catch(()=>[]),
       API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated,task_progress_update)&order=created_at.desc&limit=300').catch(()=>[]),
-      API.get('resource_requests?select=id,project_id,status,submitted_at,role,notes&status=eq.pending&order=submitted_at.asc&limit=20').catch(()=>[]),
+      API.get('resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&order=submitted_at.asc&limit=20').catch(()=>[]),
       API.get(`workflow_step_instances?select=id,instance_id,event_type,outcome,actor_name,created_at&event_type=eq.task_progress_update&created_at=gte.${weekDays[0]}T00:00:00&order=created_at.desc&limit=300`).catch(()=>[]),
       API.get(`time_entries?date=gte.${weekDays[0]}&date=lte.${weekDays[4]}&select=id,project_id,resource_id,date,hours,is_billable&limit=500`).catch(()=>[]),
       API.get('workflow_action_items?status=eq.open&order=due_date.asc&limit=50').catch(()=>[]),
@@ -3340,6 +3340,32 @@ async function loadManagementView() {
     // ─────────────────────────────────────────────────────
     // Module-level management event functions
     // ─────────────────────────────────────────────────────
+    window.mgOpenWfModal = function(el) {
+      const name  = el.dataset.wfName;
+      const rate  = el.dataset.wfRate;
+      const resets= el.dataset.wfResets;
+      const comp  = el.dataset.wfComp;
+      const narr  = el.dataset.aiNarr;
+      const act   = el.dataset.actionHtml;
+      mgOpenModal(name + ' — Cross-instance analysis',
+        '<div class="mg-modal-section">Failure rate</div>' +
+        '<div class="mg-modal-block">' + rate + '% own-failure rate · ' + resets + ' resets · ' + comp + ' completions</div>' +
+        '<div class="mg-modal-section">AI narrative</div>' +
+        '<div class="mg-modal-block mg-modal-ai">' + narr + '</div>' +
+        (act ? act : '')
+      );
+    };
+    window.mgOpenLogDecisionModal = function() {
+      const body = '<div class="mg-modal-section">Decision type</div>' +
+        '<select id="mg-dec-type" class="mg-modal-select"><option>Escalation</option><option>Resource</option><option>Process</option><option>Budget</option><option>People</option></select>' +
+        '<div class="mg-modal-section">Decision &amp; reasoning</div>' +
+        '<textarea id="mg-dec-text" class="mg-modal-input" rows="3" placeholder="Describe the decision and reasoning…"></textarea>' +
+        '<div style="display:flex;gap:6px;margin-top:10px">' +
+        '<button class="mg-btn mg-btn-c" onclick="mgLogDecision()">Log decision →</button>' +
+        '<button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>' +
+        '</div>';
+      mgOpenModal('Log a management decision', body);
+    };
     window.mgSwitchTab = function(el, name) {
       document.querySelectorAll('.mg-tab').forEach(t=>t.classList.remove('on'));
       document.querySelectorAll('.mg-tc').forEach(c=>c.classList.remove('on'));
@@ -3532,14 +3558,23 @@ async function loadManagementView() {
             : wfTemplates.map(t=>{
               const col = t.failureRate>=60?'#E24B4A':t.failureRate>=35?'#EF9F27':'#1D9E75';
               const lbl = t.failureRate>=60?'Redesign recommended':t.failureRate>=35?'Watch':'Healthy';
-              return `<div class="mg-wf-row" onclick="mgOpenModal('${esc(t.name)} — Cross-instance analysis','<div class=\'mg-modal-section\'>Failure rate</div><div class=\'mg-modal-block\'>${t.failureRate}% own-failure rate · ${t.resets} resets · ${t.completions} completions</div><div class=\'mg-modal-section\'>AI narrative</div><div class=\'mg-modal-block mg-modal-ai\'>${t.failureRate>=60?'Failure rate above redesign threshold. Root cause: approval criteria ambiguity or upstream dependency issues. Recommend: explicit checklist at approval step and pre-submission review gate.':t.failureRate>=35?'Failure rate rising — monitor for another 2 weeks. Not yet at redesign threshold.':'Template is healthy. No action required.'}</div>${t.failureRate>=60?'<div class=\'mg-modal-section\'>Action</div><div style=\'display:flex;gap:6px;margin-top:6px\'><button class=\'mg-btn mg-btn-c\' onclick=\'compassToast(\'Redesign authorized — CoC event written\',2000);mgCloseModal()\'>Authorize redesign →</button></div>':''}')">
+              const aiNarr = t.failureRate>=60
+                ? 'Failure rate above redesign threshold (60%). Root cause: approval criteria ambiguity or upstream dependency issues. Recommend: explicit checklist at approval step and pre-submission review gate.'
+                : t.failureRate>=35
+                ? 'Failure rate rising — monitor for 2 more weeks. Not yet at redesign threshold.'
+                : 'Template is healthy. No action required.';
+              const actionHtml = t.failureRate>=60
+                ? '<div style=\'font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin:10px 0 5px\'>Action</div><button class=\'mg-btn mg-btn-c\' style=\'margin-top:4px\' onclick=\'compassToast(&quot;Redesign authorized&quot;,2000);mgCloseModal()\'>Authorize redesign &rarr;</button>'
+                : '';
+              return `<div class="mg-wf-row" data-wf-name="${esc(t.name)}" data-wf-rate="${t.failureRate}" data-wf-resets="${t.resets}" data-wf-comp="${t.completions}" data-ai-narr="${esc(aiNarr)}" data-action-html="${esc(actionHtml)}"
+                onclick="mgOpenWfModal(this)">
                 <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;min-width:160px;flex-shrink:0">${esc(t.name)}</div>
                 <div style="flex:2;min-width:0">
                   <div class="mg-wf-bar"><div class="mg-wf-fill" style="width:${t.failureRate}%;background:${col}"></div></div>
                   <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${t.failureRate}% own-failure rate · ${t.resets} instances</div>
                 </div>
                 <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${col};border-color:${col}40;flex-shrink:0">${lbl}</span>
-                ${t.failureRate>=60?`<button class="mg-btn mg-btn-c" onclick="event.stopPropagation();compassToast('Redesign authorized',2000)">Authorize →</button>`:''}
+                ${t.failureRate>=60?`<button class="mg-btn mg-btn-c" onclick="event.stopPropagation();compassToast('Redesign authorized',2000)">Authorize &rarr;</button>`:''}
               </div>`;
             }).join('')}
         </div>
@@ -3550,7 +3585,7 @@ async function loadManagementView() {
         <div class="mg-panel" style="margin:10px 12px">
           <div class="mg-panel-head">
             <span class="mg-panel-title">Management decision log — immutable · CoC-linked</span>
-            <button class="mg-btn mg-btn-c" onclick="mgOpenModal('Log a management decision','<div class=\'mg-modal-section\'>Decision type</div><select id=\'mg-dec-type\' class=\'mg-modal-select\'><option>Escalation</option><option>Resource</option><option>Process</option><option>Budget</option><option>People</option></select><div class=\'mg-modal-section\'>Decision &amp; reasoning</div><textarea id=\'mg-dec-text\' class=\'mg-modal-input\' rows=\'3\' placeholder=\'Describe the decision and reasoning...\'></textarea><div style=\'display:flex;gap:6px;margin-top:10px\'><button class=\'mg-btn mg-btn-c\' onclick=\'mgLogDecision()\'>Log decision →</button><button class=\'mg-btn\' style=\'border-color:rgba(255,255,255,.2);color:#5A84A8\' onclick=\'mgCloseModal()\'>Cancel</button></div>')">+ Log decision</button>
+            <button class="mg-btn mg-btn-c" onclick="mgOpenLogDecisionModal()">+ Log decision</button>
           </div>
           ${cocEvents.filter(e=>e.event_type==='management_decision').slice(0,10).map(e=>{
             const typeColors = {Escalation:'#E24B4A',Resource:'#00D2FF',Process:'#8B5CF6',Budget:'#1D9E75',People:'#EF9F27'};
@@ -3630,13 +3665,6 @@ async function loadExecutiveView() {
     const dependency  = Math.round(reworkCost*0.22);
     const complexity  = reworkCost - preventable - dependency;
 
-    // Archive briefs — last 7 entries from CoC management_decision events + synthetic
-    const archiveBriefs = [
-      {date:'Today',color:reworkCost>500000?'#E24B4A':reworkCost>200000?'#EF9F27':'#1D9E75',
-       delta:'Current status',
-       text:`Portfolio: ${activeProjects.length} active project${activeProjects.length!==1?'s':''}. Rework cost ${formatYen(reworkCost)} — ${reworkRate}% of all workflow steps result in rework. ${resourceReqs.length>0?resourceReqs.length+' resource request'+( resourceReqs.length>1?'s':'')+' pending. ':''}${portfolioSPI?'Portfolio SPI '+portfolioSPI.toFixed(2)+'.':''} ${redesignTemplates.length>0?redesignTemplates.length+' workflow template'+( redesignTemplates.length>1?'s':'')+' at redesign threshold.':'No templates at redesign threshold.'}`}
-    ];
-
     // Workflow redesign candidates
     const templateMap = {};
     reworkEvents.forEach(e=>{
@@ -3659,6 +3687,14 @@ async function loadExecutiveView() {
     const redesignCost = redesignTemplates.length * 18000;
     const redesignSavings = reworkCost * 0.6;
     const roi = redesignCost>0 ? Math.round(redesignSavings/redesignCost*100) : 0;
+
+    // Archive briefs — built after redesignTemplates is available
+    const archiveBriefs = [
+      {date:'Today',
+       color:reworkCost>500000?'#E24B4A':reworkCost>200000?'#EF9F27':'#1D9E75',
+       delta:'Current status',
+       text:'Portfolio: '+activeProjects.length+' active project'+(activeProjects.length!==1?'s':'')+'. Rework cost '+formatYen(reworkCost)+' — '+reworkRate+'% failure rate. '+(resourceReqs.length>0?resourceReqs.length+' resource request'+(resourceReqs.length>1?'s':'')+' pending. ':'')+( portfolioSPI?'Portfolio SPI '+portfolioSPI.toFixed(2)+'. ':'')+( redesignTemplates.length>0?redesignTemplates.length+' template'+(redesignTemplates.length>1?'s':'')+' at redesign threshold.':'No templates at redesign threshold.')},
+    ];
 
     // KPI colors
     const spiColor = portfolioSPI ? (portfolioSPI>=1?'#1D9E75':portfolioSPI>=0.85?'#EF9F27':'#E24B4A') : '#3A5C80';
@@ -4016,9 +4052,9 @@ async function loadClientView() {
 
     const today = new Date().toLocaleDateString('en-CA');
     const [projTasks, wfInstances, resourceReqs] = await Promise.all([
-      API.get(`tasks?select=id,name,status,due_date,pct_complete,milestone_date,phase&project_id=eq.${clientProject.id}&order=sequence_order.asc`).catch(()=>[]),
+      API.get(`tasks?select=id,name,status,due_date,pct_complete,sequence_order&project_id=eq.${clientProject.id}&limit=200`).catch(()=>[]),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&project_id=eq.${clientProject.id}&limit=20`).catch(()=>[]),
-      API.get(`resource_requests?select=id,project_id,status,submitted_at,role&project_id=eq.${clientProject.id}&status=eq.pending`).catch(()=>[]),
+      API.get(`resource_requests?select=id,project_id,status,submitted_at&project_id=eq.${clientProject.id}&status=eq.pending`).catch(()=>[]),
     ]);
 
     const totalTasks = projTasks.length;
