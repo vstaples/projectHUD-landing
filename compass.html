@@ -3381,20 +3381,308 @@ async function loadManagementView() {
     window.mgCloseModal = function() {
       document.getElementById('mg-modal-overlay').classList.remove('on');
     };
-    window.mgApproveReq = function(el, reqId) {
-      const row = el.closest('.mg-queue-item');
-      row.style.opacity='0.4';
-      API.patch('resource_requests?id=eq.'+reqId, {status:'approved'}).catch(()=>{});
-      setTimeout(()=>{ row.innerHTML='<div style="padding:6px 12px;font-family:var(--font-head);font-size:12px;color:#1D9E75">✓ Approved — PM notified</div>'; row.style.opacity='1'; },300);
+
+    // ── #5 Stat card tooltips ─────────────────────────────
+    window.mgStatHover = function(el, content) {
+      let tip = document.getElementById('mg-stat-tip');
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'mg-stat-tip';
+        tip.style.cssText = 'position:fixed;z-index:400;background:#0d1e35;border:1px solid rgba(0,210,255,.3);padding:10px 13px;min-width:220px;max-width:340px;font-family:var(--font-head);font-size:11px;color:#C8DFF0;line-height:1.7;box-shadow:0 8px 32px rgba(0,0,0,.7)';
+        document.body.appendChild(tip);
+      }
+      const r = el.getBoundingClientRect();
+      tip.innerHTML = content;
+      tip.style.display = 'block';
+      tip.style.left = r.left + 'px';
+      tip.style.top  = (r.bottom + 6) + 'px';
+    };
+    window.mgStatLeave = function() {
+      const tip = document.getElementById('mg-stat-tip');
+      if (tip) tip.style.display = 'none';
+    };
+
+    // ── #1 Health grid row expand ──────────────────────────
+    window.mgExpandRow = function(projId) {
+      const allExp = document.querySelectorAll('.mg-row-expanded');
+      const tr = document.getElementById('mg-tr-'+projId);
+      const existing = document.getElementById('mg-exp-'+projId);
+      allExp.forEach(e => { if (e.id !== 'mg-exp-'+projId) e.remove(); });
+      document.querySelectorAll('.mg-hgrid tr.selected').forEach(r=>r.classList.remove('selected'));
+      if (existing) { existing.remove(); return; }
+      const ps = projStats.find(p=>p.p.id===projId);
+      if (!ps || !tr) return;
+      tr.classList.add('selected');
+      tr.style.background = 'rgba(0,210,255,.06)';
+      const dots = projectHealthDots(ps.p);
+      const dimRows = dots.map(d => {
+        const reasons = {
+          'Schedule':   ps.overdueTasks.length>0 ? ps.overdueTasks.length+' overdue task'+(ps.overdueTasks.length>1?'s':'')+' · '+ps.overdueTasks.slice(0,3).map(t=>t.name||'task').join(', ')+(ps.overdueTasks.length>3?' +more':'') : 'No overdue tasks',
+          'Cost':       ps.p.cpi ? 'CPI '+parseFloat(ps.p.cpi).toFixed(2) : 'CPI not set — estimated from budget data',
+          'Confidence': 'Based on '+((confSignals||[]).filter(e=>ps.projInsts.some(i=>i.id===e.instance_id)).length)+' signals this week',
+          'Rework':     ps.projCoc.filter(e=>e.event_type==='step_reset').length+' resets vs '+ps.projCoc.filter(e=>e.event_type==='step_completed').length+' completions recorded',
+          'Timesheets': (weekEntries||[]).filter(e=>e.project_id===projId).map(e=>e.resource_id).filter((v,i,a)=>a.indexOf(v)===i).length+' resources logged time this week',
+          'Escalations':ps.projFlags.length>0 ? ps.projFlags.length+' unresolved flag'+(ps.projFlags.length>1?'s':'')+' · '+ps.projCoc.filter(e=>e.event_type==='step_reset').length+' total resets' : 'No active escalations',
+        };
+        const col = d.color;
+        return `<div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-bottom:1px solid rgba(0,210,255,.06)">
+          <div style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;margin-top:2px"></div>
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;min-width:88px">${d.label}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${Math.round(d.score*100)}% · ${reasons[d.label]||''}</div>
+        </div>`;
+      }).join('');
+      const exp = document.createElement('tr');
+      exp.id = 'mg-exp-'+projId;
+      exp.className = 'mg-row-expanded';
+      exp.innerHTML = `<td colspan="7" style="padding:10px 14px;background:#091522;border-left:3px solid rgba(0,210,255,.3)">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-bottom:6px">${esc(ps.p.name)} — Health breakdown</div>
+        ${dimRows}
+        ${ps.projCoc.length>0?`<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-top:8px;margin-bottom:4px">Recent CoC events</div>
+          ${ps.projCoc.slice(0,3).map(e=>`<div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;padding:3px 0">${e.event_type==='step_reset'?'↩':'✓'} ${esc(e.step_name||'—')} · ${_timeAgo(e.created_at)}${e.actor_name?' · '+esc(e.actor_name):''}</div>`).join('')}`:''}
+      </td>`;
+      tr.insertAdjacentElement('afterend', exp);
+    };
+
+    // ── #2 Queue item expand ───────────────────────────────
+    window.mgExpandQueue = function(qi) {
+      const existing = document.getElementById('mg-qexp-'+qi);
+      const row = document.getElementById('mg-qi-'+qi);
+      if (!row) return;
+      if (existing) { existing.remove(); row.style.background=''; return; }
+      document.querySelectorAll('.mg-qexp').forEach(e=>e.remove());
+      document.querySelectorAll('.mg-queue-item').forEach(r=>r.style.background='');
+      row.style.background = 'rgba(0,210,255,.04)';
+      const q = queueItems[qi];
+      if (!q) return;
+      const exp = document.createElement('div');
+      exp.id = 'mg-qexp-'+qi;
+      exp.className = 'mg-qexp';
+      exp.style.cssText = 'padding:10px 12px 12px 20px;background:#091522;border-left:3px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.1)';
+      let html = '';
+      if (q.type === 'escalation') {
+        const instResets = (reworkEvents||[]).filter(e=>wfInstances.find(w=>w.id===e.instance_id)?.project_id===q.projId);
+        html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#E24B4A;margin-bottom:6px">Intervention history</div>`;
+        if (instResets.length > 0) {
+          const grouped = {};
+          instResets.forEach(e=>{ grouped[e.instance_id]=(grouped[e.instance_id]||[]); grouped[e.instance_id].push(e); });
+          Object.entries(grouped).forEach(([instId, evts]) => {
+            const inst = wfInstances.find(w=>w.id===instId);
+            html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;margin-bottom:3px">${esc(inst?.title||instId)}</div>`;
+            evts.forEach(e=>{
+              html += `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+                <div style="width:7px;height:7px;border-radius:50%;background:#E24B4A;flex-shrink:0;margin-top:2px"></div>
+                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${esc(e.step_name||'Step reset')}${e.event_notes?' — '+esc(e.event_notes.slice(0,80)):''}</div>
+                <div style="font-family:var(--font-data);font-size:11px;color:#3A5C80;flex-shrink:0">${_timeAgo(e.created_at)}</div>
+              </div>`;
+            });
+          });
+          html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin:8px 0 4px">Assessment</div>
+            <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:7px 9px;background:rgba(239,159,39,.05);border-left:2px solid #EF9F27">${instResets.length>=2 ? 'Two or more PM-level interventions have not resolved this issue. The blocking factor appears to require authority beyond PM level — likely direct client authority, an expedited sign-off channel, or a change in the approval architecture.' : 'Single reset on record. PM is managing. Monitor for recurrence before escalating.'}</div>`;
+        } else {
+          html += `<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No CoC intervention history found for this project.</div>`;
+        }
+      } else {
+        const r = resourceReqs.find(req=>req.id===q.reqId);
+        const ageH = r ? Math.round((Date.now()-new Date(r.submitted_at).getTime())/3600000) : q.age;
+        html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin-bottom:6px">Request detail</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0">Submitted ${ageH}h ago · Status: pending</div>
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin:8px 0 4px">Assessment</div>
+          <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:7px 9px;background:rgba(239,159,39,.05);border-left:2px solid #EF9F27">Request has been pending ${ageH}h. ${ageH>96?'Significantly overdue for response — resource planning impact increasing.':ageH>48?'Aging beyond healthy threshold. PM is blocked on staffing decision.':'Within normal response window.'}</div>`;
+      }
+      exp.innerHTML = html;
+      row.insertAdjacentElement('afterend', exp);
+    };
+
+    // ── #3/#4 People — per-project billable breakdown ──────
+    window.mgShowPerson = function(fullName, arcStr, weekHrs, taskCount) {
+      const r = _resources.find(r=>(r.first_name+' '+r.last_name).trim()===fullName);
+      const hasRed = arcStr.includes('R');
+      const redIdx = arcStr.indexOf('R'), greenIdx = arcStr.indexOf('G');
+      const narrative = hasRed
+        ? (redIdx > greenIdx
+            ? 'Degradation pattern detected. Review what changed on the day the arc shifted — upstream block or relationship friction is more likely than individual performance failure.'
+            : 'Persistent issues this week. Consider direct check-in.')
+        : 'Clean week. No pattern concerns.';
+      // Per-project billable breakdown
+      const projEntries = (weekEntries||[]).filter(e=>e.resource_id===r?.id);
+      const byProj = {};
+      projEntries.forEach(e => {
+        const proj = _projects.find(p=>p.id===e.project_id);
+        const k = proj?.name||e.project_id||'Unknown';
+        if (!byProj[k]) byProj[k] = {bill:0, nonbill:0, days:{}};
+        if (e.is_billable) byProj[k].bill += parseFloat(e.hours||0);
+        else byProj[k].nonbill += parseFloat(e.hours||0);
+        byProj[k].days[e.date] = (byProj[k].days[e.date]||0) + parseFloat(e.hours||0);
+      });
+      const dayLbls = ['M','T','W','Th','F'];
+      const projBreakdownHtml = Object.entries(byProj).length > 0
+        ? Object.entries(byProj).map(([pname, v]) => {
+            const tot = v.bill + v.nonbill;
+            const billPct = tot > 0 ? Math.round(v.bill/tot*100) : 0;
+            const dayBar = weekDays.map((d,i) => {
+              const h = v.days[d]||0;
+              return `<div style="text-align:center">
+                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${dayLbls[i]}</div>
+                <div style="height:22px;width:18px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden;margin:2px auto 0;position:relative">
+                  ${h>0?`<div style="position:absolute;bottom:0;left:0;right:0;height:${Math.min(100,h/8*100)}%;background:var(--compass-cyan);opacity:.8"></div>`:''}
+                </div>
+                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;margin-top:2px">${h>0?h.toFixed(1):'—'}</div>
+              </div>`;
+            }).join('');
+            return `<div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:8px 10px;margin-bottom:6px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+                <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8">${esc(pname)}</span>
+                <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${tot.toFixed(1)}h · <span style="color:var(--compass-cyan)">${v.bill.toFixed(1)}h bill</span> / <span style="color:#8B5CF6">${v.nonbill.toFixed(1)}h non-bill</span></span>
+              </div>
+              <div style="height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;margin-bottom:6px">
+                <div style="height:100%;width:${billPct}%;background:var(--compass-cyan);border-radius:2px"></div>
+              </div>
+              <div style="display:flex;gap:8px;justify-content:space-between">${dayBar}</div>
+            </div>`;
+          }).join('')
+        : `<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No time entries this week</div>`;
+      const body = `
+        <div class="mg-modal-section">Week arc — ${arcStr}</div>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          ${arcStr.split('→').map((s,i)=>{
+            const c=s==='G'?'#1D9E75':s==='Y'?'#EF9F27':s==='R'?'#E24B4A':'rgba(255,255,255,.12)';
+            return `<div style="text-align:center"><div style="width:14px;height:14px;border-radius:50%;background:${c};margin:0 auto"></div><div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:3px">${['M','T','W','Th','F'][i]||''}</div></div>`;
+          }).join('')}
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--compass-cyan)">${weekHrs}h</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${taskCount} open tasks</div>
+          </div>
+        </div>
+        <div class="mg-modal-section">Billable vs non-billable by project</div>
+        ${projBreakdownHtml}
+        <div class="mg-modal-section">AI narrative</div>
+        <div class="mg-modal-block mg-modal-ai">${narrative}</div>`;
+      mgOpenModal(fullName + ' — Week summary', body);
+    };
+
+    // ── #7 Respond escalation — AI radio recommendations ──
+    window.mgRespondEscalation = function(title, situationText) {
+      const bodyHtml = `
+        <div class="mg-modal-section">Situation</div>
+        <div class="mg-modal-block">${situationText}</div>
+        <div class="mg-modal-section">AI recommendations — select one</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);cursor:pointer">
+            <input type="radio" name="mg-esc-action" value="direct" style="margin-top:2px;accent-color:var(--compass-cyan)">
+            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Handle directly</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Contact the blocking authority yourself — escalates above PM and account manager level</div></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);cursor:pointer">
+            <input type="radio" name="mg-esc-action" value="guide" style="margin-top:2px;accent-color:var(--compass-cyan)">
+            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Send guidance to PM</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Provide PM with a specific escalation path or alternative approach to try</div></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);cursor:pointer">
+            <input type="radio" name="mg-esc-action" value="executive" style="margin-top:2px;accent-color:var(--compass-cyan)">
+            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Escalate to executive</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Assemble intervention record and brief executive tier — full chain of custody preserved</div></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);cursor:pointer">
+            <input type="radio" name="mg-esc-action" value="monitor" style="margin-top:2px;accent-color:var(--compass-cyan)">
+            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Continue monitoring</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Log acknowledgement but allow PM to continue managing — set check-in window</div></div>
+          </label>
+        </div>
+        <div class="mg-modal-section">Your response <span style="color:#E24B4A">*</span></div>
+        <textarea id="mg-respond-text" class="mg-modal-input" rows="3" placeholder="Required — describe your response or intended action…"></textarea>
+        <div id="mg-respond-req" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Response is required</div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="mg-btn mg-btn-c" onclick="mgSendResponse()">Log response &amp; act →</button>
+          <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
+        </div>`;
+      mgOpenModal(title, bodyHtml);
+    };
+    window.mgSendResponse = function() {
+      const txt  = document.getElementById('mg-respond-text')?.value?.trim()||'';
+      const act  = document.querySelector('input[name="mg-esc-action"]:checked')?.value||'acknowledge';
+      const reqEl= document.getElementById('mg-respond-req');
+      if (!txt) {
+        if (reqEl) reqEl.style.display='block';
+        document.getElementById('mg-respond-text')?.focus();
+        return;
+      }
+      if (reqEl) reqEl.style.display='none';
+      const actionLabels = {direct:'Handling directly',guide:'Guidance sent to PM',executive:'Escalated to executive',monitor:'Monitoring — acknowledged',acknowledge:'Acknowledged'};
+      const note = '['+actionLabels[act]+'] '+txt;
+      API.post('workflow_step_instances',{
+        event_type:'management_decision', step_name:'Escalation',
+        event_notes: note, actor_name:_myResource?.name||null,
+        created_at:new Date().toISOString(),
+        firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+      }).catch(()=>{});
+      mgCloseModal();
+      compassToast('Response logged to CoC',2200);
+      setTimeout(()=>{ _viewLoaded['management']=false; loadManagementView(); },600);
+    };
+
+    // ── #8 Approve/Reject with required comments ───────────
+    window.mgApproveReq = function(el, reqId, queueTitle) {
+      mgOpenModal('Approve request', `
+        <div class="mg-modal-section">Request</div>
+        <div class="mg-modal-block">${esc(queueTitle||reqId)}</div>
+        <div class="mg-modal-section">Conditions / comments <span style="color:#E24B4A">*</span></div>
+        <textarea id="mg-approve-note" class="mg-modal-input" rows="3" placeholder="Required — note any conditions, constraints, or context for this approval…"></textarea>
+        <div id="mg-approve-req" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Comment required</div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="mg-btn mg-btn-g" onclick="mgConfirmApprove('${reqId}')">Approve →</button>
+          <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
+        </div>`);
+    };
+    window.mgConfirmApprove = async function(reqId) {
+      const txt = document.getElementById('mg-approve-note')?.value?.trim()||'';
+      const reqEl = document.getElementById('mg-approve-req');
+      if (!txt) { if(reqEl) reqEl.style.display='block'; return; }
+      await Promise.all([
+        API.patch('resource_requests?id=eq.'+reqId, {status:'approved'}).catch(()=>{}),
+        API.post('workflow_step_instances',{
+          event_type:'management_decision', step_name:'Resource',
+          event_notes:'[Approved] '+txt,
+          actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
+          firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+        }).catch(()=>{})
+      ]);
+      mgCloseModal();
+      compassToast('Approved · Decision logged to CoC',2200);
+      setTimeout(()=>{ _viewLoaded['management']=false; loadManagementView(); },600);
+    };
+    window.mgRejectReq = function(reqId, queueTitle) {
+      mgOpenModal('Reject request', `
+        <div class="mg-modal-section">Request</div>
+        <div class="mg-modal-block">${esc(queueTitle||reqId)}</div>
+        <div class="mg-modal-section">Reason for rejection <span style="color:#E24B4A">*</span></div>
+        <textarea id="mg-reject-note" class="mg-modal-input" rows="3" placeholder="Required — explain the rejection reason for the PM record…"></textarea>
+        <div id="mg-reject-req" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Reason required</div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="mg-btn mg-btn-r" onclick="mgConfirmReject('${reqId}')">Reject &amp; log →</button>
+          <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
+        </div>`);
+    };
+    window.mgConfirmReject = async function(reqId) {
+      const txt = document.getElementById('mg-reject-note')?.value?.trim()||'';
+      const reqEl = document.getElementById('mg-reject-req');
+      if (!txt) { if(reqEl) reqEl.style.display='block'; return; }
+      await Promise.all([
+        API.patch('resource_requests?id=eq.'+reqId, {status:'rejected'}).catch(()=>{}),
+        API.post('workflow_step_instances',{
+          event_type:'management_decision', step_name:'Resource',
+          event_notes:'[Rejected] '+txt,
+          actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
+          firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+        }).catch(()=>{})
+      ]);
+      mgCloseModal();
+      compassToast('Rejection logged to CoC',2200);
+      setTimeout(()=>{ _viewLoaded['management']=false; loadManagementView(); },600);
     };
     window.mgLogDecision = function() {
       const sel = document.getElementById('mg-dec-type')?.value||'';
       const txt = document.getElementById('mg-dec-text')?.value?.trim()||'';
       if (!txt) { document.getElementById('mg-dec-text').style.borderColor='rgba(226,75,74,.5)'; return; }
-      API.post('workflow_step_instances',{event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+      API.post('workflow_step_instances',{event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001',actor_name:_myResource?.name||null}).catch(()=>{});
       mgCloseModal();
       compassToast('Decision logged to CoC',2000);
-      _viewLoaded['management']=false;
+      setTimeout(()=>{ _viewLoaded['management']=false; loadManagementView(); },600);
     };
     window.mgRespondEscalation = function(title, situationText) {
       const bodyHtml = `
@@ -3483,20 +3771,22 @@ async function loadManagementView() {
           <div class="mg-sc-val" style="color:${orgConfidence===null?'#3A5C80':orgConfidence>=70?'#1D9E75':orgConfidence>=50?'#EF9F27':'#E24B4A'}">${orgConfidence!==null?orgConfidence+'%':'—'}</div>
           <div class="mg-sc-sub">green signals today</div>
         </div>
-        <div class="mg-sc">
+        <div class="mg-sc" style="cursor:default" data-tip="${escTipHtml}"
+          onmouseenter="mgStatHover(this,this.dataset.tip)" onmouseleave="mgStatLeave()">
           <div class="mg-sc-lbl">Active escalations</div>
           <div class="mg-sc-val" style="color:${escalations>0?'#E24B4A':'#3A5C80'}">${escalations}</div>
-          <div class="mg-sc-sub">awaiting response</div>
+          <div class="mg-sc-sub">${escalations>0?'hover for detail':'none pending'}</div>
         </div>
-        <div class="mg-sc">
+        <div class="mg-sc" style="cursor:default">
           <div class="mg-sc-lbl">Workflow alerts</div>
           <div class="mg-sc-val" style="color:${redesignCount>0?'#EF9F27':'#3A5C80'}">${redesignCount}</div>
           <div class="mg-sc-sub">redesign recommended</div>
         </div>
-        <div class="mg-sc">
+        <div class="mg-sc" style="cursor:default" data-tip="${rwTipFull}"
+          onmouseenter="mgStatHover(this,this.dataset.tip)" onmouseleave="mgStatLeave()">
           <div class="mg-sc-lbl">Rework cost — week</div>
           <div class="mg-sc-val" style="color:${reworkCost>500000?'#E24B4A':reworkCost>100000?'#EF9F27':'#3A5C80'}">${formatYen(reworkCost)}</div>
-          <div class="mg-sc-sub">labor hours in rework</div>
+          <div class="mg-sc-sub">hover for breakdown</div>
         </div>
       </div>
 
@@ -3525,9 +3815,12 @@ async function loadManagementView() {
                 <tbody>
                 ${activeProjects.map(p=>{
                   const dots = projectHealthDots(p);
-                  return `<tr>
-                    <td>${esc(p.name)}</td>
-                    ${dots.map(d=>`<td><div class="mg-dot" style="background:${d.color}" title="${d.label}" onclick="mgShowDot('${esc(p.name).replace(/'/g,'\\x27')}','${d.label}',${Math.round(d.score*100)})"></div></td>`).join('')}
+                  return `<tr id="mg-tr-${p.id}" style="cursor:pointer;transition:background .1s"
+                    onclick="mgExpandRow('${p.id}')"
+                    onmouseenter="this.style.background='rgba(0,210,255,.03)'"
+                    onmouseleave="if(!document.getElementById('mg-exp-${p.id}'))this.style.background=''">
+                    <td style="font-weight:600">${esc(p.name)}</td>
+                    ${dots.map(d=>`<td onclick="event.stopPropagation();mgShowDot('${esc(p.name).replace(/'/g,'\\x27')}','${d.label}',${Math.round(d.score*100)})"><div class="mg-dot" style="background:${d.color}" title="${d.label}: ${Math.round(d.score*100)}%"></div></td>`).join('')}
                   </tr>`;
                 }).join('')}
                 </tbody>
@@ -3565,7 +3858,10 @@ async function loadManagementView() {
           ${queueItems.length===0
             ? '<div style="padding:16px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No pending decisions</div>'
             : queueItems.map((q,qi)=>`
-            <div class="mg-queue-item" id="mg-qi-${qi}">
+            <div class="mg-queue-item" id="mg-qi-${qi}" style="cursor:pointer"
+              onclick="mgExpandQueue(${qi})"
+              onmouseenter="this.style.background='rgba(0,210,255,.025)'"
+              onmouseleave="if(!document.getElementById('mg-qexp-${qi}'))this.style.background=''">
               <div class="mg-qpriority" style="background:${q.priority==='red'?'#E24B4A':'#EF9F27'}"></div>
               <div style="flex:1;min-width:0">
                 <div class="mg-qtype">${q.type==='escalation'?'Escalation — PM response required':'Resource request — '+q.age+'h aging'}</div>
@@ -3573,10 +3869,11 @@ async function loadManagementView() {
                 <div class="mg-qmeta">${q.meta}</div>
                 <div class="mg-qrec">${q.rec}</div>
               </div>
-              <div class="mg-qa">
+              <div class="mg-qa" onclick="event.stopPropagation()">
                 ${q.type==='escalation'
                   ? `<button class="mg-btn mg-btn-c" onclick="mgRespondEscalation('Respond to escalation','${q.title.replace(/'/g,'\\x27')}<br>${q.meta.replace(/'/g,'\\x27')}')">Respond →</button>`
-                  : `<button class="mg-btn mg-btn-g" onclick="mgApproveReq(this,'${q.reqId}')">Approve</button><button class="mg-btn mg-btn-r">Reject</button>`}
+                  : `<button class="mg-btn mg-btn-g" onclick="mgApproveReq(this,'${q.reqId}','${q.title.replace(/'/g,'\\x27')}')">Approve</button>
+                     <button class="mg-btn mg-btn-r" onclick="mgRejectReq('${q.reqId}','${q.title.replace(/'/g,'\\x27')}')">Reject</button>`}
               </div>
             </div>`).join('')}
         </div>
@@ -3728,6 +4025,19 @@ async function loadExecutiveView() {
       if(!inst?.project_id) return;
       reworkByProj[inst.project_id] = (reworkByProj[inst.project_id]||0)+1;
     });
+
+    // Pre-compute tooltip HTML strings (avoids nested quote issues in template literals)
+    const escTipHtml = Object.entries(instResets).filter(([,c])=>c>=2).map(([id,c])=>{
+      const inst = wfInstances.find(w=>w.id===id);
+      const proj = _projects.find(p=>p.id===inst?.project_id);
+      return (proj?.name||'Unknown')+': '+c+' resets on '+((inst?.title||'').slice(0,40)||'workflow');
+    }).join(' | ') || 'No active escalations';
+
+    const rwTipLines = Object.entries(reworkByProj).sort(([,a],[,b])=>b-a).slice(0,5).map(([pid,c])=>{
+      const p = _projects.find(p=>p.id===pid);
+      return (p?.name||'?').slice(0,24)+': '+formatYen(c*HRS_PER_REWORK*HOURLY_RATE)+' ('+c+' cycles)';
+    }).join(' | ') || 'No breakdown available';
+    const rwTipFull = reworkCount+' resets x '+HRS_PER_REWORK+'h x ¥'+HOURLY_RATE.toLocaleString()+'/hr | '+rwTipLines;
     const maxRework = Math.max(1,...Object.values(reworkByProj));
 
     // Root cause breakdown (stub ratios from observed pattern)
