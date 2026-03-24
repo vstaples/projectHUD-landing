@@ -1501,47 +1501,6 @@ async function loadUserView() {
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
 
-    // ── Delegated events — wired after innerHTML is set ───────
-    content.addEventListener('click', function onContentClick(ev) {
-      // Clear filter button
-      if (ev.target.closest('.te-clear-filter')) {
-        content.removeEventListener('click', onContentClick);
-        filterTimeLog(null);
-        return;
-      }
-      // Bar chart day filter
-      const barCol = ev.target.closest('.te-bar-col');
-      if (barCol && barCol.dataset.hasHours === 'true') {
-        content.removeEventListener('click', onContentClick);
-        filterTimeLog(barCol.dataset.date);
-        return;
-      }
-      // Time log row
-      const teRow = ev.target.closest('.te-row');
-      if (teRow) {
-        const teId   = teRow.dataset.teId;
-        const isCad  = teRow.dataset.teCadence === 'true';
-        if (isCad) {
-          window.location.href = '/cadence.html';
-          return;
-        }
-        const entry = _teEntries.find(e => e.id === teId);
-        if (entry) {
-          const proj = _projects.find(p => p.id === entry.project_id);
-          openTimeEntryEdit({
-            id:           entry.id,
-            hours:        entry.hours,
-            notes:        entry.notes || '',
-            is_billable:  entry.is_billable,
-            date:         entry.date,
-            project_name: proj?.name || '—',
-            step_name:    entry.step_name || null,
-            source_type:  entry.source_type,
-          });
-        }
-      }
-    }, { once: false });
-
   } catch (e) {
     console.error('[Compass] loadUserView error:', e);
     if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-mono);font-size:11px">Failed to load — check console</div>';
@@ -2646,6 +2605,47 @@ function filterTimeLog(date) {
   _viewLoaded['user'] = false;
   loadUserView();
 }
+
+// ── Permanent delegated listener for My Work interactions ─
+// Wired once at load — survives innerHTML re-renders because
+// it lives on document, not on the content container.
+document.addEventListener('click', function(ev) {
+  // Clear filter button
+  if (ev.target.closest('.te-clear-filter')) {
+    filterTimeLog(null);
+    return;
+  }
+  // Bar chart column
+  const barCol = ev.target.closest('.te-bar-col');
+  if (barCol && barCol.dataset.hasHours === 'true') {
+    filterTimeLog(barCol.dataset.date);
+    return;
+  }
+  // Time log row
+  const teRow = ev.target.closest('.te-row');
+  if (teRow) {
+    const teId  = teRow.dataset.teId;
+    const isCad = teRow.dataset.teCadence === 'true';
+    if (isCad) {
+      window.location.href = '/cadence.html';
+      return;
+    }
+    const entry = _teEntries.find(e => e.id === teId);
+    if (entry) {
+      const proj = _projects.find(p => p.id === entry.project_id);
+      openTimeEntryEdit({
+        id:           entry.id,
+        hours:        entry.hours,
+        notes:        entry.notes || '',
+        is_billable:  entry.is_billable,
+        date:         entry.date,
+        project_name: proj?.name || '—',
+        step_name:    entry.step_name || null,
+        source_type:  entry.source_type,
+      });
+    }
+  }
+});
 
 // ── Time entry edit drawer ────────────────────────────────
 function openTimeEntryEdit(entry) {
