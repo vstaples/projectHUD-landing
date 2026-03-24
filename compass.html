@@ -5987,36 +5987,34 @@ window.loadUserConcerns = async function() {
   if (!el) return;
 
   try {
-    const resId = _myResource?.id;
-    // concerns table — firm-scoped, authored by this resource
-    const concerns = await API.get(`concerns?select=id,title,description,status,priority,project_id,phase,raised_at,addressed_to,coc_thread&raiser_resource_id=eq.${resId}&order=raised_at.desc&limit=50`).catch(()=>[]);
+    const actorName = _myResource?.name || '';
+    // Concerns stored as workflow_step_instances with step_name prefix "CONCERN:"
+    // outcome: blocked=unread, at_risk=in_progress, on_track=resolved
+    const rows = await API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at&event_type=eq.task_progress_update&step_name=like.CONCERN:*&actor_name=eq.${encodeURIComponent(actorName)}&order=created_at.desc&limit=100`).catch(()=>[]);
 
-    // Also pull CoC events linked to concerns
-    const cocEvents = concerns.length > 0
-      ? await API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,created_at&event_type=in.(concern_raised,concern_acknowledged,concern_update,concern_resolved,concern_rejected)&order=created_at.desc&limit=200`).catch(()=>[])
-      : [];
+    _concernSeq = 0;
+    window._userConcerns = (rows||[]).map(r => {
+      const title = r.step_name.replace(/^CONCERN:\s*/,'').slice(0,100);
+      const statusMap = {'blocked':'unread','at_risk':'in_progress','on_track':'resolved'};
+      const status = statusMap[r.outcome] || 'unread';
+      return {
+        id: r.id,
+        cid: 'C-'+String(++_concernSeq).padStart(3,'0'),
+        title,
+        description: r.event_notes||'',
+        status,
+        priority: 'medium',
+        projectId: null, project: '—', phase: '',
+        raised_date: r.created_at?.slice(0,10),
+        raisedAt: r.created_at,
+        thread: [],
+      };
+    });
 
-    window._userConcerns = (concerns||[]).map(c => ({
-      id: c.id,
-      cid: 'C-'+String(++_concernSeq).padStart(3,'0'),
-      title: c.title,
-      description: c.description,
-      status: c.status||'unread',
-      priority: c.priority||'medium',
-      projectId: c.project_id,
-      project: (_projects||[]).find(p=>p.id===c.project_id)?.name||'—',
-      phase: c.phase||'',
-      raised_date: c.raised_at?.slice(0,10),
-      raisedAt: c.raised_at,
-      thread: cocEvents.filter(e=>e.step_name?.includes(c.id)||false),
-    }));
-
-    // If table doesn't exist yet, show empty state gracefully
     updateConcernBadge();
     renderUserConcerns();
   } catch(e) {
     console.error('[Compass] concerns load error:', e);
-    // Table may not exist yet — show empty state with quick-capture
     window._userConcerns = [];
     renderUserConcerns();
   }
@@ -6166,34 +6164,34 @@ window.uRaiseConcern = async function() {
   const txt = document.getElementById('concern-new-text')?.value?.trim()||'';
   const priority = document.getElementById('concern-new-priority')?.value||'medium';
   if (!txt) { compassToast('Enter a concern description',2000); return; }
-  const id = crypto.randomUUID();
-  await API.post('concerns',{
-    id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
-    raiser_resource_id: _myResource?.id||null,
-    title: txt.slice(0,100),
-    description: txt,
-    status:'unread',
-    priority,
-    raised_at: new Date().toISOString(),
-  }).catch(()=>{});
-  await API.post('workflow_step_instances',{
-    id:crypto.randomUUID(), instance_id:null,
-    event_type:'concern_raised', step_name:'Concern raised: '+txt.slice(0,60),
-    event_notes:txt, actor_name:_myResource?.name||null,
-    created_at:new Date().toISOString(),
-    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
-  }).catch(()=>{});
-  document.getElementById('concern-new-text').value='';
-  compassToast('Concern logged · PM notified',2500);
-  window._concernsLoaded = false;
-  loadUserConcerns();
+  // Store concern as workflow_step_instance — no separate concerns table needed
+  const result = await API.post('workflow_step_instances',{
+    id: crypto.randomUUID(), instance_id: null,
+    event_type: 'task_progress_update',
+    step_name: 'CONCERN: '+txt.slice(0,80),
+    event_notes: txt,
+    outcome: 'blocked',
+    actor_name: _myResource?.name||null,
+    created_at: new Date().toISOString(),
+    firm_id: 'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(e=>{ console.error('[Compass] concern post error:',e); return null; });
+  if (result !== null) {
+    document.getElementById('concern-new-text').value = '';
+    compassToast('Concern logged · PM notified',2500);
+    window._concernsLoaded = false;
+    loadUserConcerns();
+  } else {
+    compassToast('Failed to log concern — check console',2500);
+  }
 };
 
 window.uEscalateConcern = function(concernId) {
   API.post('workflow_step_instances',{
     id:crypto.randomUUID(), instance_id:null,
-    event_type:'concern_update', step_name:'Escalation requested',
-    event_notes:'User requested escalation from Compass My Concerns.',
+    event_type:'task_progress_update',
+    step_name:'CONCERN: Escalation — '+concernId.slice(0,20),
+    event_notes:'User requested escalation.',
+    outcome:'at_risk',
     actor_name:_myResource?.name||null,
     created_at:new Date().toISOString(),
     firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
@@ -6206,8 +6204,10 @@ window.uAddConcernComment = function(concernId) {
   if (!txt?.trim()) return;
   API.post('workflow_step_instances',{
     id:crypto.randomUUID(), instance_id:null,
-    event_type:'concern_update', step_name:'Comment added',
-    event_notes:txt.trim(), actor_name:_myResource?.name||null,
+    event_type:'task_progress_update',
+    step_name:'CONCERN: Comment — '+concernId.slice(0,20),
+    event_notes:txt.trim(), outcome:'at_risk',
+    actor_name:_myResource?.name||null,
     created_at:new Date().toISOString(),
     firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
   }).catch(()=>{});
@@ -6216,11 +6216,13 @@ window.uAddConcernComment = function(concernId) {
 };
 
 window.uResolveConcern = async function(concernId) {
-  await API.patch('concerns?id=eq.'+concernId,{status:'resolved'}).catch(()=>{});
-  API.post('workflow_step_instances',{
+  await API.post('workflow_step_instances',{
     id:crypto.randomUUID(), instance_id:null,
-    event_type:'concern_resolved', step_name:'Concern resolved',
-    event_notes:'Marked resolved by raiser.', actor_name:_myResource?.name||null,
+    event_type:'task_progress_update',
+    step_name:'CONCERN: Resolved — '+concernId.slice(0,20),
+    event_notes:'Marked resolved by raiser.',
+    outcome:'on_track',
+    actor_name:_myResource?.name||null,
     created_at:new Date().toISOString(),
     firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
   }).catch(()=>{});
@@ -6231,12 +6233,14 @@ window.uResolveConcern = async function(concernId) {
 // Auto-load concerns count for badge on view init
 document.addEventListener('compass-identity-ready', () => {
   if (_myResource?.id) {
-    // Preload concern badge count without full render
-    API.get(`concerns?select=id,status&raiser_resource_id=eq.${_myResource.id}&status=in.(unread,not_yet_read)&limit=20`).then(rows=>{
-      const unread=(rows||[]).length;
-      const badge=document.getElementById('ust-concerns-badge');
-      if(badge&&unread>0){badge.textContent=unread+' unread';badge.className='ust-badge ust-badge-red';badge.style.display='inline';}
-    }).catch(()=>{});
+    const actName = _myResource.name||'';
+    if (actName) {
+      API.get(`workflow_step_instances?select=id&event_type=eq.task_progress_update&step_name=like.CONCERN:*&outcome=eq.blocked&actor_name=eq.${encodeURIComponent(actName)}&limit=20`).then(rows=>{
+        const unread=(rows||[]).length;
+        const badge=document.getElementById('ust-concerns-badge');
+        if(badge&&unread>0){badge.textContent=unread+' unread';badge.className='ust-badge ust-badge-red';badge.style.display='inline';}
+      }).catch(()=>{});
+    }
   }
 });
 
