@@ -1,0 +1,536 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Share Tech Mono',monospace;background:#0c1628;color:#F0F6FF;font-size:12px;overflow:hidden}
+.shell{display:flex;flex-direction:column;height:100vh;min-height:640px}
+.nav{display:flex;align-items:center;height:40px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.12);padding:0 14px;gap:8px;flex-shrink:0}
+.nav-logo{font-size:13px;font-weight:700;letter-spacing:.12em}.nav-logo span{color:#00D2FF}
+.nav-bc{font-size:11px;color:rgba(255,255,255,.3);display:flex;align-items:center;gap:5px}
+.nav-badge{font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07);margin-left:auto}
+.body{display:flex;flex:1;overflow:hidden;position:relative}
+/* LEFT PANEL */
+.left{width:340px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;overflow:hidden}
+.ctx-strip{padding:10px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(255,255,255,.02);flex-shrink:0}
+.ctx-sit{font-size:11px;color:rgba(240,246,255,.65);line-height:1.5;margin-bottom:7px}
+.ctx-kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.ctx-kpi{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px;cursor:pointer;transition:.12s}
+.ctx-kpi:hover{border-color:rgba(0,210,255,.3)}
+.ctx-kpi-l{font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em}
+.ctx-kpi-v{font-size:13px;font-weight:700;margin-top:1px}
+.left-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.lt{padding:6px 12px;font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;text-transform:uppercase;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.lt.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.left-content{flex:1;overflow-y:auto}
+/* LEVER CARDS */
+.lg{margin-bottom:10px;padding:0 10px}
+.lg-h{display:flex;align-items:center;gap:6px;margin:8px 0 5px}
+.lg-bar{width:3px;height:13px;border-radius:1px;flex-shrink:0}
+.lg-t{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.4);text-transform:uppercase;flex:1}
+.lc{border:1px solid rgba(255,255,255,.07);padding:7px 9px;margin-bottom:4px;transition:.12s;position:relative}
+.lc:not(.disabled):hover{border-color:rgba(0,210,255,.2);background:rgba(0,210,255,.03)}
+.lc.sel{border-color:rgba(0,210,255,.45);background:rgba(0,210,255,.07)}
+.lc.disabled{opacity:.35}
+.lc.warn{border-left:3px solid rgba(239,159,39,.6)}
+.lc.cpm-derived{border-left:3px solid rgba(139,92,246,.5)}
+.lc-top{display:flex;align-items:flex-start;gap:6px;margin-bottom:3px;cursor:pointer}
+.lc-chk{width:14px;height:14px;border:1px solid rgba(255,255,255,.2);border-radius:2px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;transition:.12s;margin-top:1px}
+.lc.sel .lc-chk{background:#00D2FF;border-color:#00D2FF;color:#060a10}
+.lc-name{font-size:11px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3}
+.lc-cb{font-size:10px;padding:1px 5px;border:1px solid;flex-shrink:0;white-space:nowrap;cursor:help}
+.lcb-low{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.lcb-med{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.lcb-high{border-color:rgba(226,75,74,.3);color:#E24B4A}
+.lc-meta{display:flex;gap:5px;font-size:11px;color:rgba(255,255,255,.35);flex-wrap:wrap;margin-top:2px}
+.lc-stat{display:flex;align-items:center;gap:3px;cursor:pointer}
+.lc-sd{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.lc-warn{font-size:11px;padding:4px 7px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.2);border-left:2px solid #EF9F27;color:rgba(239,159,39,.85);line-height:1.45;margin-top:5px}
+.lc-pattern{font-size:11px;padding:4px 7px;background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.18);border-left:2px solid rgba(226,75,74,.6);color:rgba(226,75,74,.8);line-height:1.45;margin-top:5px}
+.lc-params{margin-top:5px;display:none;border-top:1px solid rgba(255,255,255,.05);padding-top:5px}
+.lc.sel .lc-params{display:block}
+.pr{display:flex;align-items:center;gap:5px;margin-top:4px}
+.pr-l{font-size:11px;color:rgba(255,255,255,.3);min-width:75px}
+.pr select{flex:1;padding:2px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:11px;outline:none;cursor:pointer;border-radius:2px}
+.lc-tasks{margin-top:5px;display:flex;gap:3px;flex-wrap:wrap}
+.task-pill{font-size:11px;padding:1px 6px;border:1px solid;border-radius:0}
+.tp-green{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.tp-amber{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.tp-purple{border-color:rgba(139,92,246,.3);color:#8B5CF6}
+/* CPM VIEW */
+.cpm-view{padding:10px}
+.cv-section{font-size:11px;letter-spacing:.08em;color:rgba(0,210,255,.6);text-transform:uppercase;margin:8px 0 5px}
+.cv-row{display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:.12s}
+.cv-row:hover{background:rgba(255,255,255,.03)}
+.cv-bar{width:3px;align-self:stretch;flex-shrink:0}
+.cv-body{flex:1;padding:6px 9px}
+.cv-top{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.cv-id{font-size:11px;font-weight:700;color:rgba(0,210,255,.7);min-width:30px}
+.cv-name{font-size:11px;color:#F0F6FF;flex:1;line-height:1.3}
+.cv-assign{font-size:11px;color:rgba(255,255,255,.3);flex-shrink:0}
+.cv-meta{font-size:11px;color:rgba(255,255,255,.35);display:flex;gap:8px;flex-wrap:wrap}
+.cv-float-bar{width:50px;height:5px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden;flex-shrink:0;align-self:center}
+.cv-float-fill{height:100%;border-radius:1px}
+.cv-expand{padding:5px 9px 7px;font-size:11px;color:rgba(240,246,255,.6);line-height:1.5;border-top:1px solid rgba(255,255,255,.04);display:none}
+/* RIGHT PANEL */
+.right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.op{flex:1;overflow-y:auto;padding:14px 16px}
+.op-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,.2);text-align:center;gap:8px}
+.op-empty-text{font-size:12px;line-height:1.7}
+/* OUTCOME */
+.oh-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.oh-title{font-size:14px;font-weight:700;color:#F0F6FF}
+.oh-sub{font-size:11px;color:rgba(255,255,255,.3);margin-top:2px}
+.sc-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sc-col{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02)}
+.sc-col.rec{border-color:rgba(29,158,117,.3);background:rgba(29,158,117,.04)}
+.sc-h{padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between}
+.sc-lbl{font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase}
+.sc-rbadge{font-size:11px;padding:1px 7px;border:1px solid rgba(29,158,117,.4);color:#1D9E75;background:rgba(29,158,117,.08);cursor:pointer}
+.sc-b{padding:9px 11px}
+.sc-m{margin-bottom:6px}
+.sc-ml{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px}
+.sc-mv{font-size:16px;font-weight:700;line-height:1;cursor:pointer}
+.sc-ms{font-size:11px;color:rgba(255,255,255,.3);margin-top:1px}
+.sc-div{height:1px;background:rgba(255,255,255,.05);margin:6px 0}
+.sc-lu{font-size:11px;color:rgba(0,210,255,.6);margin-top:5px;line-height:1.5}
+.wf{margin-bottom:12px}
+.wf-t{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:6px}
+.wf-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;padding:2px 0;transition:.12s;border-radius:2px}
+.wf-row:hover{background:rgba(255,255,255,.03)}
+.wf-row:hover .wf-l{color:#F0F6FF}
+.wf-l{font-size:11px;color:rgba(240,246,255,.7);min-width:200px;flex-shrink:0;transition:.12s}
+.wf-bw{flex:1;height:14px}
+.wf-bb{height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden}
+.wf-bf{height:100%;border-radius:1px;transition:width .5s}
+.wf-v{font-size:11px;font-weight:700;min-width:65px;text-align:right}
+/* TASK IMPACT */
+.task-impact{margin-bottom:12px}
+.ti-title{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:7px}
+.ti-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.ti-card{border:1px solid;padding:7px 9px;transition:.12s}
+.tic-unblocked{border-color:rgba(29,158,117,.25);background:rgba(29,158,117,.04)}
+.tic-risk{border-color:rgba(239,159,39,.25);background:rgba(239,159,39,.04)}
+.tic-remaining{border-color:rgba(226,75,74,.18);background:rgba(226,75,74,.03)}
+.tic-advanced{border-color:rgba(139,92,246,.25);background:rgba(139,92,246,.04)}
+.ti-card-label{font-size:11px;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px}
+.ti-task{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px}
+.ti-task:last-child{margin-bottom:0}
+.ti-tid{font-size:11px;font-weight:700;color:rgba(0,210,255,.6);min-width:28px}
+/* PATTERN CALLOUT */
+.pattern-callout{margin-bottom:12px;padding:9px 11px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.2);border-left:3px solid #8B5CF6}
+.pc-title{font-size:11px;font-weight:700;color:#8B5CF6;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.pc-text{font-size:11px;color:rgba(240,246,255,.7);line-height:1.55}
+/* RISK PANEL */
+.rp{border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);margin-bottom:12px}
+.rp-h{padding:6px 11px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:6px}
+.rp-t{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase}
+.ri{display:flex;align-items:flex-start;gap:7px;padding:6px 11px;border-bottom:1px solid rgba(255,255,255,.04)}
+.ri:last-child{border-bottom:none}
+.ri-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.ri-t{font-size:11px;color:rgba(240,246,255,.7);line-height:1.5;flex:1}
+/* COMMIT */
+.cb-bar{background:#060a10;border-top:1px solid rgba(0,210,255,.1);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.cb-sum{font-size:11px;color:rgba(255,255,255,.4)}
+.cb-actions{display:flex;gap:5px}
+.cb-btn{font-family:inherit;font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid;letter-spacing:.06em;transition:.12s;background:none}
+.cb-commit{border-color:rgba(29,158,117,.5);color:#1D9E75}.cb-commit:hover{background:rgba(29,158,117,.1)}
+.cb-save{border-color:rgba(0,210,255,.35);color:#00D2FF}.cb-save:hover{background:rgba(0,210,255,.08)}
+.cb-reset{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}.cb-reset:hover{color:#fff}
+.conf-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:4px}
+.conf-fill{height:100%;border-radius:2px}
+/* STICKY PANELS */
+.sp{position:absolute;background:#0d1f35;border:1px solid rgba(0,210,255,.35);min-width:280px;max-width:380px;z-index:500;display:flex;flex-direction:column}
+.sp-tb{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#091524;border-bottom:1px solid rgba(0,210,255,.2);cursor:move;user-select:none;flex-shrink:0}
+.sp-title{font-size:12px;font-weight:700;color:#00D2FF;letter-spacing:.05em;text-transform:uppercase;flex:1}
+.sp-close{width:18px;height:18px;background:none;border:1px solid rgba(226,75,74,.4);color:#E24B4A;cursor:pointer;font-family:inherit;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.12s}
+.sp-close:hover{background:rgba(226,75,74,.15)}
+.sp-body{flex:1;overflow-y:auto;padding:10px 12px;max-height:400px}
+.sp-row{display:flex;justify-content:space-between;gap:14px;font-size:13px;color:rgba(240,246,255,.75);margin-bottom:4px;line-height:1.4}
+.sp-row-l{color:rgba(255,255,255,.4);flex-shrink:0;max-width:160px}
+.sp-row-v{font-weight:700;color:#F0F6FF;text-align:right}
+.sp-div{height:1px;background:rgba(0,210,255,.2);margin:7px 0}
+.sp-result{font-size:14px;font-weight:700;color:#F0F6FF;margin:3px 0}
+.sp-note{font-size:12px;color:rgba(255,255,255,.4);margin-top:6px;line-height:1.5;border-top:1px solid rgba(255,255,255,.07);padding-top:6px}
+.sp-inst-title{font-size:12px;font-weight:700;color:rgba(0,210,255,.8);margin:10px 0 5px}
+.sp-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.sp-tbl th{font-size:11px;color:rgba(255,255,255,.3);text-align:left;padding:3px 5px;border-bottom:1px solid rgba(255,255,255,.07);letter-spacing:.05em}
+.sp-tbl td{padding:3px 5px;border-bottom:1px solid rgba(255,255,255,.04);color:rgba(240,246,255,.75)}
+.sp-tbl tr:last-child td{border-bottom:none}
+.sp-tbl .res-y td{color:#1D9E75}.sp-tbl .res-n td{color:#E24B4A}
+.sp-resize{position:absolute;bottom:0;right:0;width:12px;height:12px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,210,255,.25) 50%)}
+.sp-green{border-left:3px solid #1D9E75}
+.sp-amber{border-left:3px solid #EF9F27}
+.sp-cyan{border-left:3px solid #00D2FF}
+.sp-purple{border-left:3px solid #8B5CF6}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+
+<div class="shell">
+<div class="nav">
+  <div class="nav-logo">COM<span>PASS</span></div>
+  <div style="width:1px;height:16px;background:rgba(0,210,255,.15);margin:0 8px"></div>
+  <div class="nav-bc">
+    <span>Flexscope</span><span style="color:rgba(255,255,255,.2)">›</span>
+    <span>BUILD #1 — Rev B blocker</span><span style="color:rgba(255,255,255,.2)">›</span>
+    <span style="color:#8B5CF6">Integrated decision simulator</span>
+  </div>
+  <span class="nav-badge">CPM + Pattern analysis</span>
+</div>
+
+<div class="body" id="sim-body">
+<div class="left">
+  <div class="ctx-strip">
+    <div class="ctx-sit">PCB Layout Rev B unsigned 7d · 2 PM interventions failed · 3 downstream tasks blocked · critical path exposed</div>
+    <div class="ctx-kpis">
+      <div class="ctx-kpi" onclick="openSP('ctx-slip')"><div class="ctx-kpi-l">Slip</div><div class="ctx-kpi-v" style="color:#E24B4A">7d</div></div>
+      <div class="ctx-kpi" onclick="openSP('ctx-daily')"><div class="ctx-kpi-l">Daily cost</div><div class="ctx-kpi-v" style="color:#EF9F27">¥12k</div></div>
+      <div class="ctx-kpi" onclick="openSP('ctx-delivery')"><div class="ctx-kpi-l">Delivery</div><div class="ctx-kpi-v" style="color:#EF9F27">Jul 5</div></div>
+    </div>
+  </div>
+  <div class="left-tabs">
+    <button class="lt active" onclick="switchLeft('levers',this)">Levers</button>
+    <button class="lt" onclick="switchLeft('cpm',this)">CPM view</button>
+  </div>
+  <div class="left-content">
+    <div id="lv-levers"><div id="lever-list"></div></div>
+    <div id="lv-cpm" style="display:none"><div class="cpm-view" id="cpm-list"></div></div>
+  </div>
+</div>
+
+<div class="right">
+  <div class="op" id="op">
+    <div class="op-empty" id="op-empty">
+      <div style="font-size:24px;opacity:.2">◎</div>
+      <div class="op-empty-text">Select levers from the left panel.<br><br>Levers tab: all intervention options<br>including CPM-derived parallel tasks.<br><br>CPM view: task network with float.<br><br>Click any stat to open explanation panel.</div>
+    </div>
+    <div id="op-results" style="display:none"></div>
+  </div>
+  <div class="cb-bar" id="cb-bar" style="display:none">
+    <div class="cb-sum" id="cb-sum"></div>
+    <div class="cb-actions">
+      <button class="cb-btn cb-commit" onclick="commit()">Commit → Log interventions</button>
+      <button class="cb-btn cb-save" onclick="alert('Saved to brief annotation.')">Save annotation</button>
+      <button class="cb-btn cb-reset" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+const DC=12000,SLIP=7;
+const LR='Labor rate: firm default ¥6,000/hr PM · ¥9,000/hr management. Configure in Firm Settings.';
+
+const TASKS={
+  'T-08':{name:'PCB Layout Rev B — sign-off',assign:'TransAtlantic',float:0,status:'blocking',dep:[],blocks:['T-09','T-11','T-14'],detail:'External sign-off. Cannot be accelerated by internal labor. Requires escalation to management or executive client contact.'},
+  'T-09':{name:'Build Review — PCB assembly verification',assign:'Alan Smith',float:0,status:'critical',dep:['T-08'],blocks:['T-12','T-13-dep'],detail:'Subsections 1–2 can advance against Rev A. Subsection 3 requires Rev B. See CPM-derived Option C.'},
+  'T-10':{name:'Software unit tests — non-PCB modules',assign:'Alan Smith',float:4,status:'available',dep:[],blocks:[],detail:'No dependency on T-08. Alan has full context. 3d of work fits within 4d float. Safest parallel option.'},
+  'T-11':{name:'Firmware integration — PCB-dependent modules',assign:'Ron White',float:0,status:'critical',dep:['T-08'],blocks:['T-15','T-16'],detail:'Modules 1–4 can proceed in simulation environment. Modules 5–6 require Rev B hardware. See CPM-derived Option D.'},
+  'T-12':{name:'Documentation — build phase report draft',assign:'Ron White',float:5,status:'available',dep:[],blocks:[],detail:'No dependency on Rev B. Drafts from completed design artifacts. 5d float. Productive use of blocked Ron.'},
+  'T-13':{name:'Thermal testing — passive components',assign:'Alan Smith',float:3,status:'parallelizable',dep:[],blocks:[],detail:'Rev B independent. Passive component thermal testing can run now. 3d float, 2.5d duration.'},
+  'T-14':{name:'Mechanical enclosure fit-check',assign:'Margaret Mills',float:1,status:'near-critical',dep:['T-08'],blocks:['T-17'],detail:'1d float remaining. Margaret absent — coverage gap. If Rev B not received today, this becomes critical path.'},
+  'T-15':{name:'Regulatory filing prep — sections 1–3',assign:'Ron White',float:6,status:'available',dep:[],blocks:[],detail:'No test data required for sections 1–3. Requirements and design rationale are complete. 6d float.'},
+};
+
+const LEVERS=[
+  {id:'esc-mgmt',group:'escalation',name:'Escalate to management',costTier:'low',days:-3,hard:0,sr:83,conf:88,risk:null,
+   warn:null,pattern:null,unblocks:['T-08→T-09','T-08→T-11','T-08→T-14'],reworkRisk:[],params:[{l:'Response target',o:['24h','48h','72h']}],
+   tt:{success:{title:'83% success rate',colorClass:'sp-green',rows:[['Matching instances','6'],['Resolved','5'],['Unresolved','1'],['Avg resolution','31h'],['Failure mode','Client unresponsive (1 case)']],result:'5/6 = 83%',note:'All 6 instances were sign-off blockers. The 1 failure required executive contact to ultimately resolve.',instances:[{p:'NovaBio 2024',d:'Oct 14',o:'Resolved',r:'28h'},{p:'OrthoMotion 2024',d:'Aug 3',o:'Resolved',r:'19h'},{p:'Flexscope 2023',d:'May 22',o:'Resolved',r:'44h'},{p:'TerraVox 2023',d:'Feb 7',o:'Resolved',r:'36h'},{p:'MediSync 2022',d:'Nov 30',o:'Resolved',r:'22h'},{p:'OrthoMotion 2022',d:'Jun 15',o:'Not resolved',r:'72h+'}]},
+    conf:{title:'88% confidence',colorClass:'sp-cyan',rows:[['Sample size','6 (adequate)'],['Signal match','High — same block type'],['Confidence band','83% ± 12%']],result:'88% confidence in the 83% estimate',note:'Confidence and success rate are different. Success = how often it works. Confidence = how sure we are of that rate.'},
+    cost:{title:'Low cost',colorClass:'sp-amber',rows:[['PM brief prep','~1h · ¥6,000'],['Management time','~2h · ¥18,000'],['Total labor','¥24,000'],['Hard out-of-pocket','¥0']],result:'¥24k labor · ¥0 hard cost → Low',note:LR}}},
+  {id:'esc-client',group:'escalation',name:'Executive contact — TransAtlantic',costTier:'low',days:-2,hard:0,sr:76,conf:72,risk:'Client relationship: low risk if framed correctly.',
+   warn:null,pattern:null,unblocks:['T-08→T-09','T-08→T-11','T-08→T-14'],reworkRisk:[],params:[{l:'Channel',o:['Account exec','Technical director','Both']}],
+   tt:{success:{title:'76% success rate',colorClass:'sp-green',rows:[['Instances','4'],['Resolved','3'],['Failure','1 — wrong contact level']],result:'3/4 = 76%',note:'Lower confidence (72%) — smaller sample and external dependency.',instances:[{p:'TerraVox 2024',d:'Mar 19',o:'Resolved',r:'48h'},{p:'MediSync 2023',d:'Sep 5',o:'Resolved',r:'61h'},{p:'OrthoMotion 2023',d:'Jan 28',o:'Resolved',r:'44h'},{p:'NovaBio 2022',d:'Jul 11',o:'Not resolved',r:'96h+'}]},
+    conf:{title:'72% confidence',colorClass:'sp-cyan',rows:[['Sample size','4 (small)'],['Confidence band','76% ± 18%']],result:'72% — smaller sample than management lever',note:'True rate could be 58–94%. More instances will narrow this.'},
+    cost:{title:'Low cost',colorClass:'sp-amber',rows:[['Account exec outreach','~0.5h · ¥3,000'],['Executive prep','~1h · ¥9,000'],['Hard cost','¥0']],result:'¥12k labor · ¥0 hard cost → Low',note:LR}}},
+  {id:'res-alan',group:'resource',name:'Alan Smith → 100% Flexscope',costTier:'med',days:-2,hard:18000,sr:62,conf:65,
+   risk:'NovaBio Section 4.3 coverage gap — Sandra Okafor substitution required.',
+   warn:'62% success rate reflects 8 prior instances. All 3 failures were upstream approval blocks — the same pattern as today.',
+   pattern:'Today\'s block (Rev B sign-off) matches the 3 FAILURE cases exactly. Resource allocation does not address a third-party approval constraint. Consider pairing with escalation.',
+   unblocks:[],reworkRisk:[],params:[{l:'Duration',o:['1 week','2 weeks','Until resolved']}],
+   tt:{success:{title:'62% success — why 5 worked, 3 did not',colorClass:'sp-green',rows:[['Instances','8'],['Resolved (resource-constrained blocks)','5'],['Not resolved (approval blocks)','3'],['Today\'s block type','Approval — matches failures'],['Failure pattern','External sign-off pending — labor cannot help']],result:'5/8 = 62% · but today matches the 3 failures',note:'The 5 successes all had internal, labor-addressable blocks. The 3 failures all had external approval blocks — the same as today\'s Rev B situation.',instances:[{p:'Flexscope 2024',d:'Nov 2',o:'Resolved',r:'2d'},{p:'OrthoMotion 2024',d:'Jun 14',o:'Resolved',r:'3d'},{p:'NovaBio 2023',d:'Dec 9',o:'Resolved',r:'1.5d'},{p:'MediSync 2023',d:'Aug 22',o:'Resolved',r:'4d'},{p:'TerraVox 2023',d:'Apr 3',o:'Resolved',r:'2.5d'},{p:'Flexscope 2023',d:'Jan 17',o:'Not resolved',r:'—'},{p:'OrthoMotion 2022',d:'Oct 5',o:'Not resolved',r:'—'},{p:'NovaBio 2022',d:'May 29',o:'Not resolved',r:'—'}]},
+    conf:{title:'65% confidence',colorClass:'sp-cyan',rows:[['Sample size','8'],['Signal match','Medium — today matches failure pattern'],['Effective rate for today','~35–45% (approval block subset)']],result:'65% statistical · lower effective rate today',note:'The signal match is only medium because the current block matches the 3 failure cases more than the 5 successes.'},
+    cost:{title:'Med cost',colorClass:'sp-amber',rows:[['NovaBio coverage lost (1wk)','¥18,000'],['Sandra Okafor switch overhead','¥8,000'],['Mgmt approval labor','¥9,000'],['Total','¥35,000'],['Hard cost','¥0'],['Cost if lever FAILS','Same ¥35k — no refund']],result:'¥35k labor equivalent · ¥0 hard → Med',note:'Cost is INDEPENDENT of success rate. Med = moderately expensive to try regardless of outcome. If Alan fails to resolve (likely — approval block), you still paid ¥35k.'}}},
+  {id:'mat-exp',group:'materials',name:'Expedite PCB fabrication run',costTier:'high',days:-5,hard:85000,sr:95,conf:90,
+   risk:'Non-cancellable after 24h. Confirm Rev B sign-off status first.',
+   warn:null,pattern:null,unblocks:['T-08→T-09','T-08→T-11','T-08→T-14'],reworkRisk:[],
+   params:[{l:'Supplier',o:['Current (2d, +¥85k)','Alt A (4d, +¥60k)','Alt B (6d, +¥95k)']},{l:'Qty tier',o:['Prototype · 5u · ¥18k/u','Pre-prod · 25u · ¥11k/u','Production · 100u · ¥6.5k/u']}],
+   tt:{success:{title:'95% confidence — deterministic',colorClass:'sp-green',rows:[['Outcome type','Deterministic — not behavioural'],['Standard lead time','7d'],['Expedite lead time','2d'],['Recovery','5d'],['Failure mode','Supplier capacity unavailable (<5%)']],result:'95% — near-certain if supplier confirms',note:'Unlike escalation, expedite has a defined physical outcome. Confirm capacity before committing.'},
+    cost:{title:'High cost',colorClass:'sp-amber',rows:[['Expedite premium','¥85,000'],['Schedule value recovered','5d × ¥12k = ¥60,000'],['Net cost after recovery','¥25,000'],['Risk','Non-cancellable after 24h']],result:'Net ¥25k after recovery · ¥85k if it fails → High',note:'High because ¥85k committed immediately. However net economic position is only ¥25k — less than 3 days continued slip.'}}},
+  {id:'cpm-a',group:'cpm',name:'CPM Option A — Alan: T-10 + T-13',costTier:'low',days:-3,hard:0,sr:95,conf:90,
+   risk:null,warn:null,pattern:null,
+   unblocks:[],advances:['T-10','T-13'],reworkRisk:[],params:[],
+   tt:{success:{title:'CPM Option A — task analysis',colorClass:'sp-purple',rows:[['T-10 float','4d (duration 3d)'],['T-13 float','3d (duration 2.5d)'],['Dependency on T-08','None'],['Rework risk','Zero — Rev B independent'],['Combined recovery','~3d (parallel execution)'],['Alan capacity','Available — no conflict']],result:'3d recovery · 0% rework risk · ¥0 cost',note:'Derived from live CPM analysis. These tasks have been verified to have zero dependency on PCB Layout Rev B. The safest parallel option in the set.'},
+    cost:{title:'Low cost — CPM derived',colorClass:'sp-amber',rows:[['Alan reallocation to T-10+T-13','No change — already assigned'],['Additional labor','¥0'],['Rework exposure','¥0'],['Hard cost','¥0']],result:'Effectively free — ¥0 cost · 3d recovery',note:'These are tasks Alan was already scheduled to do. Starting them now rather than after Rev B simply reorders the sequence.'}}},
+  {id:'cpm-b',group:'cpm',name:'CPM Option B — Ron: T-12 + T-15',costTier:'low',days:-2.5,hard:0,sr:95,conf:90,
+   risk:null,warn:null,pattern:null,
+   unblocks:[],advances:['T-12','T-15'],reworkRisk:[],params:[],
+   tt:{success:{title:'CPM Option B — task analysis',colorClass:'sp-purple',rows:[['T-12 float','5d (duration 2d)'],['T-15 float','6d (duration 3d)'],['Dependency on T-08','None'],['Dependency on T-11','None'],['Rework risk','Zero — Rev B independent'],['Ron capacity','Available — T-11 is blocked']],result:'2.5d recovery · 0% rework risk · ¥0 cost',note:'Derived from live CPM. Ron is currently blocked on T-11. These tasks give him productive work and prevent confidence degradation from unproductive waiting.'},
+    cost:{title:'Low cost — CPM derived',colorClass:'sp-amber',rows:[['Ron reallocation','No change — already assigned'],['Additional labor','¥0'],['Rework exposure','¥0']],result:'Effectively free — ¥0 cost · 2.5d recovery',note:'Same principle as Option A. Resequencing, not additional work.'}}},
+  {id:'cpm-c',group:'cpm',name:'CPM Option C — T-09 partial (Rev A subsections)',costTier:'low',days:-1.5,hard:0,sr:80,conf:75,
+   risk:'Low rework exposure (~0.5d) if Rev A–B delta is non-minor. Confirm with Alan before starting.',
+   warn:'Requires PM confirmation that Rev B delta vs Rev A is cosmetic/dimensional only.',
+   pattern:null,
+   unblocks:[],advances:['T-09-partial'],reworkRisk:['T-09-ss3'],params:[],
+   tt:{success:{title:'CPM Option C — partial T-09 advance',colorClass:'sp-purple',rows:[['T-09 subsections 1–2','Rev A compatible — can proceed'],['T-09 subsection 3','Requires Rev B — hold'],['Float available','0d — but partial advance still recovers 1.5d'],['Rework risk','0.5d if Rev A–B delta is non-minor'],['Precedent','2 prior instances of partial build review advance']],result:'1.5d recovery · low rework exposure · ¥0 cost',note:'Risk is manageable if Rev B delta is confirmed as minor. Recommend 15-min Alan + PM alignment before starting.'},
+    cost:{title:'Low cost — CPM derived',colorClass:'sp-amber',rows:[['Labor','Alan already assigned to T-09'],['Additional cost','¥0'],['Rework exposure','0.5d if delta is non-minor = ~¥6,000']],result:'¥0–6k depending on Rev B delta',note:'Best case: free. Worst case: 0.5d rework = ¥6k. Strong expected value.'}}},
+  {id:'cpm-d',group:'cpm',name:'CPM Option D — T-11 modules 1–4 (sim env)',costTier:'low',days:-2,hard:0,sr:75,conf:70,
+   risk:'Moderate rework exposure (~0.8d) if module 5–6 boundary shifts in Rev B.',
+   warn:'Ron must confirm module 5–6 boundary is stable before starting modules 3–4.',
+   pattern:null,
+   unblocks:[],advances:['T-11-m1-4'],reworkRisk:['T-11-m3-4'],params:[],
+   tt:{success:{title:'CPM Option D — firmware modules 1–4',colorClass:'sp-purple',rows:[['Modules 1–4','No PCB hardware dependency'],['Modules 5–6','Require Rev B hardware'],['Integration env','Simulation environment available'],['Rework risk','0.8d if boundary shifts'],['Ron capacity','Available — T-11 PCB modules blocked']],result:'2d recovery · moderate rework exposure',note:'1 prior instance of firmware boundary shift cost 1d rework. Recommend Ron confirms boundary is stable at module 3–4 interface.'},
+    cost:{title:'Low cost — CPM derived',colorClass:'sp-amber',rows:[['Labor','Ron already assigned to T-11'],['Additional cost','¥0'],['Rework exposure','0.8d = ~¥9,600 if boundary shifts']],result:'¥0–9.6k depending on boundary stability',note:'Expected value is strongly positive. Confirm boundary before modules 3–4.'}}},
+  {id:'mat-scope',group:'materials',name:'Defer non-critical BOM to Phase 4',costTier:'low',days:-2,hard:0,sr:92,conf:85,
+   risk:null,warn:null,pattern:null,unblocks:[],reworkRisk:[],params:[{l:'Items',o:['Cosmetic housing (2d)','Packaging + cosmetic (3d)']}],
+   tt:{success:{title:'92% success — scope deferral',colorClass:'sp-green',rows:[['Instances','12'],['Clean','11/12'],['Items','Cosmetic · Packaging'],['Regulatory impact','None']],result:'11/12 = 92% · ¥0 cost',note:'High rate because cosmetic items have zero dependency on core build path.'},
+    cost:{title:'Low cost',colorClass:'sp-amber',rows:[['Schedule update','~0.5h · ¥3,000'],['Hard cost','¥0']],result:'~¥3k labor → Low',note:LR}}},
+];
+
+const GROUP_META={escalation:{color:'#E24B4A',label:'Escalation levers'},resource:{color:'#00D2FF',label:'Resource levers'},materials:{color:'#8B5CF6',label:'Materials levers'},cpm:{color:'#8B5CF6',label:'CPM-derived parallel options'}};
+const CTX_PANELS={
+  'ctx-slip':{title:'Schedule slip — 7 days',colorClass:'sp-cyan',rows:[['First identified','Mar 19, 2026'],['Root cause','PCB Layout Rev B not signed off'],['Blocking tasks','T-09 · T-11 · T-14'],['PM interventions','2 · both negative outcomes'],['Days accumulating','+1d/day until resolved']],result:'7d current slip on critical path',note:'Every day the block persists adds ¥12k cost and pushes delivery further. No float available on the critical path.'},
+  'ctx-daily':{title:'Daily cost — ¥12,000/day',colorClass:'sp-cyan',rows:[['Ron White — blocked labor','¥4,800/day'],['Alan Smith — blocked labor','¥4,200/day'],['Overhead allocation (20%)','¥1,800/day'],['PM coordination','¥1,200/day'],['Total','¥12,000/day'],['Rate source','Firm Settings → Cost model']],result:'¥12,000 per day the block persists',note:'Represents fully-loaded cost of blocked resources. Does not include rework cost or client relationship impact. Configure rate in Firm Settings.'},
+  'ctx-delivery':{title:'Delivery projection — Jul 5',colorClass:'sp-cyan',rows:[['Contract date','Jun 30, 2026'],['Current slip','7d'],['Contractual tolerance','±10d (to Jul 14)'],['P50 no-action projection','Jul 9'],['Jul 5 shown','Assumes partial recovery in progress'],['Penalties apply after','Jul 14']],result:'Jul 5 projected · within contractual tolerance',note:'Jul 5 assumes partial recovery. Without further intervention P50 is Jul 9. Contract allows to Jul 14 before penalties.'},
+};
+
+const selected=new Set();
+let spCount=0;
+
+function buildLevers(){
+  const ll=document.getElementById('lever-list');
+  let cg=null,ge=null;
+  LEVERS.forEach(lev=>{
+    if(lev.group!==cg){
+      cg=lev.group;
+      const gm=GROUP_META[cg];
+      ge=document.createElement('div');ge.className='lg';
+      const cnt=LEVERS.filter(l=>l.group===cg).length;
+      ge.innerHTML=`<div class="lg-h"><div class="lg-bar" style="background:${gm.color}"></div><div class="lg-t">${gm.label}</div><span style="font-size:11px;color:rgba(255,255,255,.25)">${cnt}</span></div>`;
+      ll.appendChild(ge);
+    }
+    const card=document.createElement('div');
+    const isCPM=lev.group==='cpm';
+    card.className='lc'+(isCPM?' cpm-derived':'')+(lev.warn||lev.pattern?' warn':'');
+    card.id='lc-'+lev.id;
+    const tc={low:'lcb-low',med:'lcb-med',high:'lcb-high'}[lev.costTier];
+    const tl={low:'Low cost',med:'Med cost',high:'High cost'}[lev.costTier];
+    let tasksHtml='';
+    if(lev.advances&&lev.advances.length){
+      tasksHtml=`<div class="lc-tasks">${lev.advances.map(t=>`<span class="task-pill tp-purple">${t} →</span>`).join('')}</div>`;
+    }
+    if(lev.unblocks&&lev.unblocks.length&&lev.unblocks[0]){
+      tasksHtml+=`<div class="lc-tasks">${lev.unblocks.map(t=>`<span class="task-pill tp-green">unblocks ${t}</span>`).join('')}</div>`;
+    }
+    let warnHtml=lev.warn?`<div class="lc-warn">${lev.warn}</div>`:'';
+    let patternHtml=lev.pattern?`<div class="lc-pattern">${lev.pattern}</div>`:'';
+    let paramsHtml=lev.params&&lev.params.length?'<div class="lc-params">'+lev.params.map(p=>`<div class="pr"><span class="pr-l">${p.l}</span><select onclick="event.stopPropagation()" onchange="runSim()">${p.o.map(o=>`<option>${o}</option>`).join('')}</select></div>`).join('')+'</div>':'';
+    card.innerHTML=`<div class="lc-top"><div class="lc-chk">✓</div><div class="lc-name">${lev.name}</div><span class="lc-cb ${tc}" data-lid="${lev.id}" data-tt="cost">${tl}</span></div>
+    <div class="lc-meta">
+      <span class="lc-stat" data-lid="${lev.id}" data-tt="success"><div class="lc-sd" style="background:${lev.sr>=80?'#1D9E75':lev.sr>=65?'#EF9F27':'#E24B4A'}"></div>${lev.sr}% success</span>
+      <span class="lc-stat" data-lid="${lev.id}" data-tt="conf"><div class="lc-sd" style="background:#8B5CF6"></div>${lev.conf}% conf</span>
+    </div>
+    ${warnHtml}${patternHtml}${tasksHtml}${paramsHtml}`;
+    card.querySelector('.lc-top').addEventListener('click',()=>toggleLever(lev.id));
+    card.querySelectorAll('[data-lid]').forEach(el=>{
+      el.addEventListener('click',e=>{e.stopPropagation();const l=LEVERS.find(x=>x.id===el.dataset.lid);if(l&&l.tt&&l.tt[el.dataset.tt])openSP(null,l.tt[el.dataset.tt]);});
+    });
+    ge.appendChild(card);
+  });
+}
+
+function buildCPM(){
+  const cl=document.getElementById('cpm-list');
+  const sections=[
+    {label:'Critical path — blocked on Rev B',filter:t=>t.status==='blocking'||t.status==='critical'},
+    {label:'Near-critical — act soon',filter:t=>t.status==='near-critical'},
+    {label:'Parallelizable now',filter:t=>t.status==='parallelizable'||t.status==='available'},
+  ];
+  const colors={blocking:'#E24B4A',critical:'#E24B4A','near-critical':'#EF9F27',parallelizable:'#8B5CF6',available:'#1D9E75'};
+  sections.forEach(sec=>{
+    const tasks=Object.entries(TASKS).filter(([,t])=>sec.filter(t));
+    if(!tasks.length)return;
+    const lbl=document.createElement('div');lbl.className='cv-section';lbl.textContent=sec.label;cl.appendChild(lbl);
+    tasks.forEach(([id,t])=>{
+      const row=document.createElement('div');row.className='cv-row';
+      const c=colors[t.status]||'#1D9E75';
+      const fp=Math.min(100,Math.round((t.float/7)*100));
+      row.innerHTML=`<div class="cv-bar" style="background:${c}"></div>
+        <div class="cv-body">
+          <div class="cv-top"><div class="cv-id">${id}</div><div class="cv-name">${t.name}</div><div class="cv-assign">${t.assign}</div></div>
+          <div class="cv-meta">
+            <span style="color:${c};font-weight:700">${t.float===0?'0d float · '+t.status.toUpperCase():t.float+'d float'}</span>
+            ${t.dep.length?`<span>Deps: ${t.dep.join(', ')}</span>`:'<span>No Rev B dependency</span>'}
+            ${t.blocks.length?`<span>Blocks: ${t.blocks.join(', ')}</span>`:''}
+          </div>
+        </div>
+        <div style="padding:6px 9px;display:flex;align-items:center;gap:5px">
+          <div class="cv-float-bar"><div class="cv-float-fill" style="width:${fp}%;background:${c}"></div></div>
+        </div>`;
+      const exp=document.createElement('div');exp.className='cv-expand';exp.textContent=t.detail;
+      row.appendChild(exp);
+      row.addEventListener('click',()=>{const open=exp.style.display==='block';document.querySelectorAll('.cv-expand').forEach(e=>e.style.display='none');if(!open)exp.style.display='block';});
+      cl.appendChild(row);
+    });
+  });
+}
+
+function toggleLever(id){
+  const card=document.getElementById('lc-'+id);
+  if(selected.has(id)){selected.delete(id);card.classList.remove('sel');}
+  else{selected.add(id);card.classList.add('sel');}
+  runSim();
+}
+
+function switchLeft(tab,btn){
+  document.querySelectorAll('.lt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  document.getElementById('lv-levers').style.display=tab==='levers'?'block':'none';
+  document.getElementById('lv-cpm').style.display=tab==='cpm'?'block':'none';
+}
+
+function runSim(){
+  const res=document.getElementById('op-results'),empty=document.getElementById('op-empty'),cb=document.getElementById('cb-bar');
+  if(selected.size===0){res.style.display='none';empty.style.display='flex';cb.style.display='none';return;}
+  empty.style.display='none';res.style.display='block';cb.style.display='flex';
+  let totalDays=0,totalHard=0,minSR=100,wConf=0;
+  const levers=[],risks=[],patterns=[],matL=[],unblockedTasks=new Set(),advancedTasks=new Set(),reworkTasks=new Set();
+  selected.forEach(id=>{
+    const d=LEVERS.find(l=>l.id===id);
+    totalDays+=d.days;totalHard+=d.hard;minSR=Math.min(minSR,d.sr);wConf+=d.conf;
+    levers.push(d);
+    if(d.risk)risks.push({text:d.risk,sev:d.sr<70?'#E24B4A':'#EF9F27'});
+    if(d.pattern)patterns.push(d.pattern);
+    if(d.hard>0||d.group==='materials')matL.push(d);
+    (d.unblocks||[]).forEach(u=>{const t=u.split('→')[1];if(t)unblockedTasks.add(t);});
+    (d.advances||[]).forEach(t=>advancedTasks.add(t));
+    (d.reworkRisk||[]).forEach(t=>reworkTasks.add(t));
+  });
+  const avgConf=Math.round(wConf/selected.size);
+  const projSlip=Math.max(0,SLIP+totalDays);
+  const recovDays=Math.max(0,-totalDays);
+  const schedVal=recovDays*DC;
+  const netCost=totalHard-schedVal;
+  const pd=new Date('2026-06-30');pd.setDate(pd.getDate()+projSlip);
+  const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  document.getElementById('cb-sum').innerHTML=`<span>${selected.size}</span> lever${selected.size>1?'s':''} · <span>${recovDays}d</span> recovered · <span>¥${Math.round(totalHard/1000)}k</span> hard cost · net: <span style="color:${netCost<=0?'#1D9E75':'#EF9F27'}">${netCost<=0?'¥'+Math.round(Math.abs(netCost)/1000)+'k benefit':'¥'+Math.round(netCost/1000)+'k cost'}</span>`;
+
+  const unblockList=[...unblockedTasks].map(t=>TASKS[t]?`<div class="ti-task"><span class="ti-tid">${t}</span>${TASKS[t].name.split('—')[0].trim()}</div>`:`<div class="ti-task"><span class="ti-tid">${t}</span></div>`).join('');
+  const advanceList=[...advancedTasks].map(t=>{const tid=t.split('-')[0]+'-'+t.split('-')[1];const task=TASKS[tid];return `<div class="ti-task"><span class="ti-tid">${tid}</span>${task?task.name.split('—')[0].trim():t}</div>`;}).join('');
+  const reworkList=[...reworkTasks].map(t=>`<div class="ti-task"><span class="ti-tid" style="color:#EF9F27">${t}</span>Monitor for rework exposure</div>`).join('');
+  const remainingBlocked=!selected.has('esc-mgmt')&&!selected.has('esc-client')&&!selected.has('mat-exp')?['T-09','T-11','T-14'].map(t=>`<div class="ti-task"><span class="ti-tid" style="color:#E24B4A">${t}</span>${TASKS[t].name.split('—')[0].trim()}</div>`).join(''):'';
+
+  const patternBlock=patterns.length?`<div class="pattern-callout"><div class="pc-title">Pattern analysis — active warning</div><div class="pc-text">${patterns[0]}</div></div>`:'';
+
+  res.innerHTML=`
+    <div class="oh-row"><div><div class="oh-title">Projected outcome</div><div class="oh-sub">${selected.size} lever${selected.size>1?'s':''} · click any value to open explanation</div></div></div>
+    ${patternBlock}
+    <div class="sc-wrap">
+      <div class="sc-col"><div class="sc-h"><span class="sc-lbl">If no action</span></div>
+        <div class="sc-b">
+          <div class="sc-m"><div class="sc-ml">Delivery</div><div class="sc-mv" style="color:#E24B4A">${fmt(new Date('2026-07-09'))}</div><div class="sc-ms">+7d · +1d/day</div></div>
+          <div class="sc-div"></div>
+          <div class="sc-m"><div class="sc-ml">Cost accumulating</div><div class="sc-mv" style="color:#E24B4A;cursor:pointer" id="slip-cl">¥84k</div><div class="sc-ms">click for detail</div></div>
+        </div>
+      </div>
+      <div class="sc-col rec"><div class="sc-h"><span class="sc-lbl">With selected levers</span>
+        <span class="sc-rbadge" id="sr-badge" style="cursor:pointer">${minSR}% success</span></div>
+        <div class="sc-b">
+          <div class="sc-m"><div class="sc-ml">Projected delivery</div>
+            <div class="sc-mv" style="color:${projSlip<=2?'#1D9E75':projSlip<=5?'#EF9F27':'#E24B4A'};cursor:pointer" id="del-cl">${fmt(pd)}</div>
+            <div class="sc-ms">${projSlip===0?'On contract':'+'+projSlip+'d from contract'}</div>
+          </div>
+          <div class="sc-div"></div>
+          <div class="sc-m"><div class="sc-ml">Net economic position</div>
+            <div class="sc-mv" style="color:${netCost<=0?'#1D9E75':'#EF9F27'};cursor:pointer" id="net-cl">${netCost<=0?'+¥'+Math.round(Math.abs(netCost)/1000)+'k benefit':'–¥'+Math.round(netCost/1000)+'k cost'}</div>
+            <div class="sc-ms">click for breakdown</div>
+          </div>
+          <div class="sc-m"><div class="sc-ml">Confidence</div>
+            <div class="conf-bar"><div class="conf-fill" style="width:${avgConf}%;background:${avgConf>=75?'#1D9E75':avgConf>=55?'#EF9F27':'#E24B4A'}"></div></div>
+            <div class="sc-ms" style="margin-top:3px">${avgConf}% avg</div>
+          </div>
+          <div class="sc-lu">${levers.map(l=>l.name).join(' + ')}</div>
+        </div>
+      </div>
+    </div>
+    <div class="wf"><div class="wf-t">Cost & schedule waterfall</div>
+      <div class="wf-row" id="wf-slip"><div class="wf-l">Current slip (¥12k × 7d)</div><div class="wf-bw"><div class="wf-bb"><div class="wf-bf" style="width:100%;background:#E24B4A"></div></div></div><div class="wf-v" style="color:#E24B4A">–¥84k</div></div>
+      ${totalHard>0?`<div class="wf-row" id="wf-int"><div class="wf-l">Intervention hard cost</div><div class="wf-bw"><div class="wf-bb"><div class="wf-bf" style="width:${Math.min(100,Math.round(totalHard/840))}%;background:#EF9F27"></div></div></div><div class="wf-v" style="color:#EF9F27">–¥${Math.round(totalHard/1000)}k</div></div>`:''}
+      ${recovDays>0?`<div class="wf-row" id="wf-rec"><div class="wf-l">Schedule value recovered</div><div class="wf-bw"><div class="wf-bb"><div class="wf-bf" style="width:${Math.min(100,Math.round(schedVal/840))}%;background:#1D9E75"></div></div></div><div class="wf-v" style="color:#1D9E75">+¥${Math.round(schedVal/1000)}k</div></div>`:''}
+      <div class="wf-row" id="wf-net" style="border-top:1px solid rgba(255,255,255,.08);padding-top:5px;margin-top:3px"><div class="wf-l" style="color:#F0F6FF;font-weight:700">Net position</div><div class="wf-bw"><div class="wf-bb"><div class="wf-bf" style="width:${Math.min(100,Math.round(Math.abs(netCost)/840))}%;background:${netCost<=0?'#1D9E75':'#EF9F27'}"></div></div></div><div class="wf-v" style="color:${netCost<=0?'#1D9E75':'#EF9F27'};font-weight:700">${netCost<=0?'+¥'+Math.round(Math.abs(netCost)/1000)+'k saving':'–¥'+Math.round(netCost/1000)+'k'}</div></div>
+    </div>
+    <div class="task-impact">
+      <div class="ti-title">Task network impact</div>
+      <div class="ti-grid">
+        ${unblockedTasks.size?`<div class="ti-card tic-unblocked"><div class="ti-card-label">Tasks unblocked</div>${unblockList}</div>`:''}
+        ${advancedTasks.size?`<div class="ti-card tic-advanced"><div class="ti-card-label">Tasks advanced now</div>${advanceList}</div>`:''}
+        ${remainingBlocked?`<div class="ti-card tic-remaining"><div class="ti-card-label">Still blocked</div>${remainingBlocked}</div>`:''}
+        ${reworkTasks.size?`<div class="ti-card tic-risk"><div class="ti-card-label">Rework watch</div>${reworkList}</div>`:''}
+      </div>
+    </div>
+    ${risks.length?`<div class="rp"><div class="rp-h"><div class="lg-bar" style="background:#EF9F27;width:3px;height:11px;border-radius:1px;flex-shrink:0"></div><div class="rp-t">Second-order effects</div></div>${risks.map(r=>`<div class="ri"><div class="ri-dot" style="background:${r.sev}"></div><div class="ri-t">${r.text}</div></div>`).join('')}</div>`:''}
+    ${matL.length?`<div style="border:1px solid rgba(139,92,246,.15);background:rgba(139,92,246,.04);margin-bottom:12px"><div style="padding:6px 11px;border-bottom:1px solid rgba(139,92,246,.1);font-size:11px;letter-spacing:.08em;color:rgba(139,92,246,.7);text-transform:uppercase">Materials cost model</div><table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed"><thead><tr style="border-bottom:1px solid rgba(255,255,255,.05)"><th style="padding:5px 11px;color:rgba(255,255,255,.3);text-align:left">Scenario</th><th style="padding:5px 11px;color:rgba(255,255,255,.3);text-align:left">Qty</th><th style="padding:5px 11px;color:rgba(255,255,255,.3);text-align:left">Unit</th><th style="padding:5px 11px;color:rgba(255,255,255,.3);text-align:left">Recovery</th></tr></thead><tbody><tr><td style="padding:5px 11px;color:rgba(240,246,255,.75)">Prototype</td><td style="padding:5px 11px;color:rgba(240,246,255,.75)">5</td><td style="padding:5px 11px;color:rgba(240,246,255,.75)">¥18k</td><td style="padding:5px 11px;color:rgba(240,246,255,.75)">0d</td></tr><tr><td style="padding:5px 11px;color:#8B5CF6">Pre-prod run</td><td style="padding:5px 11px;color:#8B5CF6">25</td><td style="padding:5px 11px;color:#8B5CF6">¥11k</td><td style="padding:5px 11px;color:#8B5CF6">Locks pricing</td></tr></tbody></table><div style="padding:6px 11px;font-size:11px;color:rgba(139,92,246,.6);border-top:1px solid rgba(139,92,246,.1)">Pre-prod run saves ¥175k at 25-unit volume vs prototype pricing.</div></div>`:''}
+  `;
+
+  document.getElementById('slip-cl').addEventListener('click',()=>openSP('ctx-slip'));
+  document.getElementById('del-cl').addEventListener('click',()=>{
+    openSP(null,{title:'Delivery — calculation',colorClass:'sp-cyan',rows:[['Contract date','Jun 30, 2026'],...levers.filter(l=>l.days<0).map(l=>[l.name,Math.abs(l.days)+'d recovered']),['Combined (capped 7d)',recovDays+'d'],['Remaining slip',projSlip+'d'],['Projected',fmt(pd)]],result:projSlip===0?'On contract':fmt(pd)+' (+'+projSlip+'d)',note:'Days capped at current slip. Same day cannot be recovered twice.'});
+  });
+  document.getElementById('net-cl').addEventListener('click',()=>{
+    openSP(null,{title:'Net position — calculation',colorClass:'sp-amber',rows:[['Slip cost (7d × ¥12k)','–¥84k'],...levers.filter(l=>l.hard>0).map(l=>[l.name+' hard cost','–¥'+Math.round(l.hard/1000)+'k']),['Schedule value recovered','+¥'+Math.round(schedVal/1000)+'k'],['Net',netCost<=0?'+¥'+Math.round(Math.abs(netCost)/1000)+'k':'–¥'+Math.round(netCost/1000)+'k']],result:netCost<=0?'+¥'+Math.round(Math.abs(netCost)/1000)+'k benefit':'–¥'+Math.round(netCost/1000)+'k net cost',note:'Hard costs only. Internal labor excluded from net figure but shown in individual lever panels.'});
+  });
+  document.getElementById('sr-badge').addEventListener('click',()=>{
+    openSP(null,{title:'Combined success rate',colorClass:'sp-green',rows:[...levers.map(l=>[l.name,l.sr+'% · '+l.conf+'% conf']),['Combined (weakest lever)',minSR+'%'],['Avg confidence',avgConf+'%']],result:minSR+'% combined · '+avgConf+'% confidence',note:'Combined rate = weakest lever. Confidence = average. A chain is only as strong as its weakest link.'});
+  });
+  document.getElementById('wf-slip').addEventListener('click',()=>openSP('ctx-daily'));
+  const wi=document.getElementById('wf-int');if(wi)wi.addEventListener('click',()=>openSP(null,{title:'Intervention cost',colorClass:'sp-amber',rows:[...levers.filter(l=>l.hard>0).map(l=>[l.name,'¥'+Math.round(l.hard/1000)+'k']),['Total','¥'+Math.round(totalHard/1000)+'k']],result:'¥'+Math.round(totalHard/1000)+'k hard cost',note:'CPM-derived and labor-only levers are ¥0 hard cost — not shown here.'}));
+  const wr=document.getElementById('wf-rec');if(wr)wr.addEventListener('click',()=>openSP(null,{title:'Schedule value recovered',colorClass:'sp-cyan',rows:[...levers.filter(l=>l.days<0).map(l=>[l.name,Math.abs(l.days)+'d']),['Combined (capped at 7d)',recovDays+'d'],['× ¥12,000/day',''],['Total value','¥'+Math.round(schedVal/1000)+'k']],result:recovDays+'d × ¥12k = ¥'+Math.round(schedVal/1000)+'k',note:'Days are combined and capped at 7d. Same day cannot be recovered twice.'}));
+  document.getElementById('wf-net').addEventListener('click',()=>openSP(null,{title:'Net position',colorClass:'sp-cyan',rows:[['Hard cost','–¥'+Math.round(totalHard/1000)+'k'],['Value recovered','+¥'+Math.round(schedVal/1000)+'k'],['Net',netCost<=0?'+¥'+Math.round(Math.abs(netCost)/1000)+'k benefit':'–¥'+Math.round(netCost/1000)+'k']],result:netCost<=0?'+¥'+Math.round(Math.abs(netCost)/1000)+'k benefit':'–¥'+Math.round(netCost/1000)+'k net',note:'Economic only. Does not include internal labor, relationship factors, or strategic considerations.'}));
+}
+
+function openSP(key,data){
+  const cfg=data||(key?CTX_PANELS[key]:null);if(!cfg)return;
+  spCount++;const pid='sp-'+spCount;
+  const body=document.getElementById('sim-body');
+  const sp=document.createElement('div');
+  sp.className='sp '+(cfg.colorClass||'sp-cyan');sp.id=pid;
+  const sx=Math.min(360+spCount*18,500),sy=Math.min(50+spCount*18,200);
+  sp.style.cssText=`left:${sx}px;top:${sy}px;width:320px`;
+  let html=`<div class="sp-tb" id="tb-${pid}"><div class="sp-title">${cfg.title}</div><button class="sp-close" onclick="document.getElementById('${pid}').remove()">✕</button></div><div class="sp-body">`;
+  html+=cfg.rows.map(r=>`<div class="sp-row"><span class="sp-row-l">${r[0]}</span><span class="sp-row-v">${r[1]}</span></div>`).join('');
+  html+=`<div class="sp-div"></div><div class="sp-result">${cfg.result}</div>`;
+  if(cfg.note)html+=`<div class="sp-note">${cfg.note}</div>`;
+  if(cfg.instances){
+    html+=`<div class="sp-inst-title">Prior instances (${cfg.instances.length})</div><table class="sp-tbl"><thead><tr><th>Project</th><th>Date</th><th>Outcome</th><th>Time</th></tr></thead><tbody>`;
+    cfg.instances.forEach(i=>{html+=`<tr class="${i.o==='Resolved'?'res-y':'res-n'}"><td>${i.p}</td><td>${i.d}</td><td>${i.o}</td><td>${i.r}</td></tr>`;});
+    html+=`</tbody></table>`;
+  }
+  html+=`</div><div class="sp-resize" id="rs-${pid}"></div>`;
+  sp.innerHTML=html;body.appendChild(sp);
+  makeDraggable(sp,document.getElementById('tb-'+pid));
+  makeResizable(sp,document.getElementById('rs-'+pid));
+}
+
+function makeDraggable(el,h){
+  let ox,oy,sx,sy;
+  h.addEventListener('mousedown',e=>{e.preventDefault();sx=el.offsetLeft;sy=el.offsetTop;ox=e.clientX;oy=e.clientY;
+    const mm=e2=>{el.style.left=(sx+e2.clientX-ox)+'px';el.style.top=(sy+e2.clientY-oy)+'px';};
+    const mu=()=>{document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+    document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});
+}
+function makeResizable(el,h){
+  let ow,oh,ox,oy;
+  h.addEventListener('mousedown',e=>{e.preventDefault();e.stopPropagation();ow=el.offsetWidth;oh=el.offsetHeight;ox=e.clientX;oy=e.clientY;
+    const mm=e2=>{el.style.width=Math.max(240,ow+e2.clientX-ox)+'px';el.style.maxHeight=Math.max(180,oh+e2.clientY-oy)+'px';};
+    const mu=()=>{document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+    document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});
+}
+function commit(){
+  const names=[];selected.forEach(id=>names.push(LEVERS.find(l=>l.id===id).name));
+  alert('Committed:\n\n'+names.join('\n')+'\n\nIntervention records created. CoC events written. Morning Brief delta updated.');
+  resetAll();
+}
+function resetAll(){
+  selected.clear();document.querySelectorAll('.lc.sel').forEach(c=>c.classList.remove('sel'));
+  document.getElementById('op-results').style.display='none';document.getElementById('op-empty').style.display='flex';document.getElementById('cb-bar').style.display='none';
+}
+buildLevers();buildCPM();
+</script>

@@ -1,0 +1,596 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Share Tech Mono',monospace;background:#0c1628;color:#F0F6FF;font-size:12px}
+.shell{display:flex;height:100vh;min-height:600px;overflow:hidden}
+.sidebar{width:220px;background:#060a10;border-right:1px solid rgba(0,210,255,.1);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-head{padding:14px 14px 10px;border-bottom:1px solid rgba(0,210,255,.08)}
+.sidebar-logo{font-size:13px;font-weight:700;letter-spacing:.12em;color:#F0F6FF;margin-bottom:2px}
+.sidebar-logo span{color:#00D2FF}
+.sidebar-sub{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase}
+.tier-btns{padding:10px 10px 6px}
+.tier-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.25);text-transform:uppercase;padding:0 4px;margin-bottom:6px}
+.tier-btn{width:100%;padding:7px 10px;background:none;border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.45);font-family:inherit;font-size:10px;letter-spacing:.08em;cursor:pointer;text-align:left;margin-bottom:4px;transition:.12s;display:flex;align-items:center;gap:7px}
+.tier-btn:hover{border-color:rgba(0,210,255,.25);color:rgba(255,255,255,.8)}
+.tier-btn.active{border-color:rgba(0,210,255,.4);background:rgba(0,210,255,.07);color:#00D2FF}
+.tier-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.archive-section{padding:10px;border-top:1px solid rgba(0,210,255,.08);flex:1;overflow-y:auto}
+.archive-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.25);text-transform:uppercase;margin-bottom:7px;padding:0 4px}
+.arch-row{display:flex;align-items:center;gap:7px;padding:5px 6px;cursor:pointer;border:1px solid transparent;transition:.12s;margin-bottom:2px}
+.arch-row:hover{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06)}
+.arch-row.active-arch{background:rgba(0,210,255,.05);border-color:rgba(0,210,255,.15)}
+.arch-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.arch-date{font-size:10px;color:rgba(255,255,255,.5);flex:1}
+.arch-delta{font-size:9px;color:rgba(255,255,255,.25);white-space:nowrap}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.brief-top{background:#0c1628;border-bottom:1px solid rgba(0,210,255,.1);padding:12px 18px;flex-shrink:0}
+.brief-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.brief-tier-badge{font-size:9px;letter-spacing:.12em;padding:2px 9px;border:1px solid;text-transform:uppercase}
+.btb-pm{border-color:rgba(0,210,255,.35);color:#00D2FF;background:rgba(0,210,255,.07)}
+.btb-mgmt{border-color:rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07)}
+.btb-exec{border-color:rgba(239,159,39,.35);color:#EF9F27;background:rgba(239,159,39,.07)}
+.brief-generated{font-size:9px;color:rgba(255,255,255,.3);letter-spacing:.06em}
+.brief-title{font-size:18px;font-weight:700;color:#F0F6FF;letter-spacing:.04em;margin-bottom:3px;font-family:'Rajdhani',sans-serif}
+.brief-delta-bar{display:flex;align-items:center;gap:10px;font-size:10px;flex-wrap:wrap}
+.delta-chip{display:flex;align-items:center;gap:4px;padding:2px 8px;border:1px solid}
+.dc-red{border-color:rgba(226,75,74,.3);color:#E24B4A;background:rgba(226,75,74,.06)}
+.dc-amber{border-color:rgba(239,159,39,.3);color:#EF9F27;background:rgba(239,159,39,.06)}
+.dc-green{border-color:rgba(29,158,117,.3);color:#1D9E75;background:rgba(29,158,117,.06)}
+.dc-gray{border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.4);background:rgba(255,255,255,.03)}
+.brief-body{flex:1;overflow-y:auto;padding:16px 18px}
+.section-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.section-icon{width:4px;height:18px;border-radius:2px;flex-shrink:0}
+.section-title{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.section-count{font-size:9px;padding:1px 6px;border:1px solid;letter-spacing:.05em}
+.sc-red{border-color:rgba(226,75,74,.3);color:#E24B4A}
+.sc-amber{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.sc-green{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.brief-section{margin-bottom:18px}
+.action-card{border:1px solid rgba(255,255,255,.08);margin-bottom:6px;overflow:hidden;transition:.12s}
+.action-card:hover{border-color:rgba(0,210,255,.2)}
+.ac-head{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;cursor:pointer}
+.ac-bar{width:3px;align-self:stretch;border-radius:1px;flex-shrink:0}
+.ac-info{flex:1;min-width:0}
+.ac-title{font-size:11px;font-weight:700;color:#F0F6FF;margin-bottom:2px}
+.ac-why{font-size:10px;color:rgba(240,246,255,.6);line-height:1.45}
+.ac-badge{font-size:9px;padding:2px 7px;border:1px solid;flex-shrink:0;letter-spacing:.05em;align-self:flex-start;white-space:nowrap}
+.ab-red{border-color:rgba(226,75,74,.4);color:#E24B4A;background:rgba(226,75,74,.07)}
+.ab-amber{border-color:rgba(239,159,39,.35);color:#EF9F27;background:rgba(239,159,39,.06)}
+.ab-pred{border-color:rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.06)}
+.ac-detail{display:none;padding:0 11px 10px 22px;border-top:1px solid rgba(255,255,255,.05)}
+.ac-detail.open{display:block}
+.detail-block{margin-top:8px}
+.detail-label{font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.6);text-transform:uppercase;margin-bottom:3px}
+.detail-text{font-size:10px;color:rgba(240,246,255,.7);line-height:1.55;padding:6px 9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06)}
+.detail-pred{font-size:10px;color:rgba(139,92,246,.9);line-height:1.55;padding:6px 9px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-left:2px solid #8B5CF6}
+.action-row{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.act-btn{font-family:inherit;font-size:9px;padding:4px 11px;cursor:pointer;border:1px solid;letter-spacing:.07em;background:none;transition:.12s}
+.ab-primary{border-color:rgba(0,210,255,.4);color:#00D2FF}
+.ab-primary:hover{background:rgba(0,210,255,.08)}
+.ab-secondary{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.45)}
+.ab-secondary:hover{color:#fff}
+.ai-section{margin-bottom:16px}
+.ai-narrative{font-size:10px;color:rgba(240,246,255,.72);line-height:1.65;padding:10px 12px;background:rgba(239,159,39,.04);border:1px solid rgba(239,159,39,.12);border-left:2px solid rgba(239,159,39,.6)}
+.ai-label{font-size:9px;letter-spacing:.1em;color:rgba(239,159,39,.6);text-transform:uppercase;margin-bottom:5px}
+.regen-row{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.regen-btn{font-family:inherit;font-size:9px;padding:3px 10px;background:none;border:1px solid rgba(239,159,39,.3);color:rgba(239,159,39,.7);cursor:pointer;letter-spacing:.08em;transition:.12s}
+.regen-btn:hover{background:rgba(239,159,39,.08);color:#EF9F27}
+.immutable-tag{font-size:9px;color:rgba(255,255,255,.25);letter-spacing:.06em}
+.annotation-area{margin-top:8px}
+.ann-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:4px}
+.ann-input{width:100%;padding:6px 8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#C8DFF0;font-family:inherit;font-size:10px;outline:none;resize:none}
+.ann-input:focus{border-color:rgba(0,210,255,.25)}
+.health-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:12px}
+.hg-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);padding:7px 9px}
+.hg-proj{font-size:9px;color:rgba(255,255,255,.4);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em}
+.hg-val{font-size:15px;font-weight:700}
+.hg-sub{font-size:9px;color:rgba(255,255,255,.3);margin-top:1px}
+.people-strip{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
+.person-chip{display:flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02)}
+.pchip-av{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
+.pchip-name{font-size:9px;color:rgba(255,255,255,.6)}
+.pchip-arc{display:flex;gap:2px;margin-left:2px}
+.arc-d{width:8px;height:8px;border-radius:50%}
+.brief-footer{background:#060a10;border-top:1px solid rgba(0,210,255,.08);padding:8px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.footer-meta{font-size:9px;color:rgba(255,255,255,.25);letter-spacing:.06em}
+.footer-actions{display:flex;gap:6px}
+.fa-btn{font-family:inherit;font-size:9px;padding:4px 11px;cursor:pointer;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);background:none;letter-spacing:.07em;transition:.12s}
+.fa-btn:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@700&display=swap" rel="stylesheet"/>
+
+<div class="shell">
+
+<div class="sidebar">
+  <div class="sidebar-head">
+    <div class="sidebar-logo">COM<span>PASS</span></div>
+    <div class="sidebar-sub">Morning Brief</div>
+  </div>
+  <div class="tier-btns">
+    <div class="tier-label">Role tier</div>
+    <button class="tier-btn active" onclick="switchTier('pm',this)">
+      <div class="tier-dot" style="background:#00D2FF"></div>PM tier
+    </button>
+    <button class="tier-btn" onclick="switchTier('mgmt',this)">
+      <div class="tier-dot" style="background:#8B5CF6"></div>Management tier
+    </button>
+    <button class="tier-btn" onclick="switchTier('exec',this)">
+      <div class="tier-dot" style="background:#EF9F27"></div>Executive tier
+    </button>
+  </div>
+  <div class="archive-section">
+    <div class="archive-label">Brief archive</div>
+    <div class="arch-row active-arch" onclick="selectArchive(this,'Mar 24')">
+      <div class="arch-dot" style="background:#E24B4A"></div>
+      <div class="arch-date">Mar 24</div>
+      <div class="arch-delta">Today</div>
+    </div>
+    <div class="arch-row" onclick="selectArchive(this,'Mar 20')">
+      <div class="arch-dot" style="background:#E24B4A"></div>
+      <div class="arch-date">Mar 20</div>
+      <div class="arch-delta">–3 items</div>
+    </div>
+    <div class="arch-row" onclick="selectArchive(this,'Mar 17')">
+      <div class="arch-dot" style="background:#E24B4A"></div>
+      <div class="arch-date">Mar 17</div>
+      <div class="arch-delta">+2 risks</div>
+    </div>
+    <div class="arch-row" onclick="selectArchive(this,'Mar 13')">
+      <div class="arch-dot" style="background:#EF9F27"></div>
+      <div class="arch-date">Mar 13</div>
+      <div class="arch-delta">Clean day</div>
+    </div>
+    <div class="arch-row" onclick="selectArchive(this,'Mar 10')">
+      <div class="arch-dot" style="background:#EF9F27"></div>
+      <div class="arch-date">Mar 10</div>
+      <div class="arch-delta">+1 risk</div>
+    </div>
+    <div class="arch-row" onclick="selectArchive(this,'Mar 6')">
+      <div class="arch-dot" style="background:#EF9F27"></div>
+      <div class="arch-date">Mar 6</div>
+      <div class="arch-delta">Rising rework</div>
+    </div>
+    <div class="arch-row" onclick="selectArchive(this,'Mar 3')">
+      <div class="arch-dot" style="background:#1D9E75"></div>
+      <div class="arch-date">Mar 3</div>
+      <div class="arch-delta">First signal</div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="brief-top">
+    <div class="brief-meta">
+      <span class="brief-tier-badge btb-pm" id="tier-badge">PM tier</span>
+      <span class="brief-generated">Generated 6:00 AM · Mar 24, 2026 · Immutable</span>
+    </div>
+    <div class="brief-title" id="brief-title">Good morning, Vaughn.</div>
+    <div class="brief-delta-bar" id="delta-bar">
+      <span style="font-size:10px;color:rgba(255,255,255,.3)">Since yesterday:</span>
+      <span class="delta-chip dc-red">+1 escalation recommended</span>
+      <span class="delta-chip dc-amber">Build #1 now 7d overdue</span>
+      <span class="delta-chip dc-green">Design Review resolved</span>
+      <span class="delta-chip dc-gray">NovaBio unchanged</span>
+    </div>
+  </div>
+
+  <div class="brief-body" id="brief-body">
+  </div>
+
+  <div class="brief-footer">
+    <div class="footer-meta" id="footer-meta">Apex Consulting Group · Flexscope · NovaBio · Internal · 3 active projects · CoC events: 847</div>
+    <div class="footer-actions">
+      <button class="fa-btn" onclick="alert('PDF export — brief frozen at generation time')">Export PDF</button>
+      <button class="fa-btn" onclick="alert('Share link copied — recipient sees read-only view')">Share</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const briefs = {
+  pm: {
+    badge:'PM tier', badgeClass:'btb-pm',
+    title:'Good morning, Vaughn.',
+    delta:[
+      {cls:'dc-red',text:'+1 escalation recommended'},
+      {cls:'dc-amber',text:'Build #1 now 7d overdue'},
+      {cls:'dc-green',text:'Design Review resolved'},
+      {cls:'dc-gray',text:'NovaBio unchanged'},
+    ],
+    footer:'Apex Consulting Group · Flexscope · NovaBio · Internal · 3 active projects · CoC events: 847',
+    sections:[
+      {
+        title:'Requires action today', icon:'#E24B4A', countCls:'sc-red', count:'2',
+        items:[
+          {
+            bar:'#E24B4A', badge:'Escalation recommended', badgeCls:'ab-red',
+            title:'BUILD #1 — PCB Layout Rev B still unsigned after 7 days',
+            why:'Two PM-level interventions have not resolved this. The sign-off authority required is above PM level. Escalation brief is pre-assembled and ready to send.',
+            detail:{
+              situation:'Build Review cannot proceed. 3 downstream tasks blocked. Schedule impact: 7d and growing at 1d/day.',
+              prediction:'Based on 6 similar blocker patterns: resource reassignment has 17% success rate. Direct management contact with client technical director has 83% success rate.',
+              recommended:'Send escalation brief to CS now. Every additional day costs approximately ¥12k in schedule slip.',
+              actions:[{label:'Send escalation brief →',primary:true},{label:'View intervention record',primary:false}]
+            }
+          },
+          {
+            bar:'#EF9F27', badge:'Respond today', badgeCls:'ab-amber',
+            title:'Margaret Mills — day 3 with no activity',
+            why:'Third consecutive day with zero time logged and no signals. Pattern is escalating: day 1 = check-in, day 2 = manager escalation recommended, day 3 = urgent.',
+            detail:{
+              situation:'Margaret is assigned to 40% of Flexscope BUILD phase tasks. 3 of her assigned tasks are now overdue.',
+              prediction:'No prediction available — absence pattern is ambiguous. Could be personal or performance-related.',
+              recommended:'Contact Margaret directly today. If no response by noon, escalate to management.',
+              actions:[{label:'Log intervention →',primary:true},{label:'Notify management',primary:false}]
+            }
+          },
+        ]
+      },
+      {
+        title:'Trending toward risk', icon:'#EF9F27', countCls:'sc-amber', count:'2',
+        items:[
+          {
+            bar:'#EF9F27', badge:'74% rejection probability', badgeCls:'ab-pred',
+            title:'Design Review Signoff — next instance at elevated risk',
+            why:'Template redesign is authorized but not yet deployed. Any new Design Review instance launched before the redesign completes will hit the same Approval step failure mode.',
+            detail:{
+              situation:'2 new Design Review instances are in queue to launch in the next 5 days for NovaBio.',
+              prediction:'Based on 14 prior instances before template redesign: 74% probability of rejection at Approval step on first submission. Estimated rework cost if both instances hit this: ¥48k.',
+              recommended:'Hold NovaBio Design Review launches until redesigned template is available. ETA from CS: Apr 7.',
+              actions:[{label:'Flag to NovaBio PM →',primary:true},{label:'View template status',primary:false}]
+            }
+          },
+          {
+            bar:'#EF9F27', badge:'Watch', badgeCls:'ab-amber',
+            title:'NovaBio — Section 4.3 reviewer capacity gap',
+            why:'Robert Chen reduced to 40% on NovaBio. Section 4.3 review starts Apr 2. At 40% he cannot complete it within the gate window.',
+            detail:{
+              situation:'Section 4.3 review requires approximately 24h of focused work over 5 days. Robert Chen has 16h available at current allocation.',
+              prediction:'At current allocation, 67% probability of section 4.3 review missing the Apr 8 gate.',
+              recommended:'Either expand Robert Chen to 60% for this window or assign Sandra Okafor (capacity available).',
+              actions:[{label:'Request allocation change →',primary:true},{label:'Assess Sandra Okafor',primary:false}]
+            }
+          },
+        ]
+      },
+      {
+        title:'AI narrative', icon:'#EF9F27', countCls:null, count:null, narrative:true,
+        text:'Portfolio is under pressure at the Flexscope BUILD phase, but the root causes are identifiable and the interventions are clear. The Design Review resolution yesterday was a genuine positive signal — one intervention, one meeting, positive outcome within 24h. That demonstrates the intervention record is working as designed.\n\nThe BUILD #1 blocker is the critical path item today. Everything else can wait. Send the escalation brief, let management engage the client technical director, and the 7-day slip becomes recoverable.\n\nNovaBio remains the portfolio health anchor — clean green signals, on-schedule, on-budget. Do not let Flexscope pressure spill into NovaBio resourcing decisions without a deliberate tradeoff.',
+      }
+    ]
+  },
+  mgmt: {
+    badge:'Management tier', badgeClass:'btb-mgmt',
+    title:'Good morning, Chris.',
+    delta:[
+      {cls:'dc-red',text:'Escalation from VS received'},
+      {cls:'dc-amber',text:'2 resource decisions pending'},
+      {cls:'dc-amber',text:'Template redesign sprint D3'},
+      {cls:'dc-green',text:'Org confidence 72%'},
+    ],
+    footer:'Apex Consulting Group · 3 active projects · 6 team members · 6 decisions pending · Rework cost YTD: ¥620k',
+    sections:[
+      {
+        title:'Decisions required from you', icon:'#E24B4A', countCls:'sc-red', count:'3',
+        items:[
+          {
+            bar:'#E24B4A', badge:'Escalation', badgeCls:'ab-red',
+            title:'Flexscope BUILD #1 — direct management intervention needed',
+            why:'VS has exhausted PM-level options. Two interventions, two negative outcomes. PCB Layout Rev B requires direct access to Flexscope design authority — above PM channel.',
+            detail:{
+              situation:'7 days overdue. 3 downstream tasks blocked. ¥12k/day accumulating. PM escalation brief received 4:52 PM yesterday.',
+              prediction:'If resolved today: 2-3 day schedule recovery possible. If unresolved this week: P50 delivery slips to Jul 12 (+12d from contract).',
+              recommended:'Contact TransAtlantic technical director directly — bypass account manager channel. VS has the contact details.',
+              actions:[{label:'Open escalation brief →',primary:true},{label:'Log management intervention',primary:false}]
+            }
+          },
+          {
+            bar:'#EF9F27', badge:'52h aging', badgeCls:'ab-amber',
+            title:'Resource request — Alan Smith full allocation to Flexscope',
+            why:'VS requested Alan Smith at 100% Flexscope to accelerate BUILD phase. Alan is currently 60/40 Flexscope/NovaBio. NovaBio impact requires assessment.',
+            detail:{
+              situation:'NovaBio section 4.2 is complete. Section 4.3 does not start until Apr 2. Window exists for temporary reallocation.',
+              prediction:'Approving 100% Flexscope through Apr 14 has 82% probability of recovering 2 of the 7 lost days. NovaBio risk is low if condition is Apr 14 return.',
+              recommended:'Approve with condition: return to 60/40 by Apr 14. Sandra Okafor covers Section 4.3.',
+              actions:[{label:'Approve with condition →',primary:true},{label:'Reject',primary:false}]
+            }
+          },
+          {
+            bar:'#EF9F27', badge:'48h aging', badgeCls:'ab-amber',
+            title:'Robert Chen — NovaBio capacity gap for Section 4.3',
+            why:'Chen at 40% cannot complete Section 4.3 review in window. PM has not escalated this yet — system surfaced it proactively.',
+            detail:{
+              situation:'Section 4.3 starts Apr 2. Chen has 16h available; review requires 24h. Gap: 8h.',
+              prediction:'Without intervention: 67% probability of Apr 8 gate miss.',
+              recommended:'Authorize Sandra Okafor substitution for Section 4.3. She has capacity and context from Section 4.2 overlap.',
+              actions:[{label:'Authorize substitution →',primary:true},{label:'Expand Chen allocation',primary:false}]
+            }
+          },
+        ]
+      },
+      {
+        title:'Patterns emerging', icon:'#EF9F27', countCls:'sc-amber', count:'2',
+        items:[
+          {
+            bar:'#8B5CF6', badge:'Cross-project pattern', badgeCls:'ab-pred',
+            title:'Ron White × design authority — 73% rejection rate vs 22% firm avg',
+            why:'The system has now computed this pairing across 14 instances. It is not a Flexscope anomaly — it is a persistent interpersonal dynamic.',
+            detail:{
+              situation:'This pairing will recur on every project where Ron submits to this approver. The template redesign addresses the process; it does not address the relationship.',
+              prediction:'Without intervention on the relationship: 71% probability of same pattern on next shared project.',
+              recommended:'Facilitate a structured alignment session between Ron and the design authority — clarify expectations, not blame. This investment prevents recurring rework cycles.',
+              actions:[{label:'Schedule alignment session →',primary:true},{label:'Restructure approval chain',primary:false}]
+            }
+          },
+          {
+            bar:'#EF9F27', badge:'Watch', badgeCls:'ab-amber',
+            title:'Margaret Mills — third absence pattern this quarter',
+            why:'First instance the system surfaced this as a pattern rather than an isolated event. 52h missed this quarter without explanation.',
+            detail:{
+              situation:'Pattern: mid-week disappearance 3 times in 8 weeks. No performance issues otherwise — signals when present are consistently green.',
+              prediction:'Without a conversation: 60% probability of recurrence within 3 weeks based on prior pattern.',
+              recommended:'This is a management conversation, not a PM conversation. Personal welfare check recommended before any performance framing.',
+              actions:[{label:'Log management intervention →',primary:true}]
+            }
+          },
+        ]
+      },
+      {
+        title:'Organization health', icon:'#1D9E75', countCls:'sc-green', count:'Healthy',
+        items:[],
+        healthGrid:[
+          {proj:'Confidence today',val:'72%',sub:'4 green · 1 amber · 1 red',color:'#EF9F27'},
+          {proj:'Timesheet compliance',val:'67%',sub:'4 of 6 logged today',color:'#EF9F27'},
+          {proj:'Rework cost — week',val:'¥84k',sub:'↑ from ¥61k last week',color:'#E24B4A'},
+        ],
+        people:[
+          {initials:'RW',bg:'rgba(226,75,74,.15)',tc:'#E24B4A',arc:['#1D9E75','#1D9E75','#EF9F27','#EF9F27','#E24B4A']},
+          {initials:'AS',bg:'rgba(29,158,117,.15)',tc:'#1D9E75',arc:['#1D9E75','#1D9E75','#1D9E75','#EF9F27','#EF9F27']},
+          {initials:'SO',bg:'rgba(29,158,117,.15)',tc:'#1D9E75',arc:['#1D9E75','#1D9E75','#1D9E75','#1D9E75','#1D9E75']},
+          {initials:'MM',bg:'rgba(239,159,39,.15)',tc:'#EF9F27',arc:['#1D9E75','#1D9E75','rgba(255,255,255,.15)','rgba(255,255,255,.1)','rgba(255,255,255,.08)']},
+        ]
+      },
+      {
+        title:'AI narrative', icon:'#EF9F27', countCls:null, count:null, narrative:true,
+        text:'Three decisions require your authority today — the BUILD #1 escalation is the highest-leverage. Direct client contact will unlock more schedule recovery than any additional PM-level intervention.\n\nThe system surfaced the Robert Chen capacity gap proactively — VS has not raised it yet. This is the prediction capability working: identifying a conflict 10 days before it surfaces as a missed gate, giving you time to act without urgency.\n\nOrganization confidence at 72% is acceptable but the rework cost trend is not. ¥84k this week vs ¥61k last week. The template redesign will bend this curve — hold the sprint timeline.',
+      }
+    ]
+  },
+  exec: {
+    badge:'Executive tier', badgeClass:'btb-exec',
+    title:'Good morning.',
+    delta:[
+      {cls:'dc-amber',text:'Margin 39% — 3pts below target'},
+      {cls:'dc-red',text:'Rework ¥620k Q1 · +100% vs Q4'},
+      {cls:'dc-green',text:'Management handling BUILD escalation'},
+      {cls:'dc-green',text:'Template redesign authorized'},
+    ],
+    footer:'Apex Consulting Group · ¥8.4M YTD · 39% margin · 4 projects · Pipeline ¥6.2M',
+    sections:[
+      {
+        title:'Bottom line', icon:'#00D2FF', countCls:null, count:null,
+        items:[
+          {
+            bar:'#00D2FF', badge:'Financial read', badgeCls:'ab-pred',
+            title:'Portfolio generating ¥8.4M of ¥9.2M target. Margin is 3pts below target — this is a rework problem, not a revenue problem.',
+            why:'One high-ROI decision was already made: template redesign authorized by CS, projected to recover ¥380k annually at a cost of ¥18k. No executive action required on this.',
+            detail:{
+              situation:'Q1 rework cost: ¥620k — up from ¥310k Q4 2025. 66% is Process Quality Failure (preventable). Design Review Signoff template is the root cause.',
+              prediction:'If redesign completes on schedule (Apr 7): Q2 margin projects to 40.8%. If delayed: Q2 margin projects to 37.1%.',
+              recommended:'No action required. Monitor template redesign sprint completion. Flag if CS reports delay beyond Apr 7.',
+              actions:[{label:'View financial detail →',primary:true}]
+            }
+          },
+        ]
+      },
+      {
+        title:'Requires awareness', icon:'#EF9F27', countCls:'sc-amber', count:'1',
+        items:[
+          {
+            bar:'#EF9F27', badge:'Escalation in progress', badgeCls:'ab-amber',
+            title:'Flexscope BUILD #1 — management has taken the escalation',
+            why:'CS is contacting TransAtlantic technical director directly to expedite PCB Layout Rev B sign-off. No executive action needed unless CS is unsuccessful by tomorrow.',
+            detail:{
+              situation:'7-day schedule slip on Flexscope BUILD phase. Root cause: client-side sign-off delay. Management has intervened.',
+              prediction:'If resolved today: P50 delivery Jul 5. If unresolved this week: P50 delivery Jul 12 — within contractual tolerance per Section 7.4.',
+              recommended:'Monitor. If CS reports unsuccessful by tomorrow morning, executive visibility to TransAtlantic account relationship may be warranted.',
+              actions:[{label:'Review contract terms →',primary:false}]
+            }
+          },
+        ]
+      },
+      {
+        title:'Pipeline & growth', icon:'#1D9E75', countCls:'sc-green', count:'¥6.2M',
+        items:[
+          {
+            bar:'#1D9E75', badge:'3 proposals active', badgeCls:'ab-pred',
+            title:'MediSync (¥1.8M, 85%), Orbis Biotech (¥1.4M, 70%), TerraVox (¥0.9M, 55%) — combined expected value ¥3.4M',
+            why:'Win rate this quarter at 67%. MediSync is highest probability and highest value — prioritize BD resource accordingly.',
+            detail:{
+              situation:'Pipeline is healthy. 3 proposals in active stage. Q2 close target: ¥3.8M.',
+              prediction:'At current win rates and pipeline velocity: Q2 new business projects to ¥3.4M — 90% of target.',
+              recommended:'No action required. Ensure VS has adequate BD time alongside Flexscope delivery pressure.',
+              actions:[{label:'Open Pipeline HUD →',primary:true}]
+            }
+          },
+        ]
+      },
+      {
+        title:'AI narrative', icon:'#EF9F27', countCls:null, count:null, narrative:true,
+        text:'The portfolio is financially healthy at the revenue line. The margin problem is real but it has a known cause, a known fix, and a management team executing on it. The system identified the rework trend 21 days before today\'s financial impact was fully quantified — that early warning is working.\n\nNo executive decisions are required this brief. Management is handling the operational escalation. The template redesign is authorized and in sprint. Pipeline is healthy.\n\nThe one watch item: if the BUILD #1 escalation is not resolved by tomorrow, the relationship channel with TransAtlantic may need executive attention. The system will surface this in tomorrow\'s brief if that condition is met.',
+      }
+    ]
+  }
+};
+
+let currentTier = 'pm';
+let openCards = new Set();
+
+function switchTier(tier, btn){
+  currentTier = tier;
+  document.querySelectorAll('.tier-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderBrief(tier);
+}
+
+function selectArchive(el, date){
+  document.querySelectorAll('.arch-row').forEach(r=>r.classList.remove('active-arch'));
+  el.classList.add('active-arch');
+  openCards.clear();
+  if(date !== 'Mar 24'){
+    const body = document.getElementById('brief-body');
+    body.innerHTML = `<div style="padding:40px 20px;text-align:center;font-size:10px;color:rgba(255,255,255,.3)">
+      <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.4);margin-bottom:8px">${date}, 2026</div>
+      <div style="color:rgba(255,255,255,.25);margin-bottom:12px">Archived brief — immutable snapshot</div>
+      <div style="max-width:400px;margin:0 auto;text-align:left;font-size:10px;color:rgba(240,246,255,.55);line-height:1.65;padding:10px 12px;background:rgba(239,159,39,.04);border:1px solid rgba(239,159,39,.12);border-left:2px solid rgba(239,159,39,.5)">
+        ${date==='Mar 3'?'Portfolio revenue tracking ¥6.2M YTD. Margin 40.5% — within target. Flexscope showing early rework signals: Design Review Signoff rejection rate elevated at 41% vs historical average 28%. No action required today but rework trend bears watching. NovaBio and OrthoMotion both green.':
+        date==='Mar 6'?'Flexscope rework rate now 53% at Approval step — second consecutive week above baseline. Quarterly rework cost projection updated to ¥480k if trend continues. Recommend management review of Design Review Signoff template. NovaBio and OrthoMotion both green.':
+        date==='Mar 10'?'Management notified of Design Review Signoff pattern. CS to review template redesign options. Rework cost now ¥320k YTD — trending to ¥580k quarterly. BUILD phase delayed 2d due to PCB Layout Rev B sign-off pending.':
+        date==='Mar 13'?'Flexscope SPI declined to 0.81. Design Review Signoff now at 67% own-failure rate — above the 60% redesign threshold. Two PM interventions underway. Template redesign authorization pending.':
+        date==='Mar 17'?'Management authorized Design Review Signoff template redesign. Rework cost ¥480k Q1. Build phase further delayed — PCB Layout Rev B now 6d pending. Two PM interventions on BUILD #1 blocker unsuccessful. Escalation path being prepared.':
+        'Flexscope Phase 1 budget overrun of ¥15k approved. Rework cost is the driver. Template redesign sprint commencing. Two PM interventions on BUILD #1 blocker unsuccessful.'}
+      </div>
+      <div style="margin-top:12px;font-size:9px;color:rgba(255,255,255,.2)">This brief was generated at 6:00 AM on ${date}, 2026 · Read-only · Annotations additive only</div>
+    </div>`;
+    return;
+  }
+  renderBrief(currentTier);
+}
+
+function renderBrief(tier){
+  const d = briefs[tier];
+  document.getElementById('tier-badge').textContent = d.badge;
+  document.getElementById('tier-badge').className = 'brief-tier-badge ' + d.badgeClass;
+  document.getElementById('brief-title').textContent = d.title;
+  document.getElementById('footer-meta').textContent = d.footer;
+  const db = document.getElementById('delta-bar');
+  db.innerHTML = '<span style="font-size:10px;color:rgba(255,255,255,.3)">Since yesterday:</span>';
+  d.delta.forEach(dc=>{
+    const s = document.createElement('span');
+    s.className = 'delta-chip ' + dc.cls;
+    s.textContent = dc.text;
+    db.appendChild(s);
+  });
+  const body = document.getElementById('brief-body');
+  body.innerHTML = '';
+  d.sections.forEach((sec,si)=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'brief-section';
+    const head = document.createElement('div');
+    head.className = 'section-head';
+    head.innerHTML = `<div class="section-icon" style="background:${sec.icon}"></div>
+      <div class="section-title">${sec.title}</div>
+      ${sec.count ? `<span class="section-count ${sec.countCls}">${sec.count}</span>` : ''}`;
+    wrap.appendChild(head);
+    if(sec.narrative){
+      const aiWrap = document.createElement('div');
+      aiWrap.className = 'ai-section';
+      aiWrap.innerHTML = `
+        <div class="ai-label">AI narrative — generated 6:00 AM</div>
+        <div class="ai-narrative">${sec.text.replace(/\n/g,'<br><br>')}</div>
+        <div class="regen-row">
+          <span class="immutable-tag">Immutable at generation time</span>
+          <button class="regen-btn" onclick="regenNarrative(this)">Regenerate against current CoC</button>
+        </div>
+        <div class="annotation-area">
+          <div class="ann-label">PM annotation (additive)</div>
+          <textarea class="ann-input" rows="2" placeholder="Add context that will carry into tomorrow's delta..."></textarea>
+        </div>`;
+      wrap.appendChild(aiWrap);
+    } else if(sec.healthGrid){
+      const grid = document.createElement('div');
+      grid.className = 'health-grid';
+      sec.healthGrid.forEach(hg=>{
+        grid.innerHTML += `<div class="hg-card">
+          <div class="hg-proj">${hg.proj}</div>
+          <div class="hg-val" style="color:${hg.color}">${hg.val}</div>
+          <div class="hg-sub">${hg.sub}</div>
+        </div>`;
+      });
+      wrap.appendChild(grid);
+      if(sec.people && sec.people.length){
+        const ps = document.createElement('div');
+        ps.className = 'people-strip';
+        sec.people.forEach(p=>{
+          const chip = document.createElement('div');
+          chip.className = 'person-chip';
+          chip.innerHTML = `<div class="pchip-av" style="background:${p.bg};color:${p.tc}">${p.initials}</div>
+            <span class="pchip-name">${p.initials}</span>
+            <div class="pchip-arc">${p.arc.map(c=>`<div class="arc-d" style="background:${c}"></div>`).join('')}</div>`;
+          ps.appendChild(chip);
+        });
+        wrap.appendChild(ps);
+      }
+    }
+    (sec.items||[]).forEach((item,ii)=>{
+      const cardId = `card-${si}-${ii}`;
+      const card = document.createElement('div');
+      card.className = 'action-card';
+      card.innerHTML = `
+        <div class="ac-head" onclick="toggleCard('${cardId}')">
+          <div class="ac-bar" style="background:${item.bar}"></div>
+          <div class="ac-info">
+            <div class="ac-title">${item.title}</div>
+            <div class="ac-why">${item.why}</div>
+          </div>
+          <span class="ac-badge ${item.badgeCls}">${item.badge}</span>
+        </div>
+        <div class="ac-detail${openCards.has(cardId)?' open':''}" id="${cardId}">
+          <div class="detail-block">
+            <div class="detail-label">Situation</div>
+            <div class="detail-text">${item.detail.situation}</div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-label">Prediction <span style="color:rgba(139,92,246,.6);font-size:9px">(${item.detail.prediction.includes('No prediction')?'insufficient data':'based on historical CoC patterns'})</span></div>
+            <div class="${item.detail.prediction.includes('No prediction')?'detail-text':'detail-pred'}">${item.detail.prediction}</div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-label">Recommended action</div>
+            <div class="detail-text">${item.detail.recommended}</div>
+          </div>
+          <div class="action-row">
+            ${item.detail.actions.map(a=>`<button class="act-btn ${a.primary?'ab-primary':'ab-secondary'}" onclick="handleAction('${a.label}')">${a.label}</button>`).join('')}
+          </div>
+        </div>`;
+      wrap.appendChild(card);
+    });
+    body.appendChild(wrap);
+  });
+}
+
+function toggleCard(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const isOpen = el.classList.contains('open');
+  if(isOpen){ el.classList.remove('open'); openCards.delete(id); }
+  else { el.classList.add('open'); openCards.add(id); }
+}
+
+function handleAction(label){
+  const msgs = {
+    'Send escalation brief →':'Escalation brief sent to CS. CoC event written. Management notified.',
+    'Open escalation brief →':'Opening escalation brief — pre-assembled from intervention record.',
+    'Log intervention →':'Intervention log form opening.',
+    'Log management intervention':'Management intervention record form opening.',
+    'Approve with condition →':'Resource request approved. Condition: return to 60/40 by Apr 14. VS notified. CoC event written.',
+    'Authorize substitution →':'Sandra Okafor authorized for NovaBio Section 4.3 review. VS notified.',
+    'Schedule alignment session →':'Alignment session between Ron White and design authority — scheduling form opening.',
+    'View financial detail →':'Opening Financial tab in Executive View.',
+    'Open Pipeline HUD →':'Opening Pipeline HUD.',
+  };
+  alert(msgs[label] || label + ' — navigating to relevant view.');
+}
+
+function regenNarrative(btn){
+  btn.textContent = 'Regenerating...';
+  btn.disabled = true;
+  setTimeout(()=>{
+    btn.textContent = 'Regenerated — narrative updated against latest CoC';
+    btn.style.color = '#1D9E75';
+    btn.style.borderColor = 'rgba(29,158,117,.4)';
+  }, 1200);
+}
+
+renderBrief('pm');
+</script>
