@@ -3131,7 +3131,7 @@ async function loadManagementView() {
 
     const [wfInstances, cocEvents, resourceReqs, confSignals, weekEntries, actionItems] = await Promise.all([
       API.get('workflow_instances?select=id,title,status,current_step_name,project_id,launched_at&status=eq.active&limit=50').catch(()=>[]),
-      API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated,task_progress_update)&order=created_at.desc&limit=300').catch(()=>[]),
+      API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated,task_progress_update,management_decision)&order=created_at.desc&limit=300').catch(()=>[]),
       API.get('resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&order=submitted_at.asc&limit=20').catch(()=>[]),
       API.get(`workflow_step_instances?select=id,instance_id,event_type,outcome,actor_name,created_at&event_type=eq.task_progress_update&created_at=gte.${weekDays[0]}T00:00:00&order=created_at.desc&limit=300`).catch(()=>[]),
       API.get(`time_entries?date=gte.${weekDays[0]}&date=lte.${weekDays[4]}&select=id,project_id,resource_id,date,hours,is_billable&limit=500`).catch(()=>[]),
@@ -3218,29 +3218,38 @@ async function loadManagementView() {
     // Health grid per project
     function dotColor(score) { return score>=0.85?'#1D9E75':score>=0.65?'#EF9F27':'#E24B4A'; }
     function projectHealthDots(p) {
-      const projTasks = _tasks.filter(t=>t.project_id===p.id);
-      const overdue = projTasks.filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status)).length;
-      const projInsts = wfInstances.filter(w=>w.project_id===p.id);
-      const projResets = reworkEvents.filter(e=>projInsts.some(i=>i.id===e.instance_id)).length;
-      const projCompleted = cocEvents.filter(e=>e.event_type==='step_completed'&&projInsts.some(i=>i.id===e.instance_id)).length;
-      const projEntries = weekEntries.filter(e=>e.project_id===p.id);
-      const schedScore = projTasks.length>0 ? 1-(overdue/Math.max(projTasks.length,1)) : 0.8;
-      const costScore = p.cpi ? Math.min(parseFloat(p.cpi),1) : 0.8;
-      const projSigs = confSignals.filter(e=>projInsts.some(i=>i.id===e.instance_id)||projEntries.some(te=>te.resource_id===e.resource_id));
-      const confScore = projSigs.length>0 ? projSigs.filter(e=>e.outcome==='on_track').length/projSigs.length : 0.7;
-      const reworkScore = projCompleted>0 ? Math.max(0,1-projResets/Math.max(projCompleted,1)) : (projResets>0?0.3:0.8);
-      const projResIds = new Set(projEntries.map(e=>e.resource_id));
+      const projTasks    = _tasks.filter(t=>t.project_id===p.id);
+      const overdue      = projTasks.filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status));
+      const projInsts    = wfInstances.filter(w=>w.project_id===p.id);
+      const projResets   = reworkEvents.filter(e=>projInsts.some(i=>i.id===e.instance_id));
+      const projCompleted= cocEvents.filter(e=>e.event_type==='step_completed'&&projInsts.some(i=>i.id===e.instance_id)).length;
+      const projEntries  = weekEntries.filter(e=>e.project_id===p.id);
+      const projResIds   = new Set(projEntries.map(e=>e.resource_id));
       const taskAssigned = new Set(_tasks.filter(t=>t.project_id===p.id&&t.assigned_to).map(t=>t.assigned_to));
-      const tsScore = taskAssigned.size>0 ? Math.min(projResIds.size/taskAssigned.size,1) : 0.7;
-      const escScore = Object.entries(instResets).some(([id,c])=>c>=2&&wfInstances.find(w=>w.id===id)?.project_id===p.id) ? 0.1 : 0.9;
+      const projSigs     = confSignals.filter(e=>projInsts.some(i=>i.id===e.instance_id)||projEntries.some(te=>te.resource_id===e.resource_id));
+      const hasEsc       = Object.entries(instResets).some(([id,c])=>c>=2&&wfInstances.find(w=>w.id===id)?.project_id===p.id);
+
+      // Honest scores: null = no data (grey), number = scored
+      const schedScore = projTasks.length>0 ? 1-(overdue.length/Math.max(projTasks.length,1)) : null;
+      const costScore  = p.cpi ? Math.min(parseFloat(p.cpi),1) : null;
+      const confScore  = projSigs.length>0 ? projSigs.filter(e=>e.outcome==='on_track').length/projSigs.length : null;
+      const reworkScore= projResets.length>0||projCompleted>0 ? (projCompleted>0 ? Math.max(0,1-projResets.length/Math.max(projCompleted,1)) : 0.2) : null;
+      const tsScore    = taskAssigned.size>0 ? projResIds.size/taskAssigned.size : null;
+      const escScore   = hasEsc ? 0.1 : null;
+
+      function scoreColor(s) {
+        if (s===null) return '#2A4060'; // grey = no data
+        return s>=0.85?'#1D9E75':s>=0.65?'#EF9F27':'#E24B4A';
+      }
+      // Expose counts for expand row
       return [
-        {label:'Schedule',score:schedScore},
-        {label:'Cost',score:costScore},
-        {label:'Confidence',score:confScore},
-        {label:'Rework',score:reworkScore},
-        {label:'Timesheets',score:tsScore},
-        {label:'Escalations',score:escScore},
-      ].map(d=>({...d,color:dotColor(d.score)}));
+        {label:'Schedule',   score:schedScore, color:scoreColor(schedScore),   overdue:overdue.length,   total:projTasks.length},
+        {label:'Cost',       score:costScore,  color:scoreColor(costScore)},
+        {label:'Confidence', score:confScore,  color:scoreColor(confScore),    sigCount:projSigs.length, greenSigs:projSigs.filter(e=>e.outcome==='on_track').length},
+        {label:'Rework',     score:reworkScore,color:scoreColor(reworkScore),  resets:projResets.length, completions:projCompleted},
+        {label:'Timesheets', score:tsScore,    color:scoreColor(tsScore),      logged:projResIds.size,   expected:taskAssigned.size},
+        {label:'Escalations',score:escScore,   color:scoreColor(escScore),     hasEsc},
+      ];
     }
 
     // ── Pairing intelligence — actor with highest rejection rate ──────
@@ -3426,19 +3435,27 @@ async function loadManagementView() {
       tr.style.background = 'rgba(0,210,255,.06)';
       const dots = projectHealthDots(ps.p);
       const dimRows = dots.map(d => {
-        const reasons = {
-          'Schedule':   ps.overdueTasks.length>0 ? ps.overdueTasks.length+' overdue task'+(ps.overdueTasks.length>1?'s':'')+' · '+ps.overdueTasks.slice(0,3).map(t=>t.name||'task').join(', ')+(ps.overdueTasks.length>3?' +more':'') : 'No overdue tasks',
-          'Cost':       ps.p.cpi ? 'CPI '+parseFloat(ps.p.cpi).toFixed(2) : 'CPI not set — estimated from budget data',
-          'Confidence': 'Based on '+((confSignals||[]).filter(e=>ps.projInsts.some(i=>i.id===e.instance_id)).length)+' signals this week',
-          'Rework':     ps.projCoc.filter(e=>e.event_type==='step_reset').length+' resets vs '+ps.projCoc.filter(e=>e.event_type==='step_completed').length+' completions recorded',
-          'Timesheets': (weekEntries||[]).filter(e=>e.project_id===projId).map(e=>e.resource_id).filter((v,i,a)=>a.indexOf(v)===i).length+' resources logged time this week',
-          'Escalations':ps.projFlags.length>0 ? ps.projFlags.length+' unresolved flag'+(ps.projFlags.length>1?'s':'')+' · '+ps.projCoc.filter(e=>e.event_type==='step_reset').length+' total resets' : 'No active escalations',
-        };
+        let reason;
+        if (d.score === null) {
+          reason = 'No data this week';
+        } else if (d.label==='Schedule') {
+          reason = d.overdue>0 ? d.overdue+' overdue of '+d.total+' tasks · '+ps.overdueTasks.slice(0,3).map(t=>esc(t.name||'task')).join(', ')+(ps.overdueTasks.length>3?' +more':'') : 'All '+d.total+' tasks on schedule';
+        } else if (d.label==='Cost') {
+          reason = ps.p.cpi ? 'CPI '+parseFloat(ps.p.cpi).toFixed(2) : 'CPI not available';
+        } else if (d.label==='Confidence') {
+          reason = d.sigCount===0 ? 'No signals posted this week' : d.greenSigs+' green / '+d.sigCount+' total signals ('+Math.round(d.greenSigs/d.sigCount*100)+'%)';
+        } else if (d.label==='Rework') {
+          reason = d.resets===0&&d.completions===0 ? 'No workflow activity this week' : d.resets+' reset'+(d.resets!==1?'s':'')+' · '+d.completions+' completion'+(d.completions!==1?'s':'');
+        } else if (d.label==='Timesheets') {
+          reason = d.expected===0 ? 'No assigned resources found' : d.logged+' / '+d.expected+' assigned resources logged time this week';
+        } else if (d.label==='Escalations') {
+          reason = d.hasEsc ? 'Active escalation — 2+ failed interventions' : 'No escalations';
+        }
         const col = d.color;
         return `<div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-bottom:1px solid rgba(0,210,255,.06)">
           <div style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;margin-top:2px"></div>
           <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;min-width:88px">${d.label}</div>
-          <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${Math.round(d.score*100)}% · ${reasons[d.label]||''}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${d.score===null?'No data':Math.round(d.score*100)+'%'} · ${reason}</div>
         </div>`;
       }).join('');
       const exp = document.createElement('tr');
@@ -3746,24 +3763,7 @@ async function loadManagementView() {
         }</div>`;
       mgOpenModal(projName + ' — ' + label, body);
     };
-    // Person card detail
-    window.mgShowPerson = function(fullName, arcStr, weekHrs, taskCount) {
-      const hasRed = arcStr.includes('R');
-      const redIdx = arcStr.indexOf('R'), greenIdx = arcStr.indexOf('G');
-      const narrative = hasRed
-        ? (redIdx > greenIdx
-            ? 'Degradation pattern detected. Review what changed on the day the arc shifted — upstream block or relationship friction is more likely than individual performance failure.'
-            : 'Persistent issues this week. Consider direct check-in.')
-        : 'Clean week. No pattern concerns.';
-      const body = `
-        <div class="mg-modal-section">Week arc</div>
-        <div class="mg-modal-block" style="font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:.08em">${arcStr}</div>
-        <div class="mg-modal-section">Hours</div>
-        <div class="mg-modal-block">${weekHrs}h logged · ${taskCount} open task${taskCount !== 1 ? 's' : ''} across active projects</div>
-        <div class="mg-modal-section">AI narrative</div>
-        <div class="mg-modal-block mg-modal-ai">${narrative}</div>`;
-      mgOpenModal(fullName + ' — Cross-project pattern', body);
-    };
+    // mgShowPerson defined above with full per-project breakdown
 
     // Pre-compute reworkByProj for management view (separate from exec view's copy)
     const mgReworkByProj = {};
