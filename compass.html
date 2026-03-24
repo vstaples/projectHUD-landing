@@ -1100,137 +1100,237 @@ async function loadUserView() {
   const content = document.getElementById('user-content');
 
   try {
-    // Fetch my tasks + workflow step instances assigned to me
-    const [myTasks, myActionItems, wfInstances] = await Promise.all([
-      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,effort_days&assigned_resource_id=eq.${_myResource?.id || 'none'}&status=not.in.(complete,cancelled)&order=due_date.asc`).catch(() => []),
-      API.get(`workflow_action_items?owner_resource_id=eq.${_myResource?.id || 'none'}&status=eq.open&order=due_date.asc`).catch(() => []),
+    const resId = _myResource?.id || 'none';
+
+    const [myTasks, myActionItems, wfInstances, myTimeEntries] = await Promise.all([
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_resource_id=eq.${resId}&status=not.in.(complete,cancelled)&order=due_date.asc`).catch(() => []),
+      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&order=due_date.asc`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
+      API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
     ]);
 
-    const today = new Date().toLocaleDateString('en-CA');
+    const today     = new Date().toLocaleDateString('en-CA');
+    const todayDate = new Date(today + 'T00:00:00');
 
-    // Build unified work list
+    // ── Week boundaries (Mon–Sun) ─────────────────────────────────────
+    const dayOfWeek  = todayDate.getDay(); // 0=Sun … 6=Sat
+    const isoOffset  = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // offset to Monday
+    const weekStart  = new Date(todayDate); weekStart.setDate(todayDate.getDate() - isoOffset);
+    const weekDays   = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+      return d.toLocaleDateString('en-CA');
+    });
+    const weekLabels = ['M','T','W','T','F','S','S'];
+
+    // ── Hours per day this week ───────────────────────────────────────
+    const hoursByDay = {};
+    weekDays.forEach(d => hoursByDay[d] = 0);
+    myTimeEntries.forEach(e => {
+      if (hoursByDay.hasOwnProperty(e.date)) {
+        hoursByDay[e.date] += parseFloat(e.hours || 0);
+      }
+    });
+
+    // ── This-week totals ──────────────────────────────────────────────
+    const weekEntries    = myTimeEntries.filter(e => weekDays.includes(e.date));
+    const weekTotal      = weekEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+    const weekBillable   = weekEntries.filter(e => e.is_billable).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+    const todayTotal     = parseFloat(hoursByDay[today] || 0);
+    const maxDayHours    = Math.max(...Object.values(hoursByDay), 1);
+
+    // ── Work list ─────────────────────────────────────────────────────
     const workItems = [];
-
-    // Tasks
     myTasks.forEach(t => {
       const proj = _projects.find(p => p.id === t.project_id);
       const overdue = t.due_date && t.due_date < today;
-      workItems.push({
-        type: 'task',
-        id: t.id,
-        title: t.name,
-        project: proj?.name || 'Unknown project',
-        due: t.due_date,
-        overdue,
-        pct: t.pct_complete || 0,
-        urgency: overdue ? 0 : (t.due_date ? 1 : 2),
-      });
+      workItems.push({ type:'task', id:t.id, title:t.name, project:proj?.name||'—',
+        projectId: t.project_id || null,
+        due:t.due_date, overdue, pct:t.pct_complete||0,
+        urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
     });
-
-    // Action items
     myActionItems.forEach(a => {
       const overdue = a.due_date && a.due_date < today;
-      workItems.push({
-        type: 'action',
-        id: a.id,
-        title: a.title,
-        project: 'Action item',
-        due: a.due_date,
-        overdue,
-        urgency: overdue ? 0 : 1,
-      });
+      workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
+        projectId: null,
+        due:a.due_date, overdue, urgency: overdue ? 0 : 1 });
     });
-
-    // Sort by urgency (overdue first, then by due date)
     workItems.sort((a, b) => {
       if (a.urgency !== b.urgency) return a.urgency - b.urgency;
       if (a.due && b.due) return a.due.localeCompare(b.due);
       return 0;
     });
-
     const overdueCount = workItems.filter(w => w.overdue).length;
-    const totalCount   = workItems.length;
+
+    // ── Bar chart HTML ────────────────────────────────────────────────
+    const barChart = weekDays.map((d, i) => {
+      const hrs    = hoursByDay[d] || 0;
+      const pct    = Math.round((hrs / Math.max(maxDayHours, 8)) * 100);
+      const isToday = d === today;
+      const isFuture = d > today;
+      const barColor = isToday ? 'var(--compass-cyan)' : isFuture ? 'var(--border)' : hrs > 0 ? 'var(--compass-green)' : 'var(--border)';
+      return `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+          <div style="font-family:var(--font-mono);font-size:10px;color:${isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
+            ${hrs > 0 ? hrs.toFixed(1) : ''}
+          </div>
+          <div style="width:100%;height:48px;display:flex;align-items:flex-end;justify-content:center">
+            <div style="width:80%;height:${Math.max(pct, hrs > 0 ? 4 : 0)}%;background:${barColor};
+              border-radius:2px 2px 0 0;transition:height .3s;min-height:${hrs > 0 ? '2px' : '0'}"></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;
+            color:${isToday ? 'var(--compass-cyan)' : 'var(--text3)'};
+            font-weight:${isToday ? '600' : '400'}">${weekLabels[i]}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+            ${new Date(d + 'T00:00:00').getDate()}
+          </div>
+        </div>`;
+    }).join('');
+
+    // ── Recent time entries ───────────────────────────────────────────
+    const recentEntries = myTimeEntries.slice(0, 8);
 
     content.innerHTML = `
-      <div class="stat-strip stat-strip-4" style="margin-bottom:16px">
+      <div class="stat-strip stat-strip-4" style="margin-bottom:14px">
         <div class="stat-card">
-          <div class="stat-label">Work items today</div>
-          <div class="stat-value">${totalCount}</div>
-          <div class="stat-sub">tasks + action items</div>
+          <div class="stat-label">Hours this week</div>
+          <div class="stat-value sv-cyan">${weekTotal.toFixed(1)}</div>
+          <div class="stat-sub">${weekBillable.toFixed(1)}h billable</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Overdue</div>
-          <div class="stat-value ${overdueCount > 0 ? 'sv-red' : 'sv-green'}">${overdueCount}</div>
-          <div class="stat-sub">past due date</div>
+          <div class="stat-label">Today</div>
+          <div class="stat-value ${todayTotal > 0 ? 'sv-green' : ''}">${todayTotal.toFixed(1)}h</div>
+          <div class="stat-sub">logged so far</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Open items</div>
+          <div class="stat-value ${overdueCount > 0 ? 'sv-red' : ''}">${workItems.length}</div>
+          <div class="stat-sub">${overdueCount > 0 ? overdueCount + ' overdue' : 'all current'}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Active workflows</div>
-          <div class="stat-value sv-cyan">${wfInstances.length}</div>
+          <div class="stat-value sv-amber">${wfInstances.length}</div>
           <div class="stat-sub">firm-wide</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Open action items</div>
-          <div class="stat-value sv-amber">${myActionItems.length}</div>
-          <div class="stat-sub">assigned to you</div>
         </div>
       </div>
 
-      <div class="two-col">
+      <div style="display:grid;grid-template-columns:1fr minmax(0,300px);gap:14px">
         <div>
+
+          <!-- Weekly bar chart -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">This week — hours by day</div>
+              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+                ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                –
+                ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+              </div>
+            </div>
+            <div style="display:flex;gap:4px;padding:10px 13px 8px;align-items:flex-end">
+              ${barChart}
+            </div>
+          </div>
+
+          <!-- My work list -->
           <div class="cmp-panel">
             <div class="panel-hdr">
-              <div class="panel-title">My work — today</div>
-              ${overdueCount > 0 ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>` : '<span class="panel-badge pb-green">All current</span>'}
+              <div class="panel-title">My work</div>
+              ${overdueCount > 0
+                ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>`
+                : '<span class="panel-badge pb-green">All current</span>'}
             </div>
             ${workItems.length === 0
-              ? `<div style="padding:20px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No open items assigned to you</div>`
+              ? `<div style="padding:18px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No open items assigned to you</div>`
               : workItems.map(w => `
-              <div class="cmp-row" onclick="compassToast('Opening ${esc(w.title)}…')">
-                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
+              <div class="cmp-row" onclick="compassToast('${esc(w.title)}')">
+                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+                  background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(w.title)}</div>
                   <div class="row-sub">${esc(w.project)} · ${w.type === 'task' ? 'Task' : 'Action item'}${w.due ? ' · Due ' + fmtDate(w.due) : ''}</div>
                   ${w.type === 'task' && w.pct > 0 ? `
-                  <div class="progress-track" style="margin-top:5px;width:120px">
+                  <div class="progress-track" style="margin-top:4px;width:100px">
                     <div class="progress-fill" style="width:${w.pct}%;background:var(--compass-cyan)"></div>
                   </div>` : ''}
                 </div>
-                ${w.overdue ? `<span class="status-badge sb-risk">${daysOverdue(w.due)}d overdue</span>` : ''}
-                <button class="cmp-btn btn-approve" style="padding:3px 10px" onclick="event.stopPropagation();compassToast('Completion panel opening…')">Complete</button>
-              </div>`).join('')
-            }
+                ${w.overdue ? `<span class="status-badge sb-risk">${daysOverdue(w.due)}d over</span>` : ''}
+                <button class="cmp-btn btn-approve" style="padding:3px 10px"
+                  onclick="event.stopPropagation();openCompletionPanel(${JSON.stringify({
+                    id: w.id, type: w.type, title: w.title,
+                    projectId: w.projectId || null
+                  })})">Complete</button>
+              </div>`).join('')}
           </div>
         </div>
 
         <div>
+          <!-- Timesheet — recent entries -->
           <div class="cmp-panel" style="margin-bottom:14px">
             <div class="panel-hdr">
-              <div class="panel-title">Active workflows you're on</div>
+              <div class="panel-title">Time log — recent</div>
+              <a href="/resources.html" style="font-family:var(--font-mono);font-size:10px;
+                color:var(--compass-cyan);text-decoration:none">Full view →</a>
             </div>
-            ${wfInstances.slice(0, 5).map(w => {
+            ${recentEntries.length === 0
+              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No time entries this period</div>`
+              : recentEntries.map(e => {
+                  const proj = _projects.find(p => p.id === e.project_id);
+                  const sourceIcon = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
+                  const sourceColor = e.source_type === 'step_comment' ? 'var(--compass-cyan)' : e.source_type === 'action_item' ? 'var(--compass-purple)' : 'var(--text3)';
+                  return `
+                  <div style="display:flex;align-items:center;gap:8px;padding:7px 13px;
+                    border-bottom:1px solid var(--border)">
+                    <div style="font-size:13px;color:${sourceColor};flex-shrink:0">${sourceIcon}</div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
+                        color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                        ${e.step_name ? esc(e.step_name) : esc(proj?.name || '—')}
+                      </div>
+                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">
+                        ${fmtDate(e.date)} · ${e.is_billable ? 'Billable' : 'Non-billable'}
+                      </div>
+                    </div>
+                    <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;
+                      color:${e.is_billable ? 'var(--compass-green)' : 'var(--text2)'};flex-shrink:0">
+                      ${parseFloat(e.hours).toFixed(1)}h
+                    </div>
+                  </div>`;
+                }).join('')}
+            <div style="padding:8px 13px;display:flex;justify-content:space-between;
+              font-family:var(--font-mono);font-size:10px">
+              <span style="color:var(--text3)">Week total</span>
+              <span style="font-weight:600;color:var(--compass-cyan)">${weekTotal.toFixed(1)}h</span>
+            </div>
+          </div>
+
+          <!-- Workflows -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr"><div class="panel-title">Active workflows</div></div>
+            ${wfInstances.slice(0, 4).map(w => {
               const proj = _projects.find(p => p.id === w.project_id);
               return `
               <div class="cmp-row" onclick="window.location.href='/cadence.html'">
-                <div style="width:7px;height:7px;border-radius:50%;background:var(--compass-amber);flex-shrink:0"></div>
+                <div style="width:7px;height:7px;border-radius:50%;
+                  background:var(--compass-amber);flex-shrink:0"></div>
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(w.title)}</div>
-                  <div class="row-sub">${proj ? esc(proj.name) + ' · ' : ''}${w.current_step_name ? 'At: ' + esc(w.current_step_name) : 'Active'}</div>
+                  <div class="row-sub">${proj ? esc(proj.name) + ' · ' : ''}${w.current_step_name ? esc(w.current_step_name) : 'Active'}</div>
                 </div>
                 <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">▶</span>
               </div>`;
             }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No active instances</div>'}
           </div>
 
+          <!-- Quick actions -->
           <div class="cmp-panel">
-            <div class="panel-hdr"><div class="panel-title">Quick actions</div></div>
+            <div class="panel-hdr"><div class="panel-title">Quick access</div></div>
             <div class="cmp-row" onclick="window.location.href='/cadence.html'">
-              <div class="row-title">Open Cadence canvas →</div>
-              <div class="row-sub">View and advance workflow instances</div>
+              <div style="flex:1"><div class="row-title">Cadence canvas →</div>
+              <div class="row-sub">Log hours while advancing steps</div></div>
             </div>
-            <div class="cmp-row" onclick="window.location.href='/project-detail.html'">
-              <div class="row-title">Open project tasks →</div>
-              <div class="row-sub">Update task progress and log hours</div>
+            <div class="cmp-row" onclick="window.location.href='/resources.html'">
+              <div style="flex:1"><div class="row-title">Full timesheet →</div>
+              <div class="row-sub">Edit, submit, and review all entries</div></div>
             </div>
           </div>
         </div>
@@ -1327,7 +1427,7 @@ async function loadPMView() {
                   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
                     <div>
                       <div style="font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text0)">${esc(p.name)}</div>
-                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">${esc(p.client_name || '')} · Target: ${targetDate}</div>
+                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">${esc(p.client_name || p.client_id || '')} · Target: ${targetDate}</div>
                     </div>
                     <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
                       ${overdue.length > 0 ? `<span class="status-badge sb-risk">${overdue.length} overdue</span>` : ''}
@@ -1694,7 +1794,7 @@ async function loadExecutiveView() {
               <div class="cmp-row" onclick="window.location.href='/project-detail.html?id=${p.id}'">
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(p.name)}</div>
-                  <div class="row-sub">${esc(p.client_name || '')} · Target: ${fmtDate(p.target_date)}${near ? ' · <span style="color:var(--compass-amber)">Near target</span>' : ''}</div>
+                  <div class="row-sub">${esc(p.client_name || p.client_id || '')} · Target: ${fmtDate(p.target_date)}${near ? ' · <span style="color:var(--compass-amber)">Near target</span>' : ''}</div>
                 </div>
                 ${insts.length > 0 ? `<span class="status-badge sb-warn">${insts.length} workflow${insts.length > 1 ? 's' : ''}</span>` : ''}
                 <span class="status-badge ${near ? 'sb-warn' : 'sb-future'}">
@@ -1809,7 +1909,7 @@ async function loadClientView() {
         <div>
           <div style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--text0)">${esc(clientProject.name)}</div>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">
-            ${esc(clientProject.client_name || 'Client')} · PM: ${esc(clientProject.pm_name || 'Project Manager')} · Target: ${fmtDate(clientProject.target_date)}
+            ${esc(clientProject.client_name || clientProject.client_id || 'Client')} · PM: ${esc(clientProject.pm_name || 'Project Manager')} · Target: ${fmtDate(clientProject.target_date)}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -1941,6 +2041,271 @@ function sendClientMessage() {
   compassToast('Message sent to project manager');
   if (inp) inp.value = '';
 }
+
+
+// ══════════════════════════════════════════════════════════
+// COMPLETION MICRO-PANEL
+// Captures hours, signal (G/Y/R), and note on any work item
+// completion. Writes time_entries + patches task/action item.
+// ══════════════════════════════════════════════════════════
+
+let _cmpSignal = null;   // 'green' | 'yellow' | 'red' | null
+let _cmpItem   = null;   // { id, type, title, projectId }
+
+function openCompletionPanel(item) {
+  _cmpItem   = item;
+  _cmpSignal = null;
+
+  // Remove any existing panel
+  document.getElementById('completion-micro-panel')?.remove();
+
+  const today = new Date().toLocaleDateString('en-CA');
+
+  const panel = document.createElement('div');
+  panel.id = 'completion-micro-panel';
+  panel.style.cssText = `
+    position:fixed;bottom:0;left:0;right:0;z-index:500;
+    background:var(--bg1,#0c1628);
+    border-top:1px solid var(--border,rgba(0,210,255,.12));
+    box-shadow:0 -8px 32px rgba(0,0,0,.5);
+    padding:16px 20px 20px;
+    animation:cmp-slide-up .2s ease;
+  `;
+
+  // Inject animation keyframe once
+  if (!document.getElementById('cmp-style')) {
+    const s = document.createElement('style');
+    s.id = 'cmp-style';
+    s.textContent = `
+      @keyframes cmp-slide-up {
+        from { transform:translateY(100%); opacity:0; }
+        to   { transform:translateY(0);    opacity:1; }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  panel.innerHTML = `
+    <div style="max-width:640px;margin:0 auto">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;
+            text-transform:uppercase;color:var(--compass-cyan,#00D2FF);margin-bottom:3px">
+            ${item.type === 'task' ? 'Complete task' : 'Resolve action item'}
+          </div>
+          <div style="font-family:var(--font-ui,sans-serif);font-size:14px;font-weight:500;
+            color:var(--text0,#eef4ff);line-height:1.3;max-width:480px">
+            ${esc(item.title)}
+          </div>
+        </div>
+        <button onclick="closeCompletionPanel()"
+          style="background:none;border:none;color:var(--text3,#3a5a7a);
+            font-size:18px;cursor:pointer;padding:0 0 0 12px;line-height:1;flex-shrink:0"
+          onmouseenter="this.style.color='var(--text0)'"
+          onmouseleave="this.style.color='var(--text3,#3a5a7a)'">✕</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start">
+
+        <!-- Hours -->
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+            letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Hours</div>
+          <input id="cmp-hours" type="number" min="0" max="24" step="0.25"
+            placeholder="0.0"
+            style="width:80px;font-family:var(--font-mono);font-size:16px;font-weight:600;
+              padding:7px 10px;background:var(--bg2,#0c1628);
+              border:1px solid var(--border,rgba(0,210,255,.12));
+              color:var(--compass-cyan,#00D2FF);outline:none;
+              transition:border-color .15s;text-align:center"
+            onfocus="this.style.borderColor='rgba(0,210,255,.5)'"
+            onblur="this.style.borderColor='var(--border,rgba(0,210,255,.12))'" />
+        </div>
+
+        <!-- Note -->
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+            letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Note</div>
+          <input id="cmp-note" type="text"
+            placeholder="What did you complete? (required to log hours)"
+            style="width:100%;font-family:var(--font-ui);font-size:12px;
+              padding:8px 10px;background:var(--bg2);
+              border:1px solid var(--border,rgba(0,210,255,.12));
+              color:var(--text1,#c8dff0);outline:none;transition:border-color .15s"
+            onfocus="this.style.borderColor='rgba(0,210,255,.5)'"
+            onblur="this.style.borderColor='var(--border,rgba(0,210,255,.12))'" />
+        </div>
+
+        <!-- Signal -->
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+            letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Signal</div>
+          <div style="display:flex;gap:6px;align-items:center;padding-top:4px">
+            <button id="cmp-sig-green" onclick="setCmpSignal('green')"
+              title="On track"
+              style="width:22px;height:22px;border-radius:50%;border:2px solid #1D9E75;
+                background:transparent;cursor:pointer;transition:all .12s"
+              onmouseenter="this.style.background='rgba(29,158,117,.2)'"
+              onmouseleave="this.style.background=_cmpSignal==='green'?'#1D9E75':'transparent'">
+            </button>
+            <button id="cmp-sig-yellow" onclick="setCmpSignal('yellow')"
+              title="Some uncertainty"
+              style="width:22px;height:22px;border-radius:50%;border:2px solid #EF9F27;
+                background:transparent;cursor:pointer;transition:all .12s"
+              onmouseenter="this.style.background='rgba(239,159,39,.2)'"
+              onmouseleave="this.style.background=_cmpSignal==='yellow'?'#EF9F27':'transparent'">
+            </button>
+            <button id="cmp-sig-red" onclick="setCmpSignal('red')"
+              title="Blocked or at risk"
+              style="width:22px;height:22px;border-radius:50%;border:2px solid #E24B4A;
+                background:transparent;cursor:pointer;transition:all .12s"
+              onmouseenter="this.style.background='rgba(226,75,74,.2)'"
+              onmouseleave="this.style.background=_cmpSignal==='red'?'#E24B4A':'transparent'">
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;
+            font-family:var(--font-mono);font-size:10px;color:var(--text3)">
+            <input id="cmp-billable" type="checkbox" checked
+              style="accent-color:var(--compass-cyan)"/>
+            Billable
+          </label>
+          <span id="cmp-status" style="font-family:var(--font-mono);font-size:10px;
+            color:var(--compass-amber);min-height:14px"></span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeCompletionPanel()"
+            style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+              text-transform:uppercase;padding:7px 16px;background:none;
+              border:1px solid var(--border);color:var(--text3);cursor:pointer;
+              transition:all .12s"
+            onmouseenter="this.style.borderColor='var(--text2)';this.style.color='var(--text1)'"
+            onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+            Skip
+          </button>
+          <button id="cmp-submit" onclick="submitCompletion()"
+            style="font-family:var(--font-mono);font-size:10px;font-weight:600;
+              letter-spacing:.08em;text-transform:uppercase;padding:7px 20px;
+              background:var(--compass-cyan,#00D2FF);color:#060a10;
+              border:none;cursor:pointer;transition:opacity .12s"
+            onmouseenter="this.style.opacity='.85'"
+            onmouseleave="this.style.opacity='1'">
+            Mark complete →
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+  setTimeout(() => document.getElementById('cmp-hours')?.focus(), 80);
+}
+
+function setCmpSignal(sig) {
+  _cmpSignal = _cmpSignal === sig ? null : sig;  // toggle
+  const colors = { green:'#1D9E75', yellow:'#EF9F27', red:'#E24B4A' };
+  ['green','yellow','red'].forEach(s => {
+    const btn = document.getElementById(`cmp-sig-${s}`);
+    if (btn) btn.style.background = _cmpSignal === s ? colors[s] : 'transparent';
+  });
+}
+
+function closeCompletionPanel() {
+  const panel = document.getElementById('completion-micro-panel');
+  if (!panel) return;
+  panel.style.transition = 'transform .15s ease, opacity .15s';
+  panel.style.transform  = 'translateY(100%)';
+  panel.style.opacity    = '0';
+  setTimeout(() => panel.remove(), 160);
+  _cmpItem   = null;
+  _cmpSignal = null;
+}
+
+async function submitCompletion() {
+  const item     = _cmpItem;
+  if (!item) return;
+
+  const hoursRaw = parseFloat(document.getElementById('cmp-hours')?.value || 0);
+  const note     = (document.getElementById('cmp-note')?.value || '').trim();
+  const billable = document.getElementById('cmp-billable')?.checked ?? true;
+  const statusEl = document.getElementById('cmp-status');
+  const submitBtn = document.getElementById('cmp-submit');
+
+  // Validate: hours require a note
+  if (hoursRaw > 0 && note.length < 10) {
+    if (statusEl) statusEl.textContent = 'Add a note to log hours (10+ chars)';
+    document.getElementById('cmp-note')?.focus();
+    return;
+  }
+
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+  if (statusEl)  statusEl.textContent = '';
+
+  const today = new Date().toLocaleDateString('en-CA');
+  const promises = [];
+
+  // ── 1. Write time_entries row if hours logged ──────────────
+  if (hoursRaw > 0) {
+    promises.push(
+      API.post('time_entries', {
+        firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
+        resource_id: _myResource?.id  || null,
+        user_id:     _myResource?.user_id || null,
+        project_id:  item.projectId   || null,
+        task_id:     item.type === 'task'   ? item.id : null,
+        source_type: 'direct',
+        date:        today,
+        hours:       hoursRaw,
+        is_billable: billable,
+        notes:       note || null,
+      }).catch(() => {})
+    );
+  }
+
+  // ── 2. Patch the work item status ──────────────────────────
+  if (item.type === 'task') {
+    promises.push(
+      API.patch(`tasks?id=eq.${item.id}`, {
+        status:       'complete',
+        pct_complete: 100,
+        updated_at:   new Date().toISOString(),
+      }).catch(() => {})
+    );
+  } else if (item.type === 'action') {
+    promises.push(
+      API.patch(`workflow_action_items?id=eq.${item.id}`, {
+        status:      'resolved',
+        resolved_at: new Date().toISOString(),
+        resolution_note: note || null,
+      }).catch(() => {})
+    );
+  }
+
+  try {
+    await Promise.all(promises);
+    closeCompletionPanel();
+    compassToast(`${esc(item.title.slice(0,40))} — marked complete`);
+    // Refresh the user view so the item disappears and bar chart updates
+    _viewLoaded['user'] = false;
+    loadUserView();
+  } catch(e) {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Mark complete →'; }
+    if (statusEl)  statusEl.textContent = 'Failed — try again';
+  }
+}
+
+// Close panel on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCompletionPanel();
+});
 
 </script>
 </body>
