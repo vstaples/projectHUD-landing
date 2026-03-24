@@ -913,6 +913,22 @@
       <span style="font-size:13px">◈</span> Simulate
     </button>
 
+    <!-- Calendar icon trigger -->
+    <button id="nav-cal-btn"
+      onclick="toggleUserCalendar()"
+      style="position:relative;width:30px;height:30px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s"
+      onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='var(--compass-cyan)'"
+      onmouseleave="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.5)'"
+      title="My Calendar">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="1" y1="5" x2="13" y2="5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="4" y1="1" x2="4" y2="3" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="10" y1="1" x2="10" y2="3" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span id="cal-nav-badge" style="display:none;position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#E24B4A;font-family:var(--font-head);font-size:11px;font-weight:700;color:#fff;align-items:center;justify-content:center"></span>
+    </button>
+
     <div class="nav-sep"></div>
 
     <!-- Cadence link -->
@@ -1645,6 +1661,47 @@ async function loadUserView() {
     }
 
     content.innerHTML = `
+    <!-- Calendar popup overlay -->
+    <div id="user-cal-popup" style="display:none;position:fixed;top:44px;right:120px;width:310px;background:#0d1e35;border:1px solid rgba(0,210,255,.3);z-index:200;padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.06em" id="ucal-month-label">MARCH 2026</div>
+        <div style="display:flex;gap:4px">
+          <button onclick="ucalNav(-1)" style="width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'" onmouseleave="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='rgba(255,255,255,.5)'">&#8249;</button>
+          <button onclick="ucalNav(1)"  style="width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'" onmouseleave="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='rgba(255,255,255,.5)'">&#8250;</button>
+          <button onclick="toggleUserCalendar()" style="width:22px;height:22px;background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:14px">&#x2715;</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px">
+        ${['M','T','W','T','F','S','S'].map(d=>`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0;letter-spacing:.06em">${d}</div>`).join('')}
+      </div>
+      <div id="ucal-cells" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        ${[['#8B5CF6','Meeting'],['#EF9F27','Due date'],['#00D2FF','Action item'],['#E24B4A','Concern']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:4px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:7px;height:7px;border-radius:50%;background:${c}"></div>${l}</div>`).join('')}
+      </div>
+      <div id="ucal-agenda" style="border-top:1px solid rgba(255,255,255,.06);padding-top:8px"></div>
+    </div>
+
+    <!-- Suite tabs -->
+    <div id="user-suite-tabs" style="display:flex;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px;background:rgba(255,255,255,.01)">
+      <button class="ust on" data-tab="work"     onclick="uSwitchTab('work',this)">Work list</button>
+      <button class="ust"    data-tab="timesheet" onclick="uSwitchTab('timesheet',this)">Timesheet</button>
+      <button class="ust"    data-tab="meetings"  onclick="uSwitchTab('meetings',this)">My meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="concerns"  onclick="uSwitchTab('concerns',this)">My concerns <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
+    </div>
+    <style>
+      .ust{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 14px;cursor:pointer;color:rgba(255,255,255,.35);background:none;border:none;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:5px}
+      .ust.on{color:#00D2FF;border-bottom-color:#00D2FF}
+      .ust:hover:not(.on){color:rgba(255,255,255,.7)}
+      .ust-badge{font-size:11px;padding:1px 6px;border-radius:2px}
+      .ust-badge-red{background:rgba(226,75,74,.15);color:#E24B4A}
+      .ust-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27}
+      .ust-badge-green{background:rgba(29,158,117,.12);color:#1D9E75}
+      .utc{display:none}.utc.on{display:block}
+    </style>
+
+    <!-- Tab: WORK (existing content wrapper) -->
+    <div class="utc on" id="utc-work">
+
     <!-- 1.A Greeting -->
     <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-bottom:14px">
       <div>
@@ -1952,6 +2009,28 @@ async function loadUserView() {
           </div>
         </div>
       </div>
+    </div><!-- end right col -->
+    </div><!-- end main grid -->
+
+    </div><!-- end utc-work -->
+
+    <!-- Tab: TIMESHEET -->
+    <div class="utc" id="utc-timesheet">
+      <div style="padding:16px 0;text-align:center">
+        <div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;margin-bottom:12px">Your weekly timesheet is embedded in the Work tab.<br>Click below to open the weekly entry drawer.</div>
+        <button onclick="uSwitchTab('work',document.querySelector('.ust[data-tab=work]'));setTimeout(()=>document.querySelector('.open-weekly-ts-btn')?.click(),200)"
+          style="font-family:var(--font-head);font-size:11px;padding:5px 16px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;margin-top:4px;letter-spacing:.06em">Open this week's timesheet →</button>
+      </div>
+    </div>
+
+    <!-- Tab: MEETINGS -->
+    <div class="utc" id="utc-meetings">
+      <div id="user-meetings-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading meetings…</div></div>
+    </div>
+
+    <!-- Tab: CONCERNS -->
+    <div class="utc" id="utc-concerns">
+      <div id="user-concerns-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading concerns…</div></div>
     </div>`;
 
     if (loading) loading.style.display = 'none';
@@ -5624,6 +5703,542 @@ window.mbToggleCard = function(cardId) {
   if (!el) return;
   el.style.display = el.style.display==='none' ? 'block' : 'none';
 };
+
+
+// ══════════════════════════════════════════════════════════
+// MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
+// ══════════════════════════════════════════════════════════
+
+// ── Tab switcher ─────────────────────────────────────────
+let _uActiveTab = 'work';
+window.uSwitchTab = function(tab, btn) {
+  _uActiveTab = tab;
+  document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.utc').forEach(c => c.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  const panel = document.getElementById('utc-'+tab);
+  if (panel) panel.classList.add('on');
+  if (tab === 'meetings' && !window._meetingsLoaded) loadUserMeetings();
+  if (tab === 'concerns' && !window._concernsLoaded) loadUserConcerns();
+};
+
+// ── Calendar popup ────────────────────────────────────────
+let _ucalYear  = new Date().getFullYear();
+let _ucalMonth = new Date().getMonth(); // 0-indexed
+
+window.toggleUserCalendar = function() {
+  const p = document.getElementById('user-cal-popup');
+  if (!p) return;
+  const visible = p.style.display !== 'none';
+  p.style.display = visible ? 'none' : 'block';
+  if (!visible) renderUserCalendar();
+};
+
+window.ucalNav = function(dir) {
+  _ucalMonth += dir;
+  if (_ucalMonth > 11) { _ucalMonth = 0; _ucalYear++; }
+  if (_ucalMonth < 0)  { _ucalMonth = 11; _ucalYear--; }
+  renderUserCalendar();
+};
+
+function renderUserCalendar() {
+  const today = new Date().toLocaleDateString('en-CA');
+  const todayDate = new Date(today+'T00:00:00');
+  const lblEl = document.getElementById('ucal-month-label');
+  if (lblEl) lblEl.textContent = new Date(_ucalYear, _ucalMonth, 1)
+    .toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
+
+  const cells = document.getElementById('ucal-cells');
+  if (!cells) return;
+
+  // Build event map from live data
+  const evMap = {}; // date-string -> array of color
+  const addEv = (date, col) => {
+    if (!date) return;
+    const d = date.slice(0,10);
+    if (!evMap[d]) evMap[d] = [];
+    evMap[d].push(col);
+  };
+
+  // Tasks due
+  (_wiItems||[]).forEach(w => { if (w.due) addEv(w.due, w.overdue?'#E24B4A':'#EF9F27'); });
+  // Action items
+  (window._userConcerns||[]).forEach(c => { if (c.raised_date) addEv(c.raised_date, '#E24B4A'); });
+  // Meetings
+  (window._userMeetings||[]).forEach(m => { if (m.date) addEv(m.date, '#8B5CF6'); });
+
+  const firstDay = new Date(_ucalYear, _ucalMonth, 1);
+  const lastDay  = new Date(_ucalYear, _ucalMonth+1, 0);
+  const startDow = (firstDay.getDay()+6)%7; // Mon=0
+
+  let html = '';
+  // Blanks
+  for (let i=0;i<startDow;i++) {
+    const prevDate = new Date(_ucalYear, _ucalMonth, -startDow+i+1);
+    html += `<div style="padding:2px 3px;border:1px solid transparent;opacity:.3">
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-align:center">${prevDate.getDate()}</div>
+    </div>`;
+  }
+  for (let d=1; d<=lastDay.getDate(); d++) {
+    const dt = new Date(_ucalYear, _ucalMonth, d).toLocaleDateString('en-CA');
+    const isToday = dt === today;
+    const dots = evMap[dt]||[];
+    html += `<div onclick="ucalSelectDay('${dt}')" style="min-height:30px;padding:2px 3px;border:1px solid ${isToday?'rgba(0,210,255,.5)':'transparent'};background:${isToday?'rgba(0,210,255,.08)':'transparent'};cursor:pointer;position:relative;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='${isToday?'rgba(0,210,255,.5)':'transparent'}'">
+      <div style="font-family:var(--font-head);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.6)'};font-weight:${isToday?'700':'400'};text-align:center">${d}</div>
+      <div style="display:flex;gap:1.5px;justify-content:center;flex-wrap:wrap;margin-top:1px">${dots.slice(0,3).map(c=>`<div style="width:4px;height:4px;border-radius:50%;background:${c}"></div>`).join('')}</div>
+    </div>`;
+  }
+  cells.innerHTML = html;
+  ucalSelectDay(today); // default to today's agenda
+}
+
+window.ucalSelectDay = function(dt) {
+  const agendaEl = document.getElementById('ucal-agenda');
+  if (!agendaEl) return;
+  const label = new Date(dt+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const items = [];
+  // Tasks due on this day
+  (_wiItems||[]).filter(w=>w.due===dt).forEach(w=>
+    items.push({color:w.overdue?'#E24B4A':'#EF9F27', time:'Task', text:esc(w.title)}));
+  // Meetings on this day
+  (window._userMeetings||[]).filter(m=>m.date&&m.date.slice(0,10)===dt).forEach(m=>
+    items.push({color:'#8B5CF6', time:m.time||'Mtg', text:esc(m.title)}));
+  agendaEl.innerHTML = `<div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.5);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">${label}</div>` +
+    (items.length ? items.map(i=>`<div style="display:flex;align-items:center;gap:6px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <div style="width:6px;height:6px;border-radius:50%;background:${i.color};flex-shrink:0"></div>
+      <span style="color:rgba(255,255,255,.35);min-width:36px;flex-shrink:0">${i.time}</span>
+      <span>${i.text}</span>
+    </div>`).join('') : `<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No events</div>`);
+};
+
+// ── MEETINGS ─────────────────────────────────────────────
+window._meetingsLoaded = false;
+window._userMeetings   = [];
+window._mtgFilter      = 'all';
+
+window.loadUserMeetings = async function() {
+  window._meetingsLoaded = true;
+  const el = document.getElementById('user-meetings-content');
+  if (!el) return;
+
+  try {
+    // meetings table — linked to pipeline prospects and workflow instances
+    const today = new Date().toLocaleDateString('en-CA');
+    const resId = _myResource?.id;
+    const userId = _myResource?.user_id;
+
+    const [meetings, attendees] = await Promise.all([
+      API.get(`meetings?select=id,title,meeting_date,duration_minutes,location_or_link,meeting_type,status,created_by&order=meeting_date.desc&limit=50`).catch(()=>[]),
+      userId ? API.get(`meeting_attendees?select=meeting_id,attendance_status&user_id=eq.${userId}&limit=100`).catch(()=>[]) : Promise.resolve([]),
+    ]);
+
+    const myMeetingIds = new Set(attendees.map(a=>a.meeting_id));
+    // Also include meetings I created
+    const myMeetings = (meetings||[]).filter(m => myMeetingIds.has(m.id) || m.created_by===userId);
+
+    window._userMeetings = myMeetings.map(m => ({
+      id: m.id,
+      title: m.title,
+      date: m.meeting_date?.slice(0,10),
+      time: m.meeting_date ? new Date(m.meeting_date).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : null,
+      duration: m.duration_minutes||60,
+      location: m.location_or_link,
+      type: m.meeting_type||'meeting',
+      status: m.status||'scheduled',
+      owned: m.created_by===userId,
+      past: m.meeting_date && m.meeting_date.slice(0,10) < today,
+    }));
+
+    // Update badge
+    const todayMtgs = window._userMeetings.filter(m=>m.date===today).length;
+    const badge = document.getElementById('ust-meetings-badge');
+    if (badge && todayMtgs > 0) {
+      badge.textContent = todayMtgs+' today';
+      badge.className = 'ust-badge ust-badge-green';
+      badge.style.display = 'inline';
+    }
+
+    renderUserMeetings();
+  } catch(e) {
+    console.error('[Compass] meetings load error:', e);
+    el.innerHTML = '<div style="font-family:var(--font-head);font-size:12px;color:#E24B4A;padding:16px 0">Failed to load meetings</div>';
+  }
+};
+
+function renderUserMeetings() {
+  const el = document.getElementById('user-meetings-content');
+  if (!el) return;
+  const today = new Date().toLocaleDateString('en-CA');
+  const f = window._mtgFilter;
+
+  const filtered = (window._userMeetings||[]).filter(m => {
+    if (f==='owned')    return m.owned;
+    if (f==='upcoming') return !m.past;
+    if (f==='past')     return m.past;
+    if (f==='today')    return m.date===today;
+    return true;
+  });
+
+  // Group into sections
+  const todayMtgs    = filtered.filter(m=>m.date===today);
+  const upcomingMtgs = filtered.filter(m=>!m.past&&m.date!==today);
+  const pastMtgs     = filtered.filter(m=>m.past).slice(0,10);
+
+  function mtgRow(m) {
+    const barColor = m.owned ? '#8B5CF6' : m.past ? 'rgba(255,255,255,.15)' : '#00D2FF';
+    const badge = m.owned ? '<span style="font-family:var(--font-head);font-size:11px;padding:2px 7px;border:1px solid rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07)">Owned by me</span>'
+                : m.past  ? '<span style="font-family:var(--font-head);font-size:11px;padding:2px 7px;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.35)">Completed</span>'
+                          : '<span style="font-family:var(--font-head);font-size:11px;padding:2px 7px;border:1px solid rgba(0,210,255,.25);color:rgba(0,210,255,.7);background:rgba(0,210,255,.05)">Invited</span>';
+    const timeStr = m.time ? m.time : '';
+    const durStr  = m.duration ? m.duration+'min' : '';
+    const locStr  = m.location ? esc(m.location) : '';
+    const metaParts = [timeStr, durStr, locStr].filter(Boolean);
+    const expandId = 'umtg-exp-'+m.id;
+    return `<div style="display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.07)'">
+      <div style="width:4px;align-self:stretch;background:${barColor};flex-shrink:0"></div>
+      <div style="flex:1;padding:9px 12px">
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px">
+          <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${esc(m.title)}</div>
+          ${badge}
+        </div>
+        <div style="display:flex;gap:10px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);flex-wrap:wrap;margin-bottom:5px">${metaParts.map(p=>`<span>${p}</span>`).join('')}</div>
+      </div>
+      <div style="padding:9px 10px;display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+        <button onclick="event.stopPropagation();uToggleMtgExpand('${expandId}')"
+          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid ${m.past?'rgba(255,255,255,.15)':'rgba(0,210,255,.35)'};color:${m.past?'rgba(255,255,255,.4)':'#00D2FF'};cursor:pointer;letter-spacing:.06em">Details</button>
+        ${!m.past?`<button onclick="event.stopPropagation();window.location.href='/meeting-minutes.html?meeting_id=${m.id}'"
+          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.2);color:#5A84A8;cursor:pointer;letter-spacing:.06em">Minutes</button>`:''}
+      </div>
+    </div>
+    <div id="${expandId}" style="display:none;padding:6px 12px 10px 16px;background:#060c18;border:1px solid rgba(255,255,255,.06);border-top:none;margin-top:-6px;margin-bottom:6px">
+      ${m.past?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Outcome</div>
+        <div style="font-family:var(--font-body);font-size:12px;color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">Meeting completed. Open minutes for full record.</div>`
+      :`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Outcome (fill after meeting)</div>
+        <textarea id="umtg-out-${m.id}" style="width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:12px;outline:none;resize:none;box-sizing:border-box" rows="2" placeholder="Record outcome — will be written to CoC…"></textarea>`}
+      <div style="display:flex;gap:5px;margin-top:7px">
+        ${!m.past?`<button onclick="uSaveOutcome('${m.id}')"
+          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Save outcome to CoC →</button>
+        <button onclick="alert('Action item form — assigns to a team member and logs to CoC')"
+          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">+ Spawn action item</button>`:''}
+        <button onclick="window.location.href='/meeting-minutes.html?meeting_id=${m.id}'"
+          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Open minutes →</button>
+      </div>
+    </div>`;
+  }
+
+  function section(label, rows) {
+    if (!rows.length) return '';
+    return `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(0,210,255,.5);text-transform:uppercase;margin:10px 0 7px;padding-bottom:4px;border-bottom:1px solid rgba(0,210,255,.08)">${label}</div>` +
+      rows.map(mtgRow).join('');
+  }
+
+  const filterBar = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase">Show</span>
+    ${['all','owned','today','upcoming','past'].map(f=>`<button onclick="window._mtgFilter='${f}';renderUserMeetings()" 
+      style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:${window._mtgFilter===f?'rgba(0,210,255,.08)':'none'};border:1px solid ${window._mtgFilter===f?'rgba(0,210,255,.4)':'rgba(255,255,255,.12)'};color:${window._mtgFilter===f?'#00D2FF':'rgba(255,255,255,.5)'};cursor:pointer;transition:.12s;letter-spacing:.06em;text-transform:capitalize">${f}</button>`).join('')}
+    <button onclick="alert('New meeting form: title, project, date/time, duration, attendees, agenda, CoC link')"
+      style="font-family:var(--font-head);font-size:11px;margin-left:auto;padding:4px 12px;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.07em">+ Schedule meeting</button>
+  </div>`;
+
+  if (!filtered.length) {
+    el.innerHTML = filterBar + '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:24px 0;text-align:center">No meetings found for this filter.</div>';
+    return;
+  }
+
+  el.innerHTML = filterBar +
+    (f==='all' || f==='today'    ? section('Today — '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), todayMtgs) : '') +
+    (f==='all' || f==='upcoming' ? section('Upcoming', upcomingMtgs) : '') +
+    (f==='all' || f==='past'     ? section('Past', pastMtgs) : '') +
+    (f==='owned' || f==='today' || f==='upcoming' || f==='past' ? filtered.map(mtgRow).join('') : '');
+}
+
+window.uToggleMtgExpand = function(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+};
+
+window.uSaveOutcome = async function(meetingId) {
+  const txt = document.getElementById('umtg-out-'+meetingId)?.value?.trim()||'';
+  if (!txt) { compassToast('Enter an outcome before saving',2000); return; }
+  await API.post('workflow_step_instances',{
+    id: crypto.randomUUID(), instance_id: null,
+    event_type: 'task_progress_update',
+    step_name: 'Meeting outcome',
+    event_notes: txt,
+    actor_name: _myResource?.name||null,
+    outcome: 'on_track',
+    created_at: new Date().toISOString(),
+    firm_id: 'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  compassToast('Outcome saved to CoC',2200);
+  document.getElementById('umtg-out-'+meetingId).value = '';
+};
+
+// ── CONCERNS ─────────────────────────────────────────────
+window._concernsLoaded = false;
+window._userConcerns   = [];
+window._concernFilter  = 'all';
+let _concernSeq = 0; // for optimistic local IDs
+
+window.loadUserConcerns = async function() {
+  window._concernsLoaded = true;
+  const el = document.getElementById('user-concerns-content');
+  if (!el) return;
+
+  try {
+    const resId = _myResource?.id;
+    // concerns table — firm-scoped, authored by this resource
+    const concerns = await API.get(`concerns?select=id,title,description,status,priority,project_id,phase,raised_at,addressed_to,coc_thread&raiser_resource_id=eq.${resId}&order=raised_at.desc&limit=50`).catch(()=>[]);
+
+    // Also pull CoC events linked to concerns
+    const cocEvents = concerns.length > 0
+      ? await API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,created_at&event_type=in.(concern_raised,concern_acknowledged,concern_update,concern_resolved,concern_rejected)&order=created_at.desc&limit=200`).catch(()=>[])
+      : [];
+
+    window._userConcerns = (concerns||[]).map(c => ({
+      id: c.id,
+      cid: 'C-'+String(++_concernSeq).padStart(3,'0'),
+      title: c.title,
+      description: c.description,
+      status: c.status||'unread',
+      priority: c.priority||'medium',
+      projectId: c.project_id,
+      project: (_projects||[]).find(p=>p.id===c.project_id)?.name||'—',
+      phase: c.phase||'',
+      raised_date: c.raised_at?.slice(0,10),
+      raisedAt: c.raised_at,
+      thread: cocEvents.filter(e=>e.step_name?.includes(c.id)||false),
+    }));
+
+    // If table doesn't exist yet, show empty state gracefully
+    updateConcernBadge();
+    renderUserConcerns();
+  } catch(e) {
+    console.error('[Compass] concerns load error:', e);
+    // Table may not exist yet — show empty state with quick-capture
+    window._userConcerns = [];
+    renderUserConcerns();
+  }
+};
+
+function updateConcernBadge() {
+  const unread = (window._userConcerns||[]).filter(c=>c.status==='unread'||c.status==='not_yet_read').length;
+  const badge = document.getElementById('ust-concerns-badge');
+  if (badge) {
+    if (unread > 0) {
+      badge.textContent = unread+' unread';
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  // Nav bar concern badge (if visible from other views)
+  const navBadge = document.getElementById('concern-nav-badge');
+  if (navBadge && unread > 0) { navBadge.textContent = unread; navBadge.style.display='flex'; }
+}
+
+function renderUserConcerns() {
+  const el = document.getElementById('user-concerns-content');
+  if (!el) return;
+  const f = window._concernFilter;
+  const today = new Date().toLocaleDateString('en-CA');
+
+  const filtered = (window._userConcerns||[]).filter(c => {
+    if (f==='all')        return true;
+    if (f==='unread')     return c.status==='unread'||c.status==='not_yet_read';
+    if (f==='open')       return ['unread','not_yet_read','acknowledged'].includes(c.status);
+    if (f==='inprogress') return c.status==='in_progress';
+    if (f==='resolved')   return c.status==='resolved';
+    if (f==='rejected')   return c.status==='rejected';
+    return true;
+  });
+
+  const statusColors = {
+    'unread':'#E24B4A','not_yet_read':'#E24B4A',
+    'acknowledged':'#EF9F27',
+    'in_progress':'#00D2FF',
+    'resolved':'#1D9E75',
+    'rejected':'rgba(255,255,255,.2)'
+  };
+  const statusLabels = {
+    'unread':'Not yet read','not_yet_read':'Not yet read',
+    'acknowledged':'Acknowledged',
+    'in_progress':'In progress',
+    'resolved':'Resolved',
+    'rejected':'Rejected'
+  };
+  const barColors = {
+    'unread':'#E24B4A','not_yet_read':'#E24B4A',
+    'acknowledged':'#EF9F27',
+    'in_progress':'#00D2FF',
+    'resolved':'#1D9E75',
+    'rejected':'rgba(255,255,255,.2)'
+  };
+
+  const quickCapture = `<div style="display:flex;gap:8px;margin-bottom:12px;padding:8px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15)">
+    <textarea id="concern-new-text" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:12px;padding:5px 8px;outline:none;resize:none;box-sizing:border-box" rows="2" placeholder="Describe your concern — logged with timestamp and routed to your PM…"></textarea>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <select id="concern-new-priority" style="font-family:var(--font-head);font-size:11px;padding:3px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
+        <option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option><option value="low">Low</option>
+      </select>
+      <select id="concern-new-visibility" style="font-family:var(--font-head);font-size:11px;padding:3px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
+        <option value="pm">PM only</option><option value="management">Management</option><option value="all">All</option>
+      </select>
+      <button onclick="uRaiseConcern()" style="font-family:var(--font-head);font-size:11px;padding:4px 10px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;white-space:nowrap;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(0,210,255,.08)'" onmouseleave="this.style.background='none'">+ Raise concern</button>
+    </div>
+  </div>`;
+
+  const filterBar = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase">Status</span>
+    ${[['all','All'],['unread','Unread'],['open','Open'],['inprogress','In progress'],['resolved','Resolved'],['rejected','Rejected']].map(([v,l])=>`<button onclick="window._concernFilter='${v}';renderUserConcerns()"
+      style="font-family:var(--font-head);font-size:11px;padding:2px 9px;background:${window._concernFilter===v?'rgba(0,210,255,.06)':'none'};border:1px solid ${window._concernFilter===v?'rgba(0,210,255,.4)':'rgba(255,255,255,.1)'};color:${window._concernFilter===v?'#00D2FF':'rgba(255,255,255,.5)'};cursor:pointer;transition:.12s">${l}</button>`).join('')}
+  </div>`;
+
+  if (!filtered.length && !(window._userConcerns||[]).length) {
+    el.innerHTML = quickCapture + filterBar + '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:24px 0;text-align:center">No concerns raised yet.<br>Use the form above to log your first concern.</div>';
+    return;
+  }
+  if (!filtered.length) {
+    el.innerHTML = quickCapture + filterBar + '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0;text-align:center">No concerns match this filter.</div>';
+    return;
+  }
+
+  const rows = filtered.map(c => {
+    const barCol    = barColors[c.status]||'rgba(255,255,255,.2)';
+    const statCol   = statusColors[c.status]||'rgba(255,255,255,.4)';
+    const statLabel = statusLabels[c.status]||c.status;
+    const expandId  = 'uconcern-exp-'+c.id;
+    const metaParts = [c.cid, c.raisedAt?_timeAgo(c.raisedAt):'', c.project, c.phase].filter(Boolean);
+    const threadHtml = (c.thread||[]).length > 0
+      ? c.thread.map((e,i,arr) => `<div style="display:flex;gap:8px;margin-bottom:0">
+          <div style="display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0">
+            <div style="width:8px;height:8px;border-radius:50%;background:${e.event_type==='concern_raised'?'#E24B4A':e.event_type==='concern_resolved'?'#1D9E75':'#EF9F27'}"></div>
+            ${i<arr.length-1?'<div style="flex:1;width:1px;background:rgba(255,255,255,.08);margin:2px auto 0;min-height:8px"></div>':''}
+          </div>
+          <div style="flex:1;padding-bottom:8px">
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:2px">${esc(e.actor_name||'System')} · ${_timeAgo(e.created_at)}</div>
+            <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.5">${esc(e.event_notes||e.step_name||'')}</div>
+          </div>
+        </div>`).join('')
+      : `<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Awaiting acknowledgement from PM.</div>`;
+
+    return `<div style="display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.07)'">
+      <div style="width:4px;align-self:stretch;background:${barCol};flex-shrink:0"></div>
+      <div style="flex:1;padding:9px 12px">
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px">
+          <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${esc(c.title)}</div>
+          <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid ${statCol}40;color:${statCol};background:${statCol}12;flex-shrink:0;white-space:nowrap">${statLabel}</span>
+        </div>
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px;display:flex;gap:10px;flex-wrap:wrap">${metaParts.map(p=>`<span>${p}</span>`).join('')}</div>
+        ${c.description?`<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);line-height:1.55">${esc(c.description.slice(0,180))}${c.description.length>180?'…':''}</div>`:''}
+        <div id="${expandId}" style="display:none;margin-top:8px">
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px">CoC history</div>
+          <div style="border-left:1px solid rgba(0,210,255,.15);padding-left:8px;margin-bottom:8px">${threadHtml}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+            ${['in_progress','resolved'].includes(c.status)?'':`<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Escalate to</span>
+            <select onchange="" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
+              <option>PM</option><option>Management</option><option>Executive</option>
+            </select>
+            <button onclick="uEscalateConcern('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Escalate →</button>`}
+            <button onclick="uAddConcernComment('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">+ Add comment</button>
+            ${c.status==='in_progress'?`<button onclick="uResolveConcern('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(29,158,117,.35);color:#1D9E75;cursor:pointer">Mark resolved</button>`:''}
+          </div>
+        </div>
+      </div>
+      <div style="padding:9px 10px;flex-shrink:0">
+        <button onclick="event.stopPropagation();uToggleConcernExpand('${expandId}')"
+          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid ${c.status==='unread'||c.status==='not_yet_read'?'rgba(0,210,255,.35)':'rgba(255,255,255,.15)'};color:${c.status==='unread'||c.status==='not_yet_read'?'#00D2FF':'rgba(255,255,255,.4)'};cursor:pointer;letter-spacing:.06em">Open</button>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = quickCapture + filterBar + rows.join('');
+}
+
+window.uToggleConcernExpand = function(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+};
+
+window.uRaiseConcern = async function() {
+  const txt = document.getElementById('concern-new-text')?.value?.trim()||'';
+  const priority = document.getElementById('concern-new-priority')?.value||'medium';
+  if (!txt) { compassToast('Enter a concern description',2000); return; }
+  const id = crypto.randomUUID();
+  await API.post('concerns',{
+    id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
+    raiser_resource_id: _myResource?.id||null,
+    title: txt.slice(0,100),
+    description: txt,
+    status:'unread',
+    priority,
+    raised_at: new Date().toISOString(),
+  }).catch(()=>{});
+  await API.post('workflow_step_instances',{
+    id:crypto.randomUUID(), instance_id:null,
+    event_type:'concern_raised', step_name:'Concern raised: '+txt.slice(0,60),
+    event_notes:txt, actor_name:_myResource?.name||null,
+    created_at:new Date().toISOString(),
+    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  document.getElementById('concern-new-text').value='';
+  compassToast('Concern logged · PM notified',2500);
+  window._concernsLoaded = false;
+  loadUserConcerns();
+};
+
+window.uEscalateConcern = function(concernId) {
+  API.post('workflow_step_instances',{
+    id:crypto.randomUUID(), instance_id:null,
+    event_type:'concern_update', step_name:'Escalation requested',
+    event_notes:'User requested escalation from Compass My Concerns.',
+    actor_name:_myResource?.name||null,
+    created_at:new Date().toISOString(),
+    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  compassToast('Escalation logged to CoC',2200);
+};
+
+window.uAddConcernComment = function(concernId) {
+  const txt = prompt('Add a comment to this concern:');
+  if (!txt?.trim()) return;
+  API.post('workflow_step_instances',{
+    id:crypto.randomUUID(), instance_id:null,
+    event_type:'concern_update', step_name:'Comment added',
+    event_notes:txt.trim(), actor_name:_myResource?.name||null,
+    created_at:new Date().toISOString(),
+    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  compassToast('Comment logged to CoC',2000);
+  window._concernsLoaded=false; loadUserConcerns();
+};
+
+window.uResolveConcern = async function(concernId) {
+  await API.patch('concerns?id=eq.'+concernId,{status:'resolved'}).catch(()=>{});
+  API.post('workflow_step_instances',{
+    id:crypto.randomUUID(), instance_id:null,
+    event_type:'concern_resolved', step_name:'Concern resolved',
+    event_notes:'Marked resolved by raiser.', actor_name:_myResource?.name||null,
+    created_at:new Date().toISOString(),
+    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  compassToast('Resolved · CoC updated',2000);
+  window._concernsLoaded=false; loadUserConcerns();
+};
+
+// Auto-load concerns count for badge on view init
+document.addEventListener('compass-identity-ready', () => {
+  if (_myResource?.id) {
+    // Preload concern badge count without full render
+    API.get(`concerns?select=id,status&raiser_resource_id=eq.${_myResource.id}&status=in.(unread,not_yet_read)&limit=20`).then(rows=>{
+      const unread=(rows||[]).length;
+      const badge=document.getElementById('ust-concerns-badge');
+      if(badge&&unread>0){badge.textContent=unread+' unread';badge.className='ust-badge ust-badge-red';badge.style.display='inline';}
+    }).catch(()=>{});
+  }
+});
 
 
 // ══════════════════════════════════════════════════════════
