@@ -1009,8 +1009,10 @@ let _wfType      = 'all';  // 'all' | 'task' | 'action'  [Session 16]
 let _doneToday   = [];     // session-persistent completed items  [Session 16]
 let _activeGauge = null;   // clicked gauge date key | null  [Session 16]
 let _dwellTimer  = null;   // gauge hover dwell timer  [Session 16]
+let _weekOffset  = 0;      // weeks back from current week (0 = this week)
 
 // ── Init ──────────────────────────────────────────────────
+// compass-date is updated by loadUserView (shows week range when navigating)
 document.getElementById('compass-date').textContent =
   new Date().toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
@@ -1253,13 +1255,29 @@ async function loadUserView() {
     const todayDate = new Date(today + 'T00:00:00');
     const dayOfWeek = todayDate.getDay();
     const isoOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const weekStart = new Date(todayDate); weekStart.setDate(todayDate.getDate() - isoOffset);
+    const weekStart = new Date(todayDate);
+    weekStart.setDate(todayDate.getDate() - isoOffset - (_weekOffset * 7));
     const weekStartDate = weekStart.toLocaleDateString('en-CA');
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+    const weekEndDate = weekEnd.toLocaleDateString('en-CA');
     const weekDays = Array.from({length:7}, (_, i) => {
       const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
       return d.toLocaleDateString('en-CA');
     });
     const weekLabels = ['M','T','W','T','F','S','S'];
+
+    // Update top-right date display to reflect current week view
+    const dateEl = document.getElementById('compass-date');
+    if (dateEl) {
+      if (_weekOffset === 0) {
+        dateEl.textContent = new Date().toLocaleDateString('en-US',{
+          weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase();
+      } else {
+        const ws = new Date(weekStart).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        const we = new Date(weekEnd).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+        dateEl.textContent = (ws + ' – ' + we).toUpperCase();
+      }
+    }
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
@@ -1640,10 +1658,30 @@ async function loadUserView() {
         <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
-            <div class="panel-title">This week — hours by day</div>
-            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-              ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-              – ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+            <div class="panel-title">${_weekOffset===0?'This week':_weekOffset===1?'Last week':`${_weekOffset} weeks ago`} — hours by day</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <!-- Back a week -->
+              <button id="week-step-back"
+                style="background:none;border:1px solid var(--border);color:var(--text3);
+                  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+                  cursor:pointer;font-size:12px;padding:0;line-height:1;transition:all .12s"
+                onmouseenter="this.style.borderColor='var(--compass-cyan)';this.style.color='var(--compass-cyan)'"
+                onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">‹</button>
+              <!-- Date range label -->
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);min-width:86px;text-align:center">
+                ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                – ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+              </div>
+              <!-- Forward a week (disabled when at current) -->
+              <button id="week-step-fwd"
+                ${_weekOffset===0?'disabled':''  }
+                style="background:none;border:1px solid ${_weekOffset===0?'rgba(255,255,255,.08)':'var(--border)'};
+                  color:${_weekOffset===0?'rgba(255,255,255,.15)':'var(--text3)'};
+                  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+                  cursor:${_weekOffset===0?'default':'pointer'};font-size:12px;padding:0;line-height:1;transition:all .12s"
+                ${_weekOffset>0?`onmouseenter="this.style.borderColor='var(--compass-cyan)';this.style.color='var(--compass-cyan)'"
+                  onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'"`:''}
+                >›</button>
             </div>
           </div>
           <!-- Inner two-column: gauges left | bill summary right -->
@@ -2994,6 +3032,17 @@ document.addEventListener('click', function(ev) {
   // ── Date range filter ─────────────────────────────────────
   const dateBtn = ev.target.closest('.wf-date-btn');
   if (dateBtn) { _wfDateRange = dateBtn.dataset.range; _viewLoaded['user']=false; loadUserView(); return; }
+  // ── Week stepper ──────────────────────────────────────────
+  if (ev.target.closest('#week-step-back')) {
+    _weekOffset += 1;
+    _activeGauge = null; _teFilter = null;
+    _viewLoaded['user'] = false; loadUserView(); return;
+  }
+  if (ev.target.closest('#week-step-fwd') && _weekOffset > 0) {
+    _weekOffset -= 1;
+    _activeGauge = null; _teFilter = null;
+    _viewLoaded['user'] = false; loadUserView(); return;
+  }
   // ── Gauge click → toggle active / filter time log ─────────
   const gaugeCol = ev.target.closest('.gauge-col');
   if (gaugeCol) {
