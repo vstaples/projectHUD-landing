@@ -3118,8 +3118,6 @@ async function loadPMView() {
 async function loadManagementView() {
   const content = document.getElementById('mgmt-content');
   if (!content) return;
-  if (_viewLoaded['management']) return;
-  _viewLoaded['management'] = true;
 
   content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading management view…</div>`;
 
@@ -3594,8 +3592,6 @@ async function loadManagementView() {
 async function loadExecutiveView() {
   const content = document.getElementById('exec-content');
   if (!content) return;
-  if (_viewLoaded['executive']) return;
-  _viewLoaded['executive'] = true;
 
   content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading executive view…</div>`;
 
@@ -4004,8 +4000,6 @@ async function loadExecutiveView() {
 async function loadClientView() {
   const content = document.getElementById('client-content');
   if (!content) return;
-  if (_viewLoaded['client']) return;
-  _viewLoaded['client'] = true;
 
   content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading client portal…</div>`;
 
