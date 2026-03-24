@@ -1943,120 +1943,122 @@ async function loadPMView() {
   if (!document.getElementById('pm-style')) {
     const s = document.createElement('style'); s.id = 'pm-style';
     s.textContent = `
-      /* ── Layout ─────────────────────────────────────────── */
-      .pm-wrap { display:flex; flex-direction:column; gap:0; margin:-20px -22px; }
-      .pm-alertrail { background:rgba(226,75,74,.08); border-bottom:2px solid rgba(226,75,74,.35); }
-      .pm-alert { display:flex; align-items:center; gap:10px; padding:8px 16px; border-bottom:1px solid rgba(226,75,74,.14); }
-      .pm-alert:last-child { border-bottom:none; }
-      .pm-alert-type { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.1em; color:#E24B4A; white-space:nowrap; min-width:108px; }
-      .pm-alert-type.warn { color:#EF9F27; }
-      .pm-alert-proj { font-family:var(--font-head); font-size:11px; font-weight:700; color:#00D2FF; white-space:nowrap; margin-right:3px; }
-      .pm-alert-msg { font-family:var(--font-body); font-size:11px; color:#C8DFF0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .pm-alert-age { font-family:var(--font-data); font-size:11px; color:#5A84A8; white-space:nowrap; margin:0 10px; }
-      .pm-btn { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; padding:5px 13px; border:1px solid; cursor:pointer; white-space:nowrap; background:none; transition:background .1s; }
-      .pm-btn-red { color:#E24B4A; border-color:rgba(226,75,74,.5); } .pm-btn-red:hover { background:rgba(226,75,74,.14); }
-      .pm-btn-cyan { color:#00D2FF; border-color:rgba(0,210,255,.4); } .pm-btn-cyan:hover { background:rgba(0,210,255,.1); }
-      /* ── Stat strip ─────────────────────────────────────── */
-      .pm-sstrip { display:grid; grid-template-columns:repeat(5,1fr); border-bottom:1px solid rgba(0,210,255,.12); background:#070d1c; }
-      .pm-sc { padding:10px 14px; border-right:1px solid rgba(0,210,255,.08); }
-      .pm-sc:last-child { border-right:none; }
-      .pm-sc-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#4A74A0; margin-bottom:3px; text-transform:uppercase; }
-      .pm-sc-val { font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1; }
-      .pm-sc-sub { font-family:var(--font-head); font-size:11px; color:#4A74A0; margin-top:2px; }
-      /* ── Portfolio body ─────────────────────────────────── */
-      .pm-body { display:grid; grid-template-columns:1fr 272px; gap:0; }
-      .pm-left { border-right:1px solid rgba(0,210,255,.1); display:flex; flex-direction:column; }
-      .pm-right { display:flex; flex-direction:column; background:#060b18; }
-      /* ── Tabs ────────────────────────────────────────────── */
-      .pm-tabs { display:flex; border-bottom:1px solid rgba(0,210,255,.12); background:#080f20; padding:0 4px; }
-      .pm-tab { font-family:var(--font-head); font-size:12px; font-weight:700; letter-spacing:.07em; padding:9px 14px; cursor:pointer; color:#5A84A8; border-bottom:2px solid transparent; display:flex; align-items:center; gap:5px; transition:color .12s; }
-      .pm-tab.on { color:#F0F6FF; border-bottom-color:#00D2FF; background:rgba(0,210,255,.04); }
-      .pm-tab:hover:not(.on) { color:#90B8D8; }
-      .pm-tbadge { font-size:10px; font-weight:700; padding:1px 5px; border-radius:2px; }
-      /* ── Section header ─────────────────────────────────── */
-      .pm-sec-hdr { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.12em; color:#3A6490; padding:5px 14px; background:#070d1c; border-bottom:1px solid rgba(0,210,255,.07); display:flex; align-items:center; gap:6px; text-transform:uppercase; }
-      /* ── Project cards ──────────────────────────────────── */
-      .pm-pcards { overflow-y:auto; background:#070c1a; }
-      .pm-pcard { border-left:4px solid; padding:12px 14px 10px; cursor:pointer; transition:background .12s,border-color .12s; background:#0c1525; margin:6px 8px 0; border-top:1px solid rgba(255,255,255,.06); border-right:1px solid rgba(0,210,255,.08); border-bottom:1px solid rgba(0,210,255,.08); }
-      .pm-pcard:hover { background:#101e35; border-right-color:rgba(0,210,255,.2); }
-      .pm-pcard.open { background:rgba(0,210,255,.07) !important; border-right-color:rgba(0,210,255,.4) !important; }
-      .pm-pn { font-family:var(--font-display); font-size:15px; font-weight:700; color:#F0F6FF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:.02em; }
-      .pm-pmeta { font-family:var(--font-head); font-size:11px; color:#4A74A0; margin:2px 0 8px; }
-      /* ── Day grid ────────────────────────────────────────── */
-      .pm-dgrid { display:grid; grid-template-columns:repeat(5,52px); gap:0; margin:6px 0; background:rgba(0,0,0,.25); border:1px solid rgba(0,210,255,.1); width:fit-content; }
-      .pm-dcell { text-align:center; padding:5px 6px; border-right:1px solid rgba(0,210,255,.07); }
-      .pm-dcell:last-child { border-right:none; }
-      .pm-dlbl { font-family:var(--font-head); font-size:11px; font-weight:700; color:#4A74A0; margin-bottom:3px; }
-      .pm-dhrs { font-family:var(--font-head); font-size:11px; font-weight:700; margin-top:2px; }
-      .pm-dot { width:7px; height:7px; border-radius:50%; margin:0 auto; }
-      /* ── EVM row ─────────────────────────────────────────── */
-      .pm-evmrow { display:flex; gap:0; margin:4px 0; align-items:stretch; background:rgba(0,0,0,.2); border:1px solid rgba(0,210,255,.08); }
-      .pm-evm-cell { padding:5px 10px; border-right:1px solid rgba(0,210,255,.06); }
-      .pm-evm-cell:last-child { border-right:none; margin-left:auto; }
-      .pm-evm-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#4A74A0; }
-      .pm-evm-val { font-family:var(--font-display); font-size:16px; font-weight:700; line-height:1.1; }
-      /* ── Progress bar ────────────────────────────────────── */
-      .pm-pbar { height:4px; background:rgba(255,255,255,.06); margin:6px 0 3px; border-radius:2px; position:relative; overflow:hidden; }
-      .pm-pbar-fill { height:100%; position:absolute; left:0; top:0; border-radius:2px; }
-      /* ── Chip row ────────────────────────────────────────── */
-      .pm-chiprow { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; align-items:center; }
-      .pm-chip { font-family:var(--font-head); font-size:11px; font-weight:700; padding:2px 8px; }
-      .pm-chip-r { color:#E24B4A; border:1px solid rgba(226,75,74,.4); background:rgba(226,75,74,.08); }
-      .pm-chip-a { color:#EF9F27; border:1px solid rgba(239,159,39,.4); background:rgba(239,159,39,.08); }
-      .pm-chip-c { color:#00D2FF; border:1px solid rgba(0,210,255,.35); background:rgba(0,210,255,.07); }
-      .pm-chip-g { color:#1D9E75; border:1px solid rgba(29,158,117,.35); background:rgba(29,158,117,.07); }
-      /* ── Feed ────────────────────────────────────────────── */
-      .pm-feed-hdr { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid rgba(0,210,255,.12); background:#070d1c; flex-shrink:0; }
-      .pm-frow { display:flex; gap:0; border-bottom:1px solid rgba(0,210,255,.07); cursor:pointer; transition:background .1s; overflow:hidden; }
-      .pm-frow:hover { background:rgba(255,255,255,.025); }
-      .pm-fstrip { width:3px; flex-shrink:0; }
-      .pm-ftag-col { display:flex; flex-direction:column; justify-content:center; padding:6px 8px 6px 7px; min-width:0; width:80px; flex-shrink:0; border-right:1px solid rgba(0,210,255,.07); }
-      .pm-ftag { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .pm-ftag-inst { font-family:var(--font-head); font-size:10px; color:#4A74A0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
-      .pm-fbody { flex:1; min-width:0; }
-      .pm-ftitle { font-family:var(--font-body); font-size:11px; color:#C8DFF0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .pm-fsub { font-family:var(--font-head); font-size:11px; margin-top:1px; }
-      .pm-fage { font-family:var(--font-data); font-size:11px; color:#5A84A8; flex-shrink:0; align-self:center; white-space:nowrap; }
-      /* ── Drawer ──────────────────────────────────────────── */
-      .pm-drawer { position:fixed; top:44px; right:0; bottom:0; width:540px; background:#08101f; border-left:1px solid rgba(0,210,255,.2); display:flex; flex-direction:column; z-index:200; box-shadow:-16px 0 48px rgba(0,0,0,.7); animation:pm-drawer-in .22s ease; }
-      @keyframes pm-drawer-in { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
-      .pm-drhdr { padding:12px 15px 10px; border-bottom:1px solid rgba(0,210,255,.12); flex-shrink:0; background:#070d1c; }
-      .pm-drname { font-family:var(--font-display); font-size:20px; font-weight:700; color:#F0F6FF; line-height:1.1; }
-      .pm-drdesc { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin:3px 0 6px; }
-      .pm-drstrip { display:grid; grid-template-columns:repeat(6,1fr); border-bottom:1px solid rgba(0,210,255,.1); flex-shrink:0; background:#070d1c; }
-      .pm-drc { padding:8px 8px; border-right:1px solid rgba(0,210,255,.08); text-align:center; }
-      .pm-drc:last-child { border-right:none; }
-      .pm-drc-lbl { font-family:var(--font-head); font-size:10px; font-weight:700; letter-spacing:.07em; color:#4A74A0; text-transform:uppercase; }
-      .pm-drc-val { font-family:var(--font-display); font-size:18px; font-weight:700; line-height:1; margin-top:2px; }
-      .pm-drc-sub { font-family:var(--font-head); font-size:10px; color:#4A74A0; margin-top:1px; }
-      .pm-drtabs { display:flex; border-bottom:1px solid rgba(0,210,255,.1); background:#060c18; flex-shrink:0; overflow-x:auto; }
-      .pm-drtab { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; padding:8px 13px; cursor:pointer; color:#5A84A8; border-bottom:2px solid transparent; white-space:nowrap; transition:color .1s; }
-      .pm-drtab.on { color:#F0F6FF; border-bottom-color:#00D2FF; }
-      .pm-drtab:hover:not(.on) { color:#90B8D8; }
-      .pm-drbody { flex:1; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:0; }
-      .pm-drcol { border-right:1px solid rgba(0,210,255,.08); }
-      .pm-drcol:last-child { border-right:none; }
-      .pm-dcsec { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.1em; color:#4A74A0; padding:7px 12px 4px; text-transform:uppercase; border-bottom:1px solid rgba(0,210,255,.07); background:#070d1c; display:flex; align-items:center; gap:6px; }
-      .pm-rfcard { margin:8px 10px; background:rgba(226,75,74,.07); border:1px solid rgba(226,75,74,.3); border-left:3px solid #E24B4A; padding:10px 11px; }
-      .pm-rf-tag { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#E24B4A; margin-bottom:5px; }
-      .pm-rf-who { font-family:var(--font-body); font-size:12px; font-weight:600; color:#F0F6FF; margin-bottom:3px; }
-      .pm-rf-quote { font-family:var(--font-body); font-size:11px; color:#C8DFF0; font-style:italic; margin-bottom:8px; line-height:1.5; border-left:2px solid rgba(226,75,74,.4); padding-left:8px; }
-      .pm-rf-ctx { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin-bottom:9px; }
-      .pm-aicard { margin:8px 10px; background:rgba(239,159,39,.05); border:1px solid rgba(239,159,39,.18); border-left:3px solid #EF9F27; padding:9px 11px; }
-      .pm-ai-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#EF9F27; margin-bottom:5px; }
-      .pm-ai-item { font-family:var(--font-body); font-size:11px; color:#C8DFF0; margin-bottom:4px; padding-left:12px; position:relative; line-height:1.5; }
-      .pm-ai-item::before { content:'·'; position:absolute; left:2px; color:#EF9F27; font-weight:700; }
-      .pm-decrow { padding:7px 12px; border-bottom:1px solid rgba(0,210,255,.07); display:flex; gap:7px; align-items:flex-start; }
-      .pm-dec-chip { font-family:var(--font-head); font-size:11px; font-weight:700; padding:2px 7px; white-space:nowrap; flex-shrink:0; }
-      .pm-dec-text { font-family:var(--font-body); font-size:11px; color:#C8DFF0; line-height:1.5; flex:1; }
-      .pm-dec-date { font-family:var(--font-data); font-size:11px; color:#5A84A8; white-space:nowrap; margin-top:1px; }
-      .pm-brief-row { display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid rgba(0,210,255,.07); cursor:pointer; transition:background .1s; }
-      .pm-brief-row:hover { background:rgba(255,255,255,.02); }
-      .pm-bdate { font-family:var(--font-head); font-size:11px; font-weight:600; color:#C8DFF0; min-width:90px; }
-      .pm-bflag { font-family:var(--font-head); font-size:11px; flex:1; }
-      .pm-feed-row { display:flex; gap:7px; padding:7px 12px; border-bottom:1px solid rgba(0,210,255,.07); transition:background .1s; }
-      .pm-feed-row:hover { background:rgba(255,255,255,.02); }
-      .pm-live-dot { width:7px; height:7px; border-radius:50%; background:#1D9E75; display:inline-block; flex-shrink:0; }
+      .pm-wrap{display:flex;flex-direction:column;gap:0;margin:-20px -22px}
+      /* Alert rail */
+      .pm-alertrail{background:rgba(226,75,74,.08);border-bottom:2px solid rgba(226,75,74,.4)}
+      .pm-alert{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(226,75,74,.12)}
+      .pm-alert:last-child{border-bottom:none}
+      .pm-alert-type{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;white-space:nowrap;min-width:110px}
+      .pm-alert-type.warn{color:#EF9F27}
+      .pm-alert-proj{font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;white-space:nowrap;margin-right:2px}
+      .pm-alert-msg{font-family:var(--font-body);font-size:11px;color:#C8DFF0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .pm-alert-age{font-family:var(--font-data);font-size:11px;color:#5A84A8;white-space:nowrap;margin:0 12px}
+      .pm-btn{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 13px;border:1px solid;cursor:pointer;white-space:nowrap;background:none;transition:background .1s}
+      .pm-btn-red{color:#E24B4A;border-color:rgba(226,75,74,.5)}.pm-btn-red:hover{background:rgba(226,75,74,.15)}
+      .pm-btn-cyan{color:#00D2FF;border-color:rgba(0,210,255,.4)}.pm-btn-cyan:hover{background:rgba(0,210,255,.1)}
+      /* Stat strip */
+      .pm-sstrip{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid rgba(0,210,255,.12);background:#060d1c}
+      .pm-sc{padding:10px 16px;border-right:1px solid rgba(0,210,255,.08)}
+      .pm-sc:last-child{border-right:none}
+      .pm-sc-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
+      .pm-sc-val{font-family:var(--font-display);font-size:24px;font-weight:700;line-height:1}
+      .pm-sc-sub{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      /* Body */
+      .pm-body{display:grid;grid-template-columns:1fr 280px;gap:0}
+      .pm-left{border-right:1px solid rgba(0,210,255,.1);display:flex;flex-direction:column}
+      .pm-right{display:flex;flex-direction:column;background:#060b18}
+      /* Tabs — large readable buttons like mockup */
+      .pm-tabs{display:flex;gap:2px;padding:10px 12px;background:#07101f;border-bottom:1px solid rgba(0,210,255,.12)}
+      .pm-tab{font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.04em;padding:7px 18px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:7px;transition:all .12s}
+      .pm-tab.on{color:#F0F6FF;background:#132035;border-color:rgba(0,210,255,.4)}
+      .pm-tab:hover:not(.on){color:#90B8D8;background:#0e1e30}
+      .pm-tbadge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px}
+      /* Section header */
+      .pm-sec-hdr{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.12em;color:#3A5C80;padding:6px 14px;background:#06101e;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:7px;text-transform:uppercase}
+      /* Cards */
+      .pm-pcards{overflow-y:auto;background:#07101f;padding:8px}
+      .pm-pcard{border-left:4px solid;padding:14px 14px 12px;cursor:pointer;transition:background .12s,border-color .12s;background:#0d1a2e;margin-bottom:6px;border-top:1px solid rgba(255,255,255,.05);border-right:1px solid rgba(0,210,255,.1);border-bottom:1px solid rgba(0,210,255,.1)}
+      .pm-pcard:hover{background:#112030;border-right-color:rgba(0,210,255,.25)}
+      .pm-pcard.open{background:rgba(0,210,255,.08)!important;border-right-color:rgba(0,210,255,.45)!important}
+      .pm-pn{font-family:var(--font-display);font-size:18px;font-weight:700;color:#F0F6FF;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .pm-pmeta{font-family:var(--font-head);font-size:11px;color:#4A6E90;margin:3px 0 8px}
+      /* Day grid — each day in its own box like mockup */
+      .pm-dgrid{display:flex;gap:6px;margin:8px 0}
+      .pm-dcell{background:#0a1828;border:1px solid rgba(0,210,255,.12);padding:6px 8px;text-align:center;min-width:52px}
+      .pm-dlbl{font-family:var(--font-head);font-size:12px;font-weight:700;color:#4A6E90;margin-bottom:4px}
+      .pm-dot{width:8px;height:8px;border-radius:50%;margin:0 auto 4px}
+      .pm-dhrs{font-family:var(--font-head);font-size:12px;font-weight:700}
+      /* Progress bar */
+      .pm-pbar{height:5px;background:rgba(255,255,255,.07);margin:8px 0 4px;border-radius:2px;position:relative;overflow:hidden}
+      .pm-pbar-fill{height:100%;position:absolute;left:0;top:0;border-radius:2px}
+      /* EVM row — big numbers separated clearly */
+      .pm-evmrow{display:flex;gap:0;margin:8px 0 4px;border:1px solid rgba(0,210,255,.1);background:#091522}
+      .pm-evm-cell{padding:7px 14px;border-right:1px solid rgba(0,210,255,.08);flex:1}
+      .pm-evm-cell:last-child{border-right:none}
+      .pm-evm-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#4A6E90;text-transform:uppercase}
+      .pm-evm-val{font-family:var(--font-display);font-size:20px;font-weight:700;line-height:1.1;margin-top:1px}
+      /* Chips */
+      .pm-chiprow{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;align-items:center}
+      .pm-chip{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px}
+      .pm-chip-r{color:#E24B4A;border:1px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08)}
+      .pm-chip-a{color:#EF9F27;border:1px solid rgba(239,159,39,.4);background:rgba(239,159,39,.08)}
+      .pm-chip-c{color:#00D2FF;border:1px solid rgba(0,210,255,.35);background:rgba(0,210,255,.07)}
+      .pm-chip-g{color:#1D9E75;border:1px solid rgba(29,158,117,.35);background:rgba(29,158,117,.07)}
+      /* Feed */
+      .pm-feed-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(0,210,255,.12);background:#06101e;flex-shrink:0}
+      .pm-frow{display:flex;gap:0;border-bottom:1px solid rgba(0,210,255,.08);cursor:pointer;transition:background .1s;overflow:hidden}
+      .pm-frow:hover{background:rgba(255,255,255,.025)}
+      .pm-fstrip{width:4px;flex-shrink:0}
+      .pm-ftag-col{display:flex;flex-direction:column;justify-content:center;padding:8px 9px 8px 8px;width:82px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08)}
+      .pm-ftag{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .pm-ftag-inst{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .pm-fbody{flex:1;min-width:0;padding:8px 9px}
+      .pm-ftitle{font-family:var(--font-body);font-size:12px;color:#C8DFF0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .pm-fsub{font-family:var(--font-body);font-size:11px;margin-top:2px}
+      .pm-fage{font-family:var(--font-data);font-size:11px;color:#3A5C80;flex-shrink:0;align-self:center;padding-right:10px;white-space:nowrap}
+      /* Drawer */
+      .pm-drawer{position:fixed;top:44px;right:0;bottom:0;width:540px;background:#08101f;border-left:1px solid rgba(0,210,255,.2);display:flex;flex-direction:column;z-index:200;box-shadow:-16px 0 48px rgba(0,0,0,.8);animation:pm-drawer-in .22s ease}
+      @keyframes pm-drawer-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+      .pm-drhdr{padding:12px 15px 10px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0;background:#07101e}
+      .pm-drname{font-family:var(--font-display);font-size:20px;font-weight:700;color:#F0F6FF;line-height:1.1}
+      .pm-drdesc{font-family:var(--font-head);font-size:11px;color:#4A6E90;margin:3px 0 6px}
+      .pm-drstrip{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid rgba(0,210,255,.1);flex-shrink:0;background:#07101e}
+      .pm-drc{padding:8px;border-right:1px solid rgba(0,210,255,.08);text-align:center}
+      .pm-drc:last-child{border-right:none}
+      .pm-drc-lbl{font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.07em;color:#3A5C80;text-transform:uppercase}
+      .pm-drc-val{font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;margin-top:2px}
+      .pm-drc-sub{font-family:var(--font-head);font-size:10px;color:#3A5C80;margin-top:1px}
+      .pm-drtabs{display:flex;border-bottom:1px solid rgba(0,210,255,.1);background:#060c18;flex-shrink:0;overflow-x:auto}
+      .pm-drtab{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.06em;padding:8px 14px;cursor:pointer;color:#4A6E90;border-bottom:2px solid transparent;white-space:nowrap;transition:color .1s}
+      .pm-drtab.on{color:#F0F6FF;border-bottom-color:#00D2FF}
+      .pm-drtab:hover:not(.on){color:#90B8D8}
+      .pm-drbody{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:0}
+      .pm-drcol{border-right:1px solid rgba(0,210,255,.08)}
+      .pm-drcol:last-child{border-right:none}
+      .pm-dcsec{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#3A5C80;padding:7px 12px 4px;text-transform:uppercase;border-bottom:1px solid rgba(0,210,255,.07);background:#070d1c;display:flex;align-items:center;gap:6px}
+      .pm-rfcard{margin:8px 10px;background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.3);border-left:3px solid #E24B4A;padding:10px 11px}
+      .pm-rf-tag{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#E24B4A;margin-bottom:5px}
+      .pm-rf-who{font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF;margin-bottom:3px}
+      .pm-rf-quote{font-family:var(--font-body);font-size:11px;color:#C8DFF0;font-style:italic;margin-bottom:8px;line-height:1.5;border-left:2px solid rgba(226,75,74,.4);padding-left:8px}
+      .pm-rf-ctx{font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-bottom:9px}
+      .pm-aicard{margin:8px 10px;background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-left:3px solid #EF9F27;padding:9px 11px}
+      .pm-ai-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#EF9F27;margin-bottom:5px}
+      .pm-ai-item{font-family:var(--font-body);font-size:11px;color:#C8DFF0;margin-bottom:4px;padding-left:12px;position:relative;line-height:1.5}
+      .pm-ai-item::before{content:'·';position:absolute;left:2px;color:#EF9F27;font-weight:700}
+      .pm-decrow{padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07);display:flex;gap:7px;align-items:flex-start}
+      .pm-dec-chip{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 7px;white-space:nowrap;flex-shrink:0}
+      .pm-dec-text{font-family:var(--font-body);font-size:11px;color:#C8DFF0;line-height:1.5;flex:1}
+      .pm-dec-date{font-family:var(--font-data);font-size:11px;color:#4A6E90;white-space:nowrap;margin-top:1px}
+      .pm-brief-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid rgba(0,210,255,.07);cursor:pointer;transition:background .1s}
+      .pm-brief-row:hover{background:rgba(255,255,255,.02)}
+      .pm-bdate{font-family:var(--font-head);font-size:11px;font-weight:600;color:#C8DFF0;min-width:90px}
+      .pm-bflag{font-family:var(--font-head);font-size:11px;flex:1}
+      .pm-feed-row{display:flex;gap:7px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07);transition:background .1s}
+      .pm-feed-row:hover{background:rgba(255,255,255,.02)}
+      .pm-live-dot{width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;flex-shrink:0}
+      /* Exceptions / Team / Action items tab panels */
+      .pm-tabpanel{display:none;overflow-y:auto;flex:1;padding:12px}
+      .pm-tabpanel.on{display:block}
     `;
     document.head.appendChild(s);
   }
@@ -2169,35 +2171,46 @@ async function loadPMView() {
     // ── Project card HTML ────────────────────────────────
     function projCardHtml(ps, idx) {
       const {p,pct,doneTasks,totalTasks,overdueTasks,projInsts,projFlags,projReqs,projCoc,hoursByDay} = ps;
-      const bcolor = projStatusColor(ps);
-      const slabel = projStatusLabel(ps);
+      const bcolor   = projStatusColor(ps);
+      const slabel   = projStatusLabel(ps);
       const barColor = projFlags.length>0||overdueTasks.length>3?'#E24B4A':overdueTasks.length>0?'#EF9F27':'#1D9E75';
-      const pmName = _resources.find(r=>r.id===p.pm_resource_id);
-      const pmLabel = pmName ? `${pmName.first_name} ${pmName.last_name}` : '—';
-      // CoC recent events
-      const cocHtml = projCoc.length>0 ? projCoc.slice(0,2).map(e=>{
+      const pmName   = _resources.find(r=>r.id===p.pm_resource_id);
+      const pmLabel  = pmName ? `${pmName.first_name} ${pmName.last_name}` : '—';
+      // CoC recent events inline
+      const cocHtml = projCoc.slice(0,2).map(e=>{
         const isRej=e.event_type==='step_reset', isDone=e.event_type==='step_completed';
-        const c = isRej?'var(--compass-red)':isDone?'var(--compass-green)':'var(--compass-amber)';
-        const ic = isRej?'↩':isDone?'✓':'●';
-        return `<div style="font-family:var(--font-head);font-size:11px;color:${c};display:flex;gap:5px;align-items:baseline;margin-top:2px">
-          <span style="flex-shrink:0">${ic}</span>
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${esc(e.step_name||'—')}${e.event_notes?' — '+esc(e.event_notes.slice(0,50)):''}</span>
-          <span style="color:var(--text3);flex-shrink:0">${_timeAgo(e.created_at)}</span>
+        const c=isRej?'var(--compass-red)':isDone?'var(--compass-green)':'var(--compass-amber)';
+        return `<div style="display:flex;gap:6px;align-items:baseline;margin-top:3px;font-family:var(--font-head);font-size:11px">
+          <span style="color:${c};flex-shrink:0">${isRej?'↩':isDone?'✓':'●'}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${esc(e.step_name||'—')}${e.event_notes?' — <span style="color:'+c+'">'+esc(e.event_notes.slice(0,50))+'</span>':''}</span>
+          <span style="color:#3A5C80;flex-shrink:0">${_timeAgo(e.created_at)}</span>
         </div>`;
-      }).join('') : '';
+      }).join('');
+
       return `<div class="pm-pcard" id="pm-card-${p.id}" data-proj-id="${p.id}" style="border-left-color:${bcolor}"
         onclick="pmOpenDrawer('${p.id}')">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:2px">
+        <!-- Header row: name + status badges -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px">
           <div class="pm-pn">${esc(p.name)}</div>
-          <div style="display:flex;gap:4px;flex-shrink:0">
+          <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;padding-top:2px">
             ${slabel}
             ${projFlags.length>0?`<span class="pm-chip pm-chip-r">${projFlags.length} flag${projFlags.length>1?'s':''}</span>`:''}
-            ${projInsts.length>0?`<span class="pm-chip pm-chip-c">${projInsts.length} wf</span>`:''}
             ${projReqs.length>0?`<span class="pm-chip pm-chip-a">${projReqs.length} req</span>`:''}
           </div>
         </div>
         <div class="pm-pmeta">${esc(p.client||'—')} · PM ${pmLabel} · Due ${p.target_date?fmtDate(p.target_date):'—'}</div>
-        <div class="pm-dgrid">${dayGridHtml(hoursByDay)}</div>
+
+        <!-- Day grid: individual boxed cells like mockup -->
+        <div class="pm-dgrid">
+          ${dayGridHtml(hoursByDay)}
+        </div>
+
+        <!-- Progress bar — full width, colored -->
+        <div class="pm-pbar">
+          <div class="pm-pbar-fill" style="width:${Math.min(pct,100)}%;background:${barColor}"></div>
+        </div>
+
+        <!-- EVM metrics row -->
         <div class="pm-evmrow">
           <div class="pm-evm-cell">
             <div class="pm-evm-lbl">CPI</div>
@@ -2207,25 +2220,35 @@ async function loadPMView() {
             <div class="pm-evm-lbl">SPI</div>
             <div class="pm-evm-val" style="color:${evmColor(p.spi)}">${p.spi?parseFloat(p.spi).toFixed(2):'—'}</div>
           </div>
-          ${p.budget_hours?`<div class="pm-evm-cell"><div class="pm-evm-lbl">BUDGET</div><div class="pm-evm-val" style="color:var(--text2);font-size:13px">${p.budget_hours_used?Math.round(p.budget_hours_used):'0'}h/${Math.round(p.budget_hours)}h</div></div>`:''}
-          <div class="pm-evm-cell" style="margin-left:auto">
-            <div class="pm-evm-lbl">P50 TARGET</div>
-            <div class="pm-evm-val" style="color:${barColor};font-size:13px">${p.target_date?fmtDate(p.target_date):'—'}</div>
+          <div class="pm-evm-cell">
+            <div class="pm-evm-lbl">TCPI</div>
+            <div class="pm-evm-val" style="color:${evmColor(p.tcpi)}">${p.tcpi?parseFloat(p.tcpi).toFixed(2):'—'}</div>
           </div>
-            </div>
-        <div class="pm-pbar">
-          <div class="pm-pbar-fill" style="width:${pct}%;background:${barColor}"></div>
+          <div class="pm-evm-cell" style="border-right:none">
+            <div class="pm-evm-lbl">FORECAST SLIP</div>
+            <div class="pm-evm-val" style="color:${barColor};font-size:14px">${p.forecast_slip||'On track'}</div>
+          </div>
         </div>
-        <div style="font-family:var(--font-head);font-size:11px;color:#5A84A8">${pct}% complete · ${doneTasks}/${totalTasks} tasks${p.budget_hours?` · ${p.budget_hours_used?Math.round(p.budget_hours_used):'0'}h of ${Math.round(p.budget_hours)}h budget`:''}</div>
+
+        <!-- Stats line + budget -->
+        <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:4px">
+          <span>${pct}% complete · ${doneTasks}/${totalTasks} tasks</span>
+          ${p.budget_hours?`<span>${p.budget_hours_used?Math.round(p.budget_hours_used):'0'}h of ${Math.round(p.budget_hours)}h budget</span>`:''}
+        </div>
+
+        <!-- Chip row: overdue + requests + red signal + P50 right-aligned -->
         <div class="pm-chiprow">
           ${overdueTasks.length>0?`<span class="pm-chip pm-chip-r">${overdueTasks.length} overdue</span>`:''}
           ${projReqs.length>0?`<span class="pm-chip pm-chip-a">${projReqs.length} request${projReqs.length>1?'s':''}</span>`:''}
           ${projFlags.length>0?`<span class="pm-chip pm-chip-r">${projFlags.length} red signal${projFlags.length>1?'s':''}</span>`:''}
-          ${p.target_date?`<span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#5A84A8">
-            P50 <strong style="color:${barColor}">${fmtDate(p.target_date)}</strong>
-          </span>`:''}
+          <span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#4A6E90">
+            P50 <strong style="color:${barColor}">${p.target_date?fmtDate(p.target_date):'—'}</strong>
+            ${p.target_date?` · target ${fmtDate(p.target_date)}`:''}
+          </span>
         </div>
-        ${cocHtml?`<div style="border-top:1px solid rgba(0,210,255,.07);margin-top:6px;padding-top:5px">${cocHtml}</div>`:''}
+
+        <!-- Recent CoC events -->
+        ${cocHtml?`<div style="border-top:1px solid rgba(0,210,255,.08);margin-top:8px;padding-top:6px">${cocHtml}</div>`:''}
       </div>`;
     }
 
@@ -2297,19 +2320,97 @@ async function loadPMView() {
       <div class="pm-body">
         <div class="pm-left">
           <div class="pm-tabs">
-            <div class="pm-tab on">Portfolio</div>
-            <div class="pm-tab">Exceptions ${totalFlags>0||totalOverdue>0?`<span class="pm-tbadge" style="background:rgba(226,75,74,.2);color:#E24B4A">${totalFlags+totalOverdue}</span>`:''}</div>
-            <div class="pm-tab">Team</div>
-            <div class="pm-tab">Action items ${actionItems.filter(a=>a.due_date&&a.due_date<today).length>0?`<span class="pm-tbadge" style="background:rgba(239,159,39,.2);color:#EF9F27">${actionItems.filter(a=>a.due_date&&a.due_date<today).length}</span>`:''}</div>
+            <div class="pm-tab on" onclick="pmSwitchTab(this,'pm-tab-portfolio')">Portfolio</div>
+            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-exceptions')">Exceptions ${totalFlags>0||totalOverdue>0?`<span class="pm-tbadge" style="background:rgba(226,75,74,.25);color:#E24B4A">${totalFlags+totalOverdue}</span>`:''}</div>
+            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-team')">Team</div>
+            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-actions')">Action items ${actionItems.filter(a=>a.due_date&&a.due_date<today).length>0?`<span class="pm-tbadge" style="background:rgba(239,159,39,.25);color:#EF9F27">${actionItems.filter(a=>a.due_date&&a.due_date<today).length}</span>`:''}</div>
           </div>
-          <div class="pm-pcards">
+
+          <!-- Portfolio tab -->
+          <div id="pm-tab-portfolio" class="pm-tabpanel on" style="padding:0">
             <div class="pm-sec-hdr">
-              <span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>
+              <span style="width:7px;height:7px;border-radius:50%;background:#E24B4A;display:inline-block;flex-shrink:0"></span>
               ACTIVE — URGENCY ORDERED
+              <span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#3A5C80">${activeProjects.length} projects</span>
             </div>
-            ${projStats.length>0
-              ? projStats.map((ps,i)=>projCardHtml(ps,i)).join('')
-              : `<div style="padding:20px 13px;text-align:center;font-family:var(--font-head);font-size:12px;color:var(--text3)">No active projects</div>`}
+            <div class="pm-pcards" style="overflow-y:auto;flex:1">
+              ${projStats.length>0
+                ? projStats.map((ps,i)=>projCardHtml(ps,i)).join('')
+                : `<div style="padding:20px 13px;text-align:center;font-family:var(--font-head);font-size:12px;color:var(--text3)">No active projects</div>`}
+            </div>
+          </div>
+
+          <!-- Exceptions tab -->
+          <div id="pm-tab-exceptions" class="pm-tabpanel">
+            ${redFlags.length===0&&totalOverdue===0
+              ? `<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No exceptions — all projects on track</div>`
+              : `${redFlags.length>0?`
+                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:8px;text-transform:uppercase">■ Red flags (${redFlags.length})</div>
+                ${redFlags.map(f=>`
+                  <div style="background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.28);border-left:3px solid #E24B4A;padding:10px 12px;margin-bottom:7px">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+                      <span style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(f.projName)} — ${esc(f.instTitle)}</span>
+                      <span style="font-family:var(--font-data);font-size:11px;color:#5A84A8">${_timeAgo(f.created_at)}</span>
+                    </div>
+                    ${f.actor_name?`<div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;margin-bottom:4px">${esc(f.actor_name)}</div>`:''}
+                    ${f.event_notes?`<div style="font-family:var(--font-body);font-size:11px;color:#C8DFF0;font-style:italic;border-left:2px solid rgba(226,75,74,.4);padding-left:8px">"${esc(f.event_notes.slice(0,120))}"</div>`:''}
+                    <div style="display:flex;gap:6px;margin-top:8px">
+                      <button class="pm-btn pm-btn-red" style="flex:1">Acknowledge</button>
+                      <button class="pm-btn pm-btn-cyan" style="flex:1" onclick="event.stopPropagation();pmOpenDrawer('${f.projId}')">Open instance →</button>
+                    </div>
+                  </div>`).join('')}`:''}
+                ${projStats.filter(ps=>ps.overdueTasks.length>0).length>0?`
+                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:10px 0 8px;text-transform:uppercase">● Overdue tasks</div>
+                ${projStats.filter(ps=>ps.overdueTasks.length>0).map(ps=>`
+                  <div style="background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-left:3px solid #EF9F27;padding:8px 12px;margin-bottom:6px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                      <span style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(ps.p.name)}</span>
+                      <span class="pm-chip pm-chip-a">${ps.overdueTasks.length} overdue</span>
+                    </div>
+                    ${ps.overdueTasks.slice(0,3).map(t=>`<div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;padding-left:8px;margin-bottom:2px">· ${esc(t.name||t.title||'—')} <span style="color:#E24B4A">${daysOverdue(t.due_date)}d</span></div>`).join('')}
+                    ${ps.overdueTasks.length>3?`<div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;padding-left:8px">+${ps.overdueTasks.length-3} more</div>`:''}
+                  </div>`).join('')}`:''}`}
+          </div>
+
+          <!-- Team tab -->
+          <div id="pm-tab-team" class="pm-tabpanel">
+            ${_resources.filter(r=>r.is_active).length===0
+              ?`<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No active team members</div>`
+              :`<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#3A5C80;margin-bottom:8px;text-transform:uppercase">Active resources (${_resources.filter(r=>r.is_active).length})</div>
+              ${_resources.filter(r=>r.is_active).slice(0,15).map(r=>{
+                const projCount = _projects.filter(p=>p.pm_resource_id===r.id||_tasks.some(t=>t.assigned_to===r.user_id&&t.status!=='complete')).length;
+                const taskCount = _tasks.filter(t=>t.assigned_to===r.user_id&&!['complete','cancelled'].includes(t.status)).length;
+                const initials  = ((r.first_name||'')[0]||'')+''+((r.last_name||'')[0]||'');
+                return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,210,255,.07)">
+                  <div style="width:32px;height:32px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials.toUpperCase())}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF">${esc(r.first_name+' '+r.last_name)}</div>
+                    <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90">${taskCount} open task${taskCount!==1?'s':''}</div>
+                  </div>
+                  <span class="pm-chip ${taskCount>5?'pm-chip-a':taskCount>0?'pm-chip-c':'pm-chip-g'}">${taskCount} tasks</span>
+                </div>`;
+              }).join('')}`}
+          </div>
+
+          <!-- Action items tab -->
+          <div id="pm-tab-actions" class="pm-tabpanel">
+            ${actionItems.length===0
+              ?`<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No open action items</div>`
+              :actionItems.slice(0,20).map(a=>{
+                const overdue=a.due_date&&a.due_date<today;
+                const inst=wfInstances.find(w=>w.id===a.instance_id);
+                const proj=_projects.find(p=>p.id===inst?.project_id);
+                return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid rgba(0,210,255,.07)">
+                  <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:${overdue?'var(--compass-red)':'var(--compass-amber)'}"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'—')}</div>
+                    <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">
+                      ${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}${a.due_date?'Due '+fmtDate(a.due_date):'No due date'}
+                    </div>
+                  </div>
+                  ${overdue?`<span class="pm-chip pm-chip-r">${daysOverdue(a.due_date)}d</span>`:''}
+                </div>`;
+              }).join('')}
           </div>
         </div>
 
@@ -2344,6 +2445,15 @@ async function loadPMView() {
         </div>
       </div>
     </div>`;
+
+    // ── Tab switcher ─────────────────────────────────────
+    window.pmSwitchTab = function(el, panelId) {
+      el.closest('.pm-left').querySelectorAll('.pm-tab').forEach(t=>t.classList.remove('on'));
+      el.classList.add('on');
+      el.closest('.pm-left').querySelectorAll('.pm-tabpanel').forEach(p=>p.classList.remove('on'));
+      const panel = document.getElementById(panelId);
+      if (panel) panel.classList.add('on');
+    };
 
     // ── Drawer open / close ───────────────────────────────
     window.pmOpenDrawer = function(projId) {
