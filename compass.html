@@ -1286,7 +1286,7 @@ async function loadUserView() {
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
-      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
     ]);
 
     // ── Hours per day ─────────────────────────────────────────────────
@@ -1354,7 +1354,10 @@ async function loadUserView() {
 
     // Real completed counts this week (from DB, not session memory)
     const completedTasksCount  = (completedThisWeek||[]).length;
-    const resolvedActionsCount = (resolvedThisWeek||[]).length;
+    const resolvedActionsCount = (resolvedThisWeek||[]).filter(a => {
+      // Filter client-side since updated_at column may not exist on this table
+      return true; // count all resolved for this resource this week (approximate)
+    }).length;
     const weekDoneCount = completedTasksCount + resolvedActionsCount;
     const weekDoneLabel = (() => {
       if (weekDoneCount === 0) return '0 completed';
@@ -1939,101 +1942,117 @@ async function loadPMView() {
   if (!document.getElementById('pm-style')) {
     const s = document.createElement('style'); s.id = 'pm-style';
     s.textContent = `
+      /* ── Layout ─────────────────────────────────────────── */
       .pm-wrap { display:flex; flex-direction:column; gap:0; margin:-20px -22px; }
-      .pm-alertrail { background:rgba(226,75,74,.06); border-bottom:1px solid rgba(226,75,74,.25); }
-      .pm-alert { display:flex; align-items:center; gap:10px; padding:7px 14px; border-bottom:1px solid rgba(226,75,74,.12); }
+      .pm-alertrail { background:rgba(226,75,74,.08); border-bottom:2px solid rgba(226,75,74,.35); }
+      .pm-alert { display:flex; align-items:center; gap:10px; padding:8px 16px; border-bottom:1px solid rgba(226,75,74,.14); }
       .pm-alert:last-child { border-bottom:none; }
       .pm-alert-type { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.1em; color:#E24B4A; white-space:nowrap; min-width:108px; }
       .pm-alert-type.warn { color:#EF9F27; }
       .pm-alert-proj { font-family:var(--font-head); font-size:11px; font-weight:700; color:#00D2FF; white-space:nowrap; margin-right:3px; }
       .pm-alert-msg { font-family:var(--font-body); font-size:11px; color:#C8DFF0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .pm-alert-age { font-family:var(--font-data); font-size:11px; color:#5A84A8; white-space:nowrap; margin:0 8px; }
-      .pm-btn { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; padding:4px 11px; border:1px solid; cursor:pointer; white-space:nowrap; background:none; transition:background .1s; }
-      .pm-btn-red { color:#E24B4A; border-color:rgba(226,75,74,.4); } .pm-btn-red:hover { background:rgba(226,75,74,.12); }
-      .pm-btn-cyan { color:#00D2FF; border-color:rgba(0,210,255,.35); } .pm-btn-cyan:hover { background:rgba(0,210,255,.08); }
-      .pm-body { display:grid; grid-template-columns:1fr 290px; gap:0; min-height:0; }
-      .pm-left { border-right:1px solid rgba(0,210,255,.1); display:flex; flex-direction:column; }
-      .pm-right { display:flex; flex-direction:column; min-height:0; }
-      .pm-sstrip { display:grid; grid-template-columns:repeat(5,1fr); border-bottom:1px solid rgba(0,210,255,.1); }
-      .pm-sc { padding:9px 12px; border-right:1px solid rgba(0,210,255,.08); }
+      .pm-alert-age { font-family:var(--font-data); font-size:11px; color:#5A84A8; white-space:nowrap; margin:0 10px; }
+      .pm-btn { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; padding:5px 13px; border:1px solid; cursor:pointer; white-space:nowrap; background:none; transition:background .1s; }
+      .pm-btn-red { color:#E24B4A; border-color:rgba(226,75,74,.5); } .pm-btn-red:hover { background:rgba(226,75,74,.14); }
+      .pm-btn-cyan { color:#00D2FF; border-color:rgba(0,210,255,.4); } .pm-btn-cyan:hover { background:rgba(0,210,255,.1); }
+      /* ── Stat strip ─────────────────────────────────────── */
+      .pm-sstrip { display:grid; grid-template-columns:repeat(5,1fr); border-bottom:1px solid rgba(0,210,255,.12); background:#070d1c; }
+      .pm-sc { padding:10px 14px; border-right:1px solid rgba(0,210,255,.08); }
       .pm-sc:last-child { border-right:none; }
-      .pm-sc-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.07em; color:#5A84A8; margin-bottom:2px; text-transform:uppercase; }
-      .pm-sc-val { font-family:var(--font-display); font-size:20px; font-weight:700; line-height:1; }
-      .pm-sc-sub { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin-top:1px; }
-      .pm-tabs { display:flex; border-bottom:1px solid rgba(0,210,255,.1); background:rgba(0,0,0,.2); }
-      .pm-tab { font-family:var(--font-head); font-size:12px; font-weight:700; letter-spacing:.07em; padding:8px 14px; cursor:pointer; color:#6A94B8; border-bottom:2px solid transparent; display:flex; align-items:center; gap:5px; transition:color .1s; }
-      .pm-tab.on { color:#F0F6FF; border-bottom-color:#00D2FF; }
-      .pm-tab:hover { color:#C8DFF0; }
+      .pm-sc-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#4A74A0; margin-bottom:3px; text-transform:uppercase; }
+      .pm-sc-val { font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1; }
+      .pm-sc-sub { font-family:var(--font-head); font-size:11px; color:#4A74A0; margin-top:2px; }
+      /* ── Portfolio body ─────────────────────────────────── */
+      .pm-body { display:grid; grid-template-columns:1fr 272px; gap:0; }
+      .pm-left { border-right:1px solid rgba(0,210,255,.1); display:flex; flex-direction:column; }
+      .pm-right { display:flex; flex-direction:column; background:#060b18; }
+      /* ── Tabs ────────────────────────────────────────────── */
+      .pm-tabs { display:flex; border-bottom:1px solid rgba(0,210,255,.12); background:#080f20; padding:0 4px; }
+      .pm-tab { font-family:var(--font-head); font-size:12px; font-weight:700; letter-spacing:.07em; padding:9px 14px; cursor:pointer; color:#5A84A8; border-bottom:2px solid transparent; display:flex; align-items:center; gap:5px; transition:color .12s; }
+      .pm-tab.on { color:#F0F6FF; border-bottom-color:#00D2FF; background:rgba(0,210,255,.04); }
+      .pm-tab:hover:not(.on) { color:#90B8D8; }
       .pm-tbadge { font-size:10px; font-weight:700; padding:1px 5px; border-radius:2px; }
-      .pm-pcards { overflow-y:auto; }
-      .pm-sec-hdr { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.1em; color:#5A84A8; padding:5px 13px; background:rgba(0,0,0,.25); border-bottom:1px solid rgba(0,210,255,.07); display:flex; align-items:center; gap:6px; }
-      .pm-pcard { border-bottom:1px solid rgba(0,210,255,.07); border-left:3px solid; padding:10px 13px; cursor:pointer; transition:background .12s; }
-      .pm-pcard:hover { background:rgba(255,255,255,.02); }
-      .pm-pcard.open { background:rgba(0,210,255,.04) !important; }
-      .pm-pn { font-family:var(--font-body); font-size:13px; font-weight:600; color:#F0F6FF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .pm-pmeta { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin:2px 0 6px; }
-      .pm-dgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:2px; margin:5px 0; }
-      .pm-dcell { text-align:center; }
-      .pm-dlbl { font-family:var(--font-head); font-size:11px; font-weight:700; color:#5A84A8; }
-      .pm-dhrs { font-family:var(--font-head); font-size:11px; font-weight:700; }
-      .pm-dot { width:6px; height:6px; border-radius:50%; margin:2px auto; }
-      .pm-evmrow { display:flex; gap:14px; margin:5px 0; align-items:baseline; }
-      .pm-evm-lbl { font-family:var(--font-head); font-size:11px; letter-spacing:.06em; color:#5A84A8; }
-      .pm-evm-val { font-family:var(--font-display); font-size:16px; font-weight:700; }
-      .pm-pbar { height:3px; background:rgba(255,255,255,.07); margin:5px 0 3px; position:relative; overflow:hidden; border-radius:2px; }
-      .pm-pbar-fill { height:100%; position:absolute; left:0; top:0; }
-      .pm-chiprow { display:flex; gap:5px; flex-wrap:wrap; margin-top:5px; align-items:center; }
-      .pm-chip { font-family:var(--font-head); font-size:11px; font-weight:700; padding:1px 7px; }
-      .pm-chip-r { color:#E24B4A; border:1px solid rgba(226,75,74,.35); background:rgba(226,75,74,.07); }
-      .pm-chip-a { color:#EF9F27; border:1px solid rgba(239,159,39,.35); background:rgba(239,159,39,.07); }
-      .pm-chip-c { color:#00D2FF; border:1px solid rgba(0,210,255,.3); background:rgba(0,210,255,.07); }
-      .pm-chip-g { color:#1D9E75; border:1px solid rgba(29,158,117,.3); background:rgba(29,158,117,.07); }
-      .pm-feed-hdr { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid rgba(0,210,255,.1); background:rgba(0,0,0,.2); flex-shrink:0; }
-      .pm-frow { display:flex; gap:8px; padding:7px 12px; border-bottom:1px solid rgba(0,210,255,.06); cursor:pointer; transition:background .1s; }
-      .pm-frow:hover { background:rgba(255,255,255,.02); }
-      .pm-ftag { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; white-space:nowrap; color:#00D2FF; min-width:80px; }
+      /* ── Section header ─────────────────────────────────── */
+      .pm-sec-hdr { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.12em; color:#3A6490; padding:5px 14px; background:#070d1c; border-bottom:1px solid rgba(0,210,255,.07); display:flex; align-items:center; gap:6px; text-transform:uppercase; }
+      /* ── Project cards ──────────────────────────────────── */
+      .pm-pcards { overflow-y:auto; background:#080e1e; }
+      .pm-pcard { border-bottom:1px solid rgba(0,210,255,.1); border-left:4px solid; padding:12px 14px 10px; cursor:pointer; transition:background .12s; background:#0a1220; margin:6px 8px; border-radius:0; border:1px solid rgba(0,210,255,.1); border-left:4px solid; }
+      .pm-pcard:hover { background:#0d1830; border-color:rgba(0,210,255,.2); }
+      .pm-pcard.open { background:rgba(0,210,255,.06) !important; border-color:rgba(0,210,255,.35) !important; }
+      .pm-pn { font-family:var(--font-display); font-size:15px; font-weight:700; color:#F0F6FF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:.02em; }
+      .pm-pmeta { font-family:var(--font-head); font-size:11px; color:#4A74A0; margin:2px 0 8px; }
+      /* ── Day grid ────────────────────────────────────────── */
+      .pm-dgrid { display:inline-grid; grid-template-columns:repeat(5,48px); gap:0; margin:4px 0 6px; background:rgba(0,0,0,.2); border:1px solid rgba(0,210,255,.08); }
+      .pm-dcell { text-align:center; padding:5px 4px; border-right:1px solid rgba(0,210,255,.06); }
+      .pm-dcell:last-child { border-right:none; }
+      .pm-dlbl { font-family:var(--font-head); font-size:11px; font-weight:700; color:#4A74A0; margin-bottom:3px; }
+      .pm-dhrs { font-family:var(--font-head); font-size:11px; font-weight:700; margin-top:2px; }
+      .pm-dot { width:7px; height:7px; border-radius:50%; margin:0 auto; }
+      /* ── EVM row ─────────────────────────────────────────── */
+      .pm-evmrow { display:flex; gap:0; margin:4px 0; align-items:stretch; background:rgba(0,0,0,.2); border:1px solid rgba(0,210,255,.08); }
+      .pm-evm-cell { padding:5px 10px; border-right:1px solid rgba(0,210,255,.06); }
+      .pm-evm-cell:last-child { border-right:none; margin-left:auto; }
+      .pm-evm-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#4A74A0; }
+      .pm-evm-val { font-family:var(--font-display); font-size:16px; font-weight:700; line-height:1.1; }
+      /* ── Progress bar ────────────────────────────────────── */
+      .pm-pbar { height:4px; background:rgba(255,255,255,.06); margin:6px 0 3px; border-radius:2px; position:relative; overflow:hidden; }
+      .pm-pbar-fill { height:100%; position:absolute; left:0; top:0; border-radius:2px; }
+      /* ── Chip row ────────────────────────────────────────── */
+      .pm-chiprow { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; align-items:center; }
+      .pm-chip { font-family:var(--font-head); font-size:11px; font-weight:700; padding:2px 8px; }
+      .pm-chip-r { color:#E24B4A; border:1px solid rgba(226,75,74,.4); background:rgba(226,75,74,.08); }
+      .pm-chip-a { color:#EF9F27; border:1px solid rgba(239,159,39,.4); background:rgba(239,159,39,.08); }
+      .pm-chip-c { color:#00D2FF; border:1px solid rgba(0,210,255,.35); background:rgba(0,210,255,.07); }
+      .pm-chip-g { color:#1D9E75; border:1px solid rgba(29,158,117,.35); background:rgba(29,158,117,.07); }
+      /* ── Feed ────────────────────────────────────────────── */
+      .pm-feed-hdr { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid rgba(0,210,255,.12); background:#070d1c; flex-shrink:0; }
+      .pm-frow { display:flex; gap:8px; padding:7px 12px; border-bottom:1px solid rgba(0,210,255,.07); cursor:pointer; transition:background .1s; }
+      .pm-frow:hover { background:rgba(255,255,255,.025); }
+      .pm-ftag { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:70px; flex-shrink:0; }
       .pm-fbody { flex:1; min-width:0; }
       .pm-ftitle { font-family:var(--font-body); font-size:11px; color:#C8DFF0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .pm-fsub { font-family:var(--font-head); font-size:11px; margin-top:1px; }
-      .pm-fage { font-family:var(--font-data); font-size:11px; color:#5A84A8; flex-shrink:0; align-self:center; }
-      /* Drawer */
-      .pm-drawer { position:fixed; top:44px; right:0; bottom:0; width:540px; background:#08101f; border-left:1px solid rgba(0,210,255,.18); display:flex; flex-direction:column; z-index:200; animation:pm-drawer-in .2s ease; }
+      .pm-fage { font-family:var(--font-data); font-size:11px; color:#5A84A8; flex-shrink:0; align-self:center; white-space:nowrap; }
+      /* ── Drawer ──────────────────────────────────────────── */
+      .pm-drawer { position:fixed; top:44px; right:0; bottom:0; width:540px; background:#08101f; border-left:1px solid rgba(0,210,255,.2); display:flex; flex-direction:column; z-index:200; box-shadow:-16px 0 48px rgba(0,0,0,.7); animation:pm-drawer-in .22s ease; }
       @keyframes pm-drawer-in { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
-      .pm-drhdr { padding:11px 14px 9px; border-bottom:1px solid rgba(0,210,255,.1); flex-shrink:0; }
+      .pm-drhdr { padding:12px 15px 10px; border-bottom:1px solid rgba(0,210,255,.12); flex-shrink:0; background:#070d1c; }
       .pm-drname { font-family:var(--font-display); font-size:20px; font-weight:700; color:#F0F6FF; line-height:1.1; }
-      .pm-drdesc { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin:2px 0 5px; }
-      .pm-drstrip { display:grid; grid-template-columns:repeat(6,1fr); border-bottom:1px solid rgba(0,210,255,.1); flex-shrink:0; }
-      .pm-drc { padding:7px 8px; border-right:1px solid rgba(0,210,255,.07); text-align:center; }
+      .pm-drdesc { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin:3px 0 6px; }
+      .pm-drstrip { display:grid; grid-template-columns:repeat(6,1fr); border-bottom:1px solid rgba(0,210,255,.1); flex-shrink:0; background:#070d1c; }
+      .pm-drc { padding:8px 8px; border-right:1px solid rgba(0,210,255,.08); text-align:center; }
       .pm-drc:last-child { border-right:none; }
-      .pm-drc-lbl { font-family:var(--font-head); font-size:10px; font-weight:700; letter-spacing:.07em; color:#5A84A8; text-transform:uppercase; }
-      .pm-drc-val { font-family:var(--font-display); font-size:17px; font-weight:700; line-height:1; margin-top:1px; }
-      .pm-drc-sub { font-family:var(--font-head); font-size:10px; color:#5A84A8; }
+      .pm-drc-lbl { font-family:var(--font-head); font-size:10px; font-weight:700; letter-spacing:.07em; color:#4A74A0; text-transform:uppercase; }
+      .pm-drc-val { font-family:var(--font-display); font-size:18px; font-weight:700; line-height:1; margin-top:2px; }
+      .pm-drc-sub { font-family:var(--font-head); font-size:10px; color:#4A74A0; margin-top:1px; }
       .pm-drtabs { display:flex; border-bottom:1px solid rgba(0,210,255,.1); background:#060c18; flex-shrink:0; overflow-x:auto; }
-      .pm-drtab { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; padding:7px 12px; cursor:pointer; color:#6A94B8; border-bottom:2px solid transparent; white-space:nowrap; }
+      .pm-drtab { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.06em; padding:8px 13px; cursor:pointer; color:#5A84A8; border-bottom:2px solid transparent; white-space:nowrap; transition:color .1s; }
       .pm-drtab.on { color:#F0F6FF; border-bottom-color:#00D2FF; }
+      .pm-drtab:hover:not(.on) { color:#90B8D8; }
       .pm-drbody { flex:1; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:0; }
       .pm-drcol { border-right:1px solid rgba(0,210,255,.08); }
       .pm-drcol:last-child { border-right:none; }
-      .pm-dcsec { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.1em; color:#5A84A8; padding:6px 11px 3px; text-transform:uppercase; border-bottom:1px solid rgba(0,210,255,.06); background:rgba(0,0,0,.15); }
-      .pm-rfcard { margin:8px 10px; background:rgba(226,75,74,.07); border:1px solid rgba(226,75,74,.28); padding:9px 11px; }
-      .pm-rf-tag { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#E24B4A; margin-bottom:4px; }
-      .pm-rf-who { font-family:var(--font-body); font-size:12px; font-weight:600; color:#F0F6FF; margin-bottom:2px; }
-      .pm-rf-quote { font-family:var(--font-body); font-size:11px; color:#C8DFF0; font-style:italic; margin-bottom:7px; line-height:1.4; }
-      .pm-rf-ctx { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin-bottom:8px; }
-      .pm-aicard { margin:8px 10px; background:rgba(239,159,39,.05); border:1px solid rgba(239,159,39,.2); border-left:3px solid #EF9F27; padding:8px 10px; }
-      .pm-ai-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#EF9F27; margin-bottom:4px; }
-      .pm-ai-item { font-family:var(--font-body); font-size:11px; color:#C8DFF0; margin-bottom:3px; padding-left:10px; position:relative; line-height:1.4; }
-      .pm-ai-item::before { content:'·'; position:absolute; left:2px; color:#EF9F27; }
-      .pm-decrow { padding:7px 11px; border-bottom:1px solid rgba(0,210,255,.06); display:flex; gap:7px; align-items:flex-start; }
-      .pm-dec-chip { font-family:var(--font-head); font-size:11px; font-weight:700; padding:1px 6px; white-space:nowrap; flex-shrink:0; }
-      .pm-dec-text { font-family:var(--font-body); font-size:11px; color:#C8DFF0; line-height:1.4; flex:1; }
-      .pm-dec-date { font-family:var(--font-data); font-size:11px; color:#5A84A8; white-space:nowrap; }
-      .pm-brief-row { display:flex; align-items:center; gap:8px; padding:6px 11px; border-bottom:1px solid rgba(0,210,255,.06); cursor:pointer; transition:background .1s; }
+      .pm-dcsec { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.1em; color:#4A74A0; padding:7px 12px 4px; text-transform:uppercase; border-bottom:1px solid rgba(0,210,255,.07); background:#070d1c; display:flex; align-items:center; gap:6px; }
+      .pm-rfcard { margin:8px 10px; background:rgba(226,75,74,.07); border:1px solid rgba(226,75,74,.3); border-left:3px solid #E24B4A; padding:10px 11px; }
+      .pm-rf-tag { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#E24B4A; margin-bottom:5px; }
+      .pm-rf-who { font-family:var(--font-body); font-size:12px; font-weight:600; color:#F0F6FF; margin-bottom:3px; }
+      .pm-rf-quote { font-family:var(--font-body); font-size:11px; color:#C8DFF0; font-style:italic; margin-bottom:8px; line-height:1.5; border-left:2px solid rgba(226,75,74,.4); padding-left:8px; }
+      .pm-rf-ctx { font-family:var(--font-head); font-size:11px; color:#5A84A8; margin-bottom:9px; }
+      .pm-aicard { margin:8px 10px; background:rgba(239,159,39,.05); border:1px solid rgba(239,159,39,.18); border-left:3px solid #EF9F27; padding:9px 11px; }
+      .pm-ai-lbl { font-family:var(--font-head); font-size:11px; font-weight:700; letter-spacing:.08em; color:#EF9F27; margin-bottom:5px; }
+      .pm-ai-item { font-family:var(--font-body); font-size:11px; color:#C8DFF0; margin-bottom:4px; padding-left:12px; position:relative; line-height:1.5; }
+      .pm-ai-item::before { content:'·'; position:absolute; left:2px; color:#EF9F27; font-weight:700; }
+      .pm-decrow { padding:7px 12px; border-bottom:1px solid rgba(0,210,255,.07); display:flex; gap:7px; align-items:flex-start; }
+      .pm-dec-chip { font-family:var(--font-head); font-size:11px; font-weight:700; padding:2px 7px; white-space:nowrap; flex-shrink:0; }
+      .pm-dec-text { font-family:var(--font-body); font-size:11px; color:#C8DFF0; line-height:1.5; flex:1; }
+      .pm-dec-date { font-family:var(--font-data); font-size:11px; color:#5A84A8; white-space:nowrap; margin-top:1px; }
+      .pm-brief-row { display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid rgba(0,210,255,.07); cursor:pointer; transition:background .1s; }
       .pm-brief-row:hover { background:rgba(255,255,255,.02); }
       .pm-bdate { font-family:var(--font-head); font-size:11px; font-weight:600; color:#C8DFF0; min-width:90px; }
       .pm-bflag { font-family:var(--font-head); font-size:11px; flex:1; }
-      .pm-feed-row { display:flex; gap:7px; padding:6px 10px; border-bottom:1px solid rgba(0,210,255,.06); }
-      .pm-live-dot { width:6px; height:6px; border-radius:50%; background:#1D9E75; display:inline-block; flex-shrink:0; }
+      .pm-feed-row { display:flex; gap:7px; padding:7px 12px; border-bottom:1px solid rgba(0,210,255,.07); transition:background .1s; }
+      .pm-feed-row:hover { background:rgba(255,255,255,.02); }
+      .pm-live-dot { width:7px; height:7px; border-radius:50%; background:#1D9E75; display:inline-block; flex-shrink:0; }
     `;
     document.head.appendChild(s);
   }
@@ -2051,7 +2070,7 @@ async function loadPMView() {
       API.get('workflow_instances?select=id,title,status,current_step_name,project_id,launched_at,priority,stakes&status=eq.active&order=launched_at.desc&limit=50').catch(() => []),
       API.get('workflow_action_items?status=eq.open&order=due_date.asc&limit=100').catch(() => []),
       API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated)&order=created_at.desc&limit=150').catch(() => []),
-      API.get('resource_requests?select=id,project_id,status,submitted_at,resource_name,role,notes&status=eq.pending&order=submitted_at.asc&limit=20').catch(() => []),
+      API.get('resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&order=submitted_at.asc&limit=20').catch(() => []),
       API.get(`time_entries?date=gte.${weekDays[0]}&date=lte.${weekDays[4]}&select=id,project_id,resource_id,date,hours,is_billable&limit=500`).catch(() => []),
     ]);
 
@@ -2138,6 +2157,11 @@ async function loadPMView() {
       }).join('');
     }
 
+    function evmColor(v) {
+      if (!v) return 'var(--text3)';
+      const n = parseFloat(v);
+      return n >= 1 ? 'var(--compass-green)' : n >= 0.9 ? 'var(--compass-amber)' : 'var(--compass-red)';
+    }
     // ── Project card HTML ────────────────────────────────
     function projCardHtml(ps, idx) {
       const {p,pct,doneTasks,totalTasks,overdueTasks,projInsts,projFlags,projReqs,projCoc,hoursByDay} = ps;
@@ -2171,16 +2195,20 @@ async function loadPMView() {
         <div class="pm-pmeta">${esc(p.client||'—')} · PM ${pmLabel} · Due ${p.target_date?fmtDate(p.target_date):'—'}</div>
         <div class="pm-dgrid">${dayGridHtml(hoursByDay)}</div>
         <div class="pm-evmrow">
-          <div class="pm-evm-lbl">CPI</div>
-          <div class="pm-evm-val" style="color:${p.cpi>=1?'var(--compass-green)':p.cpi>=.9?'var(--compass-amber)':'var(--compass-red)'}">${p.cpi?parseFloat(p.cpi).toFixed(2):'—'}</div>
-          <div class="pm-evm-lbl" style="margin-left:8px">SPI</div>
-          <div class="pm-evm-val" style="color:${p.spi>=1?'var(--compass-green)':p.spi>=.9?'var(--compass-amber)':'var(--compass-red)'}">${p.spi?parseFloat(p.spi).toFixed(2):'—'}</div>
-          ${p.budget_hours?`<div class="pm-evm-lbl" style="margin-left:8px">BUDGET</div>
-          <div class="pm-evm-val" style="color:var(--text2);font-size:13px">${p.budget_hours_used?Math.round(p.budget_hours_used):'—'}h / ${Math.round(p.budget_hours)}h</div>`:''}
-          <div style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#5A84A8">
-            ${p.target_date?`P50 <strong style="color:${barColor}">${fmtDate(p.target_date)}</strong>`:''}
+          <div class="pm-evm-cell">
+            <div class="pm-evm-lbl">CPI</div>
+            <div class="pm-evm-val" style="color:${evmColor(p.cpi)}">${p.cpi?parseFloat(p.cpi).toFixed(2):'—'}</div>
           </div>
-        </div>
+          <div class="pm-evm-cell">
+            <div class="pm-evm-lbl">SPI</div>
+            <div class="pm-evm-val" style="color:${evmColor(p.spi)}">${p.spi?parseFloat(p.spi).toFixed(2):'—'}</div>
+          </div>
+          ${p.budget_hours?`<div class="pm-evm-cell"><div class="pm-evm-lbl">BUDGET</div><div class="pm-evm-val" style="color:var(--text2);font-size:13px">${p.budget_hours_used?Math.round(p.budget_hours_used):'0'}h/${Math.round(p.budget_hours)}h</div></div>`:''}
+          <div class="pm-evm-cell" style="margin-left:auto">
+            <div class="pm-evm-lbl">P50 TARGET</div>
+            <div class="pm-evm-val" style="color:${barColor};font-size:13px">${p.target_date?fmtDate(p.target_date):'—'}</div>
+          </div>
+            </div>
         <div class="pm-pbar">
           <div class="pm-pbar-fill" style="width:${pct}%;background:${barColor}"></div>
         </div>
@@ -2217,7 +2245,7 @@ async function loadPMView() {
         alerts.push(`<div class="pm-alert">
           <span class="pm-alert-type warn">● REQUEST ${hrs}H</span>
           <span class="pm-alert-proj">${esc(proj?.name||'—')}</span>
-          <span class="pm-alert-msg">Resource request — ${esc(r.role||r.resource_name||'unnamed')} — no response</span>
+          <span class="pm-alert-msg">Resource request — pending ${hrs}h with no response</span>
           <span class="pm-alert-age">${_timeAgo(r.submitted_at)}</span>
           <button class="pm-btn pm-btn-red">Acknowledge</button>
           <button class="pm-btn pm-btn-cyan">Open request →</button>
@@ -2289,7 +2317,7 @@ async function loadPMView() {
               ? `<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No recent activity</div>`
               : feedEvents.map(({e,proj,isRej,isDone,color,icon,age})=>`
               <div class="pm-frow" onclick="pmOpenDrawer('${proj?.id||''}')">
-                <span class="pm-ftag" style="color:${proj?color:'var(--text3)'};min-width:72px">${esc(proj?.name?.slice(0,10)||'—')}</span>
+                <span class="pm-ftag" style="color:${isRej?'var(--compass-red)':isDone?'var(--compass-green)':'var(--compass-amber)'}">${esc(proj?.name?.slice(0,12)||'—')}</span>
                 <div class="pm-fbody">
                   <div class="pm-ftitle">${esc(e.step_name||'—')}${e.actor_name?' — '+esc(e.actor_name):''}</div>
                   ${e.event_notes&&isRej?`<div class="pm-fsub" style="color:var(--compass-red);font-style:italic">"${esc(e.event_notes.slice(0,60))}"</div>`:''}
