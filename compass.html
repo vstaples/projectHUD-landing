@@ -1300,23 +1300,23 @@ async function loadUserView() {
 
     // ── Bar chart HTML ────────────────────────────────────────────────
     const barChart = weekDays.map((d, i) => {
-      const hrs    = hoursByDay[d] || 0;
-      const pct    = Math.round((hrs / Math.max(maxDayHours, 8)) * 100);
+      const hrs      = hoursByDay[d] || 0;
+      const pct      = Math.round((hrs / Math.max(maxDayHours, 8)) * 100);
       const isToday  = d === today;
       const isFuture = d > today;
       const isActive = _teFilter === d;
       const barColor = isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : isFuture ? 'var(--border)' : hrs > 0 ? 'var(--compass-green)' : 'var(--border)';
       return `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
-          cursor:${hrs > 0 ? 'pointer' : 'default'}"
-          onclick="${hrs > 0 ? `filterTimeLog('${d}')` : ''}">
-          <div style="font-family:var(--font-mono);font-size:10px;color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
+        <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
+            cursor:${hrs > 0 ? 'pointer' : 'default'}">
+          <div style="font-family:var(--font-mono);font-size:10px;
+            color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
             ${hrs > 0 ? hrs.toFixed(1) : ''}
           </div>
           <div style="width:100%;height:48px;display:flex;align-items:flex-end;justify-content:center">
             <div style="width:80%;height:${Math.max(pct, hrs > 0 ? 4 : 0)}%;background:${barColor};
-              border-radius:2px 2px 0 0;transition:all .2s;min-height:${hrs > 0 ? '2px' : '0'};
-              ${hrs > 0 ? 'box-shadow:0 0 0 0 transparent' : ''}"></div>
+              border-radius:2px 2px 0 0;transition:all .2s;min-height:${hrs > 0 ? '2px' : '0'}"></div>
           </div>
           <div style="font-family:var(--font-mono);font-size:10px;
             color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'};
@@ -1415,7 +1415,7 @@ async function loadUserView() {
             <div class="panel-hdr">
               <div class="panel-title">Time log${filterLabel ? ` — ${filterLabel}` : ' — recent'}</div>
               <div style="display:flex;gap:8px;align-items:center">
-                ${filterLabel ? `<button onclick="filterTimeLog(null)"
+                ${filterLabel ? `<button class="te-clear-filter"
                   style="font-family:var(--font-mono);font-size:10px;color:var(--compass-amber);
                     background:none;border:none;cursor:pointer;padding:0">✕ clear</button>` : ''}
                 <a href="/resources.html" style="font-family:var(--font-mono);font-size:10px;
@@ -1426,28 +1426,17 @@ async function loadUserView() {
               ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
                   ${filterLabel ? 'No entries for this day' : 'No time entries this period'}
                  </div>`
-              : displayEntries.map(e => {
+              : displayEntries.map((e, idx) => {
                   const proj = _projects.find(p => p.id === e.project_id);
                   const sourceIcon  = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
                   const sourceColor = e.source_type === 'step_comment' ? 'var(--compass-cyan)' : e.source_type === 'action_item' ? 'var(--compass-purple)' : 'var(--text3)';
                   const isCadence   = e.source_type === 'step_comment';
                   return `
-                  <div style="display:flex;align-items:center;gap:8px;padding:7px 13px;
-                    border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s"
+                  <div class="te-row" data-te-id="${e.id}" data-te-cadence="${isCadence}"
+                    style="display:flex;align-items:center;gap:8px;padding:7px 13px;
+                      border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s"
                     onmouseenter="this.style.background='var(--bg2)'"
-                    onmouseleave="this.style.background=''"
-                    onclick="${isCadence
-                      ? `window.location.href='/cadence.html'`
-                      : `openTimeEntryEdit(${JSON.stringify({
-                          id: e.id,
-                          hours: e.hours,
-                          notes: e.notes || '',
-                          is_billable: e.is_billable,
-                          date: e.date,
-                          project_name: proj?.name || '—',
-                          step_name: e.step_name || null,
-                          source_type: e.source_type,
-                        })})`}">
+                    onmouseleave="this.style.background=''">
                     <div style="font-size:13px;color:${sourceColor};flex-shrink:0">${sourceIcon}</div>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
@@ -1456,7 +1445,7 @@ async function loadUserView() {
                       </div>
                       <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">
                         ${fmtDate(e.date)} · ${e.is_billable ? 'Billable' : 'Non-billable'}
-                        ${isCadence ? ' · <span style="color:var(--compass-cyan)">via Cadence</span>' : ' · click to edit'}
+                        ${isCadence ? ' · <span style="color:var(--compass-cyan)">via Cadence</span>' : ' · <span style="color:var(--text3)">click to edit</span>'}
                       </div>
                     </div>
                     <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;
@@ -1511,6 +1500,47 @@ async function loadUserView() {
 
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+
+    // ── Delegated events — wired after innerHTML is set ───────
+    content.addEventListener('click', function onContentClick(ev) {
+      // Clear filter button
+      if (ev.target.closest('.te-clear-filter')) {
+        content.removeEventListener('click', onContentClick);
+        filterTimeLog(null);
+        return;
+      }
+      // Bar chart day filter
+      const barCol = ev.target.closest('.te-bar-col');
+      if (barCol && barCol.dataset.hasHours === 'true') {
+        content.removeEventListener('click', onContentClick);
+        filterTimeLog(barCol.dataset.date);
+        return;
+      }
+      // Time log row
+      const teRow = ev.target.closest('.te-row');
+      if (teRow) {
+        const teId   = teRow.dataset.teId;
+        const isCad  = teRow.dataset.teCadence === 'true';
+        if (isCad) {
+          window.location.href = '/cadence.html';
+          return;
+        }
+        const entry = _teEntries.find(e => e.id === teId);
+        if (entry) {
+          const proj = _projects.find(p => p.id === entry.project_id);
+          openTimeEntryEdit({
+            id:           entry.id,
+            hours:        entry.hours,
+            notes:        entry.notes || '',
+            is_billable:  entry.is_billable,
+            date:         entry.date,
+            project_name: proj?.name || '—',
+            step_name:    entry.step_name || null,
+            source_type:  entry.source_type,
+          });
+        }
+      }
+    }, { once: false });
 
   } catch (e) {
     console.error('[Compass] loadUserView error:', e);
