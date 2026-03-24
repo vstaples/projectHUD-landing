@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compass — Operational Intelligence</title>
 <link rel="stylesheet" href="/css/hud.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ── Compass shell variables ─────────────────────────────── */
 :root {
@@ -13,6 +16,12 @@
   --compass-green:  #1D9E75;
   --compass-red:    #E24B4A;
   --compass-purple: #8B5CF6;
+
+  /* ── Session 16: Four-font system ─── */
+  --font-display: 'Rajdhani', sans-serif;
+  --font-head:    'Barlow Condensed', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-data:    'JetBrains Mono', monospace;
 
   /* Override hud.css text hierarchy for Compass — brighter, higher contrast */
   --text0: #F0F6FF;   /* primary text — near white */
@@ -1005,6 +1014,10 @@ let _teSelected  = null;   // id of currently selected time log row
 let _wfStatus    = 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
 let _wfProject   = '';     // project id | '' = all
 let _wfDateRange = 'week'; // 'today' | 'week' | '30d' | 'all'
+let _wfType      = 'all';  // 'all' | 'task' | 'workflow' | 'action'  [Session 16]
+let _doneToday   = [];     // session-persistent completed items  [Session 16]
+let _activeGauge = null;   // clicked gauge date key | null  [Session 16]
+let _dwellTimer  = null;   // gauge dwell timer handle
 
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('compass-date').textContent =
@@ -1195,7 +1208,8 @@ function avatarHtml(name, size = 24, cls = 'av-cyan') {
 
 
 // ══════════════════════════════════════════════════════════
-// VIEW: MY WORK (Individual Contributor)
+// VIEW: MY WORK (Individual Contributor) — Feature #1
+// Spec: Compass_MyWork_Spec_v1.pdf · Session 16
 // ══════════════════════════════════════════════════════════
 async function loadUserView() {
   const loading = document.getElementById('compass-loading');
@@ -1208,13 +1222,11 @@ async function loadUserView() {
     const d = _identityDebug;
     content.innerHTML = `
       <div style="padding:40px 20px;text-align:center">
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--compass-red);
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--compass-red);
           margin-bottom:12px;letter-spacing:.12em">⚠ IDENTITY NOT RESOLVED</div>
-
-        <!-- What we found -->
         <div style="display:inline-block;text-align:left;background:var(--bg1);
           border:1px solid var(--border);padding:14px 20px;margin-bottom:16px;
-          font-family:var(--font-mono);font-size:11px;line-height:2;min-width:320px">
+          font-family:var(--font-data);font-size:11px;line-height:2;min-width:320px">
           <div style="color:var(--text3);letter-spacing:.08em;margin-bottom:4px">SESSION DETAILS</div>
           <div><span style="color:var(--text3)">Auth email&nbsp;&nbsp;&nbsp;</span>
             <span style="color:${d.authEmail ? 'var(--compass-cyan)' : 'var(--compass-red)'}">
@@ -1229,506 +1241,695 @@ async function loadUserView() {
               ${d.resourceId && d.resourceId !== 'undefin…' ? d.resourceId : '— not linked —'}</span></div>
           ${d.error ? `<div style="color:var(--compass-red);margin-top:4px">Error: ${esc(d.error)}</div>` : ''}
         </div>
-
-        <div style="font-family:var(--font-ui);font-size:12px;color:var(--text3);
+        <div style="font-family:var(--font-body);font-size:12px;color:var(--text3);
           margin-bottom:16px;line-height:1.6;max-width:480px;margin-left:auto;margin-right:auto">
           ${d.authEmail
             ? `Logged in as <strong style="color:var(--text1)">${esc(d.authEmail)}</strong> but no matching resource record was found.<br>
                Ensure your <code style="color:var(--compass-cyan)">users</code> row has
-               <code style="color:var(--compass-cyan)">resource_id</code> set, or that a resource record
-               exists with this email address.`
+               <code style="color:var(--compass-cyan)">resource_id</code> set.`
             : `No email found in session token. Try logging out and back in.`}
         </div>
-
-        <a href="/users.html" style="font-family:var(--font-mono);font-size:11px;
+        <a href="/users.html" style="font-family:var(--font-head);font-size:11px;
           letter-spacing:.1em;color:var(--compass-cyan);text-decoration:none;
-          border:1px solid rgba(0,210,255,.3);padding:6px 16px;margin-right:8px">
-          USER MGMT →
-        </a>
+          border:1px solid rgba(0,210,255,.3);padding:6px 16px;margin-right:8px">USER MGMT →</a>
         <button onclick="_viewLoaded['user']=false;loadUserView()"
-          style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
+          style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;
             color:var(--text2);background:none;border:1px solid var(--border);
-            padding:6px 16px;cursor:pointer">
-          RETRY
-        </button>
+            padding:6px 16px;cursor:pointer">RETRY</button>
       </div>`;
     return;
   }
 
   try {
     const resId = _myResource.id;
-    const weekStartDate = new Date(new Date().setDate(new Date().getDate() - (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1))).toLocaleDateString('en-CA');
-
-    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
-      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=due_date.asc`).catch(() => []),
-      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
-      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
-      API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
-      API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
-    ]);
-
-    const today     = new Date().toLocaleDateString('en-CA');
+    const today = new Date().toLocaleDateString('en-CA');
     const todayDate = new Date(today + 'T00:00:00');
-
-    // ── Week boundaries (Mon–Sun) ─────────────────────────────────────
-    const dayOfWeek  = todayDate.getDay(); // 0=Sun … 6=Sat
-    const isoOffset  = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // offset to Monday
-    const weekStart  = new Date(todayDate); weekStart.setDate(todayDate.getDate() - isoOffset);
-    const weekDays   = Array.from({ length: 7 }, (_, i) => {
+    const dayOfWeek = todayDate.getDay();
+    const isoOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(todayDate); weekStart.setDate(todayDate.getDate() - isoOffset);
+    const weekStartDate = weekStart.toLocaleDateString('en-CA');
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
       return d.toLocaleDateString('en-CA');
     });
     const weekLabels = ['M','T','W','T','F','S','S'];
 
+    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
+      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,launched_at&status=eq.active&limit=50`).catch(() => []),
+      API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
+      API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
+    ]);
+
     // ── Hours per day this week ───────────────────────────────────────
-    const hoursByDay    = {};
-    const billableByDay = {};
+    const hoursByDay    = {}; const billableByDay = {};
     weekDays.forEach(d => { hoursByDay[d] = 0; billableByDay[d] = 0; });
     myTimeEntries.forEach(e => {
-      if (hoursByDay.hasOwnProperty(e.date)) {
+      if (Object.prototype.hasOwnProperty.call(hoursByDay, e.date)) {
         const h = parseFloat(e.hours || 0);
         hoursByDay[e.date] += h;
         if (e.is_billable) billableByDay[e.date] += h;
       }
     });
 
-    // ── This-week totals ──────────────────────────────────────────────
-    const weekEntries    = myTimeEntries.filter(e => weekDays.includes(e.date));
-    const weekTotal      = weekEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-    const weekBillable   = weekEntries.filter(e => e.is_billable).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-    const todayTotal     = parseFloat(hoursByDay[today] || 0);
-    const maxDayHours    = Math.max(...Object.values(hoursByDay), 1);
+    // ── Week totals ───────────────────────────────────────────────────
+    const weekEntries  = myTimeEntries.filter(e => weekDays.includes(e.date));
+    const weekTotal    = weekEntries.reduce((s,e) => s + parseFloat(e.hours||0), 0);
+    const weekBillable = weekEntries.filter(e=>e.is_billable).reduce((s,e) => s+parseFloat(e.hours||0), 0);
+    const todayTotal   = parseFloat(hoursByDay[today] || 0);
 
-    // ── Work list ─────────────────────────────────────────────────────
+    // ── Work list build ───────────────────────────────────────────────
     const workItems = [];
-    // Filter cancelled + effectively-complete client-side
     (myTasks || [])
       .filter(t => t.status !== 'cancelled')
-      .filter(t => {
-        const pct = parseFloat(t.pct_complete) || 0;
-        const pctNorm = pct <= 1 && pct > 0 ? Math.round(pct * 100) : Math.round(pct);
-        return pctNorm < 100; // exclude tasks that are 100% done
-      })
+      .filter(t => { const p = parseFloat(t.pct_complete)||0; const pn = p<=1&&p>0?Math.round(p*100):Math.round(p); return pn < 100; })
       .forEach(t => {
         const proj = _projects.find(p => p.id === t.project_id);
         const overdue = t.due_date && t.due_date < today;
-        const pct = parseFloat(t.pct_complete) || 0;
-        const pctNorm = pct <= 1 && pct > 0 ? Math.round(pct * 100) : Math.round(pct);
+        const p = parseFloat(t.pct_complete)||0;
+        const pctNorm = p<=1&&p>0?Math.round(p*100):Math.round(p);
         workItems.push({ type:'task', id:t.id, title:t.name, project:proj?.name||'—',
-          projectId: t.project_id || null, status: t.status,
-          due:t.due_date, overdue, pct: pctNorm,
+          projectId:t.project_id||null, status:t.status,
+          due:t.due_date, overdue, pct:pctNorm,
           urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
       });
-    myActionItems.forEach(a => {
+    (myActionItems||[]).filter(a => a.owner_resource_id).forEach(a => {
       const overdue = a.due_date && a.due_date < today;
       workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
-        projectId: null, status: a.status || 'open',
-        due:a.due_date, overdue, urgency: overdue ? 0 : 1 });
+        projectId:null, status:a.status||'open', due:a.due_date, overdue,
+        urgency: overdue ? 0 : 1 });
     });
-    workItems.sort((a, b) => {
+    workItems.sort((a,b) => {
       if (a.urgency !== b.urgency) return a.urgency - b.urgency;
       if (a.due && b.due) return a.due.localeCompare(b.due);
       return 0;
     });
-    const overdueCount = workItems.filter(w => w.overdue).length;
-
-    // Cache for drawer access
     _wiItems = workItems;
-
-    // ── Cache for interactive time log ───────────────────────────────
     _teEntries = myTimeEntries;
-    if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null; // reset if stale
+    if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null;
 
-    // ── Speedometer gauges — half-circle, needle, ticks, pill ────────
-    const gaugeMax = Math.max(maxDayHours, 8);
-    const GW=90, GH=80, GCX=45, GCY=62, GR=36;
-
-    function gPt(deg) {
-      const a = (deg - 180) * Math.PI / 180;
-      return [(GCX + GR * Math.cos(a)).toFixed(1), (GCY + GR * Math.sin(a)).toFixed(1)];
+    // ── Stat card counts ──────────────────────────────────────────────
+    const waiting    = workItems.filter(w => w.status === 'not_started').length;
+    const inProgress = workItems.filter(w => w.status === 'in_progress').length;
+    const blocked    = workItems.filter(w => w.status === 'blocked').length;
+    const doneTodayCt= _doneToday.length;
+    const openItems  = workItems.length;
+    const overdueCount = workItems.filter(w => w.overdue).length;
+    const activeFirmWF = wfInstances.length;
+    // Streak: consecutive days with time entries
+    const uniqueDates = [...new Set(myTimeEntries.map(e=>e.date))].sort().reverse();
+    let streak = 0;
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(today); d.setDate(d.getDate() - i);
+      const ds = d.toLocaleDateString('en-CA');
+      if (uniqueDates.includes(ds)) streak++; else if (i > 0) break;
     }
-    function gArc(d1, d2) {
-      if (d2 <= d1) return '';
-      const [x1,y1] = gPt(d1), [x2,y2] = gPt(Math.min(d2, 179.9));
+    // Items completed this week
+    const weekCompletedItems = _doneToday.length; // session items; real count would need DB query
+    const firstName = (_myResource?.name || '').split(' ')[0] || 'there';
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const weekOf = weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const myWeekRow = myWeek?.[0] || null;
+    const wsStatus = myWeekRow?.status || 'draft';
+    const wsLabel = {draft:'DRAFT',submitted:'SUBMITTED',approved:'APPROVED',rejected:'REJECTED',amended:'AMENDED'}[wsStatus]||wsStatus.toUpperCase();
+    const wsColor = wsStatus==='approved'?'var(--compass-green)':wsStatus==='submitted'?'var(--compass-cyan)':wsStatus==='rejected'?'var(--compass-red)':'var(--text3)';
+
+    // ── EOD Nudge Logic (1.E) ─────────────────────────────────────────
+    const nowHr = new Date().getHours() + new Date().getMinutes()/60;
+    const expectedHrs = 8;
+    let eodNudge = null; // null | 'amber' | 'red'
+    if (nowHr >= 17 && todayTotal === 0) eodNudge = 'red';
+    else if (nowHr >= 16 && todayTotal < 4) eodNudge = 'amber';
+
+    // ── Day completion dots (M-F) ─────────────────────────────────────
+    function dayDotHtml(d, label) {
+      const hrs = hoursByDay[d] || 0;
+      const isPast = d < today;
+      const isToday = d === today;
+      const isFuture = d > today;
+      let fill, border, char, color;
+      if (isToday) { fill='var(--compass-cyan)'; border='var(--compass-cyan)'; char='■'; color='#060a10'; }
+      else if (isPast && hrs > 0) { fill='var(--compass-green)'; border='var(--compass-green)'; char='✓'; color='#060a10'; }
+      else if (isPast && hrs === 0) { fill='var(--compass-red)'; border='var(--compass-red)'; char='!'; color='#fff'; }
+      else { fill='transparent'; border='var(--muted)'; char='—'; color='var(--muted)'; }
+      return `<div class="day-dot" data-day="${d}" title="${label} · ${hrs.toFixed(1)}h"
+        style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+        <div style="width:22px;height:22px;border-radius:50%;background:${fill};border:1.5px solid ${border};
+          display:flex;align-items:center;justify-content:center;font-size:10px;color:${color};
+          font-family:var(--font-head);font-weight:700;transition:transform .1s"
+          onmouseenter="this.style.transform='scale(1.15)'" onmouseleave="this.style.transform='scale(1)'">${char}</div>
+        <span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:var(--text3)">${label}</span>
+      </div>`;
+    }
+    const dotLabels = ['M','T','W','T','F'];
+    const dotsHtml = weekDays.slice(0,5).map((d,i) => dayDotHtml(d, dotLabels[i])).join('');
+
+    // ── Speedometer Row (1.B) — compact GW=74 ────────────────────────
+    const GW=74,GH=58,GCX=37,GCY=49,GR=30;
+    function gPt(deg) {
+      const a=(deg-180)*Math.PI/180;
+      return [(GCX+GR*Math.cos(a)).toFixed(1),(GCY+GR*Math.sin(a)).toFixed(1)];
+    }
+    function gArc(d1,d2) {
+      if(d2<=d1)return '';
+      const [x1,y1]=gPt(d1),[x2,y2]=gPt(Math.min(d2,179.9));
       return `M${x1},${y1} A${GR},${GR} 0 ${d2-d1>180?1:0} 1 ${x2},${y2}`;
     }
-
-    // Tick marks + labels — computed once
-    const gTicks = Array.from({length:11},(_,i) => {
-      const deg = i * 18;
-      const isMaj = i % 2 === 0;
-      const a = (deg - 180) * Math.PI / 180;
-      const r0 = GR + 2, r1 = isMaj ? GR + 7 : GR + 4;
-      const x0=(GCX+r0*Math.cos(a)).toFixed(1), y0=(GCY+r0*Math.sin(a)).toFixed(1);
-      const x1=(GCX+r1*Math.cos(a)).toFixed(1), y1=(GCY+r1*Math.sin(a)).toFixed(1);
-      const tick = `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,255,255,.28)" stroke-width="${isMaj?1:.6}"/>`;
-      if (!isMaj) return tick;
-      const rl=GR+14, lx=(GCX+rl*Math.cos(a)).toFixed(1), ly=(GCY+rl*Math.sin(a)).toFixed(1);
-      return tick + `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="6" font-family="monospace" fill="rgba(255,255,255,.4)">${i*10}%</text>`;
-    }).join('');
-
-    const barChart = `<div style="display:flex;justify-content:space-around;padding:8px 4px 2px;gap:0">` +
-    weekDays.map((d, i) => {
-      const hrs     = hoursByDay[d]    || 0;
-      const bill    = billableByDay[d] || 0;
-      const nonBill = hrs - bill;
+    const gaugesHtml = weekDays.slice(0,7).map((d,i) => {
+      const hrs      = hoursByDay[d]    || 0;
+      const bill     = billableByDay[d] || 0;
+      const nonBill  = hrs - bill;
       const isToday  = d === today;
-      const isActive = _teFilter === d;
-
-      const pct     = Math.min(hrs / gaugeMax, 1);
-      const billPct = Math.min(bill / gaugeMax, 1);
-      const nbPct   = Math.min(nonBill / gaugeMax, 1);
-
-      const needleDeg = pct * 180;
-      const billEnd   = billPct * 180;
-      const nbEnd     = (billPct + nbPct) * 180;
-
-      const needleRad = (needleDeg - 180) * Math.PI / 180;
-      const nx = (GCX + (GR - 8) * Math.cos(needleRad)).toFixed(1);
-      const ny = (GCY + (GR - 8) * Math.sin(needleRad)).toFixed(1);
-
-      const arcColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#1D9E75';
-      const pillColor = isActive ? '#EF9F27' : isToday ? '#00D2FF' : hrs > 0 ? '#1D9E75' : 'rgba(255,255,255,.2)';
-      const dayColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#6A94B8';
-      const fw        = isToday || isActive ? '600' : '400';
-
-      return `
-      <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
-        style="display:flex;flex-direction:column;align-items:center;gap:2px;
-          flex:1;min-width:0;cursor:${hrs > 0 ? 'pointer' : 'default'}">
-        <svg viewBox="0 0 ${GW} ${GH}" width="${GW}" height="${GH}">
-          ${gTicks}
-          <path d="${gArc(0, 179.9)}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="4" stroke-linecap="round"/>
-          ${hrs > 0 ? `
-          ${bill > 0 ? `<path d="${gArc(0, billEnd)}" fill="none" stroke="${arcColor}" stroke-width="4" stroke-linecap="round"/>` : ''}
-          ${nonBill > 0 ? `<path d="${gArc(billEnd, nbEnd)}" fill="none" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>` : ''}
-          <line x1="${GCX}" y1="${GCY}" x2="${nx}" y2="${ny}" stroke="${arcColor}" stroke-width="1.5" stroke-linecap="round"/>
-          <circle cx="${GCX}" cy="${GCY}" r="3" fill="${arcColor}"/>
+      const isActive = _activeGauge === d;
+      const pct      = Math.min(hrs/8, 1);
+      const billPct  = Math.min(bill/8, 1);
+      const nbPct    = Math.min(nonBill/8, 1);
+      const billEnd  = billPct * 180;
+      const nbEnd    = (billPct+nbPct) * 180;
+      const needleRad= (pct*180 - 180)*Math.PI/180;
+      const nx       = (GCX+(GR-6)*Math.cos(needleRad)).toFixed(1);
+      const ny       = (GCY+(GR-6)*Math.sin(needleRad)).toFixed(1);
+      const arcColor = isActive ? '#EF9F27' : isToday ? '#00D2FF' : hrs>0 ? '#1D9E75' : 'rgba(255,255,255,.08)';
+      const pillColor= isActive ? '#EF9F27' : isToday ? '#00D2FF' : hrs>0 ? '#1D9E75' : 'rgba(255,255,255,.2)';
+      const dayColor = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#6A94B8';
+      const fw       = isToday || isActive ? '700' : '500';
+      return `<div class="gauge-col" data-gauge-date="${d}" data-gauge-has-data="${hrs>0}"
+        style="display:flex;flex-direction:column;align-items:center;gap:1px;
+          flex:1;min-width:0;cursor:pointer;padding:0 1px">
+        <svg viewBox="0 0 ${GW} ${GH}" width="${GW}" height="${GH}" style="overflow:visible">
+          <path d="${gArc(0,179.9)}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="4" stroke-linecap="round"/>
+          ${hrs>0 ? `
+            ${bill>0 ? `<path d="${gArc(0,billEnd)}" fill="none" stroke="${arcColor}" stroke-width="4" stroke-linecap="round"/>` : ''}
+            ${nonBill>0 ? `<path d="${gArc(billEnd,nbEnd)}" fill="none" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>` : ''}
+            <line x1="${GCX}" y1="${GCY}" x2="${nx}" y2="${ny}" stroke="${arcColor}" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="${GCX}" cy="${GCY}" r="2.8" fill="${arcColor}"/>
           ` : `<circle cx="${GCX}" cy="${GCY}" r="2" fill="rgba(255,255,255,.12)"/>`}
-          <rect x="${GCX-14}" y="${GCY+5}" width="28" height="13" rx="6"
-            fill="none" stroke="${pillColor}" stroke-width="1"/>
-          <text x="${GCX}" y="${GCY+12}" text-anchor="middle" dominant-baseline="central"
-            font-size="7" font-family="monospace" font-weight="700" fill="${pillColor}">
-            ${hrs > 0 ? hrs.toFixed(1) + 'h' : '—'}
+          <rect x="${GCX-12}" y="${GCY+4}" width="24" height="12" rx="6" fill="none" stroke="${pillColor}" stroke-width="1"/>
+          <text x="${GCX}" y="${GCY+10.5}" text-anchor="middle" dominant-baseline="central"
+            font-size="6.5" font-family="'JetBrains Mono',monospace" font-weight="700" fill="${pillColor}">
+            ${hrs>0 ? hrs.toFixed(1)+'h' : '—'}
           </text>
         </svg>
-        <div style="font-family:var(--font-mono);font-size:11px;font-weight:${fw};
-          color:${dayColor};text-align:center;line-height:1.2">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:${fw};
+          color:${dayColor};text-align:center;line-height:1.1;padding-bottom:2px">
           ${weekLabels[i]}<br>
-          <span style="font-weight:400;color:#6A94B8;font-size:11px">${new Date(d+'T00:00:00').getDate()}</span>
+          <span style="font-weight:400;color:rgba(106,148,184,.7);font-size:11px">${new Date(d+'T00:00:00').getDate()}</span>
         </div>
       </div>`;
-    }).join('') + `</div>`;
+    }).join('');
 
-    const barLegend = `
-      <div style="display:flex;align-items:center;gap:12px;padding:0 13px 6px;
-        font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-        <div style="display:flex;align-items:center;gap:5px">
-          <div style="width:14px;height:4px;background:var(--compass-cyan);border-radius:2px"></div>
-          <span>Billable</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:5px">
-          <div style="width:14px;height:4px;background:#8B5CF6;border-radius:2px"></div>
-          <span>Non-billable</span>
-        </div>
-        <span style="color:var(--text3)">Scale: 8h = full</span>
-      </div>`;
+    // ── Work list filtered rows (1.C) ─────────────────────────────────
+    function workListHtml() {
+      const cutoff30d = new Date(Date.now()+30*86400000).toLocaleDateString('en-CA');
+      const filtered = workItems.filter(w => {
+        if (_wfType !== 'all') { if (w.type !== _wfType) return false; }
+        if (_wfStatus !== 'all') {
+          if (w.type==='action') { if (_wfStatus !== 'in_progress' && _wfStatus !== 'all') return true; }
+          else if (w.status !== _wfStatus) return false;
+        }
+        if (_wfProject && w.projectId !== _wfProject) return false;
+        if (_wfDateRange==='today') return !w.due || w.due===today || w.overdue;
+        if (_wfDateRange==='week')  return !w.due || w.due<=weekDays[6] || w.overdue;
+        if (_wfDateRange==='30d')   return !w.due || w.due<=cutoff30d || w.overdue;
+        return true;
+      });
+      if (filtered.length===0) return `<div style="padding:18px 13px;text-align:center;
+        font-family:var(--font-head);font-size:12px;color:var(--text3)">No items match the current filters</div>`;
 
-    // ── Recent time entries — filtered by day if bar clicked ─────────
-    const displayEntries = _teFilter
-      ? myTimeEntries.filter(e => e.date === _teFilter)
-      : myTimeEntries.slice(0, 8);
-    const filterLabel = _teFilter
-      ? new Date(_teFilter + 'T00:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'})
-      : null;
+      return filtered.map(w => {
+        // Type badge
+        const typeColors = {
+          task:    {c:'var(--compass-cyan)',   bg:'rgba(0,210,255,.08)',   lbl:'Task'},
+          action:  {c:'var(--compass-green)',  bg:'rgba(29,158,117,.08)', lbl:'Action Item'},
+          workflow:{c:'var(--compass-amber)',  bg:'rgba(239,159,39,.08)', lbl:'Workflow'},
+        };
+        const tc = typeColors[w.type] || typeColors.task;
+        const typeBadge = `<div style="display:inline-flex;align-items:center;padding:1px 7px;
+          border:1px solid ${tc.c};background:${tc.bg};border-radius:3px;
+          font-family:var(--font-head);font-size:11px;font-weight:600;color:${tc.c};
+          white-space:nowrap">${tc.lbl}</div>`;
 
-    content.innerHTML = `
-      <div class="stat-strip stat-strip-4" style="margin-bottom:14px">
-        <div class="stat-card">
-          <div class="stat-label">Hours this week</div>
-          <div class="stat-value sv-cyan">${weekTotal.toFixed(1)}</div>
-          <div class="stat-sub">${weekBillable.toFixed(1)}h billable</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Today</div>
-          <div class="stat-value ${todayTotal > 0 ? 'sv-green' : ''}">${todayTotal.toFixed(1)}h</div>
-          <div class="stat-sub">logged so far</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Open items</div>
-          <div class="stat-value ${overdueCount > 0 ? 'sv-red' : ''}">${workItems.length}</div>
-          <div class="stat-sub">${overdueCount > 0 ? overdueCount + ' overdue' : 'all current'}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Active workflows</div>
-          <div class="stat-value sv-amber">${wfInstances.length}</div>
-          <div class="stat-sub">firm-wide</div>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr minmax(0,300px);gap:14px">
-        <div>
-
-          <!-- Weekly speedometer gauges -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr">
-              <div class="panel-title">This week — hours by day</div>
-              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-                ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-                –
-                ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+        // Progress bar
+        let progressCell = '<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">—</span>';
+        if (w.type==='task' && w.pct > 0) {
+          const fillColor = w.pct>=80?'var(--compass-green)':w.pct>=40?'var(--compass-cyan)':'rgba(255,255,255,.25)';
+          progressCell = `<div style="position:relative;margin-top:10px">
+            <div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:visible;position:relative">
+              <div class="prog-fill" data-p="${w.pct}%" style="height:100%;width:${Math.min(w.pct,100)}%;
+                background:${fillColor};border-radius:3px;transition:width .3s;position:relative">
+                <span style="position:absolute;right:0;top:-14px;transform:translateX(50%);
+                  font-family:var(--font-head);font-size:11px;font-weight:700;color:${fillColor};
+                  white-space:nowrap">${w.pct}%</span>
               </div>
-            </div>
-            <div style="padding:8px 4px 0">
-              ${barChart}
-            </div>
-            ${barLegend}
-          </div>
-
-          <!-- My work list -->
-          <div class="cmp-panel">
-            <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
-              <div class="panel-title">My work</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                ${overdueCount > 0
-                  ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>`
-                  : '<span class="panel-badge pb-green">All current</span>'}
-              </div>
-            </div>
-
-            <!-- Filter bar -->
-            <div style="display:flex;align-items:center;gap:8px;padding:8px 13px;
-              border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg2)">
-              <div style="display:flex;gap:3px">
-                ${['all','not_started','in_progress','blocked'].map(s => {
-                  const labels = {all:'All',not_started:'Not started',in_progress:'In progress',blocked:'Blocked'};
-                  const active = _wfStatus === s;
-                  return '<button class="wf-status-btn" data-status="'+s+'" style="font-family:var(--font-mono);font-size:11px;padding:3px 9px;background:'+(active?'var(--compass-cyan)':'none')+';color:'+(active?'#060a10':'var(--text2)')+';border:1px solid '+(active?'var(--compass-cyan)':'var(--border)')+';cursor:pointer">'+labels[s]+'</button>';
-                }).join('')}
-              </div>
-              <div style="display:flex;gap:3px">
-                ${[['today','Today'],['week','Week'],['30d','30d'],['all','All time']].map(([v,l]) => {
-                  const active = _wfDateRange === v;
-                  return '<button class="wf-date-btn" data-range="'+v+'" style="font-family:var(--font-mono);font-size:11px;padding:3px 9px;background:'+(active?'rgba(239,159,39,.2)':'none')+';color:'+(active?'var(--compass-amber)':'var(--text2)')+';border:1px solid '+(active?'var(--compass-amber)':'var(--border)')+';cursor:pointer">'+l+'</button>';
-                }).join('')}
-              </div>
-              <select class="wf-proj-sel" style="font-family:var(--font-mono);font-size:11px;padding:3px 8px;background:var(--bg1);color:var(--text1);border:1px solid ${_wfProject ? 'var(--compass-cyan)' : 'var(--border)'};cursor:pointer;flex:1;min-width:120px;max-width:180px">
-                <option value="">All projects</option>
-                ${[...new Set(workItems.filter(w=>w.projectId).map(w=>w.projectId))].map(pid => {
-                  const p = _projects.find(p => p.id === pid);
-                  return p ? '<option value="'+p.id+'" '+(_wfProject === p.id ? 'selected' : '')+'>'+esc(p.name)+'</option>' : '';
-                }).join('')}
-              </select>
-            </div>
-
-            <!-- Column headers -->
-            <div style="display:flex;align-items:center;gap:8px;padding:5px 13px;
-              border-bottom:1px solid var(--border);
-              font-family:var(--font-mono);font-size:11px;color:var(--text3);
-              letter-spacing:.08em;text-transform:uppercase">
-              <div style="width:8px;flex-shrink:0"></div>
-              <div style="flex:1">Task / Action item</div>
-              <div style="width:200px;text-align:center;flex-shrink:0">Progress</div>
-              <div style="width:60px;text-align:center;flex-shrink:0;${overdueCount > 0 ? 'color:var(--compass-red)' : ''}">${overdueCount > 0 ? overdueCount+' overdue' : 'Status'}</div>
-              <div style="width:74px;flex-shrink:0"></div>
-            </div>
-
-            ${(() => {
-              const today = new Date().toLocaleDateString('en-CA');
-              const cutoff30d = new Date(Date.now() + 30*86400000).toLocaleDateString('en-CA');
-              const filtered = workItems.filter(w => {
-                if (_wfStatus !== 'all') {
-                  if (w.type === 'action') { if (_wfStatus !== 'in_progress') return false; }
-                  else if (w.status !== _wfStatus) return false;
-                }
-                if (_wfProject && w.projectId !== _wfProject) return false;
-                if (_wfDateRange === 'today') return !w.due || w.due === today || w.overdue;
-                if (_wfDateRange === 'week')  return !w.due || w.due <= weekDays[6] || w.overdue;
-                if (_wfDateRange === '30d')   return !w.due || w.due <= cutoff30d || w.overdue;
-                return true;
-              });
-              if (filtered.length === 0) return '<div style="padding:18px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No items match the current filters</div>';
-              return filtered.map(w => `
-              <div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}" data-wi-projectid="${w.projectId || ''}" style="align-items:center;gap:8px">
-                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
-                <div style="flex:1;min-width:0">
-                  <div class="row-title">${esc(w.title)}</div>
-                  <div class="row-sub">${esc(w.project)} · ${w.type === 'task' ? 'Task' : 'Action item'}${w.due ? ' · Due ' + fmtDate(w.due) : ''}</div>
-                </div>
-                <div style="width:200px;flex-shrink:0;display:flex;align-items:center;gap:6px">
-                  ${w.type === 'task' ? `<div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(w.pct,100)}%;background:${w.pct >= 80 ? 'var(--compass-green)' : w.pct >= 40 ? 'var(--compass-cyan)' : w.pct > 0 ? 'var(--text3)' : 'transparent'};border-radius:3px;transition:width .3s"></div></div><span style="font-family:var(--font-mono);font-size:11px;flex-shrink:0;width:34px;text-align:right;color:${w.pct >= 80 ? 'var(--compass-green)' : w.pct > 0 ? 'var(--compass-cyan)' : 'var(--text3)'}">${w.pct}%</span>` : '<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>'}
-                </div>
-                <div style="width:60px;flex-shrink:0;text-align:center">
-                  ${w.overdue ? `<span class="status-badge sb-risk" style="font-size:11px">${daysOverdue(w.due)}d</span>` : ''}
-                </div>
-                <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}" data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}" style="padding:3px 10px;width:74px;flex-shrink:0;font-size:11px">
-                  ${w.type === 'action' ? 'Resolve' : w.status === 'not_started' ? 'Start' : w.status === 'blocked' ? 'Unblock' : 'Mark done'}
-                </button>
-              </div>`).join('');
-            })()}
-          </div>
-        </div><!-- end left column -->
-
-        <div>
-          <!-- Timesheet week status + time log -->
-          ${(() => {
-            const week = myWeek?.[0] || null;
-            const ws = week?.status || 'draft';
-            const wsColor = ws === 'approved' ? 'var(--compass-green)' : ws === 'submitted' ? 'var(--compass-cyan)' : ws === 'rejected' ? 'var(--compass-red)' : 'var(--text3)';
-            const wsLabel = { draft:'Draft', submitted:'Submitted', approved:'Approved', rejected:'Rejected', amended:'Amended' }[ws] || ws;
-            return `
-          <div style="display:flex;align-items:center;justify-content:space-between;
-            padding:8px 13px;margin-bottom:2px;
-            background:${ws === 'rejected' ? 'rgba(226,75,74,.06)' : ws === 'approved' ? 'rgba(29,158,117,.06)' : ws === 'submitted' ? 'rgba(0,210,255,.04)' : 'transparent'};
-            border:1px solid ${ws === 'rejected' ? 'rgba(226,75,74,.25)' : ws === 'approved' ? 'rgba(29,158,117,.25)' : ws === 'submitted' ? 'rgba(0,210,255,.15)' : 'var(--border)'};
-            border-bottom:none">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
-                text-transform:uppercase;color:${wsColor}">● ${wsLabel}</span>
-              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-                Week of ${new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-                · ${weekTotal.toFixed(1)}h
-              </span>
-              ${ws === 'rejected' && week.rejection_reason ? `
-              <span style="font-family:var(--font-ui);font-size:11px;color:var(--compass-red);
-                font-style:italic">"${esc(week.rejection_reason)}"</span>` : ''}
-              ${ws === 'approved' ? `
-              <span style="font-family:var(--font-mono);font-size:11px;color:var(--compass-green)">
-                by ${esc(week.approver_name || '—')}</span>` : ''}
-            </div>
-            <div style="display:flex;gap:6px">
-              ${ws === 'draft' || ws === 'rejected' || ws === 'amended' ? `
-              <button class="ts-submit-btn" data-week-id="${week?.id || ''}"
-                data-week-start="${weekStartDate}" data-week-hours="${weekTotal.toFixed(1)}"
-                style="font-family:var(--font-mono);font-size:11px;font-weight:600;
-                  letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;
-                  background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer;
-                  transition:opacity .12s"
-                onmouseenter="this.style.opacity='.85'"
-                onmouseleave="this.style.opacity='1'">
-                Submit week →
-              </button>` : ''}
-              ${ws === 'submitted' ? `
-              <span style="font-family:var(--font-mono);font-size:11px;color:var(--compass-cyan)">
-                Awaiting approval
-              </span>` : ''}
             </div>
           </div>`;
-          })()}
+        } else if (w.type==='task' && w.pct===0) {
+          progressCell = '<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">—</span>';
+        }
 
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr">
-              <div class="panel-title">Time log${filterLabel ? ` — ${filterLabel}` : ' — recent'}</div>
-              <div style="display:flex;gap:8px;align-items:center">
-                ${filterLabel ? `<button class="te-clear-filter"
-                  style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber);
-                    background:none;border:none;cursor:pointer;padding:0">✕ clear</button>` : ''}
-                <button class="te-new-btn"
-                  style="font-family:var(--font-mono);font-size:11px;font-weight:600;
-                    letter-spacing:.06em;color:var(--compass-cyan);background:none;
-                    border:1px solid rgba(0,210,255,.25);padding:3px 8px;cursor:pointer;
-                    transition:background .12s"
-                  onmouseenter="this.style.background='rgba(0,210,255,.08)'"
-                  onmouseleave="this.style.background='none'">+ Log time</button>
-                <a href="/resources.html" style="font-family:var(--font-mono);font-size:11px;
-                  color:var(--text3);text-decoration:none">Full view →</a>
-              </div>
-            </div>
-            ${displayEntries.length === 0
-              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-                  ${filterLabel ? 'No entries for this day' : 'No time entries this period'}
-                 </div>`
-              : displayEntries.map((e, idx) => {
-                  const proj = _projects.find(p => p.id === e.project_id);
-                  const sourceIcon  = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
-                  const sourceColor = e.source_type === 'step_comment' ? 'var(--compass-cyan)' : e.source_type === 'action_item' ? 'var(--compass-purple)' : 'var(--text3)';
-                  const isCadence   = e.source_type === 'step_comment';
-                  return `
-                  <div class="te-row" data-te-id="${e.id}" data-te-cadence="${isCadence}"
-                    style="display:flex;align-items:center;gap:8px;padding:7px 13px;
-                      border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;
-                      border-left:2px solid ${_teSelected === e.id ? 'var(--compass-cyan)' : 'transparent'};
-                      background:${_teSelected === e.id ? 'rgba(0,210,255,.04)' : ''}"
-                    onmouseenter="this.style.background='var(--bg2)'"
-                    onmouseleave="this.style.background='${_teSelected === e.id ? 'rgba(0,210,255,.04)' : ''}'">
-                    <div style="font-size:13px;color:${sourceColor};flex-shrink:0">${sourceIcon}</div>
-                    <div style="flex:1;min-width:0">
-                      <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
-                        color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                        ${e.step_name ? esc(e.step_name) : esc(proj?.name || '—')}
-                      </div>
-                      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">
-                        ${fmtDate(e.date)} · ${e.is_billable ? 'Billable' : 'Non-billable'}
-                        ${isCadence ? ' · <span style="color:var(--compass-cyan)">via Cadence</span>' : ' · <span style="color:var(--text3)">click to edit</span>'}
-                      </div>
-                    </div>
-                    <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;
-                      color:${e.is_billable ? 'var(--compass-green)' : 'var(--text2)'};flex-shrink:0">
-                      ${parseFloat(e.hours).toFixed(1)}h
-                    </div>
-                  </div>`;
-                }).join('')}
-            <div style="padding:8px 13px;display:flex;justify-content:space-between;
-              align-items:center;border-top:1px solid var(--border)">
-              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-                ${filterLabel ? filterLabel + ' total' : 'Week of ' + new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-              </span>
-              <div style="display:flex;align-items:center;gap:12px">
-                <span style="font-family:var(--font-mono);font-size:13px;font-weight:600;
-                  color:var(--compass-cyan)">
-                  ${filterLabel
-                    ? displayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0).toFixed(1)
-                    : weekTotal.toFixed(1)}h
-                </span>
-                <button class="te-week-footer"
-                  style="font-family:var(--font-mono);font-size:11px;color:var(--compass-cyan);
-                    background:none;border:1px solid rgba(0,210,255,.25);padding:3px 10px;
-                    cursor:pointer;transition:background .12s"
-                  onmouseenter="this.style.background='rgba(0,210,255,.08)'"
-                  onmouseleave="this.style.background='none'">Week view →</button>
-              </div>
+        // Due cell
+        let dueCell = '';
+        if (w.overdue) dueCell = `<span style="font-family:var(--font-head);font-size:11px;font-weight:700;
+          color:var(--compass-red)">${daysOverdue(w.due)}d</span>`;
+        else if (w.due) dueCell = `<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${fmtDate(w.due)}</span>`;
+        else dueCell = `<span style="color:var(--text3);font-size:11px">—</span>`;
+
+        // Action button per spec NOTE 6
+        let btnLabel, btnStyle;
+        if (w.type==='action') {
+          btnLabel='Resolve'; btnStyle=`color:var(--compass-green);border:1px solid var(--compass-green);background:none`;
+        } else if (w.status==='blocked') {
+          btnLabel='Unblock'; btnStyle=`color:var(--compass-amber);border:1px solid var(--compass-amber);background:none`;
+        } else if (w.pct>=100) {
+          btnLabel='Mark Done'; btnStyle=`color:#060a10;border:none;background:var(--compass-cyan)`;
+        } else if (w.status==='in_progress') {
+          btnLabel='In Progress'; btnStyle=`color:var(--compass-amber);border:1px solid rgba(239,159,39,.5);background:none`;
+        } else {
+          btnLabel='Start'; btnStyle=`color:var(--compass-cyan);border:1px solid rgba(0,210,255,.4);background:none`;
+        }
+
+        return `<div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
+          data-wi-status="${w.status}" data-wi-projectid="${w.projectId||''}"
+          style="display:grid;grid-template-columns:14px 86px 1fr 140px 56px 78px;
+            gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px">
+          <!-- Col 1: completion circle -->
+          <div style="display:flex;align-items:center;justify-content:center">
+            <div class="wi-complete-circle" data-wi-id="${w.id}" data-wi-type="${w.type}"
+              data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
+              data-wi-status="${w.status}"
+              title="Click to mark complete"
+              style="width:11px;height:11px;border-radius:50%;border:1.5px solid var(--text3);
+                cursor:pointer;flex-shrink:0;transition:all .12s"
+              onmouseenter="this.style.borderColor='var(--compass-green)';this.style.boxShadow='0 0 0 2px rgba(29,158,117,.25)'"
+              onmouseleave="this.style.borderColor='var(--text3)';this.style.boxShadow='none'"></div>
+          </div>
+          <!-- Col 2: type badge -->
+          <div style="padding:0 6px 0 2px;display:flex;align-items:center">${typeBadge}</div>
+          <!-- Col 3: title + subtitle -->
+          <div style="padding:8px 8px 8px 4px;min-width:0">
+            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px">
+              ${esc(w.project)}${w.due ? ' · Due '+fmtDate(w.due) : ''}</div>
+          </div>
+          <!-- Col 4: progress -->
+          <div style="padding:0 8px">${progressCell}</div>
+          <!-- Col 5: due -->
+          <div style="text-align:center">${dueCell}</div>
+          <!-- Col 6: action button -->
+          <div style="padding:0 4px">
+            <button class="wi-action-btn" data-wi-id="${w.id}" data-wi-type="${w.type}"
+              data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
+              data-wi-status="${w.status}" data-wi-pct="${w.pct||0}"
+              style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:600;
+                letter-spacing:.06em;padding:4px 0;cursor:pointer;border-radius:3px;
+                transition:opacity .12s;${btnStyle}"
+              onmouseenter="this.style.opacity='.8'" onmouseleave="this.style.opacity='1'">
+              ${btnLabel}</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Done Today Panel HTML (1.D) ───────────────────────────────────
+    function doneTodayHtml() {
+      if (_doneToday.length === 0) return `<div style="padding:12px 13px;
+        font-family:var(--font-body);font-size:12px;color:var(--text3);font-style:italic">
+        Nothing completed yet today — complete items from your work list to see them here.</div>`;
+      return _doneToday.map(item => {
+        const signalColor = item.signal==='green'?'var(--compass-green)':item.signal==='red'?'var(--compass-red)':'var(--compass-amber)';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 13px;
+          border-bottom:1px solid var(--border)">
+          <span style="color:var(--compass-green);font-size:13px;flex-shrink:0">✓</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+              ${esc(item.project||'—')} · ${item.time||'—'}
+              ${item.noTime ? ' <span style="color:var(--text3)">· no time logged</span>' : ''}
             </div>
           </div>
+          ${item.signal ? `<div style="width:8px;height:8px;border-radius:50%;background:${signalColor};flex-shrink:0"></div>` : `<div style="width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0"></div>`}
+          <div style="font-family:var(--font-display);font-size:13px;font-weight:700;
+            color:${item.noTime ? 'var(--text3)' : 'var(--compass-cyan)'};flex-shrink:0">
+            ${item.noTime ? '—' : (item.hours||0).toFixed(1)+'h'}</div>
+        </div>`;
+      }).join('');
+    }
 
-          <!-- Workflows -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr"><div class="panel-title">Active workflows</div></div>
-            ${wfInstances.slice(0, 4).map(w => {
-              const proj = _projects.find(p => p.id === w.project_id);
-              return `
-              <div class="cmp-row" onclick="window.location.href='/cadence.html?instance=${w.id}'">
-                <div style="width:7px;height:7px;border-radius:50%;
-                  background:var(--compass-amber);flex-shrink:0"></div>
-                <div style="flex:1;min-width:0">
-                  <div class="row-title">${esc(w.title)}</div>
-                  <div class="row-sub">${proj ? esc(proj.name) + ' · ' : ''}${w.current_step_name ? esc(w.current_step_name) : 'Active'}</div>
-                </div>
-                <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">▶</span>
-              </div>`;
-            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active instances</div>'}
+    // ── EOD Nudge HTML ────────────────────────────────────────────────
+    function eodNudgeHtml() {
+      if (!eodNudge) return '';
+      const isRed = eodNudge === 'red';
+      const c = isRed ? 'var(--compass-red)' : 'var(--compass-amber)';
+      const bg = isRed ? 'rgba(226,75,74,.06)' : 'rgba(239,159,39,.06)';
+      const msg = isRed ? 'No time logged today.' : 'Log today\'s time before EOD';
+      const gap = isRed ? `${(8 - todayTotal).toFixed(1)}h gap` : `${todayTotal.toFixed(1)}h of ~8h expected`;
+      return `<div style="border-left:3px solid ${c};background:${bg};padding:9px 12px;margin-top:10px;
+        display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:${c}">■ ${msg}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:2px">${gap}</div>
+        </div>
+        <button class="open-weekly-ts-btn" data-expand-today="1"
+          style="font-family:var(--font-head);font-size:11px;font-weight:600;letter-spacing:.06em;
+            padding:5px 10px;background:none;border:1px solid ${c};color:${c};cursor:pointer;
+            white-space:nowrap;flex-shrink:0;transition:background .12s"
+          onmouseenter="this.style.background='rgba(239,159,39,.1)'"
+          onmouseleave="this.style.background='none'">Log today →</button>
+      </div>`;
+    }
+
+    // ── Assemble HTML ─────────────────────────────────────────────────
+    content.innerHTML = `
+
+    <!-- 1.A: Greeting row -->
+    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;
+      gap:12px;margin-bottom:14px;padding:2px 0">
+      <div>
+        <div style="font-family:var(--font-display);font-size:22px;font-weight:700;
+          color:var(--text0);line-height:1.1">${greeting}, ${esc(firstName)}</div>
+        <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">
+          ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+      </div>
+      ${streak > 0 ? `<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+        background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
+        font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber);
+        white-space:nowrap">
+        ■ ${streak}-day streak · ${weekCompletedItems} completed this week
+      </div>` : ''}
+    </div>
+
+    <!-- 1.A: 8-Card Stat Strip -->
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px">
+      <div class="stat-card" style="border-top:2px solid var(--text3)">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Waiting</div>
+        <div class="stat-value" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--text3)">${waiting}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">assigned</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">In Progress</div>
+        <div class="stat-value sv-cyan" style="font-family:var(--font-display);font-size:22px;font-weight:700">${inProgress}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">active now</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid ${blocked>0?'var(--compass-red)':'var(--border)'}">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Blocked</div>
+        <div class="stat-value" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">needs attention</div>
+      </div>
+      <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green)">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Done Today</div>
+        <div class="stat-value" id="done-today-count" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--compass-green)">${doneTodayCt}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">completed</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-amber)">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Hrs — Week</div>
+        <div class="stat-value sv-amber" style="font-family:var(--font-display);font-size:22px;font-weight:700">${weekTotal.toFixed(1)}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${weekBillable.toFixed(1)}h billable</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Hrs — Today</div>
+        <div class="stat-value sv-cyan" style="font-family:var(--font-display);font-size:22px;font-weight:700">${todayTotal.toFixed(1)}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">of ~8h expected</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'}">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Open Items</div>
+        <div class="stat-value" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:${overdueCount>0?'var(--compass-amber)':'var(--text1)'}">${openItems}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-purple)">
+        <div class="stat-label" style="font-family:var(--font-head);font-size:11px">Active WF</div>
+        <div class="stat-value" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--compass-purple)">${activeFirmWF}</div>
+        <div class="stat-sub" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">firm-wide</div>
+      </div>
+    </div>
+
+    <!-- Two-column layout -->
+    <div style="display:grid;grid-template-columns:1fr minmax(0,300px);gap:14px">
+      <div>
+
+        <!-- 1.B: Speedometer Row -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div class="panel-hdr">
+            <div class="panel-title" style="font-family:var(--font-head);font-size:13px;font-weight:700">This week — hours by day</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+              ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+              –
+              ${new Date(weekDays[4]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+            </div>
           </div>
-
-          <!-- Quick actions -->
-          <div class="cmp-panel">
-            <div class="panel-hdr"><div class="panel-title">Quick access</div></div>
-            <div class="cmp-row" onclick="window.location.href='/cadence.html'">
-              <div style="flex:1"><div class="row-title">Cadence canvas →</div>
-              <div class="row-sub">Log hours while advancing steps</div></div>
+          <div style="display:flex;padding:6px 6px 0;gap:0">
+            ${gaugesHtml}
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:4px 10px 8px;
+            font-family:var(--font-head);font-size:11px;color:var(--text3)">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div style="width:12px;height:3px;background:var(--compass-cyan);border-radius:2px"></div>
+              <span>Billable</span>
             </div>
-            <div class="cmp-row" onclick="window.location.href='/resources.html'">
-              <div style="flex:1"><div class="row-title">Full timesheet →</div>
-              <div class="row-sub">Edit, submit, and review all entries</div></div>
+            <div style="display:flex;align-items:center;gap:5px">
+              <div style="width:12px;height:3px;background:#8B5CF6;border-radius:2px"></div>
+              <span>Non-billable</span>
             </div>
+            <span style="color:var(--text3)">Scale: 8h = full</span>
+            ${_activeGauge ? `<button class="gauge-clear-btn" style="margin-left:auto;font-family:var(--font-head);
+              font-size:11px;color:var(--compass-amber);background:none;border:none;cursor:pointer;padding:0">
+              ✕ clear filter</button>` : ''}
           </div>
         </div>
-      </div>`;
+
+        <!-- 1.C: Work List -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
+            <div class="panel-title" style="font-family:var(--font-head);font-size:13px;font-weight:700">My work</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${overdueCount>0
+                ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>`
+                : '<span class="panel-badge pb-green">All current</span>'}
+            </div>
+          </div>
+
+          <!-- Filter bar -->
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 13px;
+            border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg2)">
+            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em">TYPE</span>
+            <div style="display:flex;gap:3px">
+              ${['all','task','action'].map(t => {
+                const labels={all:'All',task:'Tasks',action:'Actions'};
+                const active=_wfType===t;
+                return `<button class="wf-type-btn" data-type="${t}" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 9px;background:${active?'rgba(139,92,246,.25)':'none'};color:${active?'#8B5CF6':'var(--text2)'};border:1px solid ${active?'#8B5CF6':'var(--border)'};cursor:pointer;transition:all .1s">${labels[t]}</button>`;
+              }).join('')}
+            </div>
+            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">STATUS</span>
+            <div style="display:flex;gap:3px">
+              ${['all','not_started','in_progress','blocked'].map(s => {
+                const labels={all:'All',not_started:'Not started',in_progress:'In progress',blocked:'Blocked'};
+                const active=_wfStatus===s;
+                return `<button class="wf-status-btn" data-status="${s}" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 9px;background:${active?'rgba(0,210,255,.12)':'none'};color:${active?'var(--compass-cyan)':'var(--text2)'};border:1px solid ${active?'var(--compass-cyan)':'var(--border)'};cursor:pointer;transition:all .1s">${labels[s]}</button>`;
+              }).join('')}
+            </div>
+            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">RANGE</span>
+            <div style="display:flex;gap:3px">
+              ${[['today','Today'],['week','Week'],['30d','30d'],['all','All time']].map(([v,l]) => {
+                const active=_wfDateRange===v;
+                return `<button class="wf-date-btn" data-range="${v}" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 9px;background:${active?'rgba(239,159,39,.15)':'none'};color:${active?'var(--compass-amber)':'var(--text2)'};border:1px solid ${active?'var(--compass-amber)':'var(--border)'};cursor:pointer;transition:all .1s">${l}</button>`;
+              }).join('')}
+            </div>
+            <select class="wf-proj-sel" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 8px;
+              background:var(--bg1);color:var(--text1);border:1px solid ${_wfProject?'var(--compass-cyan)':'var(--border)'};
+              cursor:pointer;flex:1;min-width:100px;max-width:160px;margin-left:auto">
+              <option value="">All projects</option>
+              ${[...new Set(workItems.filter(w=>w.projectId).map(w=>w.projectId))].map(pid => {
+                const p=_projects.find(p=>p.id===pid);
+                return p ? `<option value="${p.id}" ${_wfProject===p.id?'selected':''}>${esc(p.name)}</option>` : '';
+              }).join('')}
+            </select>
+          </div>
+
+          <!-- Column headers -->
+          <div style="display:grid;grid-template-columns:14px 86px 1fr 140px 56px 78px;
+            gap:0;padding:5px 8px 5px 4px;border-bottom:1px solid var(--border);
+            font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--text3);
+            letter-spacing:.08em;text-transform:uppercase">
+            <div></div>
+            <div style="padding-left:2px">TYPE</div>
+            <div style="padding-left:4px">TASK / ACTION ITEM</div>
+            <div style="padding:0 8px">PROGRESS</div>
+            <div style="text-align:center">DUE</div>
+            <div></div>
+          </div>
+
+          <!-- Work rows -->
+          <div id="work-list-rows">
+            ${workListHtml()}
+          </div>
+        </div>
+
+        <!-- 1.D: Done Today Panel -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div class="panel-hdr">
+            <div class="panel-title" style="font-family:var(--font-head);font-size:13px;font-weight:700">
+              Done today
+              ${_doneToday.length>0 ? `<span style="font-family:var(--font-head);font-size:11px;font-weight:600;
+                color:var(--compass-green);margin-left:8px">${_doneToday.length} completed</span>` : ''}
+            </div>
+          </div>
+          <div id="done-today-list">${doneTodayHtml()}</div>
+        </div>
+
+      </div><!-- end left column -->
+
+      <div>
+        <!-- 1.E: Timesheet Status Card -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div style="padding:10px 13px 6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text1)">
+                WEEK OF ${weekOf}
+              </span>
+              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+                color:${wsColor};border:1px solid ${wsColor};padding:1px 7px">${wsLabel}</span>
+            </div>
+            <div style="font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--text0);line-height:1">
+              ${weekTotal.toFixed(1)}h
+            </div>
+            <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">
+              <span style="color:var(--compass-cyan)">${weekBillable.toFixed(1)}h billable</span>
+              · <span style="color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h non-billable</span>
+            </div>
+          </div>
+
+          <!-- Day dots M-F -->
+          <div style="display:flex;align-items:center;justify-content:space-around;
+            padding:8px 13px 10px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+            ${dotsHtml}
+          </div>
+
+          ${eodNudgeHtml()}
+
+          <div style="padding:8px 13px;display:flex;gap:8px;align-items:center">
+            <button class="open-weekly-ts-btn"
+              style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;
+                letter-spacing:.07em;text-transform:uppercase;padding:7px;
+                background:none;border:1px solid rgba(0,210,255,.3);color:var(--compass-cyan);
+                cursor:pointer;transition:background .12s"
+              onmouseenter="this.style.background='rgba(0,210,255,.07)'"
+              onmouseleave="this.style.background='none'">Full week view →</button>
+            ${(wsStatus==='draft'||wsStatus==='rejected'||wsStatus==='amended') ? `
+            <button class="ts-submit-btn" data-week-id="${myWeekRow?.id||''}"
+              data-week-start="${weekStartDate}" data-week-hours="${weekTotal.toFixed(1)}"
+              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;
+                text-transform:uppercase;padding:7px 14px;background:var(--compass-cyan);
+                color:#060a10;border:none;cursor:pointer;transition:opacity .12s"
+              onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">
+              Submit →</button>` : ''}
+          </div>
+        </div>
+
+        <!-- Time log (compact, filtered) -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div class="panel-hdr">
+            <div class="panel-title" style="font-family:var(--font-head);font-size:13px;font-weight:700">
+              Time log${_teFilter ? ` — ${new Date(_teFilter+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}` : ' — recent'}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              ${_teFilter ? `<button class="te-clear-filter"
+                style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);
+                  background:none;border:none;cursor:pointer;padding:0">✕ clear</button>` : ''}
+              <button class="te-new-btn"
+                style="font-family:var(--font-head);font-size:11px;font-weight:700;
+                  letter-spacing:.06em;color:var(--compass-cyan);background:none;
+                  border:1px solid rgba(0,210,255,.25);padding:3px 8px;cursor:pointer;
+                  transition:background .12s"
+                onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+                onmouseleave="this.style.background='none'">+ Log time</button>
+              <button class="open-weekly-ts-btn"
+                style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+                  background:none;border:none;cursor:pointer;padding:0">Week view →</button>
+            </div>
+          </div>
+          ${(() => {
+            const displayEntries = _teFilter
+              ? myTimeEntries.filter(e=>e.date===_teFilter)
+              : myTimeEntries.slice(0,8);
+            if (displayEntries.length===0) return `<div style="padding:14px 13px;font-family:var(--font-head);font-size:12px;color:var(--text3)">
+              ${_teFilter ? 'No entries for this day' : 'No time entries this period'}</div>`;
+            return displayEntries.map((e,idx) => {
+              const proj=_projects.find(p=>p.id===e.project_id);
+              const sourceIcon=e.source_type==='step_comment'?'◈':e.source_type==='action_item'?'⊡':'●';
+              const sourceColor=e.source_type==='step_comment'?'var(--compass-cyan)':e.source_type==='action_item'?'var(--compass-purple)':'var(--text3)';
+              const isCadence=e.source_type==='step_comment';
+              return `<div class="te-row" data-te-id="${e.id}" data-te-cadence="${isCadence}"
+                style="display:flex;align-items:center;gap:8px;padding:7px 13px;
+                  border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;
+                  border-left:2px solid ${_teSelected===e.id?'var(--compass-cyan)':'transparent'};
+                  background:${_teSelected===e.id?'rgba(0,210,255,.04)':''}"
+                onmouseenter="this.style.background='var(--bg2)'"
+                onmouseleave="this.style.background='${_teSelected===e.id?'rgba(0,210,255,.04)':''}'">
+                <div style="font-size:13px;color:${sourceColor};flex-shrink:0">${sourceIcon}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:var(--font-body);font-size:12px;font-weight:500;
+                    color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    ${e.step_name ? esc(e.step_name) : esc(proj?.name||'—')}
+                  </div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px">
+                    ${fmtDate(e.date)} · ${e.is_billable?'Billable':'Non-billable'}
+                    ${isCadence?' · <span style="color:var(--compass-cyan)">via Cadence</span>':' · <span style="color:var(--text3)">click to edit</span>'}
+                  </div>
+                </div>
+                <div style="font-family:var(--font-display);font-size:13px;font-weight:700;
+                  color:${e.is_billable?'var(--compass-green)':'var(--text2)'};flex-shrink:0">
+                  ${parseFloat(e.hours).toFixed(1)}h</div>
+              </div>`;
+            }).join('') + `<div style="padding:8px 13px;display:flex;justify-content:space-between;
+              align-items:center;border-top:1px solid var(--border)">
+              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+                ${_teFilter ? new Date(_teFilter+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' total' : 'Week of '+new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+              <span style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--compass-cyan)">
+                ${_teFilter ? displayEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0).toFixed(1) : weekTotal.toFixed(1)}h</span>
+            </div>`;
+          })()}
+        </div>
+
+        <!-- Active Workflows -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div class="panel-hdr"><div class="panel-title" style="font-family:var(--font-head);font-size:13px;font-weight:700">Active workflows</div></div>
+          ${wfInstances.slice(0,4).map(w => {
+            const proj=_projects.find(p=>p.id===w.project_id);
+            return `<div class="cmp-row" onclick="window.location.href='/cadence.html?instance=${w.id}'">
+              <div style="width:7px;height:7px;border-radius:50%;background:var(--compass-amber);flex-shrink:0"></div>
+              <div style="flex:1;min-width:0">
+                <div class="row-title">${esc(w.title)}</div>
+                <div class="row-sub">${proj?esc(proj.name)+' · ':''}${w.current_step_name?esc(w.current_step_name):'Active'}</div>
+              </div>
+              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">▶</span>
+            </div>`;
+          }).join('')||'<div style="padding:12px 13px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No active instances</div>'}
+        </div>
+
+        <!-- Quick access -->
+        <div class="cmp-panel">
+          <div class="panel-hdr"><div class="panel-title" style="font-family:var(--font-head);font-size:13px;font-weight:700">Quick access</div></div>
+          <div class="cmp-row" onclick="window.location.href='/cadence.html'">
+            <div style="flex:1"><div class="row-title">Cadence canvas →</div>
+            <div class="row-sub">Log hours while advancing steps</div></div>
+          </div>
+          <div class="cmp-row" onclick="window.location.href='/resources.html'">
+            <div style="flex:1"><div class="row-title">Full timesheet →</div>
+            <div class="row-sub">Edit, submit, and review all entries</div></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
 
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
 
   } catch (e) {
     console.error('[Compass] loadUserView error:', e);
-    if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-mono);font-size:11px">Failed to load — check console</div>';
+    if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-head);font-size:11px">Failed to load — check console</div>';
   }
 }
 
@@ -2573,158 +2774,126 @@ function openCompletionPanel(item) {
   _cmpItem   = item;
   _cmpSignal = null;
 
-  // Remove any existing panel
+  // Remove any existing panel (mutual exclusivity)
   document.getElementById('completion-micro-panel')?.remove();
+  document.getElementById('inprogress-panel')?.remove();
 
   const today = new Date().toLocaleDateString('en-CA');
 
   const panel = document.createElement('div');
   panel.id = 'completion-micro-panel';
   panel.style.cssText = `
-    position:fixed;bottom:0;left:0;right:0;z-index:500;
-    background:var(--bg1,#0c1628);
-    border-top:1px solid var(--border,rgba(0,210,255,.12));
-    box-shadow:0 -8px 32px rgba(0,0,0,.5);
-    padding:16px 20px 20px;
-    animation:cmp-slide-up .2s ease;
+    grid-column: 1 / -1;
+    border-bottom: 2px solid var(--compass-cyan);
+    background: rgba(0,210,255,.03);
+    padding: 12px 16px 14px;
+    animation: micro-open 180ms ease;
   `;
 
-  // Inject animation keyframe once
-  if (!document.getElementById('cmp-style')) {
-    const s = document.createElement('style');
-    s.id = 'cmp-style';
-    s.textContent = `
-      @keyframes cmp-slide-up {
-        from { transform:translateY(100%); opacity:0; }
-        to   { transform:translateY(0);    opacity:1; }
-      }
-    `;
-    document.head.appendChild(s);
-  }
-
   panel.innerHTML = `
-    <div style="max-width:640px;margin:0 auto">
-
-      <!-- Header -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
-        <div>
-          <div style="font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.1em;
-            text-transform:uppercase;color:var(--compass-cyan,#00D2FF);margin-bottom:3px">
-            ${item.type === 'task' ? 'Complete task' : 'Resolve action item'}
-          </div>
-          <div style="font-family:var(--font-ui,sans-serif);font-size:14px;font-weight:500;
-            color:var(--text0,#eef4ff);line-height:1.3;max-width:480px">
-            ${esc(item.title)}
-          </div>
-        </div>
-        <button onclick="closeCompletionPanel()"
-          style="background:none;border:none;color:var(--text3,#3a5a7a);
-            font-size:18px;cursor:pointer;padding:0 0 0 12px;line-height:1;flex-shrink:0"
-          onmouseenter="this.style.color='var(--text0)'"
-          onmouseleave="this.style.color='var(--text3,#3a5a7a)'">✕</button>
+    <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--compass-cyan);margin-bottom:8px;font-weight:700">
+      ${item.type === 'task' ? 'Complete task' : 'Resolve action item'} —
+      <span style="font-weight:400;color:var(--text2)">${esc(item.title.slice(0,60))}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:105px 155px 1fr;gap:12px;align-items:start">
+      <!-- Col 1: Hours -->
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+          letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Hours</div>
+        <input id="cmp-hours" type="number" min="0" max="24" step="0.25"
+          placeholder="0.0"
+          style="width:80px;font-family:var(--font-display);font-size:22px;font-weight:700;
+            padding:7px 10px;background:var(--bg2,#0c1628);
+            border:1px solid var(--compass-cyan);color:var(--compass-cyan);
+            outline:none;text-align:center;transition:border-color .15s"
+          onfocus="this.style.borderColor='rgba(0,210,255,.8)'"
+          onblur="this.style.borderColor='var(--compass-cyan)'" />
       </div>
-
-      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start">
-
-        <!-- Hours -->
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
-            letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Hours</div>
-          <input id="cmp-hours" type="number" min="0" max="24" step="0.25"
-            placeholder="0.0"
-            style="width:80px;font-family:var(--font-mono);font-size:16px;font-weight:600;
-              padding:7px 10px;background:var(--bg2,#0c1628);
-              border:1px solid var(--border,rgba(0,210,255,.12));
-              color:var(--compass-cyan,#00D2FF);outline:none;
-              transition:border-color .15s;text-align:center"
-            onfocus="this.style.borderColor='rgba(0,210,255,.5)'"
-            onblur="this.style.borderColor='var(--border,rgba(0,210,255,.12))'" />
+      <!-- Col 2: Signal -->
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+          letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px">Signal</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button id="cmp-sig-green" onclick="setCmpSignal('green')" title="On track"
+            style="width:28px;height:28px;border-radius:50%;border:2px solid #1D9E75;
+              background:transparent;cursor:pointer;transition:all .12s"
+            onmouseenter="this.style.background='rgba(29,158,117,.2)'"
+            onmouseleave="this.style.background=_cmpSignal==='green'?'#1D9E75':'transparent'"></button>
+          <button id="cmp-sig-yellow" onclick="setCmpSignal('yellow')" title="Some uncertainty"
+            style="width:28px;height:28px;border-radius:50%;border:2px solid #EF9F27;
+              background:transparent;cursor:pointer;transition:all .12s"
+            onmouseenter="this.style.background='rgba(239,159,39,.2)'"
+            onmouseleave="this.style.background=_cmpSignal==='yellow'?'#EF9F27':'transparent'"></button>
+          <button id="cmp-sig-red" onclick="setCmpSignal('red')" title="Blocked or at risk"
+            style="width:28px;height:28px;border-radius:50%;border:2px solid #E24B4A;
+              background:transparent;cursor:pointer;transition:all .12s"
+            onmouseenter="this.style.background='rgba(226,75,74,.2)'"
+            onmouseleave="this.style.background=_cmpSignal==='red'?'#E24B4A':'transparent'"></button>
         </div>
-
-        <!-- Note -->
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
-            letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Note</div>
-          <input id="cmp-note" type="text"
-            placeholder="What did you complete? (required to log hours)"
-            style="width:100%;font-family:var(--font-ui);font-size:12px;
-              padding:8px 10px;background:var(--bg2);
-              border:1px solid var(--border,rgba(0,210,255,.12));
-              color:var(--text1,#c8dff0);outline:none;transition:border-color .15s"
-            onfocus="this.style.borderColor='rgba(0,210,255,.5)'"
-            onblur="this.style.borderColor='var(--border,rgba(0,210,255,.12))'" />
-        </div>
-
-        <!-- Signal -->
-        <div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
-            letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Signal</div>
-          <div style="display:flex;gap:6px;align-items:center;padding-top:4px">
-            <button id="cmp-sig-green" onclick="setCmpSignal('green')"
-              title="On track"
-              style="width:22px;height:22px;border-radius:50%;border:2px solid #1D9E75;
-                background:transparent;cursor:pointer;transition:all .12s"
-              onmouseenter="this.style.background='rgba(29,158,117,.2)'"
-              onmouseleave="this.style.background=_cmpSignal==='green'?'#1D9E75':'transparent'">
-            </button>
-            <button id="cmp-sig-yellow" onclick="setCmpSignal('yellow')"
-              title="Some uncertainty"
-              style="width:22px;height:22px;border-radius:50%;border:2px solid #EF9F27;
-                background:transparent;cursor:pointer;transition:all .12s"
-              onmouseenter="this.style.background='rgba(239,159,39,.2)'"
-              onmouseleave="this.style.background=_cmpSignal==='yellow'?'#EF9F27':'transparent'">
-            </button>
-            <button id="cmp-sig-red" onclick="setCmpSignal('red')"
-              title="Blocked or at risk"
-              style="width:22px;height:22px;border-radius:50%;border:2px solid #E24B4A;
-                background:transparent;cursor:pointer;transition:all .12s"
-              onmouseenter="this.style.background='rgba(226,75,74,.2)'"
-              onmouseleave="this.style.background=_cmpSignal==='red'?'#E24B4A':'transparent'">
-            </button>
-          </div>
-        </div>
-
       </div>
-
-      <!-- Actions -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;
-            font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-            <input id="cmp-billable" type="checkbox" checked
-              style="accent-color:var(--compass-cyan)"/>
-            Billable
-          </label>
-          <span id="cmp-status" style="font-family:var(--font-mono);font-size:11px;
-            color:var(--compass-amber);min-height:14px"></span>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button onclick="closeCompletionPanel()"
-            style="font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
-              text-transform:uppercase;padding:7px 16px;background:none;
-              border:1px solid var(--border);color:var(--text3);cursor:pointer;
-              transition:all .12s"
-            onmouseenter="this.style.borderColor='var(--text2)';this.style.color='var(--text1)'"
-            onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
-            Skip
-          </button>
-          <button id="cmp-submit" onclick="submitCompletion()"
-            style="font-family:var(--font-mono);font-size:11px;font-weight:600;
-              letter-spacing:.08em;text-transform:uppercase;padding:7px 20px;
-              background:var(--compass-cyan,#00D2FF);color:#060a10;
-              border:none;cursor:pointer;transition:opacity .12s"
-            onmouseenter="this.style.opacity='.85'"
-            onmouseleave="this.style.opacity='1'">
-            Mark complete →
-          </button>
-        </div>
+      <!-- Col 3: Note -->
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+          letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Note <span style="color:var(--muted)">(optional)</span></div>
+        <textarea id="cmp-note" rows="3"
+          placeholder="What did you complete?"
+          style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 10px;
+            background:var(--bg2);border:1px solid var(--border);color:var(--text1);
+            outline:none;resize:none;box-sizing:border-box;transition:border-color .15s"
+          onfocus="this.style.borderColor='rgba(0,210,255,.4)'"
+          onblur="this.style.borderColor='var(--border)'"></textarea>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;
+          font-family:var(--font-head);font-size:11px;color:var(--text3)">
+          <input id="cmp-billable" type="checkbox" checked
+            style="accent-color:var(--compass-cyan)"/>
+          Billable
+        </label>
+        <span id="cmp-status" style="font-family:var(--font-head);font-size:11px;
+          color:var(--compass-amber);min-height:14px"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="skipCompletion()"
+          style="font-family:var(--font-head);font-size:11px;font-weight:600;
+            letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;
+            background:none;border:1px solid var(--border);color:var(--text3);cursor:pointer;
+            transition:all .12s"
+          onmouseenter="this.style.borderColor='var(--text2)';this.style.color='var(--text1)'"
+          onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+          Skip <span style="font-weight:400;color:var(--muted)">— no time</span>
+        </button>
+        <button id="cmp-submit" onclick="submitCompletion()"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;
+            letter-spacing:.07em;text-transform:uppercase;padding:6px 18px;
+            background:var(--compass-cyan,#00D2FF);color:#060a10;
+            border:none;cursor:pointer;transition:opacity .12s"
+          onmouseenter="this.style.opacity='.85'"
+          onmouseleave="this.style.opacity='1'">
+          Complete →
+        </button>
       </div>
     </div>
   `;
 
-  document.body.appendChild(panel);
+  // Insert inline after the work row (spec: immediately after parent row)
+  const wiRow = document.querySelector(`.wi-row[data-wi-id="${item.id}"]`);
+  if (wiRow) {
+    wiRow.insertAdjacentElement('afterend', panel);
+  } else {
+    // Fallback: append inside work-list-rows
+    const listEl = document.getElementById('work-list-rows');
+    if (listEl) listEl.appendChild(panel);
+  }
+
   setTimeout(() => document.getElementById('cmp-hours')?.focus(), 80);
 }
+
+
 
 function setCmpSignal(sig) {
   _cmpSignal = _cmpSignal === sig ? null : sig;  // toggle
@@ -2746,8 +2915,85 @@ function closeCompletionPanel() {
   _cmpSignal = null;
 }
 
+// Skip: mark done without logging time — writes completion_skip CoC event
+async function skipCompletion() {
+  const item = _cmpItem;
+  if (!item) { closeCompletionPanel(); return; }
+
+  closeCompletionPanel();
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+  const proj = item.projectId ? _projects?.find(p=>p.id===item.projectId) : null;
+
+  // Add to _doneToday with noTime flag
+  _doneToday.unshift({
+    id: item.id, title: item.title, project: proj?.name || '—',
+    time: timeStr, hours: 0, signal: null, noTime: true,
+  });
+
+  // Write completion_skip CoC event (non-fatal)
+  try {
+    await API.post('workflow_step_instances', {
+      event_type:  'completion_skip',
+      step_name:   item.title,
+      event_notes: 'skip',
+      created_at:  now.toISOString(),
+      firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
+    }).catch(()=>{});
+  } catch(e) {}
+
+  // Mark item done in DB (non-fatal)
+  try {
+    if (item.type === 'task') {
+      await API.patch(`tasks?id=eq.${item.id}`, { status:'complete', pct_complete:100, updated_at:now.toISOString() }).catch(()=>{});
+    } else if (item.type === 'action') {
+      await API.patch(`workflow_action_items?id=eq.${item.id}`, { status:'resolved', resolved_at:now.toISOString() }).catch(()=>{});
+    }
+  } catch(e) {}
+
+  // Inline Done Today update
+  const dtList = document.getElementById('done-today-list');
+  if (dtList) {
+    const newRow = document.createElement('div');
+    newRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);animation:micro-open 200ms ease';
+    newRow.innerHTML = `
+      <span style="color:var(--compass-green);font-size:13px;flex-shrink:0">✓</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+          ${esc(proj?.name||'—')} · ${timeStr} · <span style="color:var(--text3)">no time logged</span>
+        </div>
+      </div>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0"></div>
+      <div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text3)">—</div>`;
+    dtList.querySelector('div[style*="italic"]')?.remove();
+    dtList.insertBefore(newRow, dtList.firstChild);
+  }
+
+  // Pulse counter
+  const ctr = document.getElementById('done-today-count');
+  if (ctr) {
+    ctr.textContent = _doneToday.length;
+    const card = ctr.closest('.stat-done-today');
+    if (card) { card.classList.add('stat-done-pulse'); setTimeout(()=>card.classList.remove('stat-done-pulse'),450); }
+  }
+
+  // Fade out work row
+  const wiRow = document.querySelector(`.wi-row[data-wi-id="${item.id}"]`);
+  if (wiRow) {
+    wiRow.style.transition = 'opacity 320ms ease';
+    wiRow.style.opacity = '0.3';
+    setTimeout(() => { wiRow.remove(); }, 340);
+  }
+
+  compassToast(`${esc(item.title.slice(0,40))} — skipped (no time logged)`);
+  setTimeout(() => { _viewLoaded['user'] = false; loadUserView(); }, 360);
+}
+
 async function submitCompletion() {
-  const item     = _cmpItem;
+  const item = _cmpItem;
   if (!item) return;
 
   const hoursRaw = parseFloat(document.getElementById('cmp-hours')?.value || 0);
@@ -2809,10 +3055,65 @@ async function submitCompletion() {
   try {
     await Promise.all(promises);
     closeCompletionPanel();
+
+    // ── Add to Done Today (session-persistent) ────────────
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    const proj = item.projectId ? _projects?.find(p=>p.id===item.projectId) : null;
+    _doneToday.unshift({
+      id: item.id, title: item.title, project: proj?.name || item.project || '—',
+      time: timeStr, hours: hoursRaw, signal: _cmpSignal, noTime: hoursRaw === 0,
+    });
+
+    // ── Inline DOM update: Done Today panel ──────────────
+    const dtList = document.getElementById('done-today-list');
+    if (dtList) {
+      const signalColor = _cmpSignal==='green'?'var(--compass-green)':_cmpSignal==='red'?'var(--compass-red)':'var(--compass-amber)';
+      const newRow = document.createElement('div');
+      newRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);animation:micro-open 200ms ease';
+      newRow.innerHTML = `
+        <span style="color:var(--compass-green);font-size:13px;flex-shrink:0">✓</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+            ${esc(proj?.name||'—')} · ${timeStr}${hoursRaw===0?' <span style="color:var(--text3)">· no time logged</span>':''}
+          </div>
+        </div>
+        ${_cmpSignal ? `<div style="width:8px;height:8px;border-radius:50%;background:${signalColor};flex-shrink:0"></div>` : '<div style="width:8px;height:8px"></div>'}
+        <div style="font-family:var(--font-display);font-size:13px;font-weight:700;
+          color:${hoursRaw===0?'var(--text3)':'var(--compass-cyan)'};flex-shrink:0">
+          ${hoursRaw===0?'—':hoursRaw.toFixed(1)+'h'}</div>`;
+      // Remove empty state if present
+      dtList.querySelector('div[style*="italic"]')?.remove();
+      dtList.insertBefore(newRow, dtList.firstChild);
+    }
+
+    // ── Pulse Done Today counter ──────────────────────────
+    const ctr = document.getElementById('done-today-count');
+    if (ctr) {
+      ctr.textContent = _doneToday.length;
+      const card = ctr.closest('.stat-done-today');
+      if (card) {
+        card.classList.add('stat-done-pulse');
+        setTimeout(()=>card.classList.remove('stat-done-pulse'), 450);
+      }
+    }
+
+    // ── Fade out the completed row ────────────────────────
+    const wiRow = document.querySelector(`.wi-row[data-wi-id="${item.id}"]`);
+    if (wiRow) {
+      wiRow.style.transition = 'opacity 320ms ease';
+      wiRow.style.opacity = '0.3';
+      setTimeout(() => {
+        wiRow.remove();
+        document.getElementById('inprogress-panel')?.remove();
+      }, 340);
+    }
+
     compassToast(`${esc(item.title.slice(0,40))} — marked complete`);
-    // Refresh the user view so the item disappears and bar chart updates
-    _viewLoaded['user'] = false;
-    loadUserView();
+    // Defer full reload slightly so animation plays
+    setTimeout(() => { _viewLoaded['user'] = false; loadUserView(); }, 360);
   } catch(e) {
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Mark complete →'; }
     if (statusEl)  statusEl.textContent = 'Failed — try again';
@@ -2831,53 +3132,113 @@ function filterTimeLog(date) {
   loadUserView();
 }
 
-// ── Permanent delegated listener for My Work interactions ─
+// ── Permanent delegated listeners — Session 16 ───────────
+// All wired once at load; survive innerHTML re-renders.
 document.addEventListener('change', function(ev) {
   const projSel = ev.target.closest('.wf-proj-sel');
-  if (projSel) {
-    _wfProject = projSel.value;
-    _viewLoaded['user'] = false; loadUserView();
-  }
+  if (projSel) { _wfProject = projSel.value; _viewLoaded['user'] = false; loadUserView(); }
 });
-// Wired once at load — survives innerHTML re-renders because
-// it lives on document, not on the content container.
+
 document.addEventListener('click', function(ev) {
-  // My Work filter buttons
+  // ── Type filter (new in Session 16) ──────────────────────
+  const typeBtn = ev.target.closest('.wf-type-btn');
+  if (typeBtn) { _wfType = typeBtn.dataset.type; _viewLoaded['user'] = false; loadUserView(); return; }
+
+  // ── Status filter ─────────────────────────────────────────
   const statusBtn = ev.target.closest('.wf-status-btn');
-  if (statusBtn) {
-    _wfStatus = statusBtn.dataset.status;
-    _viewLoaded['user'] = false; loadUserView(); return;
-  }
+  if (statusBtn) { _wfStatus = statusBtn.dataset.status; _viewLoaded['user'] = false; loadUserView(); return; }
+
+  // ── Date range filter ─────────────────────────────────────
   const dateBtn = ev.target.closest('.wf-date-btn');
-  if (dateBtn) {
-    _wfDateRange = dateBtn.dataset.range;
+  if (dateBtn) { _wfDateRange = dateBtn.dataset.range; _viewLoaded['user'] = false; loadUserView(); return; }
+
+  // ── Gauge click — toggle activeGauge + filter time log ───
+  const gaugeCol = ev.target.closest('.gauge-col');
+  if (gaugeCol) {
+    const d = gaugeCol.dataset.gaugeDate;
+    _activeGauge = (_activeGauge === d) ? null : d;
+    _teFilter = _activeGauge;
     _viewLoaded['user'] = false; loadUserView(); return;
   }
-  // Week view button — opens full weekly timesheet
-  if (ev.target.closest('.te-week-footer')) {
-    const anyEntry = _teEntries[0];
-    if (anyEntry) openWeeklyTimesheet(anyEntry);
-    else compassToast('No entries this week', 2000);
+
+  // ── Gauge clear filter button ─────────────────────────────
+  if (ev.target.closest('.gauge-clear-btn')) {
+    _activeGauge = null; _teFilter = null;
+    _viewLoaded['user'] = false; loadUserView(); return;
+  }
+
+  // ── Day dot click — open weekly drawer scrolled to that day ─
+  const dayDot = ev.target.closest('.day-dot');
+  if (dayDot) {
+    openFullWeeklyTimesheet({ expandDay: dayDot.dataset.day }); return;
+  }
+
+  // ── Open weekly timesheet buttons ─────────────────────────
+  if (ev.target.closest('.open-weekly-ts-btn')) {
+    const btn = ev.target.closest('.open-weekly-ts-btn');
+    openFullWeeklyTimesheet({ expandDay: btn.dataset.expandToday ? new Date().toLocaleDateString('en-CA') : null });
     return;
   }
-  // Clear filter button
-  if (ev.target.closest('.te-clear-filter')) {
-    filterTimeLog(null);
+
+  // ── Work item action button (new in Session 16) ───────────
+  const actionBtn = ev.target.closest('.wi-action-btn');
+  if (actionBtn) {
+    ev.stopPropagation();
+    const item = _wiItems.find(w => w.id === actionBtn.dataset.wiId);
+    if (!item) return;
+    const pct = parseInt(actionBtn.dataset.wiPct) || 0;
+    const status = actionBtn.dataset.wiStatus;
+    if (item.type === 'action' || pct >= 100) {
+      openCompletionPanel({ id: item.id, type: item.type, title: item.title, projectId: item.projectId || null });
+    } else if (status === 'blocked') {
+      openInProgressPanel(item);
+    } else {
+      // Start or In Progress — open in-progress update panel
+      openInProgressPanel(item);
+    }
     return;
   }
-  // Bar chart column
+
+  // ── Completion circle (new in Session 16) ────────────────
+  const wiCircle = ev.target.closest('.wi-complete-circle');
+  if (wiCircle) {
+    ev.stopPropagation();
+    const item = _wiItems.find(w => w.id === wiCircle.dataset.wiId);
+    if (item) openCompletionPanel({ id: item.id, type: item.type, title: item.title, projectId: item.projectId || null });
+    return;
+  }
+
+  // ── Legacy .wi-complete support ───────────────────────────
+  const wiComplete = ev.target.closest('.wi-complete');
+  if (wiComplete) {
+    ev.stopPropagation();
+    openCompletionPanel({ id: wiComplete.dataset.wiId, type: wiComplete.dataset.wiType,
+      title: wiComplete.dataset.wiTitle, projectId: wiComplete.dataset.wiProjectid || null });
+    return;
+  }
+
+  // ── Work item row — detail drawer ─────────────────────────
+  const wiRow = ev.target.closest('.wi-row');
+  if (wiRow && !ev.target.closest('.wi-action-btn') && !ev.target.closest('.wi-complete-circle')) {
+    document.querySelectorAll('.wi-row').forEach(r => r.classList.remove('wi-selected'));
+    wiRow.classList.add('wi-selected');
+    const item = _wiItems.find(w => w.id === wiRow.dataset.wiId);
+    if (item) openWorkItemDrawer(item);
+    return;
+  }
+
+  // ── Clear time log filter ─────────────────────────────────
+  if (ev.target.closest('.te-clear-filter')) { filterTimeLog(null); return; }
+
+  // ── Legacy bar chart column filter ───────────────────────
   const barCol = ev.target.closest('.te-bar-col');
-  if (barCol && barCol.dataset.hasHours === 'true') {
-    filterTimeLog(barCol.dataset.date);
-    return;
-  }
-  // Time log row
+  if (barCol && barCol.dataset.hasHours === 'true') { filterTimeLog(barCol.dataset.date); return; }
+
+  // ── Time log row ──────────────────────────────────────────
   const teRow = ev.target.closest('.te-row');
   if (teRow) {
     const teId  = teRow.dataset.teId;
     const isCad = teRow.dataset.teCadence === 'true';
-
-    // Update selected state and visual highlight
     _teSelected = teId;
     document.querySelectorAll('.te-row').forEach(r => {
       const isThis = r.dataset.teId === teId;
@@ -2885,66 +3246,53 @@ document.addEventListener('click', function(ev) {
       r.style.background = isThis ? 'rgba(0,210,255,.04)' : '';
       r.onmouseleave = () => { r.style.background = isThis ? 'rgba(0,210,255,.04)' : ''; };
     });
-
-    if (isCad) {
-      window.location.href = '/cadence.html';
-      return;
-    }
+    if (isCad) { window.location.href = '/cadence.html'; return; }
     const entry = _teEntries.find(e => e.id === teId);
     if (entry) {
       const proj = _projects.find(p => p.id === entry.project_id);
-      openTimeEntryEdit({
-        id:           entry.id,
-        hours:        entry.hours,
-        notes:        entry.notes || '',
-        is_billable:  entry.is_billable,
-        date:         entry.date,
-        week_start_date: entry.week_start_date,
-        project_id:   entry.project_id,
-        project_name: proj?.name || '—',
-        step_name:    entry.step_name || null,
-        source_type:  entry.source_type,
-      });
+      openTimeEntryEdit({ id:entry.id, hours:entry.hours, notes:entry.notes||'',
+        is_billable:entry.is_billable, date:entry.date, week_start_date:entry.week_start_date,
+        project_id:entry.project_id, project_name:proj?.name||'—',
+        step_name:entry.step_name||null, source_type:entry.source_type });
     }
     return;
   }
-  // Work item Complete button
-  const wiComplete = ev.target.closest('.wi-complete');
-  if (wiComplete) {
-    ev.stopPropagation();
-    openCompletionPanel({
-      id:        wiComplete.dataset.wiId,
-      type:      wiComplete.dataset.wiType,
-      title:     wiComplete.dataset.wiTitle,
-      projectId: wiComplete.dataset.wiProjectid || null,
-    });
+
+  // ── New time entry ────────────────────────────────────────
+  if (ev.target.closest('.te-new-btn')) { openNewTimeEntry(); return; }
+
+  // ── Legacy week footer button ─────────────────────────────
+  if (ev.target.closest('.te-week-footer')) {
+    const anyEntry = _teEntries[0];
+    if (anyEntry) openWeeklyTimesheet(anyEntry);
+    else compassToast('No entries this week', 2000);
     return;
   }
-  // Work item row — open detail drawer
-  const wiRow = ev.target.closest('.wi-row');
-  if (wiRow && !ev.target.closest('.wi-complete')) {
-    // Toggle selected class
-    document.querySelectorAll('.wi-row').forEach(r => r.classList.remove('wi-selected'));
-    wiRow.classList.add('wi-selected');
-    const item = _wiItems.find(w => w.id === wiRow.dataset.wiId);
-    if (item) openWorkItemDrawer(item);
-    return;
-  }
-  // New time entry button
-  if (ev.target.closest('.te-new-btn')) {
-    openNewTimeEntry();
-    return;
-  }
-  // Timesheet submit button
+
+  // ── Timesheet submit ──────────────────────────────────────
   const tsSubmit = ev.target.closest('.ts-submit-btn');
   if (tsSubmit) {
-    submitTimesheetWeek(
-      tsSubmit.dataset.weekId,
-      tsSubmit.dataset.weekStart,
-      tsSubmit.dataset.weekHours
-    );
+    submitTimesheetWeek(tsSubmit.dataset.weekId, tsSubmit.dataset.weekStart, tsSubmit.dataset.weekHours);
     return;
   }
+});
+
+// ── Gauge dwell (900ms hover → Day Intelligence Briefing) ─
+document.addEventListener('mouseover', function(ev) {
+  const gc = ev.target.closest('.gauge-col');
+  if (!gc) return;
+  const d = gc.dataset.gaugeDate;
+  if (!d) return;
+  clearTimeout(_dwellTimer);
+  _dwellTimer = setTimeout(() => {
+    if (gc.matches(':hover') && gc.dataset.gaugeHasData === 'true') {
+      openDayBriefing(d);
+    }
+  }, 900);
+});
+document.addEventListener('mouseout', function(ev) {
+  const gc = ev.target.closest('.gauge-col');
+  if (gc) clearTimeout(_dwellTimer);
 });
 
 // ── Time entry edit drawer ────────────────────────────────
@@ -3105,6 +3453,739 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
   }, 50);
 }
 
+// ── In-Progress Update Panel (1.C) ───────────────────────
+function openInProgressPanel(item) {
+  // Close any open completion panel
+  document.getElementById('completion-micro-panel')?.remove();
+  document.getElementById('inprogress-panel')?.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'inprogress-panel';
+
+  // Find the row to insert after
+  const row = document.querySelector(`.wi-row[data-wi-id="${item.id}"]`);
+  if (!row) return;
+
+  panel.style.cssText = `
+    grid-column: 1/-1;
+    border-bottom: 2px solid var(--compass-amber);
+    background: rgba(239,159,39,.04);
+    padding: 12px 16px;
+    animation: micro-open 180ms ease;
+  `;
+
+  panel.innerHTML = `
+    <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--compass-amber);margin-bottom:10px;font-weight:700">
+      Update progress — ${esc(item.title.slice(0,50))}
+    </div>
+    <div style="display:grid;grid-template-columns:160px 110px 160px auto;gap:12px;align-items:start">
+      <!-- % Complete -->
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+          letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">% Complete</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input id="ip-range" type="range" min="0" max="100" step="5"
+            value="${item.pct||0}"
+            style="flex:1;accent-color:var(--compass-amber)"
+            oninput="document.getElementById('ip-pct').value=this.value"/>
+          <input id="ip-pct" type="number" min="0" max="100"
+            value="${item.pct||0}"
+            style="width:52px;font-family:var(--font-display);font-size:16px;font-weight:700;
+              padding:4px 6px;background:var(--bg2);border:1px solid rgba(239,159,39,.4);
+              color:var(--compass-amber);outline:none;text-align:center"
+            oninput="document.getElementById('ip-range').value=this.value"/>
+        </div>
+      </div>
+      <!-- Hours today -->
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+          letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Hours today</div>
+        <input id="ip-hours" type="number" min="0" max="24" step="0.25" placeholder="0.0"
+          style="width:80px;font-family:var(--font-display);font-size:16px;font-weight:700;
+            padding:6px 8px;background:var(--bg2);border:1px solid rgba(0,210,255,.3);
+            color:var(--compass-cyan);outline:none;text-align:center"/>
+      </div>
+      <!-- Status -->
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+          letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Status</div>
+        <select id="ip-status"
+          style="font-family:var(--font-head);font-size:12px;font-weight:600;padding:6px 8px;
+            background:var(--bg2);color:var(--text1);border:1px solid var(--border);
+            width:100%;cursor:pointer">
+          <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In Progress</option>
+          <option value="not_started" ${item.status==='not_started'?'selected':''}>Not Started</option>
+          <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
+        </select>
+      </div>
+      <!-- Buttons -->
+      <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:1px">
+        <button onclick="document.getElementById('inprogress-panel').remove()"
+          style="font-family:var(--font-head);font-size:11px;font-weight:600;letter-spacing:.06em;
+            padding:7px 12px;background:none;border:1px solid var(--border);
+            color:var(--text3);cursor:pointer">Cancel</button>
+        <button id="ip-save-btn" onclick="saveInProgressUpdate('${item.id}','${item.projectId||''}')"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;
+            padding:7px 16px;background:var(--compass-amber);color:#060a10;
+            border:none;cursor:pointer;transition:opacity .12s"
+          onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save →</button>
+      </div>
+    </div>
+  `;
+
+  row.insertAdjacentElement('afterend', panel);
+  document.getElementById('ip-pct')?.focus();
+}
+
+async function saveInProgressUpdate(itemId, projectId) {
+  const pct    = parseInt(document.getElementById('ip-pct')?.value) || 0;
+  const hours  = parseFloat(document.getElementById('ip-hours')?.value || 0);
+  const status = document.getElementById('ip-status')?.value || 'in_progress';
+  const btn    = document.getElementById('ip-save-btn');
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+
+  const today = new Date().toLocaleDateString('en-CA');
+  try {
+    const ps = [
+      API.patch(`tasks?id=eq.${itemId}`, { pct_complete: pct, status, updated_at: new Date().toISOString() }).catch(()=>{})
+    ];
+    if (hours > 0 && _myResource?.id) {
+      const id = crypto.randomUUID();
+      ps.push(API.post('time_entries', {
+        id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
+        resource_id: _myResource.id, user_id: _myResource.user_id || null,
+        project_id: projectId || null, task_id: itemId, source_type:'direct',
+        date: today, hours, is_billable: true
+      }).catch(()=>{}));
+    }
+    await Promise.all(ps);
+    document.getElementById('inprogress-panel')?.remove();
+    compassToast('Progress updated');
+    _viewLoaded['user'] = false; loadUserView();
+  } catch(e) {
+    if (btn) { btn.textContent = 'Save →'; btn.disabled = false; }
+    compassToast('Failed — ' + e.message, 2500);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// COMPONENT 1.F — Full Weekly Timesheet Drawer
+// 640px right drawer · Project×Day grid + Day Accordion
+// ══════════════════════════════════════════════════════════
+function openFullWeeklyTimesheet({ expandDay = null } = {}) {
+  document.getElementById('full-weekly-drawer')?.remove();
+
+  const today = new Date().toLocaleDateString('en-CA');
+  const todayDt = new Date(today + 'T00:00:00');
+  const isoOff = todayDt.getDay() === 0 ? 6 : todayDt.getDay() - 1;
+  const wkStart = new Date(todayDt); wkStart.setDate(todayDt.getDate() - isoOff);
+  const weekStartStr = wkStart.toLocaleDateString('en-CA');
+  const weekDays = Array.from({length:5},(_,i) => {
+    const d = new Date(wkStart); d.setDate(wkStart.getDate()+i);
+    return d.toLocaleDateString('en-CA');
+  });
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri'];
+  const expandTarget = expandDay || today;
+
+  // Compute per-day per-project hours from cached entries
+  const weekEntries = _teEntries.filter(e => weekDays.includes(e.date));
+  const weekBillable = weekEntries.filter(e=>e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const weekNonBill = weekEntries.filter(e=>!e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const weekTotal = weekBillable + weekNonBill;
+
+  // Project set from entries
+  const projIds = [...new Set(weekEntries.map(e=>e.project_id).filter(Boolean))];
+  const gridProjects = projIds.map(pid => _projects.find(p=>p.id===pid)).filter(Boolean);
+
+  // Day totals
+  const dayTotals = {};
+  weekDays.forEach(d => { dayTotals[d] = weekEntries.filter(e=>e.date===d).reduce((s,e)=>s+parseFloat(e.hours||0),0); });
+
+  // ── Project × Day Grid ────────────────────────────────────
+  function cellHtml(hrs, d) {
+    const isPast = d < today; const isToday = d === today; const isFuture = d > today;
+    if (isFuture) return `<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">—</span>`;
+    if (hrs > 0) {
+      const c = isToday ? 'var(--compass-cyan)' : 'var(--compass-green)';
+      const mark = isToday ? '■' : '✓';
+      return `<span style="font-family:var(--font-head);font-size:12px;font-weight:700;color:${c}">${hrs.toFixed(1)}h ${mark}</span>`;
+    }
+    if (isPast) return `<span style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-red)">0h !</span>`;
+    return `<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">—</span>`;
+  }
+
+  const gridHtml = `
+    <div style="overflow-x:auto;margin-bottom:0">
+      <table style="width:100%;border-collapse:collapse;font-family:var(--font-head);font-size:12px">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:6px 13px;font-weight:700;color:var(--text3);
+              font-size:11px;letter-spacing:.07em">PROJECT</th>
+            ${weekDays.map((d,i) => `<th style="text-align:center;padding:6px 8px;font-weight:700;
+              color:${d===today?'var(--compass-cyan)':d<today?'var(--text2)':'var(--text3)'};font-size:11px">${dayNames[i]}</th>`).join('')}
+            <th style="text-align:right;padding:6px 13px 6px 0;font-weight:700;color:var(--text3);font-size:11px">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${gridProjects.map(proj => {
+            const rowEntries = weekEntries.filter(e=>e.project_id===proj.id);
+            const rowTotal = rowEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+            return `<tr style="border-bottom:1px solid rgba(0,210,255,.06);cursor:pointer"
+              onclick="document.querySelector('.day-acc-header[data-day=\\'${today}\\']')?.click()">
+              <td style="padding:7px 13px;color:var(--text1);white-space:nowrap;overflow:hidden;
+                text-overflow:ellipsis;max-width:160px">${esc(proj.name)}</td>
+              ${weekDays.map(d => {
+                const hrs = rowEntries.filter(e=>e.date===d).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+                return `<td style="text-align:center;padding:7px 8px">${cellHtml(hrs,d)}</td>`;
+              }).join('')}
+              <td style="text-align:right;padding:7px 13px 7px 0;font-family:var(--font-display);
+                font-size:13px;font-weight:700;color:var(--compass-cyan)">${rowTotal.toFixed(1)}h</td>
+            </tr>`;
+          }).join('')}
+          ${gridProjects.length === 0 ? `<tr><td colspan="${weekDays.length+2}" style="padding:12px 13px;
+            color:var(--text3);font-family:var(--font-head);font-size:12px">No time entries this week</td></tr>` : ''}
+        </tbody>
+        <tfoot>
+          <tr style="border-top:1px solid var(--border)">
+            <td style="padding:7px 13px;font-weight:700;color:var(--text2);font-size:11px">DAILY TOTAL</td>
+            ${weekDays.map(d => `<td style="text-align:center;padding:7px 8px">
+              ${cellHtml(dayTotals[d],d)}</td>`).join('')}
+            <td style="text-align:right;padding:7px 13px 7px 0;font-family:var(--font-display);
+              font-size:14px;font-weight:700;color:var(--compass-cyan)">${weekTotal.toFixed(1)}h</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="padding:4px 13px 6px;font-family:var(--font-head);font-size:11px;color:var(--text3)">
+        ✓ Complete · ■ Today · ! No entries · Legend
+      </div>
+    </div>`;
+
+  // ── Day Accordion HTML ────────────────────────────────────
+  function dayAccordionHtml(d, label) {
+    const isToday = d === today;
+    const isPast = d < today;
+    const isFuture = d > today;
+    const hrs = dayTotals[d] || 0;
+    const dayEntries = weekEntries.filter(e=>e.date===d);
+    const isExpanded = d === expandTarget;
+
+    let statusBadge = '';
+    let borderColor = 'var(--border)';
+    if (isToday) { statusBadge = `<span style="padding:1px 7px;background:rgba(0,210,255,.12);color:var(--compass-cyan);font-size:11px;font-weight:700;border:1px solid rgba(0,210,255,.3)">TODAY</span>`; borderColor='var(--compass-cyan)'; }
+    else if (isPast && hrs > 0) { statusBadge = `<span style="padding:1px 7px;background:rgba(29,158,117,.1);color:var(--compass-green);font-size:11px;font-weight:700;border:1px solid rgba(29,158,117,.3)">DONE</span>`; borderColor='var(--compass-green)'; }
+    else if (isPast && hrs === 0) { statusBadge = `<span style="padding:1px 7px;background:rgba(226,75,74,.1);color:var(--compass-red);font-size:11px;font-weight:700;border:1px solid rgba(226,75,74,.3)">MISSING</span>`; borderColor='var(--compass-red)'; }
+
+    const entryRowsHtml = dayEntries.map(e => {
+      const proj = _projects.find(p=>p.id===e.project_id);
+      const isDirect = e.source_type === 'direct';
+      const srcIcon = e.source_type==='step_comment' ? '■' : e.source_type==='action_item' ? '●' : '●';
+      const srcColor = e.source_type==='step_comment' ? 'var(--compass-amber)' : 'var(--text3)';
+      return `<div style="display:grid;grid-template-columns:20px 1fr auto auto auto;gap:8px;
+        align-items:center;padding:6px 13px;border-bottom:1px solid rgba(0,210,255,.04)">
+        <span style="color:${srcColor};font-size:12px">${srcIcon}</span>
+        <div>
+          <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0)">
+            ${esc(e.step_name || proj?.name || '—')}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+            ${esc(proj?.name||'—')} · ${e.is_billable?'Billable':'Non-bill'}
+            ${!isDirect ? ' · <span style="color:var(--compass-amber)">Cadence</span>' : ''}
+          </div>
+        </div>
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${e.is_billable?'var(--compass-cyan)':'#8B5CF6'}"></div>
+        <div style="font-family:var(--font-display);font-size:13px;font-weight:700;
+          color:var(--compass-cyan);min-width:36px;text-align:right">${parseFloat(e.hours).toFixed(1)}h</div>
+        ${isDirect ? `<button data-te-del="${e.id}"
+          style="background:none;border:none;color:rgba(226,75,74,.4);cursor:pointer;
+            font-size:12px;padding:0;line-height:1"
+          onmouseenter="this.style.color='var(--compass-red)'"
+          onmouseleave="this.style.color='rgba(226,75,74,.4)'">✕</button>` : '<div></div>'}
+      </div>`;
+    }).join('');
+
+    // Progress bar for today
+    const progressBar = isToday ? `
+      <div style="padding:6px 13px 4px">
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-head);
+          font-size:11px;color:var(--text3);margin-bottom:4px">
+          <span>Today's progress</span><span style="color:var(--compass-cyan)">${hrs.toFixed(1)}h / 8h</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px">
+          <div style="height:100%;width:${Math.min(hrs/8*100,100).toFixed(0)}%;
+            background:var(--compass-cyan);border-radius:2px;transition:width .3s"></div>
+        </div>
+      </div>` : '';
+
+    // Add time form (always visible in accordion body)
+    const addTimeForm = !isFuture ? `
+      <div style="padding:10px 13px;border-top:1px solid var(--border);background:rgba(0,0,0,.15)">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;
+          color:var(--text3);letter-spacing:.07em;margin-bottom:6px">ADD TIME</div>
+        <div style="display:grid;grid-template-columns:1fr 70px;gap:8px;margin-bottom:6px">
+          <input class="acc-desc-inp" data-day="${d}"
+            placeholder="Description…"
+            style="font-family:var(--font-body);font-size:12px;padding:6px 8px;
+              background:var(--bg2);border:1px solid var(--border);color:var(--text1);outline:none"/>
+          <input class="acc-hrs-inp" data-day="${d}" type="number" min="0.25" max="24" step="0.25"
+            placeholder="0.0"
+            style="font-family:var(--font-display);font-size:14px;font-weight:700;padding:6px;
+              background:var(--bg2);border:1px solid rgba(0,210,255,.3);color:var(--compass-cyan);
+              outline:none;text-align:center"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+          <select class="acc-proj-sel" data-day="${d}"
+            style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:6px 8px;
+              background:var(--bg2);border:1px solid var(--border);color:var(--text1);cursor:pointer">
+            <option value="">— Project —</option>
+            ${(_projects||[]).filter(p=>p.status==='active').map(p=>
+              `<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+          </select>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap">
+            <input class="acc-bill-chk" data-day="${d}" type="checkbox" checked
+              style="accent-color:var(--compass-cyan)"/>
+            <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">Billable</span>
+          </label>
+          <button class="acc-add-btn" data-day="${d}"
+            style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;
+              padding:6px 14px;background:var(--compass-cyan);color:#060a10;
+              border:none;cursor:pointer;transition:opacity .12s;white-space:nowrap"
+            onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Add →</button>
+        </div>
+      </div>` : '';
+
+    // Mark today complete button
+    const markCompleteBtn = isToday ? `
+      <div style="padding:8px 13px;border-top:1px solid var(--border)">
+        <button class="mark-today-complete-btn"
+          style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:700;
+            letter-spacing:.07em;text-transform:uppercase;padding:8px;
+            background:rgba(29,158,117,.12);color:var(--compass-green);
+            border:1px solid rgba(29,158,117,.3);cursor:pointer;transition:all .15s"
+          onmouseenter="this.style.background='rgba(29,158,117,.2)'"
+          onmouseleave="this.style.background='rgba(29,158,117,.12)'">
+          ✓ Mark today complete — ${hrs.toFixed(1)}h logged
+        </button>
+      </div>` : '';
+
+    return `<div class="day-accordion" data-day="${d}" style="border-left:3px solid ${borderColor};margin-bottom:4px">
+      <div class="day-acc-header" data-day="${d}"
+        style="display:flex;align-items:center;gap:10px;padding:9px 13px;
+          cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border)"
+        onclick="this.parentElement.querySelector('.day-acc-body').style.display=
+          this.parentElement.querySelector('.day-acc-body').style.display==='none'?'block':'none';
+          this.querySelector('.acc-chevron').style.transform=
+          this.parentElement.querySelector('.day-acc-body').style.display==='none'?'rotate(0deg)':'rotate(90deg)'">
+        <span class="acc-chevron" style="color:var(--text3);font-size:11px;
+          transition:transform .15s;transform:${isExpanded?'rotate(90deg)':'rotate(0deg)'}">▶</span>
+        <span style="font-family:var(--font-head);font-size:13px;font-weight:700;
+          color:${isToday?'var(--compass-cyan)':isPast&&hrs>0?'var(--compass-green)':isPast&&hrs===0?'var(--compass-red)':'var(--text2)'};
+          min-width:60px">${label}</span>
+        <span style="font-family:var(--font-display);font-size:16px;font-weight:700;
+          color:${isToday?'var(--compass-cyan)':hrs>0?'var(--compass-green)':'var(--text3)'}">${hrs.toFixed(1)}h</span>
+        ${statusBadge}
+        <span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:var(--text3)">
+          ${dayEntries.length} ${dayEntries.length===1?'entry':'entries'}</span>
+      </div>
+      <div class="day-acc-body" style="display:${isExpanded?'block':'none'}">
+        ${progressBar}
+        ${entryRowsHtml || `<div style="padding:10px 13px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No entries for this day</div>`}
+        ${addTimeForm}
+        ${markCompleteBtn}
+      </div>
+    </div>`;
+  }
+
+  const accordionHtml = weekDays.map((d,i) =>
+    dayAccordionHtml(d, new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}))).join('');
+
+  // ── Build drawer ──────────────────────────────────────────
+  if (!document.getElementById('wts-style')) {
+    const s = document.createElement('style');
+    s.id = 'wts-style';
+    s.textContent = '@keyframes wts-slide-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}';
+    document.head.appendChild(s);
+  }
+
+  const drawer = document.createElement('div');
+  drawer.id = 'full-weekly-drawer';
+  drawer.style.cssText = `position:fixed;top:0;right:0;bottom:0;width:640px;z-index:600;
+    background:var(--bg0,#060a10);border-left:1px solid var(--border);
+    box-shadow:-12px 0 40px rgba(0,0,0,.6);display:flex;flex-direction:column;
+    animation:wts-slide-in .22s ease;`;
+
+  const myWeekStatus = _teEntries.length > 0 ? 'draft' : 'draft'; // will be overridden by loaded data if available
+  const weekLabel = `${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${new Date(weekDays[4]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+
+  drawer.innerHTML = `
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div>
+        <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.12em;
+          text-transform:uppercase;color:var(--compass-cyan);margin-bottom:2px">Weekly Timesheet</div>
+        <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text0)">
+          ${weekLabel}</div>
+      </div>
+      <button onclick="document.getElementById('full-weekly-drawer').remove()"
+        style="background:none;border:none;color:var(--text3);font-size:20px;
+          cursor:pointer;padding:0;line-height:1"
+        onmouseenter="this.style.color='var(--text0)'"
+        onmouseleave="this.style.color='var(--text3)'">✕</button>
+    </div>
+
+    <!-- Scrollable body -->
+    <div style="flex:1;overflow-y:auto;padding:14px 0">
+      <!-- Project × Day Grid -->
+      <div style="padding:0 0 14px;border-bottom:1px solid var(--border);margin-bottom:14px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--text3);padding:0 13px 6px">Project Overview</div>
+        ${gridHtml}
+      </div>
+
+      <!-- Day Accordions -->
+      <div style="padding:0 0 20px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--text3);padding:0 13px 8px">Daily Breakdown</div>
+        ${accordionHtml}
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:12px 16px;border-top:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text1)">
+        <span>Week total: </span>
+        <span style="color:var(--compass-cyan)">${weekTotal.toFixed(1)}h</span>
+        <span style="color:var(--text3);font-size:11px;margin-left:8px">
+          ${weekBillable.toFixed(1)}h billable · ${weekNonBill.toFixed(1)}h non-bill
+        </span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="te-new-btn"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;
+            color:var(--compass-cyan);background:none;border:1px solid rgba(0,210,255,.3);
+            padding:7px 14px;cursor:pointer;transition:background .12s"
+          onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+          onmouseleave="this.style.background='none'">+ Log time</button>
+        <button class="ts-submit-wts-btn"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;
+            padding:7px 16px;background:var(--compass-cyan);color:#060a10;
+            border:none;cursor:pointer;transition:opacity .12s"
+          onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Submit week →</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(drawer);
+
+  // ── Drawer event listeners ────────────────────────────────
+  drawer.addEventListener('click', async ev => {
+    // Add time button
+    const addBtn = ev.target.closest('.acc-add-btn');
+    if (addBtn) {
+      const d = addBtn.dataset.day;
+      const desc = drawer.querySelector(`.acc-desc-inp[data-day="${d}"]`)?.value?.trim() || '';
+      const hrs  = parseFloat(drawer.querySelector(`.acc-hrs-inp[data-day="${d}"]`)?.value || 0);
+      const proj = drawer.querySelector(`.acc-proj-sel[data-day="${d}"]`)?.value || '';
+      const bill = drawer.querySelector(`.acc-bill-chk[data-day="${d}"]`)?.checked ?? true;
+      if (!hrs || hrs <= 0) { compassToast('Hours required', 2000); return; }
+      if (!proj) { compassToast('Project required', 2000); return; }
+      addBtn.textContent = '…'; addBtn.disabled = true;
+      try {
+        const id = crypto.randomUUID();
+        await API.post('time_entries', {
+          id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
+          resource_id: _myResource?.id, user_id: _myResource?.user_id||null,
+          project_id: proj, source_type:'direct', date: d, hours: hrs,
+          is_billable: bill, notes: desc || null
+        });
+        compassToast('Entry added');
+        drawer.remove();
+        _viewLoaded['user'] = false; loadUserView();
+        // Re-open to same day
+        setTimeout(() => openFullWeeklyTimesheet({ expandDay: d }), 400);
+      } catch(e) {
+        addBtn.textContent = 'Add →'; addBtn.disabled = false;
+        compassToast('Failed — ' + e.message, 2500);
+      }
+    }
+
+    // Delete entry
+    const delBtn = ev.target.closest('[data-te-del]');
+    if (delBtn) {
+      if (!confirm('Delete this entry?')) return;
+      try {
+        await API.del('time_entries?id=eq.'+delBtn.dataset.teDel);
+        compassToast('Deleted');
+        const expandedDay = drawer.querySelector('.day-acc-body[style*="block"]')?.closest('.day-accordion')?.dataset?.day || today;
+        drawer.remove(); _viewLoaded['user'] = false; loadUserView();
+        setTimeout(() => openFullWeeklyTimesheet({ expandDay: expandedDay }), 400);
+      } catch(e) { compassToast('Failed', 2000); }
+    }
+
+    // Mark today complete
+    if (ev.target.closest('.mark-today-complete-btn')) {
+      const todayHrs = dayTotals[today] || 0;
+      try {
+        await API.post('workflow_step_instances', {
+          event_type: 'daily_timesheet_complete',
+          event_notes: todayHrs.toFixed(1),
+          created_at: new Date().toISOString(),
+          firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+        }).catch(()=>{});
+        compassToast('Today marked complete ✓');
+        drawer.remove(); _viewLoaded['user'] = false; loadUserView();
+      } catch(e) { compassToast('Saved locally', 2000); drawer.remove(); }
+    }
+
+    // Submit week
+    if (ev.target.closest('.ts-submit-wts-btn')) {
+      drawer.remove();
+      // Find week ID from cached entries
+      const wkEntry = _teEntries.find(e => weekDays.includes(e.date));
+      submitTimesheetWeek('', weekDays[0], weekTotal.toFixed(1));
+    }
+  });
+
+  // Close on overlay click
+  setTimeout(() => {
+    document.addEventListener('mousedown', function closeWTS(ev) {
+      if (!drawer.contains(ev.target)) {
+        drawer.remove();
+        document.removeEventListener('mousedown', closeWTS);
+      }
+    });
+  }, 50);
+}
+
+// ══════════════════════════════════════════════════════════
+// COMPONENT 1.G — Day Intelligence Briefing Drawer
+// 420px right drawer; dwell-triggered or click-triggered
+// ══════════════════════════════════════════════════════════
+function openDayBriefing(dateStr) {
+  document.getElementById('day-briefing-drawer')?.remove();
+
+  const today = new Date().toLocaleDateString('en-CA');
+  const dayEntries = _teEntries.filter(e => e.date === dateStr);
+  const totalHrs = dayEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const billHrs  = dayEntries.filter(e=>e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const nonBillHrs = totalHrs - billHrs;
+  const dayLabel = new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  // Distribution by project
+  const projDist = {};
+  dayEntries.forEach(e => {
+    const pid = e.project_id || '__none__';
+    projDist[pid] = (projDist[pid] || 0) + parseFloat(e.hours||0);
+  });
+  const projDistArr = Object.entries(projDist).map(([pid,hrs]) => {
+    const proj = _projects.find(p=>p.id===pid);
+    return { pid, name: proj?.name||'Unassigned', hrs, pct: totalHrs>0 ? Math.round(hrs/totalHrs*100) : 0 };
+  }).sort((a,b)=>b.hrs-a.hrs);
+
+  // Color palette for distribution
+  const distColors = ['var(--compass-cyan)','var(--compass-amber)','var(--compass-green)','var(--compass-purple)','var(--compass-red)'];
+
+  const distBarHtml = totalHrs > 0 ? `
+    <div style="display:flex;height:7px;border-radius:4px;overflow:hidden;margin-bottom:8px">
+      ${projDistArr.map((p,i)=>`<div style="width:${p.pct}%;background:${distColors[i%distColors.length]};
+        min-width:${p.pct>0?2:0}px" title="${p.name}: ${p.pct}%"></div>`).join('')}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      ${projDistArr.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${distColors[i%distColors.length]};flex-shrink:0"></div>
+        <span style="font-family:var(--font-body);font-size:12px;color:var(--text1);flex:1">${esc(p.name)}</span>
+        <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${distColors[i%distColors.length]}">
+          ${p.pct}% (${p.hrs.toFixed(1)}h)</span>
+      </div>`).join('')}
+    </div>` : `<div style="font-family:var(--font-head);font-size:12px;color:var(--text3)">No entries for this day</div>`;
+
+  const billBarHtml = totalHrs > 0 ? `
+    <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;margin:8px 0 6px">
+      <div style="width:${billHrs/totalHrs*100}%;background:var(--compass-cyan)"></div>
+      <div style="width:${nonBillHrs/totalHrs*100}%;background:#8B5CF6"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--font-head);font-size:11px;font-weight:700">
+      <span style="color:var(--compass-cyan)">Billable ${billHrs.toFixed(1)}h (${totalHrs>0?Math.round(billHrs/totalHrs*100):0}%)</span>
+      <span style="color:#8B5CF6">Non-bill ${nonBillHrs.toFixed(1)}h (${totalHrs>0?Math.round(nonBillHrs/totalHrs*100):0}%)</span>
+    </div>` : '';
+
+  // Entry rows
+  let _expandedEntry = null;
+  function entryRowHtml(e) {
+    const proj = _projects.find(p=>p.id===e.project_id);
+    const isDirect = e.source_type === 'direct';
+    const srcIcon = e.source_type==='step_comment' ? '■' : '●';
+    const srcColor = e.source_type==='step_comment' ? 'var(--compass-amber)' : 'var(--text3)';
+    const pctOfDay = totalHrs>0 ? Math.round(parseFloat(e.hours)/totalHrs*100) : 0;
+    return `<div class="db-entry-row" data-entry-id="${e.id}" data-is-direct="${isDirect}"
+      style="border:1px solid var(--border);border-radius:3px;margin-bottom:6px;cursor:pointer;
+        transition:border-color .12s"
+      onmouseenter="this.style.borderColor='rgba(0,210,255,.3)'"
+      onmouseleave="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px">
+        <span style="color:${srcColor};font-size:12px;flex-shrink:0">${srcIcon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${esc(e.step_name||proj?.name||'—')}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+            ${esc(proj?.name||'—')} · ${pctOfDay}% of day · ${parseFloat(e.hours).toFixed(1)}h</div>
+        </div>
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+          background:${e.is_billable?'var(--compass-cyan)':'#8B5CF6'}"></div>
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;
+          color:var(--compass-cyan);min-width:40px;text-align:right">${parseFloat(e.hours).toFixed(1)}h</div>
+      </div>
+      ${!isDirect ? `<div style="padding:6px 10px 8px;border-top:1px solid var(--border);
+        background:rgba(239,159,39,.05)">
+        <span style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber)">
+          ■ Logged via Cadence — read only</span>
+        <a href="/cadence.html" style="font-family:var(--font-head);font-size:11px;
+          color:var(--compass-amber);margin-left:12px;text-decoration:none;
+          border:1px solid rgba(239,159,39,.4);padding:2px 8px">Open in Cadence →</a>
+      </div>` : ''}
+    </div>`;
+  }
+
+  const entriesHtml = dayEntries.length > 0
+    ? dayEntries.map(e=>entryRowHtml(e)).join('')
+    : `<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);padding:4px 0">No entries for this day</div>`;
+
+  if (!document.getElementById('db-style')) {
+    const s = document.createElement('style');
+    s.id = 'db-style';
+    s.textContent = '@keyframes db-slide{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}';
+    document.head.appendChild(s);
+  }
+
+  const drawer = document.createElement('div');
+  drawer.id = 'day-briefing-drawer';
+  drawer.style.cssText = `position:fixed;top:44px;right:0;bottom:0;width:420px;z-index:150;
+    background:var(--bg1,#0c1628);border-left:1px solid var(--border);
+    box-shadow:-10px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column;
+    animation:db-slide .22s ease;`;
+
+  drawer.innerHTML = `
+    <div style="flex-shrink:0;padding:12px 16px 10px;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--font-head);font-size:12px;font-weight:700;
+        letter-spacing:1.5px;text-transform:uppercase;color:var(--compass-cyan);margin-bottom:2px">
+        Day Intelligence Briefing</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--text0)">${dayLabel}</div>
+        <button onclick="document.getElementById('day-briefing-drawer').remove()"
+          style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0"
+          onmouseenter="this.style.color='var(--text0)'" onmouseleave="this.style.color='var(--text3)'">✕</button>
+      </div>
+      <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">
+        ${totalHrs.toFixed(1)}h logged · ${_doneToday.length} items completed</div>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:14px 16px">
+      <!-- Section 1: Time distribution -->
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+        text-transform:uppercase;color:var(--text3);margin-bottom:8px">Where Your Time Went</div>
+      ${distBarHtml}
+
+      <!-- Section 2: Billable vs non-billable -->
+      ${totalHrs > 0 ? `<div style="margin-top:14px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--text3);margin-bottom:4px">Billable vs Non-Billable</div>
+        ${billBarHtml}
+      </div>` : ''}
+
+      <!-- Section 3: Time entries -->
+      <div style="margin-top:16px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--text3);margin-bottom:8px">Time Entries</div>
+        <div id="db-entries-list">${entriesHtml}</div>
+      </div>
+
+      <!-- Section 4: Add entry -->
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--text3);margin-bottom:8px">Add Entry</div>
+        <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;margin-bottom:6px">
+          <input id="db-desc" placeholder="Description…"
+            style="font-family:var(--font-body);font-size:12px;padding:7px 8px;
+              background:var(--bg2);border:1px solid var(--border);color:var(--text1);outline:none"/>
+          <input id="db-hrs" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
+            style="font-family:var(--font-display);font-size:14px;font-weight:700;padding:6px;
+              background:var(--bg2);border:1px solid rgba(0,210,255,.3);color:var(--compass-cyan);
+              outline:none;text-align:center"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:6px">
+          <select id="db-proj"
+            style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:7px 8px;
+              background:var(--bg2);border:1px solid var(--border);color:var(--text1);cursor:pointer">
+            <option value="">— Project —</option>
+            ${(_projects||[]).filter(p=>p.status==='active').map(p=>
+              `<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+          </select>
+          <div id="db-bill-toggle" data-bill="1"
+            onclick="this.dataset.bill=this.dataset.bill==='1'?'0':'1';
+              this.style.background=this.dataset.bill==='1'?'rgba(0,210,255,.15)':'rgba(139,92,246,.15)';
+              this.style.color=this.dataset.bill==='1'?'var(--compass-cyan)':'#8B5CF6';
+              this.style.borderColor=this.dataset.bill==='1'?'rgba(0,210,255,.4)':'rgba(139,92,246,.4)';
+              this.textContent=this.dataset.bill==='1'?'Billable':'Non-bill'"
+            style="padding:7px 12px;border:1px solid rgba(0,210,255,.4);background:rgba(0,210,255,.15);
+              color:var(--compass-cyan);font-family:var(--font-head);font-size:11px;font-weight:700;
+              cursor:pointer;white-space:nowrap;border-radius:2px">Billable</div>
+        </div>
+        <button id="db-add-btn"
+          style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:700;
+            letter-spacing:.07em;padding:8px;background:var(--compass-cyan);color:#060a10;
+            border:none;cursor:pointer;transition:opacity .12s"
+          onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Add Entry →</button>
+        <span id="db-status" style="font-family:var(--font-head);font-size:11px;
+          color:var(--compass-amber);display:block;min-height:14px;margin-top:4px"></span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="flex-shrink:0;padding:10px 16px;border-top:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between">
+      <span style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--text2)">
+        Total: <span style="color:var(--compass-cyan)">${totalHrs.toFixed(1)}h</span>
+      </span>
+      <button onclick="document.getElementById('day-briefing-drawer').remove();openFullWeeklyTimesheet({expandDay:'${dateStr}'})"
+        style="font-family:var(--font-head);font-size:11px;color:var(--compass-cyan);
+          background:none;border:none;cursor:pointer;text-decoration:underline;
+          text-underline-offset:2px">Open full week view →</button>
+    </div>
+  `;
+
+  document.body.appendChild(drawer);
+
+  // Add entry handler
+  drawer.querySelector('#db-add-btn')?.addEventListener('click', async () => {
+    const desc = drawer.querySelector('#db-desc')?.value?.trim() || '';
+    const hrs  = parseFloat(drawer.querySelector('#db-hrs')?.value || 0);
+    const proj = drawer.querySelector('#db-proj')?.value || '';
+    const bill = drawer.querySelector('#db-bill-toggle')?.dataset?.bill === '1';
+    const statusEl = drawer.querySelector('#db-status');
+    const btn = drawer.querySelector('#db-add-btn');
+    if (!hrs || hrs <= 0) { if(statusEl) statusEl.textContent='Hours required'; return; }
+    if (!proj) { if(statusEl) statusEl.textContent='Project required'; return; }
+    btn.textContent='…'; btn.disabled=true; if(statusEl) statusEl.textContent='';
+    try {
+      const id = crypto.randomUUID();
+      await API.post('time_entries', {
+        id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
+        resource_id:_myResource?.id, user_id:_myResource?.user_id||null,
+        project_id:proj, source_type:'direct', date:dateStr,
+        hours:hrs, is_billable:bill, notes:desc||null
+      });
+      compassToast('Entry added');
+      drawer.remove();
+      _viewLoaded['user']=false; loadUserView();
+    } catch(e) {
+      btn.textContent='Add Entry →'; btn.disabled=false;
+      if(statusEl) statusEl.textContent='Failed — '+e.message;
+    }
+  });
+}
+
+// ── Legacy Weekly Timesheet (entry-based) ─────────────────
 function openWeeklyTimesheet(entry) {
   document.getElementById('te-edit-drawer')?.remove();
 
