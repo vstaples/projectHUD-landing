@@ -2092,12 +2092,13 @@ async function loadPMView() {
     const weekDays = Array.from({length:5}, (_,i)=>{ const d=new Date(weekStart); d.setDate(weekStart.getDate()+i); return d.toLocaleDateString('en-CA'); });
     const dayLabels = ['M','T','W','Th','F'];
 
-    const [wfInstances, actionItems, cocEvents, resourceReqs, weekEntries] = await Promise.all([
+    const [wfInstances, actionItems, cocEvents, resourceReqs, weekEntries, confSignals] = await Promise.all([
       API.get('workflow_instances?select=id,title,status,current_step_name,project_id,launched_at,priority,stakes&status=eq.active&order=launched_at.desc&limit=50').catch(() => []),
       API.get('workflow_action_items?status=eq.open&order=due_date.asc&limit=100').catch(() => []),
-      API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated)&order=created_at.desc&limit=150').catch(() => []),
+      API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated,task_progress_update)&order=created_at.desc&limit=300').catch(() => []),
       API.get('resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&order=submitted_at.asc&limit=20').catch(() => []),
       API.get(`time_entries?date=gte.${weekDays[0]}&date=lte.${weekDays[4]}&select=id,project_id,resource_id,date,hours,is_billable&limit=500`).catch(() => []),
+      API.get(`workflow_step_instances?select=id,instance_id,event_type,outcome,actor_name,created_at&event_type=eq.task_progress_update&created_at=gte.${weekDays[0]}T00:00:00&order=created_at.desc&limit=300`).catch(() => []),
     ]);
 
     const activeProjects = _projects.filter(p => p.status === 'active');
@@ -2140,6 +2141,90 @@ async function loadPMView() {
     const totalReqs      = resourceReqs.length;
     const totalInstances = wfInstances.length;
     const weekHours      = (weekEntries||[]).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+
+    // ── Timesheet compliance — % of active resources who logged today ──
+    const activeResIds   = new Set(_resources.filter(r=>r.is_active).map(r=>r.id));
+    const loggedToday    = new Set((weekEntries||[]).filter(e=>e.date===today).map(e=>e.resource_id));
+    const tsCompliance   = activeResIds.size > 0 ? Math.round(loggedToday.size / activeResIds.size * 100) : null;
+
+    // ── Red signals NOW — team members with red signal today ──────────
+    const redSignalsNow  = new Set(
+      (confSignals||[]).filter(e=>e.outcome==='blocked'&&e.created_at>=today+'T00:00:00').map(e=>e.actor_name)
+    ).size;
+
+    // ── Per-resource daily sentiment arc from progress updates ────────
+    // Build: resId → { date → dominant signal (green/yellow/red) }
+    const resSentiment = {};
+    (confSignals||[]).forEach(e => {
+      if (!e.actor_name) return;
+      const d = e.created_at.slice(0,10);
+      if (!weekDays.includes(d)) return;
+      if (!resSentiment[e.actor_name]) resSentiment[e.actor_name] = {};
+      // Red beats yellow beats green
+      const prev = resSentiment[e.actor_name][d];
+      const rank = {on_track:1, at_risk:2, blocked:3};
+      if (!prev || (rank[e.outcome]||0) > (rank[prev]||0))
+        resSentiment[e.actor_name][d] = e.outcome||'on_track';
+    });
+    // Also derive from time entries: no entry on a working day = grey
+    // Signal color helper
+    function sigColor(sig) {
+      if (sig==='blocked') return '#E24B4A';
+      if (sig==='at_risk')  return '#EF9F27';
+      if (sig==='on_track') return '#1D9E75';
+      return null; // no data
+    }
+    function sigLabel(sig) {
+      if (sig==='blocked') return 'Blocked';
+      if (sig==='at_risk')  return 'At risk';
+      if (sig==='on_track') return 'On track';
+      return '—';
+    }
+
+    // ── 5-segment health bar scores per project ───────────────────────
+    // Schedule: SPI if available, else task overdue ratio
+    // Cost: CPI if available, else budget consumed ratio
+    // Confidence: ratio of green signals vs all signals from team this week
+    // Rework: ratio of step_reset events vs step_completed
+    // Timesheets: % of expected resources logging time
+    function projectHealthSegments(ps) {
+      const {p, overdueTasks, projTasks, projCoc, projInsts} = ps;
+      const projEntries = (weekEntries||[]).filter(e=>e.project_id===p.id);
+      // Schedule
+      let schedScore = 1;
+      if (p.spi) schedScore = parseFloat(p.spi);
+      else if (projTasks.length > 0) schedScore = 1 - (overdueTasks.length / Math.max(projTasks.length,1));
+      // Cost
+      let costScore = 1;
+      if (p.cpi) costScore = parseFloat(p.cpi);
+      else if (p.budget_hours && p.budget_hours_used)
+        costScore = 1 - Math.max(0, (parseFloat(p.budget_hours_used)/parseFloat(p.budget_hours)) - 1);
+      // Confidence: from confSignals matching proj instances this week
+      const projInstIds = new Set(projInsts.map(i=>i.id));
+      const projSigs = (confSignals||[]).filter(e=>projInstIds.has(e.instance_id)||projEntries.some(te=>te.resource_id===e.resource_id));
+      const greenSigs = projSigs.filter(e=>e.outcome==='on_track').length;
+      const confScore = projSigs.length > 0 ? greenSigs / projSigs.length : 0.5;
+      // Rework: step_resets vs step_completed
+      const resets    = projCoc.filter(e=>e.event_type==='step_reset').length;
+      const completed = projCoc.filter(e=>e.event_type==='step_completed').length;
+      const reworkScore = completed > 0 ? Math.max(0, 1 - resets/Math.max(completed,1)) : (resets > 0 ? 0 : 0.8);
+      // Timesheets: resources who logged time this week for this proj
+      const projResIds  = new Set(projEntries.map(e=>e.resource_id));
+      const taskAssigned = new Set(_tasks.filter(t=>t.project_id===p.id&&t.assigned_to).map(t=>t.assigned_to));
+      const tsScore = taskAssigned.size > 0 ? projResIds.size / Math.max(taskAssigned.size,1) : (projResIds.size > 0 ? 1 : 0.5);
+      function score2color(s) {
+        if (s >= 0.9) return '#1D9E75';
+        if (s >= 0.7) return '#EF9F27';
+        return '#E24B4A';
+      }
+      return [
+        {label:'Schedule',  color:score2color(Math.min(schedScore,1)), score:schedScore},
+        {label:'Cost',      color:score2color(Math.min(costScore,1)),  score:costScore},
+        {label:'Confidence',color:score2color(confScore),              score:confScore},
+        {label:'Rework',    color:score2color(reworkScore),            score:reworkScore},
+        {label:'Timesheets',color:score2color(Math.min(tsScore,1)),    score:tsScore},
+      ];
+    }
 
     // ── Live feed events ──────────────────────────────────
     const feedEvents = cocEvents.slice(0,20).map(e => {
@@ -2243,6 +2328,18 @@ async function loadPMView() {
         </div>
         <div class="pm-pmeta">${esc(p.client||'—')} · PM ${pmLabel} · Due ${p.target_date?fmtDate(p.target_date):'—'}</div>
 
+        <!-- 5-segment health bar -->
+        ${(()=>{
+          const segs = projectHealthSegments(ps);
+          const labels = segs.map(s=>`<span style="font-family:var(--font-head);font-size:11px;color:${s.color};opacity:.8">${s.label}</span>`).join('<span style="color:#2A4060;margin:0 3px">·</span>');
+          return `<div style="margin:6px 0 4px">
+            <div style="display:flex;gap:2px;height:5px;margin-bottom:4px">
+              ${segs.map(s=>`<div style="flex:1;height:5px;background:${s.color};opacity:.85;border-radius:1px" title="${s.label}: ${Math.round(s.score*100)}%"></div>`).join('')}
+            </div>
+            <div style="display:flex;gap:0;justify-content:space-between;font-family:var(--font-head);font-size:11px;flex-wrap:nowrap">${labels}</div>
+          </div>`;
+        })()}
+
         <!-- Day grid: individual boxed cells like mockup -->
         <div class="pm-dgrid">
           ${dayGridHtml(hoursByDay, p.id)}
@@ -2338,14 +2435,9 @@ async function loadPMView() {
       ${alertHtml}
       <div class="pm-sstrip">
         <div class="pm-sc">
-          <div class="pm-sc-lbl">Portfolio CPI</div>
-          <div class="pm-sc-val" style="color:var(--compass-green)">—</div>
-          <div class="pm-sc-sub">cost performance avg</div>
-        </div>
-        <div class="pm-sc">
-          <div class="pm-sc-lbl">Portfolio SPI</div>
-          <div class="pm-sc-val" style="color:var(--compass-amber)">—</div>
-          <div class="pm-sc-sub">schedule performance avg</div>
+          <div class="pm-sc-lbl">Active projects</div>
+          <div class="pm-sc-val" style="color:var(--compass-cyan)">${activeProjects.length}</div>
+          <div class="pm-sc-sub">${totalInstances} workflow${totalInstances!==1?'s':''} running</div>
         </div>
         <div class="pm-sc">
           <div class="pm-sc-lbl">Red flags</div>
@@ -2353,14 +2445,19 @@ async function loadPMView() {
           <div class="pm-sc-sub">unacknowledged</div>
         </div>
         <div class="pm-sc">
-          <div class="pm-sc-lbl">Labor hours</div>
-          <div class="pm-sc-val" style="color:var(--compass-cyan)">${weekHours.toFixed(0)}h</div>
-          <div class="pm-sc-sub">this week logged</div>
+          <div class="pm-sc-lbl">Red signals now</div>
+          <div class="pm-sc-val" style="color:${redSignalsNow>0?'var(--compass-red)':'var(--text3)'}">${redSignalsNow}</div>
+          <div class="pm-sc-sub">team members today</div>
+        </div>
+        <div class="pm-sc">
+          <div class="pm-sc-lbl">Timesheet compliance</div>
+          <div class="pm-sc-val" style="color:${tsCompliance===null?'var(--text3)':tsCompliance>=80?'var(--compass-green)':tsCompliance>=50?'var(--compass-amber)':'var(--compass-red)'}">${tsCompliance!==null?tsCompliance+'%':'—'}</div>
+          <div class="pm-sc-sub">today · ${loggedToday.size}/${activeResIds.size} logged</div>
         </div>
         <div class="pm-sc">
           <div class="pm-sc-lbl">Open requests</div>
           <div class="pm-sc-val" style="color:${totalReqs>0?'var(--compass-amber)':'var(--text3)'}">${totalReqs}</div>
-          <div class="pm-sc-sub">resource requests</div>
+          <div class="pm-sc-sub">resource requests pending</div>
         </div>
       </div>
 
@@ -2434,54 +2531,38 @@ async function loadPMView() {
           <!-- Team tab -->
           <div id="pm-tab-team" class="pm-tabpanel">
             ${(function(){
-              // Build a comprehensive resource map from all sources
+              // Build resource map (same logic as before)
               const resMap = {};
-              // Source 1: firm roster
-              _resources.forEach(r => {
-                resMap[r.id] = { ...r, source:'roster', taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 };
-              });
-              // Source 2: task assignments — find user_ids not in roster
+              _resources.forEach(r => { resMap[r.id] = { ...r, source:'roster', taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 }; });
               const rosterUserIds = new Set(_resources.map(r=>r.user_id).filter(Boolean));
               _tasks.filter(t=>t.assigned_to&&!rosterUserIds.has(t.assigned_to)).forEach(t => {
                 const synId = 'synthetic_'+t.assigned_to;
                 if (!resMap[synId]) {
-                  // Try to find name from _users
                   const u = (_users||[]).find(u=>u.id===t.assigned_to);
                   const nm = u?.name||u?.email||('User '+t.assigned_to.slice(0,8));
                   const parts = nm.split(' ');
                   resMap[synId] = { id:synId, first_name:parts[0]||nm, last_name:parts.slice(1).join(' ')||'', user_id:t.assigned_to, department:'External', is_active:true, source:'task', taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 };
                 }
               });
-              // Source 3: time entries this week
               (weekEntries||[]).forEach(e => {
-                if (!resMap[e.resource_id]) {
-                  const r = _resources.find(r=>r.id===e.resource_id);
-                  if (r) resMap[r.id] = resMap[r.id] || { ...r, taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 };
-                }
                 if (resMap[e.resource_id]) {
                   resMap[e.resource_id].weekHrs += parseFloat(e.hours||0);
                   if (e.is_billable) resMap[e.resource_id].billHrs += parseFloat(e.hours||0);
                   if (e.project_id) resMap[e.resource_id].projIds.add(e.project_id);
                 }
               });
-              // Count open tasks per resource
               _tasks.filter(t=>t.assigned_to&&!['complete','cancelled'].includes(t.status)).forEach(t => {
                 const r = Object.values(resMap).find(r=>r.user_id===t.assigned_to);
                 if (r) { r.taskCount++; if(t.project_id) r.projIds.add(t.project_id); }
               });
-              // Group by department
               const allRes = Object.values(resMap).filter(r=>r.is_active!==false);
               const depts = {};
-              allRes.forEach(r => {
-                const dept = r.department || 'Unassigned';
-                if (!depts[dept]) depts[dept] = [];
-                depts[dept].push(r);
-              });
+              allRes.forEach(r => { const dept=r.department||'Unassigned'; if(!depts[dept])depts[dept]=[]; depts[dept].push(r); });
               const deptNames = Object.keys(depts).sort();
               if (!allRes.length) return '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No team members found</div>';
 
-              // Filter bar
-              let html = `<div id="pm-team-filter" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+              // ── Department filter bar ──────────────────────────
+              let html = `<div id="pm-team-filter" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:8px 0 6px;border-bottom:1px solid rgba(0,210,255,.08)">
                 <button class="pm-team-filter-btn on" data-dept="all"
                   style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:3px 10px;background:#132035;border:1px solid rgba(0,210,255,.4);color:#F0F6FF;cursor:pointer"
                   onclick="pmTeamFilter(this,'all')">All (${allRes.length})</button>
@@ -2490,29 +2571,80 @@ async function loadPMView() {
                   onclick="pmTeamFilter(this,'${esc(d)}')">${esc(d)} (${depts[d].length})</button>`).join('')}
               </div>`;
 
-              // Render grouped
+              // ── Per-resource rows with sentiment dot arc ───────
               deptNames.forEach(dept => {
                 html += `<div class="pm-team-group" data-dept="${esc(dept)}">
-                  <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;padding:6px 0 4px;border-bottom:1px solid rgba(0,210,255,.1);margin-bottom:4px">${esc(dept)}</div>`;
+                  <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;padding:6px 0 3px;border-bottom:1px solid rgba(0,210,255,.08);margin-bottom:3px">${esc(dept)}</div>`;
+
                 depts[dept].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).forEach(r => {
-                  const initials = ((r.first_name||'')[0]||'').toUpperCase() + ((r.last_name||'')[0]||'').toUpperCase();
-                  const fullName = (r.first_name+' '+r.last_name).trim();
-                  const projList = [...r.projIds].map(pid=>_projects.find(p=>p.id===pid)?.name).filter(Boolean).slice(0,2);
-                  const billPct = r.weekHrs>0 ? Math.round(r.billHrs/r.weekHrs*100) : 0;
-                  const dotColor = r.taskCount>5?'#E24B4A':r.taskCount>0?'#1D9E75':'#3A5C80';
-                  html += `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(0,210,255,.06)">
-                    <div style="width:34px;height:34px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials)}</div>
+                  const initials   = ((r.first_name||'')[0]||'').toUpperCase() + ((r.last_name||'')[0]||'').toUpperCase();
+                  const fullName   = (r.first_name+' '+r.last_name).trim();
+                  const billPct    = r.weekHrs>0 ? Math.round(r.billHrs/r.weekHrs*100) : 0;
+                  const projList   = [...r.projIds].map(pid=>_projects.find(p=>p.id===pid)?.name).filter(Boolean).slice(0,2);
+
+                  // Sentiment arc: M–F dots from resSentiment keyed by name
+                  const nameKey    = fullName;
+                  const sentByDay  = resSentiment[nameKey] || {};
+                  // Also check time entries — day with hours but no signal = logged, no signal
+                  const hByDay     = {};
+                  weekDays.forEach(d => { hByDay[d] = (weekEntries||[]).filter(e=>e.resource_id===r.id&&e.date===d).reduce((s,e)=>s+parseFloat(e.hours||0),0); });
+
+                  const dayDotLabels = ['M','T','W','Th','F'];
+                  const dotHtml = weekDays.map((d,i) => {
+                    const sig  = sentByDay[d];
+                    const hrs  = hByDay[d]||0;
+                    const isToday = d === today;
+                    let dotColor, dotTitle;
+                    if (sig) {
+                      dotColor = sigColor(sig);
+                      dotTitle = `${dayDotLabels[i]}: ${sigLabel(sig)} · ${hrs.toFixed(1)}h`;
+                    } else if (hrs > 0) {
+                      dotColor = '#4A74A0'; // logged time, no signal
+                      dotTitle = `${dayDotLabels[i]}: ${hrs.toFixed(1)}h logged, no signal`;
+                    } else if (d > today) {
+                      dotColor = 'rgba(255,255,255,.08)';
+                      dotTitle = `${dayDotLabels[i]}: future`;
+                    } else {
+                      dotColor = 'rgba(255,255,255,.15)';
+                      dotTitle = `${dayDotLabels[i]}: no activity`;
+                    }
+                    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer"
+                      title="${dotTitle}"
+                      onclick="pmPersonDayBrief('${esc(fullName)}','${d}','${dayDotLabels[i]}','${esc(fullName+': '+dotTitle)}')">
+                      <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#3A5C80">${dayDotLabels[i]}</span>
+                      <div style="width:11px;height:11px;border-radius:50%;background:${dotColor};transition:transform .1s"
+                        onmouseenter="this.style.transform='scale(1.3)'" onmouseleave="this.style.transform='scale(1)'"></div>
+                    </div>`;
+                  }).join('');
+
+                  // Week arc string e.g. G→Y→R→—→—
+                  const arcStr = weekDays.map(d=>{
+                    const sig = sentByDay[d];
+                    if (!sig) return (hByDay[d]>0)?'L':'—';
+                    return sig==='on_track'?'G':sig==='at_risk'?'Y':'R';
+                  }).join('→');
+
+                  // Hours vs expected (assume 8h/day × 5 = 40h expected)
+                  const expected = 40;
+                  const hrsColor = r.weekHrs >= expected*0.9 ? 'var(--compass-green)' : r.weekHrs >= expected*0.5 ? 'var(--compass-amber)' : 'var(--compass-red)';
+
+                  html += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(0,210,255,.06)">
+                    <div style="width:32px;height:32px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials)}</div>
                     <div style="flex:1;min-width:0">
-                      <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF">${esc(fullName)}</div>
-                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">
-                        ${projList.length?projList.map(n=>`<span style="color:#90B8D8">${esc(n)}</span>`).join(', '):'No active projects'}
-                      </div>
+                      <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(fullName)}</div>
+                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${projList.length?projList.map(n=>`<span style="color:#90B8D8">${esc(n)}</span>`).join(', '):'No active projects'}</div>
                     </div>
-                    <div style="text-align:right;flex-shrink:0">
-                      ${r.weekHrs>0?`<div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--compass-cyan)">${r.weekHrs.toFixed(1)}h</div>
-                      <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${billPct}% bill</div>`:'<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">—</div>'}
+                    <!-- Day sentiment dots -->
+                    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">${dotHtml}</div>
+                    <!-- Hours + week summary -->
+                    <div style="text-align:right;flex-shrink:0;min-width:52px">
+                      <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${hrsColor};line-height:1">${r.weekHrs.toFixed(1)}h</div>
+                      <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${billPct}% bill</div>
                     </div>
-                    <div style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0" title="${r.taskCount} open tasks"></div>
+                    <button onclick="pmPersonWeekBrief('${esc(fullName)}','${arcStr}',${r.weekHrs.toFixed(1)},${expected})"
+                      style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;background:none;border:1px solid rgba(0,210,255,.2);padding:3px 7px;cursor:pointer;flex-shrink:0;transition:background .1s"
+                      onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+                      onmouseleave="this.style.background='none'">wk →</button>
                   </div>`;
                 });
                 html += '</div>';
@@ -2571,7 +2703,7 @@ async function loadPMView() {
               <span style="font-family:var(--font-data);font-size:11px;color:var(--compass-green)">live · click to open</span>
             </div>
           </div>
-          <div style="overflow-y:auto;flex:1">
+          <div id="pm-live-feed" style="overflow-y:auto;flex:1">
             ${feedEvents.length===0
               ? `<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No recent activity</div>`
               : feedEvents.map(({e,proj,isRej,isDone,color,icon,age})=>`
@@ -2589,7 +2721,7 @@ async function loadPMView() {
               </div>`).join('')}
           </div>
           <div style="border-top:1px solid rgba(0,210,255,.1);padding:8px 12px">
-            <button class="pm-btn pm-btn-cyan" style="width:100%;padding:6px;text-align:center">+ SIMULATE LIVE EVENT</button>
+            <button class="pm-btn pm-btn-cyan" style="width:100%;padding:6px;text-align:center" onclick="pmSimulateLiveEvent()">+ SIMULATE LIVE EVENT</button>
           </div>
         </div>
       </div>
@@ -2708,6 +2840,107 @@ async function loadPMView() {
     };
 
     // ── Tab switcher ─────────────────────────────────────
+    // ── Person day brief ─────────────────────────────────
+    window.pmPersonDayBrief = function(name, date, dayLabel, summary) {
+      const hrsOnDay = (weekEntries||[]).filter(e=>{
+        const r = Object.values({}).find(r=>r); // we'll derive from name
+        return e.date===date;
+      }).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+      const dateLabel = new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+      pmOpenDayBriefingPanel(name+' · '+dayLabel, dateLabel, summary, null);
+    };
+    // ── Person week brief ─────────────────────────────────
+    window.pmPersonWeekBrief = function(name, arcStr, hrs, expected) {
+      const redCount   = (arcStr.match(/R/g)||[]).length;
+      const yellowCount= (arcStr.match(/Y/g)||[]).length;
+      const noActivity = (arcStr.match(/—/g)||[]).length;
+      let narrative = `${name} — week arc: ${arcStr}. ${hrs}h logged of ~${expected}h expected (${Math.round(hrs/expected*100)}%).`;
+      if (redCount >= 3)     narrative += ` Multiple red signals (${redCount} days) — sustained distress. Recommend direct conversation.`;
+      else if (redCount === 2) narrative += ` Two red signal days — emerging pattern. Monitor closely.`;
+      else if (noActivity >= 2) narrative += ` ${noActivity} days with no logged activity — possible disengagement or block. Recommend check-in.`;
+      else if (arcStr.includes('G→G→Y→Y→R') || arcStr.includes('G→Y→Y→R')) narrative += ' Consistent degradation over the week. Review what changed on the day the arc shifted.';
+      else if (!arcStr.includes('R') && !arcStr.includes('Y')) narrative += ' Clean week — consistent performance throughout.';
+      else narrative += ' Mixed signals — review individual day briefs for context.';
+      pmOpenDayBriefingPanel(name+' · Week summary', arcStr, narrative, {hrs, expected, arc:arcStr});
+    };
+    // ── Day briefing panel (shared by project days + person days) ─────
+    function pmOpenDayBriefingPanel(title, subtitle, narrative, extra) {
+      document.getElementById('pm-brief-overlay')?.remove();
+      document.getElementById('pm-brief-panel')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id='pm-brief-overlay';
+      overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:190';
+      overlay.onclick=()=>{overlay.remove();document.getElementById('pm-brief-panel')?.remove();};
+      document.body.appendChild(overlay);
+      const panel = document.createElement('div');
+      panel.id='pm-brief-panel';
+      panel.style.cssText='position:fixed;top:44px;right:0;bottom:0;width:360px;background:#08101f;border-left:1px solid rgba(0,210,255,.2);display:flex;flex-direction:column;z-index:200;animation:pm-drawer-in .2s ease';
+      const arcHtml = extra?.arc ? (() => {
+        const steps = extra.arc.split('→');
+        const colors = {G:'#1D9E75',Y:'#EF9F27',R:'#E24B4A','L':'#4A74A0','—':'rgba(255,255,255,.12)'};
+        const labels = ['M','T','W','Th','F'];
+        return `<div style="display:flex;gap:8px;align-items:flex-end;margin:10px 0 8px;padding:10px 12px;background:#091522;border:1px solid rgba(0,210,255,.1)">
+          ${steps.map((s,i)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${colors[s]||'#3A5C80'}">${s}</span>
+            <div style="width:14px;height:14px;border-radius:50%;background:${colors[s]||'rgba(255,255,255,.08)'}"></div>
+            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${labels[i]||''}</span>
+          </div>`).join('<span style="color:#2A4060;align-self:center;font-size:11px;padding-bottom:14px">→</span>')}
+          <div style="margin-left:auto;text-align:right;border-left:1px solid rgba(0,210,255,.08);padding-left:10px">
+            <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${extra.hrs>=extra.expected*0.9?'var(--compass-green)':extra.hrs>=extra.expected*0.5?'var(--compass-amber)':'var(--compass-red)'};">${extra.hrs}h</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">of ${extra.expected}h</div>
+          </div>
+        </div>`;
+      })() : '';
+      panel.innerHTML = `
+        <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(0,210,255,.1);background:#07101e;flex-shrink:0;display:flex;align-items:flex-start;justify-content:space-between">
+          <div>
+            <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF">${title}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:2px">${subtitle}</div>
+          </div>
+          <button onclick="document.getElementById('pm-brief-overlay')?.remove();document.getElementById('pm-brief-panel')?.remove()"
+            style="background:none;border:none;color:#5A84A8;font-size:16px;cursor:pointer;padding:0"
+            onmouseenter="this.style.color='#F0F6FF'" onmouseleave="this.style.color='#5A84A8'">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:14px">
+          ${arcHtml}
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;text-transform:uppercase;margin-bottom:6px">AI NARRATIVE</div>
+          <div style="background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-left:3px solid #EF9F27;padding:10px 12px;font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6">${narrative}</div>
+          <div style="margin-top:14px">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#3A5C80;text-transform:uppercase;margin-bottom:5px">PM ANNOTATION</div>
+            <textarea placeholder="Add context for this brief…"
+              style="width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;line-height:1.5" rows="3"></textarea>
+          </div>
+        </div>`;
+      document.body.appendChild(panel);
+    }
+
+    // ── Simulate live event ───────────────────────────────
+    const _pmLiveEvents = [
+      {color:'#E24B4A',proj:'Flexscope',text:'Margaret Mills — no time logged today',meta:'Compliance alert',isFlag:true},
+      {color:'#EF9F27',proj:'Flexscope',text:'Design Review Signoff — step dwell 4h+',meta:'Approaching pessimistic estimate',isFlag:false},
+      {color:'#1D9E75',proj:'NovaBio',text:'Sandra Okafor — Section 4.2 review complete',meta:'Phase milestone hit',isFlag:false},
+      {color:'#E24B4A',proj:'Flexscope',text:'Build #1 now 6d overdue — escalation threshold',meta:'Auto-escalation triggered',isFlag:true},
+      {color:'#EF9F27',proj:'Flexscope',text:'Resource request aging 72h — no response',meta:'Staffing escalation',isFlag:false},
+    ];
+    let _pmSimIdx = 0;
+    window.pmSimulateLiveEvent = function() {
+      const ev = _pmLiveEvents[_pmSimIdx % _pmLiveEvents.length]; _pmSimIdx++;
+      const feed = document.getElementById('pm-live-feed');
+      if (!feed) return;
+      const row = document.createElement('div');
+      row.className='pm-frow';
+      row.style.background='rgba(0,210,255,.06)';
+      row.innerHTML=`<div class="pm-fstrip" style="background:${ev.color}"></div>
+        <div class="pm-ftag-col"><div class="pm-ftag" style="color:${ev.color}">${esc(ev.proj)}</div><div class="pm-ftag-inst">● live</div></div>
+        <div class="pm-fbody" style="padding:6px 8px"><div class="pm-ftitle">${ev.text}</div><div class="pm-fsub" style="color:#4A6E90">${ev.meta}</div></div>
+        <div class="pm-fage" style="padding:6px 10px 6px 0">just now</div>`;
+      feed.insertBefore(row, feed.firstChild);
+      setTimeout(()=>row.style.background='', 600);
+      if (ev.isFlag) {
+        compassToast(`⚑ New flag: ${ev.text.slice(0,50)}`, 3000);
+      }
+    };
+
     window.pmSwitchTab = function(el, panelId) {
       el.closest('.pm-left').querySelectorAll('.pm-tab').forEach(t=>t.classList.remove('on'));
       el.classList.add('on');

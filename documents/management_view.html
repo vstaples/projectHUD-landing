@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-mono,'Share Tech Mono',monospace);background:var(--color-background-tertiary,#0c1628);color:var(--color-text-primary,#F0F6FF);font-size:12px}
+.nav{display:flex;align-items:center;height:40px;background:rgba(17,24,39,1);border-bottom:1px solid rgba(0,210,255,.15);padding:0 14px;gap:0;flex-shrink:0}
+.logo{font-size:14px;font-weight:700;letter-spacing:.12em;color:#F0F6FF;margin-right:12px}
+.logo span{color:#00D2FF}
+.tab{padding:0 10px;height:40px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;transition:.12s}
+.tab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.sep{width:1px;height:18px;background:rgba(0,210,255,.15);margin:0 6px}
+.live{display:flex;align-items:center;gap:4px;font-size:10px;color:#1D9E75}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.body{padding:12px 16px;overflow-y:auto}
+.pulse-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.pcard{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:8px 10px}
+.pcard-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:3px}
+.pcard-val{font-size:20px;font-weight:700;line-height:1}
+.pcard-sub{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px}
+.cv{color:#00D2FF}.ca{color:#EF9F27}.cr{color:#E24B4A}.cg{color:#1D9E75}.cp{color:#8B5CF6}
+.main-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:12px}
+.mtab{padding:7px 14px;font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.4);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;text-transform:uppercase;display:flex;align-items:center;gap:5px;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.mtab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.badge-count{font-size:9px;padding:1px 5px;border-radius:2px}
+.bc-red{background:rgba(226,75,74,.2);color:#E24B4A}
+.bc-amber{background:rgba(239,159,39,.15);color:#EF9F27}
+.tc{display:none}.tc.active{display:block}
+.grid-wrap{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);margin-bottom:10px}
+.grid-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.grid-title{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.health-grid{width:100%;border-collapse:collapse}
+.health-grid th{padding:5px 10px;text-align:center;font-size:9px;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.06)}
+.health-grid th:first-child{text-align:left}
+.health-grid td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.health-grid td:first-child{font-size:10px;color:rgba(240,246,255,.8)}
+.health-grid td:not(:first-child){text-align:center}
+.hg-dot{width:12px;height:12px;border-radius:50%;display:inline-block;cursor:pointer;transition:.12s}
+.hg-dot:hover{transform:scale(1.3)}
+.brief-strip{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);padding:10px 12px;margin-bottom:10px}
+.brief-label{font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin-bottom:6px}
+.brief-items{display:flex;flex-direction:column;gap:4px}
+.brief-item{display:flex;align-items:flex-start;gap:6px;font-size:10px;color:rgba(240,246,255,.75);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer}
+.brief-item:last-child{border-bottom:none}
+.brief-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.queue-item{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.queue-priority{width:3px;align-self:stretch;flex-shrink:0;border-radius:1px}
+.queue-info{flex:1;min-width:0}
+.queue-type{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:2px}
+.queue-title{font-size:10px;color:rgba(240,246,255,.85);margin-bottom:3px}
+.queue-meta{font-size:9px;color:rgba(255,255,255,.35)}
+.queue-rec{font-size:9px;color:#00D2FF;margin-top:3px;padding:3px 6px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15)}
+.queue-actions{display:flex;gap:4px;align-items:flex-start;padding-top:2px}
+.qa-btn{font-family:inherit;font-size:9px;padding:4px 9px;cursor:pointer;border:1px solid;transition:.12s;letter-spacing:.05em;background:none}
+.qa-approve{border-color:rgba(29,158,117,.4);color:#1D9E75}
+.qa-approve:hover{background:rgba(29,158,117,.1)}
+.qa-reject{border-color:rgba(226,75,74,.35);color:#E24B4A}
+.qa-reject:hover{background:rgba(226,75,74,.08)}
+.qa-respond{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.qa-respond:hover{background:rgba(0,210,255,.08)}
+.person-card{border:1px solid rgba(255,255,255,.08);padding:10px 12px;margin-bottom:6px;cursor:pointer;transition:.12s}
+.person-card:hover{border-color:rgba(0,210,255,.2)}
+.pc-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.arc-line{display:flex;align-items:center;gap:3px;flex:1}
+.arc-dot{width:14px;height:14px;border-radius:50%;cursor:pointer;flex-shrink:0;border:1.5px solid transparent;transition:.12s}
+.arc-dot.active{border-color:rgba(255,255,255,.5)}
+.arc-connector{width:12px;height:1.5px;background:rgba(255,255,255,.15);flex-shrink:0}
+.pc-meta{display:flex;gap:12px;font-size:9px;color:rgba(255,255,255,.35)}
+.wf-row{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:.12s}
+.wf-row:hover{background:rgba(255,255,255,.02)}
+.wf-name{font-size:10px;flex:1}
+.wf-bar-wrap{flex:2;min-width:0}
+.wf-bar{height:6px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden;margin-bottom:2px}
+.wf-fill{height:100%;border-radius:1px;transition:width .3s}
+.wf-label{font-size:9px;color:rgba(255,255,255,.35)}
+.wf-health{font-size:9px;padding:2px 6px;border:1px solid;letter-spacing:.05em;flex-shrink:0}
+.wf-h-red{border-color:rgba(226,75,74,.4);color:#E24B4A}
+.wf-h-amber{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.wf-h-green{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.wf-action{font-family:inherit;font-size:9px;padding:3px 8px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF;cursor:pointer;flex-shrink:0;letter-spacing:.05em}
+.dl-row{display:flex;align-items:flex-start;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.dl-badge{font-size:9px;padding:2px 7px;border:1px solid;letter-spacing:.05em;flex-shrink:0;white-space:nowrap}
+.dl-esc{border-color:rgba(226,75,74,.4);color:#E24B4A}
+.dl-res{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.dl-proc{border-color:rgba(139,92,246,.3);color:#8B5CF6}
+.dl-bud{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.dl-info{flex:1}
+.dl-text{font-size:10px;color:rgba(240,246,255,.8)}
+.dl-meta{font-size:9px;color:rgba(255,255,255,.35);margin-top:1px}
+.dl-log-btn{font-family:inherit;font-size:9px;padding:4px 10px;background:none;border:1px solid rgba(0,210,255,.25);color:#00D2FF;cursor:pointer;letter-spacing:.06em}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#111827;border:1px solid rgba(0,210,255,.2);width:480px;max-height:80vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.modal-title{font-size:12px;font-weight:700;color:#F0F6FF}
+.modal-close{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);width:22px;height:22px;cursor:pointer;font-size:12px;font-family:inherit}
+.modal-body{padding:14px}
+.modal-section{font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:10px 0 5px}
+.modal-text{font-size:10px;color:rgba(240,246,255,.75);line-height:1.55;padding:8px 10px;background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.15);border-left:2px solid #EF9F27}
+.modal-btn-row{display:flex;gap:6px;margin-top:12px}
+.modal-btn{font-family:inherit;font-size:10px;padding:6px 14px;cursor:pointer;border:1px solid;letter-spacing:.06em;transition:.12s;background:none}
+.mb-primary{border-color:rgba(0,210,255,.4);color:#00D2FF}
+.mb-primary:hover{background:rgba(0,210,255,.1)}
+.mb-secondary{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.5)}
+.mb-secondary:hover{color:#fff}
+.mb-red{border-color:rgba(226,75,74,.4);color:#E24B4A}
+.mb-red:hover{background:rgba(226,75,74,.08)}
+.respond-input{width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:10px;outline:none;resize:none;margin-top:6px}
+.respond-input:focus{border-color:rgba(0,210,255,.3)}
+.mock-lbl{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);font-size:9px;letter-spacing:.12em;color:#00D2FF;padding:3px 12px;pointer-events:none;z-index:999}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="logo">COM<span>PASS</span></div>
+  <div class="sep"></div>
+  <button class="tab">My Work</button>
+  <button class="tab">PM View</button>
+  <button class="tab active">Management</button>
+  <button class="tab">Executive</button>
+  <div class="sep"></div>
+  <span style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.35);padding:0 8px">&#9656; CADENCE</span>
+  <div class="live" style="margin-left:auto"><div class="live-dot"></div>LIVE</div>
+  <span style="font-size:10px;color:rgba(255,255,255,.3);margin-left:10px">TUE MAR 24, 2026</span>
+  <div style="width:26px;height:26px;border-radius:50%;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#8B5CF6;margin-left:8px">CS</div>
+</div>
+
+<div class="body">
+
+<div class="pulse-strip">
+  <div class="pcard">
+    <div class="pcard-label">Decisions pending</div>
+    <div class="pcard-val cr">6</div>
+    <div class="pcard-sub">requests + escalations</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Org confidence</div>
+    <div class="pcard-val ca">72%</div>
+    <div class="pcard-sub">green signals today</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Active escalations</div>
+    <div class="pcard-val cr">1</div>
+    <div class="pcard-sub">awaiting response</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Workflow alerts</div>
+    <div class="pcard-val ca">1</div>
+    <div class="pcard-sub">redesign recommended</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Rework cost — week</div>
+    <div class="pcard-val cr">¥84k</div>
+    <div class="pcard-sub">labor hours in rework</div>
+  </div>
+</div>
+
+<div class="main-tabs">
+  <button class="mtab active" onclick="showTab('overview',this)">Overview</button>
+  <button class="mtab" onclick="showTab('queue',this)">Approval queue <span class="badge-count bc-red">6</span></button>
+  <button class="mtab" onclick="showTab('people',this)">People</button>
+  <button class="mtab" onclick="showTab('workflows',this)">Workflows</button>
+  <button class="mtab" onclick="showTab('decisions',this)">Decision log</button>
+</div>
+
+<div class="tc active" id="tc-overview">
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:12px">
+    <div>
+      <div class="grid-wrap">
+        <div class="grid-head">
+          <span class="grid-title">Portfolio health grid</span>
+          <span style="font-size:9px;color:rgba(255,255,255,.3)">SPI · CPI · Confidence · Rework · Timesheets · Escalations</span>
+        </div>
+        <table class="health-grid">
+          <thead>
+            <tr>
+              <th style="text-align:left;min-width:160px">Project</th>
+              <th>Schedule</th>
+              <th>Cost</th>
+              <th>Confidence</th>
+              <th>Rework</th>
+              <th>Timesheets</th>
+              <th>Escalations</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Flexscope Endoscopic</td>
+              <td><div class="hg-dot" style="background:#EF9F27" onclick="openModal('Flexscope — Schedule','SPI 0.79 — schedule is slipping. 19 overdue tasks concentrated in BUILD phases. P50 forecast shows 5d slip. Root cause: PCB Layout Rev B has not been signed off, blocking downstream build tasks.')"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75" onclick="openModal('Flexscope — Cost','CPI 0.91 — slightly under budget efficiency target but within acceptable variance. Rework labor cost is the primary driver of CPI degradation. If rework rate continues, Q2 CPI projects to 0.86.')"></div></td>
+              <td><div class="hg-dot" style="background:#E24B4A" onclick="openModal('Flexscope — Team Confidence','1 red signal (Ron White, 4:18 PM), 2 yellow signals (Alan Smith, Margaret Mills). 72% of signals this week have been amber or red — the highest on any active project. Trajectory: degrading.')"></div></td>
+              <td><div class="hg-dot" style="background:#E24B4A" onclick="openModal('Flexscope — Rework Rate','28 rejection cycles on Design Review Signoff this instance. Dominant classification: Process Quality Failure (73% own-failure rate at Approval step across 14 instances). Template redesign recommended.')"></div></td>
+              <td><div class="hg-dot" style="background:#EF9F27" onclick="openModal('Flexscope — Timesheet Compliance','67% — Margaret Mills logged 0h Wed/Thu. Ron White 4h short of expected. Alan Smith on track. One submitted (Sandra Okafor). PM has issued EOD nudge to non-compliant team members.')"></div></td>
+              <td><div class="hg-dot" style="background:#E24B4A" onclick="openEscalation()"></div></td>
+            </tr>
+            <tr>
+              <td>NovaBio QMS</td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#EF9F27" onclick="openModal('NovaBio — Rework Rate','Rework rate rising on QMS documentation steps. 3 rejections in last 30 days vs historical average of 1. Classification: Process Quality (approval criteria ambiguity). Not yet at redesign threshold.')"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:rgba(255,255,255,.12)"></div></td>
+            </tr>
+            <tr>
+              <td>Internal Platform</td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:#1D9E75"></div></td>
+              <td><div class="hg-dot" style="background:rgba(255,255,255,.12)"></div></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="padding:5px 10px;font-size:9px;color:rgba(255,255,255,.25)">Click any dot for detail</div>
+      </div>
+    </div>
+    <div>
+      <div class="brief-strip">
+        <div class="brief-label">Management brief — today</div>
+        <div class="brief-items">
+          <div class="brief-item" onclick="showTab('queue',document.querySelectorAll('.mtab')[1])">
+            <div class="brief-dot" style="background:#E24B4A"></div>
+            Escalation from VS: BUILD #1 blocker — 2 failed interventions, PCB Layout Rev B authority required
+          </div>
+          <div class="brief-item" onclick="showTab('queue',document.querySelectorAll('.mtab')[1])">
+            <div class="brief-dot" style="background:#E24B4A"></div>
+            Resource request aging 52h — Alan Smith Flexscope full allocation
+          </div>
+          <div class="brief-item" onclick="showTab('workflows',document.querySelectorAll('.mtab')[3])">
+            <div class="brief-dot" style="background:#EF9F27"></div>
+            Design Review Signoff — 73% own-failure rate, redesign recommended
+          </div>
+          <div class="brief-item">
+            <div class="brief-dot" style="background:#EF9F27"></div>
+            Ron White + Flexscope design authority: 73% vs 22% firm avg rejection rate — pairing issue
+          </div>
+          <div class="brief-item">
+            <div class="brief-dot" style="background:#1D9E75"></div>
+            NovaBio QMS on track — Sandra Okafor green all week
+          </div>
+        </div>
+      </div>
+      <div class="grid-wrap">
+        <div class="grid-head"><span class="grid-title">Pairing intelligence</span></div>
+        <div style="padding:8px 12px;font-size:10px;color:rgba(240,246,255,.7);line-height:1.6">
+          Ron White × Flexscope design authority<br>
+          <span style="font-size:16px;font-weight:700;color:#E24B4A">73%</span> <span style="font-size:9px;color:rgba(255,255,255,.35)">rejection rate on first submission</span><br>
+          <span style="font-size:9px;color:rgba(255,255,255,.3)">vs firm avg</span> <span style="color:#1D9E75;font-weight:700">22%</span> <span style="font-size:9px;color:rgba(255,255,255,.3)">— action: restructure approval chain or direct conversation</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tc" id="tc-queue">
+  <div class="grid-wrap">
+    <div class="grid-head"><span class="grid-title">Approval queue — 6 pending decisions</span></div>
+    <div class="queue-item">
+      <div class="queue-priority" style="background:#E24B4A"></div>
+      <div class="queue-info">
+        <div class="queue-type">Escalation — PM response required</div>
+        <div class="queue-title">BUILD #1 blocker: PCB Layout Rev B sign-off · 2 failed interventions</div>
+        <div class="queue-meta">Flexscope · From: VS · Mar 24, 3:45 PM</div>
+        <div class="queue-rec">2 interventions have not resolved. Blocking issue requires authority beyond PM level — design authority contact or expedited approval path needed.</div>
+      </div>
+      <div class="queue-actions">
+        <button class="qa-btn qa-respond" onclick="openRespondModal('escalation')">Respond →</button>
+      </div>
+    </div>
+    <div class="queue-item" id="req1">
+      <div class="queue-priority" style="background:#EF9F27"></div>
+      <div class="queue-info">
+        <div class="queue-type">Resource request — 52h aging</div>
+        <div class="queue-title">Alan Smith — full allocation to Flexscope BUILD phase</div>
+        <div class="queue-meta">Requested by VS · Alan currently at 60% Flexscope / 40% NovaBio · 3 active projects competing</div>
+        <div class="queue-rec">Caution — Alan moving to 100% Flexscope removes NovaBio coverage during QMS Phase 2 gate. Approve with condition: return to 60/40 by Apr 14.</div>
+      </div>
+      <div class="queue-actions">
+        <button class="qa-btn qa-approve" onclick="approveRequest('req1')">Approve</button>
+        <button class="qa-btn qa-reject">Reject</button>
+      </div>
+    </div>
+    <div class="queue-item" id="req2">
+      <div class="queue-priority" style="background:#EF9F27"></div>
+      <div class="queue-info">
+        <div class="queue-type">Resource request — 28h aging</div>
+        <div class="queue-title">Robert Chen — 20% allocation to NovaBio QMS review</div>
+        <div class="queue-meta">Requested by VS · Robert currently at 85% across 3 projects · NovaBio section 4.3 review upcoming</div>
+        <div class="queue-rec">Caution — Robert Chen is at 85% capacity. Adding 20% creates a conflict. Consider Sandra Okafor for this review instead.</div>
+      </div>
+      <div class="queue-actions">
+        <button class="qa-btn qa-approve" onclick="approveRequest('req2')">Approve</button>
+        <button class="qa-btn qa-reject">Reject</button>
+      </div>
+    </div>
+    <div class="queue-item">
+      <div class="queue-priority" style="background:rgba(255,255,255,.2)"></div>
+      <div class="queue-info">
+        <div class="queue-type">Timesheet submission — flagged</div>
+        <div class="queue-title">Ron White — week of Mar 23 · 27.5h submitted (12.5h gap)</div>
+        <div class="queue-meta">27.5h vs 40h expected · All hours on Flexscope · No NovaBio logged despite 20% allocation</div>
+      </div>
+      <div class="queue-actions">
+        <button class="qa-btn qa-approve">Approve</button>
+        <button class="qa-btn qa-reject">Query</button>
+      </div>
+    </div>
+    <div class="queue-item">
+      <div class="queue-priority" style="background:rgba(255,255,255,.2)"></div>
+      <div class="queue-info">
+        <div class="queue-type">Timesheet submission — flagged</div>
+        <div class="queue-title">Margaret Mills — week of Mar 23 · 18h submitted (absence days)</div>
+        <div class="queue-meta">18h · Wed/Thu marked absent · No reason provided · Third instance this quarter</div>
+      </div>
+      <div class="queue-actions">
+        <button class="qa-btn qa-approve">Approve</button>
+        <button class="qa-btn qa-reject">Query</button>
+      </div>
+    </div>
+    <div class="queue-item">
+      <div class="queue-priority" style="background:#1D9E75"></div>
+      <div class="queue-info">
+        <div class="queue-type">Timesheet submission — clean</div>
+        <div class="queue-title">Sandra Okafor — week of Mar 23 · 38h submitted</div>
+        <div class="queue-meta">38h · 100% NovaBio QMS · All billable</div>
+      </div>
+      <div class="queue-actions">
+        <button class="qa-btn qa-approve">Approve</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tc" id="tc-people">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div class="person-card" onclick="openModal('Ron White — Cross-project pattern','Ron has posted red signals on Approval steps across 5 instances in the last 6 months. This is NOT an isolated incident — the pattern predates Flexscope. However, 26/28 rejections this week are Type A/B (upstream resets), suggesting Ron is experiencing process failure rather than causing it. The approver relationship is the variable to change.')">
+      <div class="pc-top">
+        <div class="av" style="background:rgba(226,75,74,.15);color:#E24B4A">RW</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700">Ron White</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.35)">Flexscope · 60% · 27.5h/40h</div>
+        </div>
+      </div>
+      <div class="arc-line">
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#EF9F27"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#EF9F27"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot active" style="background:#E24B4A"></div>
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:8px">G→G→Y→Y→R</span>
+      </div>
+    </div>
+    <div class="person-card" onclick="openModal('Margaret Mills — Cross-project pattern','Margaret has 3 unexplained absence periods this quarter, all mid-week. No pattern correlation with project phases. Total missed hours this quarter: 52h. Performance conversation recommended — this is the 3rd instance and is now affecting Flexscope timesheet compliance.')">
+      <div class="pc-top">
+        <div class="av" style="background:rgba(239,159,39,.15);color:#EF9F27">MM</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700">Margaret Mills</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.35)">Flexscope · 40% · 18h/40h</div>
+        </div>
+      </div>
+      <div class="arc-line">
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:rgba(255,255,255,.12)"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:rgba(255,255,255,.08)"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:rgba(255,255,255,.06)"></div>
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:8px">G→G→—→—→—</span>
+      </div>
+    </div>
+    <div class="person-card" onclick="openModal('Alan Smith — Cross-project pattern','Alan is a reliable contributor. Clean green arc until Thursday when PCB Layout Rev B block surfaced. This is the third time Alan has been blocked by upstream documentation issues on Flexscope — pattern suggests the approval chain architecture needs review, not the person.')">
+      <div class="pc-top">
+        <div class="av" style="background:rgba(29,158,117,.15);color:#1D9E75">AS</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700">Alan Smith</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.35)">Flexscope · 60% · 32h/40h</div>
+        </div>
+      </div>
+      <div class="arc-line">
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#EF9F27"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#EF9F27"></div>
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:8px">G→G→G→Y→Y</span>
+      </div>
+    </div>
+    <div class="person-card" onclick="openModal('Sandra Okafor — Cross-project pattern','Sandra is the highest-performing contributor this week. Consistently green arc, 38h logged, NovaBio QMS work on schedule. No concerns. Consider for expanded NovaBio Phase 2 review role — she has capacity and context.')">
+      <div class="pc-top">
+        <div class="av" style="background:rgba(29,158,117,.15);color:#1D9E75">SO</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700">Sandra Okafor</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.35)">NovaBio · 100% · 38h/40h</div>
+        </div>
+      </div>
+      <div class="arc-line">
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <div class="arc-connector"></div>
+        <div class="arc-dot" style="background:#1D9E75"></div>
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:8px">G→G→G→G→G</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:8px;font-size:9px;color:rgba(255,255,255,.3);padding:4px 0">Click any person card for cross-project pattern analysis</div>
+</div>
+
+<div class="tc" id="tc-workflows">
+  <div class="grid-wrap">
+    <div class="grid-head">
+      <span class="grid-title">Workflow intelligence — 3 templates · 1 redesign recommended</span>
+    </div>
+    <div class="wf-row" onclick="openModal('Design Review Signoff — Cross-instance analysis','73% own-failure rate at Approval step across 14 instances over 6 months. Dominant classification: Process Quality Failure. The approval criteria are ambiguous — different approvers interpret documentation requirements differently. Recommended fix: redesign approval criteria with explicit checklist, add pre-submission review gate. Estimated impact: reduce rework rate from 73% to ~30%.')">
+      <div style="min-width:160px;font-size:10px;color:rgba(240,246,255,.85)">Design Review Signoff</div>
+      <div class="wf-bar-wrap">
+        <div class="wf-bar"><div class="wf-fill" style="width:73%;background:#E24B4A"></div></div>
+        <div class="wf-label">73% own-failure rate at Approval · 14 instances · dominant: Process Quality</div>
+      </div>
+      <span class="wf-health wf-h-red">Redesign recommended</span>
+      <button class="wf-action" onclick="event.stopPropagation();openModal('Authorize redesign — Design Review Signoff','Authorizing this redesign will: (1) freeze new instances on old template, (2) assign redesign to PM for 2-week sprint, (3) projected impact: reduce rework from 73% to ~30%, saving an estimated ¥380k annually in labor rework cost.\n\nClick Authorize to confirm.')">Authorize →</button>
+    </div>
+    <div class="wf-row" onclick="openModal('Materials Readiness — Cross-instance analysis','Rework rate rising: 3 instances in last 60 days, up from historical average of 0.8. Root cause: ETA inputs frequently optimistic (average 4d slip vs quoted delivery). Not yet at redesign threshold but trending upward. Recommend monitoring and adding supplier ETA buffer requirement to template.')">
+      <div style="min-width:160px;font-size:10px;color:rgba(240,246,255,.85)">Materials Readiness</div>
+      <div class="wf-bar-wrap">
+        <div class="wf-bar"><div class="wf-fill" style="width:34%;background:#EF9F27"></div></div>
+        <div class="wf-label">34% own-failure rate · 6 instances · rising trend — watch</div>
+      </div>
+      <span class="wf-health wf-h-amber">Watch</span>
+      <button class="wf-action" onclick="event.stopPropagation()">Monitor</button>
+    </div>
+    <div class="wf-row">
+      <div style="min-width:160px;font-size:10px;color:rgba(240,246,255,.85)">QS Document Review</div>
+      <div class="wf-bar-wrap">
+        <div class="wf-bar"><div class="wf-fill" style="width:12%;background:#1D9E75"></div></div>
+        <div class="wf-label">12% own-failure rate · 8 instances · healthy</div>
+      </div>
+      <span class="wf-health wf-h-green">Healthy</span>
+      <button class="wf-action" style="opacity:.3;cursor:default">—</button>
+    </div>
+  </div>
+</div>
+
+<div class="tc" id="tc-decisions">
+  <div class="grid-wrap">
+    <div class="grid-head">
+      <span class="grid-title">Management decision log — immutable · CoC-linked</span>
+      <button class="dl-log-btn" onclick="openLogDecisionModal()">+ Log decision</button>
+    </div>
+    <div class="dl-row">
+      <span class="dl-badge dl-esc">Escalation</span>
+      <div class="dl-info">
+        <div class="dl-text">Received escalation from VS re BUILD #1 blocker. Contacting Flexscope design authority directly to expedite PCB Layout Rev B sign-off. Target resolution: 24h.</div>
+        <div class="dl-meta">Mar 24, 4:52 PM · CS · Linked: Flexscope — Intervention Record</div>
+      </div>
+    </div>
+    <div class="dl-row">
+      <span class="dl-badge dl-res">Resource</span>
+      <div class="dl-info">
+        <div class="dl-text">Approved Alan Smith to 100% Flexscope effective Mar 25. Condition: return to 60/40 allocation by Apr 14. NovaBio section 4.3 review temporarily reassigned to Sandra Okafor.</div>
+        <div class="dl-meta">Mar 24, 2:00 PM · CS · Linked: Resource request #RR-2024-0312</div>
+      </div>
+    </div>
+    <div class="dl-row">
+      <span class="dl-badge dl-proc">Process</span>
+      <div class="dl-info">
+        <div class="dl-text">Authorized redesign of Design Review Signoff template — Approval step. VS assigned as redesign lead. 2-week sprint. New template to include explicit approval criteria checklist and pre-submission review gate.</div>
+        <div class="dl-meta">Mar 22, 9:15 AM · CS · Linked: Design Review Signoff — Template Intelligence</div>
+      </div>
+    </div>
+    <div class="dl-row">
+      <span class="dl-badge" style="border-color:rgba(29,158,117,.3);color:#1D9E75">Budget</span>
+      <div class="dl-info">
+        <div class="dl-text">Approved ¥15k budget overrun on Flexscope Phase 1 — rework cost exceeded estimate by ¥15k due to Design Review Signoff rejection cycles. Approved as non-recurring provided template redesign completes.</div>
+        <div class="dl-meta">Mar 20, 11:00 AM · CS · Linked: Flexscope — Executive Brief</div>
+      </div>
+    </div>
+    <div class="dl-row">
+      <span class="dl-badge dl-res">Resource</span>
+      <div class="dl-info">
+        <div class="dl-text">Restructured Robert Chen — reduced Flexscope from 60% to 40% to accommodate NovaBio QMS Phase 2 expansion. Effective immediately.</div>
+        <div class="dl-meta">Mar 18, 3:30 PM · CS</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title" id="modal-title">Detail</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">Intelligence</div>
+      <div class="modal-text" id="modal-text"></div>
+      <div class="modal-btn-row" id="modal-btns">
+        <button class="modal-btn mb-primary" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mock-lbl">COMPASS · MANAGEMENT VIEW · MOCKUP</div>
+
+<script>
+function showTab(name, el){
+  document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tc-'+name).classList.add('active');
+}
+
+function openModal(title, text){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-text').textContent = text;
+  document.getElementById('modal-btns').innerHTML = '<button class="modal-btn mb-primary" onclick="closeModal()">Close</button>';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function openEscalation(){
+  document.getElementById('modal-title').textContent = 'Flexscope — Escalation response required';
+  document.getElementById('modal-text').textContent = 'BUILD #1 is 5d overdue. Root cause: PCB Layout Rev B has not been signed off by design authority. PM (VS) made two interventions — resource reassignment and expedited sign-off request — both unsuccessful after 48h measurement windows. This requires management-level authority to resolve.';
+  document.getElementById('modal-btns').innerHTML = `
+    <button class="modal-btn mb-primary" onclick="handleEscResp('direct')">I'll handle directly →</button>
+    <button class="modal-btn mb-secondary" onclick="handleEscResp('guide')">Send guidance to PM</button>
+    <button class="modal-btn mb-red" onclick="handleEscResp('escalate')">Escalate to executive</button>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function handleEscResp(type){
+  const msgs = {
+    direct: "Action logged: CS will contact Flexscope design authority directly. Management intervention record created. VS notified.",
+    guide: "Guidance sent to VS: Contact design authority via TransAtlantic account manager channel — direct PM-to-authority route has been blocked. Management guidance recorded.",
+    escalate: "Executive brief assembled from intervention record and escalation. Sent to executive tier for awareness. Full chain of custody preserved."
+  };
+  alert(msgs[type]);
+  closeModal();
+}
+
+function openRespondModal(type){
+  document.getElementById('modal-title').textContent = 'Respond to escalation';
+  document.getElementById('modal-text').textContent = 'Select your response type below. Each response creates a management-level intervention record and notifies the PM.';
+  document.getElementById('modal-btns').innerHTML = `
+    <button class="modal-btn mb-primary" onclick="handleEscResp('direct')">I'll handle directly →</button>
+    <button class="modal-btn mb-secondary" onclick="handleEscResp('guide')">Send guidance to PM</button>
+    <button class="modal-btn mb-red" onclick="handleEscResp('escalate')">Escalate to executive</button>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function openLogDecisionModal(){
+  document.getElementById('modal-title').textContent = 'Log a management decision';
+  document.getElementById('modal-text').textContent = 'Decisions are immutable once logged. They are CoC-linked and visible to PMs and executives.';
+  document.getElementById('modal-btns').innerHTML = `
+    <select style="font-family:inherit;font-size:10px;padding:5px 8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#C8DFF0;width:100%;outline:none;margin-bottom:8px">
+      <option>Escalation</option><option>Resource</option><option>Process</option><option>Budget</option><option>People</option>
+    </select>
+    <textarea class="respond-input" rows="3" placeholder="Describe the decision and reasoning..."></textarea>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="modal-btn mb-primary" onclick="alert('Decision logged to CoC.');closeModal()">Log decision →</button>
+      <button class="modal-btn mb-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function approveRequest(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.style.opacity='0.4';
+  el.style.transition='opacity .3s';
+  setTimeout(()=>{
+    el.innerHTML='<div style="padding:6px 12px;font-size:10px;color:#1D9E75;font-family:inherit">✓ Approved — CoC event written · PM notified</div>';
+    el.style.opacity='1';
+  },300);
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+</script>
+</body>
+</html>

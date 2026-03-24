@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-mono,'Share Tech Mono',monospace);background:var(--color-background-tertiary,#0c1628);color:var(--color-text-primary,#F0F6FF);font-size:12px}
+.nav{display:flex;align-items:center;height:40px;background:rgba(17,24,39,1);border-bottom:1px solid rgba(0,210,255,.15);padding:0 14px;gap:0;flex-shrink:0}
+.logo{font-size:14px;font-weight:700;letter-spacing:.12em;color:#F0F6FF;margin-right:12px}
+.logo span{color:#00D2FF}
+.tab{padding:0 10px;height:40px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;transition:.12s}
+.tab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.sep{width:1px;height:18px;background:rgba(0,210,255,.15);margin:0 6px}
+.live{display:flex;align-items:center;gap:4px;font-size:10px;color:#1D9E75}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.body{padding:12px 16px;overflow-y:auto}
+.kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:10px 12px;position:relative;cursor:pointer;transition:.12s}
+.kpi:hover{border-color:rgba(0,210,255,.2)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-green::before{background:#1D9E75}
+.kpi-cyan::before{background:#00D2FF}
+.kpi-amber::before{background:#EF9F27}
+.kpi-red::before{background:#E24B4A}
+.kpi-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:3px}
+.kpi-val{font-size:18px;font-weight:700;line-height:1}
+.kpi-sub{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px}
+.cv{color:#00D2FF}.ca{color:#EF9F27}.cr{color:#E24B4A}.cg{color:#1D9E75}.cp{color:#8B5CF6}
+.main-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:12px}
+.mtab{padding:7px 14px;font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.4);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;text-transform:uppercase;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.mtab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.tc{display:none}.tc.active{display:block}
+.panel{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);margin-bottom:10px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.panel-title{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.brief-narrative{padding:10px 12px;border-left:2px solid #EF9F27;background:rgba(239,159,39,.04);font-size:10px;color:rgba(240,246,255,.75);line-height:1.6;margin:10px 12px}
+.proj-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:.12s}
+.proj-row:hover{background:rgba(255,255,255,.02)}
+.proj-name{font-size:10px;flex:1}
+.proj-status{font-size:9px;padding:2px 7px;border:1px solid;letter-spacing:.05em;flex-shrink:0}
+.ps-green{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.ps-amber{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.ps-red{border-color:rgba(226,75,74,.3);color:#E24B4A}
+.proj-val{font-size:10px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right}
+.rework-proj{font-size:9px;min-width:60px;text-align:right}
+.sparkline{display:flex;align-items:flex-end;gap:2px;height:28px;width:60px}
+.spark-bar{background:rgba(0,210,255,.25);flex:1;border-radius:1px 1px 0 0;transition:.3s}
+.spark-bar.highlight{background:#00D2FF}
+.fin-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.fin-label{font-size:9px;color:rgba(255,255,255,.4);flex:1}
+.fin-bar{flex:2;height:6px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden}
+.fin-fill{height:100%;border-radius:1px}
+.fin-val{font-size:10px;font-weight:700;min-width:50px;text-align:right}
+.q-row{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.q-dot{width:8px;height:8px;border-radius:50%}
+.archive-dots{display:flex;gap:5px;padding:8px 12px;flex-wrap:wrap}
+.arch-dot{width:18px;height:18px;border-radius:50%;cursor:pointer;border:1.5px solid transparent;display:flex;align-items:center;justify-content:center;font-size:8px;transition:.12s;flex-shrink:0}
+.arch-dot:hover{transform:scale(1.2)}
+.arch-dot.selected{border-color:rgba(255,255,255,.5)}
+.brief-detail{padding:10px 12px;display:none}
+.brief-detail.show{display:block}
+.bd-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.bd-date{font-size:11px;font-weight:700}
+.bd-delta{font-size:9px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.04);padding:2px 8px;border:1px solid rgba(255,255,255,.08)}
+.bd-text{font-size:10px;color:rgba(240,246,255,.7);line-height:1.55;padding:8px 10px;background:rgba(239,159,39,.04);border:1px solid rgba(239,159,39,.12);border-left:2px solid #EF9F27}
+.roi-panel{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);padding:12px 14px;margin-bottom:10px}
+.roi-head{font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin-bottom:10px}
+.roi-comparison{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.roi-col{padding:8px 10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02)}
+.roi-scenario{font-size:9px;letter-spacing:.08em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:4px}
+.roi-val{font-size:22px;font-weight:700}
+.roi-label{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px}
+.roi-auth-btn{font-family:inherit;font-size:10px;font-weight:700;padding:7px 20px;background:#1D9E75;border:none;color:#060a10;cursor:pointer;letter-spacing:.08em;transition:.12s;width:100%}
+.roi-auth-btn:hover{opacity:.85}
+.pipe-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.pipe-stage{font-size:9px;padding:2px 7px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);letter-spacing:.05em;flex-shrink:0;min-width:80px;text-align:center}
+.pipe-name{font-size:10px;flex:1}
+.pipe-val{font-size:10px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right}
+.pipe-prob{font-size:9px;color:rgba(255,255,255,.35);min-width:40px;text-align:right}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#111827;border:1px solid rgba(0,210,255,.2);width:440px;max-height:80vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.modal-title{font-size:12px;font-weight:700;color:#F0F6FF}
+.modal-close{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);width:22px;height:22px;cursor:pointer;font-size:12px;font-family:inherit}
+.modal-body{padding:14px;font-size:10px;color:rgba(240,246,255,.75);line-height:1.6}
+.mock-lbl{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);font-size:9px;letter-spacing:.12em;color:#00D2FF;padding:3px 12px;pointer-events:none;z-index:999}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="logo">COM<span>PASS</span></div>
+  <div class="sep"></div>
+  <button class="tab">My Work</button>
+  <button class="tab">PM View</button>
+  <button class="tab">Management</button>
+  <button class="tab active">Executive</button>
+  <div class="sep"></div>
+  <span style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.35);padding:0 8px">&#9656; CADENCE</span>
+  <div class="live" style="margin-left:auto"><div class="live-dot"></div>LIVE</div>
+  <span style="font-size:10px;color:rgba(255,255,255,.3);margin-left:10px">TUE MAR 24, 2026</span>
+</div>
+
+<div class="body">
+
+<div class="kpi-strip">
+  <div class="kpi kpi-cyan" onclick="openModal('Revenue YTD','¥8.4M of ¥9.2M target — 91% of annual target with Q1 complete. Flexscope (¥4.2M), NovaBio (¥2.8M), and pipeline (¥1.4M). On track to hit annual target if Flexscope Phase 2 closes by May.')">
+    <div class="kpi-label">Revenue YTD</div>
+    <div class="kpi-val cv">¥8.4M</div>
+    <div class="kpi-sub">of ¥9.2M target</div>
+  </div>
+  <div class="kpi kpi-amber" onclick="openModal('Gross Margin','39% gross margin — 3pts below Q4 target of 42%. Root cause is rework cost on Flexscope Design Review Signoff: ¥620k in labor rework this quarter represents 1.8pts of margin drag. The fix is a template redesign that management has authorized — projected margin recovery ¥380k annually.')">
+    <div class="kpi-label">Gross Margin</div>
+    <div class="kpi-val ca">39%</div>
+    <div class="kpi-sub">3pts below Q4 target</div>
+  </div>
+  <div class="kpi kpi-red" onclick="openModal('Rework Cost Q1','¥620k in labor rework costs this quarter — up from ¥310k in Q4 2025 and ¥180k in Q3 2025. Growth rate: tripling quarter-over-quarter. 66% is Process Quality Failure (preventable). Management has authorized Design Review Signoff template redesign — projected to reduce rework by ¥380k annually.')">
+    <div class="kpi-label">Rework cost Q1</div>
+    <div class="kpi-val cr">¥620k</div>
+    <div class="kpi-sub">+100% vs Q4 2025</div>
+  </div>
+  <div class="kpi kpi-green" onclick="openModal('Active Projects','4 active projects — Flexscope (¥4.2M, at risk), NovaBio (¥2.8M, on track), OrthoMotion (¥1.1M, on track), Internal ($0, on track). 3 proposals in pipeline — combined estimated value ¥6.2M.')">
+    <div class="kpi-label">Active projects</div>
+    <div class="kpi-val cg">4</div>
+    <div class="kpi-sub">¥8.1M combined value</div>
+  </div>
+  <div class="kpi kpi-amber" onclick="openModal('Schedule Performance','Portfolio SPI 0.88 — below healthy threshold of 1.0. Flexscope is the primary drag (SPI 0.79). NovaBio and OrthoMotion both above 1.0. If Flexscope schedule improvement materializes from BUILD phase, portfolio SPI projects to 0.94 by end of quarter.')">
+    <div class="kpi-label">Portfolio SPI</div>
+    <div class="kpi-val ca">0.88</div>
+    <div class="kpi-sub">below 1.0 threshold</div>
+  </div>
+  <div class="kpi kpi-amber" onclick="openModal('Pipeline Value','¥6.2M in active pipeline across 6 prospects — 3 in proposal stage, 2 in qualification, 1 in discovery. Win rate this quarter: 67%. Expected close value if Q2 targets met: ¥3.8M.')">
+    <div class="kpi-label">Pipeline value</div>
+    <div class="kpi-val ca">¥6.2M</div>
+    <div class="kpi-sub">3 proposals active</div>
+  </div>
+</div>
+
+<div class="main-tabs">
+  <button class="mtab active" onclick="showTab('overview',this)">Overview</button>
+  <button class="mtab" onclick="showTab('financial',this)">Financial</button>
+  <button class="mtab" onclick="showTab('rework',this)">Rework cost</button>
+  <button class="mtab" onclick="showTab('archive',this)">Brief archive</button>
+  <button class="mtab" onclick="showTab('pipeline',this)">Pipeline</button>
+</div>
+
+<div class="tc active" id="tc-overview">
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:12px">
+    <div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Morning brief — executive tier</span><span style="font-size:9px;color:rgba(0,210,255,.5)">Generated 6:00 AM</span></div>
+        <div class="brief-narrative">Portfolio is generating ¥8.4M of ¥9.2M annual target. Margin is 3pts below target — this is a rework problem, not a revenue problem. One escalation is in management hands (BUILD #1 blocker). One high-ROI decision is available: template redesign authorized by CS, projected to recover ¥380k annually. No action required from executive this brief — situation is being managed.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Portfolio — project status</span></div>
+        <div class="proj-row" onclick="openModal('Flexscope Endoscopic Platform','¥4.2M · AT RISK — SPI 0.79, 19 overdue tasks, 1 active escalation, rework cost ¥480k this quarter. PM intervention in progress. Management has taken escalation. Template redesign will address root cause. Timeline risk: +5d slip projected on P50 forecast.')">
+          <div class="proj-name">Flexscope Endoscopic Platform</div>
+          <div class="sparkline">
+            <div class="spark-bar" style="height:35%"></div>
+            <div class="spark-bar" style="height:50%"></div>
+            <div class="spark-bar" style="height:45%"></div>
+            <div class="spark-bar highlight" style="height:40%"></div>
+          </div>
+          <span class="proj-status ps-red">At risk</span>
+          <span class="proj-val">¥4.2M</span>
+          <span class="rework-proj cr">¥480k rework</span>
+        </div>
+        <div class="proj-row" onclick="openModal('NovaBio QMS Implementation','¥2.8M · ON TRACK — SPI 1.04, CPI 1.01. Section 4.2 complete this week. QMS gap analysis 68% vs 65% target. No rework issues. On track to hit Sep 15 delivery.')">
+          <div class="proj-name">NovaBio Quality System</div>
+          <div class="sparkline">
+            <div class="spark-bar" style="height:60%"></div>
+            <div class="spark-bar" style="height:65%"></div>
+            <div class="spark-bar" style="height:70%"></div>
+            <div class="spark-bar highlight" style="height:75%"></div>
+          </div>
+          <span class="proj-status ps-green">On track</span>
+          <span class="proj-val">¥2.8M</span>
+          <span class="rework-proj cg">¥22k rework</span>
+        </div>
+        <div class="proj-row" onclick="openModal('OrthoMotion Regulatory Filing','¥1.1M · ON TRACK — SPI 1.02. FDA 510(k) predicate confirmed. Documentation complete. No rework issues.')">
+          <div class="proj-name">OrthoMotion Regulatory Filing</div>
+          <div class="sparkline">
+            <div class="spark-bar" style="height:55%"></div>
+            <div class="spark-bar" style="height:60%"></div>
+            <div class="spark-bar" style="height:58%"></div>
+            <div class="spark-bar highlight" style="height:65%"></div>
+          </div>
+          <span class="proj-status ps-green">On track</span>
+          <span class="proj-val">¥1.1M</span>
+          <span class="rework-proj cg">¥8k rework</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Rework cost by project — Q1</span></div>
+        <div style="padding:8px 12px">
+          <div class="fin-row">
+            <div class="fin-label">Flexscope</div>
+            <div class="fin-bar"><div class="fin-fill" style="width:77%;background:#E24B4A"></div></div>
+            <div class="fin-val cr">¥480k</div>
+          </div>
+          <div class="fin-row">
+            <div class="fin-label">NovaBio</div>
+            <div class="fin-bar"><div class="fin-fill" style="width:15%;background:#EF9F27"></div></div>
+            <div class="fin-val ca">¥22k</div>
+          </div>
+          <div class="fin-row">
+            <div class="fin-label">OrthoMotion</div>
+            <div class="fin-bar"><div class="fin-fill" style="width:8%;background:#1D9E75"></div></div>
+            <div class="fin-val cg">¥8k</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Key decisions pending</span></div>
+        <div style="padding:8px 12px;font-size:10px;color:rgba(240,246,255,.7);line-height:1.6">
+          <div class="q-row"><div class="q-dot" style="background:#1D9E75"></div><span>Template redesign authorized by CS — no executive action needed</span></div>
+          <div class="q-row" style="margin-top:4px"><div class="q-dot" style="background:#EF9F27"></div><span>BUILD #1 escalation in management hands — CS contacting design authority</span></div>
+          <div class="q-row" style="margin-top:4px"><div class="q-dot" style="background:#1D9E75"></div><span>No budget overruns requiring executive approval this brief</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tc" id="tc-financial">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Quarterly revenue trend</span></div>
+      <div style="padding:10px 12px">
+        <div style="display:flex;align-items:flex-end;gap:6px;height:80px;margin-bottom:8px">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="flex:1;width:100%;background:#00D2FF;opacity:.3;border-radius:1px 1px 0 0;height:50%"></div>
+            <span style="font-size:8px;color:rgba(255,255,255,.3)">Q3'25</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="background:#00D2FF;opacity:.4;border-radius:1px 1px 0 0;width:100%;height:70%"></div>
+            <span style="font-size:8px;color:rgba(255,255,255,.3)">Q4'25</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="background:#00D2FF;border-radius:1px 1px 0 0;width:100%;height:100%"></div>
+            <span style="font-size:8px;color:#00D2FF">Q1'26</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-around;font-size:10px;color:rgba(255,255,255,.5)">
+          <span>¥5.8M</span><span>¥7.1M</span><span class="cv">¥8.4M</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Margin analysis</span></div>
+      <div style="padding:10px 12px">
+        <div class="fin-row">
+          <div class="fin-label">Revenue Q1</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:100%;background:#00D2FF;opacity:.4"></div></div>
+          <div class="fin-val cv">¥8.4M</div>
+        </div>
+        <div class="fin-row">
+          <div class="fin-label">Labor cost</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:55%;background:#8B5CF6;opacity:.5"></div></div>
+          <div class="fin-val cp">¥4.6M</div>
+        </div>
+        <div class="fin-row">
+          <div class="fin-label">Rework cost</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:7%;background:#E24B4A"></div></div>
+          <div class="fin-val cr">¥620k</div>
+        </div>
+        <div class="fin-row">
+          <div class="fin-label">Gross margin</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:39%;background:#1D9E75"></div></div>
+          <div class="fin-val cg">39%</div>
+        </div>
+        <div style="margin-top:8px;padding:6px 8px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.15);border-left:2px solid #EF9F27;font-size:9px;color:rgba(240,246,255,.6)">
+          Without rework: margin projects to 41.3% — gap is ¥620k avoidable cost
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="grid-column:1/-1">
+      <div class="panel-head"><span class="panel-title">Q2 forecast — two scenarios</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 12px">
+        <div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.15);padding:8px 10px">
+          <div style="font-size:9px;color:rgba(226,75,74,.7);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">If no change</div>
+          <div style="font-size:18px;font-weight:700;color:#E24B4A">37.1%</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px">Rework cost projects to ¥780k Q2 at current rate</div>
+        </div>
+        <div style="background:rgba(29,158,117,.05);border:1px solid rgba(29,158,117,.2);padding:8px 10px">
+          <div style="font-size:9px;color:rgba(29,158,117,.7);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">With template redesign</div>
+          <div style="font-size:18px;font-weight:700;color:#1D9E75">40.8%</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.35);margin-top:2px">Redesign reduces rework to ~¥200k — margin recovery ¥380k</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tc" id="tc-rework">
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+    <div>
+      <div class="roi-panel">
+        <div class="roi-head">Rework cost trend — Q3 2025 → Q1 2026</div>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:100px;margin-bottom:8px">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+              <div style="background:#EF9F27;opacity:.4;border-radius:1px 1px 0 0;width:100%;height:29%"></div>
+            </div>
+            <span style="font-size:8px;color:rgba(255,255,255,.3)">Q3'25</span>
+            <span style="font-size:9px;color:rgba(255,255,255,.4)">¥180k</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+              <div style="background:#EF9F27;opacity:.6;border-radius:1px 1px 0 0;width:100%;height:50%"></div>
+            </div>
+            <span style="font-size:8px;color:rgba(255,255,255,.3)">Q4'25</span>
+            <span style="font-size:9px;color:rgba(255,255,255,.4)">¥310k</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+              <div style="background:#E24B4A;border-radius:1px 1px 0 0;width:100%;height:100%"></div>
+            </div>
+            <span style="font-size:8px;color:#E24B4A">Q1'26</span>
+            <span style="font-size:9px;color:#E24B4A">¥620k</span>
+          </div>
+        </div>
+        <div style="font-size:9px;color:rgba(255,255,255,.3);margin-bottom:12px">Costs have tripled in 3 quarters</div>
+        <div class="roi-head" style="margin-top:12px">Root cause breakdown</div>
+        <div class="fin-row">
+          <div class="fin-label">Process Quality Failure</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:66%;background:#E24B4A"></div></div>
+          <div class="fin-val cr">66% preventable</div>
+        </div>
+        <div class="fin-row">
+          <div class="fin-label">Dependency / inputs not ready</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:22%;background:#EF9F27"></div></div>
+          <div class="fin-val ca">22%</div>
+        </div>
+        <div class="fin-row">
+          <div class="fin-label">Novel work / complexity</div>
+          <div class="fin-bar"><div class="fin-fill" style="width:12%;background:#1D9E75"></div></div>
+          <div class="fin-val cg">12% expected</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="roi-panel">
+        <div class="roi-head">Template redesign ROI</div>
+        <div class="roi-comparison">
+          <div class="roi-col">
+            <div class="roi-scenario">Redesign cost</div>
+            <div class="roi-val ca">¥18k</div>
+            <div class="roi-label">2-week sprint + testing</div>
+          </div>
+          <div class="roi-col">
+            <div class="roi-scenario">Annual saving</div>
+            <div class="roi-val cg">¥380k</div>
+            <div class="roi-label">projected rework reduction</div>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:#1D9E75;margin-bottom:4px">ROI: 2,111%</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.35);margin-bottom:10px">Payback period: &lt;3 weeks</div>
+        <button class="roi-auth-btn" onclick="authorizeRedesign(this)">Authorize template redesign →</button>
+      </div>
+      <div class="panel" style="padding:10px 12px;font-size:9px;color:rgba(255,255,255,.3);line-height:1.6">
+        Brief archive shows this pattern first appeared <strong style="color:rgba(255,255,255,.5)">21 days ago</strong> in the Mar 3 brief. Management was notified Mar 10. Decision logged Mar 22. System identified this before it became a crisis.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tc" id="tc-archive">
+  <div class="panel">
+    <div class="panel-head"><span class="panel-title">Brief archive — executive tier · scroll dates to select</span></div>
+    <div class="archive-dots" id="archive-dots"></div>
+    <div class="brief-detail" id="brief-detail">
+      <div class="bd-head">
+        <div class="bd-date" id="bd-date"></div>
+        <div class="bd-delta" id="bd-delta"></div>
+      </div>
+      <div class="bd-text" id="bd-text"></div>
+    </div>
+    <div style="padding:5px 12px 8px;font-size:9px;color:rgba(255,255,255,.25)">Green = healthy · Amber = watch · Red = action required · Click any date to open brief</div>
+  </div>
+</div>
+
+<div class="tc" id="tc-pipeline">
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Pipeline — 6 active prospects · ¥6.2M estimated value</span>
+      <span style="font-size:9px;color:rgba(255,255,255,.3)">Win rate this quarter: 67%</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-stage" style="border-color:rgba(0,210,255,.25);color:#00D2FF">Proposal</span>
+      <div class="pipe-name">MediSync — Device UX Platform</div>
+      <span class="pipe-prob">85%</span>
+      <span class="pipe-val">¥1.8M</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-stage" style="border-color:rgba(0,210,255,.25);color:#00D2FF">Proposal</span>
+      <div class="pipe-name">Orbis Biotech — Sterilization Workflow</div>
+      <span class="pipe-prob">70%</span>
+      <span class="pipe-val">¥1.4M</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-stage" style="border-color:rgba(0,210,255,.25);color:#00D2FF">Proposal</span>
+      <div class="pipe-name">TerraVox — Sensor Calibration Suite</div>
+      <span class="pipe-prob">55%</span>
+      <span class="pipe-val">¥0.9M</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-stage">Qualification</span>
+      <div class="pipe-name">AquaPath — Fluid Dynamics Platform</div>
+      <span class="pipe-prob">40%</span>
+      <span class="pipe-val">¥1.2M</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-stage">Qualification</span>
+      <div class="pipe-name">NextVue — Imaging System Overhaul</div>
+      <span class="pipe-prob">35%</span>
+      <span class="pipe-val">¥0.6M</span>
+    </div>
+    <div class="pipe-row">
+      <span class="pipe-stage">Discovery</span>
+      <div class="pipe-name">HelioMed — Remote Diagnostics</div>
+      <span class="pipe-prob">20%</span>
+      <span class="pipe-val">¥0.3M</span>
+    </div>
+    <div style="padding:6px 12px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;font-size:10px">
+      <span style="color:rgba(255,255,255,.4)">Expected close value at current win rates:</span>
+      <span class="cv" style="font-weight:700">¥3.8M</span>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="mock-lbl">COMPASS · EXECUTIVE VIEW · MOCKUP</div>
+
+<script>
+function showTab(name, el){
+  document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tc-'+name).classList.add('active');
+  if(name==='archive') renderArchive();
+}
+
+function openModal(title, text){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = text;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+
+function authorizeRedesign(btn){
+  btn.textContent = '✓ Authorized — CoC event written · Management notified';
+  btn.style.background = '#1D9E75';
+  btn.disabled = true;
+  btn.style.opacity = '0.8';
+}
+
+const archiveBriefs = [
+  {date:'Mar 3',color:'#EF9F27',delta:'First appearance of rework trend',text:'Portfolio revenue tracking ¥6.2M YTD. Margin 40.5% — within target. Flexscope showing early rework signals: Design Review Signoff rejection rate elevated at 41% (historical avg 28%). NovaBio on track. No action required today but rework trend bears watching.'},
+  {date:'Mar 6',color:'#EF9F27',delta:'Rework rate climbing',text:'Flexscope rework rate now 53% at Approval step — second consecutive week above baseline. Quarterly rework cost projection updated to ¥480k if trend continues. Recommend management review of Design Review Signoff template. NovaBio and OrthoMotion both green.'},
+  {date:'Mar 10',color:'#E24B4A',delta:'Management briefed — action taken',text:'Management notified of Design Review Signoff pattern. CS to review template redesign options. Flexscope rework cost now ¥320k YTD — trending to ¥580k quarterly. BUILD phase delayed 2d due to PCB Layout Rev B sign-off pending. Revenue tracking on target.'},
+  {date:'Mar 13',color:'#E24B4A',delta:'Escalation threshold approaching',text:'Flexscope SPI declined to 0.81. Design Review Signoff now at 67% own-failure rate — above the 60% threshold for template redesign recommendation. Two PM interventions underway. Template redesign authorization pending from management.'},
+  {date:'Mar 17',color:'#E24B4A',delta:'Template redesign authorized',text:'Management authorized Design Review Signoff template redesign — ¥18k investment projected to recover ¥380k annually. Flexscope rework cost ¥480k Q1. Build phase further delayed — PCB Layout Rev B now 6d pending. Escalation path being prepared.'},
+  {date:'Mar 20',color:'#E24B4A',delta:'Budget overrun approved',text:'Flexscope Phase 1 budget overrun of ¥15k approved by management. Rework cost is the driver — not scope creep. Margin impact: 0.4pts this quarter. Template redesign sprint commencing. Two PM interventions on BUILD #1 blocker unsuccessful.'},
+  {date:'Mar 24',color:'#E24B4A',delta:'Today — escalation in management hands',text:'BUILD #1 escalation has been taken up directly by CS — design authority contact in progress. If resolved in 24h, schedule recovery is possible. Rework cost ¥620k Q1 — tripled vs Q3 2025. Template redesign sprint underway. Revenue and margin tracking as last brief. Pipeline: 3 proposals at proposal stage.'},
+];
+
+function renderArchive(){
+  const dotsEl = document.getElementById('archive-dots');
+  dotsEl.innerHTML = archiveBriefs.map((b,i)=>`<div class="arch-dot" style="background:${b.color}" title="${b.date}" onclick="showBrief(${i})">${b.date.split(' ')[1]}</div>`).join('');
+}
+
+function showBrief(i){
+  document.querySelectorAll('.arch-dot').forEach((d,j)=>d.classList.toggle('selected',j===i));
+  const b = archiveBriefs[i];
+  document.getElementById('bd-date').textContent = b.date + ', 2026';
+  document.getElementById('bd-delta').textContent = b.delta;
+  document.getElementById('bd-text').textContent = b.text;
+  const detail = document.getElementById('brief-detail');
+  detail.classList.add('show');
+}
+
+renderArchive();
+</script>
+</body>
+</html>

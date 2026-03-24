@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-mono,'Share Tech Mono',monospace);background:var(--color-background-tertiary,#0c1628);color:var(--color-text-primary,#F0F6FF);font-size:12px}
+.panel-outer{padding:12px 16px;overflow-y:auto}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08)}
+.panel-title{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.log-btn{font-family:inherit;font-size:9px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.08em;transition:.12s}
+.log-btn:hover{background:rgba(0,210,255,.08)}
+.esc-banner{background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.3);border-left:3px solid #E24B4A;padding:10px 12px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+.esc-icon{font-size:16px;flex-shrink:0;color:#E24B4A}
+.esc-info{flex:1}
+.esc-label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#E24B4A;margin-bottom:3px}
+.esc-text{font-size:10px;color:rgba(240,246,255,.8);line-height:1.5}
+.esc-actions{display:flex;gap:6px;margin-top:8px}
+.esc-btn{font-family:inherit;font-size:9px;padding:5px 14px;cursor:pointer;border:1px solid;letter-spacing:.08em;transition:.12s;background:none}
+.eb-primary{border-color:rgba(226,75,74,.5);color:#E24B4A}
+.eb-primary:hover{background:rgba(226,75,74,.1)}
+.eb-dismiss{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.4)}
+.eb-dismiss:hover{color:#fff}
+.intervention{border:1px solid rgba(255,255,255,.08);margin-bottom:10px;overflow:hidden}
+.int-header{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:flex-start;gap:8px;cursor:pointer;transition:.12s;background:rgba(255,255,255,.02)}
+.int-header:hover{background:rgba(255,255,255,.04)}
+.int-status-bar{width:3px;align-self:stretch;border-radius:1px;flex-shrink:0}
+.int-proj{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:2px}
+.int-signal{font-size:11px;font-weight:700}
+.int-timestamp{font-size:9px;color:rgba(255,255,255,.35);margin-top:1px}
+.int-outcome{font-size:9px;padding:2px 8px;border:1px solid;letter-spacing:.05em;margin-left:auto;flex-shrink:0;align-self:flex-start}
+.io-pending{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.io-negative{border-color:rgba(226,75,74,.3);color:#E24B4A}
+.io-positive{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.int-body{background:#0c1628}
+.int-step{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.step-line{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:16px}
+.step-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.step-connector{flex:1;width:1px;background:rgba(255,255,255,.08);margin-top:3px;min-height:10px}
+.step-content{flex:1;min-width:0;padding-top:1px}
+.step-type{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:3px}
+.step-text{font-size:10px;color:rgba(240,246,255,.8);line-height:1.5}
+.step-meta{font-size:9px;color:rgba(255,255,255,.3);margin-top:3px}
+.step-outcome-box{margin-top:6px;padding:6px 8px;border:1px solid;font-size:9px;line-height:1.5}
+.sob-positive{background:rgba(29,158,117,.06);border-color:rgba(29,158,117,.25);color:#1D9E75}
+.sob-negative{background:rgba(226,75,74,.05);border-color:rgba(226,75,74,.2);color:#E24B4A}
+.sob-pending{background:rgba(239,159,39,.05);border-color:rgba(239,159,39,.2);color:#EF9F27}
+.esc-threshold{background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.2);border-left:2px solid #E24B4A;padding:8px 10px;margin:6px 12px 8px;font-size:10px;color:rgba(240,246,255,.75);line-height:1.5}
+.esc-threshold-btns{display:flex;gap:5px;margin-top:8px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:flex-start;justify-content:center;padding-top:40px}
+.modal-overlay.show{display:flex}
+.modal{background:#111827;border:1px solid rgba(226,75,74,.3);width:520px;max-height:85vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.modal-title{font-size:12px;font-weight:700;color:#F0F6FF}
+.modal-close{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);width:22px;height:22px;cursor:pointer;font-size:12px;font-family:inherit}
+.modal-body{padding:14px}
+.brief-section{font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:10px 0 5px}
+.brief-section:first-child{margin-top:0}
+.brief-block{padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);font-size:10px;color:rgba(240,246,255,.75);line-height:1.55;margin-bottom:6px}
+.brief-ai{border-left:2px solid #EF9F27;background:rgba(239,159,39,.04)}
+.brief-action-row{display:flex;gap:4px;padding:4px 9px;border-bottom:1px solid rgba(255,255,255,.04);font-size:10px}
+.ba-label{font-size:9px;color:rgba(255,255,255,.4);min-width:60px}
+.ba-val{flex:1;color:rgba(240,246,255,.75)}
+.ba-result{font-size:9px;padding:1px 6px;border:1px solid}
+.modal-textarea{width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:10px;outline:none;resize:none;margin-top:6px}
+.modal-textarea:focus{border-color:rgba(0,210,255,.3)}
+.modal-select{width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:10px;outline:none;cursor:pointer;margin-bottom:6px}
+.modal-btn{font-family:inherit;font-size:10px;padding:6px 16px;cursor:pointer;border:1px solid;letter-spacing:.08em;transition:.12s;background:none}
+.mb-primary{border-color:rgba(0,210,255,.4);color:#00D2FF}
+.mb-primary:hover{background:rgba(0,210,255,.08)}
+.mb-red{border-color:rgba(226,75,74,.4);color:#E24B4A}
+.mb-secondary{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.4)}
+.mock-lbl{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);font-size:9px;letter-spacing:.12em;color:#00D2FF;padding:3px 12px;pointer-events:none;z-index:999}
+</style>
+</head>
+<body>
+
+<div class="panel-outer">
+
+<div class="panel-head">
+  <div>
+    <div class="panel-title">Intervention record — Flexscope Endoscopic Platform</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.25);margin-top:2px">3 active · 1 resolved · 1 escalation recommended · CoC-linked</div>
+  </div>
+  <button class="log-btn" onclick="openLogModal()">+ Log intervention</button>
+</div>
+
+<div class="esc-banner" id="esc-banner">
+  <div class="esc-icon">⚠</div>
+  <div class="esc-info">
+    <div class="esc-label">Escalation recommended</div>
+    <div class="esc-text">Two interventions on BUILD #1 blocker have not produced a positive outcome. The blocking issue (PCB Layout Rev B sign-off) appears to require authority beyond PM level.</div>
+    <div class="esc-actions">
+      <button class="esc-btn eb-primary" onclick="openEscBrief()">Compose escalation brief →</button>
+      <button class="esc-btn eb-dismiss" onclick="dismissBanner()">Dismiss — I'll continue managing</button>
+    </div>
+  </div>
+</div>
+
+<div class="intervention" id="int-build">
+  <div class="int-header" onclick="toggleInt('int-build-body')">
+    <div class="int-status-bar" style="background:#E24B4A"></div>
+    <div>
+      <div class="int-proj">Flexscope · BUILD phase</div>
+      <div class="int-signal cr">BUILD #1 Build Review — overdue 5d</div>
+      <div class="int-timestamp">First identified: Mar 19 · 2 interventions · 2 negative outcomes</div>
+    </div>
+    <span class="int-outcome io-negative">Escalation recommended</span>
+  </div>
+  <div id="int-build-body">
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:rgba(226,75,74,.6)"></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Problem signal</div>
+        <div class="step-text">BUILD #1 Build Review — overdue 5d · Mar 19, 2:00 PM</div>
+        <div class="step-meta">Trigger: task exceeded scheduled completion by 5 days · Root cause auto-classified: Required inputs not ready (PCB Layout Drawing Rev B)</div>
+      </div>
+    </div>
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#00D2FF"></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Corrective action 1 — Resource reassignment</div>
+        <div class="step-text">Mar 19, 2:30 PM — Reassigned Build Review to Alan Smith to unblock Ron White.</div>
+        <div class="step-meta">Expected: Task advances within 24h · Measurement window: 24h</div>
+        <div class="step-outcome-box sob-negative">Measured 24h later — NEGATIVE. Alan Smith also blocked — PCB Layout Rev B still not signed off. Task remains overdue. Root cause is upstream, not assignee.</div>
+      </div>
+    </div>
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#00D2FF"></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Corrective action 2 — Escalation attempt</div>
+        <div class="step-text">Mar 20, 9:00 AM — Requested expedited sign-off on PCB Layout Rev B from Flexscope design authority via TransAtlantic account manager. No response after 4h.</div>
+        <div class="step-meta">Expected: Rev B cleared by EOD · Measurement window: 24h</div>
+        <div class="step-outcome-box sob-negative">Measured 24h later — NEGATIVE. Rev B still not signed off. Task now 7d overdue. Sign-off request not acknowledged.</div>
+      </div>
+    </div>
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#E24B4A"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Current state</div>
+        <div class="step-text">BUILD #1 Build Review now 7d overdue. PCB Layout Rev B sign-off has not been received. Two interventions have not produced a positive outcome. This signal requires authority beyond PM level.</div>
+      </div>
+    </div>
+    <div class="esc-threshold">
+      ⚠ Two interventions have not resolved this signal. The blocking issue (PCB Layout Rev B sign-off) appears to require authority beyond PM level — direct design authority access, expedited client channel, or budget authority.
+      <div class="esc-threshold-btns">
+        <button class="esc-btn eb-primary" onclick="openEscBrief()">Compose escalation brief →</button>
+        <button class="esc-btn eb-dismiss" style="font-size:9px;padding:4px 10px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.4);cursor:pointer;background:none;font-family:inherit" onclick="this.parentElement.style.display='none'">Dismiss</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="intervention" id="int-design">
+  <div class="int-header" onclick="toggleInt('int-design-body')">
+    <div class="int-status-bar" style="background:#1D9E75"></div>
+    <div>
+      <div class="int-proj">Flexscope · Design phase</div>
+      <div class="int-signal cg">Ron White red signal — Approval: Design Review · Resolved</div>
+      <div class="int-timestamp">Identified: Mar 24, 4:18 PM · 1 intervention · Positive outcome</div>
+    </div>
+    <span class="int-outcome io-positive">Resolved</span>
+  </div>
+  <div id="int-design-body" style="display:none">
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#E24B4A"></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Problem signal</div>
+        <div class="step-text">Ron White — red confidence signal at Approval: Design Review Signoff · Mar 24, 4:18 PM</div>
+        <div class="step-meta">28th rejection cycle · Documentation date error · Trajectory G→G→Y→Y→R this week</div>
+      </div>
+    </div>
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#00D2FF"></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Corrective action — Meeting convened</div>
+        <div class="step-text">Mar 24, 4:45 PM — Convened Ron White and approver to align on documentation requirements. Agreed: Ron corrects dates, approver clears on next submission.</div>
+        <div class="step-meta">Expected: Sign-off clears on next submission attempt · Measurement window: 24h</div>
+        <div class="step-outcome-box sob-positive">Measured 24h later — POSITIVE. Sign-off cleared on first attempt. Red signal did not recur. Instance advanced to Final Meeting.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="intervention" id="int-mills">
+  <div class="int-header" onclick="toggleInt('int-mills-body')">
+    <div class="int-status-bar" style="background:#EF9F27"></div>
+    <div>
+      <div class="int-proj">Flexscope · Resource</div>
+      <div class="int-signal ca">Margaret Mills — no activity Wed/Thu · Pending outcome</div>
+      <div class="int-timestamp">Identified: Mar 25, 9:00 AM · 1 intervention · Outcome pending</div>
+    </div>
+    <span class="int-outcome io-pending">Pending outcome</span>
+  </div>
+  <div id="int-mills-body" style="display:none">
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#EF9F27"></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Problem signal</div>
+        <div class="step-text">Margaret Mills — no time logged and no signals posted Wed and Thu · Third occurrence this quarter</div>
+        <div class="step-meta">2 consecutive days · No explanation in system · Impact: timesheet compliance at 67%</div>
+      </div>
+    </div>
+    <div class="int-step">
+      <div class="step-line">
+        <div class="step-dot" style="background:#00D2FF"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-type">Corrective action — Meeting convened</div>
+        <div class="step-text">Mar 25, 10:00 AM — Check-in scheduled with Margaret Mills to understand situation and ensure any support needed is provided.</div>
+        <div class="step-meta">Expected: Situation understood, absence explained or addressed · Measurement window: 48h</div>
+        <div class="step-outcome-box sob-pending">Measuring — outcome available after Mar 27, 10:00 AM. Check back then.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title" id="modal-title">Escalation brief</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+    </div>
+  </div>
+</div>
+
+<div class="mock-lbl">COMPASS · INTERVENTION RECORD · MOCKUP</div>
+
+<script>
+function toggleInt(bodyId){
+  const el = document.getElementById(bodyId);
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function dismissBanner(){
+  const b = document.getElementById('esc-banner');
+  b.style.opacity='0';b.style.transition='opacity .3s';
+  setTimeout(()=>b.style.display='none',300);
+}
+
+function openLogModal(){
+  document.getElementById('modal-title').textContent = '+ Log intervention';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin-bottom:5px">Problem signal (select from active signals)</div>
+    <select class="modal-select">
+      <option>BUILD #1 Build Review — overdue 7d</option>
+      <option>Ron White — red signal at Approval step</option>
+      <option>Margaret Mills — no activity 2d</option>
+      <option>Resource request aging 52h</option>
+    </select>
+    <div style="font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:8px 0 5px">Action type</div>
+    <select class="modal-select">
+      <option>Resource reassignment</option>
+      <option>Meeting convened</option>
+      <option>Action item created</option>
+      <option>Template redesign</option>
+      <option>Escalation to management</option>
+      <option>Process change</option>
+      <option>External intervention</option>
+    </select>
+    <div style="font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:8px 0 5px">What did you do?</div>
+    <textarea class="modal-textarea" rows="3" placeholder="Describe the corrective action taken..."></textarea>
+    <div style="font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:8px 0 5px">Expected effect</div>
+    <textarea class="modal-textarea" rows="2" placeholder="What do you expect to happen as a result?"></textarea>
+    <div style="font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:8px 0 5px">Measurement window</div>
+    <select class="modal-select">
+      <option>24 hours</option><option>48 hours</option><option>72 hours</option><option>1 week</option>
+    </select>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="modal-btn mb-primary" onclick="alert('Intervention logged. Measurement scheduled. CoC event written.');closeModal()">Save intervention →</button>
+      <button class="modal-btn mb-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function openEscBrief(){
+  document.getElementById('modal-title').textContent = 'Escalation brief — auto-assembled';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-bottom:10px">This brief was assembled automatically from the intervention record. Review and add context before sending.</div>
+    <div class="brief-section">Problem signal</div>
+    <div class="brief-block">BUILD #1 Build Review — overdue 7 days · First identified: Mar 19 · Trigger: Required inputs not ready (PCB Layout Drawing Rev B)</div>
+    <div class="brief-section">Interventions taken</div>
+    <div class="brief-action-row" style="flex-direction:column;padding:6px 9px;gap:3px">
+      <div style="display:flex;gap:4px;align-items:center">
+        <span class="ba-label">Mar 19</span>
+        <span class="ba-val">Resource reassignment — Alan Smith to Build Review</span>
+        <span class="ba-result" style="border-color:rgba(226,75,74,.3);color:#E24B4A">NEGATIVE</span>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;margin-top:4px">
+        <span class="ba-label">Mar 20</span>
+        <span class="ba-val">Expedited sign-off request to design authority</span>
+        <span class="ba-result" style="border-color:rgba(226,75,74,.3);color:#E24B4A">NEGATIVE</span>
+      </div>
+    </div>
+    <div class="brief-section">Current state</div>
+    <div class="brief-block">PCB Layout Rev B has not been signed off after 7 days and two PM-level interventions. Build Review cannot proceed. 3 downstream tasks are blocked. Schedule impact: 7d slip and growing.</div>
+    <div class="brief-section">AI narrative — recommended action</div>
+    <div class="brief-block brief-ai">The blocking issue requires authority that the PM does not have: direct access to the Flexscope design authority, an expedited client channel above the account manager level, or authorization to proceed with an alternative PCB source. Recommended management action: direct contact with TransAtlantic's technical director or authorization to engage a second PCB fabrication supplier.</div>
+    <div class="brief-section">PM context (optional)</div>
+    <textarea class="modal-textarea" rows="2" placeholder="Add any context you want management to have..."></textarea>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="modal-btn mb-red" onclick="sendEscalation()">Send to management →</button>
+      <button class="modal-btn mb-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function sendEscalation(){
+  closeModal();
+  const banner = document.getElementById('esc-banner');
+  banner.innerHTML = '<div style="padding:0 2px;font-size:9px;color:#1D9E75;font-family:inherit">✓ Escalation brief sent to CS · Management intervention record created · You will be notified when CS responds</div>';
+  banner.style.borderLeftColor='#1D9E75';
+  banner.style.borderColor='rgba(29,158,117,.3)';
+  banner.style.background='rgba(29,158,117,.05)';
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+</script>
+</body>
+</html>

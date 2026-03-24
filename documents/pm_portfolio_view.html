@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-mono,'Share Tech Mono',monospace);background:var(--color-background-tertiary,#0c1628);color:var(--color-text-primary,#F0F6FF);font-size:12px}
+.nav{display:flex;align-items:center;height:40px;background:var(--color-background-secondary,#111827);border-bottom:1px solid rgba(0,210,255,.15);padding:0 14px;gap:8px;flex-shrink:0}
+.logo{font-size:14px;font-weight:700;letter-spacing:.12em;color:#F0F6FF;margin-right:12px}
+.logo span{color:#00D2FF}
+.tab{padding:0 10px;height:40px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;transition:.12s}
+.tab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.sep{width:1px;height:18px;background:rgba(0,210,255,.15);margin:0 6px}
+.live{display:flex;align-items:center;gap:4px;font-size:10px;color:#1D9E75;margin-left:auto}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.body{padding:12px 16px;overflow-y:auto}
+.pulse-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.pcard{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:8px 10px}
+.pcard-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:3px}
+.pcard-val{font-size:20px;font-weight:700;line-height:1}
+.pcard-sub{font-size:9px;color:rgba(255,255,255,.35);margin-top:2px}
+.cv{color:#00D2FF}.ca{color:#EF9F27}.cr{color:#E24B4A}.cg{color:#1D9E75}
+.red-rail{margin-bottom:10px}
+.rail-label{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:5px}
+.flag-card{display:flex;align-items:center;gap:8px;background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.25);border-left:3px solid #E24B4A;padding:7px 10px;margin-bottom:4px}
+.flag-proj{font-size:10px;font-weight:700;color:#E24B4A;min-width:70px}
+.flag-text{flex:1;font-size:10px;color:rgba(240,246,255,.8)}
+.flag-ack{background:none;border:1px solid rgba(226,75,74,.4);color:#E24B4A;font-family:inherit;font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:.06em;transition:.12s}
+.flag-ack:hover{background:rgba(226,75,74,.15)}
+.flag-open{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-family:inherit;font-size:9px;padding:3px 8px;cursor:pointer;margin-left:4px;transition:.12s}
+.flag-open:hover{color:#fff}
+.two-col{display:grid;grid-template-columns:1fr 340px;gap:12px}
+.project-cards{}
+.proj-card{border:1px solid rgba(255,255,255,.08);margin-bottom:8px;cursor:pointer;transition:.12s}
+.proj-card:hover{border-color:rgba(0,210,255,.2)}
+.proj-card.urgent{border-left:3px solid #E24B4A;border-color:rgba(226,75,74,.3)}
+.pc-head{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+.pc-name{font-size:12px;font-weight:700;flex:1}
+.pc-client{font-size:10px;color:rgba(255,255,255,.4)}
+.pc-date{font-size:10px;color:rgba(255,255,255,.35)}
+.health-bar{display:flex;height:5px;gap:2px;margin:6px 0}
+.hb-seg{height:5px;flex:1;border-radius:1px}
+.pc-badges{display:flex;gap:5px;flex-wrap:wrap;padding:0 10px 5px}
+.badge{font-size:9px;padding:2px 7px;border:1px solid;letter-spacing:.05em}
+.badge-red{border-color:rgba(226,75,74,.4);color:#E24B4A;background:rgba(226,75,74,.08)}
+.badge-amber{border-color:rgba(239,159,39,.4);color:#EF9F27;background:rgba(239,159,39,.08)}
+.badge-muted{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4);background:none}
+.pc-days{display:flex;gap:3px;padding:5px 10px 8px;align-items:center}
+.day-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 5px;cursor:pointer;border:1px solid rgba(255,255,255,.08);background:none;transition:.12s;font-family:inherit}
+.day-btn:hover{border-color:rgba(0,210,255,.3);background:rgba(0,210,255,.06)}
+.day-btn.active-day{border-color:rgba(0,210,255,.4);background:rgba(0,210,255,.08)}
+.day-letter{font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.08em}
+.day-dot{width:8px;height:8px;border-radius:50%}
+.day-hrs{font-size:9px;color:rgba(255,255,255,.35)}
+.day-briefing{position:fixed;top:0;right:0;width:340px;height:100%;background:#111827;border-left:1px solid rgba(0,210,255,.2);z-index:100;transform:translateX(100%);transition:.22s ease;display:flex;flex-direction:column}
+.day-briefing.open{transform:translateX(0)}
+.db-head{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-start;justify-content:space-between}
+.db-day{font-size:14px;font-weight:700;color:#F0F6FF}
+.db-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
+.db-close{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);width:22px;height:22px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.db-body{flex:1;overflow-y:auto;padding:12px 14px}
+.db-section{font-size:9px;letter-spacing:.1em;color:rgba(0,210,255,.7);text-transform:uppercase;margin:10px 0 5px}
+.db-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.db-kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:6px 7px}
+.db-kpi-l{font-size:8px;color:rgba(255,255,255,.4);letter-spacing:.08em;text-transform:uppercase}
+.db-kpi-v{font-size:15px;font-weight:700;margin-top:1px}
+.db-narrative{background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.15);border-left:2px solid #EF9F27;padding:8px 10px;font-size:10px;color:rgba(240,246,255,.75);line-height:1.55}
+.db-note{margin-top:8px}
+.db-note-label{font-size:9px;color:rgba(255,255,255,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.db-note-input{width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:10px;outline:none;resize:none}
+.db-note-input:focus{border-color:rgba(0,210,255,.3)}
+.right-col{}
+.panel{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);margin-bottom:8px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+.panel-title{font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.5);text-transform:uppercase}
+.feed-row{display:flex;align-items:flex-start;gap:7px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:.1s}
+.feed-row:hover{background:rgba(255,255,255,.03)}
+.feed-bar{width:3px;flex-shrink:0;align-self:stretch;border-radius:1px;margin-top:2px}
+.feed-info{flex:1;min-width:0}
+.feed-event{font-size:10px;color:rgba(240,246,255,.8);line-height:1.4}
+.feed-meta{font-size:9px;color:rgba(255,255,255,.35);margin-top:1px}
+.feed-open{font-size:9px;color:rgba(0,210,255,.6);opacity:0;transition:.12s;flex-shrink:0}
+.feed-row:hover .feed-open{opacity:1}
+.person-row{display:flex;align-items:center;gap:7px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.av-c{background:rgba(0,210,255,.15);color:#00D2FF}
+.av-a{background:rgba(239,159,39,.15);color:#EF9F27}
+.av-r{background:rgba(226,75,74,.15);color:#E24B4A}
+.av-g{background:rgba(29,158,117,.15);color:#1D9E75}
+.person-name{font-size:10px;flex:1}
+.dots{display:flex;gap:3px}
+.dot{width:12px;height:12px;border-radius:50%;cursor:pointer;border:1.5px solid transparent;transition:.12s;display:flex;align-items:center;justify-content:center;font-size:7px;color:transparent}
+.dot:hover{transform:scale(1.2)}
+.dot.active-dot{border-color:rgba(255,255,255,.6);color:rgba(255,255,255,.6)}
+.person-hrs{font-size:9px;color:rgba(255,255,255,.35);min-width:28px;text-align:right}
+.week-sum-btn{font-size:9px;color:rgba(0,210,255,.6);background:none;border:none;cursor:pointer;font-family:inherit;padding:0 2px}
+.tabs-row{display:flex;border-bottom:1px solid rgba(255,255,255,.08)}
+.ptab{padding:5px 10px;font-size:9px;letter-spacing:.08em;color:rgba(255,255,255,.4);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;text-transform:uppercase}
+.ptab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.exc-row{display:flex;align-items:flex-start;gap:7px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.exc-sev{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.exc-info{flex:1;min-width:0}
+.exc-title{font-size:10px;color:rgba(240,246,255,.8)}
+.exc-meta{font-size:9px;color:rgba(255,255,255,.35);margin-top:1px}
+.ai-row{display:flex;align-items:center;gap:7px;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.ai-title{font-size:10px;flex:1;color:rgba(240,246,255,.8)}
+.ai-badge{font-size:9px;color:#EF9F27;background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.25);padding:1px 6px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:90;display:none}
+.overlay.show{display:block}
+.mockup-lbl{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);font-size:9px;letter-spacing:.12em;color:#00D2FF;padding:3px 12px;pointer-events:none;z-index:999}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="logo">COM<span>PASS</span></div>
+  <div class="sep"></div>
+  <button class="tab">My Work</button>
+  <button class="tab active">PM View</button>
+  <button class="tab">Management</button>
+  <button class="tab">Executive</button>
+  <div class="sep"></div>
+  <span style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.35);padding:0 8px">&#9656; CADENCE</span>
+  <div class="live" style="margin-left:auto"><div class="live-dot"></div>LIVE</div>
+  <span style="font-size:10px;color:rgba(255,255,255,.3);margin-left:10px">TUE MAR 24, 2026</span>
+  <div style="width:26px;height:26px;border-radius:50%;background:rgba(0,210,255,.15);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#00D2FF;margin-left:8px">VS</div>
+</div>
+
+<div class="body">
+
+<div class="pulse-strip">
+  <div class="pcard">
+    <div class="pcard-label">Active projects</div>
+    <div class="pcard-val cv">4</div>
+    <div class="pcard-sub">across 3 clients</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Red flags</div>
+    <div class="pcard-val cr" id="flag-count">2</div>
+    <div class="pcard-sub">unacknowledged</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Red signals now</div>
+    <div class="pcard-val cr">1</div>
+    <div class="pcard-sub">team members</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Timesheet compliance</div>
+    <div class="pcard-val ca">67%</div>
+    <div class="pcard-sub">today</div>
+  </div>
+  <div class="pcard">
+    <div class="pcard-label">Open requests</div>
+    <div class="pcard-val ca">3</div>
+    <div class="pcard-sub">aging 48h+</div>
+  </div>
+</div>
+
+<div class="red-rail" id="red-rail">
+  <div class="rail-label">Red flags — unacknowledged</div>
+  <div class="flag-card" id="flag1">
+    <div class="flag-proj">FLEXSCOPE</div>
+    <div class="flag-text">Ron White — red confidence signal at Approval: Design Review · 4:18 PM</div>
+    <button class="flag-ack" onclick="ackFlag('flag1')">Acknowledge →</button>
+    <button class="flag-open">Open</button>
+  </div>
+  <div class="flag-card" id="flag2">
+    <div class="flag-proj">FLEXSCOPE</div>
+    <div class="flag-text">Build #1 Build Review — overdue 5d, no recent comments</div>
+    <button class="flag-ack" onclick="ackFlag('flag2')">Acknowledge →</button>
+    <button class="flag-open">Open</button>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="project-cards">
+
+    <div class="proj-card urgent" id="card-flex">
+      <div class="pc-head">
+        <div>
+          <div class="pc-name">Flexscope Endoscopic Platform</div>
+          <div class="pc-client">TransAtlantic · VS · Target: Jun 30</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <span class="badge badge-red">2 red flags</span>
+          <span class="badge badge-amber">19 overdue</span>
+          <span class="badge badge-amber">3 requests</span>
+        </div>
+      </div>
+      <div style="padding:0 10px">
+        <div class="health-bar">
+          <div class="hb-seg" style="background:#EF9F27" title="Schedule"></div>
+          <div class="hb-seg" style="background:#1D9E75" title="Cost"></div>
+          <div class="hb-seg" style="background:#E24B4A" title="Confidence"></div>
+          <div class="hb-seg" style="background:#E24B4A" title="Rework"></div>
+          <div class="hb-seg" style="background:#EF9F27" title="Timesheets"></div>
+        </div>
+        <div style="display:flex;gap:12px;font-size:9px;color:rgba(255,255,255,.3);margin-bottom:6px">
+          <span>Schedule</span><span>Cost</span><span>Confidence</span><span>Rework</span><span>Timesheets</span>
+        </div>
+      </div>
+      <div class="pc-badges">
+        <span class="badge badge-amber">P50 +5d slip projected</span>
+        <span class="badge badge-amber">2 active interventions</span>
+      </div>
+      <div class="pc-days">
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-right:4px">Brief:</span>
+        <button class="day-btn active-day" onclick="openBriefing('flex','Mon','6.0h · 4 items completed','SPI 0.82 · CPI 0.94 · 1 rejection cycle','Monday: Design Review Signoff advanced past Checklist. BUILD #1 now 2d overdue. Ron White logged 3h, green signal all day.')">
+          <span class="day-letter">M</span>
+          <div class="day-dot" style="background:#1D9E75"></div>
+          <span class="day-hrs">6.0h</span>
+        </button>
+        <button class="day-btn active-day" onclick="openBriefing('flex','Tue','4.0h so far · Ron red signal','SPI 0.79 · CPI 0.91 · 28 rejection cycles','Tuesday: Ron White posted red confidence at 4:18 PM on Approval step. 28th rejection cycle on Design Review Signoff. Build #1 now 5d overdue. PCB Layout Rev B still pending.')">
+          <span class="day-letter">T</span>
+          <div class="day-dot" style="background:#E24B4A"></div>
+          <span class="day-hrs">4.0h</span>
+        </button>
+        <button class="day-btn" onclick="openBriefing('flex','Wed','','','No data yet for Wednesday.')">
+          <span class="day-letter">W</span>
+          <div class="day-dot" style="background:rgba(255,255,255,.12)"></div>
+          <span class="day-hrs">—</span>
+        </button>
+        <button class="day-btn">
+          <span class="day-letter">T</span>
+          <div class="day-dot" style="background:rgba(255,255,255,.08)"></div>
+          <span class="day-hrs">—</span>
+        </button>
+        <button class="day-btn">
+          <span class="day-letter">F</span>
+          <div class="day-dot" style="background:rgba(255,255,255,.08)"></div>
+          <span class="day-hrs">—</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="proj-card" id="card-nova">
+      <div class="pc-head">
+        <div>
+          <div class="pc-name">NovaBio Quality System Implementation</div>
+          <div class="pc-client">NovaBio · VS · Target: Sep 15</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <span class="badge badge-muted">On track</span>
+        </div>
+      </div>
+      <div style="padding:0 10px">
+        <div class="health-bar">
+          <div class="hb-seg" style="background:#1D9E75"></div>
+          <div class="hb-seg" style="background:#1D9E75"></div>
+          <div class="hb-seg" style="background:#1D9E75"></div>
+          <div class="hb-seg" style="background:#EF9F27"></div>
+          <div class="hb-seg" style="background:#1D9E75"></div>
+        </div>
+      </div>
+      <div class="pc-badges">
+        <span class="badge badge-muted">SPI 1.04</span>
+        <span class="badge badge-muted">CPI 1.01</span>
+      </div>
+      <div class="pc-days">
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-right:4px">Brief:</span>
+        <button class="day-btn active-day" onclick="openBriefing('nova','Mon','5.0h · 3 items completed','SPI 1.04 · CPI 1.01 · Clean','Monday: Section 4.2 review completed on schedule. QMS gap analysis 68% complete. All signals green.')">
+          <span class="day-letter">M</span>
+          <div class="day-dot" style="background:#1D9E75"></div>
+          <span class="day-hrs">5.0h</span>
+        </button>
+        <button class="day-btn active-day" onclick="openBriefing('nova','Tue','3.5h so far','SPI 1.03 · CPI 1.01 · Clean','Tuesday: Document review in progress. Sandra Okafor logged 3.5h, green signals throughout. On track.')">
+          <span class="day-letter">T</span>
+          <div class="day-dot" style="background:#1D9E75"></div>
+          <span class="day-hrs">3.5h</span>
+        </button>
+        <button class="day-btn"><span class="day-letter">W</span><div class="day-dot" style="background:rgba(255,255,255,.08)"></div><span class="day-hrs">—</span></button>
+        <button class="day-btn"><span class="day-letter">T</span><div class="day-dot" style="background:rgba(255,255,255,.08)"></div><span class="day-hrs">—</span></button>
+        <button class="day-btn"><span class="day-letter">F</span><div class="day-dot" style="background:rgba(255,255,255,.08)"></div><span class="day-hrs">—</span></button>
+      </div>
+    </div>
+
+    <div class="proj-card" id="card-int">
+      <div class="pc-head">
+        <div>
+          <div class="pc-name">Internal — ProjectHUD Platform Build</div>
+          <div class="pc-client">Apex Internal · VS</div>
+        </div>
+        <span class="badge badge-muted">Internal</span>
+      </div>
+      <div class="pc-days" style="padding:6px 10px 8px">
+        <span style="font-size:9px;color:rgba(255,255,255,.3);margin-right:4px">Brief:</span>
+        <button class="day-btn active-day" onclick="openBriefing('int','Mon','4.0h','Internal','Monday: Compass My Work view spec complete. Schema migration drafted.')">
+          <span class="day-letter">M</span>
+          <div class="day-dot" style="background:#1D9E75"></div>
+          <span class="day-hrs">4.0h</span>
+        </button>
+        <button class="day-btn active-day" onclick="openBriefing('int','Tue','2.0h so far','Internal','Tuesday: Session 15 design review in progress.')">
+          <span class="day-letter">T</span>
+          <div class="day-dot" style="background:#00D2FF"></div>
+          <span class="day-hrs">2.0h</span>
+        </button>
+        <button class="day-btn"><span class="day-letter">W</span><div class="day-dot" style="background:rgba(255,255,255,.08)"></div><span class="day-hrs">—</span></button>
+        <button class="day-btn"><span class="day-letter">T</span><div class="day-dot" style="background:rgba(255,255,255,.08)"></div><span class="day-hrs">—</span></button>
+        <button class="day-btn"><span class="day-letter">F</span><div class="day-dot" style="background:rgba(255,255,255,.08)"></div><span class="day-hrs">—</span></button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="right-col">
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Portfolio Feed</span>
+        <span style="font-size:9px;color:rgba(0,210,255,.5)">Live</span>
+      </div>
+      <div id="feed-list">
+        <div class="feed-row" onclick="this.querySelector('.feed-open').style.opacity='1'">
+          <div class="feed-bar" style="background:#E24B4A"></div>
+          <div class="feed-info">
+            <div class="feed-event">Ron White — red signal · Approval step</div>
+            <div class="feed-meta">Flexscope · 4:18 PM · Design Review Signoff</div>
+          </div>
+          <span class="feed-open">Open →</span>
+        </div>
+        <div class="feed-row">
+          <div class="feed-bar" style="background:#EF9F27"></div>
+          <div class="feed-info">
+            <div class="feed-event">Build #1 Build Review — 5d overdue</div>
+            <div class="feed-meta">Flexscope · 2:00 PM</div>
+          </div>
+          <span class="feed-open">Open →</span>
+        </div>
+        <div class="feed-row">
+          <div class="feed-bar" style="background:#EF9F27"></div>
+          <div class="feed-info">
+            <div class="feed-event">Resource request aging 52h — Alan Smith</div>
+            <div class="feed-meta">Flexscope · 12:00 PM</div>
+          </div>
+          <span class="feed-open">Open →</span>
+        </div>
+        <div class="feed-row">
+          <div class="feed-bar" style="background:#1D9E75"></div>
+          <div class="feed-info">
+            <div class="feed-event">Sandra Okafor — Section 4.2 review complete</div>
+            <div class="feed-meta">NovaBio · 11:15 AM</div>
+          </div>
+          <span class="feed-open">Open →</span>
+        </div>
+        <div class="feed-row">
+          <div class="feed-bar" style="background:#1D9E75"></div>
+          <div class="feed-info">
+            <div class="feed-event">Design Review Signoff — advanced to Approval</div>
+            <div class="feed-meta">Flexscope · 9:00 AM</div>
+          </div>
+          <span class="feed-open">Open →</span>
+        </div>
+      </div>
+      <div style="padding:5px 10px;border-top:1px solid rgba(255,255,255,.06)">
+        <button onclick="simulateEvent()" style="font-family:inherit;font-size:9px;color:rgba(0,210,255,.6);background:none;border:1px solid rgba(0,210,255,.2);padding:3px 10px;cursor:pointer;letter-spacing:.06em">+ Simulate live event</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="tabs-row">
+        <div class="ptab active" onclick="switchTab('team',this)">Team</div>
+        <div class="ptab" onclick="switchTab('exc',this)">Exceptions <span style="color:#E24B4A">5</span></div>
+        <div class="ptab" onclick="switchTab('ai',this)">Action items <span style="color:#EF9F27">2</span></div>
+      </div>
+      <div class="tab-content active" id="tab-team">
+        <div class="person-row">
+          <div class="av av-r">RW</div>
+          <div class="person-name">Ron White</div>
+          <div class="dots" id="dots-rw">
+            <div class="dot" style="background:#1D9E75" onclick="openPersonBriefing('RW','Ron White','Mon','Green — 6h logged, 2 steps completed, no rejections on Design Review.')">M</div>
+            <div class="dot" style="background:#1D9E75">T</div>
+            <div class="dot" style="background:#EF9F27" onclick="openPersonBriefing('RW','Ron White','Wed','Yellow — Formatting dispute with approver. Documentation gap identified. 3h logged.')">W</div>
+            <div class="dot" style="background:#EF9F27">T</div>
+            <div class="dot active-dot" style="background:#E24B4A" onclick="openPersonBriefing('RW','Ron White','Fri','Red — 28th rejection cycle. Documentation date error. Approver relationship strained. 4h logged, zero progress.')">F</div>
+          </div>
+          <span class="person-hrs">4.0h</span>
+          <button class="week-sum-btn" onclick="openWeekSummary('Ron White','G→G→Y→Y→R','27.5h / 40h expected','Consistent degradation over 5 days. Ron is experiencing the process failing him — 26 upstream resets, 2 own failures. Recommended: direct conversation before Monday about the approver dynamic.')">wk →</button>
+        </div>
+        <div class="person-row">
+          <div class="av av-g">AS</div>
+          <div class="person-name">Alan Smith</div>
+          <div class="dots">
+            <div class="dot" style="background:#1D9E75" onclick="openPersonBriefing('AS','Alan Smith','Mon','Green — 5h logged, PCB Layout Rev B under review, clean progress.')">M</div>
+            <div class="dot" style="background:#1D9E75">T</div>
+            <div class="dot" style="background:#1D9E75">W</div>
+            <div class="dot" style="background:#EF9F27" onclick="openPersonBriefing('AS','Alan Smith','Thu','Yellow — Blocked waiting for PCB Layout Rev B sign-off. Cannot advance Build Review.')">T</div>
+            <div class="dot" style="background:#EF9F27">F</div>
+          </div>
+          <span class="person-hrs">5.0h</span>
+          <button class="week-sum-btn" onclick="openWeekSummary('Alan Smith','G→G→G→Y→Y','32h / 40h expected','Strong week until Thursday. Block is upstream — PCB Layout Rev B sign-off not received. Not a performance issue.')">wk →</button>
+        </div>
+        <div class="person-row">
+          <div class="av av-g">SO</div>
+          <div class="person-name">Sandra Okafor</div>
+          <div class="dots">
+            <div class="dot" style="background:#1D9E75">M</div>
+            <div class="dot" style="background:#1D9E75">T</div>
+            <div class="dot" style="background:#1D9E75">W</div>
+            <div class="dot" style="background:#1D9E75">T</div>
+            <div class="dot" style="background:#1D9E75">F</div>
+          </div>
+          <span class="person-hrs">3.5h</span>
+          <button class="week-sum-btn" onclick="openWeekSummary('Sandra Okafor','G→G→G→G→G','38h / 40h expected','Clean week. Consistently green. NovaBio QMS work on schedule.')">wk →</button>
+        </div>
+        <div class="person-row">
+          <div class="av av-a">MM</div>
+          <div class="person-name">Margaret Mills</div>
+          <div class="dots">
+            <div class="dot" style="background:#1D9E75">M</div>
+            <div class="dot" style="background:#1D9E75">T</div>
+            <div class="dot" style="background:rgba(255,255,255,.15)" onclick="openPersonBriefing('MM','Margaret Mills','Wed','No activity — no time logged, no signals posted. Day 1: check in.')">W</div>
+            <div class="dot" style="background:rgba(255,255,255,.1)" onclick="openPersonBriefing('MM','Margaret Mills','Thu','No activity — second consecutive day. Manager escalation recommended.')">T</div>
+            <div class="dot" style="background:rgba(255,255,255,.08)">F</div>
+          </div>
+          <span class="person-hrs" style="color:#EF9F27">0h</span>
+          <button class="week-sum-btn" onclick="openWeekSummary('Margaret Mills','G→G→—→—→—','18h / 40h expected','No activity since Tuesday. Two consecutive days with zero time logged and no signals. Urgent: reassign if not resolved.')">wk →</button>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-exc">
+        <div class="exc-row"><div class="exc-sev" style="background:#E24B4A"></div><div class="exc-info"><div class="exc-title">Design Review Signoff — 28 rejections at Approval</div><div class="exc-meta">Flexscope · Pattern: Process Quality Failure</div></div></div>
+        <div class="exc-row"><div class="exc-sev" style="background:#E24B4A"></div><div class="exc-info"><div class="exc-title">Build #1 Build Review — overdue 5d</div><div class="exc-meta">Flexscope · Root: Required inputs not ready</div></div></div>
+        <div class="exc-row"><div class="exc-sev" style="background:#EF9F27"></div><div class="exc-info"><div class="exc-title">PCB Layout Drawing Rev B — pending 8d</div><div class="exc-meta">Flexscope · Blocking 3 downstream tasks</div></div></div>
+        <div class="exc-row"><div class="exc-sev" style="background:#EF9F27"></div><div class="exc-info"><div class="exc-title">Resource request aging 52h — no response</div><div class="exc-meta">Flexscope · Requesting Alan Smith full-time</div></div></div>
+        <div class="exc-row"><div class="exc-sev" style="background:#EF9F27"></div><div class="exc-info"><div class="exc-title">M4 Design Review — overdue 5d</div><div class="exc-meta">Flexscope · Assigned to Ron White</div></div></div>
+      </div>
+      <div class="tab-content" id="tab-ai">
+        <div class="ai-row"><div class="ai-title">Follow up with NovaBio on regulatory timeline</div><div class="ai-badge">1d over</div></div>
+        <div class="ai-row"><div class="ai-title">Review and approve Alan's timesheet for week of Mar 9</div><div class="ai-badge" style="color:#EF9F27;background:rgba(239,159,39,.1);border-color:rgba(239,159,39,.25)">Due Mar 24</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeBriefing()"></div>
+
+<div class="day-briefing" id="day-briefing">
+  <div class="db-head">
+    <div>
+      <div class="db-day" id="db-day-title">Monday, Mar 23</div>
+      <div class="db-sub" id="db-sub">Flexscope · 6.0h logged · 4 items completed</div>
+    </div>
+    <button class="db-close" onclick="closeBriefing()">✕</button>
+  </div>
+  <div class="db-body">
+    <div class="db-section">Health snapshot</div>
+    <div class="db-kpi-row">
+      <div class="db-kpi"><div class="db-kpi-l">SPI</div><div class="db-kpi-v ca" id="db-spi">0.82</div></div>
+      <div class="db-kpi"><div class="db-kpi-l">CPI</div><div class="db-kpi-v cv" id="db-cpi">0.94</div></div>
+      <div class="db-kpi"><div class="db-kpi-l">Rework</div><div class="db-kpi-v cr" id="db-rew">28</div></div>
+      <div class="db-kpi"><div class="db-kpi-l">Signals</div><div class="db-kpi-v cg" id="db-sig">G/Y/R</div></div>
+    </div>
+    <div class="db-section">AI narrative</div>
+    <div class="db-narrative" id="db-narrative">Loading...</div>
+    <div class="db-note">
+      <div class="db-note-label">PM annotation</div>
+      <textarea class="db-note-input" rows="2" placeholder="Add context for this day's brief..."></textarea>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-lbl">COMPASS · PM PORTFOLIO VIEW · MOCKUP</div>
+
+<script>
+let flagCount = 2;
+
+function ackFlag(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.style.transition = 'opacity .3s';
+  el.style.opacity = '0';
+  setTimeout(()=>{
+    el.remove();
+    flagCount--;
+    document.getElementById('flag-count').textContent = flagCount;
+    if(flagCount === 0){
+      document.getElementById('red-rail').style.display = 'none';
+    }
+  }, 300);
+}
+
+const briefingData = {
+  flex: {
+    Mon:{sub:'Flexscope · 6.0h logged · 4 items completed',spi:'0.82',cpi:'0.94',rew:'1',sig:'G/G/G/G',text:'Monday opened with Design Review Signoff advancing past Checklist after 22 hours. Ron White and Alan Smith both logged full days — green confidence across all four signals. BUILD #1 moved into active development; no blocks identified. Portfolio position: amber on schedule, green on cost.'},
+    Tue:{sub:'Flexscope · 4.0h so far · Ron red signal',spi:'0.79',cpi:'0.91',rew:'28',sig:'G/Y/Y/R',text:'Tuesday is the critical day this week. Ron White posted a red confidence signal at 4:18 PM on the Approval step — the 28th rejection cycle on Design Review Signoff. The root cause is a documentation date error, but the underlying pattern is a process friction issue with the approver. BUILD #1 is now 5d overdue. PCB Layout Rev B has not been signed off. Recommend immediate intervention.'},
+    Wed:{sub:'Flexscope · No data yet',spi:'—',cpi:'—',rew:'—',sig:'—',text:'No activity logged yet for Wednesday.'},
+  },
+  nova:{
+    Mon:{sub:'NovaBio · 5.0h logged · 3 items completed',spi:'1.04',cpi:'1.01',rew:'0',sig:'G/G/G/G',text:'Clean day for NovaBio. Section 4.2 review completed on schedule. QMS gap analysis now 68% complete against target of 65% at this point in the project. All signals green across 3 active team members.'},
+    Tue:{sub:'NovaBio · 3.5h so far',spi:'1.03',cpi:'1.01',rew:'0',sig:'G/G/G',text:'Tuesday in progress. Document review continuing at pace. Sandra Okafor logged 3.5h with green signals throughout. On track to hit weekly deliverable target.'},
+  },
+  int:{
+    Mon:{sub:'Internal · 4.0h',spi:'—',cpi:'—',rew:'—',sig:'G/G',text:'Internal platform work: My Work view spec completed and handed off. Schema migration drafted for time_entries unified model. Session 15 agenda prepared.'},
+    Tue:{sub:'Internal · 2.0h so far',spi:'—',cpi:'—',rew:'—',sig:'G',text:'Session 15 design review in progress. PM portfolio view and mockup rebuild underway.'},
+  }
+};
+
+function openBriefing(proj, day, sub, kpis, narrative){
+  const data = briefingData[proj]?.[day];
+  if(!data){ alert('No data yet for '+day); return; }
+  document.getElementById('db-day-title').textContent = day+', Mar '+(day==='Mon'?'23':day==='Tue'?'24':day==='Wed'?'25':'26');
+  document.getElementById('db-sub').textContent = data.sub;
+  document.getElementById('db-spi').textContent = data.spi;
+  document.getElementById('db-cpi').textContent = data.cpi;
+  document.getElementById('db-rew').textContent = data.rew;
+  document.getElementById('db-sig').textContent = data.sig;
+  document.getElementById('db-narrative').textContent = data.text;
+  document.getElementById('day-briefing').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function openPersonBriefing(initials, name, day, text){
+  document.getElementById('db-day-title').textContent = name + ' · ' + day;
+  document.getElementById('db-sub').textContent = 'Personal day brief — click dots to view other days';
+  document.getElementById('db-spi').textContent = '—';
+  document.getElementById('db-cpi').textContent = '—';
+  document.getElementById('db-rew').textContent = '—';
+  document.getElementById('db-sig').textContent = '—';
+  document.getElementById('db-narrative').textContent = text;
+  document.getElementById('day-briefing').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function openWeekSummary(name, arc, hours, summary){
+  document.getElementById('db-day-title').textContent = name + ' · Week summary';
+  document.getElementById('db-sub').textContent = hours + ' · ' + arc;
+  document.getElementById('db-spi').textContent = arc.split('→')[0];
+  document.getElementById('db-cpi').textContent = arc.split('→')[4]||'—';
+  document.getElementById('db-rew').textContent = hours.split('/')[0].trim();
+  document.getElementById('db-sig').textContent = 'arc';
+  document.getElementById('db-narrative').textContent = summary;
+  document.getElementById('day-briefing').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeBriefing(){
+  document.getElementById('day-briefing').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function switchTab(name, el){
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+const liveEvents = [
+  {color:'#E24B4A',event:'Margaret Mills — no time logged today',meta:'Flexscope · 4:31 PM · Compliance alert'},
+  {color:'#EF9F27',event:'Design Review Signoff — step dwell 4h+',meta:'Flexscope · 3:15 PM · Approaching pessimistic'},
+  {color:'#1D9E75',event:'Sandra Okafor — NovaBio doc review complete',meta:'NovaBio · 2:45 PM'},
+  {color:'#E24B4A',event:'Build #1 now 6d overdue — escalation threshold',meta:'Flexscope · 4:00 PM'},
+];
+let evIdx=0;
+function simulateEvent(){
+  const ev = liveEvents[evIdx % liveEvents.length]; evIdx++;
+  const feed = document.getElementById('feed-list');
+  const row = document.createElement('div');
+  row.className = 'feed-row';
+  row.innerHTML = `<div class="feed-bar" style="background:${ev.color}"></div><div class="feed-info"><div class="feed-event">${ev.event}</div><div class="feed-meta">${ev.meta}</div></div><span class="feed-open">Open →</span>`;
+  row.style.animation='none';
+  row.style.background='rgba(0,210,255,.06)';
+  feed.insertBefore(row, feed.firstChild);
+  setTimeout(()=>row.style.background='',500);
+  if(ev.color==='#E24B4A'){
+    flagCount++;
+    document.getElementById('flag-count').textContent=flagCount;
+    document.getElementById('red-rail').style.display='';
+    const rail=document.getElementById('red-rail');
+    const fc=document.createElement('div');
+    fc.className='flag-card';
+    const fid='flag-new-'+evIdx;
+    fc.id=fid;
+    fc.innerHTML=`<div class="flag-proj">AUTO</div><div class="flag-text">${ev.event}</div><button class="flag-ack" onclick="ackFlag('${fid}')">Acknowledge →</button>`;
+    rail.appendChild(fc);
+  }
+}
+</script>
+</body>
+</html>
