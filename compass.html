@@ -1293,18 +1293,24 @@ async function loadUserView() {
 
     // ── Work list ─────────────────────────────────────────────────────
     const workItems = [];
-    // Filter cancelled client-side — PostgREST multi-value neq is unreliable
-    (myTasks || []).filter(t => t.status !== 'cancelled').forEach(t => {
-      const proj = _projects.find(p => p.id === t.project_id);
-      const overdue = t.due_date && t.due_date < today;
-      // pct_complete stored as 0-100, guard against decimal (0-1) storage
-      const pct = parseFloat(t.pct_complete) || 0;
-      const pctNorm = pct <= 1 && pct > 0 ? Math.round(pct * 100) : Math.round(pct);
-      workItems.push({ type:'task', id:t.id, title:t.name, project:proj?.name||'—',
-        projectId: t.project_id || null, status: t.status,
-        due:t.due_date, overdue, pct: pctNorm,
-        urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
-    });
+    // Filter cancelled + effectively-complete client-side
+    (myTasks || [])
+      .filter(t => t.status !== 'cancelled')
+      .filter(t => {
+        const pct = parseFloat(t.pct_complete) || 0;
+        const pctNorm = pct <= 1 && pct > 0 ? Math.round(pct * 100) : Math.round(pct);
+        return pctNorm < 100; // exclude tasks that are 100% done
+      })
+      .forEach(t => {
+        const proj = _projects.find(p => p.id === t.project_id);
+        const overdue = t.due_date && t.due_date < today;
+        const pct = parseFloat(t.pct_complete) || 0;
+        const pctNorm = pct <= 1 && pct > 0 ? Math.round(pct * 100) : Math.round(pct);
+        workItems.push({ type:'task', id:t.id, title:t.name, project:proj?.name||'—',
+          projectId: t.project_id || null, status: t.status,
+          due:t.due_date, overdue, pct: pctNorm,
+          urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
+      });
     myActionItems.forEach(a => {
       const overdue = a.due_date && a.due_date < today;
       workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
@@ -1464,12 +1470,11 @@ async function loadUserView() {
                 </div>
                 <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}"
                   data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}"
-                  style="padding:3px 10px;width:74px;flex-shrink:0;
-                    font-size:${w.type === 'task' && w.pct > 0 && w.status === 'in_progress' ? '9px' : '10px'}">
-                  ${w.status === 'not_started' ? 'Start'
-                    : w.status === 'blocked' ? 'Unblock'
-                    : w.type === 'task' && w.pct > 0 && w.pct < 100 ? 'Mark done'
-                    : 'Complete'}
+                  style="padding:3px 10px;width:74px;flex-shrink:0;font-size:10px">
+                  ${w.type === 'action' ? 'Resolve'
+                    : w.status === 'not_started' ? 'Start'
+                    : w.status === 'blocked'     ? 'Unblock'
+                    : 'Mark done'}
                 </button>
               </div>`).join('')}
           </div>
