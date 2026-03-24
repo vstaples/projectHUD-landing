@@ -2363,9 +2363,9 @@ async function loadPMView() {
         <div class="pm-left">
           <div class="pm-tabs">
             <div class="pm-tab on" onclick="pmSwitchTab(this,'pm-tab-portfolio')">Portfolio</div>
-            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-exceptions')">Exceptions ${totalFlags>0||totalOverdue>0?`<span class="pm-tbadge" style="background:rgba(226,75,74,.25);color:#E24B4A">${totalFlags+totalOverdue}</span>`:''}</div>
+            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-exceptions')">Exceptions ${(totalFlags+totalOverdue)>0?`<span class="pm-tbadge" style="background:rgba(226,75,74,.25);color:#E24B4A">${totalFlags+totalOverdue}</span>`:''}</div>
             <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-team')">Team</div>
-            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-actions')">Action items ${actionItems.filter(a=>a.due_date&&a.due_date<today).length>0?`<span class="pm-tbadge" style="background:rgba(239,159,39,.25);color:#EF9F27">${actionItems.filter(a=>a.due_date&&a.due_date<today).length}</span>`:''}</div>
+            <div class="pm-tab" onclick="pmSwitchTab(this,'pm-tab-actions')">Action items ${actionItems.length>0?`<span class="pm-tbadge" style="background:rgba(239,159,39,.25);color:#EF9F27">${actionItems.length}</span>`:''}</div>
           </div>
 
           <!-- Portfolio tab -->
@@ -2384,75 +2384,177 @@ async function loadPMView() {
 
           <!-- Exceptions tab -->
           <div id="pm-tab-exceptions" class="pm-tabpanel">
-            ${redFlags.length===0&&totalOverdue===0
-              ? `<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No exceptions — all projects on track</div>`
-              : `${redFlags.length>0?`
-                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:8px;text-transform:uppercase">■ Red flags (${redFlags.length})</div>
-                ${redFlags.map(f=>`
-                  <div style="background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.28);border-left:3px solid #E24B4A;padding:10px 12px;margin-bottom:7px">
+            ${(function(){
+              let html = '';
+              // ── Red flags ─────────────────────────────────────
+              if (redFlags.length > 0) {
+                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:8px;text-transform:uppercase">■ Red flags (${redFlags.length})</div>`;
+                redFlags.forEach(f => {
+                  html += `<div style="background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.28);border-left:3px solid #E24B4A;padding:10px 12px;margin-bottom:7px">
                     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
                       <span style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(f.projName)} — ${esc(f.instTitle)}</span>
                       <span style="font-family:var(--font-data);font-size:11px;color:#5A84A8">${_timeAgo(f.created_at)}</span>
                     </div>
                     ${f.actor_name?`<div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;margin-bottom:4px">${esc(f.actor_name)}</div>`:''}
-                    ${f.event_notes?`<div style="font-family:var(--font-body);font-size:11px;color:#C8DFF0;font-style:italic;border-left:2px solid rgba(226,75,74,.4);padding-left:8px">"${esc(f.event_notes.slice(0,120))}"</div>`:''}
+                    ${f.event_notes?`<div style="font-family:var(--font-body);font-size:11px;color:#C8DFF0;font-style:italic;border-left:2px solid rgba(226,75,74,.4);padding-left:8px;margin-bottom:8px">"${esc(f.event_notes.slice(0,120))}"</div>`:''}
                     <div style="display:flex;gap:6px;margin-top:8px">
-                      <button class="pm-btn pm-btn-red" style="flex:1">Acknowledge</button>
+                      <button class="pm-btn pm-btn-red" style="flex:1" onclick="pmAcknowledge('${f.instance_id}',null,this)">Acknowledge</button>
                       <button class="pm-btn pm-btn-cyan" style="flex:1" onclick="event.stopPropagation();pmOpenDrawer('${f.projId}')">Open instance →</button>
                     </div>
-                  </div>`).join('')}`:''}
-                ${projStats.filter(ps=>ps.overdueTasks.length>0).length>0?`
-                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:10px 0 8px;text-transform:uppercase">● Overdue tasks</div>
-                ${projStats.filter(ps=>ps.overdueTasks.length>0).map(ps=>`
-                  <div style="background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-left:3px solid #EF9F27;padding:8px 12px;margin-bottom:6px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-                      <span style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(ps.p.name)}</span>
-                      <span class="pm-chip pm-chip-a">${ps.overdueTasks.length} overdue</span>
-                    </div>
-                    ${ps.overdueTasks.slice(0,3).map(t=>`<div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;padding-left:8px;margin-bottom:2px">· ${esc(t.name||t.title||'—')} <span style="color:#E24B4A">${daysOverdue(t.due_date)}d</span></div>`).join('')}
-                    ${ps.overdueTasks.length>3?`<div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;padding-left:8px">+${ps.overdueTasks.length-3} more</div>`:''}
-                  </div>`).join('')}`:''}`}
+                  </div>`;
+                });
+              }
+              // ── Overdue tasks — flat list, ALL of them ─────────
+              if (totalOverdue > 0) {
+                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:10px 0 8px;text-transform:uppercase">● Overdue tasks (${totalOverdue})</div>`;
+                projStats.filter(ps=>ps.overdueTasks.length>0).forEach(ps => {
+                  html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;padding:5px 0 3px;letter-spacing:.04em">${esc(ps.p.name)}</div>`;
+                  ps.overdueTasks.forEach(t => {
+                    const assignee = _resources.find(r=>r.user_id===t.assigned_to);
+                    const name = assignee ? assignee.first_name+' '+assignee.last_name : null;
+                    html += `<div style="display:flex;align-items:baseline;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,210,255,.07)">
+                      <span style="color:#E24B4A;flex-shrink:0">!</span>
+                      <span style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name||t.title||'—')}</span>
+                      ${name?`<span style="font-family:var(--font-head);font-size:11px;color:#4A6E90;flex-shrink:0">${esc(name)}</span>`:''}
+                      <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#E24B4A;flex-shrink:0">${daysOverdue(t.due_date)}d</span>
+                    </div>`;
+                  });
+                });
+              }
+              if (!html) html = '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No exceptions — all projects on track</div>';
+              return html;
+            })()}
           </div>
 
           <!-- Team tab -->
           <div id="pm-tab-team" class="pm-tabpanel">
-            ${_resources.filter(r=>r.is_active).length===0
-              ?`<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No active team members</div>`
-              :`<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#3A5C80;margin-bottom:8px;text-transform:uppercase">Active resources (${_resources.filter(r=>r.is_active).length})</div>
-              ${_resources.filter(r=>r.is_active).slice(0,15).map(r=>{
-                const projCount = _projects.filter(p=>p.pm_resource_id===r.id||_tasks.some(t=>t.assigned_to===r.user_id&&t.status!=='complete')).length;
-                const taskCount = _tasks.filter(t=>t.assigned_to===r.user_id&&!['complete','cancelled'].includes(t.status)).length;
-                const initials  = ((r.first_name||'')[0]||'')+''+((r.last_name||'')[0]||'');
-                return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,210,255,.07)">
-                  <div style="width:32px;height:32px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials.toUpperCase())}</div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF">${esc(r.first_name+' '+r.last_name)}</div>
-                    <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90">${taskCount} open task${taskCount!==1?'s':''}</div>
-                  </div>
-                  <span class="pm-chip ${taskCount>5?'pm-chip-a':taskCount>0?'pm-chip-c':'pm-chip-g'}">${taskCount} tasks</span>
-                </div>`;
-              }).join('')}`}
+            ${(function(){
+              // Build a comprehensive resource map from all sources
+              const resMap = {};
+              // Source 1: firm roster
+              _resources.forEach(r => {
+                resMap[r.id] = { ...r, source:'roster', taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 };
+              });
+              // Source 2: task assignments — find user_ids not in roster
+              const rosterUserIds = new Set(_resources.map(r=>r.user_id).filter(Boolean));
+              _tasks.filter(t=>t.assigned_to&&!rosterUserIds.has(t.assigned_to)).forEach(t => {
+                const synId = 'synthetic_'+t.assigned_to;
+                if (!resMap[synId]) {
+                  // Try to find name from _users
+                  const u = (_users||[]).find(u=>u.id===t.assigned_to);
+                  const nm = u?.name||u?.email||('User '+t.assigned_to.slice(0,8));
+                  const parts = nm.split(' ');
+                  resMap[synId] = { id:synId, first_name:parts[0]||nm, last_name:parts.slice(1).join(' ')||'', user_id:t.assigned_to, department:'External', is_active:true, source:'task', taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 };
+                }
+              });
+              // Source 3: time entries this week
+              (weekEntries||[]).forEach(e => {
+                if (!resMap[e.resource_id]) {
+                  const r = _resources.find(r=>r.id===e.resource_id);
+                  if (r) resMap[r.id] = resMap[r.id] || { ...r, taskCount:0, projIds:new Set(), weekHrs:0, billHrs:0 };
+                }
+                if (resMap[e.resource_id]) {
+                  resMap[e.resource_id].weekHrs += parseFloat(e.hours||0);
+                  if (e.is_billable) resMap[e.resource_id].billHrs += parseFloat(e.hours||0);
+                  if (e.project_id) resMap[e.resource_id].projIds.add(e.project_id);
+                }
+              });
+              // Count open tasks per resource
+              _tasks.filter(t=>t.assigned_to&&!['complete','cancelled'].includes(t.status)).forEach(t => {
+                const r = Object.values(resMap).find(r=>r.user_id===t.assigned_to);
+                if (r) { r.taskCount++; if(t.project_id) r.projIds.add(t.project_id); }
+              });
+              // Group by department
+              const allRes = Object.values(resMap).filter(r=>r.is_active!==false);
+              const depts = {};
+              allRes.forEach(r => {
+                const dept = r.department || 'Unassigned';
+                if (!depts[dept]) depts[dept] = [];
+                depts[dept].push(r);
+              });
+              const deptNames = Object.keys(depts).sort();
+              if (!allRes.length) return '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No team members found</div>';
+
+              // Filter bar
+              let html = `<div id="pm-team-filter" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+                <button class="pm-team-filter-btn on" data-dept="all"
+                  style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:3px 10px;background:#132035;border:1px solid rgba(0,210,255,.4);color:#F0F6FF;cursor:pointer"
+                  onclick="pmTeamFilter(this,'all')">All (${allRes.length})</button>
+                ${deptNames.map(d=>`<button class="pm-team-filter-btn" data-dept="${esc(d)}"
+                  style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:3px 10px;background:#0c1828;border:1px solid rgba(0,210,255,.12);color:#5A84A8;cursor:pointer"
+                  onclick="pmTeamFilter(this,'${esc(d)}')">${esc(d)} (${depts[d].length})</button>`).join('')}
+              </div>`;
+
+              // Render grouped
+              deptNames.forEach(dept => {
+                html += `<div class="pm-team-group" data-dept="${esc(dept)}">
+                  <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;padding:6px 0 4px;border-bottom:1px solid rgba(0,210,255,.1);margin-bottom:4px">${esc(dept)}</div>`;
+                depts[dept].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).forEach(r => {
+                  const initials = ((r.first_name||'')[0]||'').toUpperCase() + ((r.last_name||'')[0]||'').toUpperCase();
+                  const fullName = (r.first_name+' '+r.last_name).trim();
+                  const projList = [...r.projIds].map(pid=>_projects.find(p=>p.id===pid)?.name).filter(Boolean).slice(0,2);
+                  const billPct = r.weekHrs>0 ? Math.round(r.billHrs/r.weekHrs*100) : 0;
+                  const dotColor = r.taskCount>5?'#E24B4A':r.taskCount>0?'#1D9E75':'#3A5C80';
+                  html += `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(0,210,255,.06)">
+                    <div style="width:34px;height:34px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials)}</div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF">${esc(fullName)}</div>
+                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">
+                        ${projList.length?projList.map(n=>`<span style="color:#90B8D8">${esc(n)}</span>`).join(', '):'No active projects'}
+                      </div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0">
+                      ${r.weekHrs>0?`<div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--compass-cyan)">${r.weekHrs.toFixed(1)}h</div>
+                      <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${billPct}% bill</div>`:'<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">—</div>'}
+                    </div>
+                    <div style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0" title="${r.taskCount} open tasks"></div>
+                  </div>`;
+                });
+                html += '</div>';
+              });
+              return html;
+            })()}
           </div>
 
           <!-- Action items tab -->
           <div id="pm-tab-actions" class="pm-tabpanel">
-            ${actionItems.length===0
-              ?`<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No open action items</div>`
-              :actionItems.slice(0,20).map(a=>{
-                const overdue=a.due_date&&a.due_date<today;
-                const inst=wfInstances.find(w=>w.id===a.instance_id);
-                const proj=_projects.find(p=>p.id===inst?.project_id);
-                return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid rgba(0,210,255,.07)">
-                  <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:${overdue?'var(--compass-red)':'var(--compass-amber)'}"></div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'—')}</div>
-                    <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">
-                      ${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}${a.due_date?'Due '+fmtDate(a.due_date):'No due date'}
+            ${(function(){
+              if (!actionItems.length) return '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No open action items</div>';
+              const overdueAIs = actionItems.filter(a=>a.due_date&&a.due_date<today);
+              const currentAIs = actionItems.filter(a=>!a.due_date||a.due_date>=today);
+              let html = '';
+              if (overdueAIs.length) {
+                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:6px;text-transform:uppercase">● Overdue (${overdueAIs.length})</div>`;
+                overdueAIs.forEach(a => {
+                  const inst=wfInstances.find(w=>w.id===a.instance_id);
+                  const proj=_projects.find(p=>p.id===inst?.project_id);
+                  html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid rgba(226,75,74,.1)">
+                    <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:var(--compass-red)"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'—')}</div>
+                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}Due ${fmtDate(a.due_date)}</div>
                     </div>
-                  </div>
-                  ${overdue?`<span class="pm-chip pm-chip-r">${daysOverdue(a.due_date)}d</span>`:''}
-                </div>`;
-              }).join('')}
+                    <span class="pm-chip pm-chip-r" style="flex-shrink:0">${daysOverdue(a.due_date)}d late</span>
+                  </div>`;
+                });
+              }
+              if (currentAIs.length) {
+                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:${overdueAIs.length?'12px':0} 0 6px;text-transform:uppercase">● Open (${currentAIs.length})</div>`;
+                currentAIs.forEach(a => {
+                  const inst=wfInstances.find(w=>w.id===a.instance_id);
+                  const proj=_projects.find(p=>p.id===inst?.project_id);
+                  html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid rgba(0,210,255,.07)">
+                    <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:var(--compass-amber)"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'—')}</div>
+                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}${a.due_date?'Due '+fmtDate(a.due_date):'No due date'}</div>
+                    </div>
+                    ${a.due_date?`<span style="font-family:var(--font-head);font-size:11px;color:#4A6E90;flex-shrink:0">${fmtDate(a.due_date)}</span>`:''}
+                  </div>`;
+                });
+              }
+              return html;
+            })()}
           </div>
         </div>
 
@@ -2607,6 +2709,17 @@ async function loadPMView() {
       el.closest('.pm-left').querySelectorAll('.pm-tabpanel').forEach(p=>p.classList.remove('on'));
       const panel = document.getElementById(panelId);
       if (panel) panel.classList.add('on');
+    };
+    window.pmTeamFilter = function(btn, dept) {
+      document.querySelectorAll('.pm-team-filter-btn').forEach(b => {
+        const on = b.dataset.dept === dept;
+        b.style.background = on ? '#132035' : '#0c1828';
+        b.style.borderColor = on ? 'rgba(0,210,255,.4)' : 'rgba(0,210,255,.12)';
+        b.style.color = on ? '#F0F6FF' : '#5A84A8';
+      });
+      document.querySelectorAll('.pm-team-group').forEach(g => {
+        g.style.display = (dept==='all' || g.dataset.dept===dept) ? 'block' : 'none';
+      });
     };
 
     // ── Drawer open / close ───────────────────────────────
