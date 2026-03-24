@@ -3422,6 +3422,50 @@ async function loadManagementView() {
       mgCloseModal();
       compassToast('Response logged · PM notified', 2200);
     };
+    // Health grid dot detail
+    window.mgShowDot = function(projName, label, score) {
+      const status = score >= 85 ? 'Healthy' : score >= 65 ? 'Watch' : 'Action required';
+      const color  = score >= 85 ? '#1D9E75' : score >= 65 ? '#EF9F27' : '#E24B4A';
+      const body = `<div class="mg-modal-section">Dimension</div>
+        <div class="mg-modal-block">${label}</div>
+        <div class="mg-modal-section">Score</div>
+        <div class="mg-modal-block">
+          <span style="font-family:var(--font-display);font-size:22px;font-weight:700;color:${color}">${score}%</span>
+          <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-left:8px">${status}</span>
+        </div>
+        <div style="height:5px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin:8px 0">
+          <div style="height:100%;width:${score}%;background:${color};border-radius:2px"></div>
+        </div>
+        <div class="mg-modal-section">Interpretation</div>
+        <div class="mg-modal-block mg-modal-ai">${
+          label === 'Schedule'    ? 'Based on SPI and overdue task ratio. Green = SPI ≥ 0.9 and low overdue count.' :
+          label === 'Cost'        ? 'Based on CPI. Green = CPI ≥ 0.9. Red = budget overrun risk.' :
+          label === 'Confidence'  ? 'Ratio of green confidence signals vs all signals this week.' :
+          label === 'Rework'      ? 'Ratio of step resets vs completions. High rework = process or quality issue.' :
+          label === 'Timesheets'  ? 'Percentage of assigned resources who logged time this week.' :
+          label === 'Escalations' ? 'Whether any workflow instance has 2+ unresolved rework cycles.' :
+          'Health dimension score derived from live CoC data.'
+        }</div>`;
+      mgOpenModal(projName + ' — ' + label, body);
+    };
+    // Person card detail
+    window.mgShowPerson = function(fullName, arcStr, weekHrs, taskCount) {
+      const hasRed = arcStr.includes('R');
+      const redIdx = arcStr.indexOf('R'), greenIdx = arcStr.indexOf('G');
+      const narrative = hasRed
+        ? (redIdx > greenIdx
+            ? 'Degradation pattern detected. Review what changed on the day the arc shifted — upstream block or relationship friction is more likely than individual performance failure.'
+            : 'Persistent issues this week. Consider direct check-in.')
+        : 'Clean week. No pattern concerns.';
+      const body = `
+        <div class="mg-modal-section">Week arc</div>
+        <div class="mg-modal-block" style="font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:.08em">${arcStr}</div>
+        <div class="mg-modal-section">Hours</div>
+        <div class="mg-modal-block">${weekHrs}h logged · ${taskCount} open task${taskCount !== 1 ? 's' : ''} across active projects</div>
+        <div class="mg-modal-section">AI narrative</div>
+        <div class="mg-modal-block mg-modal-ai">${narrative}</div>`;
+      mgOpenModal(fullName + ' — Cross-project pattern', body);
+    };
 
     // ─────────────────────────────────────────────────────
     // Render HTML
@@ -3483,7 +3527,7 @@ async function loadManagementView() {
                   const dots = projectHealthDots(p);
                   return `<tr>
                     <td>${esc(p.name)}</td>
-                    ${dots.map(d=>`<td><div class="mg-dot" style="background:${d.color}" title="${d.label}" onclick="mgOpenModal('${esc(p.name)} — ${d.label}','<div class=\'mg-modal-section\'>Score</div><div class=\'mg-modal-block\'>${d.label}: ${Math.round(d.score*100)}% — ${d.score>=0.85?'Healthy':d.score>=0.65?'Watch':'Action required'}</div>')"></div></td>`).join('')}
+                    ${dots.map(d=>`<td><div class="mg-dot" style="background:${d.color}" title="${d.label}" onclick="mgShowDot('${esc(p.name).replace(/'/g,'\\x27')}','${d.label}',${Math.round(d.score*100)})"></div></td>`).join('')}
                   </tr>`;
                 }).join('')}
                 </tbody>
@@ -3557,7 +3601,7 @@ async function loadManagementView() {
               return `<div class="mg-arc-dot" style="background:${col}" title="${stepStr}"></div>${i<4?'<div class="mg-arc-line"></div>':''}`;
             }).join('');
             const taskCount = _tasks.filter(t=>t.assigned_to===r.user_id&&!['complete','cancelled'].includes(t.status)).length;
-            return `<div class="mg-pc" onclick="mgOpenModal('${esc(fullName)} — Cross-project pattern','<div class=\'mg-modal-section\'>Week arc</div><div class=\'mg-modal-block\'>${arcStr} · ${weekHrs.toFixed(1)}h logged</div><div class=\'mg-modal-section\'>Open tasks</div><div class=\'mg-modal-block\'>${taskCount} open task${taskCount!==1?'s':''} across active projects</div><div class=\'mg-modal-section\'>AI narrative</div><div class=\'mg-modal-block mg-modal-ai\'>${arcStr.includes('R')?(arcStr.indexOf('R')>arcStr.indexOf('G')?'Degradation pattern detected. Review what changed on the day the arc shifted — upstream block or relationship friction is more likely than individual performance failure.':'Persistent issues this week. Consider direct check-in.'):'Clean week. No pattern concerns.'}</div>')">
+            return `<div class="mg-pc" onclick="mgShowPerson('${esc(fullName).replace(/'/g,'\\x27')}','${arcStr}',${weekHrs.toFixed(1)},${taskCount})">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                 <div style="width:28px;height:28px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;flex-shrink:0">${initials}</div>
                 <div>
