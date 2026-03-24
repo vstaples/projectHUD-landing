@@ -3261,6 +3261,16 @@ async function loadManagementView() {
     const greenProjs = activeProjects.filter(p=>{ const dots=projectHealthDots(p); return dots.every(d=>d.score>=0.8); });
     if (greenProjs.length) briefItems.push({color:'#1D9E75',text:`${greenProjs.map(p=>esc(p.name)).join(', ')} — all health dimensions green`,tab:'overview'});
 
+    // Build mgProjStats for expand row closure (mirrors PM view projStats shape)
+    const mgProjStats = activeProjects.map(p => {
+      const projTasks    = _tasks.filter(t=>t.project_id===p.id);
+      const overdueTasks = projTasks.filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status));
+      const projInsts    = wfInstances.filter(w=>w.project_id===p.id);
+      const projFlags    = Object.entries(instResets).filter(([id,c])=>c>=2&&wfInstances.find(w=>w.id===id)?.project_id===p.id);
+      const projCoc      = cocEvents.filter(e=>projInsts.some(i=>i.id===e.instance_id)).slice(0,6);
+      return { p, projTasks, overdueTasks, projInsts, projFlags, projCoc };
+    });
+
     // ─────────────────────────────────────────────────────
     // RENDER
     // ─────────────────────────────────────────────────────
@@ -3409,8 +3419,8 @@ async function loadManagementView() {
       const existing = document.getElementById('mg-exp-'+projId);
       allExp.forEach(e => { if (e.id !== 'mg-exp-'+projId) e.remove(); });
       document.querySelectorAll('.mg-hgrid tr.selected').forEach(r=>r.classList.remove('selected'));
-      if (existing) { existing.remove(); return; }
-      const ps = projStats.find(p=>p.p.id===projId);
+      if (existing) { existing.remove(); tr.style.background=''; return; }
+      const ps = mgProjStats.find(p=>p.p.id===projId);
       if (!ps || !tr) return;
       tr.classList.add('selected');
       tr.style.background = 'rgba(0,210,255,.06)';
@@ -3460,11 +3470,11 @@ async function loadManagementView() {
       exp.style.cssText = 'padding:10px 12px 12px 20px;background:#091522;border-left:3px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.1)';
       let html = '';
       if (q.type === 'escalation') {
-        const instResets = (reworkEvents||[]).filter(e=>wfInstances.find(w=>w.id===e.instance_id)?.project_id===q.projId);
+        const projResets = (reworkEvents||[]).filter(e=>wfInstances.find(w=>w.id===e.instance_id)?.project_id===q.projId);
         html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#E24B4A;margin-bottom:6px">Intervention history</div>`;
-        if (instResets.length > 0) {
+        if (projResets.length > 0) {
           const grouped = {};
-          instResets.forEach(e=>{ grouped[e.instance_id]=(grouped[e.instance_id]||[]); grouped[e.instance_id].push(e); });
+          projResets.forEach(e=>{ grouped[e.instance_id]=(grouped[e.instance_id]||[]); grouped[e.instance_id].push(e); });
           Object.entries(grouped).forEach(([instId, evts]) => {
             const inst = wfInstances.find(w=>w.id===instId);
             html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;margin-bottom:3px">${esc(inst?.title||instId)}</div>`;
