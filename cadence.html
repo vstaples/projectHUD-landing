@@ -906,7 +906,17 @@ function _getOutcomes(step) {
 }
 document.addEventListener('DOMContentLoaded', async () => {
   await loadAll();
-  renderTab('templates');
+
+  // ── Deep link: ?instance=<id> navigates straight to that instance ──
+  const params = new URLSearchParams(window.location.search);
+  const deepInst = params.get('instance');
+  if (deepInst) {
+    renderTab('instances');
+    // Wait for instances tab to render then select
+    setTimeout(() => selectInstance(deepInst), 120);
+  } else {
+    renderTab('templates');
+  }
 });
 
 async function loadAll() {

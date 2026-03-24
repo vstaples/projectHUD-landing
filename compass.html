@@ -980,6 +980,8 @@ let _myResource = null;
 let _currentView = null;
 let _viewLoaded  = {};
 let _identityDebug = {};
+let _teFilter    = null;   // date string 'YYYY-MM-DD' | null — filters time log by day
+let _teEntries   = [];     // cached time entries for current user view session
 
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('compass-date').textContent =
@@ -1292,33 +1294,46 @@ async function loadUserView() {
     });
     const overdueCount = workItems.filter(w => w.overdue).length;
 
+    // ── Cache for interactive time log ───────────────────────────────
+    _teEntries = myTimeEntries;
+    if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null; // reset if stale
+
     // ── Bar chart HTML ────────────────────────────────────────────────
     const barChart = weekDays.map((d, i) => {
       const hrs    = hoursByDay[d] || 0;
       const pct    = Math.round((hrs / Math.max(maxDayHours, 8)) * 100);
-      const isToday = d === today;
+      const isToday  = d === today;
       const isFuture = d > today;
-      const barColor = isToday ? 'var(--compass-cyan)' : isFuture ? 'var(--border)' : hrs > 0 ? 'var(--compass-green)' : 'var(--border)';
+      const isActive = _teFilter === d;
+      const barColor = isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : isFuture ? 'var(--border)' : hrs > 0 ? 'var(--compass-green)' : 'var(--border)';
       return `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
-          <div style="font-family:var(--font-mono);font-size:10px;color:${isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
+          cursor:${hrs > 0 ? 'pointer' : 'default'}"
+          onclick="${hrs > 0 ? `filterTimeLog('${d}')` : ''}">
+          <div style="font-family:var(--font-mono);font-size:10px;color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
             ${hrs > 0 ? hrs.toFixed(1) : ''}
           </div>
           <div style="width:100%;height:48px;display:flex;align-items:flex-end;justify-content:center">
             <div style="width:80%;height:${Math.max(pct, hrs > 0 ? 4 : 0)}%;background:${barColor};
-              border-radius:2px 2px 0 0;transition:height .3s;min-height:${hrs > 0 ? '2px' : '0'}"></div>
+              border-radius:2px 2px 0 0;transition:all .2s;min-height:${hrs > 0 ? '2px' : '0'};
+              ${hrs > 0 ? 'box-shadow:0 0 0 0 transparent' : ''}"></div>
           </div>
           <div style="font-family:var(--font-mono);font-size:10px;
-            color:${isToday ? 'var(--compass-cyan)' : 'var(--text3)'};
-            font-weight:${isToday ? '600' : '400'}">${weekLabels[i]}</div>
+            color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'};
+            font-weight:${isToday || isActive ? '600' : '400'}">${weekLabels[i]}</div>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">
             ${new Date(d + 'T00:00:00').getDate()}
           </div>
         </div>`;
     }).join('');
 
-    // ── Recent time entries ───────────────────────────────────────────
-    const recentEntries = myTimeEntries.slice(0, 8);
+    // ── Recent time entries — filtered by day if bar clicked ─────────
+    const displayEntries = _teFilter
+      ? myTimeEntries.filter(e => e.date === _teFilter)
+      : myTimeEntries.slice(0, 8);
+    const filterLabel = _teFilter
+      ? new Date(_teFilter + 'T00:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'})
+      : null;
 
     content.innerHTML = `
       <div class="stat-strip stat-strip-4" style="margin-bottom:14px">
@@ -1398,19 +1413,41 @@ async function loadUserView() {
           <!-- Timesheet — recent entries -->
           <div class="cmp-panel" style="margin-bottom:14px">
             <div class="panel-hdr">
-              <div class="panel-title">Time log — recent</div>
-              <a href="/resources.html" style="font-family:var(--font-mono);font-size:10px;
-                color:var(--compass-cyan);text-decoration:none">Full view →</a>
+              <div class="panel-title">Time log${filterLabel ? ` — ${filterLabel}` : ' — recent'}</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                ${filterLabel ? `<button onclick="filterTimeLog(null)"
+                  style="font-family:var(--font-mono);font-size:10px;color:var(--compass-amber);
+                    background:none;border:none;cursor:pointer;padding:0">✕ clear</button>` : ''}
+                <a href="/resources.html" style="font-family:var(--font-mono);font-size:10px;
+                  color:var(--compass-cyan);text-decoration:none">Full view →</a>
+              </div>
             </div>
-            ${recentEntries.length === 0
-              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No time entries this period</div>`
-              : recentEntries.map(e => {
+            ${displayEntries.length === 0
+              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+                  ${filterLabel ? 'No entries for this day' : 'No time entries this period'}
+                 </div>`
+              : displayEntries.map(e => {
                   const proj = _projects.find(p => p.id === e.project_id);
-                  const sourceIcon = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
+                  const sourceIcon  = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
                   const sourceColor = e.source_type === 'step_comment' ? 'var(--compass-cyan)' : e.source_type === 'action_item' ? 'var(--compass-purple)' : 'var(--text3)';
+                  const isCadence   = e.source_type === 'step_comment';
                   return `
                   <div style="display:flex;align-items:center;gap:8px;padding:7px 13px;
-                    border-bottom:1px solid var(--border)">
+                    border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s"
+                    onmouseenter="this.style.background='var(--bg2)'"
+                    onmouseleave="this.style.background=''"
+                    onclick="${isCadence
+                      ? `window.location.href='/cadence.html'`
+                      : `openTimeEntryEdit(${JSON.stringify({
+                          id: e.id,
+                          hours: e.hours,
+                          notes: e.notes || '',
+                          is_billable: e.is_billable,
+                          date: e.date,
+                          project_name: proj?.name || '—',
+                          step_name: e.step_name || null,
+                          source_type: e.source_type,
+                        })})`}">
                     <div style="font-size:13px;color:${sourceColor};flex-shrink:0">${sourceIcon}</div>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-ui);font-size:12px;font-weight:500;
@@ -1419,6 +1456,7 @@ async function loadUserView() {
                       </div>
                       <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">
                         ${fmtDate(e.date)} · ${e.is_billable ? 'Billable' : 'Non-billable'}
+                        ${isCadence ? ' · <span style="color:var(--compass-cyan)">via Cadence</span>' : ' · click to edit'}
                       </div>
                     </div>
                     <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;
@@ -1429,8 +1467,12 @@ async function loadUserView() {
                 }).join('')}
             <div style="padding:8px 13px;display:flex;justify-content:space-between;
               font-family:var(--font-mono);font-size:10px">
-              <span style="color:var(--text3)">Week total</span>
-              <span style="font-weight:600;color:var(--compass-cyan)">${weekTotal.toFixed(1)}h</span>
+              <span style="color:var(--text3)">${filterLabel ? filterLabel + ' total' : 'Week total'}</span>
+              <span style="font-weight:600;color:var(--compass-cyan)">
+                ${filterLabel
+                  ? displayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0).toFixed(1)
+                  : weekTotal.toFixed(1)}h
+              </span>
             </div>
           </div>
 
@@ -1440,7 +1482,7 @@ async function loadUserView() {
             ${wfInstances.slice(0, 4).map(w => {
               const proj = _projects.find(p => p.id === w.project_id);
               return `
-              <div class="cmp-row" onclick="window.location.href='/cadence.html'">
+              <div class="cmp-row" onclick="window.location.href='/cadence.html?instance=${w.id}'">
                 <div style="width:7px;height:7px;border-radius:50%;
                   background:var(--compass-amber);flex-shrink:0"></div>
                 <div style="flex:1;min-width:0">
@@ -1495,14 +1537,23 @@ async function loadPMView() {
     const today = new Date().toLocaleDateString('en-CA');
 
     // ── Red flags — rejections in the last 48h ────────────────
+    // Deduplicate: one chip per instance (most recent reset event only)
     const cutoff48h = new Date(Date.now() - 48 * 3600000).toISOString();
-    const redFlags = cocEvents.filter(e =>
-      e.event_type === 'step_reset' && e.created_at > cutoff48h
-    ).map(e => {
-      const inst = wfInstances.find(w => w.id === e.instance_id);
-      const proj = _projects.find(p => p.id === inst?.project_id);
-      return { ...e, instTitle: inst?.title || '—', projName: proj?.name || '—', projId: inst?.project_id };
-    });
+    const flagsByInstance = {};
+    cocEvents
+      .filter(e => e.event_type === 'step_reset' && e.created_at > cutoff48h)
+      .forEach(e => {
+        const inst = wfInstances.find(w => w.id === e.instance_id);
+        const proj = _projects.find(p => p.id === inst?.project_id);
+        const key  = e.instance_id;
+        if (!flagsByInstance[key] || e.created_at > flagsByInstance[key].created_at) {
+          flagsByInstance[key] = { ...e, instTitle: inst?.title || '—', projName: proj?.name || '—', projId: inst?.project_id, count: 1 };
+        } else {
+          flagsByInstance[key].count++;
+        }
+      });
+    const redFlags = Object.values(flagsByInstance)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
     // ── Per-project stats ─────────────────────────────────────
     const projStats = activeProjects.map(p => {
@@ -1577,14 +1628,15 @@ async function loadPMView() {
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           ${redFlags.map(f => `
-          <a href="/cadence.html" style="display:inline-flex;align-items:center;gap:5px;
+          <a href="/cadence.html?instance=${f.instance_id}"
+            style="display:inline-flex;align-items:center;gap:5px;
             font-family:var(--font-mono);font-size:10px;color:var(--compass-red);
             border:1px solid rgba(226,75,74,.35);padding:3px 9px;
             text-decoration:none;background:rgba(226,75,74,.06);transition:background .1s"
             onmouseenter="this.style.background='rgba(226,75,74,.14)'"
             onmouseleave="this.style.background='rgba(226,75,74,.06)'"
-            title="${esc(f.event_notes || 'No notes')}">
-            ↩ ${esc(f.projName)} — ${esc(f.step_name || f.instTitle)}
+            title="${esc(f.event_notes || 'No rejection note')}">
+            ↩ ${esc(f.instTitle)}${f.count > 1 ? ` <span style="opacity:.7">(${f.count}×)</span>` : ''}
             <span style="color:rgba(226,75,74,.6)">${_timeAgo(f.created_at)}</span>
           </a>`).join('')}
         </div>
@@ -1634,7 +1686,7 @@ async function loadPMView() {
                     ${projInsts.length > 0 ? `
                     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
                       ${projInsts.slice(0, 3).map(w => `
-                        <a href="/cadence.html" onclick="event.stopPropagation()"
+                        <a href="/cadence.html?instance=${w.id}" onclick="event.stopPropagation()"
                           style="font-family:var(--font-mono);font-size:10px;
                             color:var(--compass-cyan);border:1px solid rgba(0,210,255,.22);
                             padding:2px 7px;text-decoration:none;transition:background .1s;white-space:nowrap"
@@ -1682,7 +1734,7 @@ async function loadPMView() {
               : feedEvents.map(({ e, proj, color, icon, age, isRejection }) => `
               <div style="display:flex;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);
                 cursor:pointer;transition:background .1s"
-                onclick="window.location.href='/cadence.html'"
+                onclick="window.location.href='/cadence.html?instance=${e.instance_id}'"
                 onmouseenter="this.style.background='var(--bg2)'"
                 onmouseleave="this.style.background=''">
                 <div style="font-size:11px;color:${color};flex-shrink:0;width:14px;text-align:center;
@@ -2557,6 +2609,187 @@ async function submitCompletion() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeCompletionPanel();
 });
+
+// ── Bar chart day filter ──────────────────────────────────
+function filterTimeLog(date) {
+  _teFilter = (_teFilter === date) ? null : date; // toggle
+  _viewLoaded['user'] = false;
+  loadUserView();
+}
+
+// ── Time entry edit drawer ────────────────────────────────
+function openTimeEntryEdit(entry) {
+  document.getElementById('te-edit-drawer')?.remove();
+
+  const drawer = document.createElement('div');
+  drawer.id = 'te-edit-drawer';
+  drawer.style.cssText = `
+    position:fixed;top:0;right:0;bottom:0;width:320px;z-index:600;
+    background:var(--bg1,#0c1628);
+    border-left:1px solid var(--border,rgba(0,210,255,.12));
+    box-shadow:-8px 0 32px rgba(0,0,0,.5);
+    display:flex;flex-direction:column;
+    animation:te-slide-in .2s ease;
+  `;
+
+  if (!document.getElementById('te-style')) {
+    const s = document.createElement('style');
+    s.id = 'te-style';
+    s.textContent = `
+      @keyframes te-slide-in { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+      .te-label { font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.08em;
+        text-transform:uppercase;color:var(--text3);margin-bottom:5px;display:block }
+      .te-input { width:100%;font-family:var(--font-ui,sans-serif);font-size:13px;
+        padding:8px 10px;background:var(--bg2,#0a1220);
+        border:1px solid var(--border,rgba(0,210,255,.12));color:var(--text1);
+        outline:none;box-sizing:border-box;transition:border-color .15s }
+      .te-input:focus { border-color:rgba(0,210,255,.5) }
+    `;
+    document.head.appendChild(s);
+  }
+
+  const isEditable = entry.source_type === 'direct';
+
+  drawer.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--compass-cyan);margin-bottom:3px">
+          ${isEditable ? 'Edit time entry' : 'Time entry detail'}
+        </div>
+        <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">
+          ${esc(entry.step_name || entry.project_name)}
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">
+          ${fmtDate(entry.date)} · ${entry.source_type === 'step_comment' ? 'via Cadence' : entry.source_type}
+        </div>
+      </div>
+      <button onclick="document.getElementById('te-edit-drawer').remove()"
+        style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;
+          padding:0;line-height:1;flex-shrink:0"
+        onmouseenter="this.style.color='var(--text0)'"
+        onmouseleave="this.style.color='var(--text3)'">✕</button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:16px">
+      ${!isEditable ? `
+      <div style="background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);
+        padding:10px 12px;margin-bottom:16px;font-family:var(--font-mono);font-size:10px;
+        color:var(--compass-amber);line-height:1.6">
+        This entry was created via ${entry.source_type === 'step_comment' ? 'Cadence' : 'import'}.<br>
+        Edit it in the source system to maintain the audit trail.
+      </div>` : ''}
+
+      <div style="margin-bottom:14px">
+        <label class="te-label">Hours</label>
+        <input id="te-hours" class="te-input" type="number" min="0.25" max="24" step="0.25"
+          value="${parseFloat(entry.hours).toFixed(2)}"
+          ${!isEditable ? 'readonly style="opacity:.6;cursor:not-allowed"' : ''} />
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label class="te-label">Notes</label>
+        <textarea id="te-notes" class="te-input" rows="3"
+          style="resize:vertical;min-height:70px"
+          ${!isEditable ? 'readonly style="opacity:.6;cursor:not-allowed"' : ''}
+          placeholder="What did you work on?">${esc(entry.notes || '')}</textarea>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:${isEditable ? 'pointer' : 'default'}">
+          <input id="te-billable" type="checkbox" ${entry.is_billable ? 'checked' : ''}
+            ${!isEditable ? 'disabled' : ''}
+            style="accent-color:var(--compass-cyan);width:14px;height:14px" />
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+            letter-spacing:.08em;text-transform:uppercase">Billable</span>
+        </label>
+      </div>
+    </div>
+
+    ${isEditable ? `
+    <div style="padding:12px 16px;border-top:1px solid var(--border);
+      display:flex;gap:8px;flex-shrink:0">
+      <button onclick="deleteTimeEntry('${entry.id}')"
+        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+          text-transform:uppercase;padding:7px 14px;background:none;
+          border:1px solid rgba(226,75,74,.35);color:var(--compass-red);
+          cursor:pointer;transition:all .12s"
+        onmouseenter="this.style.background='rgba(226,75,74,.1)'"
+        onmouseleave="this.style.background='none'">Delete</button>
+      <div style="flex:1"></div>
+      <button onclick="document.getElementById('te-edit-drawer').remove()"
+        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+          text-transform:uppercase;padding:7px 14px;background:none;
+          border:1px solid var(--border);color:var(--text3);cursor:pointer"
+        onmouseenter="this.style.borderColor='var(--text2)'"
+        onmouseleave="this.style.borderColor='var(--border)'">Cancel</button>
+      <button onclick="saveTimeEntry('${entry.id}')"
+        style="font-family:var(--font-mono);font-size:10px;font-weight:600;
+          letter-spacing:.08em;text-transform:uppercase;padding:7px 18px;
+          background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer"
+        onmouseenter="this.style.opacity='.85'"
+        onmouseleave="this.style.opacity='1'">Save →</button>
+    </div>` : `
+    <div style="padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0">
+      <button onclick="document.getElementById('te-edit-drawer').remove()"
+        style="width:100%;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+          text-transform:uppercase;padding:8px;background:none;
+          border:1px solid var(--border);color:var(--text2);cursor:pointer">Close</button>
+    </div>`}
+  `;
+
+  document.body.appendChild(drawer);
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('mousedown', function closeTE(ev) {
+      if (!drawer.contains(ev.target)) {
+        drawer.remove();
+        document.removeEventListener('mousedown', closeTE);
+      }
+    });
+  }, 50);
+}
+
+async function saveTimeEntry(id) {
+  const hours    = parseFloat(document.getElementById('te-hours')?.value);
+  const notes    = document.getElementById('te-notes')?.value?.trim() || null;
+  const billable = document.getElementById('te-billable')?.checked ?? true;
+  const statusEl = document.querySelector('#te-edit-drawer .te-status');
+
+  if (!hours || hours <= 0) {
+    compassToast('Hours must be greater than 0', 2000);
+    return;
+  }
+
+  try {
+    await API.patch(`time_entries?id=eq.${id}`, {
+      hours,
+      notes,
+      is_billable: billable,
+      updated_at: new Date().toISOString(),
+    });
+    document.getElementById('te-edit-drawer')?.remove();
+    compassToast('Time entry updated');
+    _viewLoaded['user'] = false;
+    loadUserView();
+  } catch(e) {
+    compassToast('Failed to save — try again', 2500);
+  }
+}
+
+async function deleteTimeEntry(id) {
+  if (!confirm('Delete this time entry? This cannot be undone.')) return;
+  try {
+    await API.del(`time_entries?id=eq.${id}`);
+    document.getElementById('te-edit-drawer')?.remove();
+    compassToast('Time entry deleted');
+    _viewLoaded['user'] = false;
+    loadUserView();
+  } catch(e) {
+    compassToast('Failed to delete — try again', 2500);
+  }
+}
 
 </script>
 </body>
