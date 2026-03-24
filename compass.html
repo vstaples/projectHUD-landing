@@ -288,6 +288,7 @@
 
 .cmp-row:last-child { border-bottom: none; }
 .cmp-row:hover { background: var(--bg2); }
+.wi-selected { background: rgba(0,210,255,.06) !important; border-left: 2px solid var(--compass-cyan,#00D2FF) !important; }
 
 .row-title {
   font-family: var(--font-ui, 'Barlow Condensed', sans-serif);
@@ -1239,7 +1240,7 @@ async function loadUserView() {
     const weekStartDate = new Date(new Date().setDate(new Date().getDate() - (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1))).toLocaleDateString('en-CA');
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
-      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=due_date.asc`).catch(() => []),
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&status=neq.cancelled&order=due_date.asc`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&order=due_date.asc`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
@@ -1407,7 +1408,7 @@ async function loadUserView() {
               letter-spacing:.08em;text-transform:uppercase">
               <div style="width:8px;flex-shrink:0"></div>
               <div style="flex:1">Task / Action item</div>
-              <div style="width:120px;text-align:center;flex-shrink:0">Progress</div>
+              <div style="width:200px;flex-shrink:0;display:flex;align-items:center;gap:5px">Progress</div>
               <div style="width:60px;text-align:center;flex-shrink:0;
                 ${overdueCount > 0 ? 'color:var(--compass-red)' : ''}">
                 ${overdueCount > 0 ? overdueCount + ' overdue' : 'Status'}
@@ -1426,15 +1427,15 @@ async function loadUserView() {
                   <div class="row-title">${esc(w.title)}</div>
                   <div class="row-sub">${esc(w.project)} · ${w.type === 'task' ? 'Task' : 'Action item'}${w.due ? ' · Due ' + fmtDate(w.due) : ''}</div>
                 </div>
-                <!-- Progress column — fixed 120px, bar + % inline -->
-                <div style="width:120px;flex-shrink:0;display:flex;align-items:center;gap:5px">
+                <!-- Progress column — fixed 200px, bar + % inline -->
+                <div style="width:200px;flex-shrink:0;display:flex;align-items:center;gap:6px">
                   ${w.type === 'task' ? `
-                  <div style="flex:1;height:4px;background:var(--bg2);border-radius:2px;overflow:hidden">
+                  <div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
                     <div style="height:100%;width:${Math.min(w.pct,100)}%;
                       background:${w.pct >= 80 ? 'var(--compass-green)' : w.pct >= 40 ? 'var(--compass-cyan)' : w.pct > 0 ? 'var(--text3)' : 'transparent'};
-                      border-radius:2px;transition:width .3s"></div>
+                      border-radius:3px;transition:width .3s"></div>
                   </div>
-                  <span style="font-family:var(--font-mono);font-size:11px;flex-shrink:0;width:32px;text-align:right;
+                  <span style="font-family:var(--font-mono);font-size:11px;flex-shrink:0;width:34px;text-align:right;
                     color:${w.pct >= 80 ? 'var(--compass-green)' : w.pct > 0 ? 'var(--compass-cyan)' : 'var(--text3)'}">
                     ${w.pct}%</span>` : `<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>`}
                 </div>
@@ -1444,7 +1445,9 @@ async function loadUserView() {
                 </div>
                 <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}"
                   data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}"
-                  style="padding:3px 10px;width:74px;flex-shrink:0">Complete</button>
+                  style="padding:3px 10px;width:74px;flex-shrink:0">
+                  ${w.status === 'not_started' ? 'Start' : w.status === 'blocked' ? 'Unblock' : 'Complete'}
+                </button>
               </div>`).join('')}
           </div>
         </div>
@@ -2776,6 +2779,9 @@ document.addEventListener('click', function(ev) {
   // Work item row — open detail drawer
   const wiRow = ev.target.closest('.wi-row');
   if (wiRow && !ev.target.closest('.wi-complete')) {
+    // Toggle selected class
+    document.querySelectorAll('.wi-row').forEach(r => r.classList.remove('wi-selected'));
+    wiRow.classList.add('wi-selected');
     const item = _wiItems.find(w => w.id === wiRow.dataset.wiId);
     if (item) openWorkItemDrawer(item);
     return;
@@ -3215,6 +3221,7 @@ function openWorkItemDrawer(item) {
     document.addEventListener('mousedown', function closeWI(ev) {
       if (!drawer.contains(ev.target)) {
         drawer.remove();
+        document.querySelectorAll('.wi-row').forEach(r => r.classList.remove('wi-selected'));
         document.removeEventListener('mousedown', closeWI);
       }
     });
