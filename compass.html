@@ -1637,7 +1637,7 @@ async function loadUserView() {
 
     <div style="display:grid;grid-template-columns:1fr minmax(0,300px);gap:14px">
       <div>
-        <!-- 1.B Speedometer Row -->
+        <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
             <div class="panel-title">This week — hours by day</div>
@@ -1646,10 +1646,46 @@ async function loadUserView() {
               – ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
             </div>
           </div>
-          <div style="display:flex;justify-content:space-around;padding:8px 4px 0;gap:0">
-            ${gaugesHtml}
+          <!-- Inner two-column: gauges left | bill summary right -->
+          <div style="display:grid;grid-template-columns:auto 200px;gap:0;align-items:start">
+            <!-- Gauges column -->
+            <div>
+              <div style="display:flex;justify-content:flex-start;padding:8px 4px 0;gap:0">
+                ${gaugesHtml}
+              </div>
+              ${barLegend}
+            </div>
+            <!-- Billable summary column -->
+            <div style="padding:12px 14px 10px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:8px;min-width:0">
+              <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Billable vs Non-Bill</div>
+              <!-- Big numbers -->
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div>
+                  <div style="font-family:var(--font-display);font-size:22px;font-weight:700;line-height:1;color:var(--compass-cyan)">${weekBillable.toFixed(1)}h</div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:2px">billable</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-family:var(--font-display);font-size:22px;font-weight:700;line-height:1;color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h</div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:2px">non-bill</div>
+                </div>
+              </div>
+              <!-- The bar -->
+              ${weekTotal>0?`
+              <div>
+                <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.06)">
+                  <div style="width:${(weekBillable/weekTotal*100).toFixed(1)}%;background:var(--compass-cyan);transition:width .4s ease"></div>
+                  <div style="width:${((weekTotal-weekBillable)/weekTotal*100).toFixed(1)}%;background:#8B5CF6;transition:width .4s ease"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-head);font-size:11px;font-weight:700">
+                  <span style="color:var(--compass-cyan)">${weekTotal>0?Math.round(weekBillable/weekTotal*100):0}%</span>
+                  <span style="color:#8B5CF6">${weekTotal>0?Math.round((weekTotal-weekBillable)/weekTotal*100):0}%</span>
+                </div>
+              </div>
+              <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px">
+                <span style="color:var(--text1);font-weight:600">${weekTotal.toFixed(1)}h</span> total this week
+              </div>`:`<div style="font-family:var(--font-head);font-size:12px;color:var(--text3)">No hours logged yet</div>`}
+            </div>
           </div>
-          ${barLegend}
         </div>
 
         <!-- 1.C Work List -->
@@ -3393,19 +3429,29 @@ function openFullWeeklyTimesheet({ expandDay=null }={}) {
 // ══════════════════════════════════════════════════════════
 function openDayBriefing(dateStr) {
   document.getElementById('day-briefing-drawer')?.remove();
-  const today=new Date().toLocaleDateString('en-CA');
-  const dayEntries=_teEntries.filter(e=>e.date===dateStr);
-  const totalHrs=dayEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
-  const billHrs=dayEntries.filter(e=>e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
-  const nonBillHrs=totalHrs-billHrs;
-  const dayLabel=new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  _renderDayBriefing(dateStr, null);
+}
 
-  const projDist={};
+function _renderDayBriefing(dateStr, expandEntryId) {
+  document.getElementById('day-briefing-drawer')?.remove();
+
+  const today      = new Date().toLocaleDateString('en-CA');
+  const dayEntries = _teEntries.filter(e => e.date === dateStr);
+  const totalHrs   = dayEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const billHrs    = dayEntries.filter(e=>e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const nonBillHrs = totalHrs - billHrs;
+  const dayLabel   = new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  // Project distribution
+  const projDist = {};
   dayEntries.forEach(e=>{const pid=e.project_id||'__none__';projDist[pid]=(projDist[pid]||0)+parseFloat(e.hours||0);});
-  const distColors=['var(--compass-cyan)','var(--compass-amber)','var(--compass-green)','var(--compass-purple)','var(--compass-red)'];
-  const projDistArr=Object.entries(projDist).map(([pid,hrs])=>{const proj=_projects.find(p=>p.id===pid);return{pid,name:proj?.name||'Unassigned',hrs,pct:totalHrs>0?Math.round(hrs/totalHrs*100):0};}).sort((a,b)=>b.hrs-a.hrs);
+  const distColors = ['var(--compass-cyan)','var(--compass-amber)','var(--compass-green)','var(--compass-purple)','var(--compass-red)'];
+  const projDistArr = Object.entries(projDist).map(([pid,hrs])=>{
+    const proj=_projects.find(p=>p.id===pid);
+    return{pid,name:proj?.name||'Unassigned',hrs,pct:totalHrs>0?Math.round(hrs/totalHrs*100):0};
+  }).sort((a,b)=>b.hrs-a.hrs);
 
-  const distBarHtml=totalHrs>0?`
+  const distBarHtml = totalHrs>0 ? `
     <div style="display:flex;height:7px;border-radius:4px;overflow:hidden;margin-bottom:8px">
       ${projDistArr.map((p,i)=>`<div style="width:${p.pct}%;background:${distColors[i%distColors.length]};min-width:${p.pct>0?2:0}px" title="${p.name}: ${p.pct}%"></div>`).join('')}
     </div>
@@ -3415,47 +3461,134 @@ function openDayBriefing(dateStr) {
         <span style="font-family:var(--font-body);font-size:12px;color:var(--text1);flex:1">${esc(p.name)}</span>
         <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${distColors[i%distColors.length]}">${p.pct}% (${p.hrs.toFixed(1)}h)</span>
       </div>`).join('')}
-    </div>`:'<div style="font-family:var(--font-head);font-size:12px;color:var(--text3)">No entries for this day</div>';
+    </div>` : '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3)">No entries for this day</div>';
 
-  const billBarHtml=totalHrs>0?`
-    <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;margin:8px 0 6px">
-      <div style="width:${(billHrs/totalHrs*100).toFixed(0)}%;background:var(--compass-cyan)"></div>
-      <div style="width:${(nonBillHrs/totalHrs*100).toFixed(0)}%;background:#8B5CF6"></div>
+  const billBarHtml = totalHrs>0 ? `
+    <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;margin:8px 0 4px">
+      <div style="width:${(billHrs/totalHrs*100).toFixed(1)}%;background:var(--compass-cyan)"></div>
+      <div style="width:${(nonBillHrs/totalHrs*100).toFixed(1)}%;background:#8B5CF6"></div>
     </div>
     <div style="display:flex;justify-content:space-between;font-family:var(--font-head);font-size:11px;font-weight:700">
-      <span style="color:var(--compass-cyan)">Billable ${billHrs.toFixed(1)}h (${totalHrs>0?Math.round(billHrs/totalHrs*100):0}%)</span>
-      <span style="color:#8B5CF6">Non-bill ${nonBillHrs.toFixed(1)}h (${totalHrs>0?Math.round(nonBillHrs/totalHrs*100):0}%)</span>
-    </div>`:'';
+      <span style="color:var(--compass-cyan)">Billable ${billHrs.toFixed(1)}h (${Math.round(billHrs/totalHrs*100)}%)</span>
+      <span style="color:#8B5CF6">Non-bill ${nonBillHrs.toFixed(1)}h (${Math.round(nonBillHrs/totalHrs*100)}%)</span>
+    </div>` : '';
 
-  const entriesHtml=dayEntries.length>0?dayEntries.map(e=>{
-    const proj=_projects.find(p=>p.id===e.project_id);
-    const isDirect=e.source_type==='direct';
-    const pctOfDay=totalHrs>0?Math.round(parseFloat(e.hours)/totalHrs*100):0;
-    return `<div style="border:1px solid var(--border);border-radius:3px;margin-bottom:6px;
-      transition:border-color .12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)'" onmouseleave="this.style.borderColor='var(--border)'">
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px">
-        <span style="color:${e.source_type==='step_comment'?'var(--compass-amber)':'var(--text3)'};font-size:12px;flex-shrink:0">${e.source_type==='step_comment'?'■':'●'}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.step_name||proj?.name||'—')}</div>
-          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${esc(proj?.name||'—')} · ${pctOfDay}% of day · ${parseFloat(e.hours).toFixed(1)}h</div>
+  // ── Entry rows — clickable, expand inline for direct edits ──────
+  function entryRowHtml(e) {
+    const proj     = _projects.find(p=>p.id===e.project_id);
+    const isDirect = e.source_type === 'direct';
+    const isExp    = e.id === expandEntryId;
+    const pctOfDay = totalHrs>0 ? Math.round(parseFloat(e.hours)/totalHrs*100) : 0;
+    const entryHrs = parseFloat(e.hours||0);
+    const billDot  = `<div style="width:8px;height:8px;border-radius:50%;background:${e.is_billable?'var(--compass-cyan)':'#8B5CF6'};flex-shrink:0"></div>`;
+
+    const expandForm = isDirect ? `
+      <div class="db-entry-edit" data-entry-id="${e.id}" style="padding:10px 12px 12px;border-top:1px solid rgba(0,210,255,.15);background:rgba(0,210,255,.03)">
+        <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;margin-bottom:8px;align-items:end">
+          <div>
+            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Hours</div>
+            <input class="db-edit-hrs" data-entry-id="${e.id}" type="number" min="0.25" max="24" step="0.25"
+              value="${entryHrs.toFixed(2)}"
+              style="width:100%;font-family:var(--font-display);font-size:18px;font-weight:700;padding:6px 8px;
+                background:var(--bg2);border:1px solid var(--compass-cyan);color:var(--compass-cyan);
+                outline:none;text-align:center;box-sizing:border-box"/>
+          </div>
+          <div>
+            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Project</div>
+            <select class="db-edit-proj" data-entry-id="${e.id}"
+              style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:600;padding:7px 8px;
+                background:var(--bg2);border:1px solid var(--border);color:var(--text1);cursor:pointer;box-sizing:border-box">
+              ${(_projects||[]).filter(p=>p.status==='active').map(p=>`<option value="${p.id}" ${p.id===e.project_id?'selected':''}>${esc(p.name)}</option>`).join('')}
+            </select>
+          </div>
         </div>
-        <div style="width:8px;height:8px;border-radius:50%;background:${e.is_billable?'var(--compass-cyan)':'#8B5CF6'};flex-shrink:0"></div>
-        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--compass-cyan);min-width:40px;text-align:right">${parseFloat(e.hours).toFixed(1)}h</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <input class="db-edit-desc" data-entry-id="${e.id}" type="text"
+            value="${esc(e.notes||e.step_name||'')}" placeholder="Notes…"
+            style="flex:1;font-family:var(--font-body);font-size:12px;padding:6px 8px;
+              background:var(--bg2);border:1px solid var(--border);color:var(--text1);outline:none"/>
+          <div class="db-edit-bill" data-entry-id="${e.id}" data-bill="${e.is_billable?'1':'0'}"
+            style="padding:6px 10px;border:1px solid ${e.is_billable?'rgba(0,210,255,.4)':'rgba(139,92,246,.4)'};
+              background:${e.is_billable?'rgba(0,210,255,.12)':'rgba(139,92,246,.12)'};
+              color:${e.is_billable?'var(--compass-cyan)':'#8B5CF6'};
+              font-family:var(--font-head);font-size:11px;font-weight:700;cursor:pointer;
+              white-space:nowrap;border-radius:2px;user-select:none"
+            onclick="const t=this;const v=t.dataset.bill==='1'?'0':'1';t.dataset.bill=v;
+              t.style.borderColor=v==='1'?'rgba(0,210,255,.4)':'rgba(139,92,246,.4)';
+              t.style.background=v==='1'?'rgba(0,210,255,.12)':'rgba(139,92,246,.12)';
+              t.style.color=v==='1'?'var(--compass-cyan)':'#8B5CF6';
+              t.textContent=v==='1'?'Billable':'Non-bill'">
+            ${e.is_billable?'Billable':'Non-bill'}
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="db-edit-status" data-entry-id="${e.id}"
+            style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px"></span>
+          <div style="display:flex;gap:8px">
+            <button class="db-edit-delete" data-entry-id="${e.id}"
+              style="font-family:var(--font-head);font-size:11px;font-weight:600;letter-spacing:.06em;
+                padding:5px 10px;background:none;border:1px solid rgba(226,75,74,.3);
+                color:rgba(226,75,74,.7);cursor:pointer"
+              onmouseenter="this.style.borderColor='var(--compass-red)';this.style.color='var(--compass-red)'"
+              onmouseleave="this.style.borderColor='rgba(226,75,74,.3)';this.style.color='rgba(226,75,74,.7)'">Delete</button>
+            <button class="db-edit-save" data-entry-id="${e.id}"
+              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;
+                padding:5px 14px;background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer"
+              onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save →</button>
+          </div>
+        </div>
+      </div>` : `
+      <div style="padding:6px 12px 8px;border-top:1px solid var(--border);background:rgba(239,159,39,.05)">
+        <span style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber)">■ Via Cadence — read only</span>
+        <a href="/cadence.html" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);margin-left:12px;text-decoration:none;border:1px solid rgba(239,159,39,.4);padding:2px 8px">Open →</a>
+      </div>`;
+
+    return `<div class="db-entry-row" data-entry-id="${e.id}" data-direct="${isDirect}"
+      style="border:1px solid ${isExp?'rgba(0,210,255,.4)':'var(--border)'};
+        border-radius:3px;margin-bottom:6px;overflow:hidden;
+        transition:border-color .12s">
+      <div class="db-entry-header" data-entry-id="${e.id}"
+        style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:${isDirect?'pointer':'default'}"
+        ${isDirect?`onmouseenter="this.parentElement.style.borderColor='rgba(0,210,255,.35)'"
+          onmouseleave="this.parentElement.style.borderColor='${isExp?'rgba(0,210,255,.4)':'var(--border)'}'"`:''}>
+        <span style="color:${e.source_type==='step_comment'?'var(--compass-amber)':'var(--text3)'};font-size:12px;flex-shrink:0">
+          ${e.source_type==='step_comment'?'■':'●'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${esc(e.step_name||proj?.name||'—')}</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+            ${esc(proj?.name||'—')} · ${pctOfDay}% of day
+            ${isDirect?'<span style="color:rgba(0,210,255,.4);margin-left:6px">click to edit</span>':''}</div>
+        </div>
+        ${billDot}
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;
+          color:${e.is_billable?'var(--compass-cyan)':'#8B5CF6'};min-width:40px;text-align:right">
+          ${entryHrs.toFixed(1)}h</div>
+        ${isDirect?`<span style="color:var(--text3);font-size:10px;margin-left:2px;transition:transform .15s;
+          transform:${isExp?'rotate(90deg)':'rotate(0deg)'};display:inline-block">▶</span>`:''}
       </div>
-      ${!isDirect?`<div style="padding:6px 10px 8px;border-top:1px solid var(--border);background:rgba(239,159,39,.05)">
-        <span style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber)">■ Logged via Cadence — read only</span>
-        <a href="/cadence.html" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);margin-left:12px;text-decoration:none;border:1px solid rgba(239,159,39,.4);padding:2px 8px">Open in Cadence →</a>
-      </div>`:''}
+      <div class="db-entry-body" style="display:${isExp?'block':'none'}">
+        ${expandForm}
+      </div>
     </div>`;
-  }).join(''):'<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);padding:4px 0">No entries for this day</div>';
+  }
 
-  if(!document.getElementById('db-style')){const s=document.createElement('style');s.id='db-style';s.textContent='@keyframes db-slide{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}';document.head.appendChild(s);}
+  const entriesHtml = dayEntries.length>0
+    ? dayEntries.map(entryRowHtml).join('')
+    : '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);padding:4px 0">No entries for this day</div>';
 
-  const drawer=document.createElement('div');
-  drawer.id='day-briefing-drawer';
-  drawer.style.cssText='position:fixed;top:44px;right:0;bottom:0;width:420px;z-index:150;background:var(--bg1,#0c1628);border-left:1px solid var(--border);box-shadow:-10px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:db-slide .22s ease';
+  if (!document.getElementById('db-style')) {
+    const s=document.createElement('style');s.id='db-style';
+    s.textContent='@keyframes db-slide{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}';
+    document.head.appendChild(s);
+  }
 
-  drawer.innerHTML=`
+  const drawer = document.createElement('div');
+  drawer.id = 'day-briefing-drawer';
+  drawer.style.cssText = 'position:fixed;top:44px;right:0;bottom:0;width:420px;z-index:150;background:var(--bg1,#0c1628);border-left:1px solid var(--border);box-shadow:-10px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:db-slide .22s ease';
+
+  drawer.innerHTML = `
     <div style="flex-shrink:0;padding:12px 16px 10px;border-bottom:1px solid var(--border)">
       <div style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--compass-cyan);margin-bottom:2px">Day Intelligence Briefing</div>
       <div style="display:flex;align-items:baseline;justify-content:space-between">
@@ -3466,15 +3599,18 @@ function openDayBriefing(dateStr) {
       </div>
       <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">${totalHrs.toFixed(1)}h logged</div>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:14px 16px">
+    <div id="db-scroll" style="flex:1;overflow-y:auto;padding:14px 16px">
       <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Where Your Time Went</div>
       ${distBarHtml}
       ${totalHrs>0?`<div style="margin-top:14px">
         <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Billable vs Non-Billable</div>
         ${billBarHtml}</div>`:''}
       <div style="margin-top:16px">
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Time Entries</div>
-        ${entriesHtml}
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">
+          Time Entries
+          ${dayEntries.length>0?`<span style="font-weight:400;color:var(--muted);font-size:11px;text-transform:none;letter-spacing:0;margin-left:6px">— click direct entries to edit</span>`:''}
+        </div>
+        <div id="db-entries-list">${entriesHtml}</div>
       </div>
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
         <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Add Entry</div>
@@ -3499,33 +3635,124 @@ function openDayBriefing(dateStr) {
         <span id="db-status" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);display:block;min-height:14px;margin-top:4px"></span>
       </div>
     </div>
-    <div style="flex-shrink:0;padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <span style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--text2)">Total: <span style="color:var(--compass-cyan)">${totalHrs.toFixed(1)}h</span></span>
+    <div id="db-footer" style="flex-shrink:0;padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <span style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--text2)">
+          Total: <span id="db-total-hrs" style="color:var(--compass-cyan)">${totalHrs.toFixed(1)}h</span>
+        </span>
+        <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-left:8px">
+          <span id="db-bill-summary" style="color:var(--compass-cyan)">${billHrs.toFixed(1)}h</span> bill ·
+          <span id="db-nonbill-summary" style="color:#8B5CF6">${nonBillHrs.toFixed(1)}h</span> non-bill
+        </span>
+      </div>
       <button onclick="document.getElementById('day-briefing-drawer').remove();openFullWeeklyTimesheet({expandDay:'${dateStr}'})"
-        style="font-family:var(--font-head);font-size:11px;color:var(--compass-cyan);background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Open full week view →</button>
+        style="font-family:var(--font-head);font-size:11px;color:var(--compass-cyan);background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Full week →</button>
     </div>`;
 
   document.body.appendChild(drawer);
 
-  drawer.querySelector('#db-add-btn')?.addEventListener('click', async () => {
-    const desc=drawer.querySelector('#db-desc')?.value?.trim()||'';
-    const hrs=parseFloat(drawer.querySelector('#db-hrs')?.value||0);
-    const proj=drawer.querySelector('#db-proj')?.value||'';
-    const bill=drawer.querySelector('#db-bill-toggle')?.dataset?.bill==='1';
-    const statusEl=drawer.querySelector('#db-status');
-    const btn=drawer.querySelector('#db-add-btn');
-    if(!hrs||hrs<=0){if(statusEl)statusEl.textContent='Hours required';return;}
-    if(!proj){if(statusEl)statusEl.textContent='Project required';return;}
-    btn.textContent='…';btn.disabled=true;if(statusEl)statusEl.textContent='';
-    try{
-      const id=crypto.randomUUID();
-      await API.post('time_entries',{id,firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
-        resource_id:_myResource?.id,user_id:_myResource?.user_id||null,
-        project_id:proj,source_type:'direct',date:dateStr,hours:hrs,is_billable:bill,notes:desc||null});
-      compassToast('Entry added');drawer.remove();_viewLoaded['user']=false;loadUserView();
-    }catch(e){btn.textContent='Add Entry →';btn.disabled=false;if(statusEl)statusEl.textContent='Failed — '+e.message;}
+  // ── Toggle expand/collapse on entry header click ────────────────
+  drawer.addEventListener('click', async ev => {
+    // Toggle entry expand
+    const header = ev.target.closest('.db-entry-header');
+    if (header && !ev.target.closest('.db-edit-save,.db-edit-delete,.db-edit-bill')) {
+      const entryId = header.dataset.entryId;
+      const row     = header.closest('.db-entry-row');
+      if (!row || row.dataset.direct !== 'true') return;
+      const body    = row.querySelector('.db-entry-body');
+      const chevron = row.querySelector('span[style*="rotate"]');
+      const isOpen  = body.style.display !== 'none';
+      // Close all others first
+      drawer.querySelectorAll('.db-entry-body').forEach(b => { b.style.display='none'; });
+      drawer.querySelectorAll('span[style*="rotate"]').forEach(ch => { ch.style.transform='rotate(0deg)'; });
+      drawer.querySelectorAll('.db-entry-row').forEach(r => { r.style.borderColor='var(--border)'; });
+      if (!isOpen) {
+        body.style.display = 'block';
+        if (chevron) chevron.style.transform = 'rotate(90deg)';
+        row.style.borderColor = 'rgba(0,210,255,.4)';
+        row.querySelector('.db-edit-hrs')?.focus();
+      }
+      return;
+    }
+
+    // Save entry edit
+    const saveBtn = ev.target.closest('.db-edit-save');
+    if (saveBtn) {
+      const entryId  = saveBtn.dataset.entryId;
+      const row      = saveBtn.closest('.db-entry-row');
+      const hrsInput = row.querySelector('.db-edit-hrs');
+      const projSel  = row.querySelector('.db-edit-proj');
+      const descInp  = row.querySelector('.db-edit-desc');
+      const billTog  = row.querySelector('.db-edit-bill');
+      const statusEl = row.querySelector('.db-edit-status');
+      const hrs      = parseFloat(hrsInput?.value||0);
+      const projId   = projSel?.value||null;
+      const desc     = descInp?.value?.trim()||null;
+      const isBill   = billTog?.dataset?.bill === '1';
+      if (!hrs || hrs<=0) { if(statusEl) statusEl.textContent='Hours required'; return; }
+      saveBtn.textContent='…'; saveBtn.disabled=true; if(statusEl) statusEl.textContent='';
+      try {
+        await API.patch(`time_entries?id=eq.${entryId}`, {
+          hours:hrs, project_id:projId, notes:desc, is_billable:isBill,
+          updated_at: new Date().toISOString()
+        });
+        // Update in-memory cache immediately
+        const cached = _teEntries.find(e=>e.id===entryId);
+        if (cached) { cached.hours=hrs; cached.project_id=projId; cached.notes=desc; cached.is_billable=isBill; }
+        compassToast('Entry saved');
+        // Re-render briefing with same entry expanded (so user sees the updated values)
+        _renderDayBriefing(dateStr, null);
+        // Refresh main view in background (updates gauges + billable summary)
+        _viewLoaded['user']=false; loadUserView();
+      } catch(e) {
+        saveBtn.textContent='Save →'; saveBtn.disabled=false;
+        if(statusEl) statusEl.textContent='Failed — '+e.message;
+      }
+      return;
+    }
+
+    // Delete entry
+    const delBtn = ev.target.closest('.db-edit-delete');
+    if (delBtn) {
+      if (!confirm('Delete this time entry?')) return;
+      const entryId = delBtn.dataset.entryId;
+      try {
+        await API.del(`time_entries?id=eq.${entryId}`);
+        _teEntries = _teEntries.filter(e=>e.id!==entryId);
+        compassToast('Entry deleted');
+        _renderDayBriefing(dateStr, null);
+        _viewLoaded['user']=false; loadUserView();
+      } catch(e) { compassToast('Delete failed',2000); }
+      return;
+    }
+
+    // Add new entry
+    if (ev.target.closest('#db-add-btn')) {
+      const desc=drawer.querySelector('#db-desc')?.value?.trim()||'';
+      const hrs=parseFloat(drawer.querySelector('#db-hrs')?.value||0);
+      const proj=drawer.querySelector('#db-proj')?.value||'';
+      const bill=drawer.querySelector('#db-bill-toggle')?.dataset?.bill==='1';
+      const statusEl=drawer.querySelector('#db-status');
+      const btn=drawer.querySelector('#db-add-btn');
+      if(!hrs||hrs<=0){if(statusEl)statusEl.textContent='Hours required';return;}
+      if(!proj){if(statusEl)statusEl.textContent='Project required';return;}
+      btn.textContent='…';btn.disabled=true;if(statusEl)statusEl.textContent='';
+      try{
+        const id=crypto.randomUUID();
+        const newEntry={id,firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
+          resource_id:_myResource?.id,user_id:_myResource?.user_id||null,
+          project_id:proj,source_type:'direct',date:dateStr,hours:hrs,is_billable:bill,notes:desc||null};
+        await API.post('time_entries', newEntry);
+        _teEntries.unshift({...newEntry});
+        compassToast('Entry added');
+        _renderDayBriefing(dateStr, null);
+        _viewLoaded['user']=false; loadUserView();
+      }catch(e){btn.textContent='Add Entry →';btn.disabled=false;if(statusEl)statusEl.textContent='Failed — '+e.message;}
+      return;
+    }
   });
 }
+
 
 // ── Time entry edit drawer ────────────────────────────────
 function openTimeEntryEdit(entry, taskId = null, projectId = null) {
