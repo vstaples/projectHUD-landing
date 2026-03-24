@@ -1387,36 +1387,57 @@ async function loadUserView() {
           <div class="cmp-panel">
             <div class="panel-hdr">
               <div class="panel-title">My work</div>
-              ${overdueCount > 0
-                ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>`
-                : '<span class="panel-badge pb-green">All current</span>'}
+              <div style="display:flex;align-items:center;gap:8px">
+                ${overdueCount > 0
+                  ? `<span class="panel-badge pb-red">${overdueCount} overdue</span>`
+                  : '<span class="panel-badge pb-green">All current</span>'}
+              </div>
+            </div>
+            <!-- Column header row -->
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 13px 4px;
+              border-bottom:1px solid var(--border);
+              font-family:var(--font-mono);font-size:10px;color:var(--text3);
+              letter-spacing:.08em;text-transform:uppercase">
+              <div style="width:8px;flex-shrink:0"></div>
+              <div style="flex:1">Task / Action item</div>
+              <div style="width:120px;text-align:center;flex-shrink:0">Progress</div>
+              <div style="width:60px;text-align:center;flex-shrink:0;
+                ${overdueCount > 0 ? 'color:var(--compass-red)' : ''}">
+                ${overdueCount > 0 ? overdueCount + ' overdue' : 'Status'}
+              </div>
+              <div style="width:74px;text-align:center;flex-shrink:0"></div>
             </div>
             ${workItems.length === 0
               ? `<div style="padding:18px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No open items assigned to you</div>`
               : workItems.map(w => `
               <div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
-                data-wi-projectid="${w.projectId || ''}">
-                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px;
+                data-wi-projectid="${w.projectId || ''}"
+                style="align-items:center;gap:8px">
+                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
                   background:${w.overdue ? 'var(--compass-red)' : w.due ? 'var(--compass-amber)' : 'var(--border)'}"></div>
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(w.title)}</div>
                   <div class="row-sub">${esc(w.project)} · ${w.type === 'task' ? 'Task' : 'Action item'}${w.due ? ' · Due ' + fmtDate(w.due) : ''}</div>
-                  ${w.type === 'task' ? `
-                  <div style="display:flex;align-items:center;gap:7px;margin-top:5px">
-                    <div style="flex:1;height:3px;background:var(--bg2);border-radius:2px;overflow:hidden">
-                      <div style="height:100%;width:${Math.min(w.pct,100)}%;
-                        background:${w.pct >= 80 ? 'var(--compass-green)' : w.pct >= 40 ? 'var(--compass-cyan)' : 'var(--text3)'};
-                        border-radius:2px;transition:width .3s"></div>
-                    </div>
-                    <span style="font-family:var(--font-mono);font-size:10px;
-                      color:${w.pct >= 80 ? 'var(--compass-green)' : w.pct > 0 ? 'var(--compass-cyan)' : 'var(--text3)'};
-                      flex-shrink:0;min-width:28px;text-align:right">${w.pct}%</span>
-                  </div>` : ''}
                 </div>
-                ${w.overdue ? `<span class="status-badge sb-risk" style="flex-shrink:0">${daysOverdue(w.due)}d over</span>` : ''}
+                <!-- Progress column — fixed 120px, bar + % inline -->
+                <div style="width:120px;flex-shrink:0;display:flex;align-items:center;gap:5px">
+                  ${w.type === 'task' ? `
+                  <div style="flex:1;height:4px;background:var(--bg2);border-radius:2px;overflow:hidden">
+                    <div style="height:100%;width:${Math.min(w.pct,100)}%;
+                      background:${w.pct >= 80 ? 'var(--compass-green)' : w.pct >= 40 ? 'var(--compass-cyan)' : w.pct > 0 ? 'var(--text3)' : 'transparent'};
+                      border-radius:2px;transition:width .3s"></div>
+                  </div>
+                  <span style="font-family:var(--font-mono);font-size:11px;flex-shrink:0;width:32px;text-align:right;
+                    color:${w.pct >= 80 ? 'var(--compass-green)' : w.pct > 0 ? 'var(--compass-cyan)' : 'var(--text3)'}">
+                    ${w.pct}%</span>` : `<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>`}
+                </div>
+                <!-- Overdue column — fixed 60px -->
+                <div style="width:60px;flex-shrink:0;text-align:center">
+                  ${w.overdue ? `<span class="status-badge sb-risk" style="font-size:10px">${daysOverdue(w.due)}d</span>` : ''}
+                </div>
                 <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}"
                   data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}"
-                  style="padding:3px 10px;flex-shrink:0">Complete</button>
+                  style="padding:3px 10px;width:74px;flex-shrink:0">Complete</button>
               </div>`).join('')}
           </div>
         </div>
@@ -2751,10 +2772,26 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
   if (!entry) { openNewTimeEntry(taskId, projectId); return; }
   document.getElementById('te-edit-drawer')?.remove();
 
+  // Show all entries for the same week — mini weekly timesheet
+  const weekEntries = _teEntries.filter(e =>
+    entry.week_start_date
+      ? e.week_start_date === entry.week_start_date
+      : e.date && entry.date && e.date.slice(0,7) === entry.date.slice(0,7)
+  ).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+  const weekTotal = weekEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  const weekLabel = (() => {
+    if (!entry.week_start_date) return fmtDate(entry.date);
+    const ws = new Date(entry.week_start_date + 'T00:00:00');
+    const we = new Date(ws.getTime() + 6 * 86400000);
+    return ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      + ' – ' + we.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  })();
+
   const drawer = document.createElement('div');
   drawer.id = 'te-edit-drawer';
   drawer.style.cssText = `
-    position:fixed;top:0;right:0;bottom:0;width:320px;z-index:600;
+    position:fixed;top:0;right:0;bottom:0;width:440px;z-index:600;
     background:var(--bg1,#0c1628);
     border-left:1px solid var(--border,rgba(0,210,255,.12));
     box-shadow:-8px 0 32px rgba(0,0,0,.5);
@@ -2765,123 +2802,140 @@ function openTimeEntryEdit(entry, taskId = null, projectId = null) {
   if (!document.getElementById('te-style')) {
     const s = document.createElement('style');
     s.id = 'te-style';
-    s.textContent = `
-      @keyframes te-slide-in { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
-      .te-label { font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.08em;
-        text-transform:uppercase;color:var(--text3);margin-bottom:5px;display:block }
-      .te-input { width:100%;font-family:var(--font-ui,sans-serif);font-size:13px;
-        padding:8px 10px;background:var(--bg2,#0a1220);
-        border:1px solid var(--border,rgba(0,210,255,.12));color:var(--text1);
-        outline:none;box-sizing:border-box;transition:border-color .15s }
-      .te-input:focus { border-color:rgba(0,210,255,.5) }
-    `;
+    s.textContent = '@keyframes te-slide-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}';
     document.head.appendChild(s);
   }
 
-  const isEditable = entry.source_type === 'direct';
-
-  // Pre-compute all conditional attribute values — avoids ternaries inside HTML attributes
-  // which cause browser parser errors when } or ' appear inside attribute strings
-  const roAttr      = isEditable ? '' : 'readonly';
-  const roStyle     = isEditable ? '' : 'opacity:.6;cursor:not-allowed';
-  const disAttr     = isEditable ? '' : 'disabled';
-  const labelCursor = isEditable ? 'pointer' : 'default';
-  const hoursVal    = parseFloat(entry.hours).toFixed(2);
-  const notesVal    = esc(entry.notes || '');
-  const billChecked = entry.is_billable ? 'checked' : '';
-  const sourceLabel = entry.source_type === 'step_comment' ? 'Cadence' : 'import';
-  const dateLabel   = fmtDate(entry.date);
-  const titleLabel  = esc(entry.step_name || entry.project_name);
-  const sourceStr   = entry.source_type === 'step_comment' ? 'via Cadence' : entry.source_type;
+  const rowHtml = weekEntries.map(e => {
+    const proj     = _projects.find(p => p.id === e.project_id);
+    const isDirect = e.source_type === 'direct';
+    const srcIcon  = e.source_type === 'step_comment' ? '◈' : e.source_type === 'action_item' ? '⊡' : '●';
+    const srcColor = e.source_type === 'step_comment' ? 'var(--compass-cyan)' : 'var(--text3)';
+    const isActive = e.id === entry.id;
+    const dayName  = new Date(e.date + 'T00:00:00').toLocaleDateString('en-US',{weekday:'short'});
+    const dayNum   = new Date(e.date + 'T00:00:00').getDate();
+    return `<div style="border-bottom:1px solid var(--border);padding:10px 16px;
+        background:${isActive ? 'rgba(0,210,255,.04)' : ''};
+        border-left:3px solid ${isActive ? 'var(--compass-cyan)' : 'transparent'}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <span style="font-size:12px;color:${srcColor};flex-shrink:0">${srcIcon}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
+          color:var(--text0);flex-shrink:0;min-width:48px">${dayName} ${dayNum}</span>
+        <span style="font-family:var(--font-ui);font-size:11px;color:var(--text2);
+          flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(e.step_name || proj?.name || '—')}</span>
+        ${isDirect ? `<button data-te-del="${e.id}"
+          style="background:none;border:none;color:rgba(226,75,74,.4);font-size:13px;
+            cursor:pointer;padding:0;line-height:1;flex-shrink:0"
+          onmouseenter="this.style.color='var(--compass-red)'"
+          onmouseleave="this.style.color='rgba(226,75,74,.4)'" title="Delete">✕</button>` : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:72px 1fr 28px 52px;gap:6px;align-items:center">
+        <input type="number" min="0.25" max="24" step="0.25"
+          value="${parseFloat(e.hours).toFixed(2)}"
+          ${!isDirect ? 'readonly' : ''}
+          data-te-field="hours" data-te-id="${e.id}"
+          style="font-family:var(--font-mono);font-size:13px;font-weight:600;
+            padding:5px 6px;background:var(--bg2);text-align:center;
+            border:1px solid ${isActive ? 'rgba(0,210,255,.35)' : 'var(--border)'};
+            color:${e.is_billable ? 'var(--compass-cyan)' : 'var(--text2)'};
+            outline:none;width:100%;box-sizing:border-box;
+            ${!isDirect ? 'opacity:.5;cursor:not-allowed' : ''}"/>
+        <input type="text"
+          value="${esc(e.notes || '')}"
+          ${!isDirect ? 'readonly' : ''}
+          data-te-field="notes" data-te-id="${e.id}"
+          placeholder="${isDirect ? 'Notes…' : '—'}"
+          style="font-family:var(--font-ui);font-size:11px;
+            padding:5px 8px;background:var(--bg2);
+            border:1px solid ${isActive ? 'rgba(0,210,255,.35)' : 'var(--border)'};
+            color:var(--text1);outline:none;width:100%;box-sizing:border-box;
+            ${!isDirect ? 'opacity:.5;cursor:not-allowed' : ''}"/>
+        <label style="display:flex;align-items:center;justify-content:center;cursor:${isDirect ? 'pointer' : 'default'}">
+          <input type="checkbox" ${e.is_billable ? 'checked' : ''}
+            ${!isDirect ? 'disabled' : ''}
+            data-te-field="billable" data-te-id="${e.id}"
+            style="accent-color:var(--compass-cyan);width:13px;height:13px"/>
+        </label>
+        ${isDirect ? `<button data-te-save="${e.id}"
+          style="font-family:var(--font-mono);font-size:10px;font-weight:600;
+            padding:5px 0;background:var(--compass-cyan);color:#060a10;
+            border:none;cursor:pointer;width:100%"
+          onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Save</button>` :
+          `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:center">${srcIcon}</span>`}
+      </div>
+    </div>`;
+  }).join('');
 
   drawer.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;
-      padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div>
         <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-          text-transform:uppercase;color:var(--compass-cyan);margin-bottom:3px">
-          ${isEditable ? 'Edit time entry' : 'Time entry detail'}
-        </div>
+          text-transform:uppercase;color:var(--compass-cyan);margin-bottom:2px">Timesheet</div>
         <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">
-          ${titleLabel}
-        </div>
-        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">
-          ${dateLabel} · ${sourceStr}
+          Week of ${weekLabel}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">
+          ${weekEntries.length} ${weekEntries.length === 1 ? 'entry' : 'entries'} ·
+          <span style="color:var(--compass-cyan);font-weight:600">${weekTotal.toFixed(1)}h total</span>
         </div>
       </div>
       <button onclick="document.getElementById('te-edit-drawer').remove()"
-        style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;
-          padding:0;line-height:1;flex-shrink:0"
+        style="background:none;border:none;color:var(--text3);font-size:18px;
+          cursor:pointer;padding:0;line-height:1"
         onmouseenter="this.style.color='var(--text0)'"
         onmouseleave="this.style.color='var(--text3)'">✕</button>
     </div>
-
-    <div style="flex:1;overflow-y:auto;padding:16px">
-      ${!isEditable ? `
-      <div style="background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);
-        padding:10px 12px;margin-bottom:16px;font-family:var(--font-mono);font-size:10px;
-        color:var(--compass-amber);line-height:1.6">
-        This entry was created via ${sourceLabel}.<br>
-        Edit it in the source system to maintain the audit trail.
-      </div>` : ''}
-      <div style="margin-bottom:14px">
-        <label class="te-label">Hours</label>
-        <input id="te-hours" class="te-input" type="number" min="0.25" max="24" step="0.25"
-          value="${hoursVal}" ${roAttr} style="${roStyle}" />
-      </div>
-      <div style="margin-bottom:14px">
-        <label class="te-label">Notes</label>
-        <textarea id="te-notes" class="te-input" rows="3"
-          style="resize:vertical;min-height:70px;${roStyle}"
-          ${roAttr} placeholder="What did you work on?">${notesVal}</textarea>
-      </div>
-      <div style="margin-bottom:14px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:${labelCursor}">
-          <input id="te-billable" type="checkbox" ${billChecked}
-            ${disAttr} style="accent-color:var(--compass-cyan);width:14px;height:14px" />
-          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
-            letter-spacing:.08em;text-transform:uppercase">Billable</span>
-        </label>
-      </div>
+    <div style="display:grid;grid-template-columns:60px 1fr 28px 52px;gap:6px;
+      padding:5px 16px;border-bottom:1px solid var(--border);flex-shrink:0;
+      font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase">
+      <span>Hours</span><span>Notes</span><span style="text-align:center">Bill</span><span></span>
     </div>
-
-    ${isEditable ? `
-    <div style="padding:12px 16px;border-top:1px solid var(--border);
-      display:flex;gap:8px;flex-shrink:0">
-      <button onclick="deleteTimeEntry('${entry.id}')"
-        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
-          text-transform:uppercase;padding:7px 14px;background:none;
-          border:1px solid rgba(226,75,74,.35);color:var(--compass-red);
-          cursor:pointer;transition:all .12s"
-        onmouseenter="this.style.background='rgba(226,75,74,.1)'"
-        onmouseleave="this.style.background='none'">Delete</button>
-      <div style="flex:1"></div>
-      <button onclick="document.getElementById('te-edit-drawer').remove()"
-        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
-          text-transform:uppercase;padding:7px 14px;background:none;
-          border:1px solid var(--border);color:var(--text3);cursor:pointer">Cancel</button>
-      <button onclick="saveTimeEntry('${entry.id}')"
+    <div style="flex:1;overflow-y:auto">
+      ${rowHtml || '<div style="padding:20px 16px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No entries for this week</div>'}
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <button class="te-new-btn"
         style="font-family:var(--font-mono);font-size:10px;font-weight:600;
-          letter-spacing:.08em;text-transform:uppercase;padding:7px 18px;
-          background:var(--compass-cyan);color:#060a10;border:none;cursor:pointer"
-        onmouseenter="this.style.opacity='.85'"
-        onmouseleave="this.style.opacity='1'">Save →</button>
-    </div>` : `
-    <div style="padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0">
+          letter-spacing:.06em;color:var(--compass-cyan);background:none;
+          border:1px solid rgba(0,210,255,.25);padding:5px 12px;cursor:pointer"
+        onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+        onmouseleave="this.style.background='none'">+ Log time</button>
       <button onclick="document.getElementById('te-edit-drawer').remove()"
-        style="width:100%;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
-          text-transform:uppercase;padding:8px;background:none;
-          border:1px solid var(--border);color:var(--text2);cursor:pointer">Close</button>
-    </div>`}
-  `;
+        style="font-family:var(--font-mono);font-size:10px;padding:5px 14px;background:none;
+          border:1px solid var(--border);color:var(--text3);cursor:pointer">Close</button>
+    </div>`;
 
   document.body.appendChild(drawer);
+
+  drawer.addEventListener('click', async ev => {
+    const saveBtn = ev.target.closest('[data-te-save]');
+    if (saveBtn) {
+      const id    = saveBtn.dataset.teSave;
+      const hours = parseFloat(drawer.querySelector('[data-te-field="hours"][data-te-id="'+id+'"]')?.value);
+      const notes = drawer.querySelector('[data-te-field="notes"][data-te-id="'+id+'"]')?.value?.trim() || null;
+      const bill  = drawer.querySelector('[data-te-field="billable"][data-te-id="'+id+'"]')?.checked ?? true;
+      if (!hours || hours <= 0) { compassToast('Hours must be > 0', 2000); return; }
+      saveBtn.textContent = '…'; saveBtn.disabled = true;
+      try {
+        await API.patch('time_entries?id=eq.'+id, { hours, notes, is_billable: bill, updated_at: new Date().toISOString() });
+        compassToast('Saved'); _viewLoaded['user'] = false; drawer.remove(); loadUserView();
+      } catch(e) { saveBtn.textContent = 'Save'; saveBtn.disabled = false; compassToast('Failed', 2000); }
+    }
+    const delBtn = ev.target.closest('[data-te-del]');
+    if (delBtn) {
+      if (!confirm('Delete this entry?')) return;
+      try {
+        await API.del('time_entries?id=eq.'+delBtn.dataset.teDel);
+        compassToast('Deleted'); _viewLoaded['user'] = false; drawer.remove(); loadUserView();
+      } catch(e) { compassToast('Failed', 2000); }
+    }
+  });
+
   setTimeout(() => {
-    document.addEventListener('mousedown', function closeTE(ev) {
-      if (!drawer.contains(ev.target)) {
-        drawer.remove();
-        document.removeEventListener('mousedown', closeTE);
-      }
+    document.addEventListener('mousedown', function closeTEW(ev) {
+      if (!drawer.contains(ev.target)) { drawer.remove(); document.removeEventListener('mousedown', closeTEW); }
     });
   }, 50);
 }
