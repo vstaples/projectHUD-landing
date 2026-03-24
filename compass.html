@@ -5986,39 +5986,26 @@ window.loadUserConcerns = async function() {
   const el = document.getElementById('user-concerns-content');
   if (!el) return;
 
+  // Concerns stored in localStorage — no schema dependency
+  // Key: compass_concerns_<resource_id>
+  const resId = _myResource?.id || 'anon';
+  const storageKey = 'compass_concerns_' + resId;
   try {
-    const actorName = _myResource?.name || '';
-    // Concerns stored as workflow_step_instances with step_name prefix "CONCERN:"
-    // outcome: blocked=unread, at_risk=in_progress, on_track=resolved
-    const rows = await API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at&event_type=eq.task_progress_update&step_name=like.CONCERN:*&actor_name=eq.${encodeURIComponent(actorName)}&order=created_at.desc&limit=100`).catch(()=>[]);
-
-    _concernSeq = 0;
-    window._userConcerns = (rows||[]).map(r => {
-      const title = r.step_name.replace(/^CONCERN:\s*/,'').slice(0,100);
-      const statusMap = {'blocked':'unread','at_risk':'in_progress','on_track':'resolved'};
-      const status = statusMap[r.outcome] || 'unread';
-      return {
-        id: r.id,
-        cid: 'C-'+String(++_concernSeq).padStart(3,'0'),
-        title,
-        description: r.event_notes||'',
-        status,
-        priority: 'medium',
-        projectId: null, project: '—', phase: '',
-        raised_date: r.created_at?.slice(0,10),
-        raisedAt: r.created_at,
-        thread: [],
-      };
-    });
-
-    updateConcernBadge();
-    renderUserConcerns();
+    const raw = localStorage.getItem(storageKey);
+    window._userConcerns = raw ? JSON.parse(raw) : [];
   } catch(e) {
-    console.error('[Compass] concerns load error:', e);
     window._userConcerns = [];
-    renderUserConcerns();
   }
+
+  _concernSeq = window._userConcerns.length;
+  updateConcernBadge();
+  renderUserConcerns();
 };
+
+function saveConcerns() {
+  const resId = _myResource?.id || 'anon';
+  try { localStorage.setItem('compass_concerns_' + resId, JSON.stringify(window._userConcerns)); } catch(e) {}
+}
 
 function updateConcernBadge() {
   const unread = (window._userConcerns||[]).filter(c=>c.status==='unread'||c.status==='not_yet_read').length;
@@ -6161,73 +6148,66 @@ window.uToggleConcernExpand = function(id) {
 };
 
 window.uRaiseConcern = async function() {
-  const txt = document.getElementById('concern-new-text')?.value?.trim()||'';
+  const txt      = document.getElementById('concern-new-text')?.value?.trim()||'';
   const priority = document.getElementById('concern-new-priority')?.value||'medium';
   if (!txt) { compassToast('Enter a concern description',2000); return; }
-  // Store concern as workflow_step_instance — no separate concerns table needed
-  const result = await API.post('workflow_step_instances',{
-    id: crypto.randomUUID(), instance_id: crypto.randomUUID(), step_type: 'manual',
-    event_type: 'step_completed',
-    step_name: 'CONCERN: '+txt.slice(0,80),
-    event_notes: txt,
-    outcome: 'blocked',
-    actor_name: _myResource?.name||null,
-    created_at: new Date().toISOString(),
-    firm_id: 'aaaaaaaa-0001-0001-0001-000000000001'
-  }).catch(e=>{ console.error('[Compass] concern post error:',e); return null; });
-  if (result !== null) {
-    document.getElementById('concern-new-text').value = '';
-    compassToast('Concern logged · PM notified',2500);
-    window._concernsLoaded = false;
-    loadUserConcerns();
-  } else {
-    compassToast('Failed to log concern — check console',2500);
-  }
+  const resId = _myResource?.id||'anon';
+  const now   = new Date().toISOString();
+  const seq   = (window._userConcerns||[]).length + 1;
+  const newC  = {
+    id: crypto.randomUUID(),
+    cid: 'C-'+String(seq).padStart(3,'0'),
+    title: txt.slice(0,100),
+    description: txt,
+    status: 'unread',
+    priority,
+    projectId: null, project: '—', phase: '',
+    raised_date: now.slice(0,10),
+    raisedAt: now,
+    thread: [{who:_myResource?.name||'You', when:now, text:txt}],
+  };
+  window._userConcerns = [newC, ...(window._userConcerns||[])];
+  saveConcerns();
+  document.getElementById('concern-new-text').value = '';
+  compassToast('Concern logged',2000);
+  updateConcernBadge();
+  renderUserConcerns();
 };
 
 window.uEscalateConcern = function(concernId) {
-  API.post('workflow_step_instances',{
-    id:crypto.randomUUID(), instance_id:crypto.randomUUID(), step_type:'manual',
-    event_type:'step_completed',
-    step_name:'CONCERN: Escalation — '+concernId.slice(0,20),
-    event_notes:'User requested escalation.',
-    outcome:'at_risk',
-    actor_name:_myResource?.name||null,
-    created_at:new Date().toISOString(),
-    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
-  }).catch(()=>{});
-  compassToast('Escalation logged to CoC',2200);
+  const c = (window._userConcerns||[]).find(x=>x.id===concernId);
+  if (!c) return;
+  c.status = 'in_progress';
+  c.thread = c.thread||[];
+  c.thread.push({who:'System',when:new Date().toISOString(),text:'Escalated by raiser.'});
+  saveConcerns();
+  compassToast('Escalated · status → In progress',2200);
+  updateConcernBadge();
+  renderUserConcerns();
 };
 
 window.uAddConcernComment = function(concernId) {
-  const txt = prompt('Add a comment to this concern:');
+  const txt = prompt('Add a comment:');
   if (!txt?.trim()) return;
-  API.post('workflow_step_instances',{
-    id:crypto.randomUUID(), instance_id:crypto.randomUUID(), step_type:'manual',
-    event_type:'step_completed',
-    step_name:'CONCERN: Comment — '+concernId.slice(0,20),
-    event_notes:txt.trim(), outcome:'at_risk',
-    actor_name:_myResource?.name||null,
-    created_at:new Date().toISOString(),
-    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
-  }).catch(()=>{});
-  compassToast('Comment logged to CoC',2000);
-  window._concernsLoaded=false; loadUserConcerns();
+  const c = (window._userConcerns||[]).find(x=>x.id===concernId);
+  if (!c) return;
+  c.thread = c.thread||[];
+  c.thread.push({who:_myResource?.name||'You',when:new Date().toISOString(),text:txt.trim()});
+  saveConcerns();
+  compassToast('Comment added',2000);
+  renderUserConcerns();
 };
 
-window.uResolveConcern = async function(concernId) {
-  await API.post('workflow_step_instances',{
-    id:crypto.randomUUID(), instance_id:crypto.randomUUID(), step_type:'manual',
-    event_type:'step_completed',
-    step_name:'CONCERN: Resolved — '+concernId.slice(0,20),
-    event_notes:'Marked resolved by raiser.',
-    outcome:'on_track',
-    actor_name:_myResource?.name||null,
-    created_at:new Date().toISOString(),
-    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
-  }).catch(()=>{});
-  compassToast('Resolved · CoC updated',2000);
-  window._concernsLoaded=false; loadUserConcerns();
+window.uResolveConcern = function(concernId) {
+  const c = (window._userConcerns||[]).find(x=>x.id===concernId);
+  if (!c) return;
+  c.status = 'resolved';
+  c.thread = c.thread||[];
+  c.thread.push({who:_myResource?.name||'You',when:new Date().toISOString(),text:'Marked resolved.'});
+  saveConcerns();
+  compassToast('Resolved',2000);
+  updateConcernBadge();
+  renderUserConcerns();
 };
 
 // Auto-load concerns count for badge on view init
