@@ -5963,7 +5963,7 @@ window.uSaveOutcome = async function(meetingId) {
   if (!txt) { compassToast('Enter an outcome before saving',2000); return; }
   await API.post('workflow_step_instances',{
     id: crypto.randomUUID(), instance_id: crypto.randomUUID(), step_type: 'manual',
-    event_type: 'task_progress_update',
+    event_type: 'flag_acknowledged',
     step_name: 'Meeting outcome',
     event_notes: txt,
     actor_name: _myResource?.name||null,
@@ -6167,7 +6167,7 @@ window.uRaiseConcern = async function() {
   // Store concern as workflow_step_instance — no separate concerns table needed
   const result = await API.post('workflow_step_instances',{
     id: crypto.randomUUID(), instance_id: crypto.randomUUID(), step_type: 'manual',
-    event_type: 'task_progress_update',
+    event_type: 'flag_acknowledged',
     step_name: 'CONCERN: '+txt.slice(0,80),
     event_notes: txt,
     outcome: 'blocked',
@@ -6188,7 +6188,7 @@ window.uRaiseConcern = async function() {
 window.uEscalateConcern = function(concernId) {
   API.post('workflow_step_instances',{
     id:crypto.randomUUID(), instance_id:crypto.randomUUID(), step_type:'manual',
-    event_type:'task_progress_update',
+    event_type:'flag_acknowledged',
     step_name:'CONCERN: Escalation — '+concernId.slice(0,20),
     event_notes:'User requested escalation.',
     outcome:'at_risk',
@@ -6204,7 +6204,7 @@ window.uAddConcernComment = function(concernId) {
   if (!txt?.trim()) return;
   API.post('workflow_step_instances',{
     id:crypto.randomUUID(), instance_id:crypto.randomUUID(), step_type:'manual',
-    event_type:'task_progress_update',
+    event_type:'flag_acknowledged',
     step_name:'CONCERN: Comment — '+concernId.slice(0,20),
     event_notes:txt.trim(), outcome:'at_risk',
     actor_name:_myResource?.name||null,
@@ -6218,7 +6218,7 @@ window.uAddConcernComment = function(concernId) {
 window.uResolveConcern = async function(concernId) {
   await API.post('workflow_step_instances',{
     id:crypto.randomUUID(), instance_id:crypto.randomUUID(), step_type:'manual',
-    event_type:'task_progress_update',
+    event_type:'flag_acknowledged',
     step_name:'CONCERN: Resolved — '+concernId.slice(0,20),
     event_notes:'Marked resolved by raiser.',
     outcome:'on_track',
