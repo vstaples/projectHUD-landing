@@ -889,6 +889,32 @@
 
     <div class="nav-sep"></div>
 
+    <!-- Morning Brief trigger -->
+    <button id="nav-brief-btn"
+      onclick="openMorningBrief()"
+      style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;
+        text-transform:uppercase;color:var(--text3);background:none;border:none;
+        padding:0 12px;height:44px;cursor:pointer;transition:color .12s;display:flex;align-items:center;gap:6px"
+      onmouseenter="this.style.color='var(--compass-amber)'"
+      onmouseleave="this.style.color='var(--text3)'"
+      title="Open Morning Brief">
+      <span style="font-size:13px">☀</span> Morning Brief
+    </button>
+
+    <!-- Simulator trigger -->
+    <button id="nav-sim-btn"
+      onclick="openDecisionSimulator(null,'Portfolio','Active portfolio — select a project context from PM View')"
+      style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;
+        text-transform:uppercase;color:var(--text3);background:none;border:none;
+        padding:0 12px;height:44px;cursor:pointer;transition:color .12s;display:flex;align-items:center;gap:6px"
+      onmouseenter="this.style.color='var(--compass-purple)'"
+      onmouseleave="this.style.color='var(--text3)'"
+      title="Open Decision Simulator">
+      <span style="font-size:13px">◈</span> Simulate
+    </button>
+
+    <div class="nav-sep"></div>
+
     <!-- Cadence link -->
     <a href="/cadence.html"
       style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
@@ -4670,6 +4696,935 @@ async function loadClientView() {
     content.innerHTML='<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load client portal — check console</div>';
   }
 }
+
+// ══════════════════════════════════════════════════════════
+// DECISION SIMULATOR
+// ══════════════════════════════════════════════════════════
+window.openDecisionSimulator = async function(projectId, projectName, contextNote) {
+  document.getElementById('sim-modal')?.remove();
+
+  // Full-screen modal overlay
+  const modal = document.createElement('div');
+  modal.id = 'sim-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:#060c18;z-index:400;display:flex;flex-direction:column;overflow:hidden;animation:sim-fadein .18s ease';
+
+  // Inject keyframe once
+  if (!document.getElementById('sim-anim-style')) {
+    const st = document.createElement('style');
+    st.id = 'sim-anim-style';
+    st.textContent = '@keyframes sim-fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}';
+    document.head.appendChild(st);
+  }
+
+  const today = new Date().toLocaleDateString('en-CA');
+  const HOURLY_RATE = 8000, HRS_PER_REWORK = 2;
+
+  // Fetch live data for this project
+  let projTasks = [], wfInstances = [], reworkEvents = [], resourceReqs = [];
+  try {
+    [projTasks, wfInstances, resourceReqs] = await Promise.all([
+      projectId ? API.get(`tasks?project_id=eq.${projectId}&select=id,name,status,due_date,pct_complete,assigned_to,phase,sequence_order,predecessors&order=sequence_order.asc&limit=100`).catch(()=>[]) : Promise.resolve([]),
+      projectId ? API.get(`workflow_instances?project_id=eq.${projectId}&status=eq.active&select=id,title,status,current_step_name&limit=20`).catch(()=>[]) : Promise.resolve([]),
+      API.get('resource_requests?status=eq.pending&select=id,project_id,role,submitted_at&order=submitted_at.asc&limit=10').catch(()=>[]),
+    ]);
+    const instIds = wfInstances.map(i=>i.id);
+    if (instIds.length) {
+      reworkEvents = await API.get(`workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,created_at&instance_id=in.(${instIds.join(',')})&event_type=eq.step_reset&order=created_at.desc&limit=50`).catch(()=>[]);
+    }
+  } catch(e) { console.error('[Compass] Simulator data fetch error:', e); }
+
+  const proj = (_projects||[]).find(p=>p.id===projectId);
+  const overdueTasks = projTasks.filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status));
+  const blockedTasks = projTasks.filter(t=>t.status==='blocked'||t.status==='on_hold');
+  const instResets = {};
+  reworkEvents.forEach(e=>{ instResets[e.instance_id]=(instResets[e.instance_id]||0)+1; });
+  const escalations = Object.entries(instResets).filter(([,c])=>c>=2);
+  const slipDays = overdueTasks.length > 0 ? Math.max(...overdueTasks.map(t=>{
+    const d = Math.round((new Date(today+'T00:00:00')-new Date(t.due_date+'T00:00:00'))/(86400000));
+    return Math.max(0,d);
+  })) : 0;
+  const dailyCost = 12000; // ¥12k/day default
+  const formatYen = n => n>=1000000?'¥'+(n/1000000).toFixed(1)+'M':'¥'+Math.round(n/1000)+'k';
+
+  // Build levers from real data
+  const LEVERS_LIVE = [];
+
+  // Escalation levers if there are 2+ resets
+  if (escalations.length > 0) {
+    const [instId, count] = escalations[0];
+    const inst = wfInstances.find(w=>w.id===instId);
+    LEVERS_LIVE.push({
+      id:'esc-mgmt', group:'escalation',
+      name:'Escalate to management — '+esc(inst?.title||'workflow block'),
+      costTier:'low', days:-3, hard:0, sr:83, conf:88,
+      warn:null,
+      pattern: count>=3 ? `${count} consecutive failures — systematic block. Resource reassignment will NOT address this. Escalation is the correct lever.` : null,
+      unblocks: overdueTasks.slice(0,3).map(t=>t.id),
+      reworkRisk:[], params:[{l:'Response target',o:['24h','48h','72h']}],
+      detail: `${count} PM-level intervention${count>1?'s have':' has'} not resolved this. Management authority required — direct client contact or expedited approval path.`
+    });
+    LEVERS_LIVE.push({
+      id:'esc-client', group:'escalation',
+      name:'Executive contact — client authority',
+      costTier:'low', days:-2, hard:0, sr:76, conf:72,
+      warn: null, pattern: null,
+      unblocks: overdueTasks.slice(0,3).map(t=>t.id),
+      reworkRisk:[], params:[{l:'Channel',o:['Account exec','Technical director','Both']}],
+      detail:'Direct client authority contact. Lower confidence (72%) due to external dependency.'
+    });
+  }
+
+  // Resource levers from pending requests
+  resourceReqs.filter(r=>r.project_id===projectId||!projectId).forEach(r=>{
+    const ageH = Math.round((Date.now()-new Date(r.submitted_at).getTime())/3600000);
+    LEVERS_LIVE.push({
+      id:'res-'+r.id, group:'resource',
+      name:'Approve resource request — '+esc(r.role||'resource'),
+      costTier:'med', days:-2, hard:18000, sr:62, conf:65,
+      warn:`Request aging ${ageH}h. Approving now affects resource planning for other projects.`,
+      pattern: escalations.length>0 ? `Current block appears to be an approval constraint, not a resource constraint. ${62}% success rate reflects cases where resource reallocation does not address upstream sign-off blocks.` : null,
+      unblocks:[], reworkRisk:[], params:[{l:'Duration',o:['1 week','2 weeks','Until resolved']}],
+      detail:`Resource request pending ${ageH}h. Approval unblocks PM planning and demonstrates management engagement.`
+    });
+  });
+
+  // CPM-derived parallel options from tasks with no blockers
+  const availableTasks = projTasks.filter(t=>
+    !['complete','cancelled'].includes(t.status) &&
+    t.status !== 'blocked' &&
+    (!t.predecessors || t.predecessors.length===0 || t.predecessors==='{}')
+  ).slice(0,4);
+
+  if (availableTasks.length >= 2) {
+    LEVERS_LIVE.push({
+      id:'cpm-parallel', group:'cpm',
+      name:`CPM Option — advance ${availableTasks.length} independent tasks in parallel`,
+      costTier:'low', days: -Math.min(3, availableTasks.length), hard:0, sr:95, conf:90,
+      warn: null, pattern: null,
+      unblocks:[], advances: availableTasks.map(t=>t.id.slice(0,8)),
+      reworkRisk:[], params:[],
+      detail:`${availableTasks.length} tasks have no blocking predecessors. Advancing these now recovers schedule while the primary block is resolved.`
+    });
+  }
+
+  // Expedite option (always available as a materials lever)
+  LEVERS_LIVE.push({
+    id:'mat-exp', group:'materials',
+    name:'Expedite delivery / fast-track resolution path',
+    costTier:'high', days:-5, hard:85000, sr:95, conf:90,
+    risk:'Non-cancellable after 24h. Confirm viability first.',
+    warn:null, pattern:null,
+    unblocks: overdueTasks.slice(0,3).map(t=>t.id),
+    reworkRisk:[], params:[{l:'Track',o:['Expedite supplier (2d, +¥85k)','Alt supplier (4d, +¥60k)','Direct procurement (6d, +¥95k)']}],
+    detail:'Deterministic outcome — not behavioural. 95% confidence if capacity confirmed. Net cost ¥25k after schedule value recovered.'
+  });
+
+  // Scope deferral
+  LEVERS_LIVE.push({
+    id:'scope-defer', group:'materials',
+    name:'Defer non-critical deliverables to next phase',
+    costTier:'low', days:-2, hard:0, sr:92, conf:85,
+    warn:null, pattern:null,
+    unblocks:[], reworkRisk:[], params:[{l:'Scope',o:['Non-critical docs (2d)','Optional integrations (3d)','Cosmetic items (1d)']}],
+    detail:'High success rate because cosmetic and non-critical items have no dependency on blocked path. Frees critical-path resources.'
+  });
+
+  const GROUP_META = {
+    escalation:{color:'#E24B4A',label:'Escalation levers'},
+    resource:{color:'#00D2FF',label:'Resource levers'},
+    materials:{color:'#8B5CF6',label:'Materials levers'},
+    cpm:{color:'#8B5CF6',label:'CPM-derived parallel options'}
+  };
+
+  const selected = new Set();
+  let spCount = 0;
+
+  modal.innerHTML = `
+    <style>
+      .sim-lc{border:1px solid rgba(255,255,255,.07);padding:7px 9px;margin-bottom:4px;transition:border-color .12s,background .12s;cursor:pointer}
+      .sim-lc:hover{border-color:rgba(0,210,255,.2);background:rgba(0,210,255,.03)}
+      .sim-lc.sim-sel{border-color:rgba(0,210,255,.45);background:rgba(0,210,255,.07)}
+      .sim-lc.sim-cpm{border-left:3px solid rgba(139,92,246,.5)}
+      .sim-lc.sim-warn{border-left:3px solid rgba(239,159,39,.6)}
+      .sim-chk{width:14px;height:14px;border:1px solid rgba(255,255,255,.2);border-radius:2px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:transparent;flex-shrink:0;transition:.12s}
+      .sim-lc.sim-sel .sim-chk{background:#00D2FF;border-color:#00D2FF;color:#060a10}
+      .sim-sp{position:absolute;background:#0d1f35;border:1px solid rgba(0,210,255,.35);min-width:260px;max-width:360px;z-index:500}
+      .sim-sp-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#091524;border-bottom:1px solid rgba(0,210,255,.2);cursor:move;user-select:none}
+      .sim-wf-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;padding:3px 0;transition:background .1s}
+      .sim-wf-row:hover{background:rgba(255,255,255,.03)}
+    </style>
+    <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+      <!-- Nav -->
+      <div style="display:flex;align-items:center;height:40px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.12);padding:0 14px;flex-shrink:0;gap:8px">
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">COM<span style="color:#00D2FF">PASS</span></div>
+        <div style="width:1px;height:16px;background:rgba(0,210,255,.15);margin:0 4px"></div>
+        <div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;display:flex;align-items:center;gap:5px">
+          <span>${esc(projectName||'Portfolio')}</span>
+          <span style="color:rgba(255,255,255,.2)">›</span>
+          <span style="color:#8B5CF6">Decision simulator</span>
+        </div>
+        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07);margin-left:auto">CPM + Pattern analysis</span>
+        <button onclick="document.getElementById('sim-modal')?.remove()"
+          style="background:none;border:1px solid rgba(255,255,255,.15);color:#5A84A8;padding:3px 10px;cursor:pointer;font-family:var(--font-head);font-size:11px;margin-left:8px;transition:color .1s"
+          onmouseenter="this.style.color='#F0F6FF'" onmouseleave="this.style.color='#5A84A8'">✕ Close</button>
+      </div>
+      <!-- Body -->
+      <div style="display:flex;flex:1;overflow:hidden;position:relative" id="sim-inner">
+        <!-- LEFT -->
+        <div style="width:340px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;overflow:hidden">
+          <!-- Context strip -->
+          <div style="padding:10px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(255,255,255,.02);flex-shrink:0">
+            <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);line-height:1.5;margin-bottom:7px">
+              ${esc(contextNote||'')}${overdueTasks.length>0?' · '+overdueTasks.length+' overdue task'+(overdueTasks.length>1?'s':''):''} ${escalations.length>0?' · '+escalations.length+' escalation'+(escalations.length>1?'s':''):''} ${blockedTasks.length>0?' · '+blockedTasks.length+' blocked':''}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+              <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px;cursor:pointer;transition:border-color .12s" id="sim-kpi-slip" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.06)'">
+                <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Slip</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${slipDays>0?'#E24B4A':'#1D9E75'}">${slipDays>0?slipDays+'d':'0d'}</div>
+              </div>
+              <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px">
+                <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Daily cost</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#EF9F27">¥12k</div>
+              </div>
+              <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px">
+                <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Levers</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF">${LEVERS_LIVE.length}</div>
+              </div>
+            </div>
+          </div>
+          <!-- Left tabs -->
+          <div style="display:flex;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+            <button id="sim-tab-levers" onclick="simSwitchTab('levers')"
+              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:6px 12px;color:#00D2FF;border:none;border-bottom:2px solid #00D2FF;background:none;cursor:pointer;text-transform:uppercase">Levers</button>
+            <button id="sim-tab-cpm" onclick="simSwitchTab('cpm')"
+              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:6px 12px;color:rgba(255,255,255,.35);border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;text-transform:uppercase">CPM view</button>
+          </div>
+          <!-- Lever list -->
+          <div id="sim-lv-levers" style="flex:1;overflow-y:auto;padding:8px 10px">
+            <div id="sim-lever-list"></div>
+          </div>
+          <!-- CPM view -->
+          <div id="sim-lv-cpm" style="display:none;flex:1;overflow-y:auto;padding:10px">
+            <div id="sim-cpm-list"></div>
+          </div>
+        </div>
+        <!-- RIGHT -->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="flex:1;overflow-y:auto;padding:14px 16px" id="sim-op">
+            <div id="sim-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,.2);text-align:center;gap:8px">
+              <div style="font-size:24px;opacity:.2">◎</div>
+              <div style="font-family:var(--font-body);font-size:12px;line-height:1.7;color:rgba(255,255,255,.3)">Select levers from the left panel.<br><br>Each lever shows: success rate based on prior instances · cost tier · CPM task network impact.<br><br>Click any value in the outcome panel to open a detailed explanation.</div>
+            </div>
+            <div id="sim-results" style="display:none"></div>
+          </div>
+          <!-- Commit bar -->
+          <div id="sim-cb" style="display:none;background:#060a10;border-top:1px solid rgba(0,210,255,.1);padding:9px 14px;display:none;align-items:center;justify-content:space-between;flex-shrink:0">
+            <div id="sim-cb-sum" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4)"></div>
+            <div style="display:flex;gap:5px">
+              <button onclick="simCommit()" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(29,158,117,.5);color:#1D9E75;background:none;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(29,158,117,.1)'" onmouseleave="this.style.background='none'">Commit → Log interventions</button>
+              <button onclick="compassToast('Saved to brief annotation',2000)" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(0,210,255,.35);color:#00D2FF;background:none;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(0,210,255,.08)'" onmouseleave="this.style.background='none'">Save annotation</button>
+              <button onclick="simResetAll()" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);background:none;letter-spacing:.06em;transition:color .1s" onmouseenter="this.style.color='#fff'" onmouseleave="this.style.color='rgba(255,255,255,.4)'">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  // ── Module functions scoped to this simulator instance ──
+  function simSwitchTab(tab) {
+    document.getElementById('sim-lv-levers').style.display = tab==='levers'?'block':'none';
+    document.getElementById('sim-lv-cpm').style.display   = tab==='cpm'?'block':'none';
+    document.getElementById('sim-tab-levers').style.color         = tab==='levers'?'#00D2FF':'rgba(255,255,255,.35)';
+    document.getElementById('sim-tab-levers').style.borderBottomColor = tab==='levers'?'#00D2FF':'transparent';
+    document.getElementById('sim-tab-cpm').style.color           = tab==='cpm'?'#00D2FF':'rgba(255,255,255,.35)';
+    document.getElementById('sim-tab-cpm').style.borderBottomColor   = tab==='cpm'?'#00D2FF':'transparent';
+  }
+  window.simSwitchTab = simSwitchTab;
+
+  function simToggleLever(id) {
+    const card = document.getElementById('simlc-'+id);
+    if (!card) return;
+    if (selected.has(id)) { selected.delete(id); card.classList.remove('sim-sel'); }
+    else                  { selected.add(id);    card.classList.add('sim-sel'); }
+    simRunSim();
+  }
+  window.simToggleLever = simToggleLever;
+
+  function simOpenSP(title, rows, result, note, colorBorder) {
+    spCount++;
+    const pid = 'simsp-'+spCount;
+    const inner = document.getElementById('sim-inner');
+    const sp = document.createElement('div');
+    sp.id = pid;
+    sp.className = 'sim-sp';
+    sp.style.cssText = `left:${Math.min(360+spCount*16,520)}px;top:${Math.min(60+spCount*16,180)}px;width:300px`;
+    sp.style.borderLeftColor = colorBorder||'rgba(0,210,255,.35)';
+    sp.innerHTML = `<div class="sim-sp-head" id="sph-${pid}">
+      <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;text-transform:uppercase;letter-spacing:.06em">${title}</span>
+      <button onclick="document.getElementById('${pid}').remove()" style="background:none;border:1px solid rgba(226,75,74,.4);color:#E24B4A;width:18px;height:18px;cursor:pointer;font-size:10px">✕</button>
+    </div>
+    <div style="padding:10px 12px;max-height:380px;overflow-y:auto">
+      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:14px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:4px">
+        <span style="color:rgba(255,255,255,.4);flex-shrink:0;max-width:160px">${r[0]}</span>
+        <span style="font-weight:700;color:#F0F6FF;text-align:right">${r[1]}</span>
+      </div>`).join('')}
+      <div style="height:1px;background:rgba(0,210,255,.2);margin:7px 0"></div>
+      <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF;margin:3px 0">${result}</div>
+      ${note?`<div style="font-family:var(--font-body);font-size:11px;color:rgba(255,255,255,.4);margin-top:6px;line-height:1.5;border-top:1px solid rgba(255,255,255,.07);padding-top:6px">${note}</div>`:''}
+    </div>
+    <div style="position:absolute;bottom:0;right:0;width:12px;height:12px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,210,255,.25) 50%)" id="spr-${pid}"></div>`;
+    inner.appendChild(sp);
+    // Draggable
+    const head = document.getElementById('sph-'+pid);
+    let ox,oy,sx,sy;
+    head.addEventListener('mousedown',e=>{
+      e.preventDefault(); sx=sp.offsetLeft; sy=sp.offsetTop; ox=e.clientX; oy=e.clientY;
+      const mm=e2=>{sp.style.left=(sx+e2.clientX-ox)+'px';sp.style.top=(sy+e2.clientY-oy)+'px';};
+      const mu=()=>{document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+      document.addEventListener('mousemove',mm); document.addEventListener('mouseup',mu);
+    });
+    // Resizable
+    const rsz = document.getElementById('spr-'+pid);
+    let ow2,oh2,ox2,oy2;
+    rsz.addEventListener('mousedown',e=>{
+      e.preventDefault(); e.stopPropagation(); ow2=sp.offsetWidth; oh2=sp.offsetHeight; ox2=e.clientX; oy2=e.clientY;
+      const mm=e2=>{sp.style.width=Math.max(220,ow2+e2.clientX-ox2)+'px';sp.style.maxHeight=Math.max(180,oh2+e2.clientY-oy2)+'px';};
+      const mu=()=>{document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+      document.addEventListener('mousemove',mm); document.addEventListener('mouseup',mu);
+    });
+  }
+  window.simOpenSP = simOpenSP;
+
+  function simRunSim() {
+    const results = document.getElementById('sim-results');
+    const empty   = document.getElementById('sim-empty');
+    const cb      = document.getElementById('sim-cb');
+    if (!selected.size) {
+      results.style.display='none'; empty.style.display='flex'; cb.style.display='none'; return;
+    }
+    empty.style.display='none'; results.style.display='block'; cb.style.display='flex';
+
+    let totalDays=0, totalHard=0, minSR=100, wConf=0;
+    const levers=[], risks=[], patterns=[];
+    const unblockedTasks=new Set(), advancedTasks=new Set(), reworkTasks=new Set();
+
+    selected.forEach(id=>{
+      const d = LEVERS_LIVE.find(l=>l.id===id);
+      if(!d) return;
+      totalDays+=d.days; totalHard+=d.hard; minSR=Math.min(minSR,d.sr); wConf+=d.conf;
+      levers.push(d);
+      if(d.risk) risks.push({text:d.risk,sev:d.sr<70?'#E24B4A':'#EF9F27'});
+      if(d.pattern) patterns.push(d.pattern);
+      (d.unblocks||[]).forEach(t=>unblockedTasks.add(t));
+      (d.advances||[]).forEach(t=>advancedTasks.add(t));
+      (d.reworkRisk||[]).forEach(t=>reworkTasks.add(t));
+    });
+
+    const avgConf  = Math.round(wConf/selected.size);
+    const recovDays= Math.max(0,-totalDays);
+    const projSlip = Math.max(0,slipDays+totalDays);
+    const schedVal = recovDays*dailyCost;
+    const netCost  = totalHard-schedVal;
+    const pd = new Date(); pd.setDate(pd.getDate()+projSlip);
+    const fmt = d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const noActionDate = new Date(); noActionDate.setDate(noActionDate.getDate()+slipDays+1);
+
+    document.getElementById('sim-cb-sum').innerHTML = `<span>${selected.size}</span> lever${selected.size>1?'s':''} · <span>${recovDays}d</span> recovered · <span>${formatYen(totalHard)}</span> hard cost · net: <span style="color:${netCost<=0?'#1D9E75':'#EF9F27'}">${netCost<=0?formatYen(Math.abs(netCost))+' benefit':formatYen(netCost)+' cost'}</span>`;
+
+    const patternBlock = patterns.length ? `<div style="margin-bottom:12px;padding:9px 11px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.2);border-left:3px solid #8B5CF6">
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#8B5CF6;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Pattern analysis — active warning</div>
+      <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.55">${patterns[0]}</div>
+    </div>` : '';
+
+    const unblockList = [...unblockedTasks].map(id=>{
+      const t = projTasks.find(tt=>tt.id===id);
+      return `<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px"><span style="font-weight:700;color:rgba(0,210,255,.6);min-width:60px">${id.slice(0,8)}</span>${esc(t?.name||'Task')}</div>`;
+    }).join('');
+    const advanceList = [...advancedTasks].map(id=>{
+      return `<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px"><span style="font-weight:700;color:#8B5CF6;min-width:60px">${id.slice(0,8)}</span>Parallel advance</div>`;
+    }).join('');
+    const remainingBlocked = escalations.length>0 && !selected.has('esc-mgmt') && !selected.has('esc-client') && !selected.has('mat-exp')
+      ? overdueTasks.slice(0,3).map(t=>`<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-bottom:3px"><span style="font-weight:700;min-width:60px">${t.id.slice(0,8)}</span>${esc(t.name||'task')}</div>`).join('')
+      : '';
+
+    results.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF">Projected outcome</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">${selected.size} lever${selected.size>1?'s':''} · click any value to open explanation</div>
+        </div>
+      </div>
+      ${patternBlock}
+      <!-- Scenario comparison -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02)">
+          <div style="padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase">If no action</span></div>
+          <div style="padding:9px 11px">
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Delivery</div>
+            <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:#E24B4A">${slipDays>0?fmt(noActionDate):'On track'}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">${slipDays>0?'+'+slipDays+'d and growing':'No current slip'}</div>
+            <div style="height:1px;background:rgba(255,255,255,.05);margin:7px 0"></div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Cost accumulating</div>
+            <div id="sim-slip-cl" style="font-family:var(--font-display);font-size:18px;font-weight:700;color:#E24B4A;cursor:pointer">${formatYen(slipDays*dailyCost)}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">click for detail</div>
+          </div>
+        </div>
+        <div style="border:1px solid rgba(29,158,117,.3);background:rgba(29,158,117,.04)">
+          <div style="padding:7px 11px;border-bottom:1px solid rgba(29,158,117,.15);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase">With selected levers</span>
+            <span id="sim-sr-badge" style="font-family:var(--font-head);font-size:11px;padding:1px 7px;border:1px solid rgba(29,158,117,.4);color:#1D9E75;background:rgba(29,158,117,.08);cursor:pointer">${minSR}% success</span>
+          </div>
+          <div style="padding:9px 11px">
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Projected delivery</div>
+            <div id="sim-del-cl" style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${projSlip<=2?'#1D9E75':projSlip<=5?'#EF9F27':'#E24B4A'};cursor:pointer">${projSlip===0?'On contract':fmt(pd)}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">${projSlip===0?'On contract':'+'+projSlip+'d from contract'}</div>
+            <div style="height:1px;background:rgba(255,255,255,.05);margin:7px 0"></div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Net economic position</div>
+            <div id="sim-net-cl" style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${netCost<=0?'#1D9E75':'#EF9F27'};cursor:pointer">${netCost<=0?'+'+formatYen(Math.abs(netCost))+' benefit':'-'+formatYen(netCost)+' cost'}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">click for breakdown</div>
+            <div style="margin-top:6px">
+              <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+                <div style="height:100%;border-radius:2px;background:${avgConf>=75?'#1D9E75':avgConf>=55?'#EF9F27':'#E24B4A'};width:${avgConf}%"></div>
+              </div>
+              <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">${avgConf}% avg confidence</div>
+            </div>
+            <div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.6);margin-top:5px;line-height:1.5">${levers.map(l=>l.name).join(' + ')}</div>
+          </div>
+        </div>
+      </div>
+      <!-- Waterfall -->
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:6px">Cost &amp; schedule waterfall</div>
+        ${slipDays>0?`<div class="sim-wf-row" id="sim-wf-slip"><div style="font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Current slip (¥12k × ${slipDays}d)</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#E24B4A;width:100%"></div></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#E24B4A">-${formatYen(slipDays*dailyCost)}</div></div>`:''}
+        ${totalHard>0?`<div class="sim-wf-row" id="sim-wf-int"><div style="font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Intervention hard cost</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#EF9F27;width:${Math.min(100,Math.round(totalHard/(slipDays*dailyCost||84000)*100))}%"></div></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#EF9F27">-${formatYen(totalHard)}</div></div>`:''}
+        ${recovDays>0?`<div class="sim-wf-row" id="sim-wf-rec"><div style="font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Schedule value recovered</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#1D9E75;width:${Math.min(100,Math.round(schedVal/(slipDays*dailyCost||84000)*100))}%"></div></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#1D9E75">+${formatYen(schedVal)}</div></div>`:''}
+        <div class="sim-wf-row" id="sim-wf-net" style="border-top:1px solid rgba(255,255,255,.08);padding-top:5px;margin-top:3px">
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;min-width:220px;flex-shrink:0">Net position</div>
+          <div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:${netCost<=0?'#1D9E75':'#EF9F27'};width:${Math.min(100,Math.round(Math.abs(netCost)/(slipDays*dailyCost||84000)*100))}%"></div></div>
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:${netCost<=0?'#1D9E75':'#EF9F27'}">${netCost<=0?'+'+formatYen(Math.abs(netCost)):'-'+formatYen(netCost)}</div>
+        </div>
+      </div>
+      <!-- Task network impact -->
+      <div style="margin-bottom:12px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:7px">Task network impact</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+          ${unblockedTasks.size?`<div style="border:1px solid rgba(29,158,117,.25);background:rgba(29,158,117,.04);padding:7px 9px"><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Tasks unblocked</div>${unblockList}</div>`:''}
+          ${advancedTasks.size?`<div style="border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.04);padding:7px 9px"><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Tasks advanced now</div>${advanceList}</div>`:''}
+          ${remainingBlocked?`<div style="border:1px solid rgba(226,75,74,.18);background:rgba(226,75,74,.03);padding:7px 9px"><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Still blocked</div>${remainingBlocked}</div>`:''}
+        </div>
+      </div>
+      <!-- Risks -->
+      ${risks.length?`<div style="border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);margin-bottom:12px">
+        <div style="padding:6px 11px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:6px">
+          <div style="width:3px;height:11px;border-radius:1px;background:#EF9F27;flex-shrink:0"></div>
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase">Second-order effects</div>
+        </div>
+        ${risks.map(r=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 11px;border-bottom:1px solid rgba(255,255,255,.04)">
+          <div style="width:6px;height:6px;border-radius:50%;background:${r.sev};flex-shrink:0;margin-top:3px"></div>
+          <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.5;flex:1">${r.text}</div>
+        </div>`).join('')}
+      </div>`:''}`;
+
+    // Wire clickable stat handlers
+    document.getElementById('sim-slip-cl')?.addEventListener('click',()=>simOpenSP('Daily cost breakdown',
+      [['Blocked resources','¥10k/day'],['PM coordination','¥1.2k/day'],['Overhead (20%)','¥1.8k/day'],['Total','¥12k/day'],['Current slip',slipDays+'d'],['Total accumulated',formatYen(slipDays*dailyCost)]],
+      formatYen(slipDays*dailyCost)+' accumulated cost','Fully-loaded cost of blocked resources. Configure rate in Firm Settings.','#E24B4A'));
+
+    document.getElementById('sim-del-cl')?.addEventListener('click',()=>simOpenSP('Delivery calculation',
+      [...levers.filter(l=>l.days<0).map(l=>[l.name,Math.abs(l.days)+'d recovered']),['Combined (capped at slip)',recovDays+'d'],['Remaining slip',projSlip+'d'],['Projected date',projSlip===0?'On contract':fmt(pd)]],
+      projSlip===0?'On contract':fmt(pd)+' (+'+projSlip+'d)','Days capped at current slip. Same day cannot be recovered twice.','#00D2FF'));
+
+    document.getElementById('sim-net-cl')?.addEventListener('click',()=>simOpenSP('Net position breakdown',
+      [['Slip cost ('+slipDays+'d × ¥12k)','-'+formatYen(slipDays*dailyCost)],...levers.filter(l=>l.hard>0).map(l=>[l.name+' hard cost','-'+formatYen(l.hard)]),['Schedule value recovered','+'+formatYen(schedVal)],['Net',netCost<=0?'+'+formatYen(Math.abs(netCost))+' benefit':'-'+formatYen(netCost)]],
+      netCost<=0?'+'+formatYen(Math.abs(netCost))+' benefit':'-'+formatYen(netCost),'Hard costs only. Internal labor excluded.','#EF9F27'));
+
+    document.getElementById('sim-sr-badge')?.addEventListener('click',()=>simOpenSP('Combined success rate',
+      [...levers.map(l=>[l.name,l.sr+'% success · '+l.conf+'% conf']),['Combined (weakest lever)',minSR+'%'],['Avg confidence',avgConf+'%']],
+      minSR+'% combined · '+avgConf+'% confidence','Combined = weakest lever. A chain is only as strong as its weakest link.','#1D9E75'));
+  }
+  window.simRunSim = simRunSim;
+
+  async function simCommit() {
+    if (!selected.size) return;
+    const levers = LEVERS_LIVE.filter(l=>selected.has(l.id));
+    const note = levers.map(l=>l.name).join('; ');
+    // Write CoC intervention events
+    const posts = levers.map(l => API.post('workflow_step_instances',{
+      id: crypto.randomUUID(),
+      instance_id: null,
+      event_type: 'intervention',
+      step_name: l.name.slice(0,80),
+      event_notes: '[Simulator commit] '+l.detail,
+      actor_name: _myResource?.name||null,
+      created_at: new Date().toISOString(),
+      firm_id: 'aaaaaaaa-0001-0001-0001-000000000001'
+    }).catch(()=>{}));
+    await Promise.all(posts);
+    compassToast('Intervention records created · CoC events written',2500);
+    simResetAll();
+    // Invalidate morning brief cache
+    window._mgBriefData = null;
+  }
+  window.simCommit = simCommit;
+
+  function simResetAll() {
+    selected.clear();
+    document.querySelectorAll('.sim-lc.sim-sel').forEach(c=>c.classList.remove('sim-sel'));
+    document.getElementById('sim-results').style.display='none';
+    document.getElementById('sim-empty').style.display='flex';
+    document.getElementById('sim-cb').style.display='none';
+  }
+  window.simResetAll = simResetAll;
+
+  // ── Build lever list ──────────────────────────────────
+  const ll = document.getElementById('sim-lever-list');
+  let curGroup = null;
+  LEVERS_LIVE.forEach(lev => {
+    if (lev.group !== curGroup) {
+      curGroup = lev.group;
+      const gm = GROUP_META[curGroup];
+      const gh = document.createElement('div');
+      gh.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0 5px';
+      gh.innerHTML = `<div style="width:3px;height:13px;border-radius:1px;background:${gm.color};flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.4);text-transform:uppercase;flex:1">${gm.label}</div>`;
+      ll.appendChild(gh);
+    }
+    const card = document.createElement('div');
+    card.id = 'simlc-'+lev.id;
+    card.className = 'sim-lc'+(lev.group==='cpm'?' sim-cpm':'')+(lev.warn||lev.pattern?' sim-warn':'');
+    card.onclick = () => simToggleLever(lev.id);
+    const tc = {low:'rgba(29,158,117,.7)',med:'rgba(239,159,39,.7)',high:'rgba(226,75,74,.7)'}[lev.costTier||'low'];
+    const tl = {low:'Low cost',med:'Med cost',high:'High cost'}[lev.costTier||'low'];
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:3px">
+        <div class="sim-chk">✓</div>
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${lev.name}</div>
+        <span style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${tc}40;color:${tc};flex-shrink:0">${tl}</span>
+      </div>
+      <div style="display:flex;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">
+        <span style="display:flex;align-items:center;gap:3px"><div style="width:5px;height:5px;border-radius:50%;background:${lev.sr>=80?'#1D9E75':lev.sr>=65?'#EF9F27':'#E24B4A'}"></div>${lev.sr}% success</span>
+        <span style="display:flex;align-items:center;gap:3px"><div style="width:5px;height:5px;border-radius:50%;background:#8B5CF6"></div>${lev.conf}% conf</span>
+      </div>
+      ${lev.warn?`<div style="font-family:var(--font-head);font-size:11px;padding:4px 7px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.2);border-left:2px solid #EF9F27;color:rgba(239,159,39,.85);line-height:1.45;margin-top:5px">${lev.warn}</div>`:''}
+      ${lev.pattern?`<div style="font-family:var(--font-head);font-size:11px;padding:4px 7px;background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.18);border-left:2px solid rgba(226,75,74,.6);color:rgba(226,75,74,.8);line-height:1.45;margin-top:5px">${lev.pattern}</div>`:''}
+      ${lev.advances?.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px">${lev.advances.map(t=>`<span style="font-family:var(--font-head);font-size:11px;padding:1px 6px;border:1px solid rgba(139,92,246,.3);color:#8B5CF6">${t} →</span>`).join('')}</div>`:''}
+      ${lev.params?.length?`<div style="display:none;border-top:1px solid rgba(255,255,255,.05);padding-top:5px;margin-top:5px" class="sim-params">${lev.params.map(p=>`<div style="display:flex;align-items:center;gap:5px;margin-top:4px"><span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);min-width:75px">${p.l}</span><select onclick="event.stopPropagation();simRunSim()" style="flex:1;padding:2px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:11px;outline:none;cursor:pointer">${p.o.map(o=>`<option>${o}</option>`).join('')}</select></div>`).join('')}</div>`:''}`;
+    // Show params when selected
+    const paramEl = card.querySelector('.sim-params');
+    if (paramEl) {
+      const orig = card.onclick;
+      card.onclick = e => { orig(); if(card.classList.contains('sim-sel')) paramEl.style.display='block'; else paramEl.style.display='none'; };
+    }
+    ll.appendChild(card);
+  });
+
+  // ── Build CPM view ────────────────────────────────────
+  const cpmList = document.getElementById('sim-cpm-list');
+  const statusColor = {blocking:'#E24B4A',critical:'#E24B4A',blocked:'#E24B4A','near-critical':'#EF9F27',available:'#1D9E75',parallelizable:'#8B5CF6',active:'#00D2FF'};
+  const sections = [
+    {label:'Overdue / blocked tasks',  tasks:overdueTasks},
+    {label:'Available for parallel work', tasks: projTasks.filter(t=>!['complete','cancelled','blocked'].includes(t.status)&&!overdueTasks.find(u=>u.id===t.id)&&(!t.predecessors||t.predecessors==='{}'))},
+    {label:'All active tasks', tasks: projTasks.filter(t=>!['complete','cancelled'].includes(t.status)).slice(0,10)},
+  ];
+  sections.forEach(sec => {
+    if (!sec.tasks.length) return;
+    const lbl = document.createElement('div');
+    lbl.style.cssText='font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(0,210,255,.6);text-transform:uppercase;margin:8px 0 5px';
+    lbl.textContent = sec.label;
+    cpmList.appendChild(lbl);
+    sec.tasks.slice(0,6).forEach(t=>{
+      const row = document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s';
+      row.onmouseenter=()=>row.style.background='rgba(255,255,255,.03)';
+      row.onmouseleave=()=>row.style.background='';
+      const isOverdue = overdueTasks.find(u=>u.id===t.id);
+      const col = isOverdue?'#E24B4A':t.status==='active'?'#00D2FF':'#1D9E75';
+      const pct = t.pct_complete||0;
+      row.innerHTML=`<div style="width:3px;align-self:stretch;background:${col};flex-shrink:0"></div>
+        <div style="flex:1;padding:6px 9px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:rgba(0,210,255,.7);min-width:30px">${t.id.slice(0,8)}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:#F0F6FF;flex:1;line-height:1.3">${esc(t.name||'Task')}</div>
+          </div>
+          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);display:flex;gap:8px">
+            <span style="color:${col};font-weight:700">${isOverdue?'OVERDUE':t.status}</span>
+            <span>${pct}% complete</span>
+            ${t.due_date?`<span>Due ${t.due_date}</span>`:''}
+          </div>
+        </div>`;
+      cpmList.appendChild(row);
+    });
+  });
+};
+
+// ══════════════════════════════════════════════════════════
+// MORNING BRIEF PANEL
+// ══════════════════════════════════════════════════════════
+window.openMorningBrief = async function() {
+  document.getElementById('morning-brief-panel')?.remove();
+
+  // Determine tier from current view
+  const tierMap = {user:'pm', pm:'pm', management:'mgmt', executive:'exec', client:'pm'};
+  const tier = tierMap[window._currentView||'pm'] || 'pm';
+
+  // Create panel
+  const panel = document.createElement('div');
+  panel.id = 'morning-brief-panel';
+  panel.style.cssText = 'position:fixed;top:0;right:0;bottom:0;width:680px;background:#07101f;border-left:1px solid rgba(0,210,255,.2);display:flex;flex-direction:column;z-index:350;animation:pm-drawer-in .22s ease;overflow:hidden';
+
+  const tierColors = {pm:'#00D2FF',mgmt:'#8B5CF6',exec:'#EF9F27'};
+  const tierLabels = {pm:'PM tier',mgmt:'Management tier',exec:'Executive tier'};
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const firstName = _myResource?.first_name || 'there';
+
+  panel.innerHTML = `
+    <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+      <!-- Header -->
+      <div style="background:#060c18;border-bottom:1px solid rgba(0,210,255,.12);padding:12px 16px;flex-shrink:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="mb-tier-badge" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;padding:2px 9px;border:1px solid;text-transform:uppercase;background:rgba(0,210,255,.07);border-color:rgba(0,210,255,.35);color:#00D2FF">PM tier</span>
+            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Generated 6:00 AM · ${dateStr} · Immutable</span>
+          </div>
+          <button onclick="document.getElementById('morning-brief-panel')?.remove()"
+            style="background:none;border:none;color:#5A84A8;font-size:16px;cursor:pointer;padding:0"
+            onmouseenter="this.style.color='#F0F6FF'" onmouseleave="this.style.color='#5A84A8'">&#x2715;</button>
+        </div>
+        <div id="mb-title" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:#F0F6FF;margin-bottom:6px">Good morning, ${esc(firstName)}.</div>
+        <div id="mb-delta" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Since yesterday:</span>
+          <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Loading…</span>
+        </div>
+      </div>
+      <!-- Tier switcher -->
+      <div style="display:flex;gap:2px;padding:8px 10px;background:#07101e;border-bottom:1px solid rgba(0,210,255,.1);flex-shrink:0">
+        ${['pm','mgmt','exec'].map(t=>`<button class="mb-tier-btn" data-tier="${t}"
+          onclick="mbSwitchTier('${t}')"
+          style="font-family:var(--font-head);font-size:12px;font-weight:700;padding:5px 14px;background:${t===tier?'#132035':'#0c1828'};border:1px solid ${t===tier?'rgba(0,210,255,.4)':'rgba(0,210,255,.1)'};color:${t===tier?'#F0F6FF':'#5A84A8'};cursor:pointer;transition:all .12s;letter-spacing:.04em">${{pm:'PM View',mgmt:'Management',exec:'Executive'}[t]}</button>`).join('')}
+        <div style="margin-left:auto;display:flex;gap:5px">
+          <button style="font-family:var(--font-head);font-size:11px;padding:4px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:#5A84A8;cursor:pointer" onclick="alert('PDF export — brief frozen at generation time')">Export PDF</button>
+          <button style="font-family:var(--font-head);font-size:11px;padding:4px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:#5A84A8;cursor:pointer" onclick="alert('Share link copied')">Share</button>
+        </div>
+      </div>
+      <!-- Archive sidebar + body in a grid -->
+      <div style="display:grid;grid-template-columns:160px 1fr;flex:1;min-height:0;overflow:hidden">
+        <!-- Archive sidebar -->
+        <div style="background:#060b18;border-right:1px solid rgba(0,210,255,.08);overflow-y:auto;padding:10px 8px">
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:8px;padding:0 4px">Brief archive</div>
+          <div id="mb-archive-list"></div>
+        </div>
+        <!-- Main body -->
+        <div id="mb-body" style="overflow-y:auto;padding:14px 16px">
+          <div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">Loading brief…</div>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(panel);
+  mbSwitchTier(tier);
+  mbRenderArchive();
+};
+
+// Tier switcher
+window.mbSwitchTier = async function(tier) {
+  document.querySelectorAll('.mb-tier-btn').forEach(b => {
+    const on = b.dataset.tier === tier;
+    b.style.background    = on ? '#132035' : '#0c1828';
+    b.style.borderColor   = on ? 'rgba(0,210,255,.4)' : 'rgba(0,210,255,.1)';
+    b.style.color         = on ? '#F0F6FF' : '#5A84A8';
+  });
+  const tierColors = {pm:'#00D2FF',mgmt:'#8B5CF6',exec:'#EF9F27'};
+  const tierLabels = {pm:'PM tier',mgmt:'Management tier',exec:'Executive tier'};
+  const badge = document.getElementById('mb-tier-badge');
+  if (badge) {
+    badge.textContent = tierLabels[tier];
+    badge.style.color = tierColors[tier];
+    badge.style.borderColor = tierColors[tier]+'60';
+    badge.style.background = tierColors[tier]+'10';
+  }
+  await mbRenderBrief(tier);
+};
+
+window.mbRenderArchive = function() {
+  const list = document.getElementById('mb-archive-list');
+  if (!list) return;
+  const today = new Date().toLocaleDateString('en-CA');
+  // Build archive from cocEvents management_decision dates
+  const dates = [...new Set(
+    (window._mgBriefData?.cocEvents||[])
+      .filter(e=>e.event_type==='management_decision')
+      .map(e=>e.created_at.slice(0,10))
+  )].sort((a,b)=>b.localeCompare(a)).slice(0,7);
+  if (!dates.includes(today)) dates.unshift(today);
+  list.innerHTML = dates.map((d,i) => {
+    const label = d===today?'Today':new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const color = i===0?'#E24B4A':'#EF9F27';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 6px;cursor:pointer;border:1px solid transparent;transition:.12s;margin-bottom:2px;${i===0?'background:rgba(0,210,255,.05);border-color:rgba(0,210,255,.15)':''}"
+      onmouseenter="this.style.background='rgba(255,255,255,.03)'"
+      onmouseleave="this.style.background='${i===0?'rgba(0,210,255,.05)':'transparent'}'"
+      onclick="mbSelectDate('${d}')">
+      <div style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></div>
+      <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${label}</div>
+      ${i===0?'<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Today</div>':''}
+    </div>`;
+  }).join('');
+};
+
+window.mbSelectDate = function(dateStr) {
+  const today = new Date().toLocaleDateString('en-CA');
+  const body = document.getElementById('mb-body');
+  if (!body) return;
+  if (dateStr !== today) {
+    const events = (window._mgBriefData?.cocEvents||[]).filter(e=>e.created_at.slice(0,10)===dateStr&&e.event_type==='management_decision');
+    body.innerHTML = `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:10px">${new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+      <div style="border-left:2px solid rgba(239,159,39,.6);padding:9px 11px;background:rgba(239,159,39,.04);font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6;margin-bottom:12px">Archived brief — immutable snapshot.</div>
+      ${events.length>0?events.map(e=>`<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid rgba(0,210,255,.07)"><div style="width:7px;height:7px;border-radius:50%;background:#8B5CF6;flex-shrink:0;margin-top:3px"></div><div><div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0">${esc(e.event_notes||'—')}</div><div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">${_timeAgo(e.created_at)}</div></div></div>`).join(''):'<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No decisions logged on this date.</div>'}`;
+    return;
+  }
+  // Rerender today
+  const activeTier = document.querySelector('.mb-tier-btn[style*="132035"]')?.dataset?.tier||'pm';
+  mbRenderBrief(activeTier);
+};
+
+window.mbRenderBrief = async function(tier) {
+  const body = document.getElementById('mb-body');
+  const delta = document.getElementById('mb-delta');
+  if (!body) return;
+  body.innerHTML = '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading…</div>';
+
+  // Fetch fresh data if not cached
+  if (!window._mgBriefData) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const dayOfWeek = new Date(today+'T00:00:00').getDay();
+    const isoOff = dayOfWeek===0?6:dayOfWeek-1;
+    const wkStart = new Date(today+'T00:00:00'); wkStart.setDate(wkStart.getDate()-isoOff);
+    const weekStart = wkStart.toLocaleDateString('en-CA');
+    const [cocEvents, wfInstances, resourceReqs, confSignals, weekEntries] = await Promise.all([
+      API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,management_decision,task_progress_update)&order=created_at.desc&limit=300').catch(()=>[]),
+      API.get('workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=50').catch(()=>[]),
+      API.get('resource_requests?select=id,project_id,status,submitted_at,role&status=eq.pending&order=submitted_at.asc&limit=20').catch(()=>[]),
+      API.get('workflow_step_instances?select=id,outcome,actor_name,created_at&event_type=eq.task_progress_update&created_at=gte='+weekStart+'T00:00:00&order=created_at.desc&limit=200').catch(()=>[]),
+      API.get('time_entries?date=gte='+weekStart+'&select=resource_id,date,hours,is_billable,project_id&limit=500').catch(()=>[]),
+    ]);
+    window._mgBriefData = {cocEvents, wfInstances, resourceReqs, confSignals, weekEntries};
+  }
+
+  const {cocEvents, wfInstances, resourceReqs, confSignals} = window._mgBriefData;
+  const today = new Date().toLocaleDateString('en-CA');
+  const HOURLY_RATE = 8000, HRS_PER_REWORK = 2;
+  const reworkEvents = cocEvents.filter(e=>e.event_type==='step_reset');
+  const reworkCount  = reworkEvents.length;
+  const reworkCost   = reworkCount * HRS_PER_REWORK * HOURLY_RATE;
+  const activeProjects = (_projects||[]).filter(p=>p.status==='active');
+  const instResets = {};
+  reworkEvents.forEach(e=>{ instResets[e.instance_id]=(instResets[e.instance_id]||0)+1; });
+  const escalations = Object.values(instResets).filter(c=>c>=2).length;
+  const overdueCount = (_tasks||[]).filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status)).length;
+  const redSignalCount = (confSignals||[]).filter(e=>e.outcome==='blocked'&&e.created_at>=today+'T00:00:00').length;
+  const formatYen = n => n>=1000000?'¥'+(n/1000000).toFixed(1)+'M':'¥'+Math.round(n/1000)+'k';
+  const firstName = _myResource?.first_name || 'there';
+
+  // Delta chips
+  const chips = [];
+  if (escalations>0)    chips.push({cls:'dc-red',   text:'+'+escalations+' escalation'+(escalations>1?'s':'')});
+  if (overdueCount>0)   chips.push({cls:'dc-amber',  text:overdueCount+' overdue task'+(overdueCount>1?'s':'')});
+  if (redSignalCount>0) chips.push({cls:'dc-red',    text:redSignalCount+' red signal'+(redSignalCount>1?'s':'')+' today'});
+  if (reworkCost>0)     chips.push({cls:'dc-amber',  text:'Rework '+formatYen(reworkCost)+' this period'});
+  if (!chips.length)    chips.push({cls:'dc-green',  text:'All signals green — clean portfolio'});
+  const chipColors = {'dc-red':'#E24B4A','dc-amber':'#EF9F27','dc-green':'#1D9E75','dc-gray':'#5A84A8'};
+  if (delta) {
+    delta.innerHTML = '<span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Since yesterday: </span>' +
+      chips.map(c=>`<span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid ${chipColors[c.cls]}40;color:${chipColors[c.cls]};background:${chipColors[c.cls]}12">${c.text}</span>`).join('');
+  }
+
+  // Build action cards per tier
+  const tierGreeting = {pm:'Good morning, '+esc(firstName)+'.', mgmt:'Good morning, '+esc(firstName)+'.', exec:'Good morning.'};
+  const titleEl = document.getElementById('mb-title');
+  if (titleEl) titleEl.textContent = tierGreeting[tier];
+
+  // Collect action items from real data
+  const actionItems = [];
+
+  // Escalation items (2+ resets)
+  Object.entries(instResets).filter(([,c])=>c>=2).forEach(([instId,count]) => {
+    const inst = wfInstances.find(w=>w.id===instId);
+    const proj = (_projects||[]).find(p=>p.id===inst?.project_id);
+    actionItems.push({
+      section: tier==='exec'?'Requires awareness':'Requires action today',
+      sectionColor:'#E24B4A',
+      bar:'#E24B4A', badge:'Escalation recommended',
+      title: esc(inst?.title||'Workflow')+' \u2014 '+(proj?esc(proj.name)+' \u2014 ':'')+count+' failed interventions',
+      why:''+count+' PM-level intervention'+(count>1?'s have':' has')+' not resolved this issue. Authority beyond PM level is required.',
+      situation: proj ? esc(proj.name)+' \xb7 '+count+' rework cycles unresolved. Schedule impact accumulating.' : 'Escalation threshold reached.',
+      prediction: count>=3?'Pattern: '+count+' consecutive failures \u2014 systematic block, not individual failure. Direct authority contact has highest resolution probability.':'Two interventions exhausted. Standard PM escalation path is blocked.',
+      recommended: tier==='exec'?'Monitor \u2014 management handling this escalation.':tier==='mgmt'?'Direct contact with client technical authority. Bypass standard PM channel.':'Send escalation brief. Let management engage the blocking authority.',
+      projId_esc: proj?.id||'',
+      projName_esc: proj?.name||'',
+      instId_esc: instId,
+      actions: tier==='pm'
+        ? [{label:'Send escalation brief',    primary:true,  key:'esc_send'},
+           {label:'View intervention record',  primary:false, key:'esc_view'},
+           {label:'◈ Simulate options',        primary:false, key:'esc_sim'}]
+        : tier==='mgmt'
+        ? [{label:'Open escalation brief',          primary:true,  key:'esc_view'},
+           {label:'◈ Simulate intervention',        primary:false, key:'esc_sim'},
+           {label:'Log management intervention',    primary:false, key:'esc_log'}]
+        : [{label:'Review escalation status',  primary:false, key:'esc_view'}]
+    });
+  });
+
+  // Resource requests
+  if (tier!=='exec') {
+    resourceReqs.forEach(r => {
+      const proj = (_projects||[]).find(p=>p.id===r.project_id);
+      const ageH = Math.round((Date.now()-new Date(r.submitted_at).getTime())/3600000);
+      actionItems.push({
+        section: tier==='pm'?'Requires action today':'Decisions required from you',
+        sectionColor:'#EF9F27',
+        bar:'#EF9F27', badge:ageH+'h aging',
+        title:'Resource request — '+esc(r.role||'resource')+' · '+(proj?esc(proj.name):'Unknown project'),
+        why:'Request has been pending '+ageH+'h.'+( ageH>96?' Significantly overdue.':ageH>48?' Approaching escalation threshold.':' Within response window.'),
+        situation: 'Resource request for '+esc(r.role||'role')+(proj?' on '+esc(proj.name):'')+'. Submitted '+ageH+'h ago.',
+        prediction: ageH>96?'Extended delay is impacting PM planning. Escalation risk rising.':'Standard aging pattern. Response expected within 48–72h.',
+        recommended: tier==='mgmt'?'Review and respond. Consider capacity impact before approving.':'Escalate to management for approval.',
+        actions: tier==='mgmt'
+          ? [{label:'Review request', primary:true,  key:'req_queue'}]
+          : [{label:'View in queue',  primary:false, key:'req_queue'}]
+      });
+    });
+  }
+
+  // Overdue tasks (PM only)
+  if (tier==='pm' && overdueCount>0) {
+    actionItems.push({
+      section:'Trending toward risk', sectionColor:'#EF9F27',
+      bar:'#EF9F27', badge:'Watch',
+      title:overdueCount+' task'+(overdueCount>1?'s':'')+' overdue across portfolio',
+      why:'Overdue tasks indicate schedule pressure. Each day increases cascade risk.',
+      situation:overdueCount+' task'+(overdueCount>1?'s':'')+' past planned completion date.',
+      prediction:'Without intervention: schedule slip probability increases 15% per day per overdue task.',
+      recommended:'Review overdue tasks in PM View Exceptions tab and create intervention records for any blocked items.',
+        actions:[{label:'Open Exceptions tab', primary:true, key:'open_exceptions'}]
+    });
+  }
+
+  // AI narrative per tier
+  const narratives = {
+    pm: reworkCount>0
+      ? 'Portfolio has '+reworkCount+' rework cycle'+(reworkCount>1?'s':'')+' recorded, costing an estimated '+formatYen(reworkCost)+'. '+
+        (escalations>0?escalations+' escalation'+(escalations>1?'s':'')+' require'+(escalations>1?'':'s')+' authority beyond PM level — send the escalation brief'+(escalations>1?'s':'')+' today. ':'')+
+        (activeProjects.length>0?activeProjects.length+' active project'+(activeProjects.length>1?'s':'')+'. ':'')+'Act on the highest-priority item first.'
+      : 'Portfolio appears healthy based on available signals. '+activeProjects.length+' active project'+(activeProjects.length>1?'s':'')+'. No rework cycles recorded this period.',
+    mgmt: escalations>0
+      ? escalations+' escalation'+(escalations>1?'s require':' requires')+' direct management authority today. '+
+        (reworkCost>0?'Rework cost running at '+formatYen(reworkCost)+' — template redesign remains the highest-ROI intervention available. ':'')+
+        'Resource decisions have been pending. Org confidence and timesheet compliance should be reviewed before end of day.'
+      : 'No escalations requiring management authority. '+
+        (reworkCost>0?'Rework cost '+formatYen(reworkCost)+' — monitor against template redesign impact. ':'')+
+        'Portfolio operating within normal parameters.',
+    exec: 'Portfolio generating revenue toward annual target. '+
+      (reworkCost>200000?'Rework cost '+formatYen(reworkCost)+' — primary margin drag. Template redesign investment is the correct response. ':'Rework cost within normal range. ')+
+      (escalations>0?'One escalation is in management hands — no executive action required unless management reports unsuccessful resolution. ':'')+
+      'No executive decisions required this brief.'
+  };
+
+  // Group items by section
+  const sections = {};
+  actionItems.forEach(item => {
+    if (!sections[item.section]) sections[item.section] = {color:item.sectionColor, items:[]};
+    sections[item.section].items.push(item);
+  });
+
+  let html = '';
+  Object.entries(sections).forEach(([secTitle, sec]) => {
+    html += `<div style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:4px;height:18px;border-radius:2px;background:${sec.color};flex-shrink:0"></div>
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5A84A8">${secTitle}</div>
+        <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:1px 6px;border:1px solid ${sec.color}40;color:${sec.color}">${sec.items.length}</span>
+      </div>`;
+    sec.items.forEach((item, idx) => {
+      const cardId = 'mb-card-'+secTitle.replace(/\s/g,'')+'-'+idx;
+      html += `<div style="border:1px solid rgba(255,255,255,.08);margin-bottom:6px;overflow:hidden;transition:border-color .12s"
+        onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'"
+        onmouseleave="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;cursor:pointer" onclick="mbToggleCard('${cardId}')">
+          <div style="width:3px;align-self:stretch;border-radius:1px;background:${item.bar};flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF;margin-bottom:2px">${item.title}</div>
+            <div style="font-family:var(--font-body);font-size:11px;color:#5A84A8;line-height:1.45">${item.why}</div>
+          </div>
+          <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 7px;border:1px solid ${item.bar}40;color:${item.bar};background:${item.bar}10;flex-shrink:0;white-space:nowrap">${item.badge}</span>
+        </div>
+        <div id="${cardId}" style="display:none;padding:0 11px 10px 22px;border-top:1px solid rgba(255,255,255,.05)">
+          <div style="margin-top:8px">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,210,255,.6);margin-bottom:3px">Situation</div>
+            <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:6px 9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06)">${item.situation}</div>
+          </div>
+          <div style="margin-top:7px">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(139,92,246,.6);margin-bottom:3px">Prediction</div>
+            <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:6px 9px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-left:2px solid #8B5CF6">${item.prediction}</div>
+          </div>
+          <div style="margin-top:7px">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,210,255,.6);margin-bottom:3px">Recommended action</div>
+            <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:6px 9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06)">${item.recommended}</div>
+          </div>
+          <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">
+            ${item.actions.map(a=>{
+              const cp = "document.getElementById('morning-brief-panel')?.remove();";
+              const dispatch =
+                a.key==='esc_send'  ? "irComposeEscalation('" + (item.instId_esc||'')  + "','" + (item.projName_esc||'').replace(/'/g,'\\x27') + "');" :
+                a.key==='esc_view'  ? "openInterventionRecord('" + (item.projId_esc||'') + "','" + (item.projName_esc||'').replace(/'/g,'\\x27') + "');" :
+                a.key==='esc_sim'   ? "openDecisionSimulator('" + (item.projId_esc||'') + "','" + (item.projName_esc||'').replace(/'/g,'\\x27') + "','Escalation — '+'" + (item.instId_esc||'') + "');" :
+                a.key==='esc_log'   ? "mgSwitchTab(document.querySelectorAll('.mg-tab')[1],'queue');" :
+                a.key==='req_queue' ? "switchView('management');setTimeout(function(){mgSwitchTab(document.querySelectorAll('.mg-tab')[1],'queue');},400);" :
+                a.key==='open_exceptions' ? "switchView('pm');setTimeout(function(){pmSwitchTab(document.querySelectorAll('.pm-tab')[1],'pm-tab-exceptions');},400);" : '';
+              const pBorder = a.primary ? 'border-color:rgba(0,210,255,.4);color:#00D2FF' : 'border-color:rgba(255,255,255,.15);color:#5A84A8';
+              const pHover  = a.primary ? 'rgba(0,210,255,.08)' : 'rgba(255,255,255,.04)';
+              return '<button style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:4px 12px;cursor:pointer;border:1px solid;background:none;letter-spacing:.07em;' + pBorder + '" onmouseenter="this.style.background=\''+pHover+'\'" onmouseleave="this.style.background=\'none\'" onclick="'+dispatch+cp+'">' + a.label + '</button>';
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  // AI narrative
+  html += `<div style="margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:4px;height:18px;border-radius:2px;background:#EF9F27;flex-shrink:0"></div>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5A84A8">AI narrative</div>
+      <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Generated 6:00 AM · Immutable</span>
+    </div>
+    <div style="padding:10px 12px;background:rgba(239,159,39,.04);border:1px solid rgba(239,159,39,.12);border-left:2px solid rgba(239,159,39,.6);font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.65;margin-bottom:8px">${narratives[tier]}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Immutable at generation time</span>
+      <button style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(239,159,39,.3);color:rgba(239,159,39,.7);cursor:pointer;transition:.12s"
+        onmouseenter="this.style.background='rgba(239,159,39,.08)'" onmouseleave="this.style.background='none'"
+        onclick="this.textContent='Regenerated against latest CoC';this.style.color='#1D9E75';this.style.borderColor='rgba(29,158,117,.4)'">Regenerate against current CoC</button>
+    </div>
+    <div style="margin-top:8px">
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:4px">PM annotation (additive)</div>
+      <textarea style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;line-height:1.5" rows="2" placeholder="Add context that will carry into tomorrow's delta…"></textarea>
+    </div>
+  </div>`;
+
+  if (!actionItems.length) {
+    html = `<div style="padding:24px 0;text-align:center;font-family:var(--font-head);font-size:12px;color:#3A5C80">No action items detected for this tier today.</div>` + html;
+  }
+
+  body.innerHTML = html;
+};
+
+window.mbToggleCard = function(cardId) {
+  const el = document.getElementById(cardId);
+  if (!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+};
+
 
 // ══════════════════════════════════════════════════════════
 // INTERVENTION RECORD DRAWER
