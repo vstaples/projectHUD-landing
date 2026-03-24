@@ -978,7 +978,8 @@ let _resources  = [];
 let _users      = [];
 let _myResource = null;
 let _currentView = null;
-let _viewLoaded  = {};   // which views have been fetched
+let _viewLoaded  = {};
+let _identityDebug = {};
 
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('compass-date').textContent =
@@ -996,6 +997,69 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── Load shared base data ─────────────────────────────────
 async function loadBaseData() {
   try {
+    // ── Step 1: Resolve identity ──────────────────────────────
+    let authEmail = null;
+    let authSub   = null;
+    let appUserId = null;
+    let appUserResourceId = null;
+
+    try {
+      const token  = await Auth.getFreshToken().catch(() => Auth.getToken());
+      const claims = JSON.parse(atob(token.split('.')[1]));
+      authSub   = claims.sub;
+      authEmail = claims.email || null;
+
+      const uRows   = await API.get(`users?id=eq.${authSub}&select=id,resource_id,name,email`).catch(() => []);
+      const appUser = uRows?.[0] || null;
+      appUserId          = appUser?.id || null;
+      appUserResourceId  = appUser?.resource_id || null;
+      if (!authEmail && appUser?.email) authEmail = appUser.email;
+
+      if (appUser?.resource_id) {
+        const rRows = await API.get(
+          `resources?id=eq.${appUser.resource_id}&select=id,first_name,last_name,email,is_active,is_external,user_id,firm_id,department`
+        ).catch(() => []);
+        const r = rRows?.[0] || null;
+        if (r) {
+          _myResource = { ...r,
+            name: `${r.first_name||''} ${r.last_name||''}`.trim() || appUser.name || appUser.email || '—',
+          };
+        }
+      }
+
+      // Fallback — match by email if resource_id path didn't resolve
+      if (!_myResource && authEmail) {
+        const eRows = await API.get(
+          `resources?email=eq.${encodeURIComponent(authEmail)}&select=id,first_name,last_name,email,is_active,is_external,user_id,firm_id,department&limit=1`
+        ).catch(() => []);
+        const r = eRows?.[0] || null;
+        if (r) {
+          _myResource = { ...r,
+            name: `${r.first_name||''} ${r.last_name||''}`.trim() || authEmail || '—',
+          };
+        }
+      }
+
+      // Store debug info for error messages
+      _identityDebug = {
+        authEmail,
+        authSub:    authSub?.slice(0,8) + '…',
+        appUserId:  appUserId?.slice(0,8) + '…' || 'none',
+        resourceId: appUserResourceId?.slice(0,8) + '…' || 'none',
+        resolved:   !!_myResource,
+        name:       _myResource?.name || null,
+      };
+
+      console.log('[Compass] Identity:', _myResource?.name || 'unresolved',
+        '| email:', authEmail, '| sub:', authSub?.slice(0,8),
+        '| resource_id:', appUserResourceId?.slice(0,8) || 'none');
+
+    } catch(e) {
+      console.warn('[Compass] Identity resolution failed:', e.message);
+      _identityDebug = { error: e.message };
+    }
+
+    // ── Step 2: Load shared data ──────────────────────────────
     [_projects, _tasks, _resources, _users] = await Promise.all([
       API.getProjects().catch(() => []),
       API.getTasks().catch(() => []),
@@ -1003,19 +1067,12 @@ async function loadBaseData() {
       API.getUsers().catch(() => []),
     ]);
 
-    // Normalise name field — resources table has first_name/last_name not name
     _resources = (_resources || []).map(r => ({
       ...r,
-      name: `${r.first_name || ''} ${r.last_name || ''}`.trim() || r.email || '—',
+      name: `${r.first_name||''} ${r.last_name||''}`.trim() || r.email || '—',
     }));
 
-    // Identify current user's resource record
-    const currentUser = _users.find(u => u.id === Auth?.userId);
-    _myResource = currentUser
-      ? _resources.find(r => r.id === currentUser.resource_id) || null
-      : null;
-
-    // Update avatar in nav
+    // Update nav avatar
     if (_myResource?.name) {
       const initials = _myResource.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
       const avEl = document.getElementById('compass-user-av');
@@ -1110,18 +1167,52 @@ async function loadUserView() {
   if (!_myResource?.id) {
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+    const d = _identityDebug;
     content.innerHTML = `
       <div style="padding:40px 20px;text-align:center">
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:8px;letter-spacing:.1em">
-          IDENTITY NOT RESOLVED
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--compass-red);
+          margin-bottom:12px;letter-spacing:.12em">⚠ IDENTITY NOT RESOLVED</div>
+
+        <!-- What we found -->
+        <div style="display:inline-block;text-align:left;background:var(--bg1);
+          border:1px solid var(--border);padding:14px 20px;margin-bottom:16px;
+          font-family:var(--font-mono);font-size:10px;line-height:2;min-width:320px">
+          <div style="color:var(--text3);letter-spacing:.08em;margin-bottom:4px">SESSION DETAILS</div>
+          <div><span style="color:var(--text3)">Auth email&nbsp;&nbsp;&nbsp;</span>
+            <span style="color:${d.authEmail ? 'var(--compass-cyan)' : 'var(--compass-red)'}">
+              ${d.authEmail || '— not found in JWT —'}</span></div>
+          <div><span style="color:var(--text3)">Auth UUID&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span style="color:var(--text2)">${d.authSub || '—'}</span></div>
+          <div><span style="color:var(--text3)">App user ID&nbsp;&nbsp;</span>
+            <span style="color:${d.appUserId && d.appUserId !== 'undefin…' ? 'var(--text2)' : 'var(--compass-red)'}">
+              ${d.appUserId && d.appUserId !== 'undefin…' ? d.appUserId : '— no users row found —'}</span></div>
+          <div><span style="color:var(--text3)">Resource ID&nbsp;&nbsp;</span>
+            <span style="color:${d.resourceId && d.resourceId !== 'undefin…' ? 'var(--text2)' : 'var(--compass-red)'}">
+              ${d.resourceId && d.resourceId !== 'undefin…' ? d.resourceId : '— not linked —'}</span></div>
+          ${d.error ? `<div style="color:var(--compass-red);margin-top:4px">Error: ${esc(d.error)}</div>` : ''}
         </div>
-        <div style="font-family:var(--font-ui);font-size:13px;color:var(--text2);margin-bottom:16px">
-          Your user account is not linked to a resource record.<br>
-          Ask your administrator to assign a resource to your login in User Mgmt.
+
+        <div style="font-family:var(--font-ui);font-size:12px;color:var(--text3);
+          margin-bottom:16px;line-height:1.6;max-width:480px;margin-left:auto;margin-right:auto">
+          ${d.authEmail
+            ? `Logged in as <strong style="color:var(--text1)">${esc(d.authEmail)}</strong> but no matching resource record was found.<br>
+               Ensure your <code style="color:var(--compass-cyan)">users</code> row has
+               <code style="color:var(--compass-cyan)">resource_id</code> set, or that a resource record
+               exists with this email address.`
+            : `No email found in session token. Try logging out and back in.`}
         </div>
-        <a href="/users.html" style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-          color:var(--compass-cyan);text-decoration:none;border:1px solid rgba(0,210,255,.3);
-          padding:6px 16px">OPEN USER MGMT →</a>
+
+        <a href="/users.html" style="font-family:var(--font-mono);font-size:10px;
+          letter-spacing:.1em;color:var(--compass-cyan);text-decoration:none;
+          border:1px solid rgba(0,210,255,.3);padding:6px 16px;margin-right:8px">
+          USER MGMT →
+        </a>
+        <button onclick="_viewLoaded['user']=false;loadUserView()"
+          style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+            color:var(--text2);background:none;border:1px solid var(--border);
+            padding:6px 16px;cursor:pointer">
+          RETRY
+        </button>
       </div>`;
     return;
   }
@@ -1384,7 +1475,8 @@ async function loadPMView() {
       API.get(`workflow_instances?select=id,title,status,current_step_name,current_step_id,project_id,launched_at&status=eq.active&order=launched_at.desc&limit=50`).catch(() => []),
       API.get(`workflow_action_items?status=eq.open&order=due_date.asc&limit=100`).catch(() => []),
       _resources.length ? Promise.resolve(_resources) :
-        API.get('resources?select=id,name,email,role,is_active&is_active=eq.true').catch(() => []),
+        _resources.length ? Promise.resolve(_resources) :
+          API.get('resources?select=id,first_name,last_name,email,is_active,user_id,firm_id&is_active=eq.true').catch(() => []),
     ]);
 
     const activeProjects = _projects.filter(p => p.status === 'active');
