@@ -3396,6 +3396,32 @@ async function loadManagementView() {
       compassToast('Decision logged to CoC',2000);
       _viewLoaded['management']=false;
     };
+    window.mgRespondEscalation = function(title, situationText) {
+      const bodyHtml = `
+        <div class="mg-modal-section">Situation</div>
+        <div class="mg-modal-block">${situationText}</div>
+        <div class="mg-modal-section">AI narrative</div>
+        <div class="mg-modal-block mg-modal-ai">This issue requires authority beyond PM level. Recommended responses: (1) handle directly — contact the blocking authority yourself, (2) send guidance to PM with a specific escalation path, or (3) escalate to executive tier for awareness.</div>
+        <div class="mg-modal-section">Your response</div>
+        <textarea id="mg-respond-text" class="mg-modal-input" rows="3" placeholder="Describe your response or action taken…"></textarea>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="mg-btn mg-btn-c" onclick="mgSendResponse()">Send response →</button>
+          <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
+        </div>`;
+      mgOpenModal(title, bodyHtml);
+    };
+    window.mgSendResponse = function() {
+      const txt = document.getElementById('mg-respond-text')?.value?.trim()||'';
+      API.post('workflow_step_instances',{
+        event_type:'management_decision', step_name:'Escalation',
+        event_notes: txt || 'Management response logged.',
+        actor_name: _myResource?.name||null,
+        created_at: new Date().toISOString(),
+        firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+      }).catch(()=>{});
+      mgCloseModal();
+      compassToast('Response logged · PM notified', 2200);
+    };
 
     // ─────────────────────────────────────────────────────
     // Render HTML
@@ -3505,7 +3531,7 @@ async function loadManagementView() {
               </div>
               <div class="mg-qa">
                 ${q.type==='escalation'
-                  ? `<button class="mg-btn mg-btn-c" onclick="mgOpenModal('Respond to escalation','<div class=\'mg-modal-section\'>Situation</div><div class=\'mg-modal-block\'>${q.title}<br>${q.meta}</div><div class=\'mg-modal-section\'>AI narrative</div><div class=\'mg-modal-block mg-modal-ai\'>This issue requires authority beyond PM level. Recommend: direct authority contact, expedited approval path, or escalation to executive tier.</div><div class=\'mg-modal-section\'>Your response</div><textarea class=\'mg-modal-input\' rows=\'2\' placeholder=\'Describe your response...\'></textarea><div style=\'display:flex;gap:6px;margin-top:10px\'><button class=\'mg-btn mg-btn-c\' onclick=\'compassToast(\'Response logged\',2000);mgCloseModal()\'>Send response →</button><button class=\'mg-btn\' style=\'border-color:rgba(255,255,255,.2);color:#5A84A8\' onclick=\'mgCloseModal()\'>Cancel</button></div>')">Respond →</button>`
+                  ? `<button class="mg-btn mg-btn-c" onclick="mgRespondEscalation('Respond to escalation','${q.title.replace(/'/g,'\\x27')}<br>${q.meta.replace(/'/g,'\\x27')}')">Respond →</button>`
                   : `<button class="mg-btn mg-btn-g" onclick="mgApproveReq(this,'${q.reqId}')">Approve</button><button class="mg-btn mg-btn-r">Reject</button>`}
               </div>
             </div>`).join('')}
