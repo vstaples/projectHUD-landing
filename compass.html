@@ -3633,6 +3633,7 @@ async function loadManagementView() {
       const actionLabels = {direct:'Handling directly',guide:'Guidance sent to PM',executive:'Escalated to executive',monitor:'Monitoring — acknowledged',acknowledge:'Acknowledged'};
       const note = '['+actionLabels[act]+'] '+txt;
       API.post('workflow_step_instances',{
+        id:crypto.randomUUID(), instance_id:null,
         event_type:'management_decision', step_name:'Escalation',
         event_notes: note, actor_name:_myResource?.name||null,
         created_at:new Date().toISOString(),
@@ -3663,6 +3664,7 @@ async function loadManagementView() {
       await Promise.all([
         API.patch('resource_requests?id=eq.'+reqId, {status:'approved'}).catch(()=>{}),
         API.post('workflow_step_instances',{
+          id:crypto.randomUUID(), instance_id:null,
           event_type:'management_decision', step_name:'Resource',
           event_notes:'[Approved] '+txt,
           actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
@@ -3692,6 +3694,7 @@ async function loadManagementView() {
       await Promise.all([
         API.patch('resource_requests?id=eq.'+reqId, {status:'rejected'}).catch(()=>{}),
         API.post('workflow_step_instances',{
+          id:crypto.randomUUID(), instance_id:null,
           event_type:'management_decision', step_name:'Resource',
           event_notes:'[Rejected] '+txt,
           actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
@@ -3706,7 +3709,7 @@ async function loadManagementView() {
       const sel = document.getElementById('mg-dec-type')?.value||'';
       const txt = document.getElementById('mg-dec-text')?.value?.trim()||'';
       if (!txt) { document.getElementById('mg-dec-text').style.borderColor='rgba(226,75,74,.5)'; return; }
-      API.post('workflow_step_instances',{event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001',actor_name:_myResource?.name||null}).catch(()=>{});
+      API.post('workflow_step_instances',{id:crypto.randomUUID(),instance_id:null,event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001',actor_name:_myResource?.name||null}).catch(()=>{});
       mgCloseModal();
       compassToast('Decision logged to CoC',2000);
       setTimeout(()=>{ _viewLoaded['management']=false; loadManagementView(); },600);
@@ -3728,6 +3731,7 @@ async function loadManagementView() {
     window.mgSendResponse = function() {
       const txt = document.getElementById('mg-respond-text')?.value?.trim()||'';
       API.post('workflow_step_instances',{
+        id:crypto.randomUUID(), instance_id:null,
         event_type:'management_decision', step_name:'Escalation',
         event_notes: txt || 'Management response logged.',
         actor_name: _myResource?.name||null,
@@ -4165,7 +4169,7 @@ async function loadExecutiveView() {
       btn.textContent='✓ Authorized — CoC event written · Management notified';
       btn.style.background='#0F6E56';
       btn.disabled=true;
-      API.post('workflow_step_instances',{event_type:'management_decision',step_name:'Process',event_notes:'Authorized workflow template redesign from executive view.',created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+      API.post('workflow_step_instances',{id:crypto.randomUUID(),instance_id:null,event_type:'management_decision',step_name:'Process',event_notes:'Authorized workflow template redesign from executive view.',created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
       compassToast('Template redesign authorized',2500);
     };
 
@@ -4512,7 +4516,7 @@ async function loadClientView() {
       const txt = inp?.value?.trim()||'';
       clCloseModal();
       compassToast('Response sent to project manager');
-      API.post('workflow_step_instances',{event_type:'client_response',step_name:'Client portal response',event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+      API.post('workflow_step_instances',{id:crypto.randomUUID(),instance_id:null,event_type:'client_response',step_name:'Client portal response',event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
     };
 
     // Light-mode client portal
@@ -4903,6 +4907,7 @@ window.irSendEscalation = async function(btn, projectId) {
   btn.textContent='✓ Escalation sent — management notified';
   btn.disabled=true;
   await API.post('workflow_step_instances',{
+    id:crypto.randomUUID(), instance_id:null,
     event_type:'management_decision', step_name:'Escalation',
     event_notes:'PM escalated to management from intervention record.',
     actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
