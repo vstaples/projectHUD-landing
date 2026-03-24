@@ -8580,6 +8580,30 @@ async function postStepComment(instId, stepId) {
   try {
     await API.post('step_comments', row);
 
+    // ── Unified timesheet: write time_entries row when hours are logged ───
+    // Non-fatal — silent failure if schema not yet migrated
+    if (hours && hours > 0) {
+      const step      = inst._tmplSteps?.find(s => s.id === stepId);
+      const today     = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+      const projId    = inst.project_id || null;
+      const teRow = {
+        firm_id:                'aaaaaaaa-0001-0001-0001-000000000001',
+        resource_id:            _myResourceId || null,
+        user_id:                _myUserId     || null,
+        project_id:             projId,
+        instance_id:            instId,
+        template_step_id:       stepId,
+        step_name:              step?.name || null,
+        source_type:            'step_comment',
+        source_step_comment_id: newCommentId,
+        date:                   today,
+        hours,
+        is_billable:            true,
+        notes:                  body.slice(0, 200),
+      };
+      API.post('time_entries', teRow).catch(() => {});
+    }
+
     // Append to local cache with the pre-generated ID
     if (!inst._stepComments) inst._stepComments = [];
     inst._stepComments.push({ ...row, created_at: new Date().toISOString() });
