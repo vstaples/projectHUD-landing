@@ -13,6 +13,21 @@
   --compass-green:  #1D9E75;
   --compass-red:    #E24B4A;
   --compass-purple: #8B5CF6;
+
+  /* Override hud.css text hierarchy for Compass — brighter, higher contrast */
+  --text0: #F0F6FF;   /* primary text — near white */
+  --text1: #C8DFF0;   /* secondary text — light blue-white */
+  --text2: #90B8D8;   /* tertiary text — medium blue (was #7a9bbf, bumped up) */
+  --text3: #6A94B8;   /* metadata / labels — readable mid-blue (was #3a5a7a, major bump) */
+  --muted: #5A84A8;   /* muted elements — still visible */
+}
+
+/* Compass minimum legible sizes — metadata/label text */
+#compass-app .row-sub,
+#compass-app .panel-badge,
+#compass-app .stat-sub,
+#compass-app .stat-label {
+  font-size: 11px;
 }
 
 /* ── Layout ──────────────────────────────────────────────── */
@@ -1408,7 +1423,7 @@ async function loadUserView() {
             <!-- Column header row -->
             <div style="display:flex;align-items:center;gap:8px;padding:4px 13px 4px;
               border-bottom:1px solid var(--border);
-              font-family:var(--font-mono);font-size:10px;color:var(--text3);
+              font-family:var(--font-mono);font-size:11px;color:var(--text3);
               letter-spacing:.08em;text-transform:uppercase">
               <div style="width:8px;flex-shrink:0"></div>
               <div style="flex:1">Task / Action item</div>
@@ -1449,8 +1464,12 @@ async function loadUserView() {
                 </div>
                 <button class="cmp-btn btn-approve wi-complete" data-wi-id="${w.id}" data-wi-type="${w.type}"
                   data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId || ''}"
-                  style="padding:3px 10px;width:74px;flex-shrink:0">
-                  ${w.status === 'not_started' ? 'Start' : w.status === 'blocked' ? 'Unblock' : 'Complete'}
+                  style="padding:3px 10px;width:74px;flex-shrink:0;
+                    font-size:${w.type === 'task' && w.pct > 0 && w.status === 'in_progress' ? '9px' : '10px'}">
+                  ${w.status === 'not_started' ? 'Start'
+                    : w.status === 'blocked' ? 'Unblock'
+                    : w.type === 'task' && w.pct > 0 && w.pct < 100 ? 'Mark done'
+                    : 'Complete'}
                 </button>
               </div>`).join('')}
           </div>
@@ -1544,7 +1563,7 @@ async function loadUserView() {
                         color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                         ${e.step_name ? esc(e.step_name) : esc(proj?.name || '—')}
                       </div>
-                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">
+                      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">
                         ${fmtDate(e.date)} · ${e.is_billable ? 'Billable' : 'Non-billable'}
                         ${isCadence ? ' · <span style="color:var(--compass-cyan)">via Cadence</span>' : ' · <span style="color:var(--text3)">click to edit</span>'}
                       </div>
@@ -2006,7 +2025,7 @@ async function loadManagementView() {
                     <div class="ar-icon ari-amber">&#9679;</div>
                     <div style="flex:1">
                       <div class="ar-title">${esc(proj?.name || 'Unknown project')} — Resource request</div>
-                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">Requested ${ageDays}d ago</div>
+                      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">Requested ${ageDays}d ago</div>
                     </div>
                     <span class="ar-due ${ageDays > 2 ? 'red' : 'amber'}">${ageDays}d pending</span>
                   </div>
@@ -2339,7 +2358,7 @@ async function loadClientView() {
                 <div class="ar-hdr">
                   <div class="ar-icon ari-red">&#9679;</div>
                   <div style="flex:1"><div class="ar-title">${esc(a.title)}</div>
-                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">${a.due_date ? 'Due ' + fmtDate(a.due_date) : 'No due date'}</div></div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">${a.due_date ? 'Due ' + fmtDate(a.due_date) : 'No due date'}</div></div>
                   ${overdue ? `<span class="ar-due red">Overdue</span>` : ''}
                 </div>
                 ${a.instructions ? `<div class="ar-body">${esc(a.instructions)}</div>` : ''}
