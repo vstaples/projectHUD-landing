@@ -3755,6 +3755,19 @@ async function loadManagementView() {
       mgOpenModal(fullName + ' — Cross-project pattern', body);
     };
 
+    // Pre-compute tooltip HTML strings (avoids nested quote issues in template literals)
+    const escTipHtml = Object.entries(instResets).filter(([,c])=>c>=2).map(([id,c])=>{
+      const inst = wfInstances.find(w=>w.id===id);
+      const proj = _projects.find(p=>p.id===inst?.project_id);
+      return (proj?.name||'Unknown')+': '+c+' resets on '+((inst?.title||'').slice(0,40)||'workflow');
+    }).join(' | ') || 'No active escalations';
+
+    const rwTipLines = Object.entries(reworkByProj).sort(([,a],[,b])=>b-a).slice(0,5).map(([pid,c])=>{
+      const p = _projects.find(p=>p.id===pid);
+      return (p?.name||'?').slice(0,24)+': '+formatYen(c*HRS_PER_REWORK*HOURLY_RATE)+' ('+c+' cycles)';
+    }).join(' | ') || 'No breakdown available';
+    const rwTipFull = reworkCount+' resets x '+HRS_PER_REWORK+'h x ¥'+HOURLY_RATE.toLocaleString()+'/hr | '+rwTipLines;
+
     // ─────────────────────────────────────────────────────
     // Render HTML
     // ─────────────────────────────────────────────────────
@@ -4025,19 +4038,6 @@ async function loadExecutiveView() {
       if(!inst?.project_id) return;
       reworkByProj[inst.project_id] = (reworkByProj[inst.project_id]||0)+1;
     });
-
-    // Pre-compute tooltip HTML strings (avoids nested quote issues in template literals)
-    const escTipHtml = Object.entries(instResets).filter(([,c])=>c>=2).map(([id,c])=>{
-      const inst = wfInstances.find(w=>w.id===id);
-      const proj = _projects.find(p=>p.id===inst?.project_id);
-      return (proj?.name||'Unknown')+': '+c+' resets on '+((inst?.title||'').slice(0,40)||'workflow');
-    }).join(' | ') || 'No active escalations';
-
-    const rwTipLines = Object.entries(reworkByProj).sort(([,a],[,b])=>b-a).slice(0,5).map(([pid,c])=>{
-      const p = _projects.find(p=>p.id===pid);
-      return (p?.name||'?').slice(0,24)+': '+formatYen(c*HRS_PER_REWORK*HOURLY_RATE)+' ('+c+' cycles)';
-    }).join(' | ') || 'No breakdown available';
-    const rwTipFull = reworkCount+' resets x '+HRS_PER_REWORK+'h x ¥'+HOURLY_RATE.toLocaleString()+'/hr | '+rwTipLines;
     const maxRework = Math.max(1,...Object.values(reworkByProj));
 
     // Root cause breakdown (stub ratios from observed pattern)
