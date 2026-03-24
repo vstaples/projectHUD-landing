@@ -1240,7 +1240,7 @@ async function loadUserView() {
     const weekStartDate = new Date(new Date().setDate(new Date().getDate() - (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1))).toLocaleDateString('en-CA');
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
-      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&status=neq.cancelled&order=due_date.asc`).catch(() => []),
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=due_date.asc`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&order=due_date.asc`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
@@ -1278,12 +1278,16 @@ async function loadUserView() {
 
     // ── Work list ─────────────────────────────────────────────────────
     const workItems = [];
-    myTasks.forEach(t => {
+    // Filter cancelled client-side — PostgREST multi-value neq is unreliable
+    (myTasks || []).filter(t => t.status !== 'cancelled').forEach(t => {
       const proj = _projects.find(p => p.id === t.project_id);
       const overdue = t.due_date && t.due_date < today;
+      // pct_complete stored as 0-100, guard against decimal (0-1) storage
+      const pct = parseFloat(t.pct_complete) || 0;
+      const pctNorm = pct <= 1 && pct > 0 ? Math.round(pct * 100) : Math.round(pct);
       workItems.push({ type:'task', id:t.id, title:t.name, project:proj?.name||'—',
         projectId: t.project_id || null, status: t.status,
-        due:t.due_date, overdue, pct: parseFloat(t.pct_complete) || 0,
+        due:t.due_date, overdue, pct: pctNorm,
         urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
     });
     myActionItems.forEach(a => {
