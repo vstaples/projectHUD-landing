@@ -1279,12 +1279,14 @@ async function loadUserView() {
       }
     }
 
-    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek] = await Promise.all([
+    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
+      API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
     ]);
 
     // ── Hours per day ─────────────────────────────────────────────────
@@ -1349,6 +1351,18 @@ async function loadUserView() {
     const hour = new Date().getHours();
     const greeting = hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
     const weekOf = weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+    // Real completed counts this week (from DB, not session memory)
+    const completedTasksCount  = (completedThisWeek||[]).length;
+    const resolvedActionsCount = (resolvedThisWeek||[]).length;
+    const weekDoneCount = completedTasksCount + resolvedActionsCount;
+    const weekDoneLabel = (() => {
+      if (weekDoneCount === 0) return '0 completed';
+      const parts = [];
+      if (completedTasksCount > 0)  parts.push(`${completedTasksCount} task${completedTasksCount!==1?'s':''}`);
+      if (resolvedActionsCount > 0) parts.push(`${resolvedActionsCount} action${resolvedActionsCount!==1?'s':''}`);
+      return parts.join(' · ') + ' done';
+    })();
 
     // EOD nudge
     const nowHr = new Date().getHours() + new Date().getMinutes()/60;
@@ -1606,7 +1620,7 @@ async function loadUserView() {
       ${streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
         background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
         font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
-        ■ ${streak}-day streak · ${_doneToday.length} completed this week</div>`:''}
+        ■ ${streak}-day streak · ${weekDoneLabel}</div>`:''}
     </div>
 
     <!-- 1.A 8-Card Strip -->
