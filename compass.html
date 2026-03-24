@@ -999,20 +999,27 @@ async function loadBaseData() {
     [_projects, _tasks, _resources, _users] = await Promise.all([
       API.getProjects().catch(() => []),
       API.getTasks().catch(() => []),
-      API.get('resources?select=id,name,email,role,is_active&is_active=eq.true&firm_id=eq.' + FIRM_ID).catch(() => []),
+      API.get('resources?select=id,first_name,last_name,email,is_active,user_id,firm_id,department&is_active=eq.true&firm_id=eq.' + FIRM_ID).catch(() => []),
       API.getUsers().catch(() => []),
     ]);
 
-    // Identify current user resource
+    // Normalise name field — resources table has first_name/last_name not name
+    _resources = (_resources || []).map(r => ({
+      ...r,
+      name: `${r.first_name || ''} ${r.last_name || ''}`.trim() || r.email || '—',
+    }));
+
+    // Identify current user's resource record
     const currentUser = _users.find(u => u.id === Auth?.userId);
     _myResource = currentUser
       ? _resources.find(r => r.id === currentUser.resource_id) || null
       : null;
 
-    // Update avatar/name in nav
+    // Update avatar in nav
     if (_myResource?.name) {
       const initials = _myResource.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-      document.getElementById('compass-user-av').textContent = initials;
+      const avEl = document.getElementById('compass-user-av');
+      if (avEl) avEl.textContent = initials;
     }
   } catch (e) {
     console.error('[Compass] loadBaseData failed:', e);
@@ -1099,8 +1106,28 @@ async function loadUserView() {
   const loading = document.getElementById('compass-loading');
   const content = document.getElementById('user-content');
 
+  // Guard: identity must be resolved before querying per-resource data
+  if (!_myResource?.id) {
+    if (loading) loading.style.display = 'none';
+    content.style.display = 'block';
+    content.innerHTML = `
+      <div style="padding:40px 20px;text-align:center">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:8px;letter-spacing:.1em">
+          IDENTITY NOT RESOLVED
+        </div>
+        <div style="font-family:var(--font-ui);font-size:13px;color:var(--text2);margin-bottom:16px">
+          Your user account is not linked to a resource record.<br>
+          Ask your administrator to assign a resource to your login in User Mgmt.
+        </div>
+        <a href="/users.html" style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          color:var(--compass-cyan);text-decoration:none;border:1px solid rgba(0,210,255,.3);
+          padding:6px 16px">OPEN USER MGMT →</a>
+      </div>`;
+    return;
+  }
+
   try {
-    const resId = _myResource?.id || 'none';
+    const resId = _myResource.id;
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete&assigned_resource_id=eq.${resId}&status=not.in.(complete,cancelled)&order=due_date.asc`).catch(() => []),
@@ -1508,7 +1535,7 @@ async function loadManagementView() {
   try {
     const [wfInstances, resourceReqs, cocEvents] = await Promise.all([
       API.get('workflow_instances?select=id,title,status,project_id,current_step_name&status=eq.active&limit=50').catch(() => []),
-      API.get('resource_requests?select=id,project_id,role_requested,status,created_at,requesting_resource_id&status=eq.pending&order=created_at.asc&limit=20').catch(() => []),
+      API.get('resource_requests?select=id,project_id,status,created_at,submitted_at&status=eq.pending&order=submitted_at.asc&limit=20').catch(() => []),
       API.get('workflow_step_instances?select=id,instance_id,event_type,outcome,created_at,template_step_id&event_type=in.(step_completed,step_reset)&order=created_at.desc&limit=200').catch(() => []),
     ]);
 
@@ -1603,13 +1630,13 @@ async function loadManagementView() {
               ? '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No pending resource requests</div>'
               : resourceReqs.map(r => {
                 const proj = _projects.find(p => p.id === r.project_id);
-                const ageDays = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000);
+                const ageDays = Math.floor((Date.now() - new Date(r.submitted_at || r.created_at).getTime()) / 86400000);
                 return `
                 <div class="action-row ${ageDays > 2 ? 'urgent' : 'warning'}">
                   <div class="ar-hdr">
                     <div class="ar-icon ari-amber">&#9679;</div>
                     <div style="flex:1">
-                      <div class="ar-title">${esc(proj?.name || 'Unknown project')} — ${esc(r.role_requested || 'Resource request')}</div>
+                      <div class="ar-title">${esc(proj?.name || 'Unknown project')} — Resource request</div>
                       <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:1px">Requested ${ageDays}d ago</div>
                     </div>
                     <span class="ar-due ${ageDays > 2 ? 'red' : 'amber'}">${ageDays}d pending</span>
