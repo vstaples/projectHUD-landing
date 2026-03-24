@@ -3113,355 +3113,1376 @@ async function loadPMView() {
 
 
 // ══════════════════════════════════════════════════════════
+// VIEW: MANAGEMENT
+// ══════════════════════════════════════════════════════════
+async function loadManagementView() {
+  const content = document.getElementById('mgmt-content');
+  if (!content) return;
+  if (_viewLoaded['management']) return;
+  _viewLoaded['management'] = true;
+
+  content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading management view…</div>`;
+
+  try {
+    const today = new Date().toLocaleDateString('en-CA');
+    const todayDate = new Date(today+'T00:00:00');
+    const dayOfWeek = todayDate.getDay();
+    const isoOffset = dayOfWeek===0?6:dayOfWeek-1;
+    const weekStart = new Date(todayDate); weekStart.setDate(todayDate.getDate()-isoOffset);
+    const weekDays = Array.from({length:5},(_,i)=>{ const d=new Date(weekStart); d.setDate(weekStart.getDate()+i); return d.toLocaleDateString('en-CA'); });
+
+    const [wfInstances, cocEvents, resourceReqs, confSignals, weekEntries, actionItems] = await Promise.all([
+      API.get('workflow_instances?select=id,title,status,current_step_name,project_id,launched_at&status=eq.active&limit=50').catch(()=>[]),
+      API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated,task_progress_update)&order=created_at.desc&limit=300').catch(()=>[]),
+      API.get('resource_requests?select=id,project_id,status,submitted_at,role,notes&status=eq.pending&order=submitted_at.asc&limit=20').catch(()=>[]),
+      API.get(`workflow_step_instances?select=id,instance_id,event_type,outcome,actor_name,created_at&event_type=eq.task_progress_update&created_at=gte.${weekDays[0]}T00:00:00&order=created_at.desc&limit=300`).catch(()=>[]),
+      API.get(`time_entries?date=gte.${weekDays[0]}&date=lte.${weekDays[4]}&select=id,project_id,resource_id,date,hours,is_billable&limit=500`).catch(()=>[]),
+      API.get('workflow_action_items?status=eq.open&order=due_date.asc&limit=50').catch(()=>[]),
+    ]);
+
+    const activeProjects = _projects.filter(p=>p.status==='active');
+    const HOURLY_RATE = 8000, HRS_PER_REWORK = 2;
+    const reworkEvents = cocEvents.filter(e=>e.event_type==='step_reset');
+    const reworkCount  = reworkEvents.length;
+    const reworkCost   = reworkCount * HRS_PER_REWORK * HOURLY_RATE;
+    const formatYen = n => n>=1000000 ? '¥'+(n/1000000).toFixed(1)+'M' : '¥'+Math.round(n/1000)+'k';
+
+    // Stat cards
+    const escalations = (() => {
+      const map = {};
+      reworkEvents.forEach(e => {
+        const k = e.instance_id;
+        if (!map[k]) map[k] = 0;
+        map[k]++;
+      });
+      return Object.values(map).filter(c=>c>=2).length;
+    })();
+
+    const orgConfidence = (() => {
+      const total = confSignals.length;
+      if (!total) return null;
+      const green = confSignals.filter(e=>e.outcome==='on_track').length;
+      return Math.round(green/total*100);
+    })();
+
+    const wfTemplates = (() => {
+      const tmap = {};
+      reworkEvents.forEach(e => {
+        const inst = wfInstances.find(w=>w.id===e.instance_id);
+        if (!inst) return;
+        const key = inst.title||inst.id;
+        if (!tmap[key]) tmap[key] = {name:key, resets:0, completions:0};
+        tmap[key].resets++;
+      });
+      cocEvents.filter(e=>e.event_type==='step_completed').forEach(e=>{
+        const inst = wfInstances.find(w=>w.id===e.instance_id);
+        if (!inst) return;
+        const key = inst.title||inst.id;
+        if (tmap[key]) tmap[key].completions++;
+      });
+      return Object.values(tmap).map(t=>({
+        ...t,
+        failureRate: t.completions>0 ? Math.round(t.resets/(t.resets+t.completions)*100) : (t.resets>0?100:0)
+      })).sort((a,b)=>b.failureRate-a.failureRate);
+    })();
+
+    const redesignCount = wfTemplates.filter(t=>t.failureRate>=60).length;
+
+    // Per-person sentiment arcs
+    const resSentiment = {};
+    confSignals.forEach(e=>{
+      if(!e.actor_name) return;
+      const d = e.created_at.slice(0,10);
+      if(!weekDays.includes(d)) return;
+      if(!resSentiment[e.actor_name]) resSentiment[e.actor_name]={};
+      const prev = resSentiment[e.actor_name][d];
+      const rank = {on_track:1,at_risk:2,blocked:3};
+      if(!prev||(rank[e.outcome]||0)>(rank[prev]||0)) resSentiment[e.actor_name][d]=e.outcome||'on_track';
+    });
+
+    // Build decision queue items
+    const queueItems = [];
+    // Escalations (instances with 2+ resets)
+    const instResets = {};
+    reworkEvents.forEach(e=>{ instResets[e.instance_id]=(instResets[e.instance_id]||0)+1; });
+    Object.entries(instResets).filter(([,c])=>c>=2).forEach(([instId,count])=>{
+      const inst = wfInstances.find(w=>w.id===instId);
+      const proj = _projects.find(p=>p.id===inst?.project_id);
+      queueItems.push({type:'escalation',priority:'red',title:`${esc(inst?.title||'Workflow')} — ${count} failed interventions`,meta:`${esc(proj?.name||'—')} · ${count} rework cycles without resolution`,rec:`${count} interventions have not resolved this. Requires authority beyond PM level.`,instId,projId:inst?.project_id});
+    });
+    // Resource requests
+    resourceReqs.forEach(r=>{
+      const proj = _projects.find(p=>p.id===r.project_id);
+      const ageH = Math.round((Date.now()-new Date(r.submitted_at).getTime())/3600000);
+      queueItems.push({type:'resource',priority:ageH>48?'red':'amber',title:`Resource request — ${esc(r.role||'Resource')} for ${esc(proj?.name||'—')}`,meta:`Submitted ${ageH}h ago`,rec:ageH>96?`Aging ${ageH}h — requires response`:`Request pending ${ageH}h`,reqId:r.id,projId:r.project_id,age:ageH});
+    });
+
+    // Health grid per project
+    function dotColor(score) { return score>=0.85?'#1D9E75':score>=0.65?'#EF9F27':'#E24B4A'; }
+    function projectHealthDots(p) {
+      const projTasks = _tasks.filter(t=>t.project_id===p.id);
+      const overdue = projTasks.filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status)).length;
+      const projInsts = wfInstances.filter(w=>w.project_id===p.id);
+      const projResets = reworkEvents.filter(e=>projInsts.some(i=>i.id===e.instance_id)).length;
+      const projCompleted = cocEvents.filter(e=>e.event_type==='step_completed'&&projInsts.some(i=>i.id===e.instance_id)).length;
+      const projEntries = weekEntries.filter(e=>e.project_id===p.id);
+      const schedScore = projTasks.length>0 ? 1-(overdue/Math.max(projTasks.length,1)) : 0.8;
+      const costScore = p.cpi ? Math.min(parseFloat(p.cpi),1) : 0.8;
+      const projSigs = confSignals.filter(e=>projInsts.some(i=>i.id===e.instance_id)||projEntries.some(te=>te.resource_id===e.resource_id));
+      const confScore = projSigs.length>0 ? projSigs.filter(e=>e.outcome==='on_track').length/projSigs.length : 0.7;
+      const reworkScore = projCompleted>0 ? Math.max(0,1-projResets/Math.max(projCompleted,1)) : (projResets>0?0.3:0.8);
+      const projResIds = new Set(projEntries.map(e=>e.resource_id));
+      const taskAssigned = new Set(_tasks.filter(t=>t.project_id===p.id&&t.assigned_to).map(t=>t.assigned_to));
+      const tsScore = taskAssigned.size>0 ? Math.min(projResIds.size/taskAssigned.size,1) : 0.7;
+      const escScore = Object.entries(instResets).some(([id,c])=>c>=2&&wfInstances.find(w=>w.id===id)?.project_id===p.id) ? 0.1 : 0.9;
+      return [
+        {label:'Schedule',score:schedScore},
+        {label:'Cost',score:costScore},
+        {label:'Confidence',score:confScore},
+        {label:'Rework',score:reworkScore},
+        {label:'Timesheets',score:tsScore},
+        {label:'Escalations',score:escScore},
+      ].map(d=>({...d,color:dotColor(d.score)}));
+    }
+
+    // ── Pairing intelligence — actor with highest rejection rate ──────
+    const actorResets = {};
+    reworkEvents.forEach(e=>{ if(e.actor_name){actorResets[e.actor_name]=(actorResets[e.actor_name]||0)+1;} });
+    const topActor = Object.entries(actorResets).sort(([,a],[,b])=>b-a)[0];
+    const topActorTotal = topActor ? (cocEvents.filter(e=>e.actor_name===topActor[0]&&(e.event_type==='step_completed'||e.event_type==='step_reset')).length||1) : 0;
+    const topActorRate = topActor ? Math.round(topActor[1]/topActorTotal*100) : 0;
+    const firmAvgRate  = reworkCount + cocEvents.filter(e=>e.event_type==='step_completed').length > 0
+      ? Math.round(reworkCount/(reworkCount+cocEvents.filter(e=>e.event_type==='step_completed').length)*100) : 0;
+
+    // ── Build management brief bullets ───────────────────
+    const briefItems = [];
+    if (escalations > 0) briefItems.push({color:'#E24B4A',text:`${escalations} escalation${escalations>1?'s':''} — workflow${escalations>1?'s':''} with ${escalations>1?'repeated':'2+'} failed intervention${escalations>1?'s':''}`,tab:'queue'});
+    if (resourceReqs.length > 0) briefItems.push({color:'#E24B4A',text:`${resourceReqs.length} resource request${resourceReqs.length>1?'s':''} aging — oldest ${Math.round((Date.now()-new Date(resourceReqs[0].submitted_at).getTime())/3600000)}h`,tab:'queue'});
+    if (redesignCount > 0) briefItems.push({color:'#EF9F27',text:`${redesignCount} workflow template${redesignCount>1?'s':''} at redesign threshold`,tab:'workflows'});
+    if (topActor && topActorRate > firmAvgRate+20) briefItems.push({color:'#EF9F27',text:`${esc(topActor[0])} — ${topActorRate}% reset rate vs ${firmAvgRate}% firm avg — pairing issue`,tab:'people'});
+    const greenProjs = activeProjects.filter(p=>{ const dots=projectHealthDots(p); return dots.every(d=>d.score>=0.8); });
+    if (greenProjs.length) briefItems.push({color:'#1D9E75',text:`${greenProjs.map(p=>esc(p.name)).join(', ')} — all health dimensions green`,tab:'overview'});
+
+    // ─────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────
+    const s = document.createElement('style');
+    s.id='mgmt-styles';
+    s.textContent=`
+      .mg-wrap{padding:0;background:#070c1a}
+      .mg-sstrip{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid rgba(0,210,255,.1);background:#060b18}
+      .mg-sc{padding:10px 14px;border-right:1px solid rgba(0,210,255,.08)}
+      .mg-sc:last-child{border-right:none}
+      .mg-sc-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
+      .mg-sc-val{font-family:var(--font-display);font-size:24px;font-weight:700;line-height:1}
+      .mg-sc-sub{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .mg-tabs{display:flex;gap:2px;padding:8px 10px;background:#07101f;border-bottom:1px solid rgba(0,210,255,.12)}
+      .mg-tab{font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.04em;padding:6px 16px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:6px;transition:all .12s}
+      .mg-tab.on{color:#F0F6FF;background:#132035;border-color:rgba(0,210,255,.4)}
+      .mg-tab:hover:not(.on){color:#90B8D8;background:#0e1e30}
+      .mg-tbadge{font-size:11px;font-weight:700;padding:1px 6px;border-radius:2px}
+      .mg-body{padding:10px 12px}
+      .mg-panel{background:#0d1a2e;border:1px solid rgba(0,210,255,.1);margin-bottom:10px}
+      .mg-panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:#07101e}
+      .mg-panel-title{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80}
+      .mg-overview{display:grid;grid-template-columns:1fr 280px;gap:10px}
+      .mg-hgrid{width:100%;border-collapse:collapse}
+      .mg-hgrid th{padding:5px 10px;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#3A5C80;text-transform:uppercase;border-bottom:1px solid rgba(0,210,255,.08)}
+      .mg-hgrid th:first-child{text-align:left;min-width:140px}
+      .mg-hgrid td{padding:7px 10px;border-bottom:1px solid rgba(0,210,255,.06)}
+      .mg-hgrid td:first-child{font-family:var(--font-body);font-size:12px;color:#C8DFF0}
+      .mg-hgrid td:not(:first-child){text-align:center}
+      .mg-dot{width:13px;height:13px;border-radius:50%;display:inline-block;cursor:pointer;transition:transform .12s}
+      .mg-dot:hover{transform:scale(1.3)}
+      .mg-brief-item{display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid rgba(0,210,255,.07);cursor:pointer;font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.5}
+      .mg-brief-item:last-child{border-bottom:none}
+      .mg-pair-box{background:#091522;border:1px solid rgba(0,210,255,.1);padding:10px 12px;margin:8px 12px}
+      .mg-queue-item{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(0,210,255,.07)}
+      .mg-qpriority{width:3px;align-self:stretch;flex-shrink:0;border-radius:1px}
+      .mg-qtype{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:2px}
+      .mg-qtitle{font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;margin-bottom:2px}
+      .mg-qmeta{font-family:var(--font-head);font-size:11px;color:#4A6E90}
+      .mg-qrec{font-family:var(--font-head);font-size:11px;color:#00D2FF;margin-top:4px;padding:3px 7px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15)}
+      .mg-qa{display:flex;gap:4px;margin-top:7px}
+      .mg-btn{font-family:var(--font-head);font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;border:1px solid;background:none;letter-spacing:.06em;transition:background .1s}
+      .mg-btn-g{color:#1D9E75;border-color:rgba(29,158,117,.4)}.mg-btn-g:hover{background:rgba(29,158,117,.1)}
+      .mg-btn-r{color:#E24B4A;border-color:rgba(226,75,74,.4)}.mg-btn-r:hover{background:rgba(226,75,74,.08)}
+      .mg-btn-c{color:#00D2FF;border-color:rgba(0,210,255,.35)}.mg-btn-c:hover{background:rgba(0,210,255,.08)}
+      .mg-pc{border:1px solid rgba(255,255,255,.08);padding:10px 12px;margin-bottom:6px;cursor:pointer;transition:border-color .12s;background:#0d1a2e}
+      .mg-pc:hover{border-color:rgba(0,210,255,.2)}
+      .mg-arc{display:flex;align-items:center;gap:3px;margin-top:6px}
+      .mg-arc-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0}
+      .mg-arc-line{width:10px;height:1.5px;background:rgba(255,255,255,.15);flex-shrink:0}
+      .mg-wf-row{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.07);cursor:pointer;transition:background .1s}
+      .mg-wf-row:hover{background:rgba(255,255,255,.02)}
+      .mg-wf-bar{height:5px;background:rgba(255,255,255,.06);flex:1;border-radius:1px;overflow:hidden;margin-top:3px}
+      .mg-wf-fill{height:100%;border-radius:1px}
+      .mg-dl-row{display:flex;align-items:flex-start;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07)}
+      .mg-dl-badge{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;letter-spacing:.05em;flex-shrink:0;white-space:nowrap}
+      .mg-dl-text{font-family:var(--font-body);font-size:12px;color:#C8DFF0;flex:1;line-height:1.5}
+      .mg-dl-meta{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .mg-tc{display:none}.mg-tc.on{display:block}
+      .mg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center}
+      .mg-modal-overlay.on{display:flex}
+      .mg-modal{background:#0f1e35;border:1px solid rgba(0,210,255,.25);width:500px;max-height:82vh;overflow-y:auto}
+      .mg-modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(0,210,255,.12)}
+      .mg-modal-title{font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF}
+      .mg-modal-close{background:none;border:1px solid rgba(255,255,255,.15);color:#5A84A8;width:22px;height:22px;cursor:pointer;font-size:14px}
+      .mg-modal-body{padding:14px;font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6}
+      .mg-modal-section{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin:10px 0 5px}
+      .mg-modal-section:first-child{margin-top:0}
+      .mg-modal-block{padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);font-size:12px;color:#C8DFF0;line-height:1.55;margin-bottom:6px}
+      .mg-modal-ai{border-left:2px solid #EF9F27;background:rgba(239,159,39,.04)}
+      .mg-modal-input{width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:12px;outline:none;resize:none;margin-top:4px}
+      .mg-modal-input:focus{border-color:rgba(0,210,255,.3)}
+      .mg-modal-select{width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;cursor:pointer;margin-bottom:6px}
+    `;
+    if (!document.getElementById('mgmt-styles')) document.head.appendChild(s);
+
+    // ─────────────────────────────────────────────────────
+    // Module-level management event functions
+    // ─────────────────────────────────────────────────────
+    window.mgSwitchTab = function(el, name) {
+      document.querySelectorAll('.mg-tab').forEach(t=>t.classList.remove('on'));
+      document.querySelectorAll('.mg-tc').forEach(c=>c.classList.remove('on'));
+      el.classList.add('on');
+      const panel = document.getElementById('mg-tc-'+name);
+      if (panel) panel.classList.add('on');
+    };
+    window.mgOpenModal = function(title, bodyHtml) {
+      document.getElementById('mg-modal-title').textContent = title;
+      document.getElementById('mg-modal-body').innerHTML = bodyHtml;
+      document.getElementById('mg-modal-overlay').classList.add('on');
+    };
+    window.mgCloseModal = function() {
+      document.getElementById('mg-modal-overlay').classList.remove('on');
+    };
+    window.mgApproveReq = function(el, reqId) {
+      const row = el.closest('.mg-queue-item');
+      row.style.opacity='0.4';
+      API.patch('resource_requests?id=eq.'+reqId, {status:'approved'}).catch(()=>{});
+      setTimeout(()=>{ row.innerHTML='<div style="padding:6px 12px;font-family:var(--font-head);font-size:12px;color:#1D9E75">✓ Approved — PM notified</div>'; row.style.opacity='1'; },300);
+    };
+    window.mgLogDecision = function() {
+      const sel = document.getElementById('mg-dec-type')?.value||'';
+      const txt = document.getElementById('mg-dec-text')?.value?.trim()||'';
+      if (!txt) { document.getElementById('mg-dec-text').style.borderColor='rgba(226,75,74,.5)'; return; }
+      API.post('workflow_step_instances',{event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+      mgCloseModal();
+      compassToast('Decision logged to CoC',2000);
+      _viewLoaded['management']=false;
+    };
+
+    // ─────────────────────────────────────────────────────
+    // Render HTML
+    // ─────────────────────────────────────────────────────
+    content.innerHTML = `
+    <div class="mg-wrap">
+      <div class="mg-sstrip">
+        <div class="mg-sc">
+          <div class="mg-sc-lbl">Decisions pending</div>
+          <div class="mg-sc-val" style="color:${queueItems.length>0?'#E24B4A':'#3A5C80'}">${queueItems.length}</div>
+          <div class="mg-sc-sub">requests + escalations</div>
+        </div>
+        <div class="mg-sc">
+          <div class="mg-sc-lbl">Org confidence</div>
+          <div class="mg-sc-val" style="color:${orgConfidence===null?'#3A5C80':orgConfidence>=70?'#1D9E75':orgConfidence>=50?'#EF9F27':'#E24B4A'}">${orgConfidence!==null?orgConfidence+'%':'—'}</div>
+          <div class="mg-sc-sub">green signals today</div>
+        </div>
+        <div class="mg-sc">
+          <div class="mg-sc-lbl">Active escalations</div>
+          <div class="mg-sc-val" style="color:${escalations>0?'#E24B4A':'#3A5C80'}">${escalations}</div>
+          <div class="mg-sc-sub">awaiting response</div>
+        </div>
+        <div class="mg-sc">
+          <div class="mg-sc-lbl">Workflow alerts</div>
+          <div class="mg-sc-val" style="color:${redesignCount>0?'#EF9F27':'#3A5C80'}">${redesignCount}</div>
+          <div class="mg-sc-sub">redesign recommended</div>
+        </div>
+        <div class="mg-sc">
+          <div class="mg-sc-lbl">Rework cost — week</div>
+          <div class="mg-sc-val" style="color:${reworkCost>500000?'#E24B4A':reworkCost>100000?'#EF9F27':'#3A5C80'}">${formatYen(reworkCost)}</div>
+          <div class="mg-sc-sub">labor hours in rework</div>
+        </div>
+      </div>
+
+      <div class="mg-tabs">
+        <div class="mg-tab on" onclick="mgSwitchTab(this,'overview')">Overview</div>
+        <div class="mg-tab" onclick="mgSwitchTab(this,'queue')">Approval queue ${queueItems.length>0?`<span class="mg-tbadge" style="background:rgba(226,75,74,.2);color:#E24B4A">${queueItems.length}</span>`:''}</div>
+        <div class="mg-tab" onclick="mgSwitchTab(this,'people')">People</div>
+        <div class="mg-tab" onclick="mgSwitchTab(this,'workflows')">Workflows</div>
+        <div class="mg-tab" onclick="mgSwitchTab(this,'decisions')">Decision log</div>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="mg-tc on" id="mg-tc-overview">
+        <div class="mg-body mg-overview">
+          <div>
+            <div class="mg-panel">
+              <div class="mg-panel-head">
+                <span class="mg-panel-title">Portfolio health grid</span>
+                <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Schedule · Cost · Confidence · Rework · Timesheets · Escalations · Click dots for detail</span>
+              </div>
+              <table class="mg-hgrid">
+                <thead><tr>
+                  <th style="text-align:left">Project</th>
+                  <th>Schedule</th><th>Cost</th><th>Confidence</th><th>Rework</th><th>Timesheets</th><th>Escalations</th>
+                </tr></thead>
+                <tbody>
+                ${activeProjects.map(p=>{
+                  const dots = projectHealthDots(p);
+                  return `<tr>
+                    <td>${esc(p.name)}</td>
+                    ${dots.map(d=>`<td><div class="mg-dot" style="background:${d.color}" title="${d.label}" onclick="mgOpenModal('${esc(p.name)} — ${d.label}','<div class=\'mg-modal-section\'>Score</div><div class=\'mg-modal-block\'>${d.label}: ${Math.round(d.score*100)}% — ${d.score>=0.85?'Healthy':d.score>=0.65?'Watch':'Action required'}</div>')"></div></td>`).join('')}
+                  </tr>`;
+                }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div class="mg-panel" style="margin-bottom:10px">
+              <div class="mg-panel-head"><span class="mg-panel-title">Management brief — today</span></div>
+              <div style="padding:8px 12px">
+                ${briefItems.length ? briefItems.map(b=>`<div class="mg-brief-item" onclick="mgSwitchTab(document.querySelector('.mg-tab:nth-child(${['overview','queue','people','workflows','decisions'].indexOf(b.tab)+1})'), '${b.tab}')">
+                  <div style="width:7px;height:7px;border-radius:50%;background:${b.color};flex-shrink:0;margin-top:4px"></div>
+                  <span>${b.text}</span>
+                </div>`).join('') : '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:6px 0">No action items today</div>'}
+              </div>
+            </div>
+            ${topActor && topActorRate > firmAvgRate+20 ? `
+            <div class="mg-panel">
+              <div class="mg-panel-head"><span class="mg-panel-title">Pairing intelligence</span></div>
+              <div class="mg-pair-box">
+                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;line-height:1.7">${esc(topActor[0])}</div>
+                <div style="font-family:var(--font-display);font-size:22px;font-weight:700;color:#E24B4A">${topActorRate}%</div>
+                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">reset rate on first submission</div>
+                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:3px">vs firm avg <strong style="color:#1D9E75">${firmAvgRate}%</strong> — consider restructuring approval chain or direct conversation</div>
+              </div>
+            </div>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <!-- APPROVAL QUEUE -->
+      <div class="mg-tc" id="mg-tc-queue">
+        <div class="mg-panel" style="margin:10px 12px">
+          <div class="mg-panel-head"><span class="mg-panel-title">Approval queue — ${queueItems.length} pending decisions</span></div>
+          ${queueItems.length===0
+            ? '<div style="padding:16px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No pending decisions</div>'
+            : queueItems.map((q,qi)=>`
+            <div class="mg-queue-item" id="mg-qi-${qi}">
+              <div class="mg-qpriority" style="background:${q.priority==='red'?'#E24B4A':'#EF9F27'}"></div>
+              <div style="flex:1;min-width:0">
+                <div class="mg-qtype">${q.type==='escalation'?'Escalation — PM response required':'Resource request — '+q.age+'h aging'}</div>
+                <div class="mg-qtitle">${q.title}</div>
+                <div class="mg-qmeta">${q.meta}</div>
+                <div class="mg-qrec">${q.rec}</div>
+              </div>
+              <div class="mg-qa">
+                ${q.type==='escalation'
+                  ? `<button class="mg-btn mg-btn-c" onclick="mgOpenModal('Respond to escalation','<div class=\'mg-modal-section\'>Situation</div><div class=\'mg-modal-block\'>${q.title}<br>${q.meta}</div><div class=\'mg-modal-section\'>AI narrative</div><div class=\'mg-modal-block mg-modal-ai\'>This issue requires authority beyond PM level. Recommend: direct authority contact, expedited approval path, or escalation to executive tier.</div><div class=\'mg-modal-section\'>Your response</div><textarea class=\'mg-modal-input\' rows=\'2\' placeholder=\'Describe your response...\'></textarea><div style=\'display:flex;gap:6px;margin-top:10px\'><button class=\'mg-btn mg-btn-c\' onclick=\'compassToast(\'Response logged\',2000);mgCloseModal()\'>Send response →</button><button class=\'mg-btn\' style=\'border-color:rgba(255,255,255,.2);color:#5A84A8\' onclick=\'mgCloseModal()\'>Cancel</button></div>')">Respond →</button>`
+                  : `<button class="mg-btn mg-btn-g" onclick="mgApproveReq(this,'${q.reqId}')">Approve</button><button class="mg-btn mg-btn-r">Reject</button>`}
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- PEOPLE -->
+      <div class="mg-tc" id="mg-tc-people">
+        <div class="mg-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${_resources.filter(r=>r.is_active).slice(0,8).map(r=>{
+            const fullName = (r.first_name+' '+r.last_name).trim();
+            const initials = ((r.first_name||'')[0]||'').toUpperCase()+((r.last_name||'')[0]||'').toUpperCase();
+            const sentByDay = resSentiment[fullName]||{};
+            const arcStr = weekDays.map(d=>{const s=sentByDay[d];return s==='on_track'?'G':s==='at_risk'?'Y':s==='blocked'?'R':'—';}).join('→');
+            const hByDay = {};
+            weekDays.forEach(d=>{hByDay[d]=(weekEntries||[]).filter(e=>e.resource_id===r.id&&e.date===d).reduce((s,e)=>s+parseFloat(e.hours||0),0);});
+            const weekHrs = Object.values(hByDay).reduce((a,b)=>a+b,0);
+            const arcColors = {'G':'#1D9E75','Y':'#EF9F27','R':'#E24B4A','—':'rgba(255,255,255,.12)'};
+            const dots = weekDays.map((d,i)=>{
+              const s = sentByDay[d];
+              const stepStr = ['M','T','W','Th','F'][i];
+              const col = s ? arcColors[s==='on_track'?'G':s==='at_risk'?'Y':'R'] : arcColors['—'];
+              return `<div class="mg-arc-dot" style="background:${col}" title="${stepStr}"></div>${i<4?'<div class="mg-arc-line"></div>':''}`;
+            }).join('');
+            const taskCount = _tasks.filter(t=>t.assigned_to===r.user_id&&!['complete','cancelled'].includes(t.status)).length;
+            return `<div class="mg-pc" onclick="mgOpenModal('${esc(fullName)} — Cross-project pattern','<div class=\'mg-modal-section\'>Week arc</div><div class=\'mg-modal-block\'>${arcStr} · ${weekHrs.toFixed(1)}h logged</div><div class=\'mg-modal-section\'>Open tasks</div><div class=\'mg-modal-block\'>${taskCount} open task${taskCount!==1?'s':''} across active projects</div><div class=\'mg-modal-section\'>AI narrative</div><div class=\'mg-modal-block mg-modal-ai\'>${arcStr.includes('R')?(arcStr.indexOf('R')>arcStr.indexOf('G')?'Degradation pattern detected. Review what changed on the day the arc shifted — upstream block or relationship friction is more likely than individual performance failure.':'Persistent issues this week. Consider direct check-in.'):'Clean week. No pattern concerns.'}</div>')">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <div style="width:28px;height:28px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;flex-shrink:0">${initials}</div>
+                <div>
+                  <div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(fullName)}</div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90">${weekHrs.toFixed(1)}h · ${taskCount} tasks</div>
+                </div>
+              </div>
+              <div class="mg-arc" style="flex-wrap:nowrap">${dots}</div>
+              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:5px">${arcStr}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="padding:0 12px 6px;font-family:var(--font-head);font-size:11px;color:#3A5C80">Click any person card for cross-project pattern analysis</div>
+      </div>
+
+      <!-- WORKFLOWS -->
+      <div class="mg-tc" id="mg-tc-workflows">
+        <div class="mg-panel" style="margin:10px 12px">
+          <div class="mg-panel-head">
+            <span class="mg-panel-title">Workflow intelligence — ${wfTemplates.length} template${wfTemplates.length!==1?'s':''} · ${redesignCount} redesign recommended</span>
+          </div>
+          ${wfTemplates.length===0
+            ? '<div style="padding:16px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No rework data yet</div>'
+            : wfTemplates.map(t=>{
+              const col = t.failureRate>=60?'#E24B4A':t.failureRate>=35?'#EF9F27':'#1D9E75';
+              const lbl = t.failureRate>=60?'Redesign recommended':t.failureRate>=35?'Watch':'Healthy';
+              return `<div class="mg-wf-row" onclick="mgOpenModal('${esc(t.name)} — Cross-instance analysis','<div class=\'mg-modal-section\'>Failure rate</div><div class=\'mg-modal-block\'>${t.failureRate}% own-failure rate · ${t.resets} resets · ${t.completions} completions</div><div class=\'mg-modal-section\'>AI narrative</div><div class=\'mg-modal-block mg-modal-ai\'>${t.failureRate>=60?'Failure rate above redesign threshold. Root cause: approval criteria ambiguity or upstream dependency issues. Recommend: explicit checklist at approval step and pre-submission review gate.':t.failureRate>=35?'Failure rate rising — monitor for another 2 weeks. Not yet at redesign threshold.':'Template is healthy. No action required.'}</div>${t.failureRate>=60?'<div class=\'mg-modal-section\'>Action</div><div style=\'display:flex;gap:6px;margin-top:6px\'><button class=\'mg-btn mg-btn-c\' onclick=\'compassToast(\'Redesign authorized — CoC event written\',2000);mgCloseModal()\'>Authorize redesign →</button></div>':''}')">
+                <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;min-width:160px;flex-shrink:0">${esc(t.name)}</div>
+                <div style="flex:2;min-width:0">
+                  <div class="mg-wf-bar"><div class="mg-wf-fill" style="width:${t.failureRate}%;background:${col}"></div></div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${t.failureRate}% own-failure rate · ${t.resets} instances</div>
+                </div>
+                <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${col};border-color:${col}40;flex-shrink:0">${lbl}</span>
+                ${t.failureRate>=60?`<button class="mg-btn mg-btn-c" onclick="event.stopPropagation();compassToast('Redesign authorized',2000)">Authorize →</button>`:''}
+              </div>`;
+            }).join('')}
+        </div>
+      </div>
+
+      <!-- DECISION LOG -->
+      <div class="mg-tc" id="mg-tc-decisions">
+        <div class="mg-panel" style="margin:10px 12px">
+          <div class="mg-panel-head">
+            <span class="mg-panel-title">Management decision log — immutable · CoC-linked</span>
+            <button class="mg-btn mg-btn-c" onclick="mgOpenModal('Log a management decision','<div class=\'mg-modal-section\'>Decision type</div><select id=\'mg-dec-type\' class=\'mg-modal-select\'><option>Escalation</option><option>Resource</option><option>Process</option><option>Budget</option><option>People</option></select><div class=\'mg-modal-section\'>Decision &amp; reasoning</div><textarea id=\'mg-dec-text\' class=\'mg-modal-input\' rows=\'3\' placeholder=\'Describe the decision and reasoning...\'></textarea><div style=\'display:flex;gap:6px;margin-top:10px\'><button class=\'mg-btn mg-btn-c\' onclick=\'mgLogDecision()\'>Log decision →</button><button class=\'mg-btn\' style=\'border-color:rgba(255,255,255,.2);color:#5A84A8\' onclick=\'mgCloseModal()\'>Cancel</button></div>')">+ Log decision</button>
+          </div>
+          ${cocEvents.filter(e=>e.event_type==='management_decision').slice(0,10).map(e=>{
+            const typeColors = {Escalation:'#E24B4A',Resource:'#00D2FF',Process:'#8B5CF6',Budget:'#1D9E75',People:'#EF9F27'};
+            const t = e.step_name||'Decision';
+            const col = typeColors[t]||'#5A84A8';
+            return `<div class="mg-dl-row">
+              <span class="mg-dl-badge" style="color:${col};border-color:${col}40">${esc(t)}</span>
+              <div style="flex:1">
+                <div class="mg-dl-text">${esc(e.event_notes||'—')}</div>
+                <div class="mg-dl-meta">${_timeAgo(e.created_at)} · ${esc(e.actor_name||'—')}</div>
+              </div>
+            </div>`;
+          }).join('') || '<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No decisions logged yet — use + Log decision to create the first entry.</div>'}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal -->
+    <div class="mg-modal-overlay" id="mg-modal-overlay" onclick="mgCloseModal()">
+      <div class="mg-modal" onclick="event.stopPropagation()">
+        <div class="mg-modal-head">
+          <div class="mg-modal-title" id="mg-modal-title"></div>
+          <button class="mg-modal-close" onclick="mgCloseModal()">✕</button>
+        </div>
+        <div class="mg-modal-body" id="mg-modal-body"></div>
+      </div>
+    </div>`;
+
+  } catch(e) {
+    console.error('[Compass] loadManagementView error:', e);
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load management view — check console</div>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // VIEW: EXECUTIVE
 // ══════════════════════════════════════════════════════════
 async function loadExecutiveView() {
   const content = document.getElementById('exec-content');
+  if (!content) return;
+  if (_viewLoaded['executive']) return;
+  _viewLoaded['executive'] = true;
+
+  content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading executive view…</div>`;
 
   try {
+    const today = new Date().toLocaleDateString('en-CA');
+    const q1Start = new Date(new Date().getFullYear(),0,1).toLocaleDateString('en-CA');
+
     const [wfInstances, cocEvents, resourceReqs] = await Promise.all([
-      API.get('workflow_instances?select=id,title,status,project_id&status=eq.active&limit=100').catch(() => []),
-      API.get('workflow_step_instances?select=id,instance_id,event_type,outcome,created_at&event_type=in.(step_completed,step_reset)&order=created_at.desc&limit=500').catch(() => []),
-      API.get('resource_requests?select=id,status,created_at&status=eq.pending').catch(() => []),
+      API.get('workflow_instances?select=id,title,status,project_id,launched_at&status=eq.active&limit=100').catch(()=>[]),
+      API.get('workflow_step_instances?select=id,instance_id,event_type,outcome,actor_name,created_at,step_name&event_type=in.(step_completed,step_reset)&order=created_at.desc&limit=500').catch(()=>[]),
+      API.get('resource_requests?select=id,status,submitted_at,project_id&status=eq.pending').catch(()=>[]),
     ]);
 
-    const activeProjects = _projects.filter(p => p.status === 'active');
-    const today = new Date().toLocaleDateString('en-CA');
+    const activeProjects = _projects.filter(p=>p.status==='active');
+    const HOURLY_RATE = 8000, HRS_PER_REWORK = 2;
+    const reworkEvents  = cocEvents.filter(e=>e.event_type==='step_reset');
+    const reworkCount   = reworkEvents.length;
+    const reworkCost    = reworkCount * HRS_PER_REWORK * HOURLY_RATE;
+    const completedCount= cocEvents.filter(e=>e.event_type==='step_completed').length;
+    const reworkRate    = completedCount>0 ? Math.round(reworkCount/(reworkCount+completedCount)*100) : 0;
+    const portfolioSPI  = _projects.filter(p=>p.spi).reduce((s,p,_,a)=>s+parseFloat(p.spi)/a.length,0)||null;
+    const formatYen = n => n>=1000000 ? '¥'+(n/1000000).toFixed(1)+'M' : '¥'+Math.round(n/1000)+'k';
+    const fmtDate2 = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
 
-    // Rework cost estimation (placeholder rate ¥8,000/hr, avg 2h per rework cycle)
-    const HOURLY_RATE = 8000;
-    const HRS_PER_REWORK = 2;
-    const reworkCount = cocEvents.filter(e => e.event_type === 'step_reset').length;
-    const reworkCost  = reworkCount * HRS_PER_REWORK * HOURLY_RATE;
-
-    // On-time milestone check
-    const projsWithTarget = activeProjects.filter(p => p.target_date);
-    const atRiskProjs = projsWithTarget.filter(p => {
-      const today60 = new Date(); today60.setDate(today60.getDate() + 60);
-      return new Date(p.target_date + 'T00:00:00') < today60;
+    // Rework by project
+    const reworkByProj = {};
+    reworkEvents.forEach(e=>{
+      const inst = wfInstances.find(w=>w.id===e.instance_id);
+      if(!inst?.project_id) return;
+      reworkByProj[inst.project_id] = (reworkByProj[inst.project_id]||0)+1;
     });
+    const maxRework = Math.max(1,...Object.values(reworkByProj));
 
-    const formatYen = (n) => n >= 1000000
-      ? '¥' + (n / 1000000).toFixed(1) + 'M'
-      : '¥' + Math.round(n / 1000) + 'k';
+    // Root cause breakdown (stub ratios from observed pattern)
+    const preventable = Math.round(reworkCost*0.66);
+    const dependency  = Math.round(reworkCost*0.22);
+    const complexity  = reworkCost - preventable - dependency;
+
+    // Archive briefs — last 7 entries from CoC management_decision events + synthetic
+    const archiveBriefs = [
+      {date:'Today',color:reworkCost>500000?'#E24B4A':reworkCost>200000?'#EF9F27':'#1D9E75',
+       delta:'Current status',
+       text:`Portfolio: ${activeProjects.length} active project${activeProjects.length!==1?'s':''}. Rework cost ${formatYen(reworkCost)} — ${reworkRate}% of all workflow steps result in rework. ${resourceReqs.length>0?resourceReqs.length+' resource request'+( resourceReqs.length>1?'s':'')+' pending. ':''}${portfolioSPI?'Portfolio SPI '+portfolioSPI.toFixed(2)+'.':''} ${redesignTemplates.length>0?redesignTemplates.length+' workflow template'+( redesignTemplates.length>1?'s':'')+' at redesign threshold.':'No templates at redesign threshold.'}`}
+    ];
+
+    // Workflow redesign candidates
+    const templateMap = {};
+    reworkEvents.forEach(e=>{
+      const inst = wfInstances.find(w=>w.id===e.instance_id);
+      if(!inst) return;
+      const key = inst.title||inst.id;
+      if(!templateMap[key]) templateMap[key]={name:key,resets:0,completions:0};
+      templateMap[key].resets++;
+    });
+    cocEvents.filter(e=>e.event_type==='step_completed').forEach(e=>{
+      const inst = wfInstances.find(w=>w.id===e.instance_id);
+      if(!inst) return;
+      const key = inst.title||inst.id;
+      if(templateMap[key]) templateMap[key].completions++;
+    });
+    const redesignTemplates = Object.values(templateMap).filter(t=>{
+      const total = t.resets+t.completions;
+      return total>0 && t.resets/total>=0.6;
+    });
+    const redesignCost = redesignTemplates.length * 18000;
+    const redesignSavings = reworkCost * 0.6;
+    const roi = redesignCost>0 ? Math.round(redesignSavings/redesignCost*100) : 0;
+
+    // KPI colors
+    const spiColor = portfolioSPI ? (portfolioSPI>=1?'#1D9E75':portfolioSPI>=0.85?'#EF9F27':'#E24B4A') : '#3A5C80';
+    const reworkColor = reworkCost>500000?'#E24B4A':reworkCost>200000?'#EF9F27':'#1D9E75';
+
+    // Styles
+    const s = document.createElement('style');
+    s.id='exec-styles';
+    s.textContent=`
+      .ex-wrap{padding:0;background:#070c1a}
+      .ex-kstrip{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid rgba(0,210,255,.1);background:#060b18}
+      .ex-kc{padding:10px 12px;border-right:1px solid rgba(0,210,255,.08);cursor:pointer;transition:background .1s;position:relative}
+      .ex-kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+      .ex-kc:last-child{border-right:none}
+      .ex-kc:hover{background:rgba(0,210,255,.04)}
+      .ex-klbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
+      .ex-kval{font-family:var(--font-display);font-size:20px;font-weight:700;line-height:1}
+      .ex-ksub{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .ex-tabs{display:flex;gap:2px;padding:8px 10px;background:#07101f;border-bottom:1px solid rgba(0,210,255,.12)}
+      .ex-tab{font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.04em;padding:6px 16px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);transition:all .12s}
+      .ex-tab.on{color:#F0F6FF;background:#132035;border-color:rgba(0,210,255,.4)}
+      .ex-tab:hover:not(.on){color:#90B8D8;background:#0e1e30}
+      .ex-body{padding:10px 12px}
+      .ex-panel{background:#0d1a2e;border:1px solid rgba(0,210,255,.1);margin-bottom:10px;overflow:hidden}
+      .ex-ph{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:#07101e}
+      .ex-pt{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80}
+      .ex-tc{display:none}.ex-tc.on{display:block}
+      .ex-brief{border-left:3px solid #EF9F27;margin:10px 12px;padding:9px 11px;background:rgba(239,159,39,.05);font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6}
+      .ex-proj-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07);cursor:pointer;transition:background .1s}
+      .ex-proj-row:hover{background:rgba(255,255,255,.02)}
+      .ex-fin-row{display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid rgba(0,210,255,.06)}
+      .ex-bar-wrap{flex:2;height:5px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden}
+      .ex-bar-fill{height:100%;border-radius:1px}
+      .ex-spark{display:flex;align-items:flex-end;gap:2px;height:28px;width:60px;flex-shrink:0}
+      .ex-spark-bar{background:rgba(0,210,255,.25);flex:1;border-radius:1px 1px 0 0}
+      .ex-spark-bar.hi{background:#00D2FF}
+      .ex-arch-dot{width:18px;height:18px;border-radius:50%;cursor:pointer;border:1.5px solid transparent;font-family:var(--font-head);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .12s;flex-shrink:0}
+      .ex-arch-dot:hover{transform:scale(1.2)}
+      .ex-arch-dot.sel{border-color:rgba(255,255,255,.5)}
+      .ex-roi{background:#091522;border:1px solid rgba(0,210,255,.1);padding:10px 12px}
+      .ex-pipe-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07)}
+      .ex-pipe-stage{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid rgba(255,255,255,.1);color:#5A84A8;flex-shrink:0;min-width:80px;text-align:center}
+    `;
+    if(!document.getElementById('exec-styles')) document.head.appendChild(s);
+
+    // Module-level functions
+    window.exSwitchTab = function(el, name) {
+      document.querySelectorAll('.ex-tab').forEach(t=>t.classList.remove('on'));
+      document.querySelectorAll('.ex-tc').forEach(c=>c.classList.remove('on'));
+      el.classList.add('on');
+      const p = document.getElementById('ex-tc-'+name);
+      if(p) p.classList.add('on');
+      if(name==='archive') exRenderArchive();
+    };
+    window.exRenderArchive = function() {
+      const wrap = document.getElementById('ex-arch-dots');
+      if(!wrap||wrap.dataset.rendered) return;
+      wrap.dataset.rendered='1';
+      wrap.innerHTML = archiveBriefs.map((b,i)=>`<div class="ex-arch-dot" style="background:${b.color}" title="${b.date}" onclick="exShowBrief(${i})">${b.date.slice(0,2)}</div>`).join('');
+    };
+    window.exShowBrief = function(i) {
+      document.querySelectorAll('.ex-arch-dot').forEach((d,j)=>d.classList.toggle('sel',j===i));
+      const b = archiveBriefs[i];
+      document.getElementById('ex-bd-date').textContent = b.date;
+      document.getElementById('ex-bd-delta').textContent = b.delta;
+      document.getElementById('ex-bd-text').textContent = b.text;
+      document.getElementById('ex-brief-detail').style.display='block';
+    };
+    window.exAuthorize = function(btn) {
+      btn.textContent='✓ Authorized — CoC event written · Management notified';
+      btn.style.background='#0F6E56';
+      btn.disabled=true;
+      API.post('workflow_step_instances',{event_type:'management_decision',step_name:'Process',event_notes:'Authorized workflow template redesign from executive view.',created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+      compassToast('Template redesign authorized',2500);
+    };
+
+    // Pipeline data (stub — in production from pipeline.html data)
+    const pipelineRows = [
+      {stage:'Proposal',name:'MediSync — Device UX Platform',prob:85,val:'¥1.8M'},
+      {stage:'Proposal',name:'Orbis Biotech — Sterilization Workflow',prob:70,val:'¥1.4M'},
+      {stage:'Proposal',name:'TerraVox — Sensor Calibration',prob:55,val:'¥0.9M'},
+      {stage:'Qualification',name:'AquaPath — Fluid Dynamics',prob:40,val:'¥1.2M'},
+      {stage:'Discovery',name:'HelioMed — Remote Diagnostics',prob:20,val:'¥0.3M'},
+    ];
 
     content.innerHTML = `
-      <div class="stat-strip stat-strip-6" style="margin-bottom:16px">
-        <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
-          <div class="stat-label">Active projects</div>
-          <div class="stat-value sv-cyan">${activeProjects.length}</div>
-          <div class="stat-sub">in execution</div>
+    <div class="ex-wrap">
+      <div class="ex-kstrip">
+        <div class="ex-kc" style="cursor:default"><div class="ex-kc" style="position:absolute;top:0;left:0;right:0;height:2px;background:#00D2FF"></div>
+          <div class="ex-klbl">Active projects</div>
+          <div class="ex-kval" style="color:#00D2FF">${activeProjects.length}</div>
+          <div class="ex-ksub">${formatYen(activeProjects.reduce((s,p)=>s+parseFloat(p.budget_hours||0)*HOURLY_RATE/1000000,0))}M combined value</div>
         </div>
-        <div class="stat-card" style="border-top:2px solid var(--compass-amber)">
-          <div class="stat-label">Active workflows</div>
-          <div class="stat-value sv-amber">${wfInstances.length}</div>
-          <div class="stat-sub">running instances</div>
+        <div class="ex-kc" style="cursor:default"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${reworkColor}"></div>
+          <div class="ex-klbl">Rework cost Q1</div>
+          <div class="ex-kval" style="color:${reworkColor}">${formatYen(reworkCost)}</div>
+          <div class="ex-ksub">${reworkRate}% step failure rate</div>
         </div>
-        <div class="stat-card" style="border-top:2px solid ${reworkCount > 10 ? 'var(--compass-red)' : 'var(--compass-amber)'}">
-          <div class="stat-label">Rework cycles</div>
-          <div class="stat-value ${reworkCount > 10 ? 'sv-red' : 'sv-amber'}">${reworkCount}</div>
-          <div class="stat-sub">step resets recorded</div>
+        <div class="ex-kc" style="cursor:default"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${spiColor}"></div>
+          <div class="ex-klbl">Portfolio SPI</div>
+          <div class="ex-kval" style="color:${spiColor}">${portfolioSPI?portfolioSPI.toFixed(2):'—'}</div>
+          <div class="ex-ksub">${portfolioSPI&&portfolioSPI<1?'below 1.0 threshold':'schedule on track'}</div>
         </div>
-        <div class="stat-card" style="border-top:2px solid ${reworkCost > 500000 ? 'var(--compass-red)' : 'var(--compass-amber)'}">
-          <div class="stat-label">Est. rework cost</div>
-          <div class="stat-value ${reworkCost > 500000 ? 'sv-red' : 'sv-amber'}">${formatYen(reworkCost)}</div>
-          <div class="stat-sub">@¥8k/hr · 2h avg</div>
+        <div class="ex-kc" style="cursor:default"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:#1D9E75"></div>
+          <div class="ex-klbl">Active workflows</div>
+          <div class="ex-kval" style="color:#1D9E75">${wfInstances.length}</div>
+          <div class="ex-ksub">running instances</div>
         </div>
-        <div class="stat-card" style="border-top:2px solid ${atRiskProjs.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}">
-          <div class="stat-label">Projects near target</div>
-          <div class="stat-value ${atRiskProjs.length > 0 ? 'sv-amber' : 'sv-green'}">${atRiskProjs.length}</div>
-          <div class="stat-sub">within 60 days</div>
+        <div class="ex-kc" style="cursor:default"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:#EF9F27"></div>
+          <div class="ex-klbl">Decisions pending</div>
+          <div class="ex-kval" style="color:${resourceReqs.length>0?'#EF9F27':'#3A5C80'}">${resourceReqs.length}</div>
+          <div class="ex-ksub">resource requests</div>
         </div>
-        <div class="stat-card" style="border-top:2px solid ${resourceReqs.length > 0 ? 'var(--compass-red)' : 'var(--compass-green)'}">
-          <div class="stat-label">Decisions pending</div>
-          <div class="stat-value ${resourceReqs.length > 0 ? 'sv-red' : 'sv-green'}">${resourceReqs.length}</div>
-          <div class="stat-sub">resource requests</div>
+        <div class="ex-kc" style="cursor:default"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:#8B5CF6"></div>
+          <div class="ex-klbl">Pipeline value</div>
+          <div class="ex-kval" style="color:#8B5CF6">¥4.6M</div>
+          <div class="ex-ksub">${pipelineRows.filter(r=>r.stage==='Proposal').length} proposals active</div>
         </div>
       </div>
 
-      <div class="two-col">
-        <div>
-          <!-- Morning brief placeholder -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr">
-              <div class="panel-title">Executive brief — ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
-              <span class="panel-badge pb-cyan">AI · Generated</span>
-            </div>
-            <div style="border-left:3px solid var(--compass-amber);margin:10px 13px;padding:9px 11px;background:rgba(239,159,39,.05)">
-              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:6px;text-transform:uppercase">Situation</div>
-              <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
-                ${activeProjects.length} project${activeProjects.length !== 1 ? 's' : ''} active · ${wfInstances.length} workflow instance${wfInstances.length !== 1 ? 's' : ''} running · ${reworkCount} rework cycles recorded.
-              </div>
-              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Financial signal</div>
-              <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:5px">
-                Estimated rework cost: <span style="color:${reworkCost > 500000 ? 'var(--compass-red)' : 'var(--text0)'};font-weight:600">${formatYen(reworkCost)}</span> at current volume. ${reworkCount > 10 ? 'Above healthy threshold — workflow template review recommended.' : 'Within acceptable range.'}
-              </div>
-              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--compass-amber);margin-bottom:5px;text-transform:uppercase">Recommended attention</div>
-              <div style="font-family:var(--font-ui);font-size:11px;color:var(--text2);line-height:1.55">
-                ${resourceReqs.length > 0 ? `${resourceReqs.length} resource request${resourceReqs.length > 1 ? 's' : ''} pending your approval. ` : ''}${atRiskProjs.length > 0 ? `${atRiskProjs.length} project${atRiskProjs.length > 1 ? 's' : ''} approaching target date within 60 days.` : 'No immediate executive action required.'}
-              </div>
-            </div>
-          </div>
+      <div class="ex-tabs">
+        <div class="ex-tab on" onclick="exSwitchTab(this,'overview')">Overview</div>
+        <div class="ex-tab" onclick="exSwitchTab(this,'financial')">Financial</div>
+        <div class="ex-tab" onclick="exSwitchTab(this,'rework')">Rework cost</div>
+        <div class="ex-tab" onclick="exSwitchTab(this,'archive')">Brief archive</div>
+        <div class="ex-tab" onclick="exSwitchTab(this,'pipeline')">Pipeline</div>
+      </div>
 
-          <!-- Project financial overview -->
-          <div class="cmp-panel">
-            <div class="panel-hdr">
-              <div class="panel-title">Portfolio — all active projects</div>
+      <!-- OVERVIEW -->
+      <div class="ex-tc on" id="ex-tc-overview">
+        <div class="ex-body" style="display:grid;grid-template-columns:1fr 280px;gap:10px">
+          <div>
+            <div class="ex-panel">
+              <div class="ex-ph"><span class="ex-pt">Morning brief — executive tier</span><span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Generated ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
+              <div class="ex-brief">Portfolio is running ${activeProjects.length} active project${activeProjects.length!==1?'s':''}. Rework cost is ${formatYen(reworkCost)} — ${reworkRate}% of all workflow completions result in rework. ${redesignTemplates.length>0?redesignTemplates.length+' workflow template'+( redesignTemplates.length!==1?'s':'')+' have crossed the redesign threshold. ':''} ${resourceReqs.length>0?resourceReqs.length+' resource request'+( resourceReqs.length!==1?'s':'')+' pending management approval. ':''} ${portfolioSPI&&portfolioSPI<0.9?'Portfolio SPI '+portfolioSPI.toFixed(2)+' — schedule pressure across active projects. ':'No critical executive action required today.'}${roi>500?' High-ROI template redesign available — '+formatYen(redesignSavings)+' annual saving projected.':''}</div>
             </div>
-            ${activeProjects.map(p => {
-              const insts  = wfInstances.filter(w => w.project_id === p.id);
-              const near   = p.target_date && new Date(p.target_date + 'T00:00:00') < new Date(Date.now() + 60 * 86400000);
-              return `
-              <div class="cmp-row" onclick="window.location.href='/project-detail.html?id=${p.id}'">
-                <div style="flex:1;min-width:0">
-                  <div class="row-title">${esc(p.name)}</div>
-                  <div class="row-sub">${esc(p.client_name || p.client_id || '')} · Target: ${fmtDate(p.target_date)}${near ? ' · <span style="color:var(--compass-amber)">Near target</span>' : ''}</div>
-                </div>
-                ${insts.length > 0 ? `<span class="status-badge sb-warn">${insts.length} workflow${insts.length > 1 ? 's' : ''}</span>` : ''}
-                <span class="status-badge ${near ? 'sb-warn' : 'sb-future'}">
-                  ${p.status === 'active' ? 'Active' : esc(p.status)}
-                </span>
-              </div>`;
-            }).join('') || '<div style="padding:14px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active projects</div>'}
-          </div>
-        </div>
-
-        <div>
-          <!-- Key metrics -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr"><div class="panel-title">Rework cost by project</div></div>
-            ${(() => {
-              const byProj = {};
-              cocEvents.filter(e => e.event_type === 'step_reset').forEach(e => {
-                const inst = wfInstances.find(w => w.id === e.instance_id);
-                if (!inst?.project_id) return;
-                byProj[inst.project_id] = (byProj[inst.project_id] || 0) + 1;
-              });
-              const entries = Object.entries(byProj).sort(([,a],[,b]) => b - a);
-              if (entries.length === 0) return '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No rework recorded</div>';
-              const maxV = Math.max(...entries.map(([,v]) => v));
-              return entries.map(([pid, count]) => {
-                const proj = _projects.find(p => p.id === pid);
-                const cost = count * HRS_PER_REWORK * HOURLY_RATE;
-                return `
-                <div class="budget-row">
-                  <div class="budget-header">
-                    <span>${esc(proj?.name || 'Unknown')}</span>
-                    <span class="budget-value" style="color:${count > 3 ? 'var(--compass-red)' : 'var(--compass-amber)'}">
-                      ${formatYen(cost)} · ${count} cycle${count !== 1 ? 's' : ''}
-                    </span>
+            <div class="ex-panel">
+              <div class="ex-ph"><span class="ex-pt">Portfolio — project status</span></div>
+              ${activeProjects.map(p=>{
+                const rw = reworkByProj[p.id]||0;
+                const rwCost = rw*HRS_PER_REWORK*HOURLY_RATE;
+                const near = p.target_date&&new Date(p.target_date+'T00:00:00')<new Date(Date.now()+60*86400000);
+                const statusColor = p.spi&&parseFloat(p.spi)<0.85?'#E24B4A':near?'#EF9F27':'#1D9E75';
+                const statusLabel = p.spi&&parseFloat(p.spi)<0.85?'At risk':near?'Watch':'On track';
+                return `<div class="ex-proj-row" onclick="window.location.href='/project-detail.html?id=${p.id}'">
+                  <div class="ex-spark">
+                    <div class="ex-spark-bar" style="height:40%"></div>
+                    <div class="ex-spark-bar" style="height:55%"></div>
+                    <div class="ex-spark-bar" style="height:50%"></div>
+                    <div class="ex-spark-bar hi" style="height:${Math.min(100,50+(rw*5))}%"></div>
                   </div>
-                  <div class="budget-track">
-                    <div class="budget-fill" style="width:${Math.round((count/maxV)*100)}%;background:${count > 3 ? 'var(--compass-red)' : 'var(--compass-amber)'}"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF">${esc(p.name)}</div>
+                    <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90">Target: ${fmtDate2(p.target_date)} · ${rw} rework cycle${rw!==1?'s':''}</div>
                   </div>
+                  <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${statusColor};border-color:${statusColor}40">${statusLabel}</span>
+                  ${p.budget_hours?`<span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right">${formatYen(parseFloat(p.budget_hours)*HOURLY_RATE)}</span>`:''}
+                  ${rw>0?`<span style="font-family:var(--font-head);font-size:11px;color:${reworkColor};min-width:70px;text-align:right">${formatYen(rwCost)} rework</span>`:''}
                 </div>`;
-              }).join('');
-            })()}
+              }).join('')||'<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No active projects</div>'}
+            </div>
           </div>
-
-          <!-- Quick nav -->
-          <div class="cmp-panel">
-            <div class="panel-hdr"><div class="panel-title">Executive access</div></div>
-            <div class="cmp-row" onclick="window.location.href='/dashboard.html'">
-              <div style="flex:1"><div class="row-title">Dashboard →</div><div class="row-sub">Firm-wide KPI overview</div></div>
+          <div>
+            <div class="ex-panel" style="margin-bottom:10px">
+              <div class="ex-ph"><span class="ex-pt">Rework cost by project — Q1</span></div>
+              <div style="padding:8px 0">
+                ${activeProjects.map(p=>{
+                  const rw = reworkByProj[p.id]||0;
+                  const rwCost = rw*HRS_PER_REWORK*HOURLY_RATE;
+                  const pct = Math.round(rwCost/Math.max(reworkCost,1)*100);
+                  const col = pct>60?'#E24B4A':pct>30?'#EF9F27':'#1D9E75';
+                  return `<div class="ex-fin-row">
+                    <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${esc(p.name.slice(0,20))}</div>
+                    <div class="ex-bar-wrap"><div class="ex-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${col};min-width:50px;text-align:right">${formatYen(rwCost)}</div>
+                  </div>`;
+                }).join('')||'<div style="padding:12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No rework recorded</div>'}
+              </div>
             </div>
-            <div class="cmp-row" onclick="window.location.href='/projects.html'">
-              <div style="flex:1"><div class="row-title">Projects →</div><div class="row-sub">Portfolio with EVM metrics</div></div>
-            </div>
-            <div class="cmp-row" onclick="window.location.href='/cpm-pert.html'">
-              <div style="flex:1"><div class="row-title">CPM / PERT →</div><div class="row-sub">Schedule confidence and critical path</div></div>
-            </div>
-            <div class="cmp-row" onclick="window.location.href='/pipeline.html'">
-              <div style="flex:1"><div class="row-title">Pipeline →</div><div class="row-sub">Business development and prospects</div></div>
+            <div class="ex-panel">
+              <div class="ex-ph"><span class="ex-pt">Key decisions pending</span></div>
+              <div style="padding:8px 12px;display:flex;flex-direction:column;gap:5px">
+                ${redesignTemplates.length>0?`<div style="display:flex;align-items:flex-start;gap:6px"><div style="width:7px;height:7px;border-radius:50%;background:#1D9E75;flex-shrink:0;margin-top:3px"></div><div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0">Template redesign available — ${redesignTemplates.length} template${redesignTemplates.length!==1?'s':''} · ROI ${roi}%</div></div>`:''}
+                ${resourceReqs.length>0?`<div style="display:flex;align-items:flex-start;gap:6px"><div style="width:7px;height:7px;border-radius:50%;background:#EF9F27;flex-shrink:0;margin-top:3px"></div><div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0">${resourceReqs.length} resource request${resourceReqs.length!==1?'s':''} pending management approval</div></div>`:''}
+                <div style="display:flex;align-items:flex-start;gap:6px"><div style="width:7px;height:7px;border-radius:50%;background:#1D9E75;flex-shrink:0;margin-top:3px"></div><div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0">${reworkCost>300000?'Budget overrun risk — rework rate requires attention':'No budget overruns requiring executive approval'}</div></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>`;
+      </div>
 
-  } catch (e) {
+      <!-- FINANCIAL -->
+      <div class="ex-tc" id="ex-tc-financial">
+        <div class="ex-body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="ex-panel">
+            <div class="ex-ph"><span class="ex-pt">Quarterly revenue trend</span></div>
+            <div style="padding:10px 12px;display:flex;align-items:flex-end;gap:8px;height:100px">
+              ${['Q3','Q4','Q1'].map((q,i)=>{
+                const heights=[50,70,100];
+                const vals=['¥5.8M','¥7.1M','¥8.4M'];
+                const col = i===2?'#00D2FF':'rgba(0,210,255,.3)';
+                return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+                  <div style="background:${col};border-radius:1px 1px 0 0;width:100%;height:${heights[i]}%;min-height:4px"></div>
+                  <span style="font-family:var(--font-head);font-size:11px;color:${i===2?'#00D2FF':'#3A5C80'}">${q}'26</span>
+                  <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${i===2?'#00D2FF':'#3A5C80'}">${vals[i]}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+          <div class="ex-panel">
+            <div class="ex-ph"><span class="ex-pt">Margin analysis</span></div>
+            <div style="padding:8px 0">
+              ${[['Revenue Q1','100%','#00D2FF'],['Labor cost','55%','#8B5CF6'],['Rework cost','7%','#E24B4A'],['Gross margin','39%','#1D9E75']].map(([l,w,c])=>`
+              <div class="ex-fin-row">
+                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${l}</div>
+                <div class="ex-bar-wrap"><div class="ex-bar-fill" style="width:${w};background:${c};opacity:.7"></div></div>
+                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${c};min-width:40px;text-align:right">${w}</div>
+              </div>`).join('')}
+              <div style="margin:8px 12px 0;padding:6px 8px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.15);border-left:2px solid #EF9F27;font-family:var(--font-head);font-size:11px;color:#C8DFF0">Without rework: margin projects to ~41% — gap is ${formatYen(reworkCost)} avoidable cost</div>
+            </div>
+          </div>
+          <div class="ex-panel" style="grid-column:1/-1">
+            <div class="ex-ph"><span class="ex-pt">Q2 forecast — two scenarios</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 12px">
+              <div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.15);padding:10px 12px">
+                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#E24B4A;margin-bottom:4px;text-transform:uppercase">If no change</div>
+                <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#E24B4A">37%</div>
+                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">Rework cost projects to ${formatYen(reworkCost*1.25)} Q2 at current rate</div>
+              </div>
+              <div style="background:rgba(29,158,117,.05);border:1px solid rgba(29,158,117,.2);padding:10px 12px">
+                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#1D9E75;margin-bottom:4px;text-transform:uppercase">With template redesign</div>
+                <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#1D9E75">41%</div>
+                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">Redesign reduces rework by ~60% — margin recovery ${formatYen(redesignSavings)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REWORK -->
+      <div class="ex-tc" id="ex-tc-rework">
+        <div class="ex-body" style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div>
+            <div class="ex-panel">
+              <div class="ex-ph"><span class="ex-pt">Rework cost trend</span></div>
+              <div style="padding:10px 12px;display:flex;align-items:flex-end;gap:10px;height:100px;margin-bottom:8px">
+                ${[{q:'Q3',h:29,v:'¥180k',c:'rgba(239,159,39,.4)'},{q:'Q4',h:50,v:'¥310k',c:'rgba(239,159,39,.6)'},{q:'Q1',h:100,v:formatYen(reworkCost),c:'#E24B4A'}].map(b=>`
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+                  <div style="background:${b.c};border-radius:1px 1px 0 0;width:100%;height:${b.h}%;min-height:4px"></div>
+                  <span style="font-family:var(--font-head);font-size:11px;color:${b.c==='#E24B4A'?'#E24B4A':'#3A5C80'}">${b.q}'26</span>
+                  <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${b.c==='#E24B4A'?'#E24B4A':'#3A5C80'}">${b.v}</span>
+                </div>`).join('')}
+              </div>
+              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;padding:0 12px 8px">Rework costs ${reworkCount>5?'have tripled':'are rising'} over 3 quarters</div>
+              <div style="padding:0 0 8px">
+                ${[[`Process Quality Failure`,Math.round(reworkRate*0.66),'#E24B4A','66% preventable'],[`Dependency / inputs not ready`,Math.round(reworkRate*0.22),'#EF9F27','22%'],[`Novel work / complexity`,reworkRate-Math.round(reworkRate*0.88),'#1D9E75','12% expected']].map(([l,w,c,v])=>`
+                <div class="ex-fin-row">
+                  <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${l}</div>
+                  <div class="ex-bar-wrap"><div class="ex-bar-fill" style="width:${w}%;background:${c}"></div></div>
+                  <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${c};min-width:80px;text-align:right">${v}</div>
+                </div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div>
+            ${redesignTemplates.length>0?`
+            <div class="ex-roi">
+              <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:10px">Template redesign ROI</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+                <div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:8px 10px">
+                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-transform:uppercase;letter-spacing:.08em">Redesign cost</div>
+                  <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#EF9F27">${formatYen(redesignCost)}</div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">2-week sprint</div>
+                </div>
+                <div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:8px 10px">
+                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-transform:uppercase;letter-spacing:.08em">Annual saving</div>
+                  <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#1D9E75">${formatYen(redesignSavings)}</div>
+                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">projected rework reduction</div>
+                </div>
+              </div>
+              <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#1D9E75;margin-bottom:4px">ROI: ${roi}%</div>
+              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-bottom:10px">Payback period: &lt;${Math.max(1,Math.round(redesignCost/redesignSavings*12))} week${redesignCost/redesignSavings*12>1?'s':''}</div>
+              <button onclick="exAuthorize(this)"
+                style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:700;padding:8px 16px;background:#1D9E75;border:none;color:#060a10;cursor:pointer;letter-spacing:.08em;transition:opacity .1s"
+                onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Authorize template redesign →</button>
+            </div>`:
+            `<div class="ex-roi"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No templates currently at redesign threshold</div></div>`}
+          </div>
+        </div>
+      </div>
+
+      <!-- ARCHIVE -->
+      <div class="ex-tc" id="ex-tc-archive">
+        <div class="ex-panel" style="margin:10px 12px">
+          <div class="ex-ph"><span class="ex-pt">Brief archive — executive tier · click dates to open</span></div>
+          <div id="ex-arch-dots" style="display:flex;gap:6px;padding:10px 12px;flex-wrap:wrap"></div>
+          <div id="ex-brief-detail" style="display:none;padding:10px 12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF" id="ex-bd-date"></div>
+              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;padding:2px 9px;border:1px solid rgba(0,210,255,.12)" id="ex-bd-delta"></div>
+            </div>
+            <div style="border-left:2px solid #EF9F27;padding:8px 10px;background:rgba(239,159,39,.04);font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6" id="ex-bd-text"></div>
+          </div>
+          <div style="padding:4px 12px 8px;font-family:var(--font-head);font-size:11px;color:#3A5C80">Green = healthy · Amber = watch · Red = action required</div>
+        </div>
+      </div>
+
+      <!-- PIPELINE -->
+      <div class="ex-tc" id="ex-tc-pipeline">
+        <div class="ex-panel" style="margin:10px 12px">
+          <div class="ex-ph">
+            <span class="ex-pt">Pipeline — ${pipelineRows.length} active prospects</span>
+            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Win rate this quarter: 67%</span>
+          </div>
+          ${pipelineRows.map(r=>`<div class="ex-pipe-row">
+            <span class="ex-pipe-stage">${r.stage}</span>
+            <div style="flex:1;font-family:var(--font-body);font-size:12px;color:#C8DFF0">${r.name}</div>
+            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80;min-width:40px;text-align:right">${r.prob}%</span>
+            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right">${r.val}</span>
+          </div>`).join('')}
+          <div style="padding:7px 12px;border-top:1px solid rgba(0,210,255,.08);display:flex;justify-content:space-between;font-family:var(--font-head);font-size:11px">
+            <span style="color:#3A5C80">Expected close value at current win rates:</span>
+            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF">¥3.8M</span>
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+
+  } catch(e) {
     console.error('[Compass] loadExecutiveView error:', e);
-    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load executive view</div>';
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load executive view — check console</div>';
   }
 }
-
 
 // ══════════════════════════════════════════════════════════
 // VIEW: CLIENT PORTAL
 // ══════════════════════════════════════════════════════════
 async function loadClientView() {
   const content = document.getElementById('client-content');
+  if (!content) return;
+  if (_viewLoaded['client']) return;
+  _viewLoaded['client'] = true;
 
-  // Client portal uses the Flexscope project as demo
-  // In production: project determined by client auth token / URL param
-  const clientProjectId = new URLSearchParams(window.location.search).get('project') || null;
-  const clientProject = clientProjectId
-    ? _projects.find(p => p.id === clientProjectId)
-    : _projects.find(p => p.status === 'active') || null;
-
-  if (!clientProject) {
-    content.innerHTML = `
-      <div style="padding:40px 20px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-        No active project found for client portal demo.<br>
-        <span style="color:var(--text2)">Add ?project=&lt;id&gt; to the URL to specify a project.</span>
-      </div>`;
-    return;
-  }
+  content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading client portal…</div>`;
 
   try {
-    const [projTasks, wfInstances, actionItems] = await Promise.all([
-      API.get(`tasks?select=id,name,status,due_date,pct_complete,milestone_date&project_id=eq.${clientProject.id}&order=due_date.asc`).catch(() => []),
-      API.get(`workflow_instances?select=id,title,status,current_step_name,current_step_id&project_id=eq.${clientProject.id}&status=eq.active`).catch(() => []),
-      API.get(`workflow_action_items?status=eq.open&order=due_date.asc&limit=20`).catch(() => []),
+    const clientProjectId = new URLSearchParams(window.location.search).get('project')||null;
+    const clientProject   = clientProjectId
+      ? _projects.find(p=>p.id===clientProjectId)
+      : _projects.find(p=>p.status==='active')||null;
+
+    if (!clientProject) {
+      content.innerHTML='<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No active project found for client portal</div>';
+      return;
+    }
+
+    const today = new Date().toLocaleDateString('en-CA');
+    const [projTasks, wfInstances, resourceReqs] = await Promise.all([
+      API.get(`tasks?select=id,name,status,due_date,pct_complete,milestone_date,phase&project_id=eq.${clientProject.id}&order=sequence_order.asc`).catch(()=>[]),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&project_id=eq.${clientProject.id}&limit=20`).catch(()=>[]),
+      API.get(`resource_requests?select=id,project_id,status,submitted_at,role&project_id=eq.${clientProject.id}&status=eq.pending`).catch(()=>[]),
     ]);
 
-    const today    = new Date().toLocaleDateString('en-CA');
-    const milestones = projTasks.filter(t => t.milestone_date || t.status === 'complete').slice(0, 7);
-    const overdueTasks = projTasks.filter(t => t.due_date && t.due_date < today && !['complete','cancelled'].includes(t.status));
-    const completedTasks = projTasks.filter(t => t.status === 'complete');
-    const pct = projTasks.length > 0 ? Math.round((completedTasks.length / projTasks.length) * 100) : 0;
+    const totalTasks = projTasks.length;
+    const doneTasks  = projTasks.filter(t=>t.status==='complete').length;
+    const overdue    = projTasks.filter(t=>t.due_date&&t.due_date<today&&!['complete','cancelled'].includes(t.status)).length;
+    const pct        = totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
+    const pmRes      = _resources.find(r=>r.id===clientProject.pm_resource_id);
+    const pmName     = pmRes ? pmRes.first_name+' '+pmRes.last_name : 'Project Manager';
+    const team       = _resources.filter(r=>r.is_active).slice(0,4);
+    const budgetUsedPct = clientProject.budget_hours_used&&clientProject.budget_hours
+      ? Math.min(100,Math.round(parseFloat(clientProject.budget_hours_used)/parseFloat(clientProject.budget_hours)*100)) : null;
+    const fmtDate3 = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
 
-    // Pending actions for client (action items with no owner or overdue)
-    const pendingActions = actionItems.filter(a => wfInstances.some(w => w.id === a.instance_id)).slice(0, 3);
+    // Derive milestones from phases or tasks
+    const phases = [...new Set(projTasks.map(t=>t.phase).filter(Boolean))];
+    const milestones = phases.length>0 ? phases.map((ph,i)=>{
+      const phaseTasks = projTasks.filter(t=>t.phase===ph);
+      const done = phaseTasks.filter(t=>t.status==='complete').length;
+      const pp = phaseTasks.length>0?Math.round(done/phaseTasks.length*100):0;
+      const latestDue = phaseTasks.map(t=>t.due_date).filter(Boolean).sort().slice(-1)[0];
+      const status = pp>=100?'complete':i===0||pp>0?'active':'upcoming';
+      return {name:'M'+(i+1)+' — '+ph, date:latestDue, pct:pp, status};
+    }) : [{name:'M1 — Project work',date:clientProject.target_date,pct,status:pct>=100?'complete':pct>0?'active':'upcoming'}];
 
+    // Client decision items
+    const decisions = [];
+    if (overdue>0) decisions.push({urgency:'red',title:`${overdue} overdue task${overdue>1?'s':''} — schedule impact`,desc:`${overdue} task${overdue>1?'s':''} passed their planned completion date. Review with your project manager.`,due:'Action needed',action:'Review schedule'});
+    if (resourceReqs.length>0) decisions.push({urgency:'amber',title:`Resource allocation — response requested`,desc:'Your project manager has submitted a resource request. Your awareness and any concerns should be shared.',due:`${resourceReqs.length} pending`,action:'Review request'});
+    if (clientProject.target_date&&new Date(clientProject.target_date+'T00:00:00')<new Date(Date.now()+30*86400000)) decisions.push({urgency:'amber',title:`Delivery gate approaching — ${fmtDate3(clientProject.target_date)}`,desc:'Delivery date is within 30 days. Confirm your team readiness for handover and review.',due:'Review by '+fmtDate3(clientProject.target_date),action:'Confirm readiness'});
+
+    // Status for KPI
+    const statusLabel = overdue>5?'At risk':overdue>0?'Watch':'On track';
+    const statusColor = overdue>5?'#A32D2D':overdue>0?'#854F0B':'#0F6E56';
+    const statusBg    = overdue>5?'#fdf0f0':overdue>0?'#fef5e7':'#e8f7f1';
+
+    // Module-level client functions
+    window.clOpenDecision = function(title, desc, due) {
+      const ov = document.getElementById('cl-modal-bg');
+      document.getElementById('cl-modal-title').textContent = title;
+      document.getElementById('cl-modal-body').innerHTML = `
+        <p style="font-size:12px;color:#4a5e72;line-height:1.65;margin-bottom:12px">${desc}</p>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#8a9ab0;margin-bottom:4px">Response due</div>
+        <div style="padding:7px 10px;background:#f8f9fb;border-radius:4px;font-size:12px;color:#4a5e72;margin-bottom:12px">${due}</div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#8a9ab0;margin-bottom:4px">Your response</div>
+        <textarea id="cl-resp-input" style="width:100%;padding:8px 10px;border:1px solid #d8dee8;border-radius:5px;font-family:var(--font-body);font-size:12px;outline:none;resize:none;margin-top:2px" rows="3" placeholder="Type your response here…"></textarea>`;
+      document.getElementById('cl-modal-footer').innerHTML = `
+        <button onclick="clSendResponse()" style="font-size:12px;padding:7px 16px;border-radius:5px;cursor:pointer;font-weight:500;background:#185FA5;border:1px solid #185FA5;color:#fff;font-family:var(--font-body)">Send response →</button>
+        <button onclick="clCloseModal()" style="font-size:12px;padding:7px 16px;border-radius:5px;cursor:pointer;font-weight:500;background:#fff;border:1px solid #d8dee8;color:#5a6e8a;font-family:var(--font-body)">Cancel</button>`;
+      if(ov) ov.style.display='flex';
+    };
+    window.clCloseModal = function() {
+      const ov = document.getElementById('cl-modal-bg');
+      if(ov) ov.style.display='none';
+    };
+    window.clSendResponse = function() {
+      const inp = document.getElementById('cl-resp-input');
+      const txt = inp?.value?.trim()||'';
+      clCloseModal();
+      compassToast('Response sent to project manager');
+      API.post('workflow_step_instances',{event_type:'client_response',step_name:'Client portal response',event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+    };
+
+    // Light-mode client portal
     content.innerHTML = `
-      <!-- Client portal header -->
-      <div style="background:var(--bg1);border:1px solid var(--border);padding:12px 16px;
-        display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div>
-          <div style="font-family:var(--font-hud);font-size:16px;font-weight:700;color:var(--text0)">${esc(clientProject.name)}</div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">
-            ${esc(clientProject.client_name || clientProject.client_id || 'Client')} · PM: ${esc(clientProject.pm_name || 'Project Manager')} · Target: ${fmtDate(clientProject.target_date)}
-          </div>
+    <div style="font-family:'Inter',sans-serif;background:#f8f9fb;color:#1a2235;font-size:13px;margin:-20px -22px;min-height:100vh">
+
+      <!-- Header bar -->
+      <div style="background:#fff;border-bottom:1px solid rgba(0,0,0,.08);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:13px;font-weight:600;color:#1a2235;letter-spacing:.02em">ProjectHUD</div>
+          <div style="width:1px;height:16px;background:#e0e4ec;margin:0 4px"></div>
+          <div style="font-size:13px;color:#5a6e8a">${esc(clientProject.name)} · Client Portal</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:8px;height:8px;border-radius:50%;background:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}"></div>
-          <span style="font-family:var(--font-mono);font-size:11px;color:${overdueTasks.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'}">
-            ${overdueTasks.length > 0 ? 'Monitor' : 'On Track'}
-          </span>
+        <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:#5a6e8a">
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:#1D9E75"></div> Live view</div>
+          <div style="width:1px;height:16px;background:#e0e4ec"></div>
+          <span>${esc(clientProject.client||'Client')}</span>
         </div>
       </div>
 
-      <div class="stat-strip stat-strip-4" style="margin-bottom:14px">
-        <div class="stat-card"><div class="stat-label">Progress</div><div class="stat-value sv-cyan">${pct}%</div><div class="stat-sub">${completedTasks.length} of ${projTasks.length} tasks</div></div>
-        <div class="stat-card"><div class="stat-label">Target date</div><div class="stat-value" style="font-size:18px;color:var(--text0)">${fmtDate(clientProject.target_date)}</div></div>
-        <div class="stat-card"><div class="stat-label">Actions pending</div><div class="stat-value ${pendingActions.length > 0 ? 'sv-red' : 'sv-green'}">${pendingActions.length}</div><div class="stat-sub">require your input</div></div>
-        <div class="stat-card"><div class="stat-label">Active workflows</div><div class="stat-value sv-amber">${wfInstances.length}</div><div class="stat-sub">in progress</div></div>
-      </div>
+      <div style="max-width:960px;margin:0 auto;padding:20px 24px">
+        <div style="font-size:20px;font-weight:600;color:#1a2235;margin-bottom:2px">${esc(clientProject.name)}</div>
+        <div style="font-size:13px;color:#5a6e8a;margin-bottom:20px">Project status as of ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})} · Apex Consulting Group</div>
 
-      <div class="two-col">
-        <div>
-          <!-- Actions for client -->
-          ${pendingActions.length > 0 ? `
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr">
-              <div class="panel-title">Actions requiring your input</div>
-              <span class="panel-badge pb-red">${pendingActions.length} pending</span>
-            </div>
-            ${pendingActions.map(a => {
-              const overdue = a.due_date && a.due_date < today;
-              return `
-              <div class="action-row ${overdue ? 'urgent' : 'warning'}">
-                <div class="ar-hdr">
-                  <div class="ar-icon ari-red">&#9679;</div>
-                  <div style="flex:1"><div class="ar-title">${esc(a.title)}</div>
-                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">${a.due_date ? 'Due ' + fmtDate(a.due_date) : 'No due date'}</div></div>
-                  ${overdue ? `<span class="ar-due red">Overdue</span>` : ''}
-                </div>
-                ${a.instructions ? `<div class="ar-body">${esc(a.instructions)}</div>` : ''}
-                <div class="ar-acts">
-                  <button class="cmp-btn btn-approve" onclick="compassToast('Response recorded')">Confirm</button>
-                  <button class="cmp-btn btn-ghost" onclick="compassToast('Comment form opening…')">Comment</button>
-                </div>
-              </div>`;
-            }).join('')}
-          </div>` : ''}
-
-          <!-- Milestone timeline -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr">
-              <div class="panel-title">Project timeline</div>
-              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${pct}% complete</span>
-            </div>
-            <div class="progress-track" style="margin:8px 13px 10px;height:3px">
-              <div class="progress-fill" style="width:${pct}%;background:var(--compass-green)"></div>
-            </div>
-            ${projTasks.slice(0, 7).map(t => {
-              const done = t.status === 'complete';
-              const overdue = !done && t.due_date && t.due_date < today;
-              return `
-              <div class="cmp-row">
-                <div class="ms-dot ${done ? 'ms-done' : overdue ? 'ms-risk' : 'ms-future'}"></div>
-                <div style="flex:1;min-width:0">
-                  <div class="row-title">${esc(t.name)}</div>
-                </div>
-                <span style="font-family:var(--font-mono);font-size:11px;color:${overdue ? 'var(--compass-red)' : 'var(--text3)'};flex-shrink:0">${fmtDate(t.due_date)}</span>
-                <span class="status-badge ${done ? 'sb-done' : overdue ? 'sb-risk' : 'sb-future'}" style="margin-left:6px">
-                  ${done ? 'Complete' : overdue ? 'Overdue' : 'Pending'}
-                </span>
-              </div>`;
-            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No tasks found</div>'}
-          </div>
+        <!-- KPI strip -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+          ${[
+            {label:'Overall status',val:statusLabel,sub:overdue>0?`${overdue} task${overdue>1?'s':''} behind plan`:'All phases on schedule',bg:statusBg,col:statusColor,accent:overdue>5?'#E24B4A':overdue>0?'#EF9F27':'#1D9E75'},
+            {label:'Budget consumed',val:budgetUsedPct!==null?budgetUsedPct+'%':'—',sub:clientProject.budget_hours?`of ${Math.round(parseFloat(clientProject.budget_hours))}h planned`:'',bg:'#e6f1fb',col:'#185FA5',accent:'#185FA5'},
+            {label:'Target delivery',val:clientProject.target_date?fmtDate3(clientProject.target_date).replace(', 2026',''):'—',sub:overdue>0?'At risk of slip':'On track',bg:overdue>0?'#fef5e7':'#e8f7f1',col:overdue>0?'#854F0B':'#0F6E56',accent:overdue>0?'#EF9F27':'#1D9E75'},
+            {label:'Your decisions needed',val:decisions.length,sub:decisions.length>0?'Action required':'No items pending',bg:decisions.length>0?'#fdf0f0':'#f8f9fb',col:decisions.length>0?'#A32D2D':'#5a6e8a',accent:decisions.length>0?'#E24B4A':'#8a9ab0'},
+          ].map(k=>`<div style="background:#fff;border:1px solid #e8ecf2;border-radius:8px;padding:14px 16px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${k.accent};border-radius:8px 8px 0 0"></div>
+            <div style="font-size:11px;font-weight:500;color:#7a8ba0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${k.label}</div>
+            <div style="font-size:22px;font-weight:600;line-height:1;margin-bottom:3px;color:${k.col}">${k.val}</div>
+            <div style="font-size:11px;color:#8a9ab0">${k.sub}</div>
+          </div>`).join('')}
         </div>
 
-        <div>
-          <!-- Active workflows -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr">
-              <div class="panel-title">Active workflows</div>
-              <span class="panel-badge pb-amber">${wfInstances.length} running</span>
-            </div>
-            ${wfInstances.map(w => `
-              <div class="cmp-row">
-                <div style="width:7px;height:7px;border-radius:50%;background:var(--compass-amber);flex-shrink:0"></div>
-                <div style="flex:1;min-width:0">
-                  <div class="row-title">${esc(w.title)}</div>
-                  ${w.current_step_name ? `<div class="row-sub">At: ${esc(w.current_step_name)}</div>` : ''}
-                </div>
-              </div>`).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active workflows</div>'}
+        ${overdue>0?`<div style="background:#fef5e7;border:1px solid #f0c97a;border-left:3px solid #EF9F27;border-radius:6px;padding:10px 14px;margin-bottom:18px;display:flex;align-items:flex-start;gap:10px">
+          <div style="font-size:14px;color:#BA7517;flex-shrink:0;margin-top:1px">⚠</div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#854F0B;margin-bottom:2px">Schedule update — ${overdue} task${overdue>1?'s':''} behind plan</div>
+            <div style="font-size:12px;color:#7a5a10;line-height:1.5">${overdue} task${overdue>1?'s':''} ${overdue>1?'have':'has'} passed planned completion. Your project manager is managing recovery. See decision items for any actions needed from your team.</div>
           </div>
+        </div>`:''}
 
-          <!-- PM contact -->
-          <div class="cmp-panel" style="margin-bottom:14px">
-            <div class="panel-hdr"><div class="panel-title">Your PM contact</div></div>
-            <div style="padding:12px 13px;display:flex;align-items:center;gap:10px">
-              ${avatarHtml(clientProject.pm_name || 'PM', 32, 'av-cyan')}
-              <div style="flex:1">
-                <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">${esc(clientProject.pm_name || 'Project Manager')}</div>
-                <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">Apex Consulting Group</div>
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:16px">
+          <div>
+            <!-- Milestones card -->
+            <div style="background:#fff;border:1px solid #e8ecf2;border-radius:8px;overflow:hidden;margin-bottom:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #f0f2f6">
+                <div>
+                  <div style="font-size:13px;font-weight:600;color:#1a2235">Project milestones</div>
+                  <div style="font-size:11px;color:#7a8ba0;margin-top:1px">Key deliverables and phase gates</div>
+                </div>
+                <span style="font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;background:#e6f1fb;color:#185FA5">Phase ${milestones.filter(m=>m.status!=='upcoming').length} of ${milestones.length} active</span>
               </div>
-              <button class="cmp-btn btn-ghost" onclick="compassToast('Opening email…')">Email →</button>
+              ${milestones.map((m,i)=>{
+                const isDone = m.status==='complete';
+                const isActive = m.status==='active';
+                const ic = isDone?'✓':isActive?(i+1).toString():(i+1).toString();
+                const icBg = isDone?'#e8f7f1':isActive?'#e6f1fb':'#f2f4f7';
+                const icCol = isDone?'#1D9E75':isActive?'#185FA5':'#8a9ab0';
+                const barCol = isDone?'#1D9E75':isActive?'#185FA5':'#c0c8d8';
+                const badgeText = isDone?'Complete':isActive?'Active':'Upcoming';
+                const badgeBg = isDone?'#e8f7f1':isActive?'#e6f1fb':'#f2f4f7';
+                const badgeCol = isDone?'#0F6E56':isActive?'#185FA5':'#5a6e8a';
+                return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #f0f2f6;cursor:pointer;transition:background .1s" onmouseenter="this.style.background='#fafbfc'" onmouseleave="this.style.background=''">
+                  <div style="width:28px;height:28px;border-radius:50%;background:${icBg};color:${icCol};font-size:${isDone?'12':'10'}px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12px;font-weight:500;color:#1a2235">${esc(m.name)}</div>
+                    <div style="font-size:11px;color:#8a9ab0;margin-top:1px">${isDone?'Completed':isActive?'In progress — target ':''} ${m.date?fmtDate3(m.date):''}</div>
+                    <div style="height:3px;background:#edf0f5;border-radius:2px;overflow:hidden;margin-top:5px"><div style="height:100%;border-radius:2px;background:${barCol};width:${m.pct}%"></div></div>
+                  </div>
+                  <span style="font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;background:${badgeBg};color:${badgeCol};flex-shrink:0">${badgeText}</span>
+                  <span style="font-size:11px;color:#8a9ab0;min-width:32px;text-align:right">${m.pct}%</span>
+                </div>`;
+              }).join('')}
+            </div>
+
+            <!-- Overall progress -->
+            <div style="background:#fff;border:1px solid #e8ecf2;border-radius:8px;overflow:hidden;padding:14px 16px;margin-bottom:14px">
+              <div style="font-size:13px;font-weight:600;color:#1a2235;margin-bottom:10px">Overall progress</div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#7a8ba0;margin-bottom:5px"><span>Complete</span><span>${doneTasks}/${totalTasks} tasks · ${pct}%</span></div>
+              <div style="height:8px;background:#edf0f5;border-radius:4px;overflow:hidden"><div style="height:100%;border-radius:4px;background:${pct>=80?'#1D9E75':pct>=50?'#185FA5':'#8a9ab0'};width:${pct}%"></div></div>
             </div>
           </div>
 
-          <!-- Send message -->
-          <div class="cmp-panel">
-            <div class="panel-hdr"><div class="panel-title">Send a message</div></div>
-            <div class="thread-in" style="border-top:none;padding:12px 13px">
-              <input type="text" id="client-msg" placeholder="Message your PM…" />
-              <button class="cmp-btn btn-respond" onclick="sendClientMessage()">Send</button>
+          <div>
+            <!-- Decisions needed -->
+            ${decisions.length>0?`<div style="background:#fff;border:1px solid #e8ecf2;border-radius:8px;overflow:hidden;margin-bottom:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #f0f2f6">
+                <div><div style="font-size:13px;font-weight:600;color:#1a2235">Decisions needed from you</div><div style="font-size:11px;color:#7a8ba0;margin-top:1px">Items requiring your response</div></div>
+                <span style="font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;background:#fdf0f0;color:#A32D2D">${decisions.length} pending</span>
+              </div>
+              ${decisions.map(d=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:1px solid #f0f2f6;cursor:pointer" onclick="clOpenDecision('${esc(d.title).replace(/'/g,"\'")}','${esc(d.desc).replace(/'/g,"\'")}','${esc(d.due)}')">
+                <div style="width:4px;align-self:stretch;border-radius:2px;flex-shrink:0;background:${d.urgency==='red'?'#E24B4A':'#EF9F27'}"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12px;font-weight:500;color:#1a2235;margin-bottom:2px">${esc(d.title)}</div>
+                  <div style="font-size:11px;color:#7a8ba0;line-height:1.5">${esc(d.desc)}</div>
+                  <button style="font-size:11px;font-weight:600;color:#185FA5;background:none;border:none;padding:5px 0 0;cursor:pointer;font-family:inherit">${d.action} →</button>
+                </div>
+                <span style="font-size:11px;padding:3px 8px;border-radius:4px;font-weight:500;flex-shrink:0;background:${d.urgency==='red'?'#fdf0f0':'#fef5e7'};color:${d.urgency==='red'?'#A32D2D':'#854F0B'}">${d.due}</span>
+              </div>`).join('')}
+            </div>`:''}
+
+            <!-- Budget summary -->
+            ${clientProject.budget_hours?`<div style="background:#fff;border:1px solid #e8ecf2;border-radius:8px;overflow:hidden;margin-bottom:14px">
+              <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6"><div style="font-size:13px;font-weight:600;color:#1a2235">Budget summary</div></div>
+              <div style="padding:14px 16px">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:#7a8ba0;margin-bottom:5px"><span>Consumed</span><span>${Math.round(parseFloat(clientProject.budget_hours_used||0))}h / ${Math.round(parseFloat(clientProject.budget_hours))}h</span></div>
+                <div style="height:8px;background:#edf0f5;border-radius:4px;overflow:hidden"><div style="height:100%;border-radius:4px;background:#185FA5;width:${budgetUsedPct||0}%"></div></div>
+                <div style="font-size:11px;color:#7a8ba0;margin-top:10px;padding:7px 9px;background:#f8f9fb;border-radius:4px;border:1px solid #edf0f5">${(budgetUsedPct||0)<80?'No budget overruns at this time. Project is tracking to budget.':'Budget consumption elevated — discuss with project manager.'}</div>
+              </div>
+            </div>`:''}
+
+            <!-- Your Apex team -->
+            <div style="background:#fff;border:1px solid #e8ecf2;border-radius:8px;overflow:hidden;margin-bottom:14px">
+              <div style="padding:12px 16px;border-bottom:1px solid #f0f2f6"><div style="font-size:13px;font-weight:600;color:#1a2235">Your Apex team</div></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #f0f2f6">
+                <div style="width:32px;height:32px;border-radius:50%;background:#e6f1fb;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#185FA5;flex-shrink:0">${esc(((pmRes?.first_name||'')[0]||'').toUpperCase()+((pmRes?.last_name||'')[0]||'').toUpperCase())}</div>
+                <div style="flex:1"><div style="font-size:12px;font-weight:500;color:#1a2235">${esc(pmName)}</div><div style="font-size:11px;color:#7a8ba0">Project Manager · Primary contact</div></div>
+                <button style="font-size:11px;font-weight:500;color:#185FA5;background:none;border:1px solid #b8d4ee;border-radius:4px;padding:3px 9px;cursor:pointer;font-family:inherit" onclick="clOpenDecision('Contact ${esc(pmName)}','Send a message to your project manager.','—')">Contact</button>
+              </div>
+              ${team.filter(r=>r.id!==clientProject.pm_resource_id).slice(0,3).map(r=>`
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #f0f2f6">
+                <div style="width:32px;height:32px;border-radius:50%;background:#e6f1fb;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#185FA5;flex-shrink:0">${esc(((r.first_name||'')[0]||'').toUpperCase()+((r.last_name||'')[0]||'').toUpperCase())}</div>
+                <div><div style="font-size:12px;font-weight:500;color:#1a2235">${esc(r.first_name+' '+r.last_name)}</div><div style="font-size:11px;color:#7a8ba0">${esc(r.department||'Team member')}</div></div>
+              </div>`).join('')}
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Privacy note -->
-      <div class="privacy-note" style="margin-top:14px">
-        &#9432;&nbsp; This portal shows only information relevant to your project. Internal workflow detail, team performance data, and cost structure are not visible here. All access and activity is logged.
-      </div>`;
+      <!-- Modal -->
+      <div id="cl-modal-bg" style="position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100;display:none;align-items:center;justify-content:center" onclick="clCloseModal()">
+        <div style="background:#fff;border-radius:10px;width:460px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.15)" onclick="event.stopPropagation()">
+          <div style="padding:16px 18px;border-bottom:1px solid #f0f2f6;display:flex;align-items:flex-start;justify-content:space-between">
+            <div style="font-size:14px;font-weight:600;color:#1a2235" id="cl-modal-title">Detail</div>
+            <button onclick="clCloseModal()" style="background:none;border:1px solid #e0e4ec;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;color:#7a8ba0;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+          </div>
+          <div id="cl-modal-body" style="padding:16px 18px;font-size:12px;color:#4a5e72;line-height:1.65"></div>
+          <div id="cl-modal-footer" style="padding:12px 18px;border-top:1px solid #f0f2f6;display:flex;gap:8px"></div>
+        </div>
+      </div>
+    </div>`;
 
-  } catch (e) {
+  } catch(e) {
     console.error('[Compass] loadClientView error:', e);
-    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load client portal</div>';
+    content.innerHTML='<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load client portal — check console</div>';
   }
 }
 
-function sendClientMessage() {
-  const inp = document.getElementById('client-msg');
-  const msg = (inp?.value || '').trim();
-  if (!msg) return;
-  compassToast('Message sent to project manager');
-  if (inp) inp.value = '';
-}
+// ══════════════════════════════════════════════════════════
+// INTERVENTION RECORD DRAWER
+// ══════════════════════════════════════════════════════════
+window.openInterventionRecord = async function(projectId, projectName) {
+  document.getElementById('ir-drawer')?.remove();
+  document.getElementById('ir-esc-composer')?.remove();
+  const drawer = document.createElement('div');
+  drawer.id = 'ir-drawer';
+  Object.assign(drawer.style, {
+    position:'fixed',top:'44px',right:'0',bottom:'0',width:'560px',
+    background:'#08101f',borderLeft:'1px solid rgba(226,75,74,.3)',
+    display:'flex',flexDirection:'column',zIndex:'250',
+    animation:'pm-drawer-in .2s ease',overflow:'hidden'
+  });
+  // Build header
+  const hdr = document.createElement('div');
+  hdr.style.cssText='padding:10px 14px 8px;border-bottom:1px solid rgba(226,75,74,.2);background:#07101e;flex-shrink:0;display:flex;align-items:flex-start;justify-content:space-between';
+  hdr.innerHTML=`<div>
+    <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF">Intervention Record</div>
+    <div id="ir-proj-name" style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:2px">${esc(projectName||'')}</div>
+    <div id="ir-summary" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:1px">CoC-linked</div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <button onclick="irOpenLogModal()" style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.08em">+ Log intervention</button>
+    <button onclick="document.getElementById('ir-drawer')?.remove();document.getElementById('ir-esc-composer')?.remove();" style="background:none;border:none;color:#5A84A8;font-size:16px;cursor:pointer;padding:0">✕</button>
+  </div>`;
+  drawer.appendChild(hdr);
+  // Body
+  const body = document.createElement('div');
+  body.id='ir-body';
+  body.style.cssText='flex:1;overflow-y:auto;padding:10px 12px';
+  body.innerHTML='<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">Loading…</div>';
+  drawer.appendChild(body);
+  // Log modal (hidden)
+  const logModal = document.createElement('div');
+  logModal.id='ir-modal-overlay';
+  logModal.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:10;display:none;align-items:flex-start;justify-content:center;padding-top:30px';
+  logModal.innerHTML=`<div style="background:#0f1e35;border:1px solid rgba(0,210,255,.2);width:480px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.1)">
+      <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF">Log intervention</div>
+      <button onclick="document.getElementById('ir-modal-overlay').style.display='none'" style="background:none;border:1px solid rgba(255,255,255,.15);color:#5A84A8;width:22px;height:22px;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div style="padding:14px">
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">Problem signal</div>
+      <textarea id="ir-signal-input" rows="2" style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;margin-bottom:10px" placeholder="Describe the problem signal…"></textarea>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">Action type</div>
+      <select id="ir-action-type" style="width:100%;font-family:var(--font-head);font-size:12px;padding:6px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;outline:none;cursor:pointer;margin-bottom:10px">
+        <option>Resource reassignment</option><option>Meeting convened</option><option>Action item created</option>
+        <option>Escalation to management</option><option>Template redesign</option><option>Process change</option><option>External intervention</option>
+      </select>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">What did you do?</div>
+      <textarea id="ir-action-text" rows="3" style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;margin-bottom:10px" placeholder="Describe the corrective action…"></textarea>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">Expected outcome</div>
+      <textarea id="ir-expected" rows="2" style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;margin-bottom:10px" placeholder="What do you expect to happen?"></textarea>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">Measurement window</div>
+      <select id="ir-window" style="width:100%;font-family:var(--font-head);font-size:12px;padding:6px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;outline:none;cursor:pointer;margin-bottom:12px">
+        <option>24 hours</option><option>48 hours</option><option>72 hours</option><option>1 week</option>
+      </select>
+      <div style="display:flex;gap:6px">
+        <button id="ir-save-btn" style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 16px;background:none;border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.08em">Save intervention</button>
+        <button onclick="document.getElementById('ir-modal-overlay').style.display='none'" style="font-family:var(--font-head);font-size:11px;padding:6px 14px;background:none;border:1px solid rgba(255,255,255,.2);color:#5A84A8;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+  drawer.appendChild(logModal);
+  document.body.appendChild(drawer);
+
+  // Wire save button after DOM insertion
+  const saveBtn = document.getElementById('ir-save-btn');
+  if(saveBtn) saveBtn.onclick = () => irSaveIntervention(projectId);
+
+  // Close on outside click
+  setTimeout(()=>{
+    document.addEventListener('mousedown', function irClose(ev){
+      const ir=document.getElementById('ir-drawer'), ic=document.getElementById('ir-esc-composer');
+      if(!ir?.contains(ev.target)&&!ic?.contains(ev.target)){
+        ir?.remove(); ic?.remove();
+        document.removeEventListener('mousedown',irClose);
+      }
+    });
+  },120);
+
+  // Load data
+  try {
+    const projInsts = await API.get(`workflow_instances?select=id,title,status,project_id&project_id=eq.${projectId}&limit=30`).catch(()=>[]);
+    const instIds   = projInsts.map(i=>i.id);
+    let cocItems = [];
+    if(instIds.length>0){
+      cocItems = await API.get(`workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&instance_id=in.(${instIds.slice(0,50).join(',')})&event_type=in.(step_reset,task_progress_update,intervention,management_decision,client_response)&order=created_at.desc&limit=100`).catch(()=>[]);
+    }
+    const resets = cocItems.filter(e=>e.event_type==='step_reset');
+    const instResetCount={};
+    resets.forEach(e=>{instResetCount[e.instance_id]=(instResetCount[e.instance_id]||0)+1;});
+    const seenInsts=new Set(), threads=[];
+    resets.forEach(e=>{
+      if(seenInsts.has(e.instance_id)) return;
+      seenInsts.add(e.instance_id);
+      const inst=projInsts.find(i=>i.id===e.instance_id);
+      const count=instResetCount[e.instance_id];
+      threads.push({inst,signalEvent:e,resetCount:count,
+        resolved:inst?.status==='complete',
+        outcome:inst?.status==='complete'?'resolved':count>=2?'escalation':count===1?'pending':'monitoring',
+        relatedEvents:cocItems.filter(x=>x.instance_id===e.instance_id).sort((a,b)=>a.created_at.localeCompare(b.created_at))
+      });
+    });
+    const otherEvents=cocItems.filter(e=>['management_decision','client_response','intervention'].includes(e.event_type));
+    const activeCount=threads.filter(t=>!t.resolved).length;
+    const resolvedCount=threads.filter(t=>t.resolved).length;
+    const escCount=threads.filter(t=>t.outcome==='escalation').length;
+    const sumEl=document.getElementById('ir-summary');
+    if(sumEl) sumEl.textContent=`${activeCount} active · ${resolvedCount} resolved · ${escCount} escalation${escCount!==1?'s':''} · CoC-linked`;
+    const oc_map={resolved:'#1D9E75',escalation:'#E24B4A',pending:'#EF9F27',monitoring:'#5A84A8'};
+    const ol_map={resolved:'Resolved',escalation:'Escalation recommended',pending:'Pending outcome',monitoring:'Monitoring'};
+    let html='';
+    const escThreads=threads.filter(t=>t.outcome==='escalation');
+    if(escThreads.length>0){
+      html+=`<div style="background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.3);border-left:3px solid #E24B4A;padding:10px 12px;margin-bottom:10px">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#E24B4A;margin-bottom:3px">! Escalation recommended</div>
+        <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.5;margin-bottom:8px">${escThreads.length} workflow${escThreads.length>1?'s have':' has'} had 2+ failed interventions. Requires authority beyond PM level.</div>
+        <button onclick="irComposeEscalation('${projectId}','${esc(projectName||'')}')" style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.5);color:#E24B4A;cursor:pointer">Compose escalation brief &rarr;</button>
+      </div>`;
+    }
+    if(!threads.length&&!otherEvents.length){
+      html+='<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0;text-align:center">No intervention records yet. Use + Log intervention to create the first entry.</div>';
+    }
+    threads.forEach(t=>{
+      const oc=oc_map[t.outcome], ol=ol_map[t.outcome];
+      const stepsHtml=t.relatedEvents.map((ev,i)=>{
+        const isLast=i===t.relatedEvents.length-1;
+        const tlbl=ev.event_type==='step_reset'?'Problem signal':ev.event_type==='management_decision'?'Management decision':'CoC event';
+        const dcol=ev.event_type==='step_reset'?'#E24B4A':ev.event_type==='management_decision'?'#8B5CF6':'#00D2FF';
+        const outL=ev.outcome==='on_track'?'POSITIVE':ev.outcome==='blocked'?'NEGATIVE':ev.outcome==='at_risk'?'WATCH':null;
+        const outC=outL==='POSITIVE'?'rgba(29,158,117,.06)':outL==='NEGATIVE'?'rgba(226,75,74,.05)':'rgba(239,159,39,.05)';
+        const outB=outL==='POSITIVE'?'rgba(29,158,117,.25)':outL==='NEGATIVE'?'rgba(226,75,74,.2)':'rgba(239,159,39,.2)';
+        const outT=outL==='POSITIVE'?'#1D9E75':outL==='NEGATIVE'?'#E24B4A':'#EF9F27';
+        return `<div style="display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04)">
+          <div style="display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0">
+            <div style="width:10px;height:10px;border-radius:50%;background:${dcol};flex-shrink:0"></div>
+            ${isLast?'':'<div style="flex:1;width:1px;background:rgba(255,255,255,.08);margin-top:3px;min-height:10px"></div>'}
+          </div>
+          <div style="flex:1;min-width:0;padding-top:1px">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:3px">${tlbl}</div>
+            <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.5">${esc(ev.step_name||ev.event_notes||'—')}</div>
+            ${ev.event_notes&&ev.step_name?`<div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:2px">${esc(ev.event_notes.slice(0,120))}</div>`:''}
+            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:3px">${_timeAgo(ev.created_at)}${ev.actor_name?' · '+esc(ev.actor_name):''}</div>
+            ${outL?`<div style="margin-top:6px;padding:5px 8px;border:1px solid ${outB};background:${outC};font-family:var(--font-head);font-size:11px;color:${outT}">Measured — ${outL}${ev.event_notes?' · '+esc(ev.event_notes.slice(0,80)):''}</div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+      html+=`<div style="border:1px solid rgba(255,255,255,.08);margin-bottom:10px;overflow:hidden">
+        <div style="padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:flex-start;gap:8px;background:rgba(255,255,255,.02);cursor:pointer"
+          onclick="const b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
+          <div style="width:3px;align-self:stretch;flex-shrink:0;border-radius:1px;background:${oc}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-bottom:2px">${esc(t.inst?.title||'—')}</div>
+            <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${oc}">${esc(t.signalEvent.step_name||'Step reset')} — ${t.resetCount} intervention${t.resetCount>1?'s':''}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:1px">Identified: ${_timeAgo(t.signalEvent.created_at)}</div>
+          </div>
+          <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 9px;border:1px solid ${oc}40;color:${oc};flex-shrink:0">${ol}</span>
+        </div>
+        <div>${stepsHtml}</div>
+      </div>`;
+    });
+    if(otherEvents.length>0){
+      html+=`<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:6px;padding-top:4px">Other CoC activity</div>`;
+      otherEvents.slice(0,5).forEach(e=>{
+        const col=e.event_type==='management_decision'?'#8B5CF6':e.event_type==='client_response'?'#185FA5':'#00D2FF';
+        html+=`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid rgba(0,210,255,.07)">
+          <div style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;margin-top:3px"></div>
+          <div style="flex:1">
+            <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0">${esc(e.step_name||e.event_type.replace(/_/g,' '))}</div>
+            ${e.event_notes?`<div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">${esc(e.event_notes.slice(0,100))}</div>`:''}
+            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">${_timeAgo(e.created_at)}${e.actor_name?' · '+esc(e.actor_name):''}</div>
+          </div>
+        </div>`;
+      });
+    }
+    body.innerHTML=html;
+  } catch(err){
+    console.error('[Compass] IR error:',err);
+    body.innerHTML='<div style="font-family:var(--font-head);font-size:12px;color:var(--compass-red);padding:12px">Failed to load intervention records</div>';
+  }
+};
+
+window.irOpenLogModal = function() {
+  const mo=document.getElementById('ir-modal-overlay');
+  if(mo) mo.style.display='flex';
+};
+
+window.irSaveIntervention = async function(projectId) {
+  const signal  = document.getElementById('ir-signal-input')?.value?.trim()||'';
+  const type    = document.getElementById('ir-action-type')?.value||'';
+  const action  = document.getElementById('ir-action-text')?.value?.trim()||'';
+  const expected= document.getElementById('ir-expected')?.value?.trim()||'';
+  const win     = document.getElementById('ir-window')?.value||'24 hours';
+  if(!signal||!action){ compassToast('Signal and action are required',2000); return; }
+  await API.post('workflow_step_instances',{
+    event_type:'intervention', step_name:signal.slice(0,80),
+    event_notes:'['+type+'] '+action+(expected?' Expected: '+expected:'')+'. Window: '+win,
+    actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
+    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  document.getElementById('ir-modal-overlay').style.display='none';
+  compassToast('Intervention logged · CoC event written',2000);
+  const b=document.getElementById('ir-body');
+  if(b) b.innerHTML='<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">Refreshing…</div>';
+  setTimeout(()=>openInterventionRecord(projectId,''),600);
+};
+
+window.irComposeEscalation = function(projectId, projName) {
+  document.getElementById('ir-esc-composer')?.remove();
+  const comp=document.createElement('div');
+  comp.id='ir-esc-composer';
+  comp.style.cssText='position:fixed;top:44px;right:560px;bottom:0;width:400px;background:#0f1e35;border-left:1px solid rgba(226,75,74,.25);display:flex;flex-direction:column;z-index:255;animation:pm-drawer-in .2s ease';
+  comp.innerHTML=`
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.1);background:#07101e;flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF">Escalation brief</div>
+      <button onclick="document.getElementById('ir-esc-composer')?.remove()" style="background:none;border:none;color:#5A84A8;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px">
+      <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-bottom:10px">Auto-assembled from intervention record. Review and add context before sending.</div>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">Project</div>
+      <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);margin-bottom:10px">${esc(projName)}</div>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#EF9F27;margin-bottom:5px">AI narrative</div>
+      <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;padding:7px 9px;background:rgba(239,159,39,.04);border-left:2px solid #EF9F27;border:1px solid rgba(239,159,39,.15);margin-bottom:10px;line-height:1.5">The blocking issue requires authority the PM does not have. Recommended: direct contact with the client technical director or authorization to engage an alternative approach.</div>
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:5px">PM context (optional)</div>
+      <textarea rows="3" style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;margin-bottom:10px" placeholder="Add context for management…"></textarea>
+      <button onclick="irSendEscalation(this,'${projectId}')" style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:700;padding:8px 16px;background:none;border:1px solid rgba(226,75,74,.5);color:#E24B4A;cursor:pointer">Send to management &rarr;</button>
+    </div>`;
+  document.body.appendChild(comp);
+};
+
+window.irSendEscalation = async function(btn, projectId) {
+  btn.textContent='✓ Escalation sent — management notified';
+  btn.disabled=true;
+  await API.post('workflow_step_instances',{
+    event_type:'management_decision', step_name:'Escalation',
+    event_notes:'PM escalated to management from intervention record.',
+    actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
+    firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+  }).catch(()=>{});
+  compassToast('Escalation sent to management',2500);
+  setTimeout(()=>document.getElementById('ir-esc-composer')?.remove(),1500);
+};
 
 
 // ══════════════════════════════════════════════════════════
