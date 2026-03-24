@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Share Tech Mono',monospace;background:#0c1628;color:#F0F6FF;font-size:12px;overflow:hidden}
+.shell{display:flex;flex-direction:column;height:600px}
+.nav{display:flex;align-items:center;height:40px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.12);padding:0 14px;gap:0;flex-shrink:0}
+.logo{font-size:13px;font-weight:700;letter-spacing:.12em}.logo span{color:#00D2FF}
+.ntab{padding:0 11px;height:40px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.35);font-family:inherit;font-size:11px;letter-spacing:.08em;cursor:pointer;transition:.12s;text-transform:uppercase}
+.ntab.on{color:#00D2FF;border-bottom-color:#00D2FF}
+.sep{width:1px;height:16px;background:rgba(0,210,255,.12);margin:0 6px}
+.nav-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.nav-icon-btn{background:none;border:1px solid rgba(0,210,255,.15);color:#5A84A8;padding:3px 9px;cursor:pointer;font-family:inherit;font-size:11px;display:flex;align-items:center;gap:5px;transition:.12s}
+.nav-icon-btn:hover{border-color:rgba(0,210,255,.4);color:#00D2FF}
+.nav-icon-btn.active{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.07)}
+.body{display:flex;flex:1;overflow:hidden}
+/* LEFT: My Work tasks (abbreviated) */
+.mw-panel{width:340px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08);overflow-y:auto;background:#07101f}
+.mw-header{padding:10px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:#060c18}
+.mw-title{font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.04em}
+.mw-sub{font-size:11px;color:#3A5C80;margin-top:2px}
+.mw-task{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.06);cursor:pointer;transition:background .1s}
+.mw-task:hover{background:rgba(0,210,255,.04)}
+.mw-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.mw-tname{font-size:11px;color:#C8DFF0;line-height:1.4}
+.mw-tmeta{font-size:11px;color:#3A5C80;margin-top:2px}
+.mw-section{padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;background:#060c18;border-bottom:1px solid rgba(0,210,255,.06)}
+/* RIGHT: Feature panels */
+.feat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#070d1c}
+.feat-tabs{display:flex;border-bottom:1px solid rgba(0,210,255,.1);flex-shrink:0;background:#060c18;padding:0 12px}
+.ftab{padding:7px 14px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#3A5C80;cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;transition:.12s}
+.ftab.on{color:#00D2FF;border-bottom-color:#00D2FF}
+.ftab:hover:not(.on){color:#90B8D8}
+.fp{display:none;flex:1;overflow-y:auto;padding:12px 14px}
+.fp.on{display:block}
+/* Calendar widget */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px}
+.cal-head{font-size:11px;font-weight:700;color:#3A5C80;text-align:center;padding:4px 0;letter-spacing:.06em}
+.cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px;border:1px solid rgba(0,210,255,.06);cursor:pointer;transition:border-color .1s;border-radius:2px;position:relative}
+.cal-day:hover{border-color:rgba(0,210,255,.3)}
+.cal-day.today{border-color:rgba(0,210,255,.5);background:rgba(0,210,255,.06)}
+.cal-day.other-month{opacity:.35}
+.cal-num{font-size:11px;font-weight:700;color:#C8DFF0}
+.today .cal-num{color:#00D2FF}
+.cal-dots{display:flex;gap:1.5px;margin-top:2px;flex-wrap:wrap;justify-content:center}
+.cal-dot{width:4px;height:4px;border-radius:50%}
+.cal-legend{display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.cal-leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#5A84A8}
+.cal-leg-dot{width:7px;height:7px;border-radius:50%}
+.cal-agenda{margin-top:10px}
+.ca-head{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:6px}
+.ca-item{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,210,255,.06)}
+.ca-bar{width:3px;align-self:stretch;border-radius:1px;flex-shrink:0}
+.ca-info{flex:1}
+.ca-title{font-size:11px;color:#C8DFF0}
+.ca-time{font-size:11px;color:#3A5C80;margin-top:1px}
+/* Meetings */
+.mtg-filter{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.mtg-chip{font-size:11px;padding:3px 10px;border:1px solid rgba(0,210,255,.15);color:#5A84A8;cursor:pointer;transition:.12s;background:none;font-family:inherit}
+.mtg-chip.on{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.07)}
+.mtg-row{border:1px solid rgba(0,210,255,.08);margin-bottom:6px;cursor:pointer;transition:border-color .1s}
+.mtg-row:hover{border-color:rgba(0,210,255,.25)}
+.mtg-head{display:flex;align-items:flex-start;gap:8px;padding:8px 10px}
+.mtg-status{width:3px;align-self:stretch;border-radius:1px;flex-shrink:0}
+.mtg-info{flex:1}
+.mtg-title{font-size:11px;font-weight:700;color:#F0F6FF;margin-bottom:2px}
+.mtg-meta{font-size:11px;color:#3A5C80}
+.mtg-badge{font-size:11px;padding:1px 7px;border:1px solid;letter-spacing:.04em;flex-shrink:0;align-self:flex-start}
+.mtg-detail{display:none;padding:0 10px 9px 21px;border-top:1px solid rgba(0,210,255,.06)}
+.mtg-detail.open{display:block}
+.mtg-notes{font-size:11px;color:#C8DFF0;line-height:1.55;margin-top:6px}
+.mtg-actions{display:flex;gap:5px;margin-top:7px}
+.mtg-btn{font-family:inherit;font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(0,210,255,.25);color:#00D2FF;cursor:pointer;transition:background .1s}
+.mtg-btn:hover{background:rgba(0,210,255,.08)}
+/* Concerns */
+.cncn-new{display:flex;gap:8px;margin-bottom:12px;padding:8px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15)}
+.cncn-input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:11px;padding:5px 8px;outline:none;resize:none}
+.cncn-input:focus{border-color:rgba(0,210,255,.35)}
+.cncn-submit{font-family:inherit;font-size:11px;padding:5px 12px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;align-self:flex-end;white-space:nowrap;transition:background .1s}
+.cncn-submit:hover{background:rgba(0,210,255,.08)}
+.cncn-filter{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.cncn-chip{font-size:11px;padding:2px 9px;border:1px solid rgba(255,255,255,.1);color:#5A84A8;cursor:pointer;background:none;font-family:inherit;transition:.12s}
+.cncn-chip.on{border-color:rgba(0,210,255,.4);color:#00D2FF;background:rgba(0,210,255,.06)}
+.cn-row{border:1px solid rgba(255,255,255,.07);margin-bottom:6px;transition:border-color .1s;cursor:pointer}
+.cn-row:hover{border-color:rgba(0,210,255,.2)}
+.cn-head{display:flex;align-items:flex-start;gap:8px;padding:8px 10px}
+.cn-bar{width:3px;align-self:stretch;border-radius:1px;flex-shrink:0}
+.cn-info{flex:1}
+.cn-title{font-size:11px;font-weight:700;color:#F0F6FF;margin-bottom:2px}
+.cn-meta{font-size:11px;color:#3A5C80}
+.cn-status{font-size:11px;padding:1px 7px;border:1px solid;letter-spacing:.04em;flex-shrink:0;align-self:flex-start;white-space:nowrap}
+.cn-detail{display:none;padding:0 10px 9px 21px;border-top:1px solid rgba(255,255,255,.05)}
+.cn-detail.open{display:block}
+.cn-thread{margin-top:6px;border-left:1px solid rgba(0,210,255,.15);padding-left:8px}
+.cn-comment{font-size:11px;color:#C8DFF0;line-height:1.5;margin-bottom:5px;padding:4px 7px;background:rgba(255,255,255,.02)}
+.cn-comment-meta{font-size:11px;color:#3A5C80;margin-bottom:1px}
+.cn-actions{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.cn-btn{font-family:inherit;font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(0,210,255,.2);color:#5A84A8;cursor:pointer;transition:.12s}
+.cn-btn:hover{color:#00D2FF;border-color:rgba(0,210,255,.4)}
+/* Calendar overlay */
+.cal-overlay{position:absolute;top:44px;right:0;width:320px;background:#0d1e35;border:1px solid rgba(0,210,255,.3);border-radius:0;z-index:100;padding:12px 14px;display:none}
+.cal-overlay.show{display:block}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<div class="shell">
+<div class="nav">
+  <div class="logo">COM<span>PASS</span></div>
+  <div class="sep"></div>
+  <button class="ntab on">My Work</button>
+  <button class="ntab">PM View</button>
+  <button class="ntab">Management</button>
+  <div class="nav-right">
+    <button class="nav-icon-btn" id="cal-toggle-btn" onclick="toggleCalOverlay()">📅 Calendar</button>
+    <button class="nav-icon-btn" onclick="switchFeature('concerns')">⚑ Concerns <span id="concern-badge" style="font-size:11px;padding:1px 5px;background:rgba(226,75,74,.2);color:#E24B4A;margin-left:3px">2</span></button>
+    <div class="sep"></div>
+    <div style="width:26px;height:26px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#00D2FF">VS</div>
+  </div>
+</div>
+<div class="body" style="position:relative">
+  <!-- Calendar overlay (triggered from nav) -->
+  <div class="cal-overlay" id="cal-overlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:#F0F6FF;letter-spacing:.06em">MARCH 2026</div>
+      <button onclick="toggleCalOverlay()" style="background:none;border:none;color:#5A84A8;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div class="cal-legend">
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#E24B4A"></div>Overdue</div>
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#EF9F27"></div>Due today</div>
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#00D2FF"></div>Meeting</div>
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#1D9E75"></div>Milestone</div>
+    </div>
+    <div class="cal-grid" id="mini-cal"></div>
+    <div id="mini-agenda"></div>
+  </div>
+
+  <!-- My Work left panel -->
+  <div class="mw-panel">
+    <div class="mw-header">
+      <div class="mw-title">Good morning, Vaughn.</div>
+      <div class="mw-sub">Tuesday, Mar 24 · 4 tasks need attention</div>
+    </div>
+    <div class="mw-section">Overdue</div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#E24B4A"></div>
+      <div><div class="mw-tname">BUILD #1 — PCB Layout Rev B review</div><div class="mw-tmeta">7d overdue · Flexscope · 0% complete</div></div>
+    </div>
+    <div class="mw-section">Due today</div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#EF9F27"></div>
+      <div><div class="mw-tname">Software unit tests — non-PCB modules</div><div class="mw-tmeta">Due Mar 24 · 4d float remaining</div></div>
+    </div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#EF9F27"></div>
+      <div><div class="mw-tname">Thermal testing — passive components</div><div class="mw-tmeta">Due Mar 24 · 3d float</div></div>
+    </div>
+    <div class="mw-section">This week</div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#1D9E75"></div>
+      <div><div class="mw-tname">Documentation — build phase draft</div><div class="mw-tmeta">Due Mar 27 · 5d float · 15% done</div></div>
+    </div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#1D9E75"></div>
+      <div><div class="mw-tname">Regulatory filing prep — sections 1–3</div><div class="mw-tmeta">Due Mar 28 · 6d float · 0% done</div></div>
+    </div>
+    <div class="mw-section">Action items</div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#8B5CF6"></div>
+      <div><div class="mw-tname">Confirm Rev B delta is cosmetic only</div><div class="mw-tmeta">From: VS · Due today</div></div>
+    </div>
+    <div class="mw-task">
+      <div class="mw-dot" style="background:#8B5CF6"></div>
+      <div><div class="mw-tname">Log module 3–4 boundary status</div><div class="mw-tmeta">From: VS · Due today</div></div>
+    </div>
+  </div>
+
+  <!-- Feature panel -->
+  <div class="feat-panel">
+    <div class="feat-tabs">
+      <button class="ftab on" onclick="switchFeature('meetings',this)" id="tab-meetings">My Meetings</button>
+      <button class="ftab" onclick="switchFeature('calendar',this)" id="tab-calendar">My Calendar</button>
+      <button class="ftab" onclick="switchFeature('concerns',this)" id="tab-concerns">My Concerns <span style="font-size:11px;padding:1px 5px;background:rgba(226,75,74,.18);color:#E24B4A;margin-left:3px">2</span></button>
+    </div>
+
+    <!-- MEETINGS -->
+    <div class="fp on" id="fp-meetings">
+      <div class="mtg-filter">
+        <button class="mtg-chip on" onclick="filterMtg('all',this)">All</button>
+        <button class="mtg-chip" onclick="filterMtg('owned',this)">Owned by me</button>
+        <button class="mtg-chip" onclick="filterMtg('invited',this)">Invited</button>
+        <button class="mtg-chip" onclick="filterMtg('upcoming',this)">Upcoming</button>
+        <button class="mtg-chip" onclick="filterMtg('past',this)">Past</button>
+        <button class="mtg-chip on" style="margin-left:auto;border-color:rgba(0,210,255,.35);color:#00D2FF" onclick="alert('+ New meeting modal')">+ New meeting</button>
+      </div>
+      <div id="mtg-list"></div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div class="fp" id="fp-calendar">
+      <div class="cal-legend" style="margin-bottom:10px">
+        <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#E24B4A"></div>Overdue task</div>
+        <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#EF9F27"></div>Due date</div>
+        <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#00D2FF"></div>Meeting</div>
+        <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#1D9E75"></div>Milestone</div>
+        <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#8B5CF6"></div>Submission</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">MARCH 2026</div>
+        <div style="display:flex;gap:5px">
+          <button style="font-family:inherit;font-size:11px;padding:2px 9px;background:none;border:1px solid rgba(0,210,255,.2);color:#5A84A8;cursor:pointer">‹ Prev</button>
+          <button style="font-family:inherit;font-size:11px;padding:2px 9px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer">Today</button>
+          <button style="font-family:inherit;font-size:11px;padding:2px 9px;background:none;border:1px solid rgba(0,210,255,.2);color:#5A84A8;cursor:pointer">Next ›</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="main-cal"></div>
+      <div class="cal-agenda" id="main-agenda">
+        <div class="ca-head">Agenda — Mar 24</div>
+      </div>
+    </div>
+
+    <!-- CONCERNS -->
+    <div class="fp" id="fp-concerns">
+      <div class="cncn-new">
+        <textarea class="cncn-input" rows="2" placeholder="Describe your concern — it will be logged with timestamp and routed to your PM…"></textarea>
+        <button class="cncn-submit" onclick="alert('Concern logged · PM notified · CoC event written')">+ Raise concern</button>
+      </div>
+      <div class="cncn-filter">
+        <button class="cncn-chip on" onclick="filterConcern('all',this)">All</button>
+        <button class="cncn-chip" onclick="filterConcern('unread',this)">Not yet read</button>
+        <button class="cncn-chip" onclick="filterConcern('unresolved',this)">Unresolved</button>
+        <button class="cncn-chip" onclick="filterConcern('inprogress',this)">In progress</button>
+        <button class="cncn-chip" onclick="filterConcern('resolved',this)">Resolved</button>
+        <button class="cncn-chip" onclick="filterConcern('rejected',this)">Rejected</button>
+      </div>
+      <div id="concern-list"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const TODAY = 24;
+
+const MEETINGS = [
+  {id:'m1',title:'PCB Rev B alignment — Alan + PM',date:'Mar 24, 10:00 AM',type:'owned',status:'upcoming',color:'#EF9F27',badge:'Today',badgeColor:'rgba(239,159,39,.4)',notes:'Quick 20-min sync to confirm whether Rev B delta is cosmetic only. Alan to check module 3–4 interface before joining.',agenda:['Confirm Rev B scope','Log outcome as CoC event','Decide on CPM Option C go/no-go'],coc:true},
+  {id:'m2',title:'Weekly Flexscope BUILD standup',date:'Mar 23, 9:00 AM',type:'invited',status:'past',color:'#1D9E75',badge:'Completed',badgeColor:'rgba(29,158,117,.4)',notes:'Standard Monday standup. Covered blockers on T-08 and T-09. Ron flagged firmware boundary issue. VS logged 2 intervention records post-meeting.',coc:true},
+  {id:'m3',title:'NovaBio Section 4.3 review prep',date:'Mar 26, 2:00 PM',type:'invited',status:'upcoming',color:'#00D2FF',badge:'Upcoming',badgeColor:'rgba(0,210,255,.3)',notes:'Sandra Okafor leading. Alan attending as potential substitute reviewer. 45 min.',coc:false},
+  {id:'m4',title:'Design Review Signoff — postmortem',date:'Mar 22, 3:30 PM',type:'owned',status:'past',color:'#8B5CF6',badge:'Completed',badgeColor:'rgba(139,92,246,.4)',notes:'Covered 28 rejection cycles. Root cause: approval criteria ambiguity. Decision: template redesign authorized. Management notified.',coc:true},
+  {id:'m5',title:'Thermal test results review',date:'Mar 27, 11:00 AM',type:'owned',status:'upcoming',color:'#1D9E75',badge:'Scheduled',badgeColor:'rgba(29,158,117,.3)',notes:'Review thermal data from T-13. Alan presenting. Ron reviewing passive component specs.',coc:false},
+];
+
+const CONCERNS = [
+  {id:'c1',title:'PCB Rev B sign-off is blocking the entire build phase — no visibility on timeline from TransAtlantic',date:'Mar 20, 9:14 AM',status:'In progress',statusColor:'#EF9F27',statusBorder:'rgba(239,159,39,.4)',priority:'#E24B4A',
+   thread:[
+     {who:'Vaughn Staples',when:'Mar 20 · 9:14 AM',text:'This has now been pending 3 days without acknowledgement. Two people are fully blocked. The schedule impact is ¥12k/day.'},
+     {who:'VS — PM',when:'Mar 20 · 9:45 AM',text:'Received. Submitting formal expedite request via account manager channel now. Will update within 24h.'},
+     {who:'VS — PM',when:'Mar 21 · 11:00 AM',text:'Account manager channel not responsive. Preparing escalation brief for management. Concern status: In Progress.'},
+   ],
+   actions:['Add comment','Escalate','View intervention record']},
+  {id:'c2',title:'Firmware module boundary unclear — Ron and I are not aligned on what requires Rev B hardware',date:'Mar 22, 4:30 PM',status:'Unresolved',statusColor:'#C8DFF0',statusBorder:'rgba(255,255,255,.2)',priority:'#EF9F27',
+   thread:[
+     {who:'Vaughn Staples',when:'Mar 22 · 4:30 PM',text:'Ron and I had a short sync but couldn't agree on whether modules 3–4 require the Rev B hardware interface. Need a definitive answer before we can proceed with CPM Option D.'},
+     {who:'VS — PM',when:'Mar 22 · 5:00 PM',text:'Read. Scheduling 15-min call with Ron and Alan tomorrow morning to get explicit sign-off on the boundary.'},
+   ],
+   actions:['Add comment','Mark resolved','Escalate']},
+  {id:'c3',title:'Weekly standup time conflicts with my deep work block on Mondays',date:'Mar 15, 8:00 AM',status:'Resolved',statusColor:'#1D9E75',statusBorder:'rgba(29,158,117,.4)',priority:'#1D9E75',
+   thread:[
+     {who:'Vaughn Staples',when:'Mar 15 · 8:00 AM',text:'Current 9 AM Monday standup interrupts my only reliable deep work window.'},
+     {who:'VS — PM',when:'Mar 16 · 10:00 AM',text:'Moving standup to 9:30 AM effective next week. Will update calendar invites.'},
+     {who:'Vaughn Staples',when:'Mar 16 · 10:15 AM',text:'Thank you — that works.'},
+   ],
+   actions:['View history']},
+];
+
+const CAL_EVENTS = {
+  17:{dots:['#E24B4A'],label:'Overdue start'},
+  19:{dots:['#E24B4A','#00D2FF'],label:'Standup · T-08 blocker'},
+  22:{dots:['#00D2FF','#8B5CF6'],label:'Design review postmortem'},
+  23:{dots:['#00D2FF','#1D9E75'],label:'Standup · Section 4.2 complete'},
+  24:{dots:['#EF9F27','#EF9F27','#00D2FF'],label:'2 due · PCB alignment meeting'},
+  26:{dots:['#EF9F27','#00D2FF'],label:'NovaBio prep'},
+  27:{dots:['#EF9F27','#00D2FF'],label:'Thermal review · docs due'},
+  28:{dots:['#EF9F27'],label:'Filing prep due'},
+  31:{dots:['#8B5CF6'],label:'Timesheet deadline'},
+};
+const AGENDA_TODAY = [
+  {bar:'#EF9F27',title:'Software unit tests due',time:'Due today · BUILD phase'},
+  {bar:'#EF9F27',title:'Thermal testing due',time:'Due today · BUILD phase'},
+  {bar:'#00D2FF',title:'PCB Rev B alignment',time:'10:00 AM · 20 min · Conference call'},
+  {bar:'#8B5CF6',title:'Log module 3–4 boundary action item',time:'EOD · Action item'},
+];
+
+function buildCal(containerId, mini=false) {
+  const c = document.getElementById(containerId);
+  if(!c) return;
+  const days = ['M','T','W','T','F','S','S'];
+  let html = days.map(d=>`<div class="cal-head">${d}</div>`).join('');
+  // March 2026 starts on Sunday (0), so Mon offset = 0 (Mon=1 in ISO, Mar 1 = Sunday → 6 blanks from Mon)
+  const startBlank = 6; // Mar 1 = Sunday, Mon-based grid
+  for(let i=0;i<startBlank;i++) html+=`<div class="cal-day other-month"><div class="cal-num" style="font-size:${mini?'9':'11'}px">${23-startBlank+i+1}</div></div>`;
+  for(let d=1;d<=31;d++){
+    const ev = CAL_EVENTS[d]||{};
+    const isToday = d===TODAY;
+    html+=`<div class="cal-day${isToday?' today':''}" onclick="showAgenda(${d})">
+      <div class="cal-num" style="font-size:${mini?'9':'11'}px">${d}</div>
+      <div class="cal-dots">${(ev.dots||[]).slice(0,mini?2:4).map(c=>`<div class="cal-dot" style="background:${c}"></div>`).join('')}</div>
+    </div>`;
+  }
+  c.innerHTML = html;
+}
+
+function showAgenda(day) {
+  document.querySelectorAll('.cal-day').forEach((el,i)=>{
+    el.style.borderColor = '';
+    if(i-5===day-1) el.style.borderColor='rgba(0,210,255,.5)';
+  });
+  const items = day===24 ? AGENDA_TODAY : [];
+  const a = document.getElementById('main-agenda');
+  if(a) {
+    a.innerHTML = `<div class="ca-head">Agenda — Mar ${day}</div>` +
+      (items.length ? items.map(i=>`<div class="ca-item"><div class="ca-bar" style="background:${i.bar}"></div><div class="ca-info"><div class="ca-title">${i.title}</div><div class="ca-time">${i.time}</div></div></div>`).join('') : `<div style="font-size:11px;color:#3A5C80;padding:8px 0">No events recorded for this date.</div>`);
+  }
+  const ma = document.getElementById('mini-agenda');
+  if(ma) {
+    ma.innerHTML = `<div class="ca-head" style="margin-top:8px">Mar ${day}</div>` +
+      (items.length ? items.map(i=>`<div class="ca-item"><div class="ca-bar" style="background:${i.bar}"></div><div class="ca-info"><div class="ca-title" style="font-size:11px">${i.title}</div></div></div>`).join('') : `<div style="font-size:11px;color:#3A5C80;padding:6px 0">No events.</div>`);
+  }
+}
+
+function buildMeetings(filter='all') {
+  const list = document.getElementById('mtg-list');
+  const filtered = MEETINGS.filter(m=> filter==='all'||(filter==='owned'&&m.type==='owned')||(filter==='invited'&&m.type==='invited')||(filter==='upcoming'&&m.status==='upcoming')||(filter==='past'&&m.status==='past'));
+  list.innerHTML = filtered.map(m=>`
+    <div class="mtg-row" onclick="toggleDetail('md-${m.id}')">
+      <div class="mtg-head">
+        <div class="mtg-status" style="background:${m.color}"></div>
+        <div class="mtg-info">
+          <div class="mtg-title">${m.title}</div>
+          <div class="mtg-meta">${m.date} · ${m.type==='owned'?'<span style="color:#00D2FF">You organized</span>':'Invited'} ${m.coc?'· <span style="color:#8B5CF6">CoC linked</span>':''}</div>
+        </div>
+        <span class="mtg-badge" style="border-color:${m.badgeColor};color:${m.color}">${m.badge}</span>
+      </div>
+      <div class="mtg-detail" id="md-${m.id}">
+        <div class="mtg-notes">${m.notes}</div>
+        <div class="mtg-actions">
+          ${m.status==='upcoming'?`<button class="mtg-btn">Join →</button><button class="mtg-btn">Reschedule</button>`:''}
+          <button class="mtg-btn">View notes</button>
+          ${m.coc?`<button class="mtg-btn" style="border-color:rgba(139,92,246,.3);color:#8B5CF6">CoC events</button>`:''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function buildConcerns(filter='all') {
+  const list = document.getElementById('concern-list');
+  const statusMap={'In progress':'inprogress','Unresolved':'unresolved','Resolved':'resolved','Rejected':'rejected'};
+  const unread=[];
+  const filtered = CONCERNS.filter(c=> filter==='all'||statusMap[c.status]===filter||(filter==='unread'&&unread.includes(c.id)));
+  list.innerHTML = filtered.map(cn=>`
+    <div class="cn-row" onclick="toggleDetail('cd-${cn.id}')">
+      <div class="cn-head">
+        <div class="cn-bar" style="background:${cn.priority}"></div>
+        <div class="cn-info">
+          <div class="cn-title">${cn.title}</div>
+          <div class="cn-meta">${cn.date} · ${cn.thread.length} comment${cn.thread.length>1?'s':''}</div>
+        </div>
+        <span class="cn-status" style="color:${cn.statusColor};border-color:${cn.statusBorder}">${cn.status}</span>
+      </div>
+      <div class="cn-detail" id="cd-${cn.id}">
+        <div class="cn-thread">
+          ${cn.thread.map(t=>`<div style="margin-bottom:5px"><div class="cn-comment-meta">${t.who} · ${t.when}</div><div class="cn-comment">${t.text}</div></div>`).join('')}
+        </div>
+        <div class="cn-actions">
+          ${cn.actions.map(a=>`<button class="cn-btn">${a}</button>`).join('')}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.toggle('open');
+}
+
+function switchFeature(name, btn) {
+  document.querySelectorAll('.fp').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('on'));
+  const panel = document.getElementById('fp-'+name);
+  const tabEl = document.getElementById('tab-'+name);
+  if(panel) panel.classList.add('on');
+  if(btn) btn.classList.add('on');
+  else if(tabEl) tabEl.classList.add('on');
+}
+
+function filterMtg(f, btn) {
+  document.querySelectorAll('.mtg-chip').forEach(c=>c.classList.remove('on'));
+  btn.classList.add('on');
+  buildMeetings(f);
+}
+
+function filterConcern(f, btn) {
+  document.querySelectorAll('.cncn-chip').forEach(c=>c.classList.remove('on'));
+  btn.classList.add('on');
+  buildConcerns(f);
+}
+
+function toggleCalOverlay() {
+  const ov = document.getElementById('cal-overlay');
+  const btn = document.getElementById('cal-toggle-btn');
+  ov.classList.toggle('show');
+  btn.classList.toggle('active');
+  if(ov.classList.contains('show')) {
+    buildCal('mini-cal', true);
+    showAgenda(TODAY);
+  }
+}
+
+buildCal('main-cal');
+buildMeetings();
+buildConcerns();
+showAgenda(TODAY);
+</script>
+</html>

@@ -1,0 +1,568 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Share Tech Mono',monospace;background:#0c1628;color:#F0F6FF;font-size:12px}
+.shell{display:flex;flex-direction:column;min-height:700px}
+.nav{display:flex;align-items:center;height:40px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.12);padding:0 14px;gap:0;flex-shrink:0}
+.nav-logo{font-size:13px;font-weight:700;letter-spacing:.12em;margin-right:10px}.nav-logo span{color:#00D2FF}
+.sep{width:1px;height:18px;background:rgba(0,210,255,.15);margin:0 8px}
+.nav-tab{padding:0 10px;height:40px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;transition:.12s;text-transform:uppercase}
+.nav-tab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.nav-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.cal-btn{position:relative;width:30px;height:30px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:11px;display:flex;align-items:center;justify-content:center;transition:.12s}
+.cal-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.cal-badge{position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#E24B4A;font-size:9px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.av{width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.15);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#00D2FF}
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.06);background:rgba(255,255,255,.01);flex-shrink:0}
+.stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);padding:7px 10px}
+.stat-l{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.stat-v{font-size:18px;font-weight:700;line-height:1}
+.stat-s{font-size:11px;color:rgba(255,255,255,.3);margin-top:1px}
+.suite-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.07);padding:0 14px;flex-shrink:0;background:rgba(255,255,255,.01)}
+.st{padding:8px 14px;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.35);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;text-transform:uppercase;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;display:flex;align-items:center;gap:5px}
+.st.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.st-badge{font-size:10px;padding:1px 5px;border-radius:2px;background:rgba(226,75,74,.15);color:#E24B4A}
+.st-badge.amber{background:rgba(239,159,39,.12);color:#EF9F27}
+.st-badge.green{background:rgba(29,158,117,.12);color:#1D9E75}
+.body{flex:1;padding:12px 14px;overflow-y:auto}
+.tab-content{display:none}.tab-content.active{display:block}
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.fb-label{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase}
+.fb-select{padding:3px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:11px;outline:none;cursor:pointer;border-radius:2px}
+.fb-btn{padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-family:inherit;font-size:11px;cursor:pointer;transition:.12s;letter-spacing:.06em}
+.fb-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.fb-btn.active-filter{border-color:rgba(0,210,255,.4);background:rgba(0,210,255,.08);color:#00D2FF}
+.new-btn{margin-left:auto;padding:4px 12px;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.35);color:#00D2FF;font-family:inherit;font-size:11px;cursor:pointer;letter-spacing:.07em;transition:.12s}
+.new-btn:hover{background:rgba(0,210,255,.18)}
+.meeting-row{display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:.12s}
+.meeting-row:hover{border-color:rgba(0,210,255,.2);background:rgba(0,210,255,.02)}
+.mr-status-bar{width:4px;align-self:stretch;flex-shrink:0}
+.mrs-upcoming{background:#00D2FF}
+.mrs-owned{background:#8B5CF6}
+.mrs-past{background:rgba(255,255,255,.15)}
+.mr-body{flex:1;padding:9px 12px}
+.mr-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+.mr-title{font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3}
+.mr-badge{font-size:11px;padding:2px 7px;border:1px solid;flex-shrink:0;white-space:nowrap}
+.mb-owned{border-color:rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07)}
+.mb-invited{border-color:rgba(0,210,255,.25);color:rgba(0,210,255,.7);background:rgba(0,210,255,.05)}
+.mb-past{border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.35)}
+.mr-meta{display:flex;gap:10px;font-size:11px;color:rgba(255,255,255,.4);flex-wrap:wrap;margin-bottom:5px}
+.mr-attendees{display:flex;gap:4px;flex-wrap:wrap}
+.attendee-chip{font-size:11px;padding:1px 7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.55)}
+.mr-coc{font-size:11px;color:rgba(0,210,255,.5);padding:4px 8px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.4);margin-top:5px;line-height:1.45}
+.mr-expand{padding:7px 12px 9px;border-top:1px solid rgba(255,255,255,.05);display:none}
+.mr-expand.open{display:block}
+.mr-actions{display:flex;gap:5px;margin-top:6px}
+.mra-btn{font-family:inherit;font-size:11px;padding:3px 10px;background:none;border:1px solid;cursor:pointer;transition:.12s;letter-spacing:.06em}
+.mra-primary{border-color:rgba(0,210,255,.35);color:#00D2FF}.mra-primary:hover{background:rgba(0,210,255,.08)}
+.mra-secondary{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}.mra-secondary:hover{color:#fff}
+.concern-row{display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:.12s}
+.concern-row:hover{border-color:rgba(0,210,255,.2);background:rgba(0,210,255,.02)}
+.cr-status-bar{width:4px;align-self:stretch;flex-shrink:0}
+.crs-unread{background:#E24B4A}
+.crs-ack{background:#EF9F27}
+.crs-inprog{background:#00D2FF}
+.crs-resolved{background:#1D9E75}
+.crs-rejected{background:rgba(255,255,255,.2)}
+.cr-body{flex:1;padding:9px 12px}
+.cr-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:4px}
+.cr-title{font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3}
+.cr-status-badge{font-size:11px;padding:2px 8px;border:1px solid;flex-shrink:0;white-space:nowrap;letter-spacing:.05em}
+.csb-unread{border-color:rgba(226,75,74,.4);color:#E24B4A;background:rgba(226,75,74,.08)}
+.csb-ack{border-color:rgba(239,159,39,.35);color:#EF9F27;background:rgba(239,159,39,.07)}
+.csb-inprog{border-color:rgba(0,210,255,.3);color:#00D2FF;background:rgba(0,210,255,.06)}
+.csb-resolved{border-color:rgba(29,158,117,.3);color:#1D9E75;background:rgba(29,158,117,.06)}
+.csb-rejected{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.35)}
+.cr-meta{display:flex;gap:10px;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px;flex-wrap:wrap}
+.cr-text{font-size:11px;color:rgba(240,246,255,.65);line-height:1.55}
+.cr-expand{padding:8px 12px 10px;border-top:1px solid rgba(255,255,255,.05);display:none}
+.cr-expand.open{display:block}
+.coc-thread{margin-bottom:8px}
+.coc-entry{display:flex;gap:8px;margin-bottom:0}
+.coc-line{display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0}
+.coc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.coc-connector{flex:1;width:1px;background:rgba(255,255,255,.08);margin:2px auto 0;min-height:8px}
+.coc-content{flex:1;padding-bottom:8px}
+.coc-meta{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:2px}
+.coc-text{font-size:11px;color:rgba(240,246,255,.7);line-height:1.5}
+.coc-action{font-size:11px;padding:3px 7px;background:rgba(0,210,255,.05);border:1px solid rgba(0,210,255,.15);color:#00D2FF;margin-top:4px;display:inline-block}
+.cr-action-row{display:flex;gap:5px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.cra-label{font-size:11px;color:rgba(255,255,255,.35)}
+.cra-select{padding:3px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:11px;outline:none;cursor:pointer;border-radius:2px}
+.cra-btn{font-family:inherit;font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em;transition:.12s}
+.cra-btn:hover{background:rgba(0,210,255,.16)}
+.cal-popup{background:#0d1f35;border:1px solid rgba(0,210,255,.25);padding:14px;margin-bottom:14px;display:none}
+.cal-popup.show{display:block}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-month{font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.06em}
+.cal-nav{display:flex;gap:4px}
+.cal-nav-btn{width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s}
+.cal-nav-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:10px}
+.cal-day-label{font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0;letter-spacing:.06em}
+.cal-cell{min-height:32px;padding:2px 3px;border:1px solid transparent;cursor:pointer;transition:.12s;position:relative}
+.cal-cell:hover{border-color:rgba(0,210,255,.2);background:rgba(0,210,255,.04)}
+.cal-cell.today{border-color:rgba(0,210,255,.4);background:rgba(0,210,255,.08)}
+.cal-cell.has-items::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#00D2FF}
+.cal-cell.has-meeting::after{background:#8B5CF6}
+.cal-cell.has-due::after{background:#EF9F27}
+.cal-num{font-size:11px;color:rgba(255,255,255,.6);text-align:center}
+.cal-cell.today .cal-num{color:#00D2FF;font-weight:700}
+.cal-cell.other-month .cal-num{color:rgba(255,255,255,.2)}
+.cal-legend{display:flex;gap:10px;flex-wrap:wrap}
+.cal-leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,.35)}
+.cal-leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cal-items-preview{margin-top:8px;border-top:1px solid rgba(255,255,255,.06);padding-top:8px}
+.cal-item{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(240,246,255,.7);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.cal-item:last-child{border-bottom:none}
+.cal-item-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cal-item-time{color:rgba(255,255,255,.35);min-width:45px;flex-shrink:0}
+.empty-state{padding:40px 20px;text-align:center;font-size:11px;color:rgba(255,255,255,.25);line-height:1.7}
+.section-divider{font-size:11px;letter-spacing:.1em;color:rgba(0,210,255,.5);text-transform:uppercase;margin:12px 0 7px;padding-bottom:4px;border-bottom:1px solid rgba(0,210,255,.08)}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+
+<div class="shell">
+<div class="nav">
+  <div class="nav-logo">COM<span>PASS</span></div>
+  <div class="sep"></div>
+  <button class="nav-tab">Brief</button>
+  <button class="nav-tab active">My Work</button>
+  <button class="nav-tab">PM View</button>
+  <button class="nav-tab">Management</button>
+  <div class="sep"></div>
+  <div class="nav-right">
+    <button class="cal-btn" id="cal-toggle-btn" onclick="toggleCalendar()" title="My Calendar">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5" x2="13" y2="5" stroke="currentColor" stroke-width="1.2"/><line x1="4" y1="1" x2="4" y2="3" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="1" x2="10" y2="3" stroke="currentColor" stroke-width="1.2"/></svg>
+      <span class="cal-badge">3</span>
+    </button>
+    <div class="av">VS</div>
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-l">Tasks due today</div><div class="stat-v" style="color:#E24B4A">3</div><div class="stat-s">2 overdue</div></div>
+  <div class="stat"><div class="stat-l">Meetings today</div><div class="stat-v" style="color:#8B5CF6">2</div><div class="stat-s">1 owned</div></div>
+  <div class="stat"><div class="stat-l">Open concerns</div><div class="stat-v" style="color:#EF9F27">4</div><div class="stat-s">1 unread</div></div>
+  <div class="stat"><div class="stat-l">Hours logged</div><div class="stat-v" style="color:#00D2FF">4.0h</div><div class="stat-s">of 8h target</div></div>
+  <div class="stat"><div class="stat-l">Action items</div><div class="stat-v" style="color:#EF9F27">6</div><div class="stat-s">2 from concerns</div></div>
+</div>
+
+<div class="suite-tabs">
+  <button class="st" onclick="switchTab('work',this)">Work list</button>
+  <button class="st" onclick="switchTab('timesheet',this)">Timesheet</button>
+  <button class="st active" onclick="switchTab('meetings',this)">My meetings <span class="st-badge green">2 today</span></button>
+  <button class="st" onclick="switchTab('concerns',this)">My concerns <span class="st-badge">1 unread</span></button>
+</div>
+
+<div class="body">
+
+<div id="cal-popup" class="cal-popup">
+  <div class="cal-header">
+    <div class="cal-month">March 2026</div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn">&#8249;</button>
+      <button class="cal-nav-btn">&#8250;</button>
+    </div>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-day-label">M</div><div class="cal-day-label">T</div><div class="cal-day-label">W</div>
+    <div class="cal-day-label">T</div><div class="cal-day-label">F</div><div class="cal-day-label">S</div><div class="cal-day-label">S</div>
+  </div>
+  <div id="cal-cells"></div>
+  <div class="cal-legend">
+    <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#8B5CF6"></div>Meeting</div>
+    <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#EF9F27"></div>Due date</div>
+    <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#00D2FF"></div>Action item</div>
+    <div class="cal-leg-item"><div class="cal-leg-dot" style="background:#E24B4A"></div>Concern deadline</div>
+  </div>
+  <div class="cal-items-preview" id="cal-today-items">
+    <div style="font-size:11px;color:rgba(0,210,255,.5);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Today — Mar 24</div>
+    <div class="cal-item"><div class="cal-item-dot" style="background:#8B5CF6"></div><div class="cal-item-time">9:00 AM</div>Design Review alignment — Ron White + approver</div>
+    <div class="cal-item"><div class="cal-item-dot" style="background:#8B5CF6"></div><div class="cal-item-time">2:00 PM</div>NovaBio section 4.3 planning</div>
+    <div class="cal-item"><div class="cal-item-dot" style="background:#EF9F27"></div><div class="cal-item-time">EOD</div>Timesheet submission due — week of Mar 23</div>
+    <div class="cal-item"><div class="cal-item-dot" style="background:#E24B4A"></div><div class="cal-item-time">EOD</div>PCB Layout Rev B — escalation response deadline</div>
+  </div>
+</div>
+
+<div class="tab-content" id="tc-work">
+  <div class="empty-state">Work list tab — current My Work view implementation.<br>Tasks, workflow steps, timesheet nudge, Done Today panel.</div>
+</div>
+
+<div class="tab-content" id="tc-timesheet">
+  <div class="empty-state">Timesheet tab — weekly grid with inline editing.<br>Day accordion, submit week flow, compliance status.</div>
+</div>
+
+<div class="tab-content active" id="tc-meetings">
+  <div class="filter-bar">
+    <span class="fb-label">Show</span>
+    <button class="fb-btn active-filter" onclick="filterMeetings('all',this)">All</button>
+    <button class="fb-btn" onclick="filterMeetings('owned',this)">Owned by me</button>
+    <button class="fb-btn" onclick="filterMeetings('upcoming',this)">Upcoming</button>
+    <button class="fb-btn" onclick="filterMeetings('past',this)">Past</button>
+    <span class="fb-label" style="margin-left:8px">Project</span>
+    <select class="fb-select"><option>All projects</option><option>Flexscope</option><option>NovaBio</option><option>Internal</option></select>
+    <button class="new-btn" onclick="openNewMeeting()">+ Schedule meeting</button>
+  </div>
+
+  <div class="section-divider">Today — Mar 24, 2026</div>
+
+  <div class="meeting-row" id="mtg-1" data-type="owned" data-when="upcoming">
+    <div class="mr-status-bar mrs-owned"></div>
+    <div class="mr-body">
+      <div class="mr-top">
+        <div class="mr-title">Design Review Signoff — alignment meeting · Ron White + Flexscope design authority</div>
+        <span class="mr-badge mb-owned">Owned by me</span>
+      </div>
+      <div class="mr-meta">
+        <span>Today 9:00 AM · 45 min</span>
+        <span>Flexscope</span>
+        <span>Video call</span>
+      </div>
+      <div class="mr-attendees">
+        <span class="attendee-chip">Ron White</span>
+        <span class="attendee-chip">T. Hashimoto (TransAtlantic)</span>
+        <span class="attendee-chip">VS (you)</span>
+      </div>
+      <div class="mr-coc">CoC-linked: Design Review Signoff · Intervention record · Concern #C-004</div>
+      <div class="mr-expand" id="me-1">
+        <div style="font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Agenda</div>
+        <div style="font-size:11px;color:rgba(240,246,255,.7);line-height:1.55;margin-bottom:8px">1. Align on documentation requirements for Rev B approval — documentation date format<br>2. Agree on pre-submission review process going forward<br>3. Confirm next submission date</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Outcome (to be filled)</div>
+        <textarea style="width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:11px;outline:none;resize:none" rows="2" placeholder="Record meeting outcome — will be written to CoC..."></textarea>
+        <div class="mr-actions">
+          <button class="mra-btn mra-primary" onclick="alert('Outcome written to CoC. Intervention record updated.')">Save outcome to CoC →</button>
+          <button class="mra-btn mra-secondary" onclick="alert('Action item form opening...')">+ Spawn action item</button>
+          <button class="mra-btn mra-secondary">Edit meeting</button>
+          <button class="mra-btn mra-secondary" style="margin-left:auto;border-color:rgba(226,75,74,.3);color:#E24B4A" onclick="alert('Meeting cancelled. Attendees notified.')">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 10px;display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+      <button class="mra-btn mra-primary" onclick="toggleExpand('me-1');event.stopPropagation()">Details</button>
+      <button class="mra-btn mra-secondary" onclick="alert('Joining call...')">Join</button>
+    </div>
+  </div>
+
+  <div class="meeting-row" id="mtg-2" data-type="invited" data-when="upcoming">
+    <div class="mr-status-bar mrs-upcoming"></div>
+    <div class="mr-body">
+      <div class="mr-top">
+        <div class="mr-title">NovaBio QMS — Section 4.3 planning</div>
+        <span class="mr-badge mb-invited">Invited</span>
+      </div>
+      <div class="mr-meta">
+        <span>Today 2:00 PM · 30 min</span>
+        <span>NovaBio</span>
+        <span>Conference room B</span>
+      </div>
+      <div class="mr-attendees">
+        <span class="attendee-chip">Sandra Okafor</span>
+        <span class="attendee-chip">Robert Chen</span>
+        <span class="attendee-chip">VS (you)</span>
+      </div>
+      <div class="mr-expand" id="me-2">
+        <div style="font-size:11px;color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">Called by Sandra Okafor. Section 4.3 review scope and timeline discussion. Robert Chen involvement TBD pending allocation decision.</div>
+        <div class="mr-actions">
+          <button class="mra-btn mra-primary" onclick="alert('Outcome recorded.')">Save outcome to CoC →</button>
+          <button class="mra-btn mra-secondary">+ Spawn action item</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 10px;display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+      <button class="mra-btn mra-primary" onclick="toggleExpand('me-2');event.stopPropagation()">Details</button>
+    </div>
+  </div>
+
+  <div class="section-divider">This week — past meetings</div>
+
+  <div class="meeting-row" id="mtg-3" data-type="owned" data-when="past">
+    <div class="mr-status-bar mrs-past"></div>
+    <div class="mr-body">
+      <div class="mr-top">
+        <div class="mr-title">BUILD #1 blocker — intervention review</div>
+        <span class="mr-badge mb-past">Owned · Completed</span>
+      </div>
+      <div class="mr-meta">
+        <span>Mar 22, 3:00 PM · 20 min</span>
+        <span>Flexscope</span>
+      </div>
+      <div class="mr-attendees">
+        <span class="attendee-chip">Alan Smith</span><span class="attendee-chip">VS (you)</span>
+      </div>
+      <div class="mr-coc">CoC outcome recorded: "Resource reassignment attempted — Alan to full BUILD review. Outcome: NEGATIVE (Rev B still pending)."</div>
+      <div class="mr-expand" id="me-3">
+        <div style="font-size:11px;color:rgba(240,246,255,.65);line-height:1.55">Outcome: Alan confirmed he cannot advance Build Review tasks until Rev B is signed off. Resource reassignment does not address root cause. PM escalation brief prepared.</div>
+        <div class="mr-actions">
+          <button class="mra-btn mra-secondary">View intervention record</button>
+          <button class="mra-btn mra-secondary">View CoC event</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 10px;flex-shrink:0">
+      <button class="mra-btn mra-secondary" onclick="toggleExpand('me-3');event.stopPropagation()">Details</button>
+    </div>
+  </div>
+
+  <div class="meeting-row" id="mtg-4" data-type="owned" data-when="past">
+    <div class="mr-status-bar mrs-past"></div>
+    <div class="mr-body">
+      <div class="mr-top">
+        <div class="mr-title">Weekly project sync — Flexscope + NovaBio</div>
+        <span class="mr-badge mb-owned">Owned · Completed</span>
+      </div>
+      <div class="mr-meta">
+        <span>Mar 20, 9:00 AM · 60 min</span>
+        <span>Flexscope · NovaBio</span>
+        <span>3 action items spawned</span>
+      </div>
+      <div class="mr-attendees">
+        <span class="attendee-chip">Ron White</span><span class="attendee-chip">Alan Smith</span><span class="attendee-chip">Sandra Okafor</span><span class="attendee-chip">VS (you)</span>
+      </div>
+    </div>
+    <div style="padding:9px 10px;flex-shrink:0">
+      <button class="mra-btn mra-secondary" onclick="toggleExpand('me-4');event.stopPropagation()">Details</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="tab-content" id="tc-concerns">
+  <div class="filter-bar">
+    <span class="fb-label">Status</span>
+    <button class="fb-btn active-filter" onclick="filterConcerns('all',this)">All</button>
+    <button class="fb-btn" onclick="filterConcerns('unread',this)">Unread <span style="color:#E24B4A">1</span></button>
+    <button class="fb-btn" onclick="filterConcerns('open',this)">Open</button>
+    <button class="fb-btn" onclick="filterConcerns('inprog',this)">In progress</button>
+    <button class="fb-btn" onclick="filterConcerns('resolved',this)">Resolved</button>
+    <select class="fb-select" style="margin-left:4px"><option>All projects</option><option>Flexscope</option><option>NovaBio</option></select>
+    <button class="new-btn" onclick="openNewConcern()">+ Raise concern</button>
+  </div>
+
+  <div class="concern-row" id="con-1">
+    <div class="cr-status-bar crs-unread"></div>
+    <div class="cr-body">
+      <div class="cr-top">
+        <div class="cr-title">PCB Layout Rev B approval process — approver responsiveness concern</div>
+        <span class="cr-status-badge csb-unread">Not yet read</span>
+      </div>
+      <div class="cr-meta">
+        <span>C-005</span><span>Raised by VS · Mar 24, 8:30 AM</span><span>Flexscope · BUILD phase</span>
+      </div>
+      <div class="cr-text">TransAtlantic design authority has not responded to two sign-off requests over 7 days. Standard SLA is 48h. Concern: this may be a systemic issue with the approval channel, not a one-off delay. Previous instance on OrthoMotion (Jun 2022) required executive contact to resolve.</div>
+      <div class="cr-expand" id="ce-1">
+        <div style="font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin:6px 0 5px">CoC history</div>
+        <div class="coc-thread">
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:#E24B4A"></div><div class="coc-connector"></div></div>
+            <div class="coc-content"><div class="coc-meta">Mar 24, 8:30 AM · VS (you)</div><div class="coc-text">Concern raised. Priority: high. No response after 7d and 2 escalation attempts via account manager channel.</div></div>
+          </div>
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:rgba(255,255,255,.2)"></div></div>
+            <div class="coc-content"><div class="coc-meta" style="color:rgba(0,210,255,.5)">Awaiting management acknowledgement</div></div>
+          </div>
+        </div>
+        <div class="cr-action-row">
+          <span class="cra-label">Escalate to</span>
+          <select class="cra-select"><option>CS (Management)</option><option>Executive tier</option></select>
+          <button class="cra-btn" onclick="alert('Concern escalated to CS. CoC event written.')">Escalate →</button>
+          <button class="mra-btn mra-secondary" style="margin-left:4px">+ Action item</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 10px;flex-shrink:0">
+      <button class="mra-btn mra-primary" onclick="toggleExpand('ce-1');markRead('con-1');event.stopPropagation()">Open</button>
+    </div>
+  </div>
+
+  <div class="concern-row" id="con-2">
+    <div class="cr-status-bar crs-inprog"></div>
+    <div class="cr-body">
+      <div class="cr-top">
+        <div class="cr-title">Design Review Signoff — approval criteria ambiguity causing repeated rejections</div>
+        <span class="cr-status-badge csb-inprog">In progress</span>
+      </div>
+      <div class="cr-meta">
+        <span>C-004</span><span>Raised by VS · Mar 19, 2:00 PM</span><span>Flexscope · Design phase</span>
+        <span style="color:#00D2FF">2 action items · 1 meeting scheduled</span>
+      </div>
+      <div class="cr-text">Design Review Signoff has accumulated 28 rejection cycles. Classification analysis suggests 73% are Process Quality Failures — approval criteria are ambiguous and interpreted differently by different approvers.</div>
+      <div class="cr-expand" id="ce-2">
+        <div style="font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin:6px 0 5px">CoC history</div>
+        <div class="coc-thread">
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:#E24B4A"></div><div class="coc-connector"></div></div>
+            <div class="coc-content"><div class="coc-meta">Mar 19, 2:00 PM · VS</div><div class="coc-text">Concern raised. 22 rejections at this point — pattern identified as Process Quality Failure.</div></div>
+          </div>
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:#EF9F27"></div><div class="coc-connector"></div></div>
+            <div class="coc-content"><div class="coc-meta">Mar 20, 9:15 AM · CS (Management)</div><div class="coc-text">Acknowledged. Template redesign authorized. VS assigned as redesign lead.</div><div class="coc-action">Action item: Design Review Signoff template redesign — due Apr 7</div></div>
+          </div>
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:#00D2FF"></div><div class="coc-connector"></div></div>
+            <div class="coc-content"><div class="coc-meta">Mar 24, 9:00 AM · VS</div><div class="coc-text">Alignment meeting held with Ron White and design authority. Documentation requirements agreed. Concern partially addressed — redesign sprint underway.</div></div>
+          </div>
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:rgba(255,255,255,.2)"></div></div>
+            <div class="coc-content"><div class="coc-meta" style="color:rgba(0,210,255,.5)">Measuring — outcome review Apr 7 (template redesign completion)</div></div>
+          </div>
+        </div>
+        <div class="cr-action-row">
+          <span class="cra-label">Update status</span>
+          <select class="cra-select"><option>In progress</option><option>Resolved</option><option>Escalate</option></select>
+          <button class="cra-btn" onclick="alert('Status updated. CoC event written.')">Update →</button>
+          <button class="mra-btn mra-secondary" style="margin-left:4px">+ Add comment</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 10px;flex-shrink:0">
+      <button class="mra-btn mra-primary" onclick="toggleExpand('ce-2');event.stopPropagation()">Open</button>
+    </div>
+  </div>
+
+  <div class="concern-row" id="con-3">
+    <div class="cr-status-bar crs-ack"></div>
+    <div class="cr-body">
+      <div class="cr-top">
+        <div class="cr-title">Margaret Mills — recurring mid-week absence pattern</div>
+        <span class="cr-status-badge csb-ack">Acknowledged</span>
+      </div>
+      <div class="cr-meta">
+        <span>C-003</span><span>Raised by VS · Mar 25, 9:00 AM</span><span>Flexscope · Resource</span>
+      </div>
+      <div class="cr-text">Third consecutive occurrence of mid-week absence without explanation this quarter. 52h missed total. Pattern suggests either a recurring personal situation or an engagement issue. Not a performance concern at this stage — welfare check recommended.</div>
+      <div class="cr-expand" id="ce-3">
+        <div class="coc-thread">
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:#EF9F27"></div><div class="coc-connector"></div></div>
+            <div class="coc-content"><div class="coc-meta">Mar 25, 9:00 AM · VS</div><div class="coc-text">Concern raised. Third occurrence — escalating to management for welfare conversation.</div></div>
+          </div>
+          <div class="coc-entry">
+            <div class="coc-line"><div class="coc-dot" style="background:#EF9F27"></div></div>
+            <div class="coc-content"><div class="coc-meta">Mar 25, 10:30 AM · CS (Management)</div><div class="coc-text">Acknowledged. Management will conduct welfare check. PM to hold on performance framing until management conversation complete.</div></div>
+          </div>
+        </div>
+        <div class="cr-action-row">
+          <button class="cra-btn" onclick="alert('Comment added to CoC.')">+ Add comment</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 10px;flex-shrink:0">
+      <button class="mra-btn mra-secondary" onclick="toggleExpand('ce-3');event.stopPropagation()">Open</button>
+    </div>
+  </div>
+
+  <div class="concern-row" id="con-4">
+    <div class="cr-status-bar crs-resolved"></div>
+    <div class="cr-body">
+      <div class="cr-top">
+        <div class="cr-title">Ron White — red confidence signal trajectory over 5 days</div>
+        <span class="cr-status-badge csb-resolved">Resolved</span>
+      </div>
+      <div class="cr-meta">
+        <span>C-002</span><span>Raised by VS · Mar 24, 4:30 PM</span><span>Flexscope · Design phase</span>
+        <span style="color:#1D9E75">Resolved same day</span>
+      </div>
+      <div class="cr-text">Ron posted red signal at Approval step — 28th rejection cycle. Trajectory G→G→Y→Y→R over the week. Concern: relationship tension with approver may be causing avoidable rejections beyond the process issue.</div>
+    </div>
+    <div style="padding:9px 10px;flex-shrink:0">
+      <button class="mra-btn mra-secondary" onclick="toggleExpand('ce-4');event.stopPropagation()">History</button>
+    </div>
+  </div>
+
+</div>
+
+</div>
+</div>
+
+<script>
+function switchTab(tab, btn){
+  document.querySelectorAll('.st').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tc-'+tab).classList.add('active');
+}
+
+function toggleExpand(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.toggle('open');
+}
+
+function markRead(rowId){
+  const row=document.getElementById(rowId);
+  if(!row)return;
+  const bar=row.querySelector('.cr-status-bar');
+  const badge=row.querySelector('.cr-status-badge');
+  if(bar){bar.className='cr-status-bar crs-ack';}
+  if(badge){badge.className='cr-status-badge csb-ack';badge.textContent='Acknowledged';}
+}
+
+function filterMeetings(type, btn){
+  document.querySelectorAll('.filter-bar .fb-btn').forEach(b=>b.classList.remove('active-filter'));
+  btn.classList.add('active-filter');
+  document.querySelectorAll('.meeting-row').forEach(row=>{
+    if(type==='all'){row.style.display='';}
+    else if(type==='owned'){row.style.display=row.dataset.type==='owned'?'':'none';}
+    else if(type==='upcoming'){row.style.display=row.dataset.when==='upcoming'?'':'none';}
+    else if(type==='past'){row.style.display=row.dataset.when==='past'?'':'none';}
+  });
+}
+
+function filterConcerns(type, btn){
+  const statusMap={unread:'crs-unread',inprog:'crs-inprog',resolved:'crs-resolved'};
+  document.querySelectorAll('#tc-concerns .filter-bar .fb-btn').forEach(b=>b.classList.remove('active-filter'));
+  btn.classList.add('active-filter');
+  document.querySelectorAll('.concern-row').forEach(row=>{
+    if(type==='all'){row.style.display='';return;}
+    const bar=row.querySelector('.cr-status-bar');
+    if(!bar){row.style.display='none';return;}
+    if(type==='open'){row.style.display=(bar.classList.contains('crs-unread')||bar.classList.contains('crs-ack'))?'':'none';}
+    else if(type==='unread'){row.style.display=bar.classList.contains('crs-unread')?'':'none';}
+    else if(type==='inprog'){row.style.display=bar.classList.contains('crs-inprog')?'':'none';}
+    else if(type==='resolved'){row.style.display=bar.classList.contains('crs-resolved')?'':'none';}
+  });
+}
+
+function toggleCalendar(){
+  const popup=document.getElementById('cal-popup');
+  popup.classList.toggle('show');
+}
+
+function openNewMeeting(){
+  alert('New meeting form:\n\nTitle, project, date/time, duration, attendees, agenda\nLocation / video link\nCoC link (optional — link to task, workflow step, or concern)\n\nMeeting will appear in all attendees\' My Meetings tab.');
+}
+
+function openNewConcern(){
+  alert('New concern form:\n\nTitle, description, project, phase\nPriority: Low / Medium / High / Critical\nVisible to: PM only / Management / All\n\nConcern will be assigned a C-### ID and written to CoC.\nStatus starts as "Not yet read" until acknowledged by recipient.');
+}
+
+(function buildCalendar(){
+  const cells=document.getElementById('cal-cells');
+  if(!cells)return;
+  const grid=document.createElement('div');
+  grid.className='cal-grid';
+  const events={24:['meeting','due'],25:['meeting'],26:['due'],27:['meeting','due'],31:['due']};
+  const firstDow=0;
+  for(let i=0;i<firstDow;i++){
+    const blank=document.createElement('div');blank.className='cal-cell other-month';
+    const n=document.createElement('div');n.className='cal-num';n.textContent=28-firstDow+i+1;blank.appendChild(n);grid.appendChild(blank);
+  }
+  for(let d=1;d<=31;d++){
+    const cell=document.createElement('div');
+    cell.className='cal-cell'+(d===24?' today':'')+(events[d]?' has-items':'');
+    if(events[d]){
+      if(events[d].includes('meeting'))cell.classList.add('has-meeting');
+      else if(events[d].includes('due'))cell.classList.add('has-due');
+    }
+    const n=document.createElement('div');n.className='cal-num';n.textContent=d;
+    cell.appendChild(n);
+    cell.addEventListener('click',()=>{
+      document.querySelectorAll('.cal-cell').forEach(c=>c.classList.remove('today'));
+      cell.classList.add('today');
+    });
+    grid.appendChild(cell);
+  }
+  cells.appendChild(grid);
+})();
+</script>
