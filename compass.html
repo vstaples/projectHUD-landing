@@ -1149,6 +1149,19 @@ function daysOverdue(dateStr) {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
+function _timeAgo(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins  <  1) return 'just now';
+  if (mins  < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days  <  7) return `${days}d ago`;
+  return fmtDate(iso);
+}
+
 // ── Avatar HTML ───────────────────────────────────────────
 function avatarHtml(name, size = 24, cls = 'av-cyan') {
   const initials = (name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -1471,63 +1484,115 @@ async function loadPMView() {
   const content = document.getElementById('pm-content');
 
   try {
-    const [wfInstances, actionItems, resources] = await Promise.all([
-      API.get(`workflow_instances?select=id,title,status,current_step_name,current_step_id,project_id,launched_at&status=eq.active&order=launched_at.desc&limit=50`).catch(() => []),
+    const [wfInstances, actionItems, cocEvents, resourceReqs] = await Promise.all([
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,launched_at,priority,stakes&status=eq.active&order=launched_at.desc&limit=50`).catch(() => []),
       API.get(`workflow_action_items?status=eq.open&order=due_date.asc&limit=100`).catch(() => []),
-      _resources.length ? Promise.resolve(_resources) :
-        _resources.length ? Promise.resolve(_resources) :
-          API.get('resources?select=id,first_name,last_name,email,is_active,user_id,firm_id&is_active=eq.true').catch(() => []),
+      API.get(`workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,step_activated)&order=created_at.desc&limit=100`).catch(() => []),
+      API.get(`resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&order=submitted_at.asc&limit=20`).catch(() => []),
     ]);
 
     const activeProjects = _projects.filter(p => p.status === 'active');
     const today = new Date().toLocaleDateString('en-CA');
 
-    // Compute per-project stats
+    // ── Red flags — rejections in the last 48h ────────────────
+    const cutoff48h = new Date(Date.now() - 48 * 3600000).toISOString();
+    const redFlags = cocEvents.filter(e =>
+      e.event_type === 'step_reset' && e.created_at > cutoff48h
+    ).map(e => {
+      const inst = wfInstances.find(w => w.id === e.instance_id);
+      const proj = _projects.find(p => p.id === inst?.project_id);
+      return { ...e, instTitle: inst?.title || '—', projName: proj?.name || '—', projId: inst?.project_id };
+    });
+
+    // ── Per-project stats ─────────────────────────────────────
     const projStats = activeProjects.map(p => {
       const projTasks = _tasks.filter(t => t.project_id === p.id);
       const overdue   = projTasks.filter(t => t.due_date && t.due_date < today && !['complete','cancelled'].includes(t.status));
       const projInsts = wfInstances.filter(w => w.project_id === p.id);
       const projAIs   = actionItems.filter(a => projInsts.some(i => i.id === a.instance_id));
       const overdueAIs= projAIs.filter(a => a.due_date && a.due_date < today);
+      const projFlags = redFlags.filter(f => f.projId === p.id);
+      const projReqs  = resourceReqs.filter(r => r.project_id === p.id);
 
-      // Simple urgency score
-      const urgency = overdue.length * 3 + overdueAIs.length * 2 + projInsts.length;
+      // Recent CoC events for this project's instances
+      const projCoc = cocEvents
+        .filter(e => projInsts.some(i => i.id === e.instance_id))
+        .slice(0, 5);
 
-      return { proj: p, projTasks, overdue, projInsts, projAIs, overdueAIs, urgency };
+      const urgency = projFlags.length * 5 + overdue.length * 3 + overdueAIs.length * 2 + projInsts.length + projReqs.length;
+
+      return { proj: p, projTasks, overdue, projInsts, projAIs, overdueAIs, projFlags, projReqs, projCoc, urgency };
     }).sort((a, b) => b.urgency - a.urgency);
 
     const totalOverdue = projStats.reduce((s, p) => s + p.overdue.length, 0);
     const totalInsts   = wfInstances.length;
     const totalAIs     = actionItems.filter(a => a.due_date && a.due_date < today).length;
+    const totalFlags   = redFlags.length;
+    const totalReqs    = resourceReqs.length;
+
+    // ── Live feed — last 20 CoC events across all instances ───
+    const feedEvents = cocEvents.slice(0, 20).map(e => {
+      const inst = wfInstances.find(w => w.id === e.instance_id);
+      const proj = _projects.find(p => p.id === inst?.project_id);
+      const isRejection = e.event_type === 'step_reset';
+      const isComplete  = e.event_type === 'step_completed';
+      const color = isRejection ? 'var(--compass-red)' : isComplete ? 'var(--compass-green)' : 'var(--compass-amber)';
+      const icon  = isRejection ? '↩' : isComplete ? '✓' : '●';
+      const age   = _timeAgo(e.created_at);
+      return { e, inst, proj, color, icon, age, isRejection };
+    });
 
     content.innerHTML = `
       <!-- Stat strip -->
-      <div class="stat-strip stat-strip-4" style="margin-bottom:16px">
-        <div class="stat-card">
+      <div class="stat-strip stat-strip-4" style="margin-bottom:14px">
+        <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
           <div class="stat-label">Active projects</div>
           <div class="stat-value sv-cyan">${activeProjects.length}</div>
-          <div class="stat-sub">firm-wide</div>
+          <div class="stat-sub">${totalInsts} workflow${totalInsts !== 1 ? 's' : ''} running</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="border-top:2px solid ${totalOverdue > 0 ? 'var(--compass-red)' : 'var(--compass-green)'}">
           <div class="stat-label">Overdue tasks</div>
           <div class="stat-value ${totalOverdue > 0 ? 'sv-red' : 'sv-green'}">${totalOverdue}</div>
           <div class="stat-sub">across all projects</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Active workflows</div>
-          <div class="stat-value sv-amber">${totalInsts}</div>
-          <div class="stat-sub">instances running</div>
+        <div class="stat-card" style="border-top:2px solid ${totalFlags > 0 ? 'var(--compass-red)' : 'var(--border)'}">
+          <div class="stat-label">Red flags — 48h</div>
+          <div class="stat-value ${totalFlags > 0 ? 'sv-red' : ''}">${totalFlags}</div>
+          <div class="stat-sub">rejections / resets</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Action items overdue</div>
-          <div class="stat-value ${totalAIs > 0 ? 'sv-red' : 'sv-green'}">${totalAIs}</div>
-          <div class="stat-sub">past due date</div>
+        <div class="stat-card" style="border-top:2px solid ${totalReqs > 0 ? 'var(--compass-amber)' : 'var(--border)'}">
+          <div class="stat-label">Pending requests</div>
+          <div class="stat-value ${totalReqs > 0 ? 'sv-amber' : ''}">${totalReqs}</div>
+          <div class="stat-sub">resource requests</div>
         </div>
       </div>
 
+      <!-- Red flag rail — only shown when flags exist -->
+      ${redFlags.length > 0 ? `
+      <div style="background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.3);
+        border-left:3px solid var(--compass-red);padding:8px 13px;margin-bottom:14px">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--compass-red);margin-bottom:6px">
+          ⚑ Red flags — last 48h
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${redFlags.map(f => `
+          <a href="/cadence.html" style="display:inline-flex;align-items:center;gap:5px;
+            font-family:var(--font-mono);font-size:10px;color:var(--compass-red);
+            border:1px solid rgba(226,75,74,.35);padding:3px 9px;
+            text-decoration:none;background:rgba(226,75,74,.06);transition:background .1s"
+            onmouseenter="this.style.background='rgba(226,75,74,.14)'"
+            onmouseleave="this.style.background='rgba(226,75,74,.06)'"
+            title="${esc(f.event_notes || 'No notes')}">
+            ↩ ${esc(f.projName)} — ${esc(f.step_name || f.instTitle)}
+            <span style="color:rgba(226,75,74,.6)">${_timeAgo(f.created_at)}</span>
+          </a>`).join('')}
+        </div>
+      </div>` : ''}
+
       <div class="two-col">
         <div>
-          <!-- Project cards — urgency ordered -->
+          <!-- Portfolio cards — urgency ordered -->
           <div class="cmp-panel">
             <div class="panel-hdr">
               <div class="panel-title">Portfolio — by urgency</div>
@@ -1535,77 +1600,144 @@ async function loadPMView() {
             </div>
             ${projStats.length === 0
               ? `<div style="padding:20px 13px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No active projects</div>`
-              : projStats.map(({ proj: p, overdue, projInsts, projAIs, overdueAIs }) => {
-                const hasRisk = overdue.length > 0 || overdueAIs.length > 0;
-                const targetDate = p.target_date ? fmtDate(p.target_date) : '—';
-                return `
-                <div style="border-bottom:1px solid var(--border);border-left:3px solid ${hasRisk ? 'var(--compass-red)' : overdue.length === 0 && projInsts.length > 0 ? 'var(--compass-amber)' : 'var(--compass-green)'};padding:12px 13px;cursor:pointer;transition:background .1s"
-                  onmouseenter="this.style.background='var(--bg2)'"
-                  onmouseleave="this.style.background=''"
-                  onclick="window.location.href='/project-detail.html?id=${p.id}'">
-                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
-                    <div>
-                      <div style="font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--text0)">${esc(p.name)}</div>
-                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px">${esc(p.client_name || p.client_id || '')} · Target: ${targetDate}</div>
+              : projStats.map(({ proj: p, overdue, projInsts, overdueAIs, projFlags, projReqs, projCoc }) => {
+                  const hasFlag  = projFlags.length > 0;
+                  const hasRisk  = overdue.length > 0 || overdueAIs.length > 0;
+                  const barColor = hasFlag ? 'var(--compass-red)' : hasRisk ? 'var(--compass-amber)' : projInsts.length > 0 ? 'var(--compass-cyan)' : 'var(--compass-green)';
+                  return `
+                  <div style="border-bottom:1px solid var(--border);border-left:3px solid ${barColor};
+                    padding:11px 13px;cursor:pointer;transition:background .1s"
+                    onmouseenter="this.style.background='var(--bg2)'"
+                    onmouseleave="this.style.background=''"
+                    onclick="window.location.href='/project-detail.html?id=${p.id}'">
+
+                    <!-- Project name + badges -->
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px">
+                      <div style="font-family:var(--font-ui);font-size:13.5px;font-weight:600;
+                        color:var(--text0);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        ${esc(p.name)}
+                      </div>
+                      <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap">
+                        ${projFlags.length  > 0 ? `<span class="status-badge sb-risk">⚑ ${projFlags.length} flag${projFlags.length > 1 ? 's' : ''}</span>` : ''}
+                        ${overdue.length    > 0 ? `<span class="status-badge sb-risk">${overdue.length} overdue</span>` : ''}
+                        ${projInsts.length  > 0 ? `<span class="status-badge sb-warn">${projInsts.length} workflow${projInsts.length > 1 ? 's' : ''}</span>` : ''}
+                        ${projReqs.length   > 0 ? `<span class="status-badge sb-warn">${projReqs.length} req</span>` : ''}
+                      </div>
                     </div>
-                    <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
-                      ${overdue.length > 0 ? `<span class="status-badge sb-risk">${overdue.length} overdue</span>` : ''}
-                      ${projInsts.length > 0 ? `<span class="status-badge sb-warn">${projInsts.length} workflow${projInsts.length > 1 ? 's' : ''}</span>` : ''}
-                      ${overdueAIs.length > 0 ? `<span class="status-badge sb-risk">${overdueAIs.length} AI overdue</span>` : ''}
+
+                    <!-- Target date -->
+                    <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:6px">
+                      Target: ${p.target_date ? fmtDate(p.target_date) : '—'}
                     </div>
-                  </div>
-                  <!-- Workflow instances for this project -->
-                  ${projInsts.length > 0 ? `
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-                    ${projInsts.slice(0, 3).map(w => `
-                      <a href="/cadence.html" onclick="event.stopPropagation()"
-                        style="font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;
-                          color:var(--compass-cyan);border:1px solid rgba(0,210,255,.25);
-                          padding:2px 8px;text-decoration:none;transition:background .1s"
-                        onmouseenter="this.style.background='rgba(0,210,255,.08)'"
-                        onmouseleave="this.style.background=''">
-                        ▶ ${esc(w.title)}${w.current_step_name ? ' — ' + esc(w.current_step_name) : ''}
-                      </a>`).join('')}
-                    ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:2px 6px">+${projInsts.length - 3} more</span>` : ''}
-                  </div>` : ''}
-                </div>`;
-              }).join('')
-            }
+
+                    <!-- Active workflow chips -->
+                    ${projInsts.length > 0 ? `
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
+                      ${projInsts.slice(0, 3).map(w => `
+                        <a href="/cadence.html" onclick="event.stopPropagation()"
+                          style="font-family:var(--font-mono);font-size:10px;
+                            color:var(--compass-cyan);border:1px solid rgba(0,210,255,.22);
+                            padding:2px 7px;text-decoration:none;transition:background .1s;white-space:nowrap"
+                          onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+                          onmouseleave="this.style.background=''">
+                          ▶ ${esc(w.title)}${w.current_step_name ? ' — ' + esc(w.current_step_name) : ''}
+                        </a>`).join('')}
+                      ${projInsts.length > 3 ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">+${projInsts.length - 3}</span>` : ''}
+                    </div>` : ''}
+
+                    <!-- Recent CoC events for this project -->
+                    ${projCoc.length > 0 ? `
+                    <div style="border-top:1px solid var(--border);margin-top:5px;padding-top:5px">
+                      ${projCoc.slice(0, 3).map(e => {
+                        const isRej = e.event_type === 'step_reset';
+                        const isDone = e.event_type === 'step_completed';
+                        const col = isRej ? 'var(--compass-red)' : isDone ? 'var(--compass-green)' : 'var(--compass-amber)';
+                        return `<div style="font-family:var(--font-mono);font-size:10px;
+                          color:${col};display:flex;gap:5px;align-items:baseline;margin-bottom:2px">
+                          <span>${isRej ? '↩' : isDone ? '✓' : '●'}</span>
+                          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">
+                            ${esc(e.step_name || '—')}${e.event_notes ? ' — ' + esc(e.event_notes.slice(0,60)) : ''}
+                          </span>
+                          <span style="color:var(--text3);flex-shrink:0">${_timeAgo(e.created_at)}</span>
+                        </div>`;
+                      }).join('')}
+                    </div>` : ''}
+                  </div>`;
+                }).join('')}
           </div>
         </div>
 
         <div>
+          <!-- Live portfolio feed -->
+          <div class="cmp-panel" style="margin-bottom:14px">
+            <div class="panel-hdr">
+              <div class="panel-title">Live feed</div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <div style="width:6px;height:6px;border-radius:50%;background:var(--compass-green);animation:pulse-live 2s infinite"></div>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--compass-green)">LIVE</span>
+              </div>
+            </div>
+            ${feedEvents.length === 0
+              ? `<div style="padding:14px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No recent workflow activity</div>`
+              : feedEvents.map(({ e, proj, color, icon, age, isRejection }) => `
+              <div style="display:flex;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);
+                cursor:pointer;transition:background .1s"
+                onclick="window.location.href='/cadence.html'"
+                onmouseenter="this.style.background='var(--bg2)'"
+                onmouseleave="this.style.background=''">
+                <div style="font-size:11px;color:${color};flex-shrink:0;width:14px;text-align:center;
+                  margin-top:1px">${icon}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:var(--font-ui);font-size:11px;color:var(--text1);
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    ${proj ? `<span style="color:var(--text3)">${esc(proj.name)} — </span>` : ''}${esc(e.step_name || '—')}
+                  </div>
+                  ${e.event_notes && isRejection ? `<div style="font-family:var(--font-ui);font-size:10px;
+                    color:var(--compass-red);margin-top:1px;font-style:italic;
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    "${esc(e.event_notes.slice(0,80))}"
+                  </div>` : ''}
+                </div>
+                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
+                  flex-shrink:0;align-self:center">${age}</div>
+              </div>`).join('')}
+          </div>
+
           <!-- Open action items -->
           <div class="cmp-panel" style="margin-bottom:14px">
             <div class="panel-hdr">
               <div class="panel-title">Open action items</div>
               ${totalAIs > 0 ? `<span class="panel-badge pb-red">${totalAIs} overdue</span>` : '<span class="panel-badge pb-green">All current</span>'}
             </div>
-            ${actionItems.slice(0, 8).map(a => {
+            ${actionItems.slice(0, 6).map(a => {
               const overdue = a.due_date && a.due_date < today;
               return `
               <div class="cmp-row">
-                <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${overdue ? 'var(--compass-red)' : 'var(--compass-amber)'}"></div>
+                <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;
+                  background:${overdue ? 'var(--compass-red)' : 'var(--compass-amber)'}"></div>
                 <div style="flex:1;min-width:0">
                   <div class="row-title">${esc(a.title)}</div>
                   <div class="row-sub">${a.owner_name ? esc(a.owner_name) : 'Unassigned'}${a.due_date ? ' · Due ' + fmtDate(a.due_date) : ''}</div>
                 </div>
                 ${overdue ? `<span class="status-badge sb-risk">Overdue</span>` : ''}
               </div>`;
-            }).join('') || '<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No open action items</div>'}
+            }).join('') || `<div style="padding:12px 13px;font-family:var(--font-mono);font-size:10px;color:var(--text3)">No open action items</div>`}
           </div>
 
           <!-- Quick nav -->
           <div class="cmp-panel">
             <div class="panel-hdr"><div class="panel-title">Quick access</div></div>
             <div class="cmp-row" onclick="window.location.href='/cadence.html'">
-              <div style="flex:1"><div class="row-title">Cadence — Workflow Canvas →</div><div class="row-sub">Manage instances, advance steps, view DAG</div></div>
+              <div style="flex:1"><div class="row-title">Cadence canvas →</div>
+              <div class="row-sub">Manage instances, advance steps</div></div>
             </div>
             <div class="cmp-row" onclick="window.location.href='/projects.html'">
-              <div style="flex:1"><div class="row-title">Projects →</div><div class="row-sub">Full project list with EVM metrics</div></div>
+              <div style="flex:1"><div class="row-title">Projects →</div>
+              <div class="row-sub">Full portfolio with EVM metrics</div></div>
             </div>
-            <div class="cmp-row" onclick="window.location.href='/resources.html'">
-              <div style="flex:1"><div class="row-title">Resources →</div><div class="row-sub">Team allocation and capacity</div></div>
+            <div class="cmp-row" onclick="window.location.href='/resource-requests.html'">
+              <div style="flex:1"><div class="row-title">Resource requests →</div>
+              <div class="row-sub">${totalReqs > 0 ? `${totalReqs} pending approval` : 'Staffing and approvals'}</div></div>
             </div>
           </div>
         </div>
