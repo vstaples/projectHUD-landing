@@ -4725,7 +4725,7 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
     [projTasks, wfInstances, resourceReqs] = await Promise.all([
       projectId ? API.get(`tasks?project_id=eq.${projectId}&select=id,name,status,due_date,pct_complete,assigned_to,phase,sequence_order,predecessors&order=sequence_order.asc&limit=100`).catch(()=>[]) : Promise.resolve([]),
       projectId ? API.get(`workflow_instances?project_id=eq.${projectId}&status=eq.active&select=id,title,status,current_step_name&limit=20`).catch(()=>[]) : Promise.resolve([]),
-      API.get('resource_requests?status=eq.pending&select=id,project_id,role,submitted_at&order=submitted_at.asc&limit=10').catch(()=>[]),
+      API.get('resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&limit=10').catch(()=>[]),
     ]);
     const instIds = wfInstances.map(i=>i.id);
     if (instIds.length) {
@@ -5404,7 +5404,7 @@ window.mbRenderBrief = async function(tier) {
     const [cocEvents, wfInstances, resourceReqs, confSignals, weekEntries] = await Promise.all([
       API.get('workflow_step_instances?select=id,instance_id,event_type,step_name,outcome,actor_name,event_notes,created_at&event_type=in.(step_completed,step_reset,management_decision,task_progress_update)&order=created_at.desc&limit=300').catch(()=>[]),
       API.get('workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=50').catch(()=>[]),
-      API.get('resource_requests?select=id,project_id,status,submitted_at,role&status=eq.pending&limit=20').catch(()=>[]),
+      API.get('resource_requests?select=id,project_id,status,submitted_at&status=eq.pending&limit=20').catch(()=>[]),
       API.get(`workflow_step_instances?select=id,outcome,actor_name,created_at&event_type=eq.task_progress_update&created_at=gte.${weekStart}T00:00:00&order=created_at.desc&limit=200`).catch(()=>[]),
       API.get(`time_entries?select=resource_id,date,hours,is_billable,project_id&date=gte.${weekStart}&limit=500`).catch(()=>[]),
     ]);
