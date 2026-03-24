@@ -1281,11 +1281,14 @@ async function loadUserView() {
     const weekLabels = ['M','T','W','T','F','S','S'];
 
     // ── Hours per day this week ───────────────────────────────────────
-    const hoursByDay = {};
-    weekDays.forEach(d => hoursByDay[d] = 0);
+    const hoursByDay    = {};
+    const billableByDay = {};
+    weekDays.forEach(d => { hoursByDay[d] = 0; billableByDay[d] = 0; });
     myTimeEntries.forEach(e => {
       if (hoursByDay.hasOwnProperty(e.date)) {
-        hoursByDay[e.date] += parseFloat(e.hours || 0);
+        const h = parseFloat(e.hours || 0);
+        hoursByDay[e.date] += h;
+        if (e.is_billable) billableByDay[e.date] += h;
       }
     });
 
@@ -1337,39 +1340,84 @@ async function loadUserView() {
     if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null; // reset if stale
 
     // ── Bar chart HTML ────────────────────────────────────────────────
+    const chartMax    = Math.max(maxDayHours, 8);
+    const targetLinePct = Math.round((8 / chartMax) * 100); // 8h target line position
+
     const barChart = weekDays.map((d, i) => {
-      const hrs      = hoursByDay[d] || 0;
-      const pct      = Math.round((hrs / Math.max(maxDayHours, 8)) * 100);
+      const hrs      = hoursByDay[d]    || 0;
+      const bill     = billableByDay[d] || 0;
+      const nonBill  = hrs - bill;
       const isToday  = d === today;
-      const isFuture = d > today;
       const isActive = _teFilter === d;
-      const barColor = isActive
-        ? 'var(--compass-amber)'
-        : isToday
-          ? 'var(--compass-cyan)'
-          : hrs > 0
-            ? 'var(--compass-green)'
-            : 'var(--border)';
+
+      // Pixel heights within the 48px bar container
+      const billPct    = Math.round((bill    / chartMax) * 100);
+      const nonBillPct = Math.round((nonBill / chartMax) * 100);
+
+      // Label color
+      const labelColor = isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text2)';
+
+      // Billable segment color
+      const billColor  = isActive ? 'var(--compass-amber)'
+        : isToday ? 'var(--compass-cyan)'
+        : 'var(--compass-green)';
+
       return `
         <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
           style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
             cursor:${hrs > 0 ? 'pointer' : 'default'}">
-          <div style="font-family:var(--font-mono);font-size:11px;
-            color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'}">
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:600;
+            color:${labelColor};min-height:16px;text-align:center">
             ${hrs > 0 ? hrs.toFixed(1) : ''}
           </div>
-          <div style="width:100%;height:48px;display:flex;align-items:flex-end;justify-content:center">
-            <div style="width:80%;height:${Math.max(pct, hrs > 0 ? 4 : 0)}%;background:${barColor};
-              border-radius:2px 2px 0 0;transition:all .2s;min-height:${hrs > 0 ? '2px' : '0'}"></div>
+          <!-- Bar container — relative so target line can be absolute -->
+          <div style="width:100%;height:48px;position:relative;display:flex;
+            align-items:flex-end;justify-content:center">
+            <!-- 8h target line -->
+            <div style="position:absolute;bottom:${targetLinePct}%;left:4%;right:4%;
+              height:1px;background:rgba(255,255,255,.12);pointer-events:none"></div>
+            <!-- Stacked bar: billable + non-billable -->
+            <div style="width:82%;display:flex;flex-direction:column;
+              justify-content:flex-end;height:100%;gap:0">
+              ${nonBill > 0 ? `
+              <div style="width:100%;height:${Math.max(nonBillPct, 2)}%;
+                background:rgba(255,255,255,.18);
+                border-radius:${bill > 0 ? '0' : '2px 2px'} 0 0;
+                transition:height .2s"></div>` : ''}
+              ${bill > 0 ? `
+              <div style="width:100%;height:${Math.max(billPct, hrs > 0 ? 3 : 0)}%;
+                background:${billColor};
+                border-radius:${nonBill > 0 ? '0' : '2px 2px'} 0 0;
+                transition:height .2s"></div>` : ''}
+              ${hrs === 0 ? `
+              <div style="width:100%;height:2px;background:var(--border)"></div>` : ''}
+            </div>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;
-            color:${isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text3)'};
-            font-weight:${isToday || isActive ? '600' : '400'}">${weekLabels[i]}</div>
+            color:${labelColor};font-weight:${isToday || isActive ? '600' : '400'}">${weekLabels[i]}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
             ${new Date(d + 'T00:00:00').getDate()}
           </div>
         </div>`;
     }).join('');
+
+    // Legend for bar chart
+    const barLegend = `
+      <div style="display:flex;align-items:center;gap:12px;padding:0 13px 6px;
+        font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="width:10px;height:6px;background:var(--compass-cyan);border-radius:1px"></div>
+          <span>Billable</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="width:10px;height:6px;background:rgba(255,255,255,.18);border-radius:1px"></div>
+          <span>Non-billable</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="width:10px;height:1px;background:rgba(255,255,255,.3)"></div>
+          <span>8h target</span>
+        </div>
+      </div>`;
 
     // ── Recent time entries — filtered by day if bar clicked ─────────
     const displayEntries = _teFilter
@@ -1416,9 +1464,10 @@ async function loadUserView() {
                 ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
               </div>
             </div>
-            <div style="display:flex;gap:4px;padding:10px 13px 8px;align-items:flex-end">
+            <div style="display:flex;gap:4px;padding:10px 13px 4px;align-items:flex-end">
               ${barChart}
             </div>
+            ${barLegend}
           </div>
 
           <!-- My work list -->
