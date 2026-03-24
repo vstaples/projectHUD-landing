@@ -5986,26 +5986,82 @@ window.loadUserConcerns = async function() {
   const el = document.getElementById('user-concerns-content');
   if (!el) return;
 
-  // Concerns stored in localStorage — no schema dependency
-  // Key: compass_concerns_<resource_id>
-  const resId = _myResource?.id || 'anon';
-  const storageKey = 'compass_concerns_' + resId;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    window._userConcerns = raw ? JSON.parse(raw) : [];
-  } catch(e) {
-    window._userConcerns = [];
-  }
+  const resId = _myResource?.id;
+  if (!resId) { window._userConcerns = []; renderUserConcerns(); return; }
 
-  _concernSeq = window._userConcerns.length;
-  updateConcernBadge();
-  renderUserConcerns();
+  try {
+    // Load concerns + their comments in parallel
+    const [concerns, comments] = await Promise.all([
+      API.get(`concerns?raiser_resource_id=eq.${resId}&order=raised_at.desc&limit=100`).catch(()=>[]),
+      API.get(`concern_comments?concern_id=not.is.null&order=created_at.asc&limit=500`).catch(()=>[]),
+    ]);
+
+    _concernSeq = 0;
+    const commentsByC = {};
+    (comments||[]).forEach(c => {
+      if (!commentsByC[c.concern_id]) commentsByC[c.concern_id] = [];
+      commentsByC[c.concern_id].push(c);
+    });
+
+    window._userConcerns = (concerns||[]).map(c => ({
+      id:          c.id,
+      cid:         'C-' + String(++_concernSeq).padStart(3,'0'),
+      title:       c.title,
+      description: c.description||'',
+      status:      c.status||'unread',
+      priority:    c.priority||'medium',
+      visibility:  c.visibility||'pm',
+      projectId:   c.project_id,
+      project:     (_projects||[]).find(p=>p.id===c.project_id)?.name||'—',
+      phase:       c.phase||'',
+      raised_date: c.raised_at?.slice(0,10),
+      raisedAt:    c.raised_at,
+      thread:      (commentsByC[c.id]||[]).map(e=>({
+        who:  e.author_name,
+        when: e.created_at,
+        text: e.body,
+        type: e.event_type,
+      })),
+    }));
+
+    // Migrate any localStorage concerns to DB (one-time)
+    try {
+      const lsKey = 'compass_concerns_' + resId;
+      const lsRaw = localStorage.getItem(lsKey);
+      if (lsRaw) {
+        const lsItems = JSON.parse(lsRaw)||[];
+        const dbIds = new Set((concerns||[]).map(c=>c.id));
+        const toMigrate = lsItems.filter(c=>!dbIds.has(c.id));
+        for (const c of toMigrate) {
+          await API.post('concerns',{
+            id: c.id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
+            raiser_resource_id: resId,
+            raiser_name: _myResource?.name||null,
+            title: c.title, description: c.description||c.title,
+            status: c.status||'unread', priority: c.priority||'medium',
+            raised_at: c.raisedAt||new Date().toISOString(),
+          }).catch(()=>{});
+        }
+        if (toMigrate.length) {
+          localStorage.removeItem(lsKey);
+          // Reload to pick up migrated items
+          window._concernsLoaded = false;
+          loadUserConcerns(); return;
+        }
+        localStorage.removeItem(lsKey);
+      }
+    } catch(e) {}
+
+    updateConcernBadge();
+    renderUserConcerns();
+  } catch(e) {
+    console.error('[Compass] concerns load error:', e);
+    window._userConcerns = [];
+    renderUserConcerns();
+  }
 };
 
-function saveConcerns() {
-  const resId = _myResource?.id || 'anon';
-  try { localStorage.setItem('compass_concerns_' + resId, JSON.stringify(window._userConcerns)); } catch(e) {}
-}
+
 
 function updateConcernBadge() {
   const unread = (window._userConcerns||[]).filter(c=>c.status==='unread'||c.status==='not_yet_read').length;
@@ -6148,79 +6204,115 @@ window.uToggleConcernExpand = function(id) {
 };
 
 window.uRaiseConcern = async function() {
-  const txt      = document.getElementById('concern-new-text')?.value?.trim()||'';
-  const priority = document.getElementById('concern-new-priority')?.value||'medium';
+  const txt        = document.getElementById('concern-new-text')?.value?.trim()||'';
+  const priority   = document.getElementById('concern-new-priority')?.value||'medium';
+  const visibility = document.getElementById('concern-new-visibility')?.value||'pm';
   if (!txt) { compassToast('Enter a concern description',2000); return; }
-  const resId = _myResource?.id||'anon';
+  const resId = _myResource?.id;
+  const newId = crypto.randomUUID();
   const now   = new Date().toISOString();
-  const seq   = (window._userConcerns||[]).length + 1;
-  const newC  = {
-    id: crypto.randomUUID(),
-    cid: 'C-'+String(seq).padStart(3,'0'),
-    title: txt.slice(0,100),
-    description: txt,
-    status: 'unread',
-    priority,
-    projectId: null, project: '—', phase: '',
-    raised_date: now.slice(0,10),
-    raisedAt: now,
-    thread: [{who:_myResource?.name||'You', when:now, text:txt}],
-  };
-  window._userConcerns = [newC, ...(window._userConcerns||[])];
-  saveConcerns();
-  document.getElementById('concern-new-text').value = '';
-  compassToast('Concern logged',2000);
-  updateConcernBadge();
-  renderUserConcerns();
+  try {
+    await API.post('concerns',{
+      id: newId,
+      firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+      raiser_resource_id: resId||null,
+      raiser_name: _myResource?.name||null,
+      title: txt.slice(0,100),
+      description: txt,
+      status: 'unread',
+      priority,
+      visibility,
+      raised_at: now,
+    });
+    // First comment = the original concern text
+    await API.post('concern_comments',{
+      concern_id:          newId,
+      firm_id:             'aaaaaaaa-0001-0001-0001-000000000001',
+      author_resource_id:  resId||null,
+      author_name:         _myResource?.name||'You',
+      body:                txt,
+      event_type:          'comment',
+      created_at:          now,
+    }).catch(()=>{});
+    document.getElementById('concern-new-text').value = '';
+    compassToast('Concern logged · C-### assigned',2200);
+    window._concernsLoaded = false;
+    loadUserConcerns();
+  } catch(e) {
+    console.error('[Compass] concern post error:',e);
+    compassToast('Failed to log concern — '+e.message,3000);
+  }
 };
 
-window.uEscalateConcern = function(concernId) {
-  const c = (window._userConcerns||[]).find(x=>x.id===concernId);
-  if (!c) return;
-  c.status = 'in_progress';
-  c.thread = c.thread||[];
-  c.thread.push({who:'System',when:new Date().toISOString(),text:'Escalated by raiser.'});
-  saveConcerns();
-  compassToast('Escalated · status → In progress',2200);
-  updateConcernBadge();
-  renderUserConcerns();
+window.uEscalateConcern = async function(concernId) {
+  try {
+    await API.patch(`concerns?id=eq.${concernId}`,{status:'in_progress'});
+    await API.post('concern_comments',{
+      concern_id: concernId,
+      firm_id:    'aaaaaaaa-0001-0001-0001-000000000001',
+      author_resource_id: _myResource?.id||null,
+      author_name: _myResource?.name||'You',
+      body: 'Concern escalated.',
+      event_type: 'escalation',
+      created_at: new Date().toISOString(),
+    });
+    compassToast('Escalated · status → In progress',2200);
+    window._concernsLoaded = false;
+    loadUserConcerns();
+  } catch(e) { compassToast('Failed: '+e.message,2500); }
 };
 
-window.uAddConcernComment = function(concernId) {
+window.uAddConcernComment = async function(concernId) {
   const txt = prompt('Add a comment:');
   if (!txt?.trim()) return;
-  const c = (window._userConcerns||[]).find(x=>x.id===concernId);
-  if (!c) return;
-  c.thread = c.thread||[];
-  c.thread.push({who:_myResource?.name||'You',when:new Date().toISOString(),text:txt.trim()});
-  saveConcerns();
-  compassToast('Comment added',2000);
-  renderUserConcerns();
+  try {
+    await API.post('concern_comments',{
+      concern_id: concernId,
+      firm_id:    'aaaaaaaa-0001-0001-0001-000000000001',
+      author_resource_id: _myResource?.id||null,
+      author_name: _myResource?.name||'You',
+      body: txt.trim(),
+      event_type: 'comment',
+      created_at: new Date().toISOString(),
+    });
+    compassToast('Comment added',2000);
+    window._concernsLoaded = false;
+    loadUserConcerns();
+  } catch(e) { compassToast('Failed: '+e.message,2500); }
 };
 
-window.uResolveConcern = function(concernId) {
-  const c = (window._userConcerns||[]).find(x=>x.id===concernId);
-  if (!c) return;
-  c.status = 'resolved';
-  c.thread = c.thread||[];
-  c.thread.push({who:_myResource?.name||'You',when:new Date().toISOString(),text:'Marked resolved.'});
-  saveConcerns();
-  compassToast('Resolved',2000);
-  updateConcernBadge();
-  renderUserConcerns();
+window.uResolveConcern = async function(concernId) {
+  try {
+    const now = new Date().toISOString();
+    await API.patch(`concerns?id=eq.${concernId}`,{
+      status: 'resolved',
+      resolved_at: now,
+      resolved_by: _myResource?.name||null,
+    });
+    await API.post('concern_comments',{
+      concern_id: concernId,
+      firm_id:    'aaaaaaaa-0001-0001-0001-000000000001',
+      author_resource_id: _myResource?.id||null,
+      author_name: _myResource?.name||'You',
+      body: 'Marked resolved.',
+      event_type: 'resolution',
+      created_at: now,
+    });
+    compassToast('Resolved · CoC updated',2000);
+    window._concernsLoaded = false;
+    loadUserConcerns();
+  } catch(e) { compassToast('Failed: '+e.message,2500); }
 };
 
 // Auto-load concerns count for badge on view init
 document.addEventListener('compass-identity-ready', () => {
   if (_myResource?.id) {
-    const actName = _myResource.name||'';
-    if (actName) {
-      API.get(`workflow_step_instances?select=id&event_type=eq.task_progress_update&step_name=like.CONCERN:*&outcome=eq.blocked&actor_name=eq.${encodeURIComponent(actName)}&limit=20`).then(rows=>{
-        const unread=(rows||[]).length;
-        const badge=document.getElementById('ust-concerns-badge');
-        if(badge&&unread>0){badge.textContent=unread+' unread';badge.className='ust-badge ust-badge-red';badge.style.display='inline';}
-      }).catch(()=>{});
-    }
+    // Badge count from concerns table
+    API.get(`concerns?raiser_resource_id=eq.${_myResource.id}&status=eq.unread&select=id&limit=20`).then(rows=>{
+      const unread=(rows||[]).length;
+      const badge=document.getElementById('ust-concerns-badge');
+      if(badge&&unread>0){badge.textContent=unread+' unread';badge.className='ust-badge ust-badge-red';badge.style.display='inline';}
+    }).catch(()=>{});
   }
 });
 
