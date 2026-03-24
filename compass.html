@@ -1339,84 +1339,111 @@ async function loadUserView() {
     _teEntries = myTimeEntries;
     if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null; // reset if stale
 
-    // ── Bar chart HTML ────────────────────────────────────────────────
-    const chartMax    = Math.max(maxDayHours, 8);
-    const targetLinePct = Math.round((8 / chartMax) * 100); // 8h target line position
+    // ── Speedometer gauges ────────────────────────────────────────────
+    const gaugeMax = Math.max(maxDayHours, 8);
 
-    const barChart = weekDays.map((d, i) => {
-      const hrs      = hoursByDay[d]    || 0;
-      const bill     = billableByDay[d] || 0;
-      const nonBill  = hrs - bill;
+    // SVG arc helper — half-circle from 180° (left) to 0° (right)
+    // deg=0 → left end, deg=180 → right end, maps to 0–8h
+    function arcD(cx, cy, rad, startDeg, endDeg) {
+      const toRad = a => (a - 180) * Math.PI / 180;
+      const x1 = cx + rad * Math.cos(toRad(startDeg));
+      const y1 = cy + rad * Math.sin(toRad(startDeg));
+      const x2 = cx + rad * Math.cos(toRad(endDeg));
+      const y2 = cy + rad * Math.sin(toRad(endDeg));
+      const large = (endDeg - startDeg) > 180 ? 1 : 0;
+      return `M${x1.toFixed(1)},${y1.toFixed(1)} A${rad},${rad} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)}`;
+    }
+
+    // Gauge panel width is dynamic — use 97px per gauge in a 680px SVG viewBox
+    const gVB = 680;
+    const gW  = Math.floor(gVB / 7); // ~97px
+    const gCY = 80;  // vertical center of arcs
+    const gR  = 32;  // arc radius
+
+    const gauges = weekDays.map((d, i) => {
+      const hrs     = hoursByDay[d]    || 0;
+      const bill    = billableByDay[d] || 0;
+      const nonBill = hrs - bill;
       const isToday  = d === today;
       const isActive = _teFilter === d;
 
-      // Pixel heights within the 48px bar container
-      const billPct    = Math.round((bill    / chartMax) * 100);
-      const nonBillPct = Math.round((nonBill / chartMax) * 100);
+      const cx = gW * i + gW / 2;
 
-      // Label color
-      const labelColor = isActive ? 'var(--compass-amber)' : isToday ? 'var(--compass-cyan)' : 'var(--text2)';
+      const billColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#1D9E75';
+      const nbColor    = isActive ? 'rgba(239,159,39,.3)' : 'rgba(255,255,255,.18)';
+      const labelColor = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#90B8D8';
+      const metaColor  = isActive ? '#EF9F27' : isToday ? '#00D2FF' : '#6A94B8';
+      const needleColor = billColor;
 
-      // Billable segment color
-      const billColor  = isActive ? 'var(--compass-amber)'
-        : isToday ? 'var(--compass-cyan)'
-        : 'var(--compass-green)';
+      const billDeg    = (bill    / gaugeMax) * 180;
+      const totalDeg   = (hrs     / gaugeMax) * 180;
+
+      // Needle endpoint
+      const needleRad = (totalDeg - 180) * Math.PI / 180;
+      const nx = (cx + (gR - 5) * Math.cos(needleRad)).toFixed(1);
+      const ny = (gCY + (gR - 5) * Math.sin(needleRad)).toFixed(1);
 
       return `
-        <div class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
-          style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;
-            cursor:${hrs > 0 ? 'pointer' : 'default'}">
-          <div style="font-family:var(--font-mono);font-size:11px;font-weight:600;
-            color:${labelColor};min-height:16px;text-align:center">
+        <g class="te-bar-col" data-date="${d}" data-has-hours="${hrs > 0}"
+          style="cursor:${hrs > 0 ? 'pointer' : 'default'}">
+
+          <!-- Track -->
+          <path d="${arcD(cx, gCY, gR, 0, 179.9)}"
+            fill="none" stroke="rgba(255,255,255,.07)" stroke-width="5" stroke-linecap="round"/>
+
+          ${hrs > 0 ? `
+          <!-- Billable arc -->
+          ${bill > 0 ? `<path d="${arcD(cx, gCY, gR, 0, Math.min(billDeg, 179.9))}"
+            fill="none" stroke="${billColor}" stroke-width="5" stroke-linecap="round"/>` : ''}
+
+          <!-- Non-billable arc -->
+          ${nonBill > 0 ? `<path d="${arcD(cx, gCY, gR, billDeg, Math.min(totalDeg, 179.9))}"
+            fill="none" stroke="${nbColor}" stroke-width="5" stroke-linecap="round"/>` : ''}
+
+          <!-- Needle -->
+          <line x1="${cx}" y1="${gCY}" x2="${nx}" y2="${ny}"
+            stroke="${needleColor}" stroke-width="1.5" stroke-linecap="round"/>
+          ` : ''}
+
+          <!-- Hub dot -->
+          <circle cx="${cx}" cy="${gCY}" r="3"
+            fill="${hrs > 0 ? billColor : 'rgba(255,255,255,.12)'}"/>
+
+          <!-- Hours label above arc -->
+          <text x="${cx}" y="${gCY - gR - 6}" text-anchor="middle"
+            font-family="var(--font-mono)" font-size="11"
+            font-weight="${hrs > 0 ? '600' : '400'}"
+            fill="${hrs > 0 ? labelColor : 'rgba(255,255,255,.15)'}">
             ${hrs > 0 ? hrs.toFixed(1) : ''}
-          </div>
-          <!-- Bar container — relative so target line can be absolute -->
-          <div style="width:100%;height:48px;position:relative;display:flex;
-            align-items:flex-end;justify-content:center">
-            <!-- 8h target line -->
-            <div style="position:absolute;bottom:${targetLinePct}%;left:4%;right:4%;
-              height:1px;background:rgba(255,255,255,.12);pointer-events:none"></div>
-            <!-- Stacked bar: billable + non-billable -->
-            <div style="width:82%;display:flex;flex-direction:column;
-              justify-content:flex-end;height:100%;gap:0">
-              ${nonBill > 0 ? `
-              <div style="width:100%;height:${Math.max(nonBillPct, 2)}%;
-                background:rgba(255,255,255,.18);
-                border-radius:${bill > 0 ? '0' : '2px 2px'} 0 0;
-                transition:height .2s"></div>` : ''}
-              ${bill > 0 ? `
-              <div style="width:100%;height:${Math.max(billPct, hrs > 0 ? 3 : 0)}%;
-                background:${billColor};
-                border-radius:${nonBill > 0 ? '0' : '2px 2px'} 0 0;
-                transition:height .2s"></div>` : ''}
-              ${hrs === 0 ? `
-              <div style="width:100%;height:2px;background:var(--border)"></div>` : ''}
-            </div>
-          </div>
-          <div style="font-family:var(--font-mono);font-size:11px;
-            color:${labelColor};font-weight:${isToday || isActive ? '600' : '400'}">${weekLabels[i]}</div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
-            ${new Date(d + 'T00:00:00').getDate()}
-          </div>
-        </div>`;
+          </text>
+
+          <!-- Day letter -->
+          <text x="${cx}" y="${gCY + 15}" text-anchor="middle"
+            font-family="var(--font-mono)" font-size="11"
+            font-weight="${isToday || isActive ? '600' : '400'}"
+            fill="${metaColor}">${weekLabels[i]}</text>
+
+          <!-- Date number -->
+          <text x="${cx}" y="${gCY + 28}" text-anchor="middle"
+            font-family="var(--font-mono)" font-size="11"
+            fill="#6A94B8">${new Date(d + 'T00:00:00').getDate()}</text>
+        </g>`;
     }).join('');
 
-    // Legend for bar chart
+    const barChart = `<svg viewBox="0 0 ${gVB} 120" style="width:100%;display:block">${gauges}</svg>`;
+
     const barLegend = `
       <div style="display:flex;align-items:center;gap:12px;padding:0 13px 6px;
         font-family:var(--font-mono);font-size:11px;color:var(--text3)">
         <div style="display:flex;align-items:center;gap:5px">
-          <div style="width:10px;height:6px;background:var(--compass-cyan);border-radius:1px"></div>
+          <div style="width:14px;height:4px;background:var(--compass-cyan);border-radius:2px"></div>
           <span>Billable</span>
         </div>
         <div style="display:flex;align-items:center;gap:5px">
-          <div style="width:10px;height:6px;background:rgba(255,255,255,.18);border-radius:1px"></div>
+          <div style="width:14px;height:4px;background:rgba(255,255,255,.18);border-radius:2px"></div>
           <span>Non-billable</span>
         </div>
-        <div style="display:flex;align-items:center;gap:5px">
-          <div style="width:10px;height:1px;background:rgba(255,255,255,.3)"></div>
-          <span>8h target</span>
-        </div>
+        <span style="color:var(--text3)">Scale: 8h = full</span>
       </div>`;
 
     // ── Recent time entries — filtered by day if bar clicked ─────────
@@ -1454,7 +1481,7 @@ async function loadUserView() {
       <div style="display:grid;grid-template-columns:1fr minmax(0,300px);gap:14px">
         <div>
 
-          <!-- Weekly bar chart -->
+          <!-- Weekly speedometer gauges -->
           <div class="cmp-panel" style="margin-bottom:14px">
             <div class="panel-hdr">
               <div class="panel-title">This week — hours by day</div>
@@ -1464,7 +1491,7 @@ async function loadUserView() {
                 ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
               </div>
             </div>
-            <div style="display:flex;gap:4px;padding:10px 13px 4px;align-items:flex-end">
+            <div style="padding:8px 4px 0">
               ${barChart}
             </div>
             ${barLegend}
