@@ -1793,7 +1793,7 @@ async function loadUserView() {
           </svg>
         </button>
         <!-- CoC icon — toggles CoC panel -->
-        <button onclick="toggleMwCoc()"
+        <button onclick="var el=document.getElementById('mw-coc');if(el){el.style.display=el.style.display==='flex'?'none':'flex';el.style.flexDirection='column';}else{alert('mw-coc not found');}"
           style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;height:30px;padding:0 10px;background:none;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;transition:all .12s;flex-shrink:0"
           onmouseenter="this.style.borderColor='rgba(0,210,255,.5)';this.style.color='#00D2FF'"
           onmouseleave="this.style.borderColor='rgba(0,210,255,.2)';this.style.color='rgba(0,210,255,.6)'"
