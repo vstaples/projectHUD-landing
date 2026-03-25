@@ -8580,29 +8580,38 @@ function openWorkItemExpanded(item) {
         <!-- Col 2b: Item CoC (fills space) + Mark Complete at bottom -->
         <div style="width:220px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
           ${(()=>{
-              const _cc = (window._myCocEvents||[]).filter(e=>{
-                const _pi = new Set((window._wfInstances||[]).filter(w=>w.project_id===item.projectId||w.task_id===item.id).map(w=>w.id));
-                const _ai = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
-                if(_ai) _pi.add(_ai);
-                return _pi.has(e.instance_id);
-              }).length;
+              const _tw = (item.title||'').toLowerCase().split(/\s+/).filter(w=>w.length>3);
+              const _pi = new Set((window._wfInstances||[]).filter(w=>{
+                if(w.task_id===item.id) return true;
+                if(w.project_id===item.projectId&&_tw.length){const wt=(w.title||'').toLowerCase();return _tw.some(k=>wt.includes(k));}
+                return false;
+              }).map(w=>w.id));
+              const _ai=(window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
+              if(_ai)_pi.add(_ai);
+              const _cc=(window._myCocEvents||[]).filter(e=>_pi.has(e.instance_id)).length;
               return '<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">Chain of Custody ('+_cc+')</div>';
             })()}
           <div style="flex:1;overflow-y:auto;min-height:0">
             ${(()=>{
               const allEvts = window._myCocEvents||[];
-              // Primary: match by project_id — all instances for this task's project
+              // Build keyword set from task title (words > 3 chars)
+              const titleWords = (item.title||'').toLowerCase().split(/\s+/).filter(w=>w.length>3);
+              // Match instances: task_id direct, OR title keywords match instance title
               const projInstIds = new Set(
-                (window._wfInstances||[])
-                  .filter(w => w.project_id === item.projectId || w.task_id === item.id)
-                  .map(w => w.id)
+                (window._wfInstances||[]).filter(w => {
+                  if (w.task_id === item.id) return true;
+                  if (w.project_id === item.projectId && titleWords.length) {
+                    const wt = (w.title||'').toLowerCase();
+                    return titleWords.some(kw => wt.includes(kw));
+                  }
+                  return false;
+                }).map(w => w.id)
               );
-              // Secondary: action item instance_id
+              // Action item instance_id
               const aiInst = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
               if (aiInst) projInstIds.add(aiInst);
-              // Tertiary: time_entries carrying instance_id for this task
-              const teInstIds = (_teEntries||[]).filter(e=>e.task_id===item.id&&e.instance_id).map(e=>e.instance_id);
-              teInstIds.forEach(id => projInstIds.add(id));
+              // Time entries carrying instance_id for this task
+              (_teEntries||[]).filter(e=>e.task_id===item.id&&e.instance_id).forEach(e=>projInstIds.add(e.instance_id));
               const itemEvts = allEvts.filter(e => projInstIds.has(e.instance_id));
               if (!itemEvts.length) return '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
               const evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',step_completed:'#1D9E75',step_action:'#00D2FF',step_reset:'#E24B4A',management_decision:'#EF9F27',intervention:'#8B5CF6'};
@@ -8634,6 +8643,11 @@ function openWorkItemExpanded(item) {
             disabled
             style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5;flex-shrink:0">Mark complete →</button>
         </div>
+      </div>
+      <!-- Gate hint + status — spans full width below both col2 panes -->
+      <div style="padding:5px 14px 8px;border-top:1px solid rgba(0,210,255,.06);flex-shrink:0">
+        <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center">Select sentiment and add a note to unlock</div>
+        <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px;display:block;text-align:center"></span>
       </div>
     </div>`;
 
