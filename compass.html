@@ -1335,19 +1335,18 @@ async function loadUserView() {
       }
     }
 
-    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek, myCocEvents] = await Promise.all([
+    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
-      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?select=id,title,status,due_date,owner_resource_id,instance_id,step_name&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
-      API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&firm_id=eq.aaaaaaaa-0001-0001-0001-000000000001&order=created_at.desc&limit=100`).catch(() => []),
+      Promise.resolve([]), // myCocEvents fetched below after instance IDs are known
     ]);
 
-    window._myCocEvents = myCocEvents||[];
-    console.log('[Compass] myCocEvents:', window._myCocEvents.length, window._myCocEvents[0]);
+    // _myCocEvents set after workItems built (below)
     // ── Hours per day ─────────────────────────────────────────────────
     const hoursByDay = {}, billableByDay = {};
     weekDays.forEach(d => { hoursByDay[d] = 0; billableByDay[d] = 0; });
@@ -1398,6 +1397,30 @@ async function loadUserView() {
     });
     _wiItems = workItems;
     _teEntries = myTimeEntries;
+
+    // ── Fetch CoC events for all instances backing the user's work ────
+    // Collect instance_ids from action items (direct FK)
+    const aiInstanceIds = [...new Set((myActionItems||[]).map(a=>a.instance_id).filter(Boolean))];
+    // Also include instances from active wfInstances matching user's projects
+    const myProjectIds  = [...new Set(workItems.map(w=>w.projectId).filter(Boolean))];
+    const projInstanceIds = (wfInstances||[]).filter(w=>myProjectIds.includes(w.project_id)).map(w=>w.id);
+    const allInstanceIds  = [...new Set([...aiInstanceIds, ...projInstanceIds])];
+    let myCocEvents = [];
+    if (allInstanceIds.length) {
+      const idList = allInstanceIds.map(id=>`"${id}"`).join(',');
+      myCocEvents = await API.get(
+        `workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&instance_id=in.(${allInstanceIds.join(',')})&order=created_at.desc&limit=200`
+      ).catch(() => []);
+    }
+    // Also include events where this user is the actor (catches task-level saves not on an instance)
+    const actorEvents = await API.get(
+      `workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&firm_id=eq.aaaaaaaa-0001-0001-0001-000000000001&actor_name=eq.${encodeURIComponent(_myResource.name||'')}&order=created_at.desc&limit=100`
+    ).catch(() => []);
+    // Merge, deduplicate by id, sort by created_at desc
+    const cocMap = new Map();
+    [...myCocEvents, ...actorEvents].forEach(e => cocMap.set(e.id, e));
+    window._myCocEvents = [...cocMap.values()].sort((a,b)=>b.created_at?.localeCompare(a.created_at||'')||0);
+    console.log('[Compass] myCocEvents:', window._myCocEvents.length, 'instance IDs:', allInstanceIds.length);
     if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null;
 
     const overdueCount = workItems.filter(w => w.overdue).length;
@@ -2084,6 +2107,7 @@ async function loadUserView() {
     (function() {
       const body  = document.getElementById('mw-coc-body');
       const count = document.getElementById('mw-coc-count');
+      // Events already filtered server-side by actor_name
       const evts  = window._myCocEvents || [];
       if (count) count.textContent = evts.length + ' events';
       if (!body) return;
