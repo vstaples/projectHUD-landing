@@ -1432,7 +1432,9 @@ async function loadUserView() {
       myProjectIds.includes(w.project_id) ||
       workItems.some(wi=>wi.id===w.task_id)
     ).map(w=>w.id);
-    const allInstanceIds  = [...new Set([...aiInstanceIds, ...projInstanceIds])];
+    // Also include action item IDs themselves as synthetic instance keys (for LOE negotiation events)
+    const aiSyntheticIds   = (myActionItems||[]).map(a=>a.id).filter(Boolean);
+    const allInstanceIds  = [...new Set([...aiInstanceIds, ...projInstanceIds, ...aiSyntheticIds])];
     let myCocEvents = [];
     if (allInstanceIds.length) {
       const idList = allInstanceIds.map(id=>`"${id}"`).join(',');
