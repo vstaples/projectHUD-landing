@@ -1977,14 +1977,11 @@ async function loadUserView() {
           <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
           <!-- Diagram view -->
           <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
-            <div id="mw-diag-viewport" style="height:480px;overflow:hidden;position:relative;display:flex;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
-              <!-- Fixed left stub column — never transforms -->
-              <div id="mw-diag-stubs" style="flex-shrink:0;z-index:10;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);overflow:hidden;position:relative"></div>
-              <!-- Zoomable timeline column -->
-              <div style="flex:1;overflow:hidden;position:relative;cursor:grab" id="mw-diag-tl-wrap">
-                <div id="mw-diag-canvas" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform">
-                  <div id="mw-diag-root"></div>
-                </div>
+            <!-- Outer: clips overflow, receives wheel/pan events -->
+            <div id="mw-diag-tl-wrap" style="height:480px;overflow:hidden;position:relative;cursor:grab;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
+              <!-- Inner canvas: single transform target -->
+              <div id="mw-diag-canvas" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform">
+                <div id="mw-diag-root"></div>
               </div>
             </div>
             <div style="display:flex;gap:12px;padding:5px 14px;border-top:1px solid rgba(255,255,255,.04);flex-wrap:wrap">
@@ -6740,17 +6737,12 @@ function _diagApplyTransform() {
   const lbl = document.getElementById('diag-zoom-lbl');
   if (c) c.style.transform = `translate(${_diagPanX}px,${_diagPanY}px) scale(${_diagScale})`;
   if (lbl) lbl.textContent = Math.round(_diagScale * 100) + '%';
-  // Sync stub column vertical pan only (no scale, no horizontal pan)
-  const stubs = document.getElementById('mw-diag-stubs');
-  if (stubs) stubs.style.transform = `translateY(${_diagPanY}px)`;
 }
 
 function buildWorkDiagram() {
   const root = document.getElementById('mw-diag-root');
-  const stubsEl = document.getElementById('mw-diag-stubs');
   if (!root) return;
   root.innerHTML = '';
-  if (stubsEl) stubsEl.innerHTML = '';
 
   const today = new Date().toLocaleDateString('en-CA');
   const items = _wiItems || [];
@@ -6759,21 +6751,22 @@ function buildWorkDiagram() {
     return;
   }
 
-  // ── Derive date columns ────────────────────────────────
+  // ── Derive date columns (weekdays only) ────────────────
   const dueDates = [...new Set(items.map(w => w.due).filter(Boolean))].sort();
   const minDate = dueDates[0] || today;
   const maxDate = dueDates[dueDates.length - 1] || today;
   const allDates = new Set(dueDates);
   allDates.add(today);
-  const endD = new Date(maxDate); endD.setDate(endD.getDate() + 7);
-  for (let d = new Date(minDate); d <= endD; d.setDate(d.getDate() + 1)) {
+  const endD = new Date(maxDate + 'T00:00:00'); endD.setDate(endD.getDate() + 7);
+  for (let d = new Date(minDate + 'T00:00:00'); d <= endD; d.setDate(d.getDate() + 1)) {
     if (d.getDay() !== 0 && d.getDay() !== 6) allDates.add(d.toLocaleDateString('en-CA'));
   }
   const DATES = [...allDates].sort();
-
-  const CW = 120, STUB = 140, CARD_W = 110;
   const dateIndex = {};
   DATES.forEach((d, i) => dateIndex[d] = i);
+
+  const CW = 120, STUB = 150, CARD_W = 110;
+  const totalW = STUB + DATES.length * CW + 40;
 
   // ── Group by project ───────────────────────────────────
   const projMap = {};
@@ -6783,168 +6776,159 @@ function buildWorkDiagram() {
     projMap[key].nodes.push(w);
   });
 
-  const totalW = DATES.length * CW + 60;
+  // ── Timeline header row ────────────────────────────────
+  // Full-width flex row: empty stub spacer + date columns
+  const tlRow = document.createElement('div');
+  tlRow.style.cssText = `display:flex;width:${totalW}px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);position:sticky;top:0;z-index:10`;
 
-  // ── Timeline header (in canvas) ────────────────────────
-  const tlH = document.createElement('div');
-  tlH.style.cssText = `display:flex;width:${totalW}px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);position:sticky;top:0;z-index:10`;
+  // Stub spacer (empty — no dates above project labels)
+  const tlStub = document.createElement('div');
+  tlStub.style.cssText = `width:${STUB}px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08)`;
+  tlRow.appendChild(tlStub);
+
+  // Date columns
   DATES.forEach(d => {
     const isToday = d === today;
     const dt = new Date(d + 'T00:00:00');
     const col = document.createElement('div');
     col.style.cssText = `width:${CW}px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px 0`;
-    const dayName = dt.toLocaleDateString('en-US', { weekday: 'short' });
     const dayNum  = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    col.innerHTML = `<div style="font-family:var(--font-head);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.25)'};font-weight:${isToday?'700':'400'}">${dayNum}</div><div style="font-family:var(--font-head);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.2)'}">${dayName}</div>`;
-    tlH.appendChild(col);
+    const dayName = dt.toLocaleDateString('en-US', { weekday: 'short' });
+    col.innerHTML = `<div style="font-family:var(--font-head);font-size:11px;font-weight:${isToday?'700':'400'};color:${isToday?'#00D2FF':'rgba(255,255,255,.3)'}">${dayNum}</div><div style="font-family:var(--font-head);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.2)'}">${dayName}</div>`;
+    tlRow.appendChild(col);
   });
-  root.appendChild(tlH);
-
-  // ── Stub header spacer ─────────────────────────────────
-  const stubTlH = document.createElement('div');
-  stubTlH.style.cssText = `width:${STUB}px;height:36px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);flex-shrink:0`;
-  if (stubsEl) stubsEl.appendChild(stubTlH);
+  root.appendChild(tlRow);
 
   // ── Swimlanes ──────────────────────────────────────────
-  const slContainer = document.createElement('div');
-  slContainer.style.cssText = `position:relative;width:${totalW}px`;
-
-  const stubsContainer = document.createElement('div');
-  stubsContainer.style.cssText = `width:${STUB}px`;
-
   Object.values(projMap).forEach(proj => {
     const projColor = _diagProjColor(proj.id === '__actions__' ? null : proj.id);
     const collapsed = _diagCollapsed.has(proj.id);
 
-    // ── Stub side: project header ──────────────────────
-    const stubSw = document.createElement('div');
-    stubSw.style.cssText = 'border-bottom:1px solid rgba(0,210,255,.06)';
+    // Project header row — spans full width, stub label pinned left
+    const projHdr = document.createElement('div');
+    projHdr.style.cssText = `display:flex;width:${totalW}px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04)`;
 
-    const ph = document.createElement('div');
-    ph.style.cssText = `display:flex;align-items:center;gap:7px;padding:5px 10px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;width:${STUB}px`;
-    ph.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${collapsed?'▸':'▾'}</div>`;
-    ph.dataset.action = 'diag-toggle-proj';
-    ph.dataset.projId = proj.id;
-    stubSw.appendChild(ph);
+    const projStub = document.createElement('div');
+    projStub.style.cssText = `width:${STUB}px;flex-shrink:0;display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;border-right:1px solid rgba(0,210,255,.06)`;
+    projStub.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${collapsed?'▸':'▾'}</div>`;
+    projStub.dataset.action = 'diag-toggle-proj';
+    projStub.dataset.projId = proj.id;
 
-    // ── Canvas side: swimlane ──────────────────────────
-    const sw = document.createElement('div');
-    sw.style.cssText = 'border-bottom:1px solid rgba(0,210,255,.06)';
-
-    // Canvas proj header (invisible — just a height spacer matching stub)
-    const swPh = document.createElement('div');
-    swPh.style.cssText = `height:29px;border-bottom:1px solid rgba(255,255,255,.04);background:rgba(255,255,255,.025)`;
-    sw.appendChild(swPh);
-
-    const pb = document.createElement('div');
-    pb.id = 'diag-pb-' + proj.id;
-    pb.style.display = collapsed ? 'none' : '';
-
-    const stubPb = document.createElement('div');
-    stubPb.id = 'diag-stub-pb-' + proj.id;
-    stubPb.style.display = collapsed ? 'none' : '';
-
-    if (!collapsed) {
-      const taskNodes   = proj.nodes.filter(n => n.type === 'task');
-      const actionNodes = proj.nodes.filter(n => n.type === 'action');
-      const subLanes = [];
-      if (taskNodes.length)   subLanes.push({ label: 'Tasks',   nodes: taskNodes });
-      if (actionNodes.length) subLanes.push({ label: 'Actions', nodes: actionNodes });
-      if (!subLanes.length)   subLanes.push({ label: '',        nodes: proj.nodes });
-
-      subLanes.forEach(lane => {
-        const { positions, CARD_H, CARD_GAP, ROW_PAD } = _diagAllocateSlots(lane.nodes, CW);
-        const maxSlot = Math.max(0, ...lane.nodes.map(n => positions[n.id]?.slot ?? 0));
-        const lh = (maxSlot + 1) * (CARD_H + CARD_GAP) + ROW_PAD * 2;
-
-        // Stub lane label
-        const stubRow = document.createElement('div');
-        stubRow.style.cssText = `width:${STUB}px;height:${lh}px;border-bottom:1px solid rgba(255,255,255,.03);background:rgba(255,255,255,.01);display:flex;align-items:flex-start;padding:6px 8px`;
-        stubRow.innerHTML = `<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
-        stubPb.appendChild(stubRow);
-
-        // Canvas lane
-        const cv = document.createElement('div');
-        cv.style.cssText = `position:relative;width:${totalW}px;height:${lh}px;border-bottom:1px solid rgba(255,255,255,.03)`;
-
-        // SVG connector + today line overlay
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:2;width:${totalW}px;height:${lh}px`;
-        cv.appendChild(svg);
-
-        const todayIdx = dateIndex[today];
-        if (todayIdx !== undefined) {
-          const tx = todayIdx * CW + CW / 2;
-          const vline = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          vline.setAttribute('x1', tx); vline.setAttribute('y1', 0);
-          vline.setAttribute('x2', tx); vline.setAttribute('y2', lh);
-          vline.setAttribute('stroke', 'rgba(0,210,255,.2)');
-          vline.setAttribute('stroke-width', '1.5');
-          svg.appendChild(vline);
-        }
-
-        // Nodes
-        lane.nodes.forEach(node => {
-          const pos = positions[node.id];
-          if (!pos) return;
-          const colIdx = dateIndex[pos.col] ?? 0;
-          const x = colIdx * CW + (CW - CARD_W) / 2;
-          const isOverdue = node.overdue;
-          const isToday   = pos.col === today;
-          const nodeColor = isOverdue ? '#E24B4A' : isToday ? '#EF9F27' : node.type === 'action' ? '#8B5CF6' : '#00D2FF';
-          const pct = node.pct || 0;
-          const statusLabel = (node.status || 'open').replace(/_/g, ' ');
-          const nd = document.createElement('div');
-          nd.style.cssText = `position:absolute;left:${x}px;top:${pos.y}px;width:${CARD_W}px;cursor:pointer;z-index:3`;
-          nd.dataset.wiId = node.id;
-          nd.dataset.action = 'diag-open-task';
-          nd.innerHTML = `<div style="border:1px solid ${nodeColor}44;border-left:3px solid ${nodeColor};background:rgba(255,255,255,.04);border-radius:3px;padding:5px 7px;transition:all .1s" class="diag-nd-inner"><div style="font-family:var(--font-head);font-size:11px;color:${nodeColor};letter-spacing:.05em;text-transform:uppercase;opacity:.65;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-16}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nodeColor};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${nodeColor}66;color:${nodeColor};display:inline-block;letter-spacing:.04em">${statusLabel}</div></div>`;
-          cv.appendChild(nd);
-        });
-
-        // Connectors
-        setTimeout(() => {
-          const cvRect = cv.getBoundingClientRect();
-          lane.nodes.forEach(node => {
-            if (node.type !== 'action') return;
-            const parent = proj.nodes.find(p => p.type === 'task' && positions[p.id] && positions[node.id] &&
-              dateIndex[positions[p.id]?.col] < dateIndex[positions[node.id]?.col]);
-            if (!parent) return;
-            const pEl = cv.querySelector(`[data-wi-id="${parent.id}"]`);
-            const cEl = cv.querySelector(`[data-wi-id="${node.id}"]`);
-            if (!pEl || !cEl) return;
-            const pR = pEl.getBoundingClientRect(), cR = cEl.getBoundingClientRect();
-            const fx = pR.right - cvRect.left, fy = pR.top + pR.height/2 - cvRect.top;
-            const tx = cR.left - cvRect.left,   ty = cR.top + cR.height/2 - cvRect.top;
-            const mx = (fx + tx) / 2;
-            const d = Math.abs(fy-ty)<4 ? `M${fx},${fy} H${tx}` : `M${fx},${fy} H${mx} V${ty} H${tx}`;
-            const path = document.createElementNS('http://www.w3.org/2000/svg','path');
-            path.setAttribute('d',d); path.setAttribute('stroke','rgba(0,210,255,.25)');
-            path.setAttribute('stroke-width','1.2'); path.setAttribute('fill','none');
-            path.setAttribute('stroke-dasharray','4,3');
-            const arr = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-            arr.setAttribute('points',`${tx},${ty} ${tx-7},${ty-3.5} ${tx-7},${ty+3.5}`);
-            arr.setAttribute('fill','rgba(0,210,255,.4)');
-            svg.appendChild(path); svg.appendChild(arr);
-          });
-        }, 80);
-
-        pb.appendChild(cv);
-      });
+    // Today marker stripe in header
+    const projTl = document.createElement('div');
+    projTl.style.cssText = `flex:1;position:relative;height:28px`;
+    const todayIdx = dateIndex[today];
+    if (todayIdx !== undefined) {
+      const tx = todayIdx * CW + CW / 2;
+      projTl.innerHTML = `<div style="position:absolute;left:${tx}px;top:0;bottom:0;width:1px;background:rgba(0,210,255,.15)"></div>`;
     }
 
-    sw.appendChild(pb);
-    slContainer.appendChild(sw);
-    stubSw.appendChild(stubPb);
-    stubsContainer.appendChild(stubSw);
+    projHdr.appendChild(projStub);
+    projHdr.appendChild(projTl);
+    root.appendChild(projHdr);
+
+    if (collapsed) return;
+
+    // Sub-lanes
+    const taskNodes   = proj.nodes.filter(n => n.type === 'task');
+    const actionNodes = proj.nodes.filter(n => n.type === 'action');
+    const subLanes = [];
+    if (taskNodes.length)   subLanes.push({ label: 'Tasks',   nodes: taskNodes });
+    if (actionNodes.length) subLanes.push({ label: 'Actions', nodes: actionNodes });
+    if (!subLanes.length)   subLanes.push({ label: '',        nodes: proj.nodes });
+
+    subLanes.forEach(lane => {
+      const { positions, CARD_H, CARD_GAP, ROW_PAD } = _diagAllocateSlots(lane.nodes, CW);
+      const maxSlot = Math.max(0, ...lane.nodes.map(n => positions[n.id]?.slot ?? 0));
+      const lh = (maxSlot + 1) * (CARD_H + CARD_GAP) + ROW_PAD * 2;
+
+      // Lane row — flex: stub label | canvas area
+      const laneRow = document.createElement('div');
+      laneRow.style.cssText = `display:flex;width:${totalW}px;border-bottom:1px solid rgba(255,255,255,.03)`;
+
+      // Stub label
+      const laneStub = document.createElement('div');
+      laneStub.style.cssText = `width:${STUB}px;flex-shrink:0;height:${lh}px;border-right:1px solid rgba(0,210,255,.05);background:rgba(255,255,255,.01);display:flex;align-items:flex-start;padding:6px 10px`;
+      laneStub.innerHTML = `<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
+
+      // Canvas area
+      const cv = document.createElement('div');
+      cv.style.cssText = `position:relative;flex:1;height:${lh}px`;
+
+      // SVG overlay: today line + connectors
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:2`;
+      svg.setAttribute('width', DATES.length * CW + 40);
+      svg.setAttribute('height', lh);
+      cv.appendChild(svg);
+
+      // Today line
+      if (todayIdx !== undefined) {
+        const tx = todayIdx * CW + CW / 2;
+        const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        vl.setAttribute('x1', tx); vl.setAttribute('y1', 0);
+        vl.setAttribute('x2', tx); vl.setAttribute('y2', lh);
+        vl.setAttribute('stroke', 'rgba(0,210,255,.18)');
+        vl.setAttribute('stroke-width', '1.5');
+        svg.appendChild(vl);
+      }
+
+      // Node cards
+      lane.nodes.forEach(node => {
+        const pos = positions[node.id];
+        if (!pos) return;
+        const colIdx = dateIndex[pos.col] ?? 0;
+        const x = colIdx * CW + (CW - CARD_W) / 2;
+        const isOverdue = node.overdue;
+        const isToday   = pos.col === today;
+        const nodeColor = isOverdue ? '#E24B4A' : isToday ? '#EF9F27' : node.type === 'action' ? '#8B5CF6' : '#00D2FF';
+        const pct = node.pct || 0;
+        const statusLabel = (node.status || 'open').replace(/_/g, ' ');
+        const nd = document.createElement('div');
+        nd.style.cssText = `position:absolute;left:${x}px;top:${pos.y}px;width:${CARD_W}px;cursor:pointer;z-index:3`;
+        nd.dataset.wiId = node.id;
+        nd.dataset.action = 'diag-open-task';
+        nd.innerHTML = `<div class="diag-nd-inner" style="border:1px solid ${nodeColor}44;border-left:3px solid ${nodeColor};background:rgba(10,12,28,.85);border-radius:3px;padding:5px 7px;transition:all .1s"><div style="font-family:var(--font-head);font-size:11px;color:${nodeColor};letter-spacing:.05em;text-transform:uppercase;opacity:.7;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-14}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nodeColor};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${nodeColor}55;color:${nodeColor};display:inline-block;letter-spacing:.04em">${statusLabel}</div></div>`;
+        cv.appendChild(nd);
+      });
+
+      // Connectors (action → nearest earlier task in same project)
+      setTimeout(() => {
+        const cvRect = cv.getBoundingClientRect();
+        lane.nodes.forEach(node => {
+          if (node.type !== 'action') return;
+          const parent = proj.nodes.find(p => p.type === 'task' &&
+            positions[p.id] && positions[node.id] &&
+            dateIndex[positions[p.id]?.col] < dateIndex[positions[node.id]?.col]);
+          if (!parent) return;
+          const pEl = cv.querySelector(`[data-wi-id="${parent.id}"]`);
+          const cEl = cv.querySelector(`[data-wi-id="${node.id}"]`);
+          if (!pEl || !cEl) return;
+          const pR = pEl.getBoundingClientRect(), cR = cEl.getBoundingClientRect();
+          const fx = pR.right - cvRect.left, fy = pR.top + pR.height/2 - cvRect.top;
+          const tx = cR.left - cvRect.left,   ty = cR.top + cR.height/2 - cvRect.top;
+          const mx = (fx + tx) / 2;
+          const d = Math.abs(fy-ty) < 4 ? `M${fx},${fy} H${tx}` : `M${fx},${fy} H${mx} V${ty} H${tx}`;
+          const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+          path.setAttribute('d',d); path.setAttribute('stroke','rgba(0,210,255,.3)');
+          path.setAttribute('stroke-width','1.2'); path.setAttribute('fill','none');
+          path.setAttribute('stroke-dasharray','4,3');
+          const arr = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+          arr.setAttribute('points',`${tx},${ty} ${tx-7},${ty-3.5} ${tx-7},${ty+3.5}`);
+          arr.setAttribute('fill','rgba(0,210,255,.4)');
+          svg.appendChild(path); svg.appendChild(arr);
+        });
+      }, 80);
+
+      laneRow.appendChild(laneStub);
+      laneRow.appendChild(cv);
+      root.appendChild(laneRow);
+    });
   });
 
-  root.appendChild(slContainer);
-  if (stubsEl) stubsEl.appendChild(stubsContainer);
   _diagApplyTransform();
 }
 
-// ── Diagram pan/zoom — module-level listeners ──────────────
 (function _initDiagPanZoom() {
   document.addEventListener('mousedown', function(ev) {
     const vp = document.getElementById('mw-diag-tl-wrap');
