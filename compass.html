@@ -8446,195 +8446,107 @@ function openWorkItemExpanded(item) {
   const complexColors = {low:'var(--compass-green)',medium:'var(--compass-amber)',high:'var(--compass-red)',critical:'#E24B4A'};
   const cx = item.complexity ? (complexColors[item.complexity.toLowerCase()]||'var(--text3)') : null;
 
+  // ── Pre-compute CoC events list ─────────────────────────
+  const _cocInstIds = new Set((window._wfInstances||[]).filter(w=>w.task_id===item.id).map(w=>w.id));
+  const _aiInst = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
+  if (_aiInst) _cocInstIds.add(_aiInst);
+  const _itemEvts = (window._myCocEvents||[]).filter(e=>_cocInstIds.has(e.instance_id));
+  const _evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',step_completed:'#1D9E75',step_action:'#00D2FF',step_reset:'#E24B4A',management_decision:'#EF9F27',intervention:'#8B5CF6'};
+  const _evtLabel={instance_launched:'Launched',instance_completed:'Completed',step_activated:'Activated',step_completed:'Step done',step_action:'Action',step_reset:'Reset',management_decision:'Decision',intervention:'Intervention'};
+  const _E=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const _cocHtml = _itemEvts.length ? _itemEvts.map((e,i)=>{
+    const col=_evtColor[e.event_type]||'#5A84A8';
+    const lbl=_evtLabel[e.event_type]||e.event_type.replace(/_/g,' ');
+    const step=(e.step_name||'').replace(/^CONCERN:\s*/,'');
+    const note=e.event_notes||'';
+    const ts=e.created_at?new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    let h='<div style="display:flex;gap:6px;margin-bottom:8px">';
+    h+='<div style="display:flex;flex-direction:column;align-items:center;width:10px;flex-shrink:0">';
+    h+='<div style="width:6px;height:6px;border-radius:50%;background:'+col+';margin-top:2px;flex-shrink:0"></div>';
+    if(i<_itemEvts.length-1) h+='<div style="width:1px;flex:1;min-height:8px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
+    h+='</div><div style="flex:1;min-width:0">';
+    h+='<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+_E(lbl)+'</div>';
+    if(step) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+_E(step.slice(0,40))+'</div>';
+    if(e.actor_name) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">By '+_E(e.actor_name)+'</div>';
+    if(note) h+='<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);margin-top:2px;padding:2px 6px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.4;word-break:break-word">'+_E(note.slice(0,100))+'</div>';
+    if(ts) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.2);margin-top:1px">'+ts+'</div>';
+    h+='</div></div>';
+    return h;
+  }).join('') : '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
+
   const detailHtml = `
-    <div style="display:grid;grid-template-columns:220px 1fr;gap:0;
-      flex:1;min-height:0;overflow:hidden;border-bottom:1px solid rgba(0,210,255,.08)">
+    <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
 
-      <!-- Col 1: Plan context meta — status, due, actual start, expected hours, effort bar -->
-      <div style="padding:10px 14px;border-right:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;gap:6px;overflow-y:auto">
-
+      <!-- Row 2: Status strip -->
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0;flex-wrap:wrap">
         ${item.type==='task'?`
-        <!-- % Complete unified: slider + live readout + progress bar -->
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">% Complete</span>
-            <span id="wi-pct-out-${item.id}" style="font-family:var(--font-display);font-size:20px;font-weight:700;color:${barColor}">${pct}%</span>
-          </div>
-          <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:5px">
-            <div id="wi-pct-bar-${item.id}" style="height:100%;width:${Math.min(pct,100)}%;background:${barColor};border-radius:2px;transition:width .15s"></div>
-          </div>
+        <div style="display:flex;align-items:center;gap:6px;min-width:180px">
+          <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">% Done</span>
           <input id="wi-pct-${item.id}" type="range" min="0" max="100" step="5" value="${pct}"
-            style="width:100%;accent-color:var(--compass-amber);margin-bottom:2px"
-            oninput="
-              document.getElementById('wi-pct-out-${item.id}').textContent=this.value+'%';
-              document.getElementById('wi-pct-bar-${item.id}').style.width=this.value+'%';
-            "/>
+            style="flex:1;accent-color:var(--compass-amber)"
+            oninput="document.getElementById('wi-pct-out-${item.id}').textContent=this.value+'%'"/>
+          <span id="wi-pct-out-${item.id}" style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${barColor};min-width:36px;text-align:right">${pct}%</span>
         </div>
-
-        <!-- Status select -->
         <select id="wi-status-${item.id}"
-          style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:600;padding:6px 8px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer">
+          style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 7px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer">
           <option value="not_started" ${item.status==='not_started'?'selected':''}>Not started</option>
           <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
           <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
-        </select>`:
-        `<div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber)">Open action item</div>`}
-
-        <!-- Plan meta: actual start + expected hours + due -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
-          <div style="background:#0a1525;padding:6px 8px;border:1px solid rgba(0,210,255,.08)">
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Actual start</div>
-            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text1)">
-              ${item.actualStart ? fmtDate(item.actualStart) : loggedHrs>0 ? 'In progress' : '—'}
-            </div>
-          </div>
-          <div style="background:#0a1525;padding:6px 8px;border:1px solid rgba(0,210,255,.08)">
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Expected hrs</div>
-            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text1)">
-              ${bh ? bh+'h' : item.effortDays ? (item.effortDays*8)+'h ('+item.effortDays+'d)' : '—'}
-            </div>
-          </div>
-          <div style="background:#0a1525;padding:6px 8px;border:1px solid rgba(0,210,255,.08)">
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Due</div>
-            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:${item.overdue?'var(--compass-red)':'var(--text1)'}">
-              ${item.due ? fmtDate(item.due) : '—'}
-            </div>
-          </div>
-          <div style="background:#0a1525;padding:6px 8px;border:1px solid rgba(0,210,255,.08)">
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Logged hrs</div>
-            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:${usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'var(--text1)'}">
-              ${ah.toFixed(1)}h${bh?' / '+bh+'h':''}
-            </div>
-          </div>
-        </div>
-
-        <!-- Effort bar (only if budget is known) -->
-        ${bh?`<div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:7px 9px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Budget</span>
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${effortColor}">${usedPct}% consumed${usedPct>100?' — over budget':usedPct>80?' — nearly full':''}</span>
-          </div>
-          <div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${Math.min(usedPct,100)}%;background:${effortColor};border-radius:2px"></div>
-          </div>
-          ${cx?`<div style="margin-top:5px;font-family:var(--font-head);font-size:11px;color:${cx}">Complexity: ${item.complexity}</div>`:''}
-        </div>`:''}
-
-        <!-- Log time -->
-        <div>
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">Log time</div>
-          <div style="display:grid;grid-template-columns:88px 1fr;gap:6px">
-            <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0h"
-              style="font-family:var(--font-display);font-size:16px;font-weight:700;padding:6px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3)">
-              <input id="wi-bill-${item.id}" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable
-            </label>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Col 2: two sub-columns — middle: sentiment+update | right: CoC+mark complete -->
-      <div style="display:flex;gap:0;min-width:0;flex:1;min-height:0;overflow:hidden">
-
-        <!-- Col 2a: Sentiment + Work Completed + Save Update -->
-        <div style="flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:7px;border-right:1px solid rgba(0,210,255,.08);min-height:0;overflow:hidden">
-          <div>
-            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">
-              Sentiment <span style="color:#E24B4A">*</span>
-            </div>
-            <div style="display:flex;gap:6px;align-items:center">
-              <button id="wi-sig-green-${item.id}" title="On track"
-                onclick="wiSetSignal('${item.id}','green')"
-                style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-              <button id="wi-sig-yellow-${item.id}" title="At risk"
-                onclick="wiSetSignal('${item.id}','yellow')"
-                style="width:16px;height:16px;border-radius:50%;border:2px solid #EF9F27;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-              <button id="wi-sig-red-${item.id}" title="Blocked / issue"
-                onclick="wiSetSignal('${item.id}','red')"
-                style="width:16px;height:16px;border-radius:50%;border:2px solid #E24B4A;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-              <input type="hidden" id="wi-sig-active-${item.id}" value=""/>
-              <span id="wi-sig-label-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">— required</span>
-            </div>
-          </div>
-          <div style="flex:1;display:flex;flex-direction:column;min-height:80px">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Work completed <span style="color:#E24B4A">*</span></span>
-              <span id="wi-comment-req-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;display:none">Required</span>
-            </div>
-            <textarea id="wi-comment-${item.id}"
-              placeholder="Describe what was accomplished this session — required to save…"
-              oninput="wiCheckGate('${item.id}')"
-              style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
-          </div>
-          <div style="display:flex;gap:0;align-items:stretch">
-            <button id="wi-save-progress-${item.id}"
-              onclick="wiSaveProgress('${item.id}','${item.projectId||''}')"
-              disabled
-              style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
-          </div>
-          <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center;margin-top:4px">Select sentiment and add a note to unlock</div>
-          <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px"></span>
-        </div>
-
-        <!-- Col 2b: Item CoC (fills space) + Mark Complete at bottom -->
-        <div style="width:220px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
-          ${(()=>{
-              const _pi = new Set((window._wfInstances||[]).filter(w=>w.task_id===item.id).map(w=>w.id));
-              const _ai = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
-              if(_ai) _pi.add(_ai);
-              const _cc = (window._myCocEvents||[]).filter(e=>_pi.has(e.instance_id)).length;
-              return '<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">Chain of Custody ('+_cc+')</div>';
-            })()}
-          <div style="flex:1;overflow-y:auto;min-height:0">
-            ${(()=>{
-              const allEvts = window._myCocEvents||[];
-              // Match only instances directly linked to this task via task_id
-              const instIds = new Set(
-                (window._wfInstances||[]).filter(w => w.task_id === item.id).map(w => w.id)
-              );
-              // Also include action item's instance_id if present
-              const aiInst = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
-              if (aiInst) instIds.add(aiInst);
-              const itemEvts = allEvts.filter(e => instIds.has(e.instance_id));
-              if (!itemEvts.length) return '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
-              const evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',step_completed:'#1D9E75',step_action:'#00D2FF',step_reset:'#E24B4A',management_decision:'#EF9F27',intervention:'#8B5CF6'};
-              const evtLabel={instance_launched:'Launched',instance_completed:'Completed',step_activated:'Activated',step_completed:'Step done',step_action:'Action',step_reset:'Reset',management_decision:'Decision',intervention:'Intervention'};
-              const E=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-              return itemEvts.map((e,i)=>{
-                const col=evtColor[e.event_type]||'#5A84A8';
-                const lbl=evtLabel[e.event_type]||e.event_type.replace(/_/g,' ');
-                const step=(e.step_name||'').replace(/^CONCERN:\s*/,'');
-                const note=e.event_notes||'';
-                const ts=e.created_at?new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
-                let h='<div style="display:flex;gap:6px;margin-bottom:8px">';
-                h+='<div style="display:flex;flex-direction:column;align-items:center;width:10px;flex-shrink:0">';
-                h+='<div style="width:6px;height:6px;border-radius:50%;background:'+col+';margin-top:2px;flex-shrink:0"></div>';
-                if(i<itemEvts.length-1) h+='<div style="width:1px;flex:1;min-height:8px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
-                h+='</div><div style="flex:1;min-width:0">';
-                h+='<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(lbl)+'</div>';
-                if(step) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step.slice(0,40))+'</div>';
-                if(e.actor_name) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">By '+E(e.actor_name)+'</div>';
-                if(note) h+='<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);margin-top:2px;padding:2px 6px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.4;word-break:break-word">'+E(note.slice(0,100))+'</div>';
-                if(ts) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.2);margin-top:1px">'+ts+'</div>';
-                h+='</div></div>';
-                return h;
-              }).join('');
-            })()}
-          </div>
-          <button id="wi-mark-complete-${item.id}"
-            onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')"
-            disabled
-            style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5;flex-shrink:0">Mark complete →</button>
+        </select>`
+        :`<div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Open action item</div>`}
+        ${[
+          ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
+          ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
+          ['Exp. Hrs',   bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
+          ['Logged',     ah.toFixed(1)+'h'+(bh?' / '+bh+'h':''), usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
+          ['Budget',     bh?usedPct+'% used':'—', effortColor],
+        ].map(([l,v,c])=>`<div style="background:#0a1525;padding:4px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap"><div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'};">${v}</div></div>`).join('')}
+        <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+          <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log time</span>
+          <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
+            style="width:64px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:4px 6px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">
+            <input id="wi-bill-${item.id}" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable
+          </label>
         </div>
       </div>
-      <!-- Gate hint + status — spans full width below both col2 panes -->
-      <div style="padding:5px 14px 8px;border-top:1px solid rgba(0,210,255,.06);flex-shrink:0">
+
+      <!-- Row 3: Sentiment + Work Completed | CoC -->
+      <div style="flex:1;min-height:0;display:flex;gap:0;overflow:hidden">
+        <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:7px;border-right:1px solid rgba(0,210,255,.08);min-height:0;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Sentiment <span style="color:#E24B4A">*</span></span>
+            <button id="wi-sig-green-${item.id}" title="On track" onclick="wiSetSignal('${item.id}','green')" style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
+            <button id="wi-sig-yellow-${item.id}" title="At risk" onclick="wiSetSignal('${item.id}','yellow')" style="width:16px;height:16px;border-radius:50%;border:2px solid #EF9F27;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
+            <button id="wi-sig-red-${item.id}" title="Blocked / issue" onclick="wiSetSignal('${item.id}','red')" style="width:16px;height:16px;border-radius:50%;border:2px solid #E24B4A;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
+            <input type="hidden" id="wi-sig-active-${item.id}" value=""/>
+            <span id="wi-sig-label-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">— required</span>
+          </div>
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
+          <textarea id="wi-comment-${item.id}" placeholder="Describe what was accomplished this session — required to save…" oninput="wiCheckGate('${item.id}')"
+            style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
+        </div>
+        <div style="width:240px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
+          <div style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
+        </div>
+      </div>
+
+      <!-- Row 4: Buttons -->
+      <div style="display:flex;gap:8px;padding:8px 14px;border-top:1px solid rgba(0,210,255,.07);flex-shrink:0">
+        <button id="wi-save-progress-${item.id}" onclick="wiSaveProgress('${item.id}','${item.projectId||''}')" disabled
+          style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
+        <button id="wi-mark-complete-${item.id}" onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')" disabled
+          style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Mark complete →</button>
+        <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);align-self:center;min-width:80px"></span>
+      </div>
+
+      <!-- Row 5: Instruction -->
+      <div style="padding:4px 14px 8px;flex-shrink:0">
         <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center">Select sentiment and add a note to unlock</div>
-        <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px;display:block;text-align:center"></span>
       </div>
-    </div>`;
 
+    </div>`;
   panel.innerHTML = headerHtml + detailHtml;
   document.body.appendChild(panel);
   setTimeout(() => document.getElementById(`wi-hrs-${item.id}`)?.focus(), 80);
