@@ -1360,12 +1360,12 @@ async function loadUserView() {
 
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
-      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.aaaaaaaa-0001-0001-0001-000000000001&limit=200`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
-      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
       Promise.resolve([]), // myCocEvents fetched below after instance IDs are known
     ]);
 
@@ -1421,6 +1421,11 @@ async function loadUserView() {
     _wiItems = workItems;
     window.myActionItems = myActionItems||[];
     window._wfInstances   = wfInstances||[];
+    // Seed negotiation state cache from DB so row borders render correctly
+    window._negStateCache = window._negStateCache || {};
+    (myActionItems||[]).forEach(a => {
+      if (a.negotiation_state) window._negStateCache[a.id] = a.negotiation_state;
+    });
     _teEntries = myTimeEntries;
 
     // ── Fetch CoC events for all instances backing the user's work ────
@@ -6953,20 +6958,36 @@ window.getNegotiationBadgeHtml = function(state) {
 };
 
 // ── Action item negotiation — state engine ────────────────
-// State stored in localStorage: compass_neg_{itemId} = {state, loe, proposedDue, comment, agreedDue, agreedLoe, thread:[], lockedAt}
+// Negotiation state persisted in workflow_action_items.negotiation_state (jsonb)
+// In-memory cache: window._negStateCache = { [itemId]: stateObj }
 // States: 'unrated' | 'pending' | 'negotiating' | 'agreed' | 'escalated'
 
-const _NEG_KEY = id => 'compass_neg_' + id;
+window._negStateCache = window._negStateCache || {};
 
 window.negGetState = function(itemId) {
-  try {
-    const raw = localStorage.getItem(_NEG_KEY(itemId));
-    return raw ? JSON.parse(raw) : { state: 'unrated', thread: [] };
-  } catch(e) { return { state: 'unrated', thread: [] }; }
+  // 1. Check in-memory cache first (populated from DB on load)
+  if (window._negStateCache[itemId]) return window._negStateCache[itemId];
+  // 2. Fall back to DB data in myActionItems
+  const ai = (window.myActionItems||[]).find(a=>a.id===itemId);
+  if (ai?.negotiation_state) {
+    window._negStateCache[itemId] = ai.negotiation_state;
+    return ai.negotiation_state;
+  }
+  // 3. Default unrated
+  return { state: 'unrated', thread: [] };
 };
 
 window.negSaveState = function(itemId, data) {
-  try { localStorage.setItem(_NEG_KEY(itemId), JSON.stringify(data)); } catch(e) {}
+  // Update in-memory cache immediately
+  window._negStateCache[itemId] = data;
+  // Update myActionItems cache so row borders re-render correctly
+  const ai = (window.myActionItems||[]).find(a=>a.id===itemId);
+  if (ai) ai.negotiation_state = data;
+  // Persist to Supabase async — no await, fire and forget
+  API.patch(`workflow_action_items?id=eq.${itemId}`, {
+    negotiation_state: data,
+    updated_at: new Date().toISOString()
+  }).catch(e => console.warn('[Compass] negSaveState write failed:', e));
 };
 
 window.negRowBorderStyle = function(itemId) {
