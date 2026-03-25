@@ -43,14 +43,9 @@ document.getElementById('compass-date').textContent =
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
   }).toUpperCase();
 
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadBaseData();
-  // Default view: PM
-  const saved = sessionStorage.getItem('compass-view') || 'pm';
-  switchView(saved);
-});
 
-// ── Load shared base data ─────────────────────────────────// ══════════════════════════════════════════════════════════
+// ── Load shared base data ─────────────────────────────────
+// ══════════════════════════════════════════════════════════
 // VIEW: MY WORK (Individual Contributor) — Feature #1 · Session 16
 // ══════════════════════════════════════════════════════════
 window._mwLoadUserView = async function() {

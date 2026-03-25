@@ -1269,6 +1269,13 @@ async function loadUserView() {
   }
 }
 
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadBaseData();
+  // Restore last view or default to PM
+  const saved = sessionStorage.getItem('compass-view') || 'pm';
+  switchView(saved);
+});
+
 </script>
 </body>
 </html>
