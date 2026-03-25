@@ -1411,7 +1411,8 @@ async function loadUserView() {
     (myActionItems||[]).filter(a=>a.owner_resource_id).forEach(a => {
       const overdue = a.due_date && a.due_date < today;
       workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
-        projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency: overdue?0:1 });
+        projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency: overdue?0:1,
+        createdBy: a.created_by_name||null, ownerName: a.owner_name||null });
     });
     workItems.sort((a,b) => {
       if (a.urgency !== b.urgency) return a.urgency - b.urgency;
@@ -1693,8 +1694,9 @@ async function loadUserView() {
           <div style="padding:8px 8px 8px 4px;min-width:0">
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px">
-              ${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</div>
+            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span>${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</span>
+              ${w.type==='action'?(()=>{const _ns=negGetState(w.id).state;return _ns&&_ns!=='unrated'?getNegotiationBadgeHtml(_ns):'';})():''}</div>
           </div>
           <div style="padding:0 8px">${progressCell}</div>
           <div style="text-align:center">${dueCell}</div>
@@ -6985,8 +6987,7 @@ window.negSaveState = function(itemId, data) {
   if (ai) ai.negotiation_state = data;
   // Persist to Supabase async — no await, fire and forget
   API.patch(`workflow_action_items?id=eq.${itemId}`, {
-    negotiation_state: data,
-    updated_at: new Date().toISOString()
+    negotiation_state: data
   }).catch(e => console.warn('[Compass] negSaveState write failed:', e));
 };
 
@@ -7101,26 +7102,6 @@ window.renderNegPanel = function(itemId, assignerName) {
     return `<div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.2);margin-bottom:8px"><div style="width:7px;height:7px;border-radius:50%;background:#EF9F27;animation:myrActivePulse 1.5s infinite;flex-shrink:0"></div><span style="font-family:var(--font-head);font-size:11px;color:rgba(239,159,39,.8);flex:1">${label}</span><span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#EF9F27">${h}h ${m}m</span></div>`;
   };
 
-  // ── Thread messages ───────────────────────────────────────
-  const threadHtml = (neg.thread||[]).map(msg => {
-    const isSystem = msg.role === 'system';
-    const isAssigner = msg.role === 'assigner';
-    const bubbleCls = isSystem
-      ? 'background:rgba(29,158,117,.04);border:1px solid rgba(29,158,117,.2);color:rgba(29,158,117,.9);font-size:11px'
-      : isAssigner
-        ? 'background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.18)'
-        : 'background:rgba(139,92,246,.04);border:1px solid rgba(139,92,246,.2)';
-    const avBg = isSystem ? 'background:rgba(29,158,117,.15);color:#1D9E75' : isAssigner ? 'background:rgba(0,210,255,.15);color:#00D2FF' : 'background:rgba(139,92,246,.15);color:#8B5CF6';
-    const avLabel = isSystem ? '✓' : (msg.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    return `<div style="display:flex;gap:8px;margin-bottom:8px">
-      <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px;${avBg}">${avLabel}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px">${esc(msg.name||'')} <span style="font-size:10px;color:rgba(255,255,255,.2)">${fmtTs(msg.ts)}</span></div>
-        <div style="font-family:var(--font-body);font-size:12px;color:rgba(240,246,255,.8);line-height:1.6;padding:8px 10px;${bubbleCls}">${esc(msg.text||'')}${msg.loe?`<div style="display:flex;gap:6px;margin-top:6px"><span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.06);color:#8B5CF6">LOE: ${esc(msg.loe)}</span><span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.06);color:#8B5CF6">Proposed due: ${esc(msg.proposedDue||'')}</span></div>`:''}${msg.comment?`<div style="margin-top:5px;padding:4px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(240,246,255,.65);line-height:1.5">${esc(msg.comment)}</div>`:''}</div>
-      </div>
-    </div>`;
-  }).join('');
-
   // ── Action zone by state ──────────────────────────────────
   let actionZone = '';
   const myName = _myResource?.name || 'Me';
@@ -7211,14 +7192,39 @@ window.renderNegPanel = function(itemId, assignerName) {
                      : s === 'negotiating' ? clockHtml(neg.counterReceivedAt, 'Assignee response window')
                      : '';
 
+  // Thread in descending order (newest first)
+  const threadDesc = [...(neg.thread||[])].reverse();
+  const threadDescHtml = threadDesc.map(msg => {
+    const isSystem = msg.role === 'system';
+    const isAssigner = msg.role === 'assigner';
+    const bubbleCls = isSystem
+      ? 'background:rgba(29,158,117,.04);border:1px solid rgba(29,158,117,.2);color:rgba(29,158,117,.9);font-size:11px'
+      : isAssigner
+        ? 'background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.18)'
+        : 'background:rgba(139,92,246,.04);border:1px solid rgba(139,92,246,.2)';
+    const avBg = isSystem ? 'background:rgba(29,158,117,.15);color:#1D9E75' : isAssigner ? 'background:rgba(0,210,255,.15);color:#00D2FF' : 'background:rgba(139,92,246,.15);color:#8B5CF6';
+    const avLabel = isSystem ? '✓' : (msg.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `<div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px;${avBg}">${avLabel}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px">${esc(msg.name||'')} <span style="font-size:10px;color:rgba(255,255,255,.2)">${fmtTs(msg.ts)}</span></div>
+        <div style="font-family:var(--font-body);font-size:12px;color:rgba(240,246,255,.8);line-height:1.6;padding:8px 10px;${bubbleCls}">${esc(msg.text||'')}${msg.loe?`<div style="display:flex;gap:6px;margin-top:6px"><span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.06);color:#8B5CF6">LOE: ${esc(msg.loe)}</span><span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.06);color:#8B5CF6">Proposed due: ${esc(msg.proposedDue||'')}</span></div>`:''}${msg.comment?`<div style="margin-top:5px;padding:4px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(240,246,255,.65);line-height:1.5">${esc(msg.comment)}</div>`:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
   el.innerHTML = `
     <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:10px">LOE Negotiation</div>
     ${stateFlowHtml}
-    ${threadHtml ? `<div style="margin-bottom:10px">${threadHtml}</div>` : ''}
     ${clockSection}
-    <div style="border-top:1px solid rgba(255,255,255,.06);padding-top:10px;background:rgba(255,255,255,.01)">
+    <div style="border-top:1px solid rgba(255,255,255,.06);padding-top:10px;background:rgba(255,255,255,.01);margin-bottom:10px">
       ${actionZone}
-    </div>`;
+    </div>
+    ${threadDesc.length ? `
+    <div style="border-top:1px solid rgba(255,255,255,.05);padding-top:10px">
+      <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.2);text-transform:uppercase;margin-bottom:8px">Thread — ${threadDesc.length} message${threadDesc.length!==1?'s':''} · newest first</div>
+      ${threadDescHtml}
+    </div>` : ''}`;
 };
 
 // ── Negotiation actions ───────────────────────────────────
@@ -9974,7 +9980,11 @@ function openWorkItemExpanded(item) {
               <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
               <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
             </select>`
-            :`<div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Open action item</div>`}
+            :`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Action item</div>
+              ${item.createdBy?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Assigned by <span style="color:var(--compass-cyan)">${esc(item.createdBy)}</span></div>`:''}
+              ${item.ownerName?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Owner: <span style="color:rgba(255,255,255,.6)">${esc(item.ownerName)}</span></div>`:''}
+            </div>`}
             ${[
               ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
               ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
