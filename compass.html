@@ -1330,7 +1330,7 @@ async function loadUserView() {
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
-      API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&actor_name=eq.${encodeURIComponent(_myResource?.name||'')}&order=created_at.desc&limit=30`).catch(() => []),
+      API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&order=created_at.desc&limit=100`).catch(() => []),
     ]);
 
     // ── Hours per day ─────────────────────────────────────────────────
@@ -1927,11 +1927,16 @@ async function loadUserView() {
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
             <div class="panel-title">My CoC</div>
-            <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">recent activity</span>
+            <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${(myCocEvents||[]).length} events loaded</span>
           </div>
           <div style="max-height:180px;overflow-y:auto">
             ${(()=>{
-              const evts = (myCocEvents||[]).filter(e=>e.event_notes||e.step_name);
+              const myName = (_myResource?.name||'').toLowerCase();
+              // Match by actor_name OR show all if name is empty
+              const evts = (myCocEvents||[]).filter(e=>
+                (e.event_notes||e.step_name) &&
+                (!myName || !e.actor_name || e.actor_name.toLowerCase().includes(myName.split(' ')[0]) || myName.includes((e.actor_name||'').toLowerCase().split(' ')[0]))
+              );
               if (!evts.length) return '<div style="padding:10px 13px;font-family:var(--font-head);font-size:11px;color:var(--text3)">No recent CoC events.</div>';
               const evtColors = {step_completed:'var(--compass-green)',step_reset:'var(--compass-red)',management_decision:'var(--compass-amber)',intervention:'var(--compass-purple)',step_activated:'var(--compass-cyan)'};
               return evts.slice(0,8).map(e=>{
