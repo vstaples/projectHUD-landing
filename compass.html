@@ -1978,14 +1978,14 @@ async function loadUserView() {
           <!-- Diagram view -->
           <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
             <!-- Outer: clips overflow, receives wheel/pan events -->
-            <div id="mw-diag-tl-wrap" style="height:480px;overflow:hidden;position:relative;cursor:grab;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
+            <div id="mw-diag-tl-wrap" style="height:480px;overflow:auto;position:relative;cursor:grab;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
               <!-- Fixed overlay: timeline header + stub labels — never transforms -->
               <div id="mw-diag-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:20;overflow:hidden">
                 <div id="mw-diag-tl-header" style="position:absolute;top:0;left:0;right:0;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)"></div>
                 <div id="mw-diag-stub-col" style="position:absolute;top:0;left:0;bottom:0;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);pointer-events:all;overflow:hidden"></div>
               </div>
               <!-- Inner canvas: transform target for cards + grid only -->
-              <div id="mw-diag-canvas" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform">
+              <div id="mw-diag-canvas">
                 <div id="mw-diag-root"></div>
               </div>
             </div>
@@ -6738,20 +6738,10 @@ function _diagAllocateSlots(nodes, CW) {
 
 // ── Build and render the diagram ──────────────────────────
 function _diagApplyTransform() {
-  const c   = document.getElementById('mw-diag-canvas');
+  // Zoom = column width only. Rebuild to reflect new CW.
+  buildWorkDiagram();
   const lbl = document.getElementById('diag-zoom-lbl');
-  // Canvas: full translate + scale (cards, connectors, today line)
-  if (c) c.style.transform = `translate(${_diagPanX}px,${_diagPanY}px) scale(${_diagScale})`;
   if (lbl) lbl.textContent = Math.round(_diagScale * 100) + '%';
-  // Timeline date strip: horizontal pan + scale only — top stays pinned
-  const tlInner = document.getElementById('mw-diag-tl-inner');
-  if (tlInner) {
-    tlInner.style.transformOrigin = '0 0';
-    tlInner.style.transform = `translateX(${_diagPanX}px) scaleX(${_diagScale})`;
-  }
-  // Stub column: vertical pan only — left stays pinned, no scale
-  const stubCol = document.getElementById('mw-diag-stub-col');
-  if (stubCol) stubCol.style.transform = `translateY(${_diagPanY}px)`;
 }
 
 function buildWorkDiagram() {
@@ -6760,7 +6750,7 @@ function buildWorkDiagram() {
   const stubCol = document.getElementById('mw-diag-stub-col');
   if (!root) return;
   root.innerHTML = '';
-  if (tlHdr)   tlHdr.innerHTML   = '';
+  if (tlHdr)   tlHdr.innerHTML = '';
   if (stubCol) stubCol.innerHTML = '';
 
   const today = new Date().toLocaleDateString('en-CA');
@@ -6784,10 +6774,14 @@ function buildWorkDiagram() {
   const dateIndex = {};
   DATES.forEach((d, i) => dateIndex[d] = i);
 
-  const CW = 120, STUB = 150, CARD_W = 110, TL_H = 36;
+  // Column width scales with zoom. Card size is always fixed.
+  const BASE_CW = 120, CW = Math.round(BASE_CW * _diagScale);
+  const STUB = 150, CARD_W = 108, CARD_H = 76, CARD_GAP = 6, ROW_PAD = 8;
+  const TL_H = 36;
   const todayIdx = dateIndex[today];
+  const totalCW = DATES.length * CW + 40;
 
-  // ── Group by project ───────────────────────────────────
+  // ── Group items by project ─────────────────────────────
   const projMap = {};
   items.forEach(w => {
     const key = w.projectId || '__actions__';
@@ -6795,85 +6789,62 @@ function buildWorkDiagram() {
     projMap[key].nodes.push(w);
   });
 
-  // ══ OVERLAY: timeline header (pinned top) ══════════════
-  // Left spacer matching stub width
+  // ══ OVERLAY: timeline header (pinned top) ═════════════
   if (tlHdr) {
-    tlHdr.style.height = TL_H + 'px';
-    tlHdr.style.display = 'flex';
-    const spacer = document.createElement('div');
-    spacer.style.cssText = `width:${STUB}px;flex-shrink:0`;
-    tlHdr.appendChild(spacer);
-    // Date columns — translate matches panX of canvas
+    tlHdr.style.cssText = `position:absolute;top:0;left:0;right:0;height:${TL_H}px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);display:flex;z-index:20;overflow:hidden`;
+    // Stub spacer
+    const sp = document.createElement('div');
+    sp.style.cssText = `width:${STUB}px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08)`;
+    tlHdr.appendChild(sp);
+    // Date columns
     const dateCols = document.createElement('div');
-    dateCols.id = 'mw-diag-tl-cols';
-    dateCols.style.cssText = `display:flex;flex:1;overflow:hidden;position:relative`;
-    const inner = document.createElement('div');
-    inner.id = 'mw-diag-tl-inner';
-    inner.style.cssText = `display:flex;position:absolute;left:0;top:0;transform-origin:0 0`;
+    dateCols.style.cssText = `display:flex;overflow:hidden`;
     DATES.forEach(d => {
       const isToday = d === today;
       const dt = new Date(d + 'T00:00:00');
       const col = document.createElement('div');
       col.style.cssText = `width:${CW}px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px 0`;
-      const dayNum  = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const dayName = dt.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayNum  = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+      const dayName = dt.toLocaleDateString('en-US', { weekday:'short' });
       col.innerHTML = `<div style="font-family:var(--font-head);font-size:11px;font-weight:${isToday?'700':'400'};color:${isToday?'#00D2FF':'rgba(255,255,255,.3)'}">${dayNum}</div><div style="font-family:var(--font-head);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.2)'}">${dayName}</div>`;
-      inner.appendChild(col);
+      dateCols.appendChild(col);
     });
-    dateCols.appendChild(inner);
     tlHdr.appendChild(dateCols);
   }
 
   // ══ OVERLAY: stub column (pinned left) ════════════════
-  // Rows are built in sync with canvas rows — same heights
-  // We build stub rows as we build canvas rows and append both
   if (stubCol) {
-    stubCol.style.width = STUB + 'px';
-    stubCol.style.top   = TL_H + 'px'; // below timeline header
+    stubCol.style.cssText = `position:absolute;top:${TL_H}px;left:0;bottom:0;width:${STUB}px;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);z-index:15;overflow:hidden`;
   }
 
-  // ══ CANVAS: cards + connectors + today line ════════════
-  // Canvas starts at STUB offset X so cards align with date cols
-  // We use padding-left:STUB so the canvas coordinates start at 0 for cards
-  // Actually: cards are placed at x = colIdx*CW + offset, canvas has no left pad
-  // The canvas left edge = STUB (covered by stub overlay), so panX applies to both
-  // We need canvas to start at x=STUB — easiest: give root a left margin of STUB
-
-  root.style.marginLeft = STUB + 'px';
-
-  let stubScrollY = 0; // accumulated height for stub rows
-
-  // Stub header spacer row
-  if (stubCol) {
-    const stubHdrRow = document.createElement('div');
-    stubHdrRow.style.cssText = `height:0`; // TL_H already offset via top:TL_H
-    stubCol.appendChild(stubHdrRow);
-  }
+  // ══ CANVAS: scrollable card area ══════════════════════
+  // Canvas sits behind the overlay. Left padding = STUB so cards align with date cols.
+  root.style.cssText = `padding-left:${STUB}px;padding-top:${TL_H}px`;
 
   Object.values(projMap).forEach(proj => {
     const projColor = _diagProjColor(proj.id === '__actions__' ? null : proj.id);
     const collapsed  = _diagCollapsed.has(proj.id);
+    const PROJ_HDR_H = 28;
 
-    // ── Stub: project header ──────────────────────────────
-    const PROJ_HDR_H = 29;
+    // ── OVERLAY STUB: project header ─────────────────────
     if (stubCol) {
       const ps = document.createElement('div');
-      ps.style.cssText = `width:100%;height:${PROJ_HDR_H}px;display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);box-sizing:border-box`;
+      ps.style.cssText = `height:${PROJ_HDR_H}px;display:flex;align-items:center;gap:7px;padding:0 10px;cursor:pointer;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);box-sizing:border-box`;
       ps.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${collapsed?'▸':'▾'}</div>`;
       ps.dataset.action = 'diag-toggle-proj';
       ps.dataset.projId = proj.id;
       stubCol.appendChild(ps);
     }
 
-    // ── Canvas: project header row (height spacer only) ───
-    const projHdrCanvas = document.createElement('div');
-    projHdrCanvas.style.cssText = `height:${PROJ_HDR_H}px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);position:relative`;
-    // Today stripe
+    // ── CANVAS: project header (full width, outside card area) ─
+    // This is rendered in root but without left-padding so it spans edge to edge
+    const projHdr = document.createElement('div');
+    projHdr.style.cssText = `margin-left:-${STUB}px;height:${PROJ_HDR_H}px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);position:relative`;
     if (todayIdx !== undefined) {
-      const tx = todayIdx * CW + CW / 2;
-      projHdrCanvas.innerHTML = `<div style="position:absolute;left:${tx}px;top:0;bottom:0;width:1px;background:rgba(0,210,255,.12)"></div>`;
+      const tx = STUB + todayIdx * CW + CW / 2;
+      projHdr.innerHTML = `<div style="position:absolute;left:${tx}px;top:0;bottom:0;width:1px;background:rgba(0,210,255,.12)"></div>`;
     }
-    root.appendChild(projHdrCanvas);
+    root.appendChild(projHdr);
 
     if (collapsed) return;
 
@@ -6886,50 +6857,63 @@ function buildWorkDiagram() {
     if (!subLanes.length)   subLanes.push({ label: '',        nodes: proj.nodes });
 
     subLanes.forEach(lane => {
-      const { positions, CARD_H, CARD_GAP, ROW_PAD } = _diagAllocateSlots(lane.nodes, CW);
-      const maxSlot = Math.max(0, ...lane.nodes.map(n => positions[n.id]?.slot ?? 0));
-      const lh = (maxSlot + 1) * (CARD_H + CARD_GAP) + ROW_PAD * 2;
+      // Slot allocation
+      const colSlots = {}, positions = {};
+      const typeOrd = { task:0, action:1 };
+      [...lane.nodes].sort((a,b) => {
+        const da = a.due||'9999', db = b.due||'9999';
+        if (da!==db) return da.localeCompare(db);
+        return (typeOrd[a.type]??2)-(typeOrd[b.type]??2);
+      }).forEach(n => {
+        const col = n.due||'9999';
+        if (!colSlots[col]) colSlots[col]=[];
+        let slot=0; while(colSlots[col].includes(slot)) slot++;
+        colSlots[col].push(slot);
+        positions[n.id]={col,slot,y:slot*(CARD_H+CARD_GAP)+ROW_PAD};
+      });
+      const maxSlot = Math.max(0,...lane.nodes.map(n=>positions[n.id]?.slot??0));
+      const lh = (maxSlot+1)*(CARD_H+CARD_GAP)+ROW_PAD*2;
 
-      // ── Stub: lane label ────────────────────────────────
+      // ── OVERLAY STUB: lane label ──────────────────────
       if (stubCol) {
         const ls = document.createElement('div');
-        ls.style.cssText = `width:100%;height:${lh}px;border-bottom:1px solid rgba(255,255,255,.03);background:rgba(255,255,255,.01);display:flex;align-items:flex-start;padding:6px 10px;box-sizing:border-box`;
+        ls.style.cssText = `height:${lh}px;background:rgba(255,255,255,.01);border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:flex-start;padding:6px 10px;box-sizing:border-box`;
         ls.innerHTML = `<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
         stubCol.appendChild(ls);
       }
 
-      // ── Canvas: lane row ────────────────────────────────
+      // ── CANVAS: lane row ─────────────────────────────
       const cv = document.createElement('div');
       cv.style.cssText = `position:relative;height:${lh}px;border-bottom:1px solid rgba(255,255,255,.03)`;
 
       // SVG: today line + connectors
-      const totalCW = DATES.length * CW + 40;
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
       svg.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:2`;
       svg.setAttribute('width', totalCW); svg.setAttribute('height', lh);
       if (todayIdx !== undefined) {
         const tx = todayIdx * CW + CW / 2;
-        const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        vl.setAttribute('x1',tx); vl.setAttribute('y1',0); vl.setAttribute('x2',tx); vl.setAttribute('y2',lh);
+        const vl = document.createElementNS('http://www.w3.org/2000/svg','line');
+        vl.setAttribute('x1',tx); vl.setAttribute('y1',0);
+        vl.setAttribute('x2',tx); vl.setAttribute('y2',lh);
         vl.setAttribute('stroke','rgba(0,210,255,.18)'); vl.setAttribute('stroke-width','1.5');
         svg.appendChild(vl);
       }
       cv.appendChild(svg);
 
-      // Node cards
+      // Node cards — fixed size, x-position scales with CW
       lane.nodes.forEach(node => {
         const pos = positions[node.id];
         if (!pos) return;
         const colIdx = dateIndex[pos.col] ?? 0;
-        const x = colIdx * CW + (CW - CARD_W) / 2;
-        const isOverdue = node.overdue, isToday = pos.col === today;
-        const nc = isOverdue ? '#E24B4A' : isToday ? '#EF9F27' : node.type === 'action' ? '#8B5CF6' : '#00D2FF';
-        const pct = node.pct || 0;
-        const sl = (node.status || 'open').replace(/_/g,' ');
+        const x = colIdx * CW + Math.max(0, (CW - CARD_W) / 2);
+        const isOverdue = node.overdue, isTod = pos.col === today;
+        const nc = isOverdue ? '#E24B4A' : isTod ? '#EF9F27' : node.type==='action' ? '#8B5CF6' : '#00D2FF';
+        const pct = node.pct||0;
+        const sl = (node.status||'open').replace(/_/g,' ');
         const nd = document.createElement('div');
         nd.style.cssText = `position:absolute;left:${x}px;top:${pos.y}px;width:${CARD_W}px;cursor:pointer;z-index:3`;
         nd.dataset.wiId = node.id; nd.dataset.action = 'diag-open-task';
-        nd.innerHTML = `<div class="diag-nd-inner" style="border:1px solid ${nc}44;border-left:3px solid ${nc};background:rgba(10,12,28,.85);border-radius:3px;padding:5px 7px;transition:all .1s"><div style="font-family:var(--font-head);font-size:11px;color:${nc};letter-spacing:.05em;text-transform:uppercase;opacity:.7;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-14}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nc};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${nc}55;color:${nc};display:inline-block;letter-spacing:.04em">${sl}</div></div>`;
+        nd.innerHTML = `<div class="diag-nd-inner" style="border:1px solid ${nc}44;border-left:3px solid ${nc};background:rgba(10,12,28,.9);border-radius:3px;padding:5px 7px;height:${CARD_H}px;box-sizing:border-box;overflow:hidden"><div style="font-family:var(--font-head);font-size:11px;color:${nc};letter-spacing:.05em;text-transform:uppercase;opacity:.7;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-14}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nc};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${nc}55;color:${nc};display:inline-block;letter-spacing:.04em">${sl}</div></div>`;
         cv.appendChild(nd);
       });
 
@@ -6937,12 +6921,11 @@ function buildWorkDiagram() {
       setTimeout(() => {
         const cvRect = cv.getBoundingClientRect();
         lane.nodes.forEach(node => {
-          if (node.type !== 'action') return;
+          if (node.type!=='action') return;
           const parent = proj.nodes.find(p => p.type==='task' && positions[p.id] && positions[node.id] &&
             dateIndex[positions[p.id]?.col] < dateIndex[positions[node.id]?.col]);
           if (!parent) return;
-          const pEl = cv.querySelector(`[data-wi-id="${parent.id}"]`);
-          const cEl = cv.querySelector(`[data-wi-id="${node.id}"]`);
+          const pEl=cv.querySelector(`[data-wi-id="${parent.id}"]`), cEl=cv.querySelector(`[data-wi-id="${node.id}"]`);
           if (!pEl||!cEl) return;
           const pR=pEl.getBoundingClientRect(), cR=cEl.getBoundingClientRect();
           const fx=pR.right-cvRect.left, fy=pR.top+pR.height/2-cvRect.top;
@@ -6963,20 +6946,55 @@ function buildWorkDiagram() {
       root.appendChild(cv);
     });
   });
-
-  _diagApplyTransform();
 }
 
-
-(function _initDiagZoom() {
-  // Wheel zoom only — diagram is pinned top-left, no pan
+// ── Pan/zoom: wheel adjusts CW via _diagScale, no CSS transform ──
+(function _initDiagInteraction() {
   document.addEventListener('wheel', function(ev) {
     const vp = document.getElementById('mw-diag-tl-wrap');
     if (!vp || !_diagramMode || !vp.contains(ev.target)) return;
     ev.preventDefault();
-    _diagScale = Math.min(2.5, Math.max(0.25, _diagScale + (ev.deltaY > 0 ? -0.1 : 0.1)));
-    _diagApplyTransform();
+    _diagScale = Math.min(3, Math.max(0.3, _diagScale + (ev.deltaY > 0 ? -0.1 : 0.1)));
+    buildWorkDiagram();
+    const lbl = document.getElementById('diag-zoom-lbl');
+    if (lbl) lbl.textContent = Math.round(_diagScale * 100) + '%';
   }, { passive: false });
+
+  // Pan: horizontal scrolls card canvas, vertical scrolls card canvas
+  let _px=false, _lx=0, _ly=0;
+  const getScroll = () => document.getElementById('mw-diag-tl-wrap');
+  document.addEventListener('mousedown', function(ev) {
+    const vp = document.getElementById('mw-diag-tl-wrap');
+    if (!vp || !_diagramMode || !vp.contains(ev.target)) return;
+    if (ev.target.closest('[data-action]')) return;
+    _px=true; _lx=ev.clientX; _ly=ev.clientY;
+    vp.style.cursor='grabbing';
+  });
+  document.addEventListener('mousemove', function(ev) {
+    if (!_px) return;
+    const dx=ev.clientX-_lx, dy=ev.clientY-_ly;
+    _lx=ev.clientX; _ly=ev.clientY;
+    const vp=document.getElementById('mw-diag-tl-wrap');
+    if (vp) { vp.scrollLeft-=dx; vp.scrollTop-=dy; }
+  });
+  document.addEventListener('mouseup', function() {
+    _px=false;
+    const vp=document.getElementById('mw-diag-tl-wrap');
+    if (vp) vp.style.cursor='grab';
+  });
+  document.addEventListener('touchstart', function(ev) {
+    const vp=document.getElementById('mw-diag-tl-wrap');
+    if (!vp||!_diagramMode||!vp.contains(ev.target)||ev.touches.length!==1) return;
+    _px=true; _lx=ev.touches[0].clientX; _ly=ev.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchmove', function(ev) {
+    if (!_px||ev.touches.length!==1) return;
+    const dx=ev.touches[0].clientX-_lx, dy=ev.touches[0].clientY-_ly;
+    _lx=ev.touches[0].clientX; _ly=ev.touches[0].clientY;
+    const vp=document.getElementById('mw-diag-tl-wrap');
+    if (vp) { vp.scrollLeft-=dx; vp.scrollTop-=dy; }
+  },{passive:true});
+  document.addEventListener('touchend', function() { _px=false; });
 })();
 
 // MY COC DRAWER
@@ -7640,16 +7658,23 @@ document.addEventListener('click', function(ev) {
     return;
   }
   if (ev.target.closest('[data-action="diag-zoom-in"]')) {
-    _diagScale = Math.min(2.5, _diagScale + 0.15);
-    _diagApplyTransform(); return;
+    _diagScale = Math.min(3, _diagScale + 0.15);
+    buildWorkDiagram();
+    const lbl=document.getElementById('diag-zoom-lbl'); if(lbl) lbl.textContent=Math.round(_diagScale*100)+'%';
+    return;
   }
   if (ev.target.closest('[data-action="diag-zoom-out"]')) {
-    _diagScale = Math.max(0.25, _diagScale - 0.15);
-    _diagApplyTransform(); return;
+    _diagScale = Math.max(0.3, _diagScale - 0.15);
+    buildWorkDiagram();
+    const lbl=document.getElementById('diag-zoom-lbl'); if(lbl) lbl.textContent=Math.round(_diagScale*100)+'%';
+    return;
   }
   if (ev.target.closest('[data-action="diag-zoom-reset"]')) {
-    _diagScale = 1;
-    _diagApplyTransform(); return;
+    _diagScale = 1; _diagPanX = 0; _diagPanY = 0;
+    buildWorkDiagram();
+    const lbl = document.getElementById('diag-zoom-lbl');
+    if (lbl) lbl.textContent = '100%';
+    return;
   }
   if (ev.target.closest('[data-action="diag-maximize"]')) {
     const panel = document.getElementById('mw-worklist-panel');
