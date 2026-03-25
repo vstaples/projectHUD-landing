@@ -6981,24 +6981,79 @@ window.negRowBorderStyle = function(itemId) {
 
 // Write a CoC event for negotiation milestone
 window.negWriteCoCEvent = async function(itemId, eventNotes, actorName) {
+  const now = new Date().toISOString();
+  const actor = actorName || _myResource?.name || null;
+  // Use real instance_id if available, otherwise use item ID as a stable synthetic key
+  const inst = (window.myActionItems||[]).find(a=>a.id===itemId)?.instance_id || itemId;
+  const evtId = crypto.randomUUID();
+  const evt = {
+    id: evtId,
+    instance_id: inst,
+    step_type: 'manual',
+    step_name: 'LOE negotiation',
+    event_type: 'step_action',
+    event_notes: eventNotes,
+    actor_name: actor,
+    outcome: 'on_track',
+    created_at: now,
+    firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+  };
+  // Optimistically push into local cache so CoC panel updates immediately
+  if (!window._myCocEvents) window._myCocEvents = [];
+  window._myCocEvents.unshift(evt);
+  // Refresh CoC panel in the open modal if it's showing this item
+  _negRefreshModalCoC(itemId);
+  // Write to Supabase in background
   try {
-    const item = (_wiItems||[]).find(w=>w.id===itemId);
-    const inst = (window.myActionItems||[]).find(a=>a.id===itemId)?.instance_id;
-    if (!inst) return;
-    await API.post('workflow_step_instances', {
-      id: crypto.randomUUID(),
-      instance_id: inst,
-      step_type: 'manual',
-      step_name: 'LOE negotiation',
-      event_type: 'step_action',
-      event_notes: eventNotes,
-      actor_name: actorName || _myResource?.name || null,
-      outcome: 'on_track',
-      created_at: new Date().toISOString(),
-      firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
-    });
+    await API.post('workflow_step_instances', evt);
   } catch(e) { console.warn('[Compass] negWriteCoC error:', e); }
 };
+
+// Refresh the CoC column in the open work item modal for a given item
+function _negRefreshModalCoC(itemId) {
+  const panel = document.querySelector(`.wi-expanded[data-wi-id="${itemId}"]`);
+  if (!panel) return;
+  // Re-compute events for this item
+  const _cocInstIds = new Set((window._wfInstances||[]).filter(w=>w.task_id===itemId).map(w=>w.id));
+  const _aiInst = (window.myActionItems||[]).find(a=>a.id===itemId)?.instance_id;
+  if (_aiInst) _cocInstIds.add(_aiInst);
+  _cocInstIds.add(itemId); // synthetic key fallback
+  const evts = (window._myCocEvents||[]).filter(e=>_cocInstIds.has(e.instance_id));
+  const _evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',
+    step_completed:'#1D9E75',step_action:'#00D2FF',step_reset:'#E24B4A',
+    management_decision:'#EF9F27',intervention:'#8B5CF6'};
+  const _evtLabel={instance_launched:'Launched',instance_completed:'Completed',step_activated:'Activated',
+    step_completed:'Step done',step_action:'Action',step_reset:'Reset',
+    management_decision:'Decision',intervention:'Intervention'};
+  const _E=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cocHtml = evts.length ? evts.map((e,i)=>{
+    const col=_evtColor[e.event_type]||'#5A84A8';
+    const lbl=_evtLabel[e.event_type]||e.event_type.replace(/_/g,' ');
+    const step=(e.step_name||'').replace(/^CONCERN:\s*/,'');
+    const note=e.event_notes||'';
+    const ts=e.created_at?new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    let h='<div style="display:flex;gap:6px;margin-bottom:8px">';
+    h+='<div style="display:flex;flex-direction:column;align-items:center;width:10px;flex-shrink:0">';
+    h+='<div style="width:6px;height:6px;border-radius:50%;background:'+col+';margin-top:2px;flex-shrink:0"></div>';
+    if(i<evts.length-1) h+='<div style="width:1px;flex:1;min-height:8px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
+    h+='</div><div style="flex:1;min-width:0">';
+    h+='<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+_E(lbl)+'</div>';
+    if(step) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+_E(step.slice(0,40))+'</div>';
+    if(e.actor_name) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">By '+_E(e.actor_name)+'</div>';
+    if(note) h+='<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);margin-top:2px;padding:2px 6px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.4;word-break:break-word">'+_E(note.slice(0,120))+'</div>';
+    if(ts) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.2);margin-top:1px">'+ts+'</div>';
+    h+='</div></div>';
+    return h;
+  }).join('') : '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
+  // Find and update the CoC column header count + body
+  const cocCol = panel.querySelector('[data-coc-col]');
+  if (cocCol) {
+    const countEl = cocCol.querySelector('[data-coc-count]');
+    const bodyEl  = cocCol.querySelector('[data-coc-body]');
+    if (countEl) countEl.textContent = 'Chain of Custody (' + evts.length + ')';
+    if (bodyEl)  bodyEl.innerHTML = cocHtml;
+  }
+}
 
 // ── Render the full negotiation panel (injected into the action item modal) ──
 window.renderNegPanel = function(itemId, assignerName) {
@@ -9784,6 +9839,7 @@ function openWorkItemExpanded(item) {
   const _cocInstIds = new Set((window._wfInstances||[]).filter(w=>w.task_id===item.id).map(w=>w.id));
   const _aiInst = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
   if (_aiInst) _cocInstIds.add(_aiInst);
+  _cocInstIds.add(item.id); // synthetic fallback key for LOE negotiation events
   const _itemEvts = (window._myCocEvents||[]).filter(e=>_cocInstIds.has(e.instance_id));
   const _evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',step_completed:'#1D9E75',step_action:'#00D2FF',step_reset:'#E24B4A',management_decision:'#EF9F27',intervention:'#8B5CF6'};
   const _evtLabel={instance_launched:'Launched',instance_completed:'Completed',step_activated:'Activated',step_completed:'Step done',step_action:'Action',step_reset:'Reset',management_decision:'Decision',intervention:'Intervention'};
@@ -9892,9 +9948,9 @@ function openWorkItemExpanded(item) {
         </div>
 
         <!-- RIGHT column: Chain of Custody — full height from row 2 top -->
-        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
-          <div style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
+        <div data-coc-col style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
+          <div data-coc-count style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
+          <div data-coc-body style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
         </div>
 
       </div>
