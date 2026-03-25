@@ -291,10 +291,18 @@ function getSunday(offset) {
   return sun;
 }
 
+function isoLocal(d) {
+  // Local date as YYYY-MM-DD — never use toISOString() for dates (UTC offset shifts day)
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
 function weekISO(sun) {
-  // Returns [startISO, endISO] for Sun–Sat week containing given Sunday
+  // Returns [startISO, endISO] for Sun–Sat week — local dates
   const sat = new Date(sun.getTime() + 6 * DAY_MS);
-  return [sun.toISOString().slice(0,10), sat.toISOString().slice(0,10)];
+  return [isoLocal(sun), isoLocal(sat)];
 }
 
 function weekDates(sun) {
@@ -328,9 +336,7 @@ function fmtHr(n) {
   return n % 1 === 0 ? n + 'h' : n.toFixed(1) + 'h';
 }
 
-function isoDate(d) {
-  return d.toISOString().slice(0,10);
-}
+function isoDate(d) { return isoLocal(d); }
 
 function showErr(msg) {
   const el = document.getElementById('mt-err');
@@ -1064,14 +1070,14 @@ async function submitNextWeekPlan() {
 /* ─── UTILITY LOOKUPS ────────────────────────────────────────────────── */
 function getProjectName(pid) {
   if (!pid || pid === '__none__') return null;
-  const projects = window._projects || [];
+  const projects = window._mtProjects || [];
   const p = projects.find(p=>p.id===pid);
   return p ? (p.name||p.title||null) : null;
 }
 
 function getTaskName(tid) {
   if (!tid || tid === '__notask__') return null;
-  const tasks = window._tasks || [];
+  const tasks = window._mtTasks || [];
   const t = tasks.find(t=>t.id===tid);
   return t ? (t.name||null) : null;
 }
@@ -1164,6 +1170,10 @@ window._mtLoadView = async function() {
 
 window._mtRefresh = async function() {
   _narrativeEditing = false;
+  // Re-stamp shared globals in case they were updated since first load
+  if (typeof _myResource !== 'undefined' && _myResource) window._mtResource = _myResource;
+  if (typeof _projects   !== 'undefined' && _projects)  window._mtProjects = _projects;
+  if (typeof _tasks      !== 'undefined' && _tasks)     window._mtTasks    = _tasks;
   await renderAll();
 };
 

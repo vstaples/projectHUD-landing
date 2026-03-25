@@ -5069,8 +5069,10 @@ window.loadMyTimeView = async function() {
       document.head.appendChild(el);
     }
     window._myTimeLoaded = true;
-    // Hand _myResource to my-time.html — it's a let in compass.html, not on window
+    // Hand scoped lets from compass.html to my-time.html via window
     window._mtResource = typeof _myResource !== 'undefined' ? _myResource : null;
+    window._mtProjects = typeof _projects  !== 'undefined' ? _projects  : [];
+    window._mtTasks    = typeof _tasks     !== 'undefined' ? _tasks     : [];
     if (window._mtLoadView) await window._mtLoadView();
     else console.error('[Compass] _mtLoadView not exported by my-time.html');
   } catch (err) {
