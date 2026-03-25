@@ -8479,65 +8479,75 @@ function openWorkItemExpanded(item) {
   const detailHtml = `
     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
 
-      <!-- Row 2: Plan meta tiles -->
-      <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0;flex-wrap:wrap">
-        ${item.type==='task'?`
-        <select id="wi-status-${item.id}"
-          style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 7px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer">
-          <option value="not_started" ${item.status==='not_started'?'selected':''}>Not started</option>
-          <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
-          <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
-        </select>`
-        :`<div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Open action item</div>`}
-        ${[
-          ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
-          ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
-          ['Exp. Hrs',   bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
-          ['Logged',     ah.toFixed(1)+'h'+(bh?' / '+bh+'h':''), usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
-          ['Budget',     bh?usedPct+'% used':'—', effortColor],
-        ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap"><div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'};">${v}</div></div>`).join('')}
-      </div>
+      <!-- Rows 2-4: two-column grid — left=controls+work completed, right=CoC full height -->
+      <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 240px;overflow:hidden">
 
-      <!-- Row 3: % Done | Log time + Billable | Sentiment — all inline -->
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
-        ${item.type==='task'?`<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:120px">
-          <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">% Done</span>
-          <input id="wi-pct-${item.id}" type="range" min="0" max="100" step="5" value="${pct}"
-            style="flex:1;accent-color:var(--compass-amber)"
-            oninput="document.getElementById('wi-pct-out-${item.id}').textContent=this.value+'%'"/>
-          <span id="wi-pct-out-${item.id}" style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${barColor};min-width:36px;text-align:right">${pct}%</span>
-        </div>
-        <div style="width:1px;height:20px;background:rgba(255,255,255,.08);flex-shrink:0"></div>`:``}
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log time</span>
-          <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
-            style="width:58px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 5px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">
-            <input id="wi-bill-${item.id}" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable
-          </label>
-        </div>
-        <div style="width:1px;height:20px;background:rgba(255,255,255,.08);flex-shrink:0"></div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Sentiment <span style="color:#E24B4A">*</span></span>
-          <button id="wi-sig-green-${item.id}" title="On track" onclick="wiSetSignal('${item.id}','green')" style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-          <button id="wi-sig-yellow-${item.id}" title="At risk" onclick="wiSetSignal('${item.id}','yellow')" style="width:16px;height:16px;border-radius:50%;border:2px solid #EF9F27;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-          <button id="wi-sig-red-${item.id}" title="Blocked / issue" onclick="wiSetSignal('${item.id}','red')" style="width:16px;height:16px;border-radius:50%;border:2px solid #E24B4A;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
-          <input type="hidden" id="wi-sig-active-${item.id}" value=""/>
-          <span id="wi-sig-label-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">— required</span>
-        </div>
-      </div>
+        <!-- LEFT column: Row 2 meta + Row 3 sentiment+slider + Row 4 work completed -->
+        <div style="display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(0,210,255,.08)">
 
-      <!-- Row 4: Work Completed | CoC — fills remaining height -->
-      <div style="flex:1;min-height:0;display:flex;gap:0;overflow:hidden">
-        <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:5px;border-right:1px solid rgba(0,210,255,.08);min-height:0;overflow:hidden">
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
-          <textarea id="wi-comment-${item.id}" placeholder="Describe what was accomplished this session — required to save…" oninput="wiCheckGate('${item.id}')"
-            style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
+          <!-- Row 2: Status + meta tiles + Log time -->
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0;flex-wrap:wrap">
+            ${item.type==='task'?`
+            <select id="wi-status-${item.id}"
+              style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 7px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer">
+              <option value="not_started" ${item.status==='not_started'?'selected':''}>Not started</option>
+              <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
+              <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
+            </select>`
+            :`<div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Open action item</div>`}
+            ${[
+              ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
+              ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
+              ['Exp. Hrs',   bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
+              ['Logged',     ah.toFixed(1)+'h'+(bh?' / '+bh+'h':''), usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
+              ['Budget',     bh?usedPct+'% used':'—', effortColor],
+            ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap"><div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'};">${v}</div></div>`).join('')}
+            <div style="width:1px;height:22px;background:rgba(255,255,255,.08);flex-shrink:0"></div>
+            <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log time</span>
+              <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
+                style="width:54px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 5px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">
+                <input id="wi-bill-${item.id}" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable
+              </label>
+            </div>
+          </div>
+
+          <!-- Row 3: Sentiment (left) + % Done slider (right, shrinkable) -->
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Sentiment <span style="color:#E24B4A">*</span></span>
+              <button id="wi-sig-green-${item.id}" title="On track" onclick="wiSetSignal('${item.id}','green')" style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
+              <button id="wi-sig-yellow-${item.id}" title="At risk" onclick="wiSetSignal('${item.id}','yellow')" style="width:16px;height:16px;border-radius:50%;border:2px solid #EF9F27;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
+              <button id="wi-sig-red-${item.id}" title="Blocked / issue" onclick="wiSetSignal('${item.id}','red')" style="width:16px;height:16px;border-radius:50%;border:2px solid #E24B4A;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
+              <input type="hidden" id="wi-sig-active-${item.id}" value=""/>
+              <span id="wi-sig-label-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">— required</span>
+            </div>
+            ${item.type==='task'?`
+            <div style="width:1px;height:20px;background:rgba(255,255,255,.08);flex-shrink:0"></div>
+            <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:80px">
+              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">% Done</span>
+              <input id="wi-pct-${item.id}" type="range" min="0" max="100" step="5" value="${pct}"
+                style="flex:1;accent-color:var(--compass-amber)"
+                oninput="document.getElementById('wi-pct-out-${item.id}').textContent=this.value+'%'"/>
+              <span id="wi-pct-out-${item.id}" style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${barColor};min-width:36px;text-align:right">${pct}%</span>
+            </div>`:``}
+          </div>
+
+          <!-- Row 4: Work Completed textarea -->
+          <div style="flex:1;padding:8px 14px;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden">
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
+            <textarea id="wi-comment-${item.id}" placeholder="Describe what was accomplished this session — required to save…" oninput="wiCheckGate('${item.id}')"
+              style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
+          </div>
         </div>
-        <div style="width:240px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
+
+        <!-- RIGHT column: Chain of Custody — full height from row 2 top -->
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
           <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
           <div style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
         </div>
+
       </div>
 
       <!-- Row 5: Buttons -->
