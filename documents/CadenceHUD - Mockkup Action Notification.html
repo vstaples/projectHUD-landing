@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Compass — Action Item Negotiation Protocol</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Share Tech Mono',monospace;background:#0c1628;color:#F0F6FF;font-size:12px}
+.shell{padding:14px 16px;position:relative}
+.page-label{font-size:11px;letter-spacing:.1em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:14px}
+.two-col{display:grid;grid-template-columns:1fr 380px;gap:16px;margin-bottom:16px}
+@media(max-width:800px){.two-col{grid-template-columns:1fr}}
+.panel{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);margin-bottom:12px;overflow:hidden}
+.ph{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;justify-content:space-between}
+.ph-title{font-size:12px;font-weight:700;color:#F0F6FF}
+.ph-sub{font-size:11px;color:rgba(255,255,255,.35)}
+.status-badge{font-size:11px;padding:2px 9px;border:1px solid;letter-spacing:.06em;white-space:nowrap}
+.sb-unrated{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.4);background:rgba(255,255,255,.04)}
+.sb-pending{border-color:rgba(239,159,39,.4);color:#EF9F27;background:rgba(239,159,39,.07)}
+.sb-negotiating{border-color:rgba(139,92,246,.4);color:#8B5CF6;background:rgba(139,92,246,.07);animation:nblink 2s infinite}
+@keyframes nblink{0%,100%{opacity:1}50%{opacity:.6}}
+.sb-agreed{border-color:rgba(29,158,117,.4);color:#1D9E75;background:rgba(29,158,117,.07)}
+.sb-escalated{border-color:rgba(226,75,74,.4);color:#E24B4A;background:rgba(226,75,74,.07)}
+.ai-detail{padding:11px 13px}
+.ai-desc-label{font-size:11px;letter-spacing:.08em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:4px}
+.ai-desc{font-size:12px;color:rgba(240,246,255,.7);line-height:1.6;padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:2px solid rgba(0,210,255,.3);margin-bottom:10px}
+.ai-meta-row{display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.ai-meta-item{font-size:11px;color:rgba(255,255,255,.35)}
+.ai-meta-val{color:#F0F6FF;font-weight:700;margin-left:3px}
+.thread{margin-bottom:10px}
+.thread-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin-bottom:7px}
+.msg{display:flex;gap:8px;margin-bottom:8px}
+.msg-av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px}
+.msg-body{flex:1;min-width:0}
+.msg-who{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.msg-time{font-size:10px;color:rgba(255,255,255,.2)}
+.msg-bubble{font-size:12px;color:rgba(240,246,255,.8);line-height:1.6;padding:8px 10px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03)}
+.msg-bubble.assigner{border-color:rgba(0,210,255,.18);background:rgba(0,210,255,.04)}
+.msg-bubble.assignee{border-color:rgba(139,92,246,.2);background:rgba(139,92,246,.04)}
+.msg-bubble.system{border-color:rgba(29,158,117,.2);background:rgba(29,158,117,.04);color:rgba(29,158,117,.9);font-size:11px}
+.msg-bubble.counter{border-color:rgba(239,159,39,.2);background:rgba(239,159,39,.04)}
+.loe-block{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+.loe-item{padding:4px 9px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.06);font-size:11px;color:#8B5CF6}
+.loe-comment{padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(240,246,255,.65);line-height:1.5;margin-top:5px}
+.response-clock{display:flex;align-items:center;gap:7px;padding:7px 10px;background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.2);margin-bottom:10px}
+.rc-dot{width:7px;height:7px;border-radius:50%;background:#EF9F27;animation:pulse 1.5s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.rc-text{font-size:11px;color:rgba(239,159,39,.8);flex:1}
+.rc-time{font-size:13px;font-weight:700;color:#EF9F27}
+.action-zone{border-top:1px solid rgba(255,255,255,.06);padding:10px 13px;background:rgba(255,255,255,.01)}
+.az-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin-bottom:7px}
+.az-ta{width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:inherit;font-size:11px;outline:none;resize:none;margin-bottom:7px}
+.az-ta:focus{border-color:rgba(0,210,255,.3)}
+.az-ta.required-glow{border-color:rgba(239,159,39,.5)}
+.az-select{padding:4px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:11px;outline:none;cursor:pointer;border-radius:2px}
+.az-row{display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap;align-items:center}
+.btn{font-family:inherit;font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid;letter-spacing:.07em;background:none;transition:.12s}
+.btn-cyan{border-color:rgba(0,210,255,.4);color:#00D2FF}.btn-cyan:hover{background:rgba(0,210,255,.08)}
+.btn-green{border-color:rgba(29,158,117,.4);color:#1D9E75}.btn-green:hover{background:rgba(29,158,117,.08)}
+.btn-amber{border-color:rgba(239,159,39,.35);color:#EF9F27}.btn-amber:hover{background:rgba(239,159,39,.07)}
+.btn-red{border-color:rgba(226,75,74,.35);color:#E24B4A}.btn-red:hover{background:rgba(226,75,74,.07)}
+.btn-gray{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}.btn-gray:hover{color:#fff}
+.diagram-strip{padding:12px 13px}
+.ds-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin-bottom:8px}
+.timeline-mini{display:flex;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:6px}
+.tm-stub{width:90px;flex-shrink:0;font-size:10px;color:rgba(255,255,255,.2);padding:4px 6px;letter-spacing:.06em;text-transform:uppercase}
+.tm-cols{display:flex;flex:1}
+.tm-col{flex:1;text-align:center;padding:4px 0;border-right:1px solid rgba(255,255,255,.04);font-size:10px;color:rgba(255,255,255,.3)}
+.tm-col.today{color:#00D2FF;border-bottom:2px solid #00D2FF}
+.swimlane-mini{border-bottom:1px solid rgba(0,210,255,.06)}
+.sl-mini-row{display:flex;min-height:70px;position:relative}
+.sl-mini-stub{width:90px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.05);display:flex;align-items:center;padding:0 6px}
+.sl-mini-label{font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.05em;text-transform:uppercase}
+.sl-mini-canvas{flex:1;position:relative;min-height:70px}
+.mini-node{position:absolute;top:7px;cursor:pointer;transition:.12s}
+.mini-node:hover{opacity:.85}
+.mn-inner{border:1px solid;border-radius:3px;padding:4px 7px;min-width:80px;max-width:110px}
+.mn-type{font-size:9px;letter-spacing:.07em;text-transform:uppercase;opacity:.6;margin-bottom:1px}
+.mn-title{font-size:11px;font-weight:700;line-height:1.25;margin-bottom:2px}
+.mn-badge{font-size:9px;padding:1px 5px;border:1px solid;letter-spacing:.04em;display:inline-block}
+.mn-unrated .mn-inner{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.15);border-style:dashed}
+.mn-unrated .mn-title{color:rgba(255,255,255,.5)}
+.mn-pending .mn-inner{background:rgba(239,159,39,.05);border-color:rgba(239,159,39,.3);border-style:dashed}
+.mn-pending .mn-title{color:#F5D080}
+.mn-negotiating .mn-inner{background:rgba(139,92,246,.06);border-color:rgba(139,92,246,.4)}
+.mn-negotiating .mn-title{color:#C4B5F8}
+.mn-agreed .mn-inner{background:rgba(29,158,117,.05);border-color:rgba(29,158,117,.3)}
+.mn-agreed .mn-title{color:#88D4B8}
+.capacity-row{display:flex;margin-bottom:8px}
+.cap-stub{width:90px;flex-shrink:0;display:flex;align-items:center;padding:0 6px}
+.cap-label{font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.05em;text-transform:uppercase}
+.cap-cols{display:flex;flex:1}
+.cap-col{flex:1;padding:3px 4px;border-right:1px solid rgba(255,255,255,.04)}
+.cap-bar{height:6px;border-radius:1px;overflow:hidden;background:rgba(255,255,255,.06);margin-bottom:2px}
+.cap-fill{height:100%;border-radius:1px}
+.cap-num{font-size:10px;text-align:center}
+.legend-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.3)}
+.leg-swatch{width:20px;height:4px;border-radius:1px}
+.leg-dashed{background:repeating-linear-gradient(90deg,rgba(255,255,255,.3) 0,rgba(255,255,255,.3) 3px,transparent 3px,transparent 6px)}
+.state-flow{display:flex;align-items:center;gap:6px;padding:10px 12px;flex-wrap:wrap}
+.sf-state{font-size:11px;padding:4px 10px;border:1px solid;border-radius:20px;white-space:nowrap}
+.sf-arrow{font-size:12px;color:rgba(255,255,255,.25)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1D9E75;color:#fff;padding:8px 18px;font-size:12px;letter-spacing:.05em;z-index:99;white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none;border-radius:2px}
+.toast.show{opacity:1}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+</head>
+<body>
+<div class="shell">
+<div class="page-label">Action item negotiation protocol — all four states</div>
+
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <span style="font-size:11px;color:rgba(255,255,255,.3)">View state:</span>
+  <button class="btn btn-gray" id="btn-unrated" onclick="setState('unrated')">Unrated</button>
+  <button class="btn btn-amber" id="btn-pending" onclick="setState('pending')">Pending agreement</button>
+  <button class="btn" style="border-color:rgba(139,92,246,.4);color:#8B5CF6" id="btn-negotiating" onclick="setState('negotiating')">Under negotiation</button>
+  <button class="btn btn-green" id="btn-agreed" onclick="setState('agreed')">Agreed &#xB7; locked</button>
+</div>
+
+<div class="two-col">
+<div>
+<div class="panel" id="main-panel">
+  <div class="ph">
+    <div>
+      <div class="ph-title">PCB Layout documentation review</div>
+      <div class="ph-sub">Action item &#xB7; Flexscope &#xB7; Assigned to Ron White &#xB7; by VS &#xB7; Mon Mar 24, 2:00 PM</div>
+    </div>
+    <span class="status-badge sb-unrated" id="status-badge">Unrated</span>
+  </div>
+  <div class="ai-detail">
+    <div class="ai-desc-label">Description &amp; instructions</div>
+    <div class="ai-desc">Pull Rev A and Rev B PCB layout drawings. Cross-reference against the Design Review approval checklist (Section 4, items 12&#x2013;18). Write a summary memo confirming Rev B changes are within approved tolerances. Deliver to VS for client submission package.</div>
+    <div class="ai-meta-row">
+      <div class="ai-meta-item">Assigned<span class="ai-meta-val">Mon Mar 24</span></div>
+      <div class="ai-meta-item">Original due<span class="ai-meta-val" id="orig-due">Thu Mar 27</span></div>
+      <div class="ai-meta-item">Project<span class="ai-meta-val">Flexscope</span></div>
+      <div class="ai-meta-item">LOE<span class="ai-meta-val" id="loe-display">Not rated</span></div>
+    </div>
+    <div class="thread" id="thread">
+      <div class="thread-label">Negotiation thread</div>
+      <div class="msg">
+        <div class="msg-av" style="background:rgba(0,210,255,.15);color:#00D2FF">VS</div>
+        <div class="msg-body">
+          <div class="msg-who">Vaughn Staples (assigner)<span class="msg-time">Mon Mar 24, 2:00 PM</span></div>
+          <div class="msg-bubble assigner">PCB documentation review &#x2014; need this done by Thursday Mar 27. Full checklist cross-reference, summary memo for client package.</div>
+        </div>
+      </div>
+      <div class="msg" id="msg-rating" style="display:none">
+        <div class="msg-av" style="background:rgba(139,92,246,.15);color:#8B5CF6">RW</div>
+        <div class="msg-body">
+          <div class="msg-who">Ron White (assignee)<span class="msg-time">Mon Mar 24, 4:15 PM</span></div>
+          <div class="msg-bubble assignee counter">
+            I've reviewed this. Entering my LOE assessment:
+            <div class="loe-block">
+              <div class="loe-item">LOE: 2 days</div>
+              <div class="loe-item">Proposed due: Fri Mar 28, COB</div>
+            </div>
+            <div class="loe-comment">This requires pulling both Rev A and Rev B drawing sets from the archive, cross-referencing all 7 items in checklist section 4, and drafting the summary memo with supporting citations. Minimum 2 full working days. I'm off Wednesday and currently have Design Review Signoff and the timesheet task active. Thursday is not achievable. COB Friday is my realistic commitment.</div>
+          </div>
+        </div>
+      </div>
+      <div class="msg" id="msg-counter" style="display:none">
+        <div class="msg-av" style="background:rgba(0,210,255,.15);color:#00D2FF">VS</div>
+        <div class="msg-body">
+          <div class="msg-who">Vaughn Staples (assigner)<span class="msg-time">Mon Mar 24, 5:02 PM</span></div>
+          <div class="msg-bubble assigner">Friday is tight &#x2014; we have a client call Monday. Can you start this first thing Tuesday and push the timesheet to next week? That gets you the full day Tuesday + Thursday = 2 days.</div>
+        </div>
+      </div>
+      <div class="msg" id="msg-response2" style="display:none">
+        <div class="msg-av" style="background:rgba(139,92,246,.15);color:#8B5CF6">RW</div>
+        <div class="msg-body">
+          <div class="msg-who">Ron White (assignee)<span class="msg-time">Mon Mar 24, 5:18 PM</span></div>
+          <div class="msg-bubble assignee">That works &#x2014; Tuesday full day + Thursday. COB Thursday Mar 27 is confirmed if timesheet moves to next week. Agreed on that condition.</div>
+        </div>
+      </div>
+      <div class="msg" id="msg-agreed" style="display:none">
+        <div class="msg-av" style="background:rgba(29,158,117,.15);color:#1D9E75;font-size:11px">&#10003;</div>
+        <div class="msg-body">
+          <div class="msg-who" style="color:rgba(29,158,117,.7)">System &#xB7; CoC event written<span class="msg-time">Mon Mar 24, 5:20 PM</span></div>
+          <div class="msg-bubble system">Agreement reached. Due date updated: Thu Mar 27, COB. LOE confirmed: 2 days. Timesheet task rescheduled to next week. All parties notified. Thread locked &#x2014; immutable from this point.</div>
+        </div>
+      </div>
+    </div>
+    <div class="response-clock" id="response-clock" style="display:none">
+      <div class="rc-dot"></div>
+      <span class="rc-text" id="clock-label">Assigner response window</span>
+      <span class="rc-time" id="clock-time">21h 44m</span>
+    </div>
+    <div class="action-zone" id="action-zone">
+      <div class="az-label" id="az-label">Rate this action item</div>
+      <div id="az-content"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="ph"><div class="ph-title">Status flow</div></div>
+  <div class="state-flow">
+    <span class="sf-state sb-unrated">Unrated</span><span class="sf-arrow">&#8594;</span>
+    <span class="sf-state sb-pending">Pending agreement</span><span class="sf-arrow">&#8594;</span>
+    <span class="sf-state sb-negotiating">Under negotiation</span><span class="sf-arrow">&#8594;</span>
+    <span class="sf-state sb-agreed">Agreed &#xB7; locked</span>
+  </div>
+  <div style="padding:8px 12px;font-size:11px;color:rgba(255,255,255,.35);line-height:1.6;border-top:1px solid rgba(255,255,255,.06)">
+    <div style="margin-bottom:4px"><span style="color:#EF9F27">Pending:</span> Assignee rated LOE + mandatory comment. Assigner has 24h to respond before auto-accept.</div>
+    <div style="margin-bottom:4px"><span style="color:#8B5CF6">Negotiating:</span> Assigner countered. Assignee has 24h to respond.</div>
+    <div><span style="color:#1D9E75">Agreed:</span> Thread locked. CoC event written. Due date and LOE are immutable. Renegotiation requires new concern.</div>
+  </div>
+</div>
+</div>
+
+<div>
+<div class="panel">
+  <div class="ph"><div class="ph-title">Diagram &#x2014; action item in timeline</div><div class="ph-sub">placed at assignment date</div></div>
+  <div class="diagram-strip">
+    <div class="ds-label">Capacity + work window</div>
+    <div class="timeline-mini">
+      <div class="tm-stub">Lane</div>
+      <div class="tm-cols">
+        <div class="tm-col today">Mon 24</div>
+        <div class="tm-col">Tue 25</div>
+        <div class="tm-col">Wed 26</div>
+        <div class="tm-col">Thu 27</div>
+        <div class="tm-col">Fri 28</div>
+      </div>
+    </div>
+    <div class="capacity-row">
+      <div class="cap-stub"><span class="cap-label">Capacity</span></div>
+      <div class="cap-cols">
+        <div class="cap-col"><div class="cap-bar"><div class="cap-fill" style="width:100%;background:#E24B4A"></div></div><div class="cap-num" style="color:#E24B4A">8/8h</div></div>
+        <div class="cap-col"><div class="cap-bar"><div class="cap-fill" style="width:25%;background:#1D9E75"></div></div><div class="cap-num" style="color:#1D9E75">2/8h</div></div>
+        <div class="cap-col"><div class="cap-bar"><div class="cap-fill" style="width:0%"></div></div><div class="cap-num" style="color:rgba(255,255,255,.3)">Off</div></div>
+        <div class="cap-col"><div class="cap-bar"><div class="cap-fill" style="width:50%;background:#EF9F27"></div></div><div class="cap-num" style="color:#EF9F27">4/8h</div></div>
+        <div class="cap-col"><div class="cap-bar"><div class="cap-fill" style="width:25%;background:#1D9E75"></div></div><div class="cap-num" style="color:#1D9E75">2/8h</div></div>
+      </div>
+    </div>
+    <div class="swimlane-mini">
+      <div class="sl-mini-row" style="min-height:70px">
+        <div class="sl-mini-stub"><div class="sl-mini-label">Flexscope tasks</div></div>
+        <div class="sl-mini-canvas" id="diagram-canvas" style="position:relative;min-height:70px">
+          <svg id="conn-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2"></svg>
+        </div>
+      </div>
+    </div>
+    <div class="legend-row">
+      <div class="leg"><div class="leg-swatch leg-dashed"></div>Unrated / pending</div>
+      <div class="leg"><div class="leg-swatch" style="background:rgba(139,92,246,.5)"></div>Under negotiation</div>
+      <div class="leg"><div class="leg-swatch" style="background:#1D9E75"></div>Agreed &#xB7; locked</div>
+      <div class="leg"><div class="leg-swatch" style="background:rgba(226,75,74,.5)"></div>Conflict</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="ph"><div class="ph-title">Capacity impact &#x2014; rated vs unrated</div></div>
+  <div style="padding:10px 12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);padding:9px 10px">
+        <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:3px;letter-spacing:.06em;text-transform:uppercase">Unrated</div>
+        <div style="font-size:16px;font-weight:700;color:rgba(255,255,255,.3)">Not counted</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.25);margin-top:2px;line-height:1.5">No LOE = no load. Cannot claim overload for unassessed work.</div>
+      </div>
+      <div style="background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.2);padding:9px 10px" id="rated-card">
+        <div style="font-size:11px;color:rgba(139,92,246,.6);margin-bottom:3px;letter-spacing:.06em;text-transform:uppercase">Rated</div>
+        <div style="font-size:16px;font-weight:700;color:#8B5CF6" id="rated-val">&#x2014;</div>
+        <div style="font-size:11px;color:rgba(139,92,246,.5);margin-top:2px;line-height:1.5" id="rated-sub">Rate this item to see capacity impact.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+</div>
+
+<script>
+const STATES={
+  unrated:{badge:'sb-unrated',badgeText:'Unrated',msgs:[],clock:false,azLabel:'Rate this action item',
+    azContent:`<div class="az-row"><span style="font-size:11px;color:rgba(255,255,255,.35)">My LOE estimate:</span><select class="az-select" id="loe-select"><option value="">Select...</option><option value="4h">4 hours</option><option value="1d">1 day</option><option value="2d">2 days</option><option value="3d">3 days</option><option value="4d">4 days</option></select><span style="font-size:11px;color:rgba(255,255,255,.35)">Proposed due:</span><select class="az-select" id="due-select"><option value="">Select...</option><option value="Tue Mar 25">Tue Mar 25</option><option value="Thu Mar 27">Thu Mar 27 (original)</option><option value="Fri Mar 28">Fri Mar 28</option><option value="Mon Mar 31">Mon Mar 31</option></select></div><textarea class="az-ta required-glow" id="loe-comment" rows="3" placeholder="Required: explain your LOE — what does this involve, why will it take this long, what constraints apply?"></textarea><div style="font-size:11px;color:rgba(255,255,255,.25);margin-bottom:7px">Comment is required. Your assessment becomes part of the permanent CoC record.</div><div class="az-row"><button class="btn btn-cyan" onclick="submitRating()">Submit rating &#8594;</button><span style="font-size:11px;color:rgba(255,255,255,.2);margin-left:4px">Assigner will be notified</span></div>`,
+    diagramState:'unrated',loeDisplay:'Not rated'},
+  pending:{badge:'sb-pending',badgeText:'Pending agreement',msgs:['msg-rating'],clock:true,clockTime:'21h 44m',clockLabel:'Assigner response window &#x2014; auto-accepted if no response',
+    azLabel:'Waiting for assigner response',
+    azContent:`<div style="font-size:11px;color:rgba(255,255,255,.35);line-height:1.6;margin-bottom:7px">Your LOE rating has been sent. Vaughn Staples has <span style="color:#EF9F27;font-weight:700">21h 44m</span> to respond before your proposed date (Fri Mar 28) is auto-accepted.</div><div class="az-row"><button class="btn btn-red" onclick="setState('escalated')">Escalate to PM &#8594;</button><button class="btn btn-gray" onclick="toast('Rating updated. Assigner notified of revision.')">Revise my rating</button></div>`,
+    diagramState:'pending',loeDisplay:'2 days (pending)'},
+  negotiating:{badge:'sb-negotiating',badgeText:'Under negotiation',msgs:['msg-rating','msg-counter'],clock:true,clockTime:'18h 58m',clockLabel:'Assignee response window',
+    azLabel:'Assigner has countered &#x2014; your response',
+    azContent:`<div style="font-size:11px;color:rgba(139,92,246,.8);line-height:1.6;padding:6px 9px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.18);border-left:2px solid #8B5CF6;margin-bottom:8px">Vaughn countered: start Tuesday, push timesheet to next week &#x2014; COB Thursday achievable?</div><textarea class="az-ta" rows="2" placeholder="Your response &#x2014; accept, counter, or explain further..."></textarea><div class="az-row"><button class="btn btn-green" onclick="acceptCounter()">Accept counter &#x2014; COB Thu Mar 27 &#x2713;</button></div><div class="az-row" style="margin-top:5px"><button class="btn btn-amber" onclick="toast('Counter submitted. Vaughn has 24h to respond.')">Submit new counter</button><button class="btn btn-red" onclick="setState('escalated')">Escalate to PM</button></div>`,
+    diagramState:'negotiating',loeDisplay:'2 days (negotiating)'},
+  agreed:{badge:'sb-agreed',badgeText:'Agreed &#xB7; locked',msgs:['msg-rating','msg-counter','msg-response2','msg-agreed'],clock:false,
+    azLabel:'Agreement locked &#x2014; immutable',
+    azContent:`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div style="padding:6px 10px;background:rgba(29,158,117,.07);border:1px solid rgba(29,158,117,.25);font-size:11px;color:#1D9E75">LOE: 2 days</div><div style="padding:6px 10px;background:rgba(29,158,117,.07);border:1px solid rgba(29,158,117,.25);font-size:11px;color:#1D9E75">Due: Thu Mar 27, COB</div><div style="padding:6px 10px;background:rgba(29,158,117,.07);border:1px solid rgba(29,158,117,.25);font-size:11px;color:#1D9E75">Agreed: Mar 24, 5:20 PM</div></div><div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px;line-height:1.55">Thread permanently locked. CoC record immutable. To renegotiate, raise a new concern.</div><div class="az-row"><button class="btn btn-cyan" onclick="toast('Starting work. CoC event: In Progress.')">Start work &#8594;</button><button class="btn btn-gray" onclick="toast('New renegotiation concern opened.')">Raise renegotiation concern</button></div>`,
+    diagramState:'agreed',loeDisplay:'2 days &#xB7; Thu Mar 27'},
+  escalated:{badge:'sb-escalated',badgeText:'Escalated to PM',msgs:['msg-rating'],clock:false,
+    azLabel:'Escalated &#x2014; PM decision pending',
+    azContent:`<div style="font-size:11px;color:rgba(226,75,74,.7);padding:7px 10px;background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);border-left:2px solid #E24B4A;margin-bottom:8px;line-height:1.55">Escalated to Vaughn Staples (PM). Full thread forwarded. PM has 24h to issue a binding decision. Their decision locks the due date and LOE.</div><div class="az-row"><button class="btn btn-gray" onclick="toast('Message added to escalation thread.')">Add context for PM</button></div>`,
+    diagramState:'negotiating',loeDisplay:'2 days (escalated)'}
+};
+
+function setState(s){
+  if(!STATES[s])return;
+  const state=STATES[s];
+  const badge=document.getElementById('status-badge');
+  badge.className='status-badge '+state.badge;
+  badge.innerHTML=state.badgeText;
+  document.getElementById('loe-display').innerHTML=state.loeDisplay;
+  document.getElementById('orig-due').textContent=s==='agreed'?'Thu Mar 27 (agreed)':'Thu Mar 27 (original)';
+  ['msg-rating','msg-counter','msg-response2','msg-agreed'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display=state.msgs.includes(id)?'flex':'none';
+  });
+  const clock=document.getElementById('response-clock');
+  clock.style.display=state.clock?'flex':'none';
+  if(state.clock){
+    document.getElementById('clock-time').textContent=state.clockTime;
+    document.getElementById('clock-label').innerHTML=state.clockLabel;
+  }
+  document.getElementById('az-label').innerHTML=state.azLabel;
+  document.getElementById('az-content').innerHTML=state.azContent;
+  const rv=document.getElementById('rated-val');
+  const rs=document.getElementById('rated-sub');
+  const rc=document.getElementById('rated-card');
+  rv.textContent=s==='unrated'?'—':s==='agreed'?'2 days · locked':'2 days (pending)';
+  rs.textContent=s==='unrated'?'Rate this item to see capacity impact.':s==='agreed'?'Loads Tue+Thu · 8h total · fits capacity.':'Proposed 2 days. Loading Tue+Thu columns.';
+  rc.style.background=s==='agreed'?'rgba(29,158,117,.05)':s==='unrated'?'rgba(139,92,246,.05)':'rgba(239,159,39,.05)';
+  rc.style.borderColor=s==='agreed'?'rgba(29,158,117,.2)':s==='unrated'?'rgba(139,92,246,.2)':'rgba(239,159,39,.2)';
+  rv.style.color=s==='agreed'?'#1D9E75':s==='unrated'?'#8B5CF6':'#EF9F27';
+  renderDiagram(state.diagramState,s);
+  document.querySelectorAll('[id^="btn-"]').forEach(b=>b.style.opacity='0.6');
+  const active=document.getElementById('btn-'+s);
+  if(active) active.style.opacity='1';
+}
+
+function submitRating(){
+  const loe=document.getElementById('loe-select')?.value;
+  const due=document.getElementById('due-select')?.value;
+  const comment=document.getElementById('loe-comment')?.value?.trim();
+  if(!loe||!due){showToast('Please select LOE and proposed due date.');return;}
+  if(!comment||comment.length<20){showToast('Comment required — explain your LOE in detail.');document.getElementById('loe-comment').style.borderColor='#E24B4A';return;}
+  showToast('Rating submitted. Assigner notified. 24h response window started.');
+  setTimeout(()=>setState('pending'),600);
+}
+
+function acceptCounter(){
+  showToast('Counter accepted. Agreement locked. CoC event written.');
+  setTimeout(()=>setState('agreed'),600);
+}
+
+function renderDiagram(diagState,fullState){
+  const canvas=document.getElementById('diagram-canvas');
+  const svg=document.getElementById('conn-svg');
+  document.querySelectorAll('.mini-node').forEach(n=>n.remove());
+  svg.innerHTML='';
+  const colW=canvas.offsetWidth/5||60;
+  if(diagState==='unrated'){
+    placeNode(canvas,'mn-unrated',0,colW,'PCB doc review','Rate LOE','rgba(255,255,255,.2)','rgba(255,255,255,.4)',3,true,'rgba(255,255,255,.15)',svg,false);
+  } else if(diagState==='pending'){
+    placeNode(canvas,'mn-pending',0,colW,'PCB doc review','Pending','rgba(239,159,39,.25)','#EF9F27',4,true,'rgba(239,159,39,.4)',svg,false);
+  } else if(diagState==='negotiating'){
+    placeNode(canvas,'mn-negotiating',0,colW,'PCB doc review','Negotiating','rgba(139,92,246,.25)','#8B5CF6',3,true,'rgba(139,92,246,.5)',svg,true);
+  } else if(diagState==='agreed'){
+    placeNode(canvas,'mn-agreed',0,colW,'PCB doc review','Agreed · Thu 27','rgba(29,158,117,.25)','#1D9E75',3,false,'#1D9E75',svg,false);
+    [1,3].forEach((col,i)=>{
+      const wb=document.createElement('div');
+      wb.style.cssText=`position:absolute;left:${col*colW+4}px;top:8px;width:${colW-8}px;height:40px;background:rgba(29,158,117,.15);border:1px dashed rgba(29,158,117,.3);display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(29,158,117,.7);z-index:1`;
+      wb.textContent='Day '+(i+1);
+      canvas.appendChild(wb);
+    });
+  }
+}
+
+function placeNode(canvas,cls,col,colW,title,badgeText,badgeColor,badgeTextColor,dueCol,dash,lineColor,svg,conflict){
+  const el=document.createElement('div');
+  el.className='mini-node '+cls;
+  el.style.cssText=`left:${col*colW+3}px;top:7px`;
+  el.innerHTML=`<div class="mn-inner"><div class="mn-type">action item</div><div class="mn-title">${title}</div><div class="mn-badge" style="border-color:${badgeColor};color:${badgeTextColor}">${badgeText}</div></div>`;
+  el.onclick=()=>showToast('Opening action item detail...');
+  canvas.appendChild(el);
+  setTimeout(()=>{
+    const cr=canvas.getBoundingClientRect();
+    const er=el.getBoundingClientRect();
+    const fx=er.right-cr.left;
+    const fy=er.top+er.height/2-cr.top;
+    const dx=dueCol*colW+colW/2;
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',fx);line.setAttribute('y1',fy);line.setAttribute('x2',dx);line.setAttribute('y2',fy);
+    line.setAttribute('stroke',lineColor);line.setAttribute('stroke-width','1.5');
+    if(dash) line.setAttribute('stroke-dasharray','4,3');
+    svg.appendChild(line);
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',dx);dot.setAttribute('cy',fy);dot.setAttribute('r','4');dot.setAttribute('fill',lineColor);
+    svg.appendChild(dot);
+    const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x',dx);lbl.setAttribute('y',fy-8);lbl.setAttribute('text-anchor','middle');
+    lbl.setAttribute('font-size','9');lbl.setAttribute('fill',lineColor);lbl.setAttribute('font-family','Share Tech Mono,monospace');
+    lbl.textContent='due';svg.appendChild(lbl);
+    if(conflict){
+      const cx=dueCol*colW+colW/2;
+      const tri=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      tri.setAttribute('points',`${cx},${fy-16} ${cx-8},${fy} ${cx+8},${fy}`);
+      tri.setAttribute('fill','rgba(226,75,74,.7)');svg.appendChild(tri);
+      const cl=document.createElementNS('http://www.w3.org/2000/svg','text');
+      cl.setAttribute('x',cx);cl.setAttribute('y',fy+13);cl.setAttribute('text-anchor','middle');
+      cl.setAttribute('font-size','9');cl.setAttribute('fill','#E24B4A');cl.setAttribute('font-family','Share Tech Mono,monospace');
+      cl.textContent='conflict';svg.appendChild(cl);
+    }
+  },80);
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2400);
+}
+function toast(msg){showToast(msg);}
+
+setState('unrated');
+</script>
+</body>
+</html>

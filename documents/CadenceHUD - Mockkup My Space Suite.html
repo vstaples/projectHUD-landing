@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Compass — My Space Suite Mockup</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Share Tech Mono',monospace;background:#0c1628;color:#F0F6FF;font-size:12px}
+.shell{display:flex;flex-direction:column;min-height:100vh}
+.top-nav{display:flex;align-items:center;height:42px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.12);padding:0 16px;gap:0;flex-shrink:0}
+.nav-logo{font-size:13px;font-weight:700;letter-spacing:.12em;margin-right:10px}.nav-logo span{color:#00D2FF}
+.nav-sep{width:1px;height:16px;background:rgba(0,210,255,.15);margin:0 8px}
+.nav-tab{padding:0 10px;height:42px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase;transition:.12s}
+.nav-tab.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.av{width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.15);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#00D2FF}
+.since-strip{padding:8px 16px;background:rgba(0,210,255,.04);border-bottom:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ss-label{font-size:11px;color:rgba(0,210,255,.6);letter-spacing:.07em;text-transform:uppercase;flex-shrink:0}
+.ss-items{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.ss-chip{font-size:11px;padding:2px 9px;border:1px solid;cursor:pointer;transition:.12s}
+.ss-chip:hover{background:rgba(0,210,255,.06)}
+.ss-red{border-color:rgba(226,75,74,.3);color:#E24B4A}
+.ss-amber{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.ss-green{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.ss-cyan{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.suite-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.07);padding:0 16px;background:rgba(255,255,255,.01);flex-shrink:0;overflow-x:auto}
+.st{padding:8px 14px;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.35);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;text-transform:uppercase;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.st.active{color:#00D2FF;border-bottom-color:#00D2FF}
+.st-badge{font-size:10px;padding:1px 5px;border-radius:2px}
+.stb-red{background:rgba(226,75,74,.15);color:#E24B4A}
+.stb-amber{background:rgba(239,159,39,.12);color:#EF9F27}
+.stb-cyan{background:rgba(0,210,255,.1);color:#00D2FF}
+.body{flex:1;overflow-y:auto}
+.tab-pane{display:none;padding:14px 16px}
+.tab-pane.active{display:block}
+.section-lbl{font-size:11px;letter-spacing:.1em;color:rgba(0,210,255,.5);text-transform:uppercase;margin:12px 0 7px}
+.section-lbl:first-child{margin-top:0}
+.cat-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin:10px 0 6px;display:flex;align-items:center;gap:6px}
+.cat-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
+.wf-catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-bottom:14px}
+.wf-card{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);padding:11px 13px;cursor:pointer;transition:.12s;position:relative;padding-bottom:38px}
+.wf-card:hover{border-color:rgba(0,210,255,.25);background:rgba(0,210,255,.03)}
+.wf-card-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+.wf-icon{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.wf-card-title{font-size:12px;font-weight:700;color:#F0F6FF;line-height:1.3;flex:1}
+.wf-card-desc{font-size:11px;color:rgba(255,255,255,.45);line-height:1.55;margin-bottom:7px}
+.wf-card-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:rgba(255,255,255,.3)}
+.wf-card-submit{position:absolute;right:10px;bottom:10px;font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;font-family:inherit;letter-spacing:.06em;transition:.12s}
+.wf-card-submit:hover{background:rgba(0,210,255,.15)}
+.wf-card.new-badge::before{content:'New';position:absolute;top:8px;right:8px;font-size:9px;padding:1px 6px;background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.3);color:#1D9E75;letter-spacing:.08em}
+.active-req{border:1px solid rgba(255,255,255,.08);margin-bottom:8px;overflow:hidden}
+.ar-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:.12s}
+.ar-head:hover{background:rgba(255,255,255,.02)}
+.ar-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ar-title{font-size:12px;font-weight:700;color:#F0F6FF;flex:1}
+.ar-badge{font-size:11px;padding:2px 8px;border:1px solid;letter-spacing:.05em;flex-shrink:0}
+.arb-progress{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.arb-waiting{border-color:rgba(239,159,39,.3);color:#EF9F27}
+.arb-approved{border-color:rgba(29,158,117,.3);color:#1D9E75}
+.ar-meta{font-size:11px;color:rgba(255,255,255,.3)}
+.ar-body{padding:9px 13px;display:none}
+.ar-body.open{display:block}
+.progress-track{margin-bottom:10px}
+.pt-label{font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px}
+.pt-steps{display:flex;gap:0;position:relative}
+.pt-steps::before{content:'';position:absolute;top:9px;left:0;right:0;height:1px;background:rgba(255,255,255,.08);z-index:0}
+.pt-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative;z-index:1}
+.pt-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.ptd-done{background:#1D9E75;color:#fff}
+.ptd-active{background:#00D2FF;color:#060a10;animation:activePulse 1.5s infinite}
+@keyframes activePulse{0%,100%{opacity:1}50%{opacity:.6}}
+.ptd-pending{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)}
+.pt-name{font-size:10px;color:rgba(255,255,255,.35);text-align:center;letter-spacing:.04em;line-height:1.3;max-width:60px}
+.pt-name.active{color:#00D2FF}.pt-name.done{color:#1D9E75}
+.ar-coc{font-size:11px;padding:6px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.35);color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px}
+.ar-actions{display:flex;gap:5px;flex-wrap:wrap}
+.btn{font-family:inherit;font-size:11px;padding:4px 12px;cursor:pointer;border:1px solid;letter-spacing:.07em;background:none;transition:.12s}
+.btn-cyan{border-color:rgba(0,210,255,.35);color:#00D2FF}.btn-cyan:hover{background:rgba(0,210,255,.08)}
+.btn-red{border-color:rgba(226,75,74,.3);color:#E24B4A}.btn-red:hover{background:rgba(226,75,74,.07)}
+.btn-gray{border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}.btn-gray:hover{color:#fff}
+.hist-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;cursor:pointer;transition:.12s}
+.hist-row:hover{background:rgba(255,255,255,.02)}
+.hist-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.hist-title{flex:1;color:#F0F6FF}
+.hist-meta{color:rgba(255,255,255,.3)}
+.hist-outcome{font-size:11px;padding:1px 7px;border:1px solid}
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-wrap.show{display:flex}
+.modal{background:#111827;border:1px solid rgba(0,210,255,.25);width:480px;max-height:85vh;overflow-y:auto;border-radius:4px}
+.modal-head{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:#111827;z-index:2}
+.modal-title{font-size:13px;font-weight:700;color:#F0F6FF;flex:1}
+.modal-close{background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:inherit;font-size:11px;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:14px}
+.form-row{margin-bottom:10px}
+.form-label{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
+.form-label.required::after{content:' *';color:#E24B4A}
+.form-input{width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:12px;outline:none;border-radius:2px}
+.form-ta{width:100%;padding:7px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:12px;outline:none;resize:none;border-radius:2px}
+.form-select{width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:inherit;font-size:12px;outline:none;border-radius:2px;cursor:pointer}
+.prefill-note{font-size:11px;color:rgba(0,210,255,.5);padding:5px 8px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);margin-bottom:10px;line-height:1.5}
+.wf-steps-preview{margin-bottom:10px}
+.wsp-label{font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase}
+.wsp-flow{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.wsp-step{font-size:11px;padding:3px 9px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);background:rgba(255,255,255,.02)}
+.wsp-arrow{font-size:11px;color:rgba(255,255,255,.2)}
+.modal-footer{padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end;position:sticky;bottom:0;background:#111827}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1D9E75;color:#fff;padding:9px 20px;font-size:12px;font-family:inherit;letter-spacing:.05em;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999;white-space:nowrap;border-radius:2px}
+.toast.show{opacity:1}
+.cal-grid-wrap{overflow-x:auto;margin-bottom:12px}
+.cal-grid{display:grid;grid-template-columns:60px repeat(7,1fr);min-width:500px}
+.cal-day-header{text-align:center;padding:5px 0;font-size:11px;color:rgba(255,255,255,.35);border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:.06em}
+.cal-day-header.today{color:#00D2FF}
+.cal-time-label{font-size:10px;color:rgba(255,255,255,.2);padding:0 6px;text-align:right;line-height:28px;border-right:1px solid rgba(255,255,255,.06)}
+.cal-cell{height:28px;border-right:1px solid rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.03);position:relative;cursor:pointer;transition:.12s}
+.cal-cell:hover{background:rgba(0,210,255,.04)}
+.cal-event{position:absolute;left:2px;right:2px;top:2px;bottom:2px;border-radius:2px;padding:1px 4px;font-size:10px;overflow:hidden;white-space:nowrap;display:flex;align-items:center}
+.ce-meeting{background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);color:#C4B5F8}
+.ce-task{background:rgba(239,159,39,.15);border:1px solid rgba(239,159,39,.3);color:#F5D080}
+.ce-focus{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);color:#7DD8F0}
+.ce-pto{background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.25);color:#F0A0A0}
+.cal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.cl-item{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.35)}
+.cl-dot{width:10px;height:10px;border-radius:1px;flex-shrink:0}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+</head>
+<body>
+<div class="shell">
+<div class="top-nav">
+  <div class="nav-logo">COM<span>PASS</span></div>
+  <div class="nav-sep"></div>
+  <button class="nav-tab">Brief</button>
+  <button class="nav-tab active">My Space</button>
+  <button class="nav-tab">PM View</button>
+  <button class="nav-tab">Management</button>
+  <div class="nav-right"><div class="live-dot"></div><div class="av">RW</div></div>
+</div>
+
+<div class="since-strip">
+  <span class="ss-label">Since last login</span>
+  <div class="ss-items">
+    <span class="ss-chip ss-red" onclick="toast('Opening PCB Rev B task...')">2 new action items assigned</span>
+    <span class="ss-chip ss-amber" onclick="toast('Opening overdue task...')">1 task now overdue — was due Friday</span>
+    <span class="ss-chip ss-green" onclick="toast('Design Review block resolved...')">Design Review block resolved</span>
+    <span class="ss-chip ss-cyan" onclick="openModal('ptoRequest')">PTO request approved — Mar 31–Apr 1</span>
+  </div>
+</div>
+
+<div class="suite-tabs">
+  <button class="st active" onclick="showTab('work',this)">My Work <span class="st-badge stb-red">3 overdue</span></button>
+  <button class="st" onclick="showTab('time',this)">My Time <span class="st-badge stb-amber">Due today</span></button>
+  <button class="st" onclick="showTab('calendar',this)">My Calendar</button>
+  <button class="st" onclick="showTab('meetings',this)">My Meetings <span class="st-badge stb-cyan">2 today</span></button>
+  <button class="st" onclick="showTab('concerns',this)">My Concerns <span class="st-badge stb-red">1 unread</span></button>
+  <button class="st" onclick="showTab('requests',this)">My Requests <span class="st-badge stb-amber">2 active</span></button>
+</div>
+
+<div class="body">
+
+<div class="tab-pane active" id="tab-work">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:9px 11px"><div style="font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Overdue</div><div style="font-size:22px;font-weight:700;color:#E24B4A">3</div><div style="font-size:11px;color:rgba(255,255,255,.25)">23h total</div></div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:9px 11px"><div style="font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Due today</div><div style="font-size:22px;font-weight:700;color:#EF9F27">4</div><div style="font-size:11px;color:rgba(255,255,255,.25)">Incl. 2 unrated</div></div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:9px 11px"><div style="font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Hours logged</div><div style="font-size:22px;font-weight:700;color:#00D2FF">4.0h</div><div style="font-size:11px;color:rgba(255,255,255,.25)">of 8h target</div></div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:9px 11px"><div style="font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Blocking</div><div style="font-size:22px;font-weight:700;color:#8B5CF6">2</div><div style="font-size:11px;color:rgba(255,255,255,.25)">People waiting</div></div>
+  </div>
+  <div style="background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15);border-left:3px solid #00D2FF;padding:9px 12px;margin-bottom:12px">
+    <div style="font-size:11px;color:rgba(0,210,255,.7);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Recommended sequence for today</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:12px;color:rgba(240,246,255,.8)"><span style="color:#00D2FF;font-weight:700;margin-right:6px">1.</span>PCB documentation review — blocks Alan Smith + VS downstream</div>
+      <div style="font-size:12px;color:rgba(240,246,255,.8)"><span style="color:#00D2FF;font-weight:700;margin-right:6px">2.</span>Section 4.2 sign-off — Sandra waiting, ~15 min</div>
+      <div style="font-size:12px;color:rgba(240,246,255,.8)"><span style="color:#00D2FF;font-weight:700;margin-right:6px">3.</span>Rate 2 unrated action items — required before capacity can be assessed</div>
+      <div style="font-size:12px;color:rgba(240,246,255,.8)"><span style="color:#EF9F27;font-weight:700;margin-right:6px">4.</span>Submit timesheet — do before 3pm nudge fires</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,.25);text-align:center;padding:20px">Work list, diagram mode, Done Today panel — see compass.html My Work implementation.</div>
+</div>
+
+<div class="tab-pane" id="tab-time">
+  <div style="font-size:11px;color:rgba(255,255,255,.25);text-align:center;padding:40px">My Time — weekly timesheet grid with inline editing, day accordion, and submit flow.</div>
+</div>
+
+<div class="tab-pane" id="tab-calendar">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:13px;font-weight:700;color:#F0F6FF">March 2026</div>
+    <div style="display:flex;gap:5px;align-items:center">
+      <button class="btn btn-gray" style="padding:3px 9px">&#8249;</button>
+      <span style="font-size:11px;color:rgba(0,210,255,.7);padding:3px 9px;border:1px solid rgba(0,210,255,.2);cursor:pointer">Today</span>
+      <button class="btn btn-gray" style="padding:3px 9px">&#8250;</button>
+      <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px"></div>
+      <button class="btn btn-cyan" style="padding:3px 10px" onclick="openModal('addBlock')">+ Block time</button>
+      <button class="btn btn-gray" style="padding:3px 10px" onclick="openModal('ptoRequest')">+ PTO</button>
+    </div>
+  </div>
+  <div class="cal-legend">
+    <div class="cl-item"><div class="cl-dot" style="background:rgba(139,92,246,.5)"></div>Meeting</div>
+    <div class="cl-item"><div class="cl-dot" style="background:rgba(0,210,255,.5)"></div>Focus block</div>
+    <div class="cl-item"><div class="cl-dot" style="background:rgba(239,159,39,.5)"></div>Task due</div>
+    <div class="cl-item"><div class="cl-dot" style="background:rgba(226,75,74,.5)"></div>PTO / out</div>
+  </div>
+  <div class="cal-grid-wrap">
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,.2);padding:6px 0">Click any hour block to add a focus block, meeting, or mark as unavailable. PTO blocks propagate to assignment constraints automatically on approval.</div>
+</div>
+
+<div class="tab-pane" id="tab-meetings">
+  <div style="font-size:11px;color:rgba(255,255,255,.25);text-align:center;padding:40px">My Meetings — owned + invited, filter by type, CoC-linked outcomes. See session mockup.</div>
+</div>
+
+<div class="tab-pane" id="tab-concerns">
+  <div style="font-size:11px;color:rgba(255,255,255,.25);text-align:center;padding:40px">My Concerns — status taxonomy, full CoC thread per concern, escalation selector. See session mockup.</div>
+</div>
+
+<div class="tab-pane" id="tab-requests">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div style="font-size:11px;color:rgba(0,210,255,.7)">Browse · Active · History</div>
+    <div style="margin-left:auto;font-size:11px;color:rgba(255,255,255,.25)">Powered by CadenceHUD workflow engine</div>
+  </div>
+
+  <div class="section-lbl">Active requests</div>
+  <div class="active-req">
+    <div class="ar-head" onclick="toggleReq('req1')">
+      <div class="ar-status" style="background:#1D9E75"></div>
+      <div class="ar-title">PTO request — Mar 31–Apr 1 (2 days)</div>
+      <span class="ar-badge arb-approved">Approved</span>
+      <div class="ar-meta">Submitted Mar 24 · PTO Request workflow</div>
+    </div>
+    <div class="ar-body" id="req1">
+      <div class="progress-track">
+        <div class="pt-label">Workflow progress</div>
+        <div class="pt-steps">
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">Submitted</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">PM review</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">Approved</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">Cal blocked</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">Team notified</div></div>
+        </div>
+      </div>
+      <div class="ar-coc">Approved by VS (PM) — Mar 24, 10:15 AM. Calendar blocked. Assignment constraints active for Mar 31–Apr 1. Team notified. CoC event written.</div>
+      <div class="ar-actions">
+        <button class="btn btn-gray" onclick="toast('Cancellation request opening...')">Request cancellation</button>
+        <button class="btn btn-cyan" onclick="toast('Navigating to My Calendar — Mar 31 highlighted.')">View in My Calendar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="active-req">
+    <div class="ar-head" onclick="toggleReq('req2')">
+      <div class="ar-status" style="background:#EF9F27;animation:activePulse 1.5s infinite"></div>
+      <div class="ar-title">Resource allocation change — Robert Chen to 60% NovaBio</div>
+      <span class="ar-badge arb-waiting">Awaiting management</span>
+      <div class="ar-meta">Submitted Mar 24 · Resource Request workflow · 18h elapsed</div>
+    </div>
+    <div class="ar-body open" id="req2">
+      <div class="progress-track">
+        <div class="pt-label">Workflow progress</div>
+        <div class="pt-steps">
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">Submitted</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-done">&#10003;</div><div class="pt-name done">PM review</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-active">2</div><div class="pt-name active">Mgmt approval</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-pending">4</div><div class="pt-name">Notify resource</div></div>
+          <div class="pt-step"><div class="pt-dot ptd-pending">5</div><div class="pt-name">Schedule update</div></div>
+        </div>
+      </div>
+      <div class="ar-coc">Step 3 — awaiting management approval. CS (Management) notified Mar 24, 2:00 PM. Response window: 24h. Auto-escalates to executive tier if no response by Mar 25, 2:00 PM.</div>
+      <div class="ar-actions">
+        <button class="btn btn-red" onclick="toast('Withdrawal confirmed. CoC event written.')">Withdraw request</button>
+        <button class="btn btn-cyan" onclick="toast('Adding context to management approval request...')">Add context</button>
+        <button class="btn btn-gray" onclick="toast('Escalating to executive tier immediately.')">Escalate now</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-lbl" style="margin-top:16px">Browse workflow catalog</div>
+
+  <div class="cat-label"><div class="cat-line"></div>Resource &amp; scheduling<div class="cat-line"></div></div>
+  <div class="wf-catalog">
+    <div class="wf-card" onclick="openModal('resourceRequest')">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(0,210,255,.1);color:#00D2FF">
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="4" r="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 12c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+        </div>
+        <div class="wf-card-title">Resource allocation request</div>
+      </div>
+      <div class="wf-card-desc">Request a change to a team member's allocation across projects. Routes to PM then management for approval.</div>
+      <div class="wf-card-meta"><span>5 steps</span><span>Avg 28h</span><span>3 this month</span></div>
+      <button class="wf-card-submit" onclick="event.stopPropagation();openModal('resourceRequest')">Submit &#8594;</button>
+    </div>
+    <div class="wf-card" onclick="openModal('ptoRequest')">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(139,92,246,.1);color:#8B5CF6">
+          <svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="1" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="1" x2="4.5" y2="3" stroke="currentColor" stroke-width="1.3"/><line x1="9.5" y1="1" x2="9.5" y2="3" stroke="currentColor" stroke-width="1.3"/></svg>
+        </div>
+        <div class="wf-card-title">PTO / leave request</div>
+      </div>
+      <div class="wf-card-desc">Request time off. Automatically blocks your calendar, notifies your PM, and updates assignment constraints for the period.</div>
+      <div class="wf-card-meta"><span>3 steps</span><span>Avg 4h</span><span>Used 6&#xD7; this year</span></div>
+      <button class="wf-card-submit" onclick="event.stopPropagation();openModal('ptoRequest')">Submit &#8594;</button>
+    </div>
+    <div class="wf-card" onclick="openModal('capacityConcern')">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(226,75,74,.1);color:#E24B4A">
+          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2L13 12H1Z" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="6" x2="7" y2="9" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="10.5" r=".8" fill="currentColor"/></svg>
+        </div>
+        <div class="wf-card-title">Capacity overload concern</div>
+      </div>
+      <div class="wf-card-desc">Formally raise a capacity concern with your PM. Pre-populated with your current load, overdue count, and queue summary.</div>
+      <div class="wf-card-meta"><span>3 steps</span><span>Avg 6h</span><span>PM notified immediately</span></div>
+      <button class="wf-card-submit" onclick="event.stopPropagation();openModal('capacityConcern')">Submit &#8594;</button>
+    </div>
+  </div>
+
+  <div class="cat-label"><div class="cat-line"></div>Approvals &amp; reviews<div class="cat-line"></div></div>
+  <div class="wf-catalog">
+    <div class="wf-card wf-card new-badge">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(29,158,117,.1);color:#1D9E75">
+          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="wf-card-title">Document review &amp; sign-off</div>
+      </div>
+      <div class="wf-card-desc">Submit a document for structured review. Routes to designated reviewers with version tracking and approval chain.</div>
+      <div class="wf-card-meta"><span>6 steps</span><span>Avg 48h</span><span>New this month</span></div>
+      <button class="wf-card-submit" onclick="toast('Document review workflow opening...')">Submit &#8594;</button>
+    </div>
+    <div class="wf-card">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(239,159,39,.1);color:#EF9F27">
+          <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="5" y1="7" x2="9" y2="7" stroke="currentColor" stroke-width="1.3"/><line x1="7" y1="5" x2="7" y2="9" stroke="currentColor" stroke-width="1.3"/></svg>
+        </div>
+        <div class="wf-card-title">Change request</div>
+      </div>
+      <div class="wf-card-desc">Submit a scope, timeline, or resource change request. Requires PM and client acknowledgement before taking effect.</div>
+      <div class="wf-card-meta"><span>7 steps</span><span>Avg 72h</span><span>1 this month</span></div>
+      <button class="wf-card-submit" onclick="toast('Change request workflow opening...')">Submit &#8594;</button>
+    </div>
+    <div class="wf-card">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(0,210,255,.1);color:#00D2FF">
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="5" x2="7" y2="7.5" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="9.5" r=".8" fill="currentColor"/></svg>
+        </div>
+        <div class="wf-card-title">Issue escalation</div>
+      </div>
+      <div class="wf-card-desc">Escalate a project issue through the formal chain of custody. Auto-attaches CoC context and intervention history.</div>
+      <div class="wf-card-meta"><span>4 steps</span><span>Avg 12h</span><span>2 this month</span></div>
+      <button class="wf-card-submit" onclick="toast('Escalation workflow opening...')">Submit &#8594;</button>
+    </div>
+  </div>
+
+  <div class="cat-label"><div class="cat-line"></div>HR &amp; admin<div class="cat-line"></div></div>
+  <div class="wf-catalog">
+    <div class="wf-card">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5)">
+          <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4.5" y1="5" x2="9.5" y2="5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+        </div>
+        <div class="wf-card-title">Expense reimbursement</div>
+      </div>
+      <div class="wf-card-desc">Submit project-related expenses for reimbursement. Routes to PM then finance for approval and processing.</div>
+      <div class="wf-card-meta"><span>4 steps</span><span>Avg 5 days</span></div>
+      <button class="wf-card-submit" onclick="toast('Expense reimbursement workflow opening...')">Submit &#8594;</button>
+    </div>
+    <div class="wf-card">
+      <div class="wf-card-top">
+        <div class="wf-icon" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.5)">
+          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2a5 5 0 100 10A5 5 0 007 2z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M4 7h6M7 4v6" stroke="currentColor" stroke-width="1"/></svg>
+        </div>
+        <div class="wf-card-title">Training request</div>
+      </div>
+      <div class="wf-card-desc">Request approval for external training, certification, or conference attendance. Includes cost and schedule impact review.</div>
+      <div class="wf-card-meta"><span>5 steps</span><span>Avg 3 days</span></div>
+      <button class="wf-card-submit" onclick="toast('Training request workflow opening...')">Submit &#8594;</button>
+    </div>
+  </div>
+
+  <div class="section-lbl" style="margin-top:4px">Request history</div>
+  <div style="border:1px solid rgba(255,255,255,.07);overflow:hidden">
+    <div class="hist-row"><div class="hist-dot" style="background:#1D9E75"></div><div class="hist-title">PTO — Dec 24–Jan 2</div><div class="hist-meta">Dec 15, 2025</div><div class="hist-outcome" style="border-color:rgba(29,158,117,.3);color:#1D9E75">Approved</div></div>
+    <div class="hist-row"><div class="hist-dot" style="background:#1D9E75"></div><div class="hist-title">Resource request — Sandra Okafor to 80%</div><div class="hist-meta">Nov 8, 2025</div><div class="hist-outcome" style="border-color:rgba(29,158,117,.3);color:#1D9E75">Approved</div></div>
+    <div class="hist-row"><div class="hist-dot" style="background:#E24B4A"></div><div class="hist-title">Change request — NovaBio Phase 3 scope</div><div class="hist-meta">Oct 22, 2025</div><div class="hist-outcome" style="border-color:rgba(226,75,74,.3);color:#E24B4A">Rejected</div></div>
+    <div class="hist-row"><div class="hist-dot" style="background:#1D9E75"></div><div class="hist-title">PTO — Sep 1–5</div><div class="hist-meta">Aug 20, 2025</div><div class="hist-outcome" style="border-color:rgba(29,158,117,.3);color:#1D9E75">Approved</div></div>
+    <div class="hist-row" style="border-bottom:none"><div class="hist-dot" style="background:#EF9F27"></div><div class="hist-title">Training request — PMBOK certification</div><div class="hist-meta">Jul 14, 2025</div><div class="hist-outcome" style="border-color:rgba(239,159,39,.3);color:#EF9F27">Pending</div></div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<div class="modal-wrap" id="modal-wrap">
+<div class="modal" id="modal-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function showTab(tab,btn){
+  document.querySelectorAll('.st').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+}
+function toggleReq(id){
+  document.getElementById(id).classList.toggle('open');
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);
+}
+const MODALS={
+  resourceRequest:{title:'Resource allocation request',body:`<div class="prefill-note">Pre-filled from My Work context: NovaBio · Section 4.3 · Apr 2 start date.</div><div class="wf-steps-preview"><div class="wsp-label">Workflow steps</div><div class="wsp-flow"><span class="wsp-step">Submit</span><span class="wsp-arrow">→</span><span class="wsp-step">PM review</span><span class="wsp-arrow">→</span><span class="wsp-step">Mgmt approval</span><span class="wsp-arrow">→</span><span class="wsp-step">Notify resource</span><span class="wsp-arrow">→</span><span class="wsp-step">Update schedule</span></div></div><div class="form-row"><div class="form-label required">Resource requested</div><select class="form-select"><option>Robert Chen</option><option>Sandra Okafor</option><option>Alan Smith</option></select></div><div class="form-row"><div class="form-label required">New allocation</div><select class="form-select"><option>60% NovaBio</option><option>80% NovaBio</option><option>100% NovaBio</option></select></div><div class="form-row"><div class="form-label required">Effective date</div><input class="form-input" type="text" value="Apr 2, 2026"/></div><div class="form-row"><div class="form-label required">Justification</div><textarea class="form-ta" rows="3">Section 4.3 review requires a dedicated resource starting Apr 2. Robert Chen at current 40% is insufficient. NovaBio milestone M3 is at risk.</textarea></div>`},
+  ptoRequest:{title:'PTO / leave request',body:`<div class="prefill-note">Your calendar will be blocked automatically on approval. Assignment constraints activate immediately.</div><div class="wf-steps-preview"><div class="wsp-label">Workflow steps</div><div class="wsp-flow"><span class="wsp-step">Submit</span><span class="wsp-arrow">→</span><span class="wsp-step">PM review</span><span class="wsp-arrow">→</span><span class="wsp-step">Approved → calendar blocked + team notified</span></div></div><div class="form-row"><div class="form-label required">From</div><input class="form-input" type="text" value="Mon Mar 31, 2026"/></div><div class="form-row"><div class="form-label required">To</div><input class="form-input" type="text" value="Tue Apr 1, 2026"/></div><div class="form-row"><div class="form-label">Coverage plan</div><textarea class="form-ta" rows="2">Sandra Okafor to monitor NovaBio items. No Flexscope actions expected in this window.</textarea></div>`},
+  capacityConcern:{title:'Capacity overload concern',body:`<div class="prefill-note">Pre-populated from your current queue. Routes directly to VS (PM) with full context attached.</div><div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);border-left:2px solid #E24B4A;padding:9px 11px;margin-bottom:12px;font-size:12px;color:rgba(240,246,255,.7);line-height:1.6"><div style="font-size:11px;color:#E24B4A;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Current load — auto-generated</div><div>Overdue: <strong style="color:#E24B4A">3 items · 23h</strong></div><div>Due today: <strong style="color:#EF9F27">4 items · ~18h estimated</strong></div><div>Available today: <strong style="color:#00D2FF">4h remaining</strong></div><div style="margin-top:5px;color:#E24B4A">Deficit: ~37h in a 4h window.</div></div><div class="form-row"><div class="form-label required">What needs to move, be delegated, or be dropped?</div><textarea class="form-ta" rows="3" placeholder="Your professional assessment. Be specific."></textarea></div>`},
+  addBlock:{title:'Add time block',body:`<div class="form-row"><div class="form-label required">Type</div><select class="form-select"><option>Focus block</option><option>Unavailable</option><option>PTO — full day</option><option>Personal appointment</option></select></div><div class="form-row"><div class="form-label required">Date</div><input class="form-input" type="text" value="Mon Mar 24, 2026"/></div><div class="form-row"><div class="form-label required">Time</div><div style="display:flex;gap:8px"><select class="form-select"><option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option><option>2:00 PM</option><option>3:00 PM</option></select><span style="font-size:12px;color:rgba(255,255,255,.3);align-self:center">to</span><select class="form-select"><option>10:00 AM</option><option>11:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>4:00 PM</option></select></div></div><div class="form-row"><div class="form-label">Label (optional)</div><input class="form-input" type="text" placeholder="e.g. Deep work — PCB documentation"/></div><div style="font-size:11px;color:rgba(255,255,255,.25);line-height:1.5">Focus blocks are soft constraints. Unavailable blocks are hard constraints — require PM override to assign into.</div>`}
+};
+function openModal(key){
+  const m=MODALS[key];if(!m)return;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-head"><div class="modal-title">${m.title}</div><button class="modal-close" onclick="closeModal()">&#x2715;</button></div><div class="modal-body">${m.body}</div><div class="modal-footer"><button class="btn btn-gray" onclick="closeModal()">Cancel</button><button class="btn btn-cyan" onclick="submitModal('${key}')">Submit request &#8594;</button></div>`;
+  document.getElementById('modal-wrap').classList.add('show');
+}
+function closeModal(){document.getElementById('modal-wrap').classList.remove('show');}
+function submitModal(key){
+  closeModal();
+  const msgs={resourceRequest:'Resource request submitted. Routing to VS for PM review.',ptoRequest:'PTO request submitted. VS will review within 4h. Calendar pre-blocked pending approval.',capacityConcern:'Capacity concern submitted to VS. Full queue context attached. 24h response window started.',addBlock:'Time block added. Visible to your PM as a scheduling constraint.'};
+  toast(msgs[key]||'Request submitted.');
+}
+function buildCalendar(){
+  const grid=document.getElementById('cal-grid');
+  const days=['','Mon 23','Tue 24','Wed 25','Thu 26','Fri 27','Sat 28','Sun 29'];
+  days.forEach((d,i)=>{
+    const h=document.createElement('div');
+    h.className='cal-day-header'+(i===2?' today':'');
+    h.textContent=d;
+    h.style.cssText='padding:5px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;'+(i===0?'border-right:1px solid rgba(255,255,255,.06)':'');
+    grid.appendChild(h);
+  });
+  const events={2:{9:{type:'meeting',label:'Design Review align'},10:{type:'focus',label:'Focus — PCB docs'},14:{type:'meeting',label:'NovaBio 4.3'},16:{type:'task',label:'Timesheet due'}},3:{10:{type:'meeting',label:'Weekly sync'},14:{type:'focus',label:'Focus block'}},4:{9:{type:'meeting',label:'Client call — TransAtlantic'},11:{type:'focus',label:'Focus block'},15:{type:'task',label:'Section 4.3 due'}}};
+  const hours=[8,9,10,11,12,13,14,15,16,17];
+  hours.forEach(h=>{
+    const lbl=document.createElement('div');lbl.className='cal-time-label';lbl.textContent=(h<=12?h:h-12)+':00'+(h<12?' AM':' PM');grid.appendChild(lbl);
+    for(let d=1;d<=7;d++){
+      const cell=document.createElement('div');cell.className='cal-cell';
+      cell.style.borderLeft=d===2?'1px solid rgba(0,210,255,.15)':'';
+      cell.style.background=d===2?'rgba(0,210,255,.02)':d>=6?'rgba(255,255,255,.01)':'';
+      const ev=events[d]&&events[d][h];
+      if(ev){const evEl=document.createElement('div');evEl.className=`cal-event ce-${ev.type}`;evEl.textContent=ev.label;cell.appendChild(evEl);}
+      cell.addEventListener('click',()=>openModal('addBlock'));
+      grid.appendChild(cell);
+    }
+  });
+}
+buildCalendar();
+</script>
+</body>
+</html>
