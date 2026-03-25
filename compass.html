@@ -9129,9 +9129,20 @@ function openFullWeeklyTimesheet({ expandDay=null }={}) {
     }
     if(ev.target.closest('.mark-today-complete-btn')){
       const todayHrs=dayTotals[today]||0;
-      await API.post('workflow_step_instances',{event_type:'daily_timesheet_complete',
-        event_notes:todayHrs.toFixed(1),created_at:new Date().toISOString(),
-        firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+      await API.post('coc_events',{
+        id: crypto.randomUUID(),
+        firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+        entity_id: _myResource?.id || crypto.randomUUID(),
+        entity_type: 'task',
+        event_type: 'progress_update',
+        step_name: 'Daily timesheet complete',
+        event_notes: todayHrs.toFixed(1) + 'h logged today',
+        actor_name: _myResource?.name || null,
+        actor_resource_id: _myResource?.id || null,
+        outcome: 'on_track',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).catch(()=>{});
       compassToast('Today marked complete ✓');drawer.remove();_viewLoaded['user']=false;loadUserView();
     }
     if(ev.target.closest('.ts-submit-wts-btn')){
@@ -10236,7 +10247,7 @@ async function wiSaveProgress(itemId, projectId) {
         id:          crypto.randomUUID(),
         instance_id: instId,
         step_type:   'manual',
-        event_type:  'task_progress_update',
+        event_type:  'step_completed',
         step_name:   pct !== null ? `Progress: ${pct}%` : 'Progress update',
         event_notes: comment,
         outcome:     sigOutcome,
