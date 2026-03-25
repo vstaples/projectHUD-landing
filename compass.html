@@ -1749,10 +1749,13 @@ async function loadUserView() {
         <button data-action="toggle-coc"
           style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;height:30px;padding:0 10px;background:none;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;transition:all .12s;flex-shrink:0"
           title="Chain of Custody">CoC</button>
-        ${streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+        ${streak>0&&weekDoneCount>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
           background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
           font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
-          ■ ${streak}-day streak · ${weekDoneLabel}</div>`:''}
+          ■ ${streak}-day streak · ${weekDoneLabel}</div>`:streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+          background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);border-radius:4px;
+          font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-cyan);white-space:nowrap">
+          ■ ${streak}-day streak</div>`:''}
       </div>
     </div>
 
@@ -1912,18 +1915,11 @@ async function loadUserView() {
           <div id="work-list-rows">${workListRows()}</div>
         </div>
 
-        <!-- 1.D Done Today -->
-        <div class="cmp-panel" style="margin-bottom:14px">
-          <div class="panel-hdr">
-            <div class="panel-title">Done today
-              ${_doneToday.length>0?`<span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:var(--compass-green);margin-left:8px">${_doneToday.length} completed</span>`:''}</div>
-          </div>
-          <div id="done-today-list">${doneTodayRows()}</div>
-        </div>
+
       </div>
 
 
-      <div id="mw-right" style="width:300px;flex-shrink:0;padding-left:14px">
+      <div id="mw-right" style="width:300px;flex-shrink:0;padding-left:14px;display:flex;flex-direction:column">
         <!-- 1.E Timesheet Status -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div style="padding:10px 13px 6px">
@@ -2025,32 +2021,19 @@ async function loadUserView() {
             </div>`}
         </div>
 
-        <!-- Active Workflows -->
-        <div class="cmp-panel" style="margin-bottom:14px">
-          <div class="panel-hdr"><div class="panel-title">Active workflows</div></div>
-          ${wfInstances.slice(0,4).map(w=>{const proj=_projects.find(p=>p.id===w.project_id);return `<div class="cmp-row" onclick="window.location.href='/cadence.html?instance=${w.id}'">
-            <div style="width:7px;height:7px;border-radius:50%;background:var(--compass-amber);flex-shrink:0"></div>
-            <div style="flex:1;min-width:0"><div class="row-title">${esc(w.title)}</div>
-              <div class="row-sub">${proj?esc(proj.name)+' · ':''  }${w.current_step_name?esc(w.current_step_name):'Active'}</div></div>
-            <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">▶</span>
-          </div>`;}).join('')||'<div style="padding:12px 13px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No active instances</div>'}
-        </div>
 
-        <!-- Quick access -->
-        <div class="cmp-panel">
-          <div class="panel-hdr"><div class="panel-title">Quick access</div></div>
-          <div class="cmp-row" onclick="window.location.href='/cadence.html'">
-            <div style="flex:1"><div class="row-title">Cadence canvas →</div>
-            <div class="row-sub">Log hours while advancing steps</div></div>
-          </div>
-          <div class="cmp-row" onclick="window.location.href='/resources.html'">
-            <div style="flex:1"><div class="row-title">Full timesheet →</div>
-            <div class="row-sub">Edit, submit, and review all entries</div></div>
+      <!-- Done Today — with vertical drag handle above -->
+        <div id="mw-done-resize" style="height:5px;cursor:row-resize;background:rgba(0,210,255,.08);border-top:1px solid rgba(0,210,255,.12);transition:background .15s" data-action="done-resize"></div>
+        <div id="mw-done-today" style="flex:1;overflow-y:auto;min-height:80px">
+          <div class="cmp-panel" style="height:100%;margin-bottom:0">
+            <div class="panel-hdr" style="flex-shrink:0">
+              <div class="panel-title">Done today
+                ${_doneToday.length>0?`<span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:var(--compass-green);margin-left:8px">${_doneToday.length} completed</span>`:''}</div>
+            </div>
+            <div id="done-today-list" style="overflow-y:auto">${doneTodayRows()}</div>
           </div>
         </div>
       </div>
-
-
 
       <!-- CoC Panel — fills remaining space -->
       <div id="mw-coc" style="display:none;flex-direction:column;width:300px;flex-shrink:0;background:#060c18;border-left:1px solid rgba(0,210,255,.15);position:relative">
