@@ -4927,11 +4927,11 @@ window.uSwitchTab = function(tab, btn) {
   if (btn) btn.classList.add('on');
   const panel = document.getElementById('utc-'+tab);
   if (panel) panel.classList.add('on');
-  if (tab === 'meetings'   && !window._meetingsLoaded)  loadUserMeetings();
-  if (tab === 'concerns'   && !window._concernsLoaded)  loadUserConcerns();
-  if (tab === 'calendar'   && !window._calTabLoaded)    { window._calTabLoaded = true; buildCalendarTab(); }
-  if (tab === 'requests'   && !window._requestsLoaded)  loadUserRequests();
-  if (tab === 'timesheet'  && !window._myTimeLoaded)    loadMyTimeView();
+  if (tab === 'meetings' && !window._meetingsLoaded) loadUserMeetings();
+  if (tab === 'concerns' && !window._concernsLoaded) loadUserConcerns();
+  if (tab === 'calendar' && !window._calTabLoaded) { window._calTabLoaded = true; buildCalendarTab(); }
+  if (tab === 'requests' && !window._requestsLoaded) loadUserRequests();
+  if (tab === 'timesheet' && !window._myTimeLoaded) loadMyTimeView();
 };
 
 // ── Calendar popup ────────────────────────────────────────
@@ -5043,6 +5043,39 @@ window._mtgFilter      = 'all';
 window._requestsLoaded = false;
 window._calTabLoaded   = false;
 window._myRequests     = [];
+
+// ── My Time loader ────────────────────────────────────────
+// Fetches /my-time.html, injects into #mt-root, calls _mtLoadView().
+// Subsequent tab clicks hit _mtRefresh() via the loaded guard.
+window.loadMyTimeView = async function() {
+  if (window._myTimeLoaded) {
+    window._mtRefresh && window._mtRefresh();
+    return;
+  }
+  const container = document.getElementById('mt-root');
+  if (!container) { console.error('[Compass] #mt-root not found'); return; }
+  try {
+    const resp = await fetch('/my-time.html');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(html, 'text/html');
+    Array.from(doc.body.childNodes).forEach(node => {
+      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
+    });
+    for (const s of doc.querySelectorAll('script')) {
+      const el = document.createElement('script');
+      el.textContent = s.textContent;
+      document.head.appendChild(el);
+    }
+    window._myTimeLoaded = true;
+    if (window._mtLoadView) await window._mtLoadView();
+    else console.error('[Compass] _mtLoadView not exported by my-time.html');
+  } catch (err) {
+    console.error('[Compass] Failed to load my-time.html:', err);
+    if (window.compassToast) compassToast('Failed to load My Time — check console', 4000);
+  }
+};
 
 window.loadUserMeetings = async function() {
   window._meetingsLoaded = true;
