@@ -1148,7 +1148,7 @@ function switchView(viewId) {
   if (!_viewLoaded[viewId]) {
     _viewLoaded[viewId] = true;
     switch (viewId) {
-      case 'user':       _mwLoadUserView();       break;
+      case 'user':       loadUserView();          break;
       case 'pm':         loadPMView();         break;
       case 'management': loadManagementView(); break;
       case 'executive':  loadExecutiveView();  break;
