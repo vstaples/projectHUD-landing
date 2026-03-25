@@ -7248,6 +7248,13 @@ document.addEventListener('change', function(ev) {
 });
 document.addEventListener('click', function(ev) {
   // ── CoC toggle ─────────────────────────────────────────
+  if (ev.target.closest('[data-action="close-wi-modal"]')) {
+    document.querySelectorAll('.wi-expanded').forEach(e=>e.remove());
+    document.getElementById('wi-backdrop')?.remove();
+    document.querySelectorAll('.wi-row').forEach(r=>{r.classList.remove('wi-selected');r.style.borderLeft='';r.style.background='';});
+    return;
+  }
+
   if (ev.target.closest('[data-action="toggle-coc"]')) {
     console.log('[Compass] CoC toggle clicked');
     const coc = document.getElementById('mw-coc');
@@ -8368,19 +8375,32 @@ function openWorkItemExpanded(item) {
   const accentColor = item.overdue ? 'var(--compass-red)' : item.type==='action' ? 'var(--compass-green)' : 'var(--compass-cyan)';
   const statusLabel = (item.status||'open').replace(/_/g,' ');
 
-  // Build expanded panel
+  // Build modal popup
   const panel = document.createElement('div');
   panel.className = 'wi-expanded';
   panel.dataset.wiId = item.id;
   panel.style.cssText = `
-    grid-column:1/-1;
+    position:fixed;
+    top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:min(900px,92vw);
+    max-height:80vh;
     background:#080f1e;
-    border-left:3px solid ${accentColor};
-    border-top:1px solid rgba(0,210,255,.1);
-    border-bottom:2px solid ${accentColor};
-    animation:micro-open 180ms ease;
+    border:1px solid rgba(0,210,255,.2);
+    border-top:3px solid ${accentColor};
+    box-shadow:0 20px 60px rgba(0,0,0,.7);
+    z-index:250;
+    display:flex;
+    flex-direction:column;
     overflow:hidden;
+    animation:micro-open 180ms ease;
   `;
+  // Backdrop
+  const backdrop = document.createElement('div');
+  backdrop.id = 'wi-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:249';
+  backdrop.addEventListener('click', () => { panel.remove(); backdrop.remove(); document.querySelectorAll('.wi-row').forEach(r=>{r.classList.remove('wi-selected');r.style.borderLeft='';r.style.background='';}); });
+  document.body.appendChild(backdrop);
 
   // ── Section 1: Header strip ──────────────────────────────
   const headerHtml = `
@@ -8407,11 +8427,9 @@ function openWorkItemExpanded(item) {
           · <span style="text-transform:capitalize">${statusLabel}</span>
         </div>
       </div>
-      <button onclick="document.querySelectorAll('.wi-expanded').forEach(e=>e.remove());document.querySelectorAll('.wi-row').forEach(r=>{r.classList.remove('wi-selected');r.style.borderLeft='';r.style.background=''})"
-        style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;
-          padding:0 0 0 14px;line-height:1;flex-shrink:0"
-        onmouseenter="this.style.color='var(--text0)'"
-        onmouseleave="this.style.color='var(--text3)'">✕</button>
+      <button data-action="close-wi-modal"
+        style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;
+          padding:0 0 0 14px;line-height:1;flex-shrink:0;transition:color .12s">✕</button>
     </div>`;
 
   // ── Section 2: Three-column detail + action area ─────────
@@ -8515,13 +8533,11 @@ function openWorkItemExpanded(item) {
 
       </div>
 
-      <!-- Col 2: two sub-columns — left: sentiment+update+actions | right: mini CoC -->
-      <div style="display:flex;gap:0;min-width:0">
+      <!-- Col 2: two sub-columns — middle: sentiment+update | right: CoC+mark complete -->
+      <div style="display:flex;gap:0;min-width:0;flex:1">
 
-        <!-- Col 2a: Sentiment + Work Completed + actions -->
-        <div style="flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:8px;border-right:1px solid rgba(0,210,255,.08)">
-
-          <!-- Sentiment — required, smaller dots -->
+        <!-- Col 2a: Sentiment + Work Completed + Save Update -->
+        <div style="flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:7px;border-right:1px solid rgba(0,210,255,.08)">
           <div>
             <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">
               Sentiment <span style="color:#E24B4A">*</span>
@@ -8540,81 +8556,75 @@ function openWorkItemExpanded(item) {
               <span id="wi-sig-label-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">— required</span>
             </div>
           </div>
-
-          <!-- Work completed -->
-          <div style="flex:1;display:flex;flex-direction:column;min-height:100px">
+          <div style="flex:1;display:flex;flex-direction:column;min-height:80px">
             <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">
-                Work completed <span style="color:#E24B4A">*</span>
-              </span>
+              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Work completed <span style="color:#E24B4A">*</span></span>
               <span id="wi-comment-req-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;display:none">Required</span>
             </div>
             <textarea id="wi-comment-${item.id}"
               placeholder="Describe what was accomplished this session — required to save…"
               oninput="wiCheckGate('${item.id}')"
-              style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:100px"></textarea>
+              style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:80px"></textarea>
           </div>
-
-          <!-- Action buttons -->
-          <div style="display:flex;gap:6px">
-            <button id="wi-save-progress-${item.id}"
-              onclick="wiSaveProgress('${item.id}','${item.projectId||''}')"
-              disabled
-              style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:7px 8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
-            <button id="wi-mark-complete-${item.id}"
-              onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')"
-              disabled
-              style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:7px 8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Mark complete →</button>
-          </div>
+          <button id="wi-save-progress-${item.id}"
+            onclick="wiSaveProgress('${item.id}','${item.projectId||''}')"
+            disabled
+            style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
           <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center">Select sentiment and add a note to unlock</div>
           <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px"></span>
         </div>
 
-        <!-- Col 2b: Mini CoC for this item -->
-        <div style="width:220px;flex-shrink:0;padding:10px 12px;overflow-y:auto;background:rgba(0,0,0,.15)">
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Item CoC</div>
-          ${(()=>{
-            const allEvts = window._myCocEvents||[];
-            // Match events to this item: action items by instance_id, tasks by title/step match
-            const aiItem  = (window._wiItems||[]).find(w=>w.id===item.id&&w.type==='action');
-            const aiInst  = aiItem ? (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id : null;
-            const itemEvts = allEvts.filter(e=>{
-              if (aiInst && e.instance_id===aiInst) return true;
-              if (e.step_name && item.title && e.step_name.toLowerCase().includes(item.title.toLowerCase().slice(0,20))) return true;
-              if (e.event_notes && item.title && e.event_notes.toLowerCase().includes(item.title.toLowerCase().slice(0,20))) return true;
-              return false;
-            });
-            if (!itemEvts.length) return '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No history yet for this item.</div>';
-            const evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',step_completed:'#1D9E75',step_reset:'#E24B4A',management_decision:'#EF9F27',intervention:'#8B5CF6'};
-            const evtLabel={instance_launched:'Launched',instance_completed:'Completed',step_activated:'Activated',step_completed:'Step done',step_reset:'Reset',management_decision:'Decision',intervention:'Intervention'};
-            const E=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            return itemEvts.map((e,i)=>{
-              const col=evtColor[e.event_type]||'#5A84A8';
-              const lbl=evtLabel[e.event_type]||e.event_type.replace(/_/g,' ');
-              const step=(e.step_name||'').replace(/^CONCERN:\s*/,'');
-              const note=e.event_notes||'';
-              const ts=e.created_at?new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
-              let h='<div style="display:flex;gap:6px;margin-bottom:8px">';
-              h+='<div style="display:flex;flex-direction:column;align-items:center;width:10px;flex-shrink:0">';
-              h+='<div style="width:6px;height:6px;border-radius:50%;background:'+col+';margin-top:2px;flex-shrink:0"></div>';
-              if(i<itemEvts.length-1) h+='<div style="width:1px;flex:1;min-height:8px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
-              h+='</div><div style="flex:1;min-width:0">';
-              h+='<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(lbl)+'</div>';
-              if(step) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step.slice(0,40))+'</div>';
-              if(e.actor_name) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">By '+E(e.actor_name)+'</div>';
-              if(note) h+='<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);margin-top:2px;padding:2px 6px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.4;word-break:break-word">'+E(note.slice(0,100))+'</div>';
-              if(ts) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.2);margin-top:1px">'+ts+'</div>';
-              h+='</div></div>';
-              return h;
-            }).join('');
-          })()}
+        <!-- Col 2b: Item CoC (fills space) + Mark Complete at bottom -->
+        <div style="width:220px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15)">
+          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Item CoC</div>
+          <div style="flex:1;overflow-y:auto;min-height:60px">
+            ${(()=>{
+              const allEvts = window._myCocEvents||[];
+              const aiInst  = (window.myActionItems||[]).find(a=>a.id===item.id)?.instance_id;
+              const wfInst  = (window._wfInstances||[]).find(w=>w.task_id===item.id || w.id===aiInst)?.id;
+              const instId  = aiInst || wfInst;
+              // Match by instance_id, or by time_entries that reference this task
+              const teInstIds = new Set((_teEntries||[]).filter(e=>e.task_id===item.id&&e.instance_id).map(e=>e.instance_id));
+              const itemEvts = allEvts.filter(e=>{
+                if (instId && e.instance_id===instId) return true;
+                if (teInstIds.size && teInstIds.has(e.instance_id)) return true;
+                return false;
+              });
+              if (!itemEvts.length) return '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
+              const evtColor={instance_launched:'#00D2FF',instance_completed:'#1D9E75',step_activated:'#e8a838',step_completed:'#1D9E75',step_action:'#00D2FF',step_reset:'#E24B4A',management_decision:'#EF9F27',intervention:'#8B5CF6'};
+              const evtLabel={instance_launched:'Launched',instance_completed:'Completed',step_activated:'Activated',step_completed:'Step done',step_action:'Action',step_reset:'Reset',management_decision:'Decision',intervention:'Intervention'};
+              const E=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+              return itemEvts.map((e,i)=>{
+                const col=evtColor[e.event_type]||'#5A84A8';
+                const lbl=evtLabel[e.event_type]||e.event_type.replace(/_/g,' ');
+                const step=(e.step_name||'').replace(/^CONCERN:\s*/,'');
+                const note=e.event_notes||'';
+                const ts=e.created_at?new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+                let h='<div style="display:flex;gap:6px;margin-bottom:8px">';
+                h+='<div style="display:flex;flex-direction:column;align-items:center;width:10px;flex-shrink:0">';
+                h+='<div style="width:6px;height:6px;border-radius:50%;background:'+col+';margin-top:2px;flex-shrink:0"></div>';
+                if(i<itemEvts.length-1) h+='<div style="width:1px;flex:1;min-height:8px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
+                h+='</div><div style="flex:1;min-width:0">';
+                h+='<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(lbl)+'</div>';
+                if(step) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step.slice(0,40))+'</div>';
+                if(e.actor_name) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">By '+E(e.actor_name)+'</div>';
+                if(note) h+='<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);margin-top:2px;padding:2px 6px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.4;word-break:break-word">'+E(note.slice(0,100))+'</div>';
+                if(ts) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.2);margin-top:1px">'+ts+'</div>';
+                h+='</div></div>';
+                return h;
+              }).join('');
+            })()}
+          </div>
+          <button id="wi-mark-complete-${item.id}"
+            onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')"
+            disabled
+            style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5;flex-shrink:0">Mark complete →</button>
         </div>
       </div>
     </div>`;
 
   panel.innerHTML = headerHtml + detailHtml;
-  wiRow.insertAdjacentElement('afterend', panel);
-  // Focus the hours input
+  document.body.appendChild(panel);
   setTimeout(() => document.getElementById(`wi-hrs-${item.id}`)?.focus(), 80);
 }
 
@@ -8835,6 +8845,7 @@ async function wiSaveProgress(itemId, projectId) {
     await Promise.all(ps);
     if (statusOut) { statusOut.textContent='✓ Saved'; statusOut.style.color='var(--compass-green)'; }
     if (saveBtn)   { saveBtn.textContent='Saved ✓'; saveBtn.disabled=false; }
+    document.getElementById('wi-backdrop')?.remove();
     setTimeout(()=>{ _viewLoaded['user']=false; loadUserView(); }, 600);
   } catch(e) {
     if (saveBtn)   { saveBtn.textContent='Save update →'; saveBtn.disabled=false; }
