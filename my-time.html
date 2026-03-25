@@ -367,7 +367,16 @@ function renderWeekLabel(sun) {
 async function loadWeekData(sun) {
   clearErr();
   const [weekStart, weekEnd] = weekISO(sun);
-  const resource = window._myResource;
+
+  // _myResource is set by compass.html's loadBaseData — wait for it if needed
+  let resource = window._myResource;
+  if (!resource) {
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      resource = window._myResource;
+      if (resource) break;
+    }
+  }
   if (!resource) { showErr('Resource identity not resolved — try refreshing.'); return; }
 
   const rid = resource.id;
