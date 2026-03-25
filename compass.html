@@ -1478,8 +1478,8 @@ async function loadUserView() {
       const x1=(GCX+r1*Math.cos(a)).toFixed(1), y1=(GCY+r1*Math.sin(a)).toFixed(1);
       const tick = `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,255,255,.28)" stroke-width="${isMaj?1:.6}"/>`;
       if (!isMaj) return tick;
-      const rl=GR+13, lx=(GCX+rl*Math.cos(a)).toFixed(1), ly=(GCY+rl*Math.sin(a)).toFixed(1);
-      return tick + `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="5.5" font-family="monospace" fill="rgba(255,255,255,.4)">${i*10}%</text>`;
+      const rl=GR+16, lx=(GCX+rl*Math.cos(a)).toFixed(1), ly=(GCY+rl*Math.sin(a)).toFixed(1);
+      return tick + `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="7.5" font-family="monospace" font-weight="700" fill="rgba(255,255,255,.75)">${i*10}%</text>`;
     }).join('');
 
     const gaugesHtml = weekDays.map((d, i) => {
@@ -5964,13 +5964,12 @@ window.loadUserMeetings = async function() {
     const userId = _myResource?.user_id;
 
     const [meetings, attendees] = await Promise.all([
-      API.get(`meetings?select=id,title,meeting_date,duration_minutes,location_or_link,meeting_type,status,created_by&order=meeting_date.desc&limit=50`).catch(()=>[]),
+      API.get(`v_meetings?select=id,title,meeting_date,duration_minutes,location_or_link,meeting_type&order=meeting_date.desc&limit=50`).catch(()=>[]),
       userId ? API.get(`meeting_attendees?select=meeting_id,attendance_status&user_id=eq.${userId}&limit=100`).catch(()=>[]) : Promise.resolve([]),
     ]);
 
     const myMeetingIds = new Set(attendees.map(a=>a.meeting_id));
-    // Also include meetings I created
-    const myMeetings = (meetings||[]).filter(m => myMeetingIds.has(m.id) || m.created_by===userId);
+    const myMeetings = (meetings||[]);  // show all firm meetings from v_meetings
 
     window._userMeetings = myMeetings.map(m => ({
       id: m.id,
@@ -5980,8 +5979,8 @@ window.loadUserMeetings = async function() {
       duration: m.duration_minutes||60,
       location: m.location_or_link,
       type: m.meeting_type||'meeting',
-      status: m.status||'scheduled',
-      owned: m.created_by===userId,
+      status: 'scheduled',
+      owned: false,
       past: m.meeting_date && m.meeting_date.slice(0,10) < today,
     }));
 
