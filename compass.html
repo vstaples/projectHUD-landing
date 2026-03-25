@@ -1330,9 +1330,10 @@ async function loadUserView() {
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
-      API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&order=created_at.desc&limit=100`).catch(() => []),
+      API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&firm_id=eq.aaaaaaaa-0001-0001-0001-000000000001&order=created_at.desc&limit=100`).catch(() => []),
     ]);
 
+    console.log('[Compass] myCocEvents:', (myCocEvents||[]).length, myCocEvents?.[0]);
     // ── Hours per day ─────────────────────────────────────────────────
     const hoursByDay = {}, billableByDay = {};
     weekDays.forEach(d => { hoursByDay[d] = 0; billableByDay[d] = 0; });
@@ -2036,12 +2037,8 @@ async function loadUserView() {
                 intervention:'Intervention', flag_acknowledged:'Flag Acknowledged',
                 meeting_created:'Meeting Created',
               };
-              const myFirst = (_myResource?.name||'').split(' ')[0].toLowerCase();
-              const evts = (myCocEvents||[]).filter(e=>
-                !myFirst || !e.actor_name ||
-                e.actor_name.toLowerCase().includes(myFirst) ||
-                myFirst.includes(e.actor_name.toLowerCase().split(' ')[0])
-              );
+              // Show all CoC events — no name filter
+              const evts = (myCocEvents||[]);
               if (!evts.length) return '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.7">No CoC events found.<br><br>Events appear here when you complete workflow steps or log updates.</div>';
               return evts.map((e,i,arr)=>{
                 const col   = evtColor[e.event_type]||'rgba(255,255,255,.3)';
