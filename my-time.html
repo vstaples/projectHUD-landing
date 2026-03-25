@@ -1,0 +1,1170 @@
+<!-- my-time.html — Compass My Time module -->
+<!-- Exports: window._mtLoadView, window._mtRefresh -->
+<!-- Loaded dynamically by compass.html; depends on shared globals set before load -->
+
+<div id="mt-root">
+<style>
+/* ─── My Time scoped styles ─────────────────────────────────────────── */
+#mt-root *{box-sizing:border-box}
+#mt-root{font-family:var(--font-body,var(--font-sans,system-ui));color:var(--text1,#c9d1d9)}
+
+/* Layout */
+.mt-wrap{padding:10px 14px 20px}
+.mt-topbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mt-title{font-size:13px;font-weight:600;color:var(--text0,#e6edf3);font-family:var(--font-head,var(--font-sans,system-ui))}
+.mt-user{font-size:11px;color:var(--text3,#6e7681)}
+.mt-week-nav{margin-left:auto;display:flex;align-items:center;gap:6px}
+.mt-week-lbl{font-size:12px;color:var(--text2,#8b949e);padding:3px 8px;background:var(--bg2,#161b22);border:0.5px solid var(--border,#30363d);border-radius:6px}
+.mt-nav-btn{background:var(--bg1,#0d1117);border:0.5px solid var(--border,#30363d);border-radius:6px;padding:3px 9px;font-size:11px;color:var(--text2,#8b949e);cursor:pointer;transition:border-color .1s}
+.mt-nav-btn:hover{border-color:var(--compass-cyan,#00D2FF);color:var(--text0,#e6edf3)}
+
+.mt-three-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:10px;align-items:start}
+
+/* Panels */
+.mt-panel{background:var(--bg1,#0d1117);border:0.5px solid var(--border,#30363d);border-radius:8px;overflow:hidden}
+.mt-panel-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--border,#30363d);background:var(--bg2,#161b22)}
+.mt-panel-title{font-size:12px;font-weight:600;color:var(--text0,#e6edf3)}
+.mt-panel-sub{font-size:11px;color:var(--text3,#6e7681);margin-left:auto;white-space:nowrap}
+
+/* Legend dots */
+.mt-legend{display:flex;gap:6px;flex-wrap:wrap}
+.mt-leg-item{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--text3,#6e7681)}
+.mt-leg-sq{width:7px;height:7px;border-radius:1px;flex-shrink:0}
+
+/* Badges */
+.mt-badge{font-size:10px;padding:2px 6px;border-radius:20px;white-space:nowrap;line-height:1.4}
+.mt-b-ok{background:#0f2a1a;color:#3fb950}
+.mt-b-warn{background:#2d1b00;color:#e3b341}
+.mt-b-block{background:#2d0f0e;color:#f85149}
+.mt-b-unplan{background:#1a1040;color:#a5a0f0}
+.mt-b-mile{background:#0a2818;color:#2ea043}
+.mt-b-proj{background:#0c2136;color:#58a6ff}
+.mt-b-carry{background:#2d1b00;color:#e3b341}
+.mt-b-pto{background:#1a1040;color:#a5a0f0}
+
+/* Seg bar */
+.mt-seg-bar{display:flex;height:5px;border-radius:3px;overflow:hidden;flex:1;min-width:40px;background:var(--bg2,#161b22)}
+.mt-s-bill{background:#185FA5}
+.mt-s-unbill{background:#7F77DD}
+.mt-s-unplan{background:#BA7517}
+.mt-s-block{background:#A32D2D}
+
+/* Alert rows */
+.mt-alert-warn{padding:6px 10px;background:#1f1500;border-top:0.5px solid #4a3000;font-size:10px;color:#e3b341;line-height:1.5}
+.mt-alert-danger{padding:6px 10px;background:#200d0d;border-top:0.5px solid #4a1010;font-size:10px;color:#f85149;line-height:1.5}
+.mt-cap-warn{padding:5px 12px;background:#1f1500;border-bottom:0.5px solid #4a3000;font-size:10px;color:#e3b341;line-height:1.5}
+
+/* Day blocks (Story panel) */
+.mt-day-block{border-bottom:0.5px solid var(--border,#30363d)}
+.mt-day-block:last-child{border-bottom:none}
+.mt-day-hdr{display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:pointer;user-select:none;transition:background .1s}
+.mt-day-hdr:hover{background:var(--bg2,#161b22)}
+.mt-day-name{font-size:12px;font-weight:500;color:var(--text0,#e6edf3);min-width:68px}
+.mt-day-hrs{font-size:11px;color:var(--text2,#8b949e);min-width:34px}
+.mt-chev{font-size:10px;color:var(--text3,#6e7681);margin-left:auto;transition:transform .15s;display:inline-block;flex-shrink:0}
+.mt-chev.open{transform:rotate(90deg)}
+
+/* Event grid (Story panel) */
+.mt-ev-grid{display:grid;grid-template-columns:80px 3px 1fr auto;gap:0;border-top:0.5px solid var(--border,#30363d)}
+.mt-ev-time{font-size:10px;color:var(--text3,#6e7681);padding:6px 5px 6px 10px;border-bottom:0.5px solid var(--border,#30363d);align-self:stretch;display:flex;align-items:center}
+.mt-ev-bar-w{padding:4px 0;border-bottom:0.5px solid var(--border,#30363d);display:flex;align-items:stretch}
+.mt-ev-bar{width:3px;border-radius:2px;flex:1}
+.mt-ev-body{padding:6px 8px;border-bottom:0.5px solid var(--border,#30363d);min-width:0}
+.mt-ev-title{font-size:11px;font-weight:500;color:var(--text0,#e6edf3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt-ev-note{font-size:10px;color:var(--text2,#8b949e);margin-top:1px;line-height:1.4}
+.mt-ev-right{padding:6px 10px 6px 5px;border-bottom:0.5px solid var(--border,#30363d);display:flex;flex-direction:column;align-items:flex-end;gap:3px;white-space:nowrap}
+.mt-ev-h{font-size:11px;font-weight:500;color:var(--text1,#c9d1d9)}
+.mt-ev-empty{padding:12px 10px;font-size:11px;color:var(--text3,#6e7681);text-align:center;font-style:italic}
+
+/* Narrative box */
+.mt-narrative{padding:10px 12px;border-top:0.5px solid var(--border,#30363d)}
+.mt-nar-lbl{font-size:10px;color:var(--text3,#6e7681);margin-bottom:5px}
+.mt-nar-text{font-size:11px;color:var(--text0,#e6edf3);line-height:1.6;padding:7px 9px;background:var(--bg2,#161b22);border-radius:6px;border:0.5px solid var(--border,#30363d);width:100%;resize:vertical;min-height:58px;font-family:inherit;outline:none;transition:border-color .1s}
+.mt-nar-text:focus{border-color:var(--compass-cyan,#00D2FF)}
+
+/* Submit / action rows */
+.mt-submit-row{display:flex;gap:6px;padding:8px 12px;border-top:0.5px solid var(--border,#30363d);align-items:center}
+.mt-btn-submit{padding:5px 14px;font-size:11px;font-weight:500;background:var(--compass-cyan,#00D2FF);color:#000;border:none;border-radius:6px;cursor:pointer;transition:opacity .1s}
+.mt-btn-submit:hover{opacity:.85}
+.mt-btn-submit:disabled{opacity:.45;cursor:default}
+.mt-btn-edit{padding:5px 10px;font-size:11px;color:var(--text2,#8b949e);border:0.5px solid var(--border,#30363d);border-radius:6px;background:none;cursor:pointer;transition:border-color .1s}
+.mt-btn-edit:hover{border-color:var(--compass-cyan,#00D2FF);color:var(--text0,#e6edf3)}
+.mt-btn-tot{font-size:11px;color:var(--text3,#6e7681);margin-left:auto}
+.mt-status-chip{font-size:10px;padding:2px 8px;border-radius:20px;margin-left:auto}
+.mt-chip-submitted{background:#0f2a1a;color:#3fb950}
+.mt-chip-approved{background:#0c2136;color:#58a6ff}
+.mt-chip-draft{background:var(--bg2,#161b22);color:var(--text3,#6e7681);border:0.5px solid var(--border,#30363d)}
+
+/* Timesheet panel */
+.mt-ts-hdr-row{display:grid;grid-template-columns:1fr repeat(5,32px) 40px;border-bottom:0.5px solid var(--border,#30363d);background:var(--bg2,#161b22);padding:4px 0}
+.mt-ts-row{display:grid;grid-template-columns:1fr repeat(5,32px) 40px;border-bottom:0.5px solid var(--border,#30363d);align-items:center;min-height:28px}
+.mt-ts-row:last-child{border-bottom:none}
+.mt-ts-proj-row{background:var(--bg2,#161b22)}
+.mt-ts-proj{font-size:11px;font-weight:600;color:var(--text0,#e6edf3);padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt-ts-sub{font-size:10px;color:var(--text2,#8b949e);padding:0 8px 0 16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt-ts-hdr-lbl{font-size:10px;color:var(--text3,#6e7681);text-align:center}
+.mt-ts-cell{font-size:11px;text-align:center;color:var(--text3,#6e7681)}
+.mt-ts-cell.filled{color:var(--text1,#c9d1d9);font-weight:500}
+.mt-ts-cell.bill{color:#58a6ff;font-weight:500}
+.mt-ts-total{font-size:11px;font-weight:600;text-align:center;padding-right:8px;color:var(--text0,#e6edf3)}
+.mt-ts-foot{display:grid;grid-template-columns:1fr repeat(5,32px) 40px;padding:5px 0;background:var(--bg2,#161b22);border-top:0.5px solid var(--border,#30363d)}
+.mt-ts-foot-lbl{font-size:10px;font-weight:600;color:var(--text2,#8b949e);padding:0 8px}
+.mt-ts-foot-val{font-size:11px;font-weight:500;text-align:center;color:var(--text0,#e6edf3)}
+.mt-ts-foot-tot{font-size:12px;font-weight:700;text-align:center;padding-right:8px;color:var(--compass-cyan,#00D2FF)}
+.mt-ts-bill-row{display:grid;grid-template-columns:1fr repeat(5,32px) 40px;padding:3px 0 6px}
+.mt-ts-bill-lbl{font-size:10px;color:var(--text3,#6e7681);padding:0 8px}
+.mt-ts-bill-bar{height:3px;border-radius:2px;margin:3px 4px 0;background:var(--bg2,#161b22)}
+.mt-ts-bill-fill{height:100%;border-radius:2px;background:#185FA5}
+.mt-ts-empty{padding:20px 12px;font-size:11px;color:var(--text3,#6e7681);text-align:center;font-style:italic}
+
+/* Next week panel — day-by-day */
+.mt-nw-day-block{border-bottom:0.5px solid var(--border,#30363d)}
+.mt-nw-day-block:last-child{border-bottom:none}
+.mt-nw-day-hdr{display:flex;align-items:center;gap:7px;padding:8px 12px;cursor:pointer;user-select:none;transition:background .1s}
+.mt-nw-day-hdr:hover{background:var(--bg2,#161b22)}
+.mt-nw-day-name{font-size:12px;font-weight:500;color:var(--text0,#e6edf3);min-width:90px}
+.mt-nw-day-cap{font-size:11px;color:var(--text2,#8b949e)}
+.mt-nw-day-cap.warn{color:#e3b341}
+.mt-nw-day-cap.over{color:#f85149}
+.mt-nw-cap-bar{height:3px;margin:0 12px 0 20px;background:var(--bg2,#161b22);border-radius:2px;overflow:hidden}
+.mt-nw-cap-fill{height:100%;border-radius:2px}
+.mt-nw-body{border-top:0.5px solid var(--border,#30363d)}
+
+/* Cal events in next week */
+.mt-cal-item{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 20px;border-bottom:0.5px solid var(--border,#30363d);background:var(--bg2,#161b22)}
+.mt-cal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.mt-cal-title{font-size:11px;color:var(--text2,#8b949e);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt-cal-time{font-size:10px;color:var(--text3,#6e7681);white-space:nowrap}
+
+/* Task items in next week */
+.mt-nw-task{display:flex;align-items:flex-start;gap:7px;padding:7px 12px 7px 20px;border-bottom:0.5px solid var(--border,#30363d)}
+.mt-nw-task:last-of-type{border-bottom:none}
+.mt-nw-dot{width:7px;height:7px;border-radius:50%;border:1.5px solid var(--border,#30363d);flex-shrink:0;margin-top:3px}
+.mt-nw-task-body{flex:1;min-width:0}
+.mt-nw-task-title{font-size:11px;color:var(--text0,#e6edf3);line-height:1.4}
+.mt-nw-task-meta{font-size:10px;color:var(--text3,#6e7681);margin-top:2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.mt-nw-task-hrs{font-size:11px;color:var(--text2,#8b949e);flex-shrink:0;white-space:nowrap}
+
+/* Flag input */
+.mt-flag-row{padding:5px 12px 6px 20px;border-bottom:0.5px solid var(--border,#30363d)}
+.mt-flag-inp{width:100%;font-size:11px;padding:4px 7px;border:0.5px solid var(--border,#30363d);border-radius:5px;background:var(--bg2,#161b22);color:var(--text0,#e6edf3);outline:none;transition:border-color .1s;font-family:inherit}
+.mt-flag-inp:focus{border-color:var(--compass-cyan,#00D2FF)}
+
+/* Next week summary */
+.mt-nw-summary{padding:8px 12px;background:var(--bg2,#161b22);border-top:0.5px solid var(--border,#30363d)}
+.mt-nw-sum-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.mt-nw-sum-lbl{color:var(--text2,#8b949e)}
+.mt-nw-sum-val{font-weight:500;color:var(--text0,#e6edf3)}
+.mt-nw-sum-val.warn{color:#e3b341}
+.mt-nw-sum-val.over{color:#f85149}
+
+/* Spinner / loading */
+.mt-loading{display:flex;align-items:center;justify-content:center;padding:32px 0;gap:8px;font-size:12px;color:var(--text3,#6e7681)}
+.mt-spinner{width:14px;height:14px;border:2px solid var(--border,#30363d);border-top-color:var(--compass-cyan,#00D2FF);border-radius:50%;animation:mt-spin .7s linear infinite}
+@keyframes mt-spin{to{transform:rotate(360deg)}}
+.mt-err{padding:16px 14px;font-size:11px;color:#f85149;background:#200d0d;border:0.5px solid #4a1010;border-radius:6px;margin:10px 14px}
+</style>
+
+<div class="mt-wrap">
+  <!-- Top bar -->
+  <div class="mt-topbar">
+    <div class="mt-title">My Time</div>
+    <div class="mt-user" id="mt-user-name">—</div>
+    <div class="mt-week-nav">
+      <button class="mt-nav-btn" id="mt-prev-btn">&#8249; Prev</button>
+      <div class="mt-week-lbl" id="mt-week-lbl">—</div>
+      <button class="mt-nav-btn" id="mt-next-btn">Next &#8250;</button>
+    </div>
+  </div>
+
+  <!-- Error banner (hidden by default) -->
+  <div id="mt-err" class="mt-err" style="display:none"></div>
+
+  <!-- Three column layout -->
+  <div class="mt-three-col" id="mt-three-col">
+
+    <!-- LEFT: Story panel -->
+    <div class="mt-panel" id="mt-story-panel">
+      <div class="mt-panel-hdr">
+        <div class="mt-panel-title">Story</div>
+        <div class="mt-legend">
+          <div class="mt-leg-item"><div class="mt-leg-sq" style="background:#185FA5"></div>Billable</div>
+          <div class="mt-leg-item"><div class="mt-leg-sq" style="background:#7F77DD"></div>Non-bill</div>
+          <div class="mt-leg-item"><div class="mt-leg-sq" style="background:#BA7517"></div>Unplanned</div>
+          <div class="mt-leg-item"><div class="mt-leg-sq" style="background:#A32D2D"></div>Blocked</div>
+        </div>
+        <div class="mt-panel-sub" id="mt-story-sub">—</div>
+      </div>
+      <div id="mt-story-days">
+        <div class="mt-loading"><div class="mt-spinner"></div>Loading story…</div>
+      </div>
+      <div class="mt-narrative">
+        <div class="mt-nar-lbl">Weekly narrative — auto-generated · edit before submitting</div>
+        <textarea class="mt-nar-text" id="mt-narrative" rows="3" placeholder="Narrative will generate from CoC events…"></textarea>
+      </div>
+      <div class="mt-submit-row">
+        <button class="mt-btn-edit" id="mt-edit-nar-btn">Edit narrative</button>
+        <button class="mt-btn-submit" id="mt-submit-ts-btn">Submit for PM approval</button>
+        <div class="mt-btn-tot" id="mt-story-tot">—</div>
+      </div>
+    </div>
+
+    <!-- CENTER: Weekly timesheet -->
+    <div class="mt-panel" id="mt-ts-panel">
+      <div class="mt-panel-hdr">
+        <div class="mt-panel-title">Weekly timesheet</div>
+        <div class="mt-panel-sub" id="mt-ts-sub">Draft</div>
+      </div>
+      <div id="mt-ts-body">
+        <div class="mt-loading"><div class="mt-spinner"></div>Loading timesheet…</div>
+      </div>
+      <div class="mt-narrative" style="padding:8px 12px">
+        <div class="mt-nar-lbl">Timesheet notes (optional)</div>
+        <textarea class="mt-nar-text" id="mt-ts-notes" rows="2" placeholder="Add notes for PM…"></textarea>
+      </div>
+      <div class="mt-submit-row">
+        <button class="mt-btn-edit" id="mt-edit-ts-btn">Edit entries</button>
+        <button class="mt-btn-submit" id="mt-submit-ts2-btn">Submit for PM approval</button>
+        <div class="mt-btn-tot" id="mt-ts-tot">—</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Next week plan -->
+    <div class="mt-panel" id="mt-nw-panel">
+      <div class="mt-panel-hdr">
+        <div class="mt-panel-title">Next week plan</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3,#6e7681)">
+          <div style="width:6px;height:6px;border-radius:50%;background:#185FA5"></div>Mtg
+          <div style="width:6px;height:6px;border-radius:50%;background:#7F77DD;margin-left:3px"></div>PTO
+        </div>
+        <div class="mt-panel-sub" id="mt-nw-sub">projected</div>
+      </div>
+      <div id="mt-nw-body">
+        <div class="mt-loading"><div class="mt-spinner"></div>Loading plan…</div>
+      </div>
+      <div class="mt-nw-summary" id="mt-nw-summary" style="display:none">
+        <div class="mt-nw-sum-row"><div class="mt-nw-sum-lbl">Total scheduled</div><div class="mt-nw-sum-val" id="mt-nw-sched">—</div></div>
+        <div class="mt-nw-sum-row"><div class="mt-nw-sum-lbl">Available (after mtgs + PTO)</div><div class="mt-nw-sum-val" id="mt-nw-avail">—</div></div>
+        <div class="mt-nw-sum-row"><div class="mt-nw-sum-lbl">Carry-forward from this week</div><div class="mt-nw-sum-val mt-b-warn" id="mt-nw-carry">—</div></div>
+        <div class="mt-nw-sum-row"><div class="mt-nw-sum-lbl">Projected billability</div><div class="mt-nw-sum-val" id="mt-nw-bill">—</div></div>
+      </div>
+      <div class="mt-submit-row" id="mt-nw-submit-row" style="display:none">
+        <button class="mt-btn-edit" id="mt-edit-plan-btn">Edit plan</button>
+        <button class="mt-btn-submit" id="mt-submit-plan-btn">Submit plan to PM</button>
+      </div>
+    </div>
+
+  </div><!-- /mt-three-col -->
+</div><!-- /mt-wrap -->
+</div><!-- /mt-root -->
+
+<script>
+(function() {
+'use strict';
+
+/* ─── Constants ──────────────────────────────────────────────────────── */
+const FIRM_ID  = window.FIRM_ID  || 'aaaaaaaa-0001-0001-0001-000000000001';
+const DAYS     = ['Mon','Tue','Wed','Thu','Fri'];
+const DAY_MS   = 86400000;
+const WEEK_CAP = 7.5; // available hours per workday (before meetings/PTO)
+
+/* ─── State ──────────────────────────────────────────────────────────── */
+let _weekOffset     = 0;   // 0 = current week, 1 = next, -1 = prev
+let _currentSunday  = null; // Date object for Sun of currently displayed week
+let _timeEntries    = [];   // time_entries rows for displayed week
+let _cocEvents      = [];   // coc_events for displayed week
+let _weekRecord     = null; // timesheet_weeks row (or null)
+let _tasks          = [];   // from window._tasks
+let _calEvents      = [];   // calendar_events for next week
+let _flagCache      = {};   // {dayKey: string} flag inputs keyed by ISO date
+let _narrativeEditing = false;
+
+/* ─── Helpers ────────────────────────────────────────────────────────── */
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+function getSunday(offset) {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const sun = new Date(now);
+  sun.setDate(now.getDate() - day + (offset * 7));
+  sun.setHours(0,0,0,0);
+  return sun;
+}
+
+function weekISO(sun) {
+  // Returns [startISO, endISO] for Sun–Sat week containing given Sunday
+  const sat = new Date(sun.getTime() + 6 * DAY_MS);
+  return [sun.toISOString().slice(0,10), sat.toISOString().slice(0,10)];
+}
+
+function weekDates(sun) {
+  // Returns array of 5 Date objects Mon–Fri
+  const dates = [];
+  for (let i = 1; i <= 5; i++) {
+    const d = new Date(sun.getTime() + i * DAY_MS);
+    dates.push(d);
+  }
+  return dates;
+}
+
+function fmtShortDate(d) {
+  // "Mar 24"
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+function fmtDayHeader(d) {
+  // "Mon 3/24"
+  const day = DAYS[d.getDay()-1] || '?';
+  return `${day} ${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function fmtDayLong(d) {
+  // "Monday 3/24"
+  return `${d.toLocaleDateString('en-US',{weekday:'long'})} ${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function fmtHr(n) {
+  if (!n && n !== 0) return '—';
+  return n % 1 === 0 ? n + 'h' : n.toFixed(1) + 'h';
+}
+
+function isoDate(d) {
+  return d.toISOString().slice(0,10);
+}
+
+function showErr(msg) {
+  const el = document.getElementById('mt-err');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function clearErr() {
+  const el = document.getElementById('mt-err');
+  if (el) el.style.display = 'none';
+}
+
+function setLoading(panelId, msg) {
+  const el = document.getElementById(panelId);
+  if (el) el.innerHTML = `<div class="mt-loading"><div class="mt-spinner"></div>${esc(msg)}</div>`;
+}
+
+/* ─── Week label ─────────────────────────────────────────────────────── */
+function renderWeekLabel(sun) {
+  const [s,e] = weekISO(sun);
+  const sd = new Date(s+'T12:00:00'), ed = new Date(e+'T12:00:00');
+  document.getElementById('mt-week-lbl').textContent =
+    `${fmtShortDate(sd)} – ${fmtShortDate(ed)}`;
+  // Next-week sub label
+  const nwSun = new Date(sun.getTime() + 7*DAY_MS);
+  const [ns,ne] = weekISO(nwSun);
+  const nd = new Date(ns+'T12:00:00'), ned = new Date(ne+'T12:00:00');
+  const nwSub = document.getElementById('mt-nw-sub');
+  if (nwSub) nwSub.textContent = `${fmtShortDate(nd)} – ${fmtShortDate(ned)} · projected`;
+}
+
+/* ─── Data loading ───────────────────────────────────────────────────── */
+async function loadWeekData(sun) {
+  clearErr();
+  const [weekStart, weekEnd] = weekISO(sun);
+  const resource = window._myResource;
+  if (!resource) { showErr('Resource identity not resolved — try refreshing.'); return; }
+
+  const rid = resource.id;
+  const uid = resource.user_id;
+
+  try {
+    // Fetch time entries for week
+    const teResp = await API.get(
+      `time_entries?firm_id=eq.${FIRM_ID}&resource_id=eq.${rid}&date=gte.${weekStart}&date=lte.${weekEnd}&select=*&order=date.asc,created_at.asc`
+    );
+    _timeEntries = Array.isArray(teResp) ? teResp : [];
+
+    // Fetch CoC events for this resource for the week
+    const cocResp = await API.get(
+      `coc_events?firm_id=eq.${FIRM_ID}&actor_resource_id=eq.${rid}&created_at=gte.${weekStart}T00:00:00&created_at=lte.${weekEnd}T23:59:59&select=*&order=created_at.asc`
+    );
+    _cocEvents = Array.isArray(cocResp) ? cocResp : [];
+
+    // Fetch timesheet_weeks record for this week
+    const twResp = await API.get(
+      `timesheet_weeks?firm_id=eq.${FIRM_ID}&resource_id=eq.${rid}&week_start_date=eq.${weekStart}&select=*`
+    );
+    _weekRecord = (Array.isArray(twResp) && twResp.length > 0) ? twResp[0] : null;
+
+    // Fetch calendar events for NEXT week (right panel)
+    const nwSun   = new Date(sun.getTime() + 7*DAY_MS);
+    const [nwStart, nwEnd] = weekISO(nwSun);
+    let calResp = [];
+    try {
+      calResp = await API.get(
+        `calendar_events?firm_id=eq.${FIRM_ID}&resource_id=eq.${rid}&event_date=gte.${nwStart}&event_date=lte.${nwEnd}&select=*&order=event_date.asc,start_time.asc`
+      );
+    } catch(e) {
+      // calendar_events may not exist yet — degrade gracefully
+      calResp = [];
+    }
+    _calEvents = Array.isArray(calResp) ? calResp : [];
+
+  } catch(err) {
+    showErr(`Failed to load time data: ${err.message || err}`);
+    _timeEntries = [];
+    _cocEvents   = [];
+    _weekRecord  = null;
+    _calEvents   = [];
+  }
+}
+
+/* ─── STORY PANEL ────────────────────────────────────────────────────── */
+function buildStoryPanel(sun) {
+  const dates = weekDates(sun);
+  const totalHours = _timeEntries.reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
+  const billHours  = _timeEntries.filter(e=>e.is_billable).reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
+  const billPct    = totalHours > 0 ? Math.round((billHours/totalHours)*100) : 0;
+
+  // Sub label
+  const sub = document.getElementById('mt-story-sub');
+  if (sub) sub.textContent = `${fmtHr(totalHours)} · ${billPct}% bill`;
+
+  // Story total
+  const tot = document.getElementById('mt-story-tot');
+  if (tot) tot.textContent = `${fmtHr(totalHours)} · Sun–Sat`;
+
+  // Group entries by day
+  const byDay = {};
+  dates.forEach(d => { byDay[isoDate(d)] = []; });
+  _timeEntries.forEach(e => {
+    const k = e.date ? e.date.slice(0,10) : null;
+    if (k && byDay[k]) byDay[k].push(e);
+  });
+
+  // Group CoC events by day
+  const cocByDay = {};
+  dates.forEach(d => { cocByDay[isoDate(d)] = []; });
+  _cocEvents.forEach(ev => {
+    const k = ev.created_at ? ev.created_at.slice(0,10) : null;
+    if (k && cocByDay[k]) cocByDay[k].push(ev);
+  });
+
+  // Build HTML — Mon open by default, others closed
+  let html = '';
+  dates.forEach((d, i) => {
+    const key = isoDate(d);
+    const dayEntries = byDay[key] || [];
+    const dayCoC     = cocByDay[key] || [];
+    const dayHours   = dayEntries.reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
+    const isOpen     = (i === 0 || i === 1); // Mon + Tue open by default
+
+    // Compute seg proportions
+    let bill=0, unbill=0, unplan=0, block=0;
+    dayEntries.forEach(e => {
+      const h = parseFloat(e.hours)||0;
+      const notes = (e.notes||'').toLowerCase();
+      if (notes.includes('block') || notes.includes('waiting')) block += h;
+      else if (!e.is_billable) unbill += h;
+      else bill += h;
+    });
+    dayCoC.forEach(ev => {
+      if (ev.event_type === 'blocked') block += 0; // already in entries
+    });
+    const segTotal = bill + unbill + unplan + block || 1;
+    const segBillPct   = Math.round((bill/segTotal)*100);
+    const segUnbillPct = Math.round((unbill/segTotal)*100);
+    const segUnplanPct = Math.round((unplan/segTotal)*100);
+    const segBlockPct  = 100 - segBillPct - segUnbillPct - segUnplanPct;
+
+    // Determine badge
+    const blockedEvs = dayCoC.filter(e=>e.event_type==='blocked');
+    let badge = '';
+    if (block > 0 || blockedEvs.length > 0) {
+      badge = `<span class="mt-badge mt-b-block">Blocked ${fmtHr(block)}</span>`;
+    } else if (dayHours === 0 && isWeekday(d)) {
+      badge = `<span class="mt-badge mt-b-warn">No entries</span>`;
+    } else if (dayEntries.some(e=>(e.notes||'').toLowerCase().includes('unplanned'))) {
+      badge = `<span class="mt-badge mt-b-unplan">Deviation</span>`;
+    } else if (dayHours > 0) {
+      badge = `<span class="mt-badge mt-b-ok">On plan</span>`;
+    }
+
+    // Alert row from CoC
+    let alert = '';
+    const alertEvs = dayCoC.filter(e=>['blocked','meeting_no_consensus'].includes(e.event_type));
+    if (alertEvs.length > 0) {
+      const alertMsg = alertEvs.map(e=>e.event_notes||e.step_name||e.event_type).filter(Boolean).join(' · ');
+      const cls = alertEvs.some(e=>e.event_type==='blocked') ? 'mt-alert-danger' : 'mt-alert-warn';
+      if (alertMsg) alert = `<div class="${cls}">${esc(alertMsg)}</div>`;
+    }
+
+    // Event rows from time_entries + CoC
+    let evRows = '';
+    if (dayEntries.length === 0 && dayCoC.length === 0) {
+      evRows = `<div class="mt-ev-empty">No time logged</div>`;
+    } else {
+      dayEntries.forEach(e => {
+        const h = parseFloat(e.hours)||0;
+        const notes = (e.notes||'').toLowerCase();
+        let barColor = '#185FA5'; // billable
+        let typeLabel = 'Planned'; let typeCls = 'mt-b-ok';
+        if (!e.is_billable) { barColor='#7F77DD'; typeLabel='Non-bill'; typeCls='mt-b-unplan'; }
+        if (notes.includes('unplanned')) { barColor='#BA7517'; typeLabel='Unplanned'; typeCls='mt-b-unplan'; }
+        if (notes.includes('block')||notes.includes('waiting')) { barColor='#A32D2D'; typeLabel='Blocked'; typeCls='mt-b-block'; }
+        // Time label from task name
+        const taskName = getTaskName(e.task_id) || getProjectName(e.project_id) || 'Time entry';
+        const noteText = e.notes ? e.notes.slice(0,80) : '';
+        evRows += `
+          <div class="mt-ev-time">${esc(fmtDate(e.date))}</div>
+          <div class="mt-ev-bar-w"><div class="mt-ev-bar" style="background:${barColor}"></div></div>
+          <div class="mt-ev-body"><div class="mt-ev-title">${esc(taskName)}</div>${noteText?`<div class="mt-ev-note">${esc(noteText)}</div>`:''}</div>
+          <div class="mt-ev-right"><div class="mt-ev-h">${fmtHr(h)}</div><span class="mt-badge ${typeCls}">${typeLabel}</span></div>`;
+      });
+      // CoC milestones not in time entries
+      dayCoC.filter(e=>['completed','loe_negotiation','signature_received'].includes(e.event_type)).forEach(ev => {
+        const label = ev.event_type==='completed'?'Completed':ev.event_type==='signature_received'?'Unblocked':'Milestone';
+        const cls   = ev.event_type==='completed'?'mt-b-ok':ev.event_type==='signature_received'?'mt-b-ok':'mt-b-mile';
+        evRows += `
+          <div class="mt-ev-time">${esc((ev.created_at||'').slice(11,16)||'—')}</div>
+          <div class="mt-ev-bar-w"><div class="mt-ev-bar" style="background:#2ea043"></div></div>
+          <div class="mt-ev-body"><div class="mt-ev-title">${esc(ev.step_name||ev.event_type)}</div>${ev.event_notes?`<div class="mt-ev-note">${esc(ev.event_notes.slice(0,80))}</div>`:''}</div>
+          <div class="mt-ev-right"><div class="mt-ev-h">—</div><span class="mt-badge ${cls}">${label}</span></div>`;
+      });
+    }
+
+    html += `
+    <div class="mt-day-block">
+      <div class="mt-day-hdr" onclick="mtTogDay('${key}')">
+        <div class="mt-day-name">${esc(fmtDayHeader(d))}</div>
+        <div class="mt-day-hrs">${fmtHr(dayHours)}</div>
+        <div class="mt-seg-bar">
+          <div class="mt-s-unbill" style="width:${segUnbillPct}%"></div>
+          <div class="mt-s-block" style="width:${segBlockPct}%"></div>
+          <div class="mt-s-unplan" style="width:${segUnplanPct}%"></div>
+          <div class="mt-s-bill" style="width:${segBillPct}%"></div>
+        </div>
+        <div style="display:flex;gap:3px;margin-left:6px;flex-shrink:0">${badge}</div>
+        <div class="mt-chev ${isOpen?'open':''}" id="mt-sc-${key}">&#9656;</div>
+      </div>
+      <div id="mt-sb-${key}" ${isOpen?'':'style="display:none"'}>
+        ${alert}
+        <div class="mt-ev-grid">${evRows}</div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('mt-story-days').innerHTML = html;
+
+  // Narrative
+  buildNarrative();
+
+  // Submit button state
+  updateSubmitState();
+}
+
+function buildNarrative() {
+  const ta = document.getElementById('mt-narrative');
+  if (!ta) return;
+  if (_narrativeEditing) return; // user is editing — don't overwrite
+
+  if (_weekRecord && _weekRecord.resource_notes) {
+    ta.value = _weekRecord.resource_notes;
+    return;
+  }
+
+  // Auto-generate from CoC events
+  const lines = [];
+  const blocked = _cocEvents.filter(e=>e.event_type==='blocked');
+  const completed = _cocEvents.filter(e=>e.event_type==='completed');
+  const sig = _cocEvents.filter(e=>e.event_type==='signature_received');
+  const noConsensus = _cocEvents.filter(e=>e.event_type==='meeting_no_consensus');
+
+  if (noConsensus.length > 0) lines.push(noConsensus.map(e=>e.event_notes||e.step_name).filter(Boolean).join('; ')+'.');
+  if (blocked.length > 0) {
+    const bh = _timeEntries.filter(e=>(e.notes||'').toLowerCase().includes('block')).reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+    lines.push(`${fmtHr(bh)} blocked — ${blocked.map(e=>e.event_notes||e.step_name||'dependency').filter(Boolean).slice(0,2).join(', ')}.`);
+  }
+  if (sig.length > 0) lines.push(sig.map(e=>e.event_notes||'Signature received').slice(0,2).join('; ')+'.');
+  if (completed.length > 0) lines.push(`${completed.length} item${completed.length>1?'s':''} completed: ${completed.map(e=>e.step_name||e.entity_id).filter(Boolean).slice(0,3).join(', ')}.`);
+
+  const totalHours = _timeEntries.reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+  const billHours  = _timeEntries.filter(e=>e.is_billable).reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+  const billPct    = totalHours>0?Math.round((billHours/totalHours)*100):0;
+  lines.push(`${fmtHr(totalHours)} logged · ${billPct}% billable.`);
+
+  ta.value = lines.join(' ') || 'No CoC events recorded this week.';
+}
+
+function updateSubmitState() {
+  const btn1 = document.getElementById('mt-submit-ts-btn');
+  const btn2 = document.getElementById('mt-submit-ts2-btn');
+  const chip = document.getElementById('mt-ts-sub');
+  if (_weekRecord) {
+    const status = _weekRecord.status || 'draft';
+    if (btn1) { btn1.textContent = status==='submitted'?'Submitted ✓':'Submit for PM approval'; btn1.disabled = (status!=='draft'); }
+    if (btn2) { btn2.textContent = status==='submitted'?'Submitted ✓':'Submit for PM approval'; btn2.disabled = (status!=='draft'); }
+    if (chip) {
+      chip.textContent = status==='approved'?'Approved':status==='submitted'?'Submitted · '+fmtShortDate(new Date(_weekRecord.submitted_at)):'Draft';
+      chip.className = 'mt-panel-sub mt-status-chip '+(status==='approved'?'mt-chip-approved':status==='submitted'?'mt-chip-submitted':'mt-chip-draft');
+    }
+  } else {
+    if (btn1) { btn1.textContent='Submit for PM approval'; btn1.disabled=false; }
+    if (btn2) { btn2.textContent='Submit for PM approval'; btn2.disabled=false; }
+    if (chip) { chip.textContent='Draft'; chip.className='mt-panel-sub mt-status-chip mt-chip-draft'; }
+  }
+}
+
+/* ─── TIMESHEET PANEL ────────────────────────────────────────────────── */
+function buildTimesheetPanel(sun) {
+  const dates = weekDates(sun);
+  const dayKeys = dates.map(isoDate);
+  const totalHours = _timeEntries.reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+
+  const sub = document.getElementById('mt-ts-sub');
+  // status already set by updateSubmitState
+
+  // Group by project → task
+  const projMap = {}; // projId → { name, tasks: { taskId → { name, days: { dayKey: hours }, isB } } }
+  _timeEntries.forEach(e => {
+    const pid  = e.project_id  || '__none__';
+    const tid  = e.task_id     || '__notask__';
+    const pname = getProjectName(pid) || 'Unknown project';
+    const tname = getTaskName(tid)    || (tid==='__notask__'?'General time':tid);
+    const h     = parseFloat(e.hours)||0;
+    const day   = e.date ? e.date.slice(0,10) : null;
+    if (!projMap[pid]) projMap[pid] = { name: pname, tasks: {} };
+    if (!projMap[pid].tasks[tid]) projMap[pid].tasks[tid] = { name: tname, isB: !!e.is_billable, days: {} };
+    if (day) projMap[pid].tasks[tid].days[day] = (projMap[pid].tasks[tid].days[day]||0) + h;
+    if (e.is_billable) projMap[pid].tasks[tid].isB = true;
+  });
+
+  if (Object.keys(projMap).length === 0) {
+    document.getElementById('mt-ts-body').innerHTML = `<div class="mt-ts-empty">No time entries for this week</div>`;
+    const tot = document.getElementById('mt-ts-tot');
+    if (tot) tot.textContent = '0h · Sun–Sat';
+    return;
+  }
+
+  // Day totals
+  const dayTotals = {};
+  dayKeys.forEach(k => {
+    dayTotals[k] = _timeEntries.filter(e=>e.date&&e.date.slice(0,10)===k).reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+  });
+  const dayBillTotals = {};
+  dayKeys.forEach(k => {
+    dayBillTotals[k] = _timeEntries.filter(e=>e.date&&e.date.slice(0,10)===k&&e.is_billable).reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+  });
+
+  let html = `
+  <div class="mt-ts-hdr-row">
+    <div class="mt-ts-hdr-lbl" style="text-align:left;padding-left:8px">Project / Task</div>
+    ${dates.map(d=>`<div class="mt-ts-hdr-lbl">${DAYS[d.getDay()-1]}</div>`).join('')}
+    <div class="mt-ts-hdr-lbl" style="padding-right:8px">Tot</div>
+  </div>`;
+
+  Object.entries(projMap).forEach(([pid, proj]) => {
+    // Project total row
+    const projDayTotals = dayKeys.map(k => {
+      return Object.values(proj.tasks).reduce((s,t)=>s+(t.days[k]||0),0);
+    });
+    const projTotal = projDayTotals.reduce((s,v)=>s+v,0);
+    html += `
+    <div class="mt-ts-row mt-ts-proj-row">
+      <div class="mt-ts-proj">${esc(proj.name)}</div>
+      ${projDayTotals.map(v=>`<div class="mt-ts-cell ${v?'bill':''}">${v?v.toFixed(1):'—'}</div>`).join('')}
+      <div class="mt-ts-total">${projTotal.toFixed(1)}</div>
+    </div>`;
+    // Task rows
+    Object.entries(proj.tasks).forEach(([tid, task]) => {
+      const taskTotal = Object.values(task.days).reduce((s,v)=>s+v,0);
+      html += `
+      <div class="mt-ts-row">
+        <div class="mt-ts-sub">${esc(task.name)}</div>
+        ${dayKeys.map(k=>`<div class="mt-ts-cell ${task.days[k]?'filled':''}">${task.days[k]?task.days[k].toFixed(1):'—'}</div>`).join('')}
+        <div class="mt-ts-total" style="font-size:10px;color:var(--text3)">${taskTotal.toFixed(1)}</div>
+      </div>`;
+    });
+  });
+
+  // Footer totals
+  html += `
+  <div class="mt-ts-foot">
+    <div class="mt-ts-foot-lbl">Total</div>
+    ${dayKeys.map(k=>`<div class="mt-ts-foot-val">${dayTotals[k]?dayTotals[k].toFixed(1):'0'}</div>`).join('')}
+    <div class="mt-ts-foot-tot">${totalHours.toFixed(1)}</div>
+  </div>
+  <div class="mt-ts-bill-row">
+    <div class="mt-ts-bill-lbl">Billable</div>
+    ${dayKeys.map(k=>{
+      const t=dayTotals[k], b=dayBillTotals[k];
+      const pct = t>0?Math.round((b/t)*100):0;
+      return `<div><div class="mt-ts-bill-bar"><div class="mt-ts-bill-fill" style="width:${pct}%"></div></div></div>`;
+    }).join('')}
+    <div></div>
+  </div>`;
+
+  document.getElementById('mt-ts-body').innerHTML = html;
+
+  const tot = document.getElementById('mt-ts-tot');
+  if (tot) tot.textContent = `${totalHours.toFixed(1)}h · Sun–Sat`;
+
+  // Restore saved notes
+  if (_weekRecord && _weekRecord.resource_notes) {
+    const ta = document.getElementById('mt-ts-notes');
+    if (ta && !ta.dataset.dirty) ta.value = _weekRecord.resource_notes;
+  }
+}
+
+/* ─── NEXT WEEK PANEL ────────────────────────────────────────────────── */
+function buildNextWeekPanel(sun) {
+  const nwSun   = new Date(sun.getTime() + 7 * DAY_MS);
+  const nwDates = weekDates(nwSun);
+
+  // Incomplete tasks assigned to this resource (carry-forwards + next week assignments)
+  const resource = window._myResource;
+  const allTasks = window._tasks || [];
+  const uid = resource ? resource.user_id : null;
+  // Tasks not done
+  const openTasks = allTasks.filter(t =>
+    t.assigned_to === uid &&
+    t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved'
+  );
+
+  // Tasks incomplete THIS week (carry-forwards)
+  const [thisStart] = weekISO(sun);
+  const carryTasks = openTasks.filter(t => {
+    if (!t.due_date) return false;
+    return t.due_date <= weekISO(sun)[1]; // due this week or earlier → carry-forward
+  });
+
+  // Tasks due next week
+  const [nwStart, nwEnd] = weekISO(nwSun);
+  const nextWeekTasks = openTasks.filter(t => {
+    if (!t.due_date) return false;
+    return t.due_date >= nwStart && t.due_date <= nwEnd;
+  });
+
+  // Merge: carryTasks distributed Mon/Tue, nextWeekTasks to due day
+  // Build day buckets
+  const dayBuckets = {};
+  nwDates.forEach(d => { dayBuckets[isoDate(d)] = { cal: [], tasks: [] }; });
+
+  // Calendar events into buckets
+  _calEvents.forEach(ev => {
+    const k = ev.event_date ? ev.event_date.slice(0,10) : null;
+    if (k && dayBuckets[k]) dayBuckets[k].cal.push(ev);
+  });
+
+  // Carry-forward tasks → Mon/Tue
+  const carryKeys = [isoDate(nwDates[0]), isoDate(nwDates[1])];
+  carryTasks.forEach((t, i) => {
+    const k = carryKeys[Math.min(i, 1)]; // pile onto Mon first, then Tue
+    if (dayBuckets[k]) dayBuckets[k].tasks.push({ task: t, isCarry: true });
+  });
+
+  // Next-week tasks → their due day (Mon–Fri)
+  nextWeekTasks.forEach(t => {
+    const k = t.due_date ? t.due_date.slice(0,10) : isoDate(nwDates[0]);
+    // Map to Mon–Fri of nwDates
+    const target = nwDates.find(d => isoDate(d) === k);
+    if (target && dayBuckets[k]) {
+      dayBuckets[k].tasks.push({ task: t, isCarry: false });
+    } else {
+      // fallback to Monday
+      const mon = isoDate(nwDates[0]);
+      if (dayBuckets[mon]) dayBuckets[mon].tasks.push({ task: t, isCarry: false });
+    }
+  });
+
+  // Compute capacity metrics
+  let totalScheduled = 0;
+  let totalCalHours  = 0;
+  let totalPtoHours  = 0;
+
+  nwDates.forEach(d => {
+    const k = isoDate(d);
+    const b = dayBuckets[k];
+    b.cal.forEach(ev => {
+      const h = parseFloat(ev.duration_hours||ev.duration_minutes/60||0);
+      if ((ev.event_type||'').toLowerCase().includes('pto')||(ev.title||'').toLowerCase().includes('pto')) {
+        totalPtoHours += h||4; // assume half day if no duration
+      } else {
+        totalCalHours += h||0.5;
+      }
+    });
+    b.tasks.forEach(item => {
+      const h = parseFloat(item.task.budget_hours || item.task.effort_days*WEEK_CAP || 4);
+      totalScheduled += h;
+    });
+  });
+
+  const workdayCount = 5;
+  const totalCapacity = workdayCount * WEEK_CAP;
+  const availableHours = totalCapacity - totalCalHours - totalPtoHours;
+  const overCapacity = totalScheduled > availableHours;
+  const carryHours = carryTasks.reduce((s,t)=>s+(parseFloat(t.budget_hours||t.effort_days*WEEK_CAP||4)),0);
+  const billableScheduled = openTasks.filter(t=>t.is_billable!==false).length / Math.max(openTasks.length,1);
+  const projBillPct = Math.round(billableScheduled * 100);
+
+  // Build HTML
+  let html = '';
+
+  if (overCapacity) {
+    html += `<div class="mt-cap-warn">${totalScheduled.toFixed(1)}h scheduled · ${availableHours.toFixed(1)}h available after meetings. ${(totalScheduled-availableHours).toFixed(1)}h over — flag items below if adjustment needed.</div>`;
+  }
+
+  nwDates.forEach((d, i) => {
+    const k = isoDate(d);
+    const bucket = dayBuckets[k];
+    const isOpen = (i === 0 || i === 1);
+
+    // Day scheduled hours
+    let dayScheduled = 0;
+    bucket.tasks.forEach(item => {
+      dayScheduled += parseFloat(item.task.budget_hours || item.task.effort_days*WEEK_CAP || 4);
+    });
+    let dayCalHours = 0;
+    bucket.cal.forEach(ev => {
+      dayCalHours += parseFloat(ev.duration_hours||ev.duration_minutes/60||0)||0.5;
+    });
+    const dayAvail = WEEK_CAP - dayCalHours;
+    const isOver = dayScheduled > dayAvail;
+    const capPct = Math.min(Math.round((dayScheduled / Math.max(dayAvail,1))*100), 100);
+
+    let capClass = '';
+    if (isOver) capClass = 'over';
+    else if (capPct > 85) capClass = 'warn';
+
+    // Cap bar color
+    const capColor = isOver ? '#A32D2D' : capPct > 85 ? '#BA7517' : '#185FA5';
+
+    // Cal event rows
+    let calHtml = '';
+    bucket.cal.forEach(ev => {
+      const isPto = (ev.event_type||'').toLowerCase().includes('pto')||(ev.title||'').toLowerCase().includes('pto');
+      const dotColor = isPto ? '#7F77DD' : '#185FA5';
+      const startTime = ev.start_time ? ev.start_time.slice(0,5) : '';
+      const durH = parseFloat(ev.duration_hours||ev.duration_minutes/60||0);
+      const timeLabel = startTime ? `${startTime}${durH?` · ${fmtHr(durH)}`:''}` : (isPto?'PTO':'Meeting');
+      calHtml += `
+      <div class="mt-cal-item">
+        <div class="mt-cal-dot" style="background:${dotColor}"></div>
+        <div class="mt-cal-title">${esc(ev.title||'Calendar event')}</div>
+        <div class="mt-cal-time">${esc(timeLabel)}</div>
+      </div>`;
+    });
+
+    // Task rows
+    let taskHtml = '';
+    bucket.tasks.forEach(item => {
+      const t = item.task;
+      const h = parseFloat(t.budget_hours || t.effort_days*WEEK_CAP || 4);
+      const projName = getProjectName(t.project_id) || 'Project';
+      const dotColor = item.isCarry ? '#BA7517' : 'var(--border,#30363d)';
+      const dueLabel = t.due_date ? `Due ${window.fmtDate?window.fmtDate(t.due_date):t.due_date.slice(5)}` : '';
+      taskHtml += `
+      <div class="mt-nw-task">
+        <div class="mt-nw-dot" style="border-color:${dotColor}"></div>
+        <div class="mt-nw-task-body">
+          <div class="mt-nw-task-title">${esc(t.name)}</div>
+          <div class="mt-nw-task-meta">
+            <span class="mt-badge mt-b-proj">${esc(projName)}</span>
+            ${item.isCarry?'<span class="mt-badge mt-b-carry">Carry-forward</span>':''}
+            ${dueLabel?`<span>${esc(dueLabel)}</span>`:''}
+          </div>
+        </div>
+        <div class="mt-nw-task-hrs">${fmtHr(h)}</div>
+      </div>`;
+    });
+
+    if (!calHtml && !taskHtml) {
+      taskHtml = `<div class="mt-ev-empty">No tasks assigned</div>`;
+    }
+
+    // Flag input — restore from cache
+    const flagVal = _flagCache[k] || '';
+
+    html += `
+    <div class="mt-nw-day-block">
+      <div class="mt-nw-day-hdr" onclick="mtTogNw('${k}')">
+        <div class="mt-nw-day-name">${esc(fmtDayLong(d))}</div>
+        <div class="mt-nw-day-cap ${capClass}">${dayScheduled.toFixed(1)}h / ${dayAvail.toFixed(1)}h avail</div>
+        <div class="mt-chev ${isOpen?'open':''}" id="mt-nwc-${k}">&#9656;</div>
+      </div>
+      <div id="mt-nwb-${k}" ${isOpen?'':'style="display:none"'}>
+        <div class="mt-nw-cap-bar"><div class="mt-nw-cap-fill" style="width:${capPct}%;background:${capColor}"></div></div>
+        <div class="mt-nw-body">
+          ${calHtml}
+          ${taskHtml}
+          <div class="mt-flag-row">
+            <input class="mt-flag-inp" placeholder="Flag a concern for PM…" value="${esc(flagVal)}" data-day="${esc(k)}" />
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('mt-nw-body').innerHTML = html;
+
+  // Summary strip
+  const sumEl = document.getElementById('mt-nw-summary');
+  if (sumEl) {
+    sumEl.style.display = '';
+    const schedEl = document.getElementById('mt-nw-sched');
+    const availEl = document.getElementById('mt-nw-avail');
+    const carryEl = document.getElementById('mt-nw-carry');
+    const billEl  = document.getElementById('mt-nw-bill');
+    if (schedEl) { schedEl.textContent=fmtHr(totalScheduled); schedEl.className='mt-nw-sum-val'+(overCapacity?' warn':''); }
+    if (availEl) availEl.textContent = fmtHr(availableHours);
+    if (carryEl) { carryEl.textContent=fmtHr(carryHours); carryEl.className='mt-nw-sum-val'+(carryHours>0?' warn':''); }
+    if (billEl)  billEl.textContent  = projBillPct + '%';
+  }
+
+  const submitRow = document.getElementById('mt-nw-submit-row');
+  if (submitRow) submitRow.style.display = '';
+
+  // Wire up flag inputs
+  wireNwFlags();
+}
+
+function wireNwFlags() {
+  document.querySelectorAll('#mt-nw-body .mt-flag-inp').forEach(inp => {
+    inp.addEventListener('input', function() {
+      const day = this.dataset.day;
+      if (day) _flagCache[day] = this.value;
+    });
+  });
+}
+
+/* ─── TOGGLE HANDLERS ────────────────────────────────────────────────── */
+window.mtTogDay = function(key) {
+  const b = document.getElementById('mt-sb-' + key);
+  const c = document.getElementById('mt-sc-' + key);
+  if (!b || !c) return;
+  const open = b.style.display !== 'none';
+  b.style.display = open ? 'none' : 'block';
+  c.classList.toggle('open', !open);
+};
+
+window.mtTogNw = function(key) {
+  const b = document.getElementById('mt-nwb-' + key);
+  const c = document.getElementById('mt-nwc-' + key);
+  if (!b || !c) return;
+  const open = b.style.display !== 'none';
+  b.style.display = open ? 'none' : 'block';
+  c.classList.toggle('open', !open);
+};
+
+/* ─── SUBMIT HANDLERS ────────────────────────────────────────────────── */
+async function submitTimesheet() {
+  const resource = window._myResource;
+  if (!resource) { compassToast && compassToast('Resource not resolved', 3000); return; }
+  const [weekStart, weekEnd] = weekISO(_currentSunday);
+  const totalHours = _timeEntries.reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+  const billHours  = _timeEntries.filter(e=>e.is_billable).reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+  const narrative  = document.getElementById('mt-narrative');
+  const tsNotes    = document.getElementById('mt-ts-notes');
+  const notes      = (narrative&&narrative.value.trim()) || (tsNotes&&tsNotes.value.trim()) || null;
+
+  const btn1 = document.getElementById('mt-submit-ts-btn');
+  const btn2 = document.getElementById('mt-submit-ts2-btn');
+  if (btn1) { btn1.disabled=true; btn1.textContent='Submitting…'; }
+  if (btn2) { btn2.disabled=true; btn2.textContent='Submitting…'; }
+
+  try {
+    if (_weekRecord) {
+      // Update existing
+      await API.patch(`timesheet_weeks?id=eq.${_weekRecord.id}`, {
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        total_hours: totalHours,
+        billable_hours: billHours,
+        resource_notes: notes
+      });
+      _weekRecord.status = 'submitted';
+      _weekRecord.submitted_at = new Date().toISOString();
+    } else {
+      // Insert new
+      const newRec = {
+        id: crypto.randomUUID(),
+        firm_id: FIRM_ID,
+        resource_id: resource.id,
+        week_start_date: weekStart,
+        week_end_date: weekEnd,
+        total_hours: totalHours,
+        billable_hours: billHours,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        resource_notes: notes
+      };
+      await API.post('timesheet_weeks', newRec);
+      _weekRecord = newRec;
+    }
+
+    // CoC event
+    await API.post('coc_events', {
+      id: crypto.randomUUID(),
+      firm_id: FIRM_ID,
+      entity_id: _weekRecord.id,
+      entity_type: 'timesheet',
+      event_type: 'timesheet_submitted',
+      step_name: 'Timesheet submitted',
+      event_notes: `Submitted ${fmtHr(totalHours)} for week of ${weekStart}`,
+      actor_name: resource.name || null,
+      actor_resource_id: resource.id,
+      outcome: 'submitted',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+
+    window.compassToast && compassToast('Timesheet submitted for PM approval', 3000);
+    updateSubmitState();
+  } catch(err) {
+    showErr(`Submit failed: ${err.message||err}`);
+    if (btn1) { btn1.disabled=false; btn1.textContent='Submit for PM approval'; }
+    if (btn2) { btn2.disabled=false; btn2.textContent='Submit for PM approval'; }
+  }
+}
+
+async function submitNextWeekPlan() {
+  const resource = window._myResource;
+  if (!resource) return;
+  const nwSun = new Date(_currentSunday.getTime() + 7*DAY_MS);
+  const [nwStart, nwEnd] = weekISO(nwSun);
+
+  // Collect flags
+  const flags = Object.entries(_flagCache)
+    .filter(([k,v]) => v && v.trim() && k >= nwStart && k <= nwEnd)
+    .map(([k,v]) => `${k}: ${v.trim()}`).join('\n');
+
+  const btn = document.getElementById('mt-submit-plan-btn');
+  if (btn) { btn.disabled=true; btn.textContent='Submitting…'; }
+
+  try {
+    await API.post('coc_events', {
+      id: crypto.randomUUID(),
+      firm_id: FIRM_ID,
+      entity_id: resource.id,
+      entity_type: 'resource_plan',
+      event_type: 'plan_submitted',
+      step_name: 'Next week plan submitted',
+      event_notes: flags || `Plan submitted for ${nwStart} – ${nwEnd}`,
+      actor_name: resource.name || null,
+      actor_resource_id: resource.id,
+      outcome: 'submitted',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    window.compassToast && compassToast('Next week plan submitted to PM', 3000);
+    if (btn) { btn.textContent='Plan submitted ✓'; }
+  } catch(err) {
+    showErr(`Plan submit failed: ${err.message||err}`);
+    if (btn) { btn.disabled=false; btn.textContent='Submit plan to PM'; }
+  }
+}
+
+/* ─── UTILITY LOOKUPS ────────────────────────────────────────────────── */
+function getProjectName(pid) {
+  if (!pid || pid === '__none__') return null;
+  const projects = window._projects || [];
+  const p = projects.find(p=>p.id===pid);
+  return p ? (p.name||p.title||null) : null;
+}
+
+function getTaskName(tid) {
+  if (!tid || tid === '__notask__') return null;
+  const tasks = window._tasks || [];
+  const t = tasks.find(t=>t.id===tid);
+  return t ? (t.name||null) : null;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  if (window.fmtDate) return window.fmtDate(iso);
+  const d = new Date(iso+'T12:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+function isWeekday(d) {
+  const day = d.getDay();
+  return day >= 1 && day <= 5;
+}
+
+/* ─── MAIN RENDER ────────────────────────────────────────────────────── */
+async function renderAll() {
+  _currentSunday = getSunday(_weekOffset);
+  renderWeekLabel(_currentSunday);
+
+  const resource = window._myResource;
+  const nameEl = document.getElementById('mt-user-name');
+  if (nameEl && resource) nameEl.textContent = resource.name || '';
+
+  setLoading('mt-story-days',  'Loading story…');
+  setLoading('mt-ts-body',     'Loading timesheet…');
+  setLoading('mt-nw-body',     'Loading plan…');
+
+  await loadWeekData(_currentSunday);
+
+  buildStoryPanel(_currentSunday);
+  buildTimesheetPanel(_currentSunday);
+  buildNextWeekPanel(_currentSunday);
+}
+
+/* ─── EVENT WIRING (delegated at module level) ───────────────────────── */
+function wireEvents() {
+  // Week navigation
+  const prevBtn = document.getElementById('mt-prev-btn');
+  const nextBtn = document.getElementById('mt-next-btn');
+  if (prevBtn) prevBtn.addEventListener('click', () => { _weekOffset--; renderAll(); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { _weekOffset++; renderAll(); });
+
+  // Submit timesheet (both Story and Timesheet panels share same action)
+  const sub1 = document.getElementById('mt-submit-ts-btn');
+  const sub2 = document.getElementById('mt-submit-ts2-btn');
+  if (sub1) sub1.addEventListener('click', submitTimesheet);
+  if (sub2) sub2.addEventListener('click', submitTimesheet);
+
+  // Submit next week plan
+  const subPlan = document.getElementById('mt-submit-plan-btn');
+  if (subPlan) subPlan.addEventListener('click', submitNextWeekPlan);
+
+  // Edit narrative button — focus textarea
+  const editNar = document.getElementById('mt-edit-nar-btn');
+  if (editNar) editNar.addEventListener('click', () => {
+    const ta = document.getElementById('mt-narrative');
+    if (ta) { ta.focus(); _narrativeEditing = true; }
+  });
+  const narTa = document.getElementById('mt-narrative');
+  if (narTa) narTa.addEventListener('input', () => { _narrativeEditing = true; });
+
+  // Edit timesheet entries (stub — could open existing edit modal)
+  const editTs = document.getElementById('mt-edit-ts-btn');
+  if (editTs) editTs.addEventListener('click', () => {
+    // Delegate to my-work.html's openFullWeeklyTimesheet if available
+    if (window.openFullWeeklyTimesheet) {
+      window.openFullWeeklyTimesheet(_weekOffset);
+    } else {
+      window.compassToast && compassToast('Timesheet edit coming soon', 2000);
+    }
+  });
+
+  // Edit plan (stub)
+  const editPlan = document.getElementById('mt-edit-plan-btn');
+  if (editPlan) editPlan.addEventListener('click', () => {
+    window.compassToast && compassToast('Plan editing coming soon', 2000);
+  });
+}
+
+/* ─── MODULE EXPORTS ─────────────────────────────────────────────────── */
+window._mtLoadView = async function() {
+  // Guard against double-init
+  if (window._mtLoaded) { window._mtRefresh && window._mtRefresh(); return; }
+  window._mtLoaded = true;
+  wireEvents();
+  await renderAll();
+};
+
+window._mtRefresh = async function() {
+  _narrativeEditing = false;
+  await renderAll();
+};
+
+})();
+</script>
