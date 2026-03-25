@@ -5993,7 +5993,7 @@ window.loadUserConcerns = async function() {
     // Load concerns + their comments in parallel
     const [concerns, comments] = await Promise.all([
       API.get(`concerns?raiser_resource_id=eq.${resId}&order=raised_at.desc&limit=100`).catch(()=>[]),
-      API.get(`concern_comments?concern_id=not.is.null&order=created_at.asc&limit=500`).catch(()=>[]),
+      API.get(`concern_comments?concern_id=not.is.null&order=created_at.asc&limit=500&select=id,concern_id,parent_id,author_name,body,event_type,created_at`).catch(()=>[]),
     ]);
 
     _concernSeq = 0;
@@ -6017,10 +6017,12 @@ window.loadUserConcerns = async function() {
       raised_date: c.raised_at?.slice(0,10),
       raisedAt:    c.raised_at,
       thread:      (commentsByC[c.id]||[]).map(e=>({
-        who:  e.author_name,
-        when: e.created_at,
-        text: e.body,
-        type: e.event_type,
+        id:        e.id,
+        parent_id: e.parent_id||null,
+        who:       e.author_name,
+        when:      e.created_at,
+        text:      e.body,
+        type:      e.event_type,
       })),
     }));
 
@@ -6151,17 +6153,45 @@ function renderUserConcerns() {
     const statLabel = statusLabels[c.status]||c.status;
     const expandId  = 'uconcern-exp-'+c.id;
     const metaParts = [c.cid, c.raisedAt?_timeAgo(c.raisedAt):'', c.project, c.phase].filter(Boolean);
-    const threadHtml = (c.thread||[]).length > 0
-      ? c.thread.map((e,i,arr) => `<div style="display:flex;gap:8px;margin-bottom:0">
-          <div style="display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0">
-            <div style="width:8px;height:8px;border-radius:50%;background:${e.event_type==='concern_raised'?'#E24B4A':e.event_type==='concern_resolved'?'#1D9E75':'#EF9F27'}"></div>
-            ${i<arr.length-1?'<div style="flex:1;width:1px;background:rgba(255,255,255,.08);margin:2px auto 0;min-height:8px"></div>':''}
-          </div>
-          <div style="flex:1;padding-bottom:8px">
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:2px">${esc(e.actor_name||'System')} · ${_timeAgo(e.created_at)}</div>
-            <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.5">${esc(e.event_notes||e.step_name||'')}</div>
-          </div>
-        </div>`).join('')
+    // Thread entries — top-level only (replies nested below their parent)
+    const topThread = (c.thread||[]).filter(e=>!e.parent_id);
+    const threadHtml = topThread.length > 0
+      ? topThread.map((e,i,arr) => {
+          const replies = (c.thread||[]).filter(r=>r.parent_id===e.id);
+          const dotColor = e.type==='resolution'?'#1D9E75':e.type==='escalation'?'#E24B4A':e.type==='acknowledgement'?'#EF9F27':'rgba(0,210,255,.6)';
+          const replyHtml = replies.map(r=>`<div style="display:flex;gap:8px;margin:4px 0 0 24px">
+            <div style="width:6px;height:6px;border-radius:50%;background:rgba(0,210,255,.4);flex-shrink:0;margin-top:3px"></div>
+            <div style="flex:1">
+              <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">${esc(r.who||'You')} · ${r.when?_timeAgo(r.when):''}</div>
+              <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);line-height:1.5">${esc(r.text||'')}</div>
+            </div>
+          </div>`).join('');
+          return `<div style="display:flex;gap:8px;margin-bottom:0">
+            <div style="display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0">
+              <div style="width:8px;height:8px;border-radius:50%;background:${dotColor}"></div>
+              ${i<arr.length-1?'<div style="flex:1;width:1px;background:rgba(255,255,255,.08);margin:2px auto 0;min-height:8px"></div>':''}
+            </div>
+            <div style="flex:1;padding-bottom:8px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+                <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);flex:1">${esc(e.who||'You')} · ${e.when?_timeAgo(e.when):''}</span>
+                <button onclick="uToggleConcernReply('${c.id}','${e.id}')"
+                  style="background:none;border:none;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;padding:0;transition:color .1s"
+                  onmouseenter="this.style.color='#00D2FF'" onmouseleave="this.style.color='rgba(255,255,255,.3)'">↩ Reply</button>
+              </div>
+              <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.5">${esc(e.text||'')}</div>
+              ${replyHtml}
+              <div id="ucr-reply-${c.id}-${e.id}" style="display:none;margin-top:5px">
+                <div style="display:flex;gap:5px">
+                  <textarea id="ucr-reply-ta-${c.id}-${e.id}" placeholder="Reply…"
+                    style="flex:1;padding:5px 8px;font-family:var(--font-body);font-size:11px;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.2);color:#C8DFF0;resize:none;min-height:40px;outline:none;box-sizing:border-box"
+                    onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();uSubmitConcernReply('${c.id}','${e.id}')}"></textarea>
+                  <button onclick="uSubmitConcernReply('${c.id}','${e.id}')"
+                    style="font-family:var(--font-head);font-size:11px;padding:0 12px;background:#00D2FF;border:none;color:#060a10;cursor:pointer;font-weight:700;white-space:nowrap;align-self:flex-end;height:30px">Reply</button>
+                </div>
+              </div>
+            </div>
+          </div>`;
+        }).join('')
       : `<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Awaiting acknowledgement from PM.</div>`;
 
     return `<div style="display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.07)'">
@@ -6182,8 +6212,20 @@ function renderUserConcerns() {
               <option>PM</option><option>Management</option><option>Executive</option>
             </select>
             <button onclick="uEscalateConcern('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Escalate →</button>`}
-            <button onclick="uAddConcernComment('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">+ Add comment</button>
+            <button onclick="uToggleConcernCompose('${c.id}')"
+              style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;transition:color .1s"
+              onmouseenter="this.style.color='#F0F6FF'" onmouseleave="this.style.color='rgba(255,255,255,.4)'">+ Add comment</button>
             ${c.status==='in_progress'?`<button onclick="uResolveConcern('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(29,158,117,.35);color:#1D9E75;cursor:pointer">Mark resolved</button>`:''}
+          </div>
+          <!-- Inline comment compose (toggled) -->
+          <div id="uconcern-compose-${c.id}" style="display:none;margin-top:8px;border-top:1px solid rgba(255,255,255,.06);padding-top:8px">
+            <div style="display:flex;gap:5px">
+              <textarea id="uconcern-compose-ta-${c.id}" placeholder="Add a comment… (Ctrl+Enter to send)"
+                style="flex:1;padding:6px 8px;font-family:var(--font-body);font-size:12px;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.2);color:#C8DFF0;resize:none;min-height:48px;outline:none;box-sizing:border-box"
+                onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();uSubmitConcernComment('${c.id}')}"></textarea>
+              <button onclick="uSubmitConcernComment('${c.id}')"
+                style="font-family:var(--font-head);font-size:11px;padding:0 14px;background:#00D2FF;border:none;color:#060a10;cursor:pointer;font-weight:700;align-self:flex-end;height:32px">Send</button>
+            </div>
           </div>
         </div>
       </div>
@@ -6262,23 +6304,64 @@ window.uEscalateConcern = async function(concernId) {
   } catch(e) { compassToast('Failed: '+e.message,2500); }
 };
 
-window.uAddConcernComment = async function(concernId) {
-  const txt = prompt('Add a comment:');
-  if (!txt?.trim()) return;
+window.uToggleConcernCompose = function(concernId) {
+  const el = document.getElementById('uconcern-compose-'+concernId);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (!open) setTimeout(()=>document.getElementById('uconcern-compose-ta-'+concernId)?.focus(), 50);
+};
+
+window.uSubmitConcernComment = async function(concernId, parentId) {
+  const taId = parentId ? 'ucr-reply-ta-'+concernId+'-'+parentId : 'uconcern-compose-ta-'+concernId;
+  const ta   = document.getElementById(taId);
+  const txt  = ta?.value?.trim()||'';
+  if (!txt) { compassToast('Enter a comment',1500); return; }
   try {
     await API.post('concern_comments',{
-      concern_id: concernId,
-      firm_id:    'aaaaaaaa-0001-0001-0001-000000000001',
-      author_resource_id: _myResource?.id||null,
-      author_name: _myResource?.name||'You',
-      body: txt.trim(),
-      event_type: 'comment',
-      created_at: new Date().toISOString(),
+      concern_id:          concernId,
+      firm_id:             'aaaaaaaa-0001-0001-0001-000000000001',
+      parent_id:           parentId||null,
+      author_resource_id:  _myResource?.id||null,
+      author_name:         _myResource?.name||'You',
+      body:                txt,
+      event_type:          'comment',
+      created_at:          new Date().toISOString(),
     });
+    if (ta) ta.value = '';
+    // Hide compose / reply area
+    if (parentId) {
+      const replyEl = document.getElementById('ucr-reply-'+concernId+'-'+parentId);
+      if (replyEl) replyEl.style.display = 'none';
+    } else {
+      const composeEl = document.getElementById('uconcern-compose-'+concernId);
+      if (composeEl) composeEl.style.display = 'none';
+    }
     compassToast('Comment added',2000);
     window._concernsLoaded = false;
     loadUserConcerns();
   } catch(e) { compassToast('Failed: '+e.message,2500); }
+};
+
+window.uAddConcernComment = function(concernId) {
+  // Legacy alias — now delegates to inline compose toggle
+  window.uToggleConcernCompose(concernId);
+};
+
+window.uToggleConcernReply = function(concernId, commentId) {
+  const el = document.getElementById('ucr-reply-'+concernId+'-'+commentId);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  // Close all other reply boxes on this concern first
+  document.querySelectorAll('[id^="ucr-reply-'+concernId+'-"]').forEach(e => e.style.display='none');
+  if (!open) {
+    el.style.display = 'block';
+    setTimeout(()=>document.getElementById('ucr-reply-ta-'+concernId+'-'+commentId)?.focus(), 50);
+  }
+};
+
+window.uSubmitConcernReply = function(concernId, parentId) {
+  window.uSubmitConcernComment(concernId, parentId);
 };
 
 window.uResolveConcern = async function(concernId) {
