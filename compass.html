@@ -2101,7 +2101,7 @@ async function loadUserView() {
     </div><!-- end mw-main -->
 
       <!-- CoC Panel — fills remaining space -->
-      <div id="mw-coc" style="flex:1;min-width:200px;overflow-y:auto;background:#060c18;border-left:none">
+      <div id="mw-coc" style="display:flex;flex-direction:column;flex:1;min-width:200px;overflow-y:auto;background:#060c18;border-left:1px solid rgba(0,210,255,.1)">
         <div style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)">
           <div>
             <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
@@ -5936,9 +5936,11 @@ let _ucalMonth = new Date().getMonth(); // 0-indexed
 
 window.toggleMwCoc = function() {
   const coc = document.getElementById('mw-coc');
-  if (!coc) return;
-  const hidden = coc.style.display === 'none';
-  coc.style.display = hidden ? 'flex' : 'none';
+  if (!coc) { console.warn('[Compass] mw-coc not found'); return; }
+  // Panel uses flex — toggle between flex and none
+  const isVisible = coc.style.display !== 'none';
+  coc.style.display = isVisible ? 'none' : 'flex';
+  coc.style.flexDirection = 'column';
 };
 
 window.toggleUserCalendar = function() {
