@@ -7136,7 +7136,10 @@ window.renderNegPanel = function(itemId, assignerName) {
       <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);line-height:1.6;margin-bottom:7px">
         Your LOE rating has been submitted. <strong style="color:#EF9F27">${assignerName||'The assigner'}</strong> has 24h to respond before your proposed date is auto-accepted.
       </div>
+      <textarea id="neg-addupdate-${itemId}" rows="2" placeholder="Add a follow-up comment to the thread (optional)..."
+        style="width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:11px;outline:none;resize:none;margin-bottom:7px;box-sizing:border-box"></textarea>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="negAddThreadUpdate('${itemId}')" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add to thread →</button>
         <button onclick="negEscalate('${itemId}')" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(226,75,74,.35);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Escalate to PM</button>
         <button onclick="negReviseRating('${itemId}')" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">Revise my rating</button>
       </div>`;
@@ -7283,6 +7286,20 @@ window.negSubmitCounter = function(itemId) {
   negSaveState(itemId, neg);
   negWriteCoCEvent(itemId, `Counter-proposal submitted: ${response}`, myName);
   compassToast('Counter submitted. Assigner has 24h to respond.');
+  renderNegPanel(itemId, neg.assignerName);
+};
+
+// Add a follow-up comment to the thread while in pending state
+window.negAddThreadUpdate = function(itemId) {
+  const text = document.getElementById('neg-addupdate-' + itemId)?.value?.trim();
+  if (!text) { compassToast('Enter a comment before adding to thread.', 2000); return; }
+  const myName = _myResource?.name || 'Me';
+  const neg = negGetState(itemId);
+  neg.thread = neg.thread || [];
+  neg.thread.push({ role:'assignee', name:myName, ts:new Date().toISOString(), text });
+  negSaveState(itemId, neg);
+  negWriteCoCEvent(itemId, `Follow-up: ${text}`, myName);
+  compassToast('Comment added to negotiation thread.');
   renderNegPanel(itemId, neg.assignerName);
 };
 
