@@ -7005,8 +7005,14 @@ window.negWriteCoCEvent = async function(itemId, eventNotes, actorName) {
   _negRefreshModalCoC(itemId);
   // Write to Supabase in background
   try {
-    await API.post('workflow_step_instances', evt);
-  } catch(e) { console.warn('[Compass] negWriteCoC error:', e); }
+    const result = await API.post('workflow_step_instances', evt);
+    console.log('[Compass] negWriteCoC success:', result);
+  } catch(e) {
+    console.error('[Compass] negWriteCoC FAILED:', e, 'payload:', JSON.stringify(evt));
+    // Remove from optimistic cache if write failed
+    window._myCocEvents = (window._myCocEvents||[]).filter(ev=>ev.id!==evtId);
+    _negRefreshModalCoC(itemId);
+  }
 };
 
 // Refresh the CoC column in the open work item modal for a given item
