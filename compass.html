@@ -913,29 +913,6 @@
       <span style="font-size:13px">◈</span> Simulate
     </button>
 
-    <!-- CoC drawer trigger -->
-    <button id="nav-coc-btn" onclick="toggleUserCoC()"
-      style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);background:none;border:none;padding:0 10px;height:44px;cursor:pointer;transition:color .12s"
-      onmouseenter="this.style.color='var(--compass-cyan)'"
-      onmouseleave="this.style.color='var(--text3)'"
-      title="My Chain of Custody">CoC</button>
-
-    <!-- Calendar icon trigger -->
-    <button id="nav-cal-btn"
-      onclick="toggleUserCalendar()"
-      style="position:relative;width:30px;height:30px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s"
-      onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='var(--compass-cyan)'"
-      onmouseleave="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.5)'"
-      title="My Calendar">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/>
-        <line x1="1" y1="5" x2="13" y2="5" stroke="currentColor" stroke-width="1.2"/>
-        <line x1="4" y1="1" x2="4" y2="3" stroke="currentColor" stroke-width="1.2"/>
-        <line x1="10" y1="1" x2="10" y2="3" stroke="currentColor" stroke-width="1.2"/>
-      </svg>
-      <span id="cal-nav-badge" style="display:none;position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#E24B4A;font-family:var(--font-head);font-size:11px;font-weight:700;color:#fff;align-items:center;justify-content:center"></span>
-    </button>
-
     <div class="nav-sep"></div>
 
     <!-- Cadence link -->
@@ -1791,6 +1768,9 @@ async function loadUserView() {
     <!-- Tab: WORK (existing content wrapper) -->
     <div class="utc on" id="utc-work">
 
+    <div id="mw-flex" style="display:flex;gap:0;align-items:flex-start">
+    <div id="mw-main" style="flex:1;min-width:0">
+
     <!-- 1.A Greeting -->
     <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-bottom:14px">
       <div>
@@ -1798,10 +1778,31 @@ async function loadUserView() {
         <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">
           ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
       </div>
-      ${streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
-        background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
-        font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
-        ■ ${streak}-day streak · ${weekDoneLabel}</div>`:''}
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Calendar icon -->
+        <button onclick="toggleUserCalendar()"
+          style="width:30px;height:30px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0"
+          onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'"
+          onmouseleave="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.5)'"
+          title="My Calendar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="1" y1="5" x2="13" y2="5" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="4" y1="1" x2="4" y2="3" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="10" y1="1" x2="10" y2="3" stroke="currentColor" stroke-width="1.2"/>
+          </svg>
+        </button>
+        <!-- CoC icon — toggles CoC panel -->
+        <button onclick="toggleMwCoc()"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;height:30px;padding:0 10px;background:none;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;transition:all .12s;flex-shrink:0"
+          onmouseenter="this.style.borderColor='rgba(0,210,255,.5)';this.style.color='#00D2FF'"
+          onmouseleave="this.style.borderColor='rgba(0,210,255,.2)';this.style.color='rgba(0,210,255,.6)'"
+          title="Chain of Custody">CoC</button>
+        ${streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+          background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
+          font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
+          ■ ${streak}-day streak · ${weekDoneLabel}</div>`:''}
+      </div>
     </div>
 
     <!-- 1.A 8-Card Strip -->
@@ -1848,8 +1849,6 @@ async function loadUserView() {
       </div>
     </div>
 
-    <div id="mw-flex" style="display:flex;gap:0;align-items:flex-start;min-height:0">
-      <div id="mw-main" style="flex:1;min-width:0;padding-right:14px">
         <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
@@ -1972,7 +1971,7 @@ async function loadUserView() {
         </div>
       </div>
 
-      <div id="mw-right" style="width:300px;flex-shrink:0">
+      <div id="mw-right" style="width:300px;flex-shrink:0;padding-left:14px">
         <!-- 1.E Timesheet Status -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div style="padding:10px 13px 6px">
@@ -2099,13 +2098,7 @@ async function loadUserView() {
         </div>
       </div>
     </div><!-- end right col -->
-
-      <!-- Drag handle -->
-      <div id="mw-coc-resizer"
-        style="width:5px;flex-shrink:0;cursor:col-resize;background:rgba(0,210,255,.08);border-left:1px solid rgba(0,210,255,.12);transition:background .15s;position:relative;z-index:2"
-        onmouseenter="this.style.background='rgba(0,210,255,.25)'"
-        onmouseleave="if(!window._cocDragging)this.style.background='rgba(0,210,255,.08)'">
-      </div>
+    </div><!-- end mw-main -->
 
       <!-- CoC Panel — fills remaining space -->
       <div id="mw-coc" style="flex:1;min-width:200px;overflow-y:auto;background:#060c18;border-left:none">
@@ -5940,6 +5933,13 @@ window.uSwitchTab = function(tab, btn) {
 // ── Calendar popup ────────────────────────────────────────
 let _ucalYear  = new Date().getFullYear();
 let _ucalMonth = new Date().getMonth(); // 0-indexed
+
+window.toggleMwCoc = function() {
+  const coc = document.getElementById('mw-coc');
+  if (!coc) return;
+  const hidden = coc.style.display === 'none';
+  coc.style.display = hidden ? 'flex' : 'none';
+};
 
 window.toggleUserCalendar = function() {
   const p = document.getElementById('user-cal-popup');
