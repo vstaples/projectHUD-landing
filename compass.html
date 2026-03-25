@@ -1260,6 +1260,84 @@ async function loadUserView() {
   if (!_myResource?.id) {
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+
+    // ── Populate CoC panel ──────────────────────────────
+    (function() {
+      const body  = document.getElementById('mw-coc-body');
+      const count = document.getElementById('mw-coc-count');
+      const evts  = window._myCocEvents || [];
+      if (count) count.textContent = evts.length + ' events';
+      if (!body) return;
+      if (!evts.length) {
+        body.innerHTML = '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.7">No CoC events found.<br><br>Events appear when you complete workflow steps or save progress updates.</div>';
+        return;
+      }
+      const evtColor = {
+        instance_launched:'#00D2FF',instance_completed:'#1D9E75',
+        step_activated:'#e8a838',step_completed:'#1D9E75',
+        step_reset:'#E24B4A',management_decision:'#EF9F27',
+        intervention:'#8B5CF6',flag_acknowledged:'#00D2FF',meeting_created:'#00D2FF',
+      };
+      const evtLabel = {
+        instance_launched:'Instance Launched',instance_completed:'Instance Completed',
+        step_activated:'Step Activated',step_completed:'Step Completed',
+        step_reset:'Step Reset',management_decision:'Management Decision',
+        intervention:'Intervention',flag_acknowledged:'Flag Acknowledged',meeting_created:'Meeting Created',
+      };
+      const E = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      let html = '';
+      evts.forEach((e, i) => {
+        const col   = evtColor[e.event_type] || '#5A84A8';
+        const label = evtLabel[e.event_type] || (e.event_type||'').replace(/_/g,' ');
+        const step  = (e.step_name||'').replace(/^CONCERN:\s*/,'');
+        const note  = e.event_notes || '';
+        const ts    = e.created_at ? new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+        const oCol  = e.outcome==='on_track'?'#1D9E75':e.outcome==='at_risk'?'#EF9F27':e.outcome==='blocked'?'#E24B4A':col;
+        const oLbl  = e.outcome==='on_track'?'On track':e.outcome==='at_risk'?'At risk':e.outcome==='blocked'?'Blocked':(e.outcome||'').replace(/_/g,' ');
+        html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
+        html += '<div style="display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0">';
+        html += '<div style="width:7px;height:7px;border-radius:50%;background:'+col+';margin-top:3px"></div>';
+        if (i < evts.length-1) html += '<div style="width:1px;flex:1;min-height:10px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
+        html += '</div><div style="flex:1;min-width:0">';
+        html += '<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(label)+'</div>';
+        if (step) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step)+'</div>';
+        if (oLbl)  html += '<div style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 8px;border-radius:10px;border:1px solid '+oCol+'44"><div style="width:5px;height:5px;border-radius:50%;background:'+oCol+'"></div><span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:'+oCol+'">'+E(oLbl)+'</span></div>';
+        if (e.actor_name) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:2px">By '+E(e.actor_name)+'</div>';
+        if (note) html += '<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);margin-top:3px;padding:3px 7px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.45;word-break:break-word">'+E(note.slice(0,200))+'</div>';
+        if (ts) html += '<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.22);margin-top:2px">'+ts+'</div>';
+        html += '</div></div>';
+      });
+      body.innerHTML = html;
+    })();
+
+    // ── Wire CoC drag handle ─────────────────────────────
+    (function() {
+      const resizer = document.getElementById('mw-coc-resizer');
+      const cocPanel = document.getElementById('mw-coc');
+      if (!resizer || !cocPanel) return;
+      let startX, startW;
+      resizer.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        window._cocDragging = true;
+        startX = e.clientX;
+        startW = cocPanel.offsetWidth;
+        resizer.style.background = 'rgba(0,210,255,.5)';
+        const mm = function(e2) {
+          const delta = startX - e2.clientX; // drag left = grow CoC
+          const newW  = Math.max(180, Math.min(600, startW + delta));
+          cocPanel.style.flex = 'none';
+          cocPanel.style.width = newW + 'px';
+        };
+        const mu = function() {
+          window._cocDragging = false;
+          resizer.style.background = 'rgba(0,210,255,.08)';
+          document.removeEventListener('mousemove', mm);
+          document.removeEventListener('mouseup', mu);
+        };
+        document.addEventListener('mousemove', mm);
+        document.addEventListener('mouseup', mu);
+      });
+    })();
     const d = _identityDebug;
     content.innerHTML = `
       <div style="padding:40px 20px;text-align:center">
@@ -1770,8 +1848,8 @@ async function loadUserView() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr minmax(0,300px);gap:14px">
-      <div>
+    <div id="mw-flex" style="display:flex;gap:0;align-items:flex-start;min-height:0">
+      <div id="mw-main" style="flex:1;min-width:0;padding-right:14px">
         <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
@@ -1894,7 +1972,7 @@ async function loadUserView() {
         </div>
       </div>
 
-      <div>
+      <div id="mw-right" style="width:300px;flex-shrink:0">
         <!-- 1.E Timesheet Status -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div style="padding:10px 13px 6px">
@@ -2021,6 +2099,26 @@ async function loadUserView() {
         </div>
       </div>
     </div><!-- end right col -->
+
+      <!-- Drag handle -->
+      <div id="mw-coc-resizer"
+        style="width:5px;flex-shrink:0;cursor:col-resize;background:rgba(0,210,255,.08);border-left:1px solid rgba(0,210,255,.12);transition:background .15s;position:relative;z-index:2"
+        onmouseenter="this.style.background='rgba(0,210,255,.25)'"
+        onmouseleave="if(!window._cocDragging)this.style.background='rgba(0,210,255,.08)'">
+      </div>
+
+      <!-- CoC Panel — fills remaining space -->
+      <div id="mw-coc" style="flex:1;min-width:200px;overflow-y:auto;background:#060c18;border-left:none">
+        <div style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)">
+          <div>
+            <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
+            <div id="mw-coc-count" style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px">loading…</div>
+          </div>
+        </div>
+        <div id="mw-coc-body" style="padding:10px 14px">
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">Loading CoC events…</div>
+        </div>
+      </div>
 
     </div><!-- end main grid -->
 
