@@ -367,16 +367,8 @@ function renderWeekLabel(sun) {
 async function loadWeekData(sun) {
   clearErr();
   const [weekStart, weekEnd] = weekISO(sun);
-
-  // _myResource is set by compass.html's loadBaseData — wait for it if needed
-  let resource = window._myResource;
-  if (!resource) {
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 100));
-      resource = window._myResource;
-      if (resource) break;
-    }
-  }
+  // _mtResource is set by my-work.html's loadMyTimeView before _mtLoadView is called
+  const resource = window._mtResource;
   if (!resource) { showErr('Resource identity not resolved — try refreshing.'); return; }
 
   const rid = resource.id;
@@ -727,7 +719,7 @@ function buildNextWeekPanel(sun) {
   const nwDates = weekDates(nwSun);
 
   // Incomplete tasks assigned to this resource (carry-forwards + next week assignments)
-  const resource = window._myResource;
+  const resource = window._mtResource;
   const allTasks = window._tasks || [];
   const uid = resource ? resource.user_id : null;
   // Tasks not done
@@ -963,7 +955,7 @@ window.mtTogNw = function(key) {
 
 /* ─── SUBMIT HANDLERS ────────────────────────────────────────────────── */
 async function submitTimesheet() {
-  const resource = window._myResource;
+  const resource = window._mtResource;
   if (!resource) { compassToast && compassToast('Resource not resolved', 3000); return; }
   const [weekStart, weekEnd] = weekISO(_currentSunday);
   const totalHours = _timeEntries.reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
@@ -1033,7 +1025,7 @@ async function submitTimesheet() {
 }
 
 async function submitNextWeekPlan() {
-  const resource = window._myResource;
+  const resource = window._mtResource;
   if (!resource) return;
   const nwSun = new Date(_currentSunday.getTime() + 7*DAY_MS);
   const [nwStart, nwEnd] = weekISO(nwSun);
@@ -1101,7 +1093,7 @@ async function renderAll() {
   _currentSunday = getSunday(_weekOffset);
   renderWeekLabel(_currentSunday);
 
-  const resource = window._myResource;
+  const resource = window._mtResource;
   const nameEl = document.getElementById('mt-user-name');
   if (nameEl && resource) nameEl.textContent = resource.name || '';
 
