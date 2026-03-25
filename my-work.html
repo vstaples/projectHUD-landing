@@ -783,6 +783,9 @@ window._mwLoadUserView = async function() {
           </div>
         </div>
 
+        <!-- 1.B2 Recommended Sequence Panel -->
+        <div id="mw-rec-seq" style="margin-bottom:14px;display:none"></div>
+
         <!-- 1.C Work List -->
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
@@ -1080,6 +1083,9 @@ window._mwLoadUserView = async function() {
 
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
+
+    // ── Recommended daily sequence panel ─────────────────
+    setTimeout(() => buildRecommendedSequence(_wiItems), 100);
 
     // ── Build diagram if in diagram mode ────────────────
     if (_diagramMode) {
@@ -6508,6 +6514,115 @@ document.addEventListener('compass-identity-ready', () => {
 // ══════════════════════════════════════════════════════════
 
 // ── Deterministic project accent color from ID hash ────────
+// ── Recommended daily sequence panel ─────────────────────
+// Algorithm: (1) blocking others, (2) overdue, (3) critical path proxy (most dependents),
+// (4) project health (SPI proxy via overdue ratio), (5) due date
+// Shows 3-5 items. Immutable for the session once generated.
+window._recSeqGenerated = false;
+
+function buildRecommendedSequence(workItems) {
+  const el = document.getElementById('mw-rec-seq');
+  if (!el) return;
+  if (!workItems || !workItems.length) { el.style.display = 'none'; return; }
+
+  // Only regenerate once per session (immutable for the day)
+  if (window._recSeqGenerated && window._recSeqItems) {
+    renderRecSeq(window._recSeqItems);
+    return;
+  }
+
+  const today = new Date().toLocaleDateString('en-CA');
+  const open  = workItems.filter(w => w.status !== 'complete' && w.status !== 'resolved' && w.status !== 'done');
+  if (!open.length) { el.style.display = 'none'; return; }
+
+  // Score each item
+  const scored = open.map(w => {
+    let score = 0;
+    const reasons = [];
+
+    // 1. Blocking other people — action items assigned by someone else (you are the bottleneck)
+    const isActionByOther = w.type === 'action' && w.createdBy && w.createdBy !== (_myResource?.name || '');
+    if (isActionByOther) { score += 1000; reasons.push('Blocking ' + esc(w.createdBy)); }
+
+    // 2. Overdue
+    if (w.overdue) {
+      const daysLate = w.due ? Math.floor((Date.now() - new Date(w.due+'T00:00:00').getTime()) / 86400000) : 1;
+      score += 500 + daysLate * 10;
+      reasons.push(daysLate + 'd overdue');
+    }
+
+    // 3. Due today
+    if (w.due === today && !w.overdue) { score += 300; reasons.push('Due today'); }
+
+    // 4. Blocked status — needs attention to unblock others
+    if (w.status === 'blocked') { score += 400; reasons.push('Blocked — needs action'); }
+
+    // 5. Unrated action item — needs rating before capacity can be assessed
+    if (w.type === 'action') {
+      const neg = negGetState(w.id);
+      if (!neg || neg.state === 'unrated') { score += 200; reasons.push('Unrated — capacity unknown'); }
+    }
+
+    // 6. Project health proxy — if project has multiple overdue items, this project is at risk
+    const projOverdue = open.filter(x => x.projectId && x.projectId === w.projectId && x.overdue).length;
+    if (projOverdue >= 2) { score += 100; if (!reasons.some(r=>r.includes('overdue'))) reasons.push('Project at risk · ' + projOverdue + ' overdue'); }
+
+    // 7. Due soon (within 2 days)
+    if (w.due && !w.overdue && w.due !== today) {
+      const daysOut = Math.floor((new Date(w.due+'T00:00:00').getTime() - Date.now()) / 86400000);
+      if (daysOut <= 2) { score += 150 - daysOut * 30; reasons.push('Due in ' + daysOut + 'd'); }
+    }
+
+    // 8. In progress — finish what you started
+    if (w.status === 'in_progress') score += 50;
+
+    return { ...w, _score: score, _reasons: reasons };
+  });
+
+  // Sort descending by score, take top 5
+  scored.sort((a, b) => b._score - a._score);
+  const top = scored.filter(w => w._score > 0).slice(0, 5);
+
+  if (!top.length) { el.style.display = 'none'; return; }
+
+  window._recSeqItems = top;
+  window._recSeqGenerated = true;
+  renderRecSeq(top);
+}
+
+function renderRecSeq(items) {
+  const el = document.getElementById('mw-rec-seq');
+  if (!el) return;
+
+  const rows = items.map((w, i) => {
+    const rankColor = i === 0 ? 'var(--compass-cyan)' : i === 1 ? 'rgba(0,210,255,.6)' : 'rgba(0,210,255,.35)';
+    const reasonHtml = w._reasons.slice(0, 2).map(r =>
+      `<span style="font-family:var(--font-head);font-size:11px;padding:1px 6px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:rgba(0,210,255,.7);border-radius:2px">${r}</span>`
+    ).join('');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer"
+      data-wi-id="${w.id}" data-wi-type="${w.type}" data-action="diag-open-task"
+      onmouseenter="this.style.background='rgba(0,210,255,.03)'" onmouseleave="this.style.background=''">
+      <div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:${rankColor};width:18px;flex-shrink:0;text-align:center">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${reasonHtml}</div>
+      </div>
+      <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);flex-shrink:0">${esc(w.project||'')}</div>
+    </div>`;
+  }).join('');
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
+        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan)">Recommended sequence for today</div>
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+        <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
+      </div>
+      ${rows}
+    </div>`;
+}
+
 function _diagProjColor(projId) {
   const palette = ['#00D2FF','#8B5CF6','#1D9E75','#EF9F27','#E24B4A','#F472B6','#38BDF8','#A3E635'];
   if (!projId) return palette[0];
@@ -6677,8 +6792,8 @@ function buildWorkDiagram() {
       <div style="height:5px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:2px">
         <div style="height:100%;width:${Math.round(pct*100)}%;background:${barColor};border-radius:2px;transition:width .3s"></div>
       </div>
-      <div style="font-family:var(--font-head);font-size:10px;color:${isToday?(over?'#E24B4A':warn?'#EF9F27':'rgba(0,210,255,.7)'):'rgba(255,255,255,.2)'};text-align:center;white-space:nowrap">
-        ${isToday ? remaining + 'h' : alloc > 0 ? alloc.toFixed(1) + 'h' : ''}
+      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${over?'#E24B4A':warn?'#EF9F27':isToday?'#00D2FF':'rgba(255,255,255,.45)'};text-align:center;white-space:nowrap;letter-spacing:.03em">
+        ${isToday ? (over?'+':'') + (over ? (alloc-AVAIL_HRS).toFixed(1)+'h over' : remaining+'h left') : alloc > 0 ? alloc.toFixed(1)+'h' : ''}
       </div>`;
     capRow.appendChild(col);
   });
