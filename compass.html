@@ -8392,9 +8392,20 @@ async function skipCompletion() {
     time:timeStr, hours:0, signal:null, noTime:true });
 
   try {
-    await API.post('workflow_step_instances',{event_type:'completion_skip',
-      step_name:item.title,event_notes:'skip',created_at:now.toISOString(),
-      firm_id:'aaaaaaaa-0001-0001-0001-000000000001'}).catch(()=>{});
+    await API.post('coc_events',{
+      id: crypto.randomUUID(),
+      firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+      entity_id: item.id,
+      entity_type: item.type === 'task' ? 'task' : 'action_item',
+      event_type: 'completed',
+      step_name: item.type === 'task' ? 'Task completed' : 'Action item resolved',
+      event_notes: 'Completed — no time logged',
+      actor_name: _myResource?.name || null,
+      actor_resource_id: _myResource?.id || null,
+      outcome: 'on_track',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }).catch(()=>{});
     if (item.type==='task') await API.patch(`tasks?id=eq.${item.id}`,{status:'complete',pct_complete:100,updated_at:now.toISOString()}).catch(()=>{});
     else await API.patch(`workflow_action_items?id=eq.${item.id}`,{status:'resolved',resolved_at:now.toISOString()}).catch(()=>{});
   } catch(e) {}
@@ -8482,6 +8493,27 @@ async function submitCompletion() {
       }).catch(() => {})
     );
   }
+
+  // ── 3. Write CoC completion event to coc_events ──────────
+  const cocEvtId = crypto.randomUUID();
+  const cocEvt = {
+    id:          cocEvtId,
+    firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
+    entity_id:   item.id,
+    entity_type: item.type === 'task' ? 'task' : 'action_item',
+    event_type:  'completed',
+    step_name:   item.type === 'task' ? 'Task completed' : 'Action item resolved',
+    event_notes: note || null,
+    actor_name:  _myResource?.name || null,
+    actor_resource_id: _myResource?.id || null,
+    outcome:     _cmpSignal === 'green' ? 'on_track' : _cmpSignal === 'yellow' ? 'at_risk' : _cmpSignal === 'red' ? 'blocked' : 'on_track',
+    created_at:  new Date().toISOString(),
+    updated_at:  new Date().toISOString(),
+  };
+  promises.push(API.post('coc_events', cocEvt).catch(()=>{}));
+  // Optimistically update local cache
+  if (!window._myCocEvents) window._myCocEvents = [];
+  window._myCocEvents.unshift(cocEvt);
 
   try {
     await Promise.all(promises);
@@ -10179,12 +10211,26 @@ async function wiSaveProgress(itemId, projectId) {
         notes: comment
       }).catch(()=>{}));
     }
-    // Write CoC progress event — requires id, instance_id (FK), step_type, valid event_type
-    // Find the instance backing this task via action items or project
-    // Find instance_id: check action items first, then workflow_instances by task_id
-    const taskAI   = (window.myActionItems||[]).find(a=>a.id===itemId);
+    // Write CoC event to coc_events (primary — no FK constraints)
+    const cocEvtId = crypto.randomUUID();
+    const cocEvt = {
+      id:          cocEvtId,
+      firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
+      entity_id:   itemId,
+      entity_type: 'task',
+      event_type:  'progress_update',
+      step_name:   pct !== null ? `Progress: ${pct}%` : 'Progress update',
+      event_notes: comment,
+      actor_name:  _myResource?.name || null,
+      actor_resource_id: _myResource?.id || null,
+      outcome:     sigOutcome,
+      created_at:  new Date().toISOString(),
+      updated_at:  new Date().toISOString(),
+    };
+    ps.push(API.post('coc_events', cocEvt).catch(()=>{}));
+    // Also write to workflow_step_instances if a workflow instance exists (keeps PM/mgmt views working)
     const wfByTask = (window._wfInstances||[]).find(w=>w.task_id===itemId);
-    const instId   = taskAI?.instance_id || wfByTask?.id || null;
+    const instId   = wfByTask?.id || null;
     if (instId) {
       ps.push(API.post('workflow_step_instances', {
         id:          crypto.randomUUID(),
@@ -10198,11 +10244,14 @@ async function wiSaveProgress(itemId, projectId) {
         firm_id:     'aaaaaaaa-0001-0001-0001-000000000001'
       }).catch(()=>{}));
     }
+    // Optimistically update local CoC cache and refresh modal panel
+    if (!window._myCocEvents) window._myCocEvents = [];
+    window._myCocEvents.unshift(cocEvt);
+    _negRefreshModalCoC(itemId);
     await Promise.all(ps);
     if (statusOut) { statusOut.textContent='✓ Saved'; statusOut.style.color='var(--compass-green)'; }
     if (saveBtn)   { saveBtn.textContent='Saved ✓'; saveBtn.disabled=false; }
-    document.getElementById('wi-backdrop')?.remove();
-    setTimeout(()=>{ _viewLoaded['user']=false; loadUserView(); }, 600);
+    setTimeout(()=>{ _viewLoaded['user']=false; loadUserView(); }, 1200);
   } catch(e) {
     if (saveBtn)   { saveBtn.textContent='Save update →'; saveBtn.disabled=false; }
     if (statusOut) { statusOut.textContent='Failed — '+e.message; statusOut.style.color='var(--compass-amber)'; }
