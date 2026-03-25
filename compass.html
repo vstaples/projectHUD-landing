@@ -1338,11 +1338,11 @@ async function loadUserView() {
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,status,due_date,owner_resource_id,instance_id,step_name&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
-      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&firm_id=eq.aaaaaaaa-0001-0001-0001-000000000001&limit=100`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
-      API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?select=id,title,status,due_date,owner_resource_id,instance_id,step_name&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
       Promise.resolve([]), // myCocEvents fetched below after instance IDs are known
     ]);
 
@@ -1401,7 +1401,7 @@ async function loadUserView() {
 
     // ── Fetch CoC events for all instances backing the user's work ────
     // Collect instance_ids from action items (direct FK)
-    const aiInstanceIds = [...new Set((myActionItems||[]).map(a=>a.instance_id).filter(Boolean))];
+    const aiInstanceIds = [...new Set([...(myActionItems||[]), ...(resolvedThisWeek||[])].map(a=>a.instance_id).filter(Boolean))];
     // Also include instances from active wfInstances matching user's projects
     const myProjectIds  = [...new Set(workItems.map(w=>w.projectId).filter(Boolean))];
     const projInstanceIds = (wfInstances||[]).filter(w=>myProjectIds.includes(w.project_id)).map(w=>w.id);
@@ -8809,16 +8809,24 @@ async function wiSaveProgress(itemId, projectId) {
         notes: comment
       }).catch(()=>{}));
     }
-    // Write CoC progress event with signal + comment
-    ps.push(API.post('workflow_step_instances', {
-      event_type:  'task_progress_update',
-      step_name:   pct !== null ? `${pct}% complete` : 'Progress update',
-      event_notes: comment,
-      outcome:     sigOutcome,
-      actor_name:  _myResource?.name || null,
-      created_at:  new Date().toISOString(),
-      firm_id:     'aaaaaaaa-0001-0001-0001-000000000001'
-    }).catch(()=>{}));
+    // Write CoC progress event — requires id, instance_id (FK), step_type, valid event_type
+    // Find the instance backing this task via action items or project
+    const taskAI = (window.myActionItems||[]).find(a=>a.id===itemId);
+    const instId = taskAI?.instance_id || null;
+    if (instId) {
+      ps.push(API.post('workflow_step_instances', {
+        id:          crypto.randomUUID(),
+        instance_id: instId,
+        step_type:   'manual',
+        event_type:  'step_completed',
+        step_name:   pct !== null ? `Progress: ${pct}%` : 'Progress update',
+        event_notes: comment,
+        outcome:     sigOutcome,
+        actor_name:  _myResource?.name || null,
+        created_at:  new Date().toISOString(),
+        firm_id:     'aaaaaaaa-0001-0001-0001-000000000001'
+      }).catch(()=>{}));
+    }
     await Promise.all(ps);
     if (statusOut) { statusOut.textContent='✓ Saved'; statusOut.style.color='var(--compass-green)'; }
     if (saveBtn)   { saveBtn.textContent='Saved ✓'; saveBtn.disabled=false; }
