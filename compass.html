@@ -1253,6 +1253,9 @@ function avatarHtml(name, size = 24, cls = 'av-cyan') {
 async function loadUserView() {
   const loading = document.getElementById('compass-loading');
   const content = document.getElementById('user-content');
+  // Reset lazy-load flags so tabs reload on view refresh
+  window._requestsLoaded = false;
+  window._calTabLoaded   = false;
 
   if (!_myResource?.id) {
     if (loading) loading.style.display = 'none';
@@ -1746,12 +1749,20 @@ async function loadUserView() {
       <div id="ucal-agenda" style="border-top:1px solid rgba(255,255,255,.06);padding-top:8px"></div>
     </div>
 
+    <!-- Since-last-login delta strip -->
+    <div id="mw-delta-strip" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px 7px;border-bottom:1px solid rgba(0,210,255,.07);background:rgba(0,210,255,.03)">
+      <span style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;white-space:nowrap">Since last login</span>
+      <div id="mw-delta-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+
     <!-- Suite tabs -->
     <div id="user-suite-tabs" style="display:flex;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px;background:rgba(255,255,255,.01)">
-      <button class="ust on" data-tab="work"     onclick="uSwitchTab('work',this)">Work list</button>
-      <button class="ust"    data-tab="timesheet" onclick="uSwitchTab('timesheet',this)">Timesheet</button>
-      <button class="ust"    data-tab="meetings"  onclick="uSwitchTab('meetings',this)">My meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
-      <button class="ust"    data-tab="concerns"  onclick="uSwitchTab('concerns',this)">My concerns <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
+      <button class="ust on" data-tab="work"      onclick="uSwitchTab('work',this)">My Work</button>
+      <button class="ust"    data-tab="timesheet"  onclick="uSwitchTab('timesheet',this)">My Time</button>
+      <button class="ust"    data-tab="calendar"   onclick="uSwitchTab('calendar',this)">My Calendar</button>
+      <button class="ust"    data-tab="meetings"   onclick="uSwitchTab('meetings',this)">My Meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="concerns"   onclick="uSwitchTab('concerns',this)">My Concerns <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
+      <button class="ust"    data-tab="requests"   onclick="uSwitchTab('requests',this)">My Requests <span id="ust-requests-badge" class="ust-badge" style="display:none"></span></button>
     </div>
     <style>
       .ust{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 14px;cursor:pointer;color:rgba(255,255,255,.35);background:none;border:none;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:5px}
@@ -1762,6 +1773,49 @@ async function loadUserView() {
       .ust-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27}
       .ust-badge-green{background:rgba(29,158,117,.12);color:#1D9E75}
       .utc{display:none}.utc.on{display:block}
+      .myr-subnav{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.35);cursor:pointer;transition:.12s;display:flex;align-items:center;gap:5px}
+      .myr-subnav.on{color:#00D2FF;border-bottom-color:#00D2FF}
+      .myr-subnav:hover:not(.on){color:rgba(255,255,255,.7)}
+      .wf-catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:14px}
+      .wf-card{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);padding:11px 13px 38px;cursor:pointer;transition:.12s;position:relative}
+      .wf-card:hover{border-color:rgba(0,210,255,.25);background:rgba(0,210,255,.03)}
+      .wf-card-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+      .wf-icon{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+      .wf-card-title{font-size:12px;font-weight:700;color:#F0F6FF;line-height:1.3;flex:1}
+      .wf-card-desc{font-size:11px;color:rgba(255,255,255,.45);line-height:1.55;margin-bottom:7px}
+      .wf-card-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:rgba(255,255,255,.3)}
+      .wf-card-submit{position:absolute;right:10px;bottom:10px;font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;font-family:var(--font-head);letter-spacing:.06em;transition:.12s}
+      .wf-card-submit:hover{background:rgba(0,210,255,.15)}
+      .wf-card-new::before{content:'New';position:absolute;top:8px;right:8px;font-size:9px;padding:1px 6px;background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.3);color:#1D9E75;letter-spacing:.08em;font-family:var(--font-head)}
+      .myr-cat-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin:10px 0 6px;display:flex;align-items:center;gap:6px}
+      .myr-cat-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
+      .myr-active-req{border:1px solid rgba(255,255,255,.08);margin-bottom:8px;overflow:hidden}
+      .myr-ar-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:.12s}
+      .myr-ar-head:hover{background:rgba(255,255,255,.02)}
+      .myr-ar-body{padding:9px 13px;display:none}
+      .myr-ar-body.open{display:block}
+      .myr-pt-steps{display:flex;gap:0;position:relative;margin:5px 0 10px}
+      .myr-pt-steps::before{content:'';position:absolute;top:9px;left:0;right:0;height:1px;background:rgba(255,255,255,.08);z-index:0}
+      .myr-pt-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative;z-index:1}
+      .myr-pt-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+      .myr-ptd-done{background:#1D9E75;color:#fff}
+      .myr-ptd-active{background:#00D2FF;color:#060a10;animation:myrActivePulse 1.5s infinite}
+      @keyframes myrActivePulse{0%,100%{opacity:1}50%{opacity:.6}}
+      .myr-ptd-pending{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)}
+      .myr-pt-name{font-size:10px;color:rgba(255,255,255,.35);text-align:center;letter-spacing:.04em;line-height:1.3;max-width:64px}
+      .myr-pt-name.done{color:#1D9E75}.myr-pt-name.active{color:#00D2FF}
+      .myr-hist-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--font-head);font-size:11px;cursor:pointer;transition:.12s}
+      .myr-hist-row:hover{background:rgba(255,255,255,.02)}
+      .myr-hist-outcome{font-size:11px;padding:1px 7px;border:1px solid;letter-spacing:.04em}
+      .cal-tab-cell{height:26px;border-right:1px solid rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.03);position:relative;cursor:pointer;transition:.12s}
+      .cal-tab-cell:hover{background:rgba(0,210,255,.04)}
+      .cal-tab-event{position:absolute;left:2px;right:2px;top:2px;bottom:2px;border-radius:2px;padding:1px 4px;font-size:10px;overflow:hidden;white-space:nowrap;display:flex;align-items:center;font-family:var(--font-head)}
+      .cal-tab-ce-meeting{background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);color:#C4B5F8}
+      .cal-tab-ce-task{background:rgba(239,159,39,.15);border:1px solid rgba(239,159,39,.3);color:#F5D080}
+      .cal-tab-ce-focus{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);color:#7DD8F0}
+      .cal-tab-ce-pto{background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.25);color:#F0A0A0}
+      .delta-chip{font-family:var(--font-head);font-size:11px;padding:2px 9px;border:1px solid;cursor:pointer;transition:.12s;white-space:nowrap}
+      .delta-chip:hover{filter:brightness(1.15)}
       #mw-coc-drag:hover{background:rgba(0,210,255,.3)!important}
       #mw-coc-drag:active{background:rgba(0,210,255,.5)!important}
       #mw-done-resize:hover{background:rgba(0,210,255,.25)!important}
@@ -1988,7 +2042,7 @@ async function loadUserView() {
               <!-- Bottom-left: stub column — v-scroll synced, no h-scroll -->
               <div id="mw-diag-stub-col" style="overflow:hidden;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);z-index:9"></div>
               <!-- Bottom-right: card canvas — master scroll source -->
-              <div id="mw-diag-canvas-wrap" style="overflow:auto;cursor:grab;position:relative" id="mw-diag-canvas-wrap">
+              <div id="mw-diag-canvas-wrap" style="overflow:auto;cursor:grab;position:relative">
                 <div id="mw-diag-root"></div>
               </div>
             </div>
@@ -2161,10 +2215,61 @@ async function loadUserView() {
     <!-- Tab: CONCERNS -->
     <div class="utc" id="utc-concerns">
       <div id="user-concerns-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading concerns…</div></div>
+    </div>
+
+    <!-- Tab: MY CALENDAR -->
+    <div class="utc" id="utc-calendar">
+      <div id="user-calendar-content">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text0)" id="cal-tab-month-label">March 2026</div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <button id="cal-tab-prev" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249;</button>
+            <button id="cal-tab-today" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);background:none;cursor:pointer">Today</button>
+            <button id="cal-tab-next" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8250;</button>
+            <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px"></div>
+            <button id="cal-tab-add-block" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer">+ Block time</button>
+            <button id="myr-pto-quick" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer">+ PTO</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(139,92,246,.5)"></div>Meeting</div>
+          <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(0,210,255,.5)"></div>Focus block</div>
+          <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(239,159,39,.5)"></div>Task due</div>
+          <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(226,75,74,.5)"></div>PTO / out</div>
+        </div>
+        <div style="overflow-x:auto;margin-bottom:10px">
+          <div id="cal-tab-grid" style="display:grid;grid-template-columns:52px repeat(7,1fr);min-width:480px"></div>
+        </div>
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);line-height:1.5">Click any hour block to add a focus block. PTO requests propagate to assignment constraints automatically on approval.</div>
+      </div>
+    </div>
+
+    <!-- Tab: MY REQUESTS -->
+    <div class="utc" id="utc-requests">
+      <div id="user-requests-content">
+        <div style="display:flex;align-items:center;gap:0;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.06);">
+          <button class="myr-subnav on" data-myr="browse" onclick="myrSwitchView('browse',this)">Browse</button>
+          <button class="myr-subnav" data-myr="active" onclick="myrSwitchView('active',this)">Active <span id="myr-active-badge" class="ust-badge ust-badge-amber" style="display:none"></span></button>
+          <button class="myr-subnav" data-myr="history" onclick="myrSwitchView('history',this)">History</button>
+          <div style="margin-left:auto;font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.06em;padding-right:4px">Powered by <span style="color:rgba(0,210,255,.5)">CadenceHUD</span> workflow engine</div>
+        </div>
+        <div id="myr-pane-browse">
+          <div id="myr-catalog-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading workflow catalog…</div></div>
+        </div>
+        <div id="myr-pane-active" style="display:none">
+          <div id="myr-active-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading active requests…</div></div>
+        </div>
+        <div id="myr-pane-history" style="display:none">
+          <div id="myr-history-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading request history…</div></div>
+        </div>
+      </div>
     </div>`;
 
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+
+    // ── Delta strip — since last login ───────────────────
+    setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
 
     // ── Build diagram if in diagram mode ────────────────
     if (_diagramMode) {
@@ -6011,6 +6116,8 @@ window.uSwitchTab = function(tab, btn) {
   if (panel) panel.classList.add('on');
   if (tab === 'meetings' && !window._meetingsLoaded) loadUserMeetings();
   if (tab === 'concerns' && !window._concernsLoaded) loadUserConcerns();
+  if (tab === 'calendar' && !window._calTabLoaded) { window._calTabLoaded = true; buildCalendarTab(); }
+  if (tab === 'requests' && !window._requestsLoaded) loadUserRequests();
 };
 
 // ── Calendar popup ────────────────────────────────────────
@@ -6119,6 +6226,9 @@ window.ucalSelectDay = function(dt) {
 window._meetingsLoaded = false;
 window._userMeetings   = [];
 window._mtgFilter      = 'all';
+window._requestsLoaded = false;
+window._calTabLoaded   = false;
+window._myRequests     = [];
 
 window.loadUserMeetings = async function() {
   window._meetingsLoaded = true;
@@ -6364,7 +6474,482 @@ window.loadUserConcerns = async function() {
     window._userConcerns = [];
     renderUserConcerns();
   }
+
+
+// ── My Requests — loadUserRequests ───────────────────────
+window.loadUserRequests = async function() {
+  window._requestsLoaded = true;
+  renderMyRequestsCatalog();
+  renderMyRequestsActive();
+  renderMyRequestsHistory();
+  // badge
+  const activeCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
+  const badge = document.getElementById('ust-requests-badge');
+  if (badge && activeCount > 0) {
+    badge.textContent = activeCount + ' active';
+    badge.style.display = 'inline';
+  }
+  const activeBadge = document.getElementById('myr-active-badge');
+  if (activeBadge && activeCount > 0) {
+    activeBadge.textContent = activeCount;
+    activeBadge.style.display = 'inline';
+  }
 };
+
+window.myrSwitchView = function(view, btn) {
+  document.querySelectorAll('.myr-subnav').forEach(b => {
+    b.classList.remove('on');
+    b.style.color = 'rgba(255,255,255,.35)';
+    b.style.borderBottomColor = 'transparent';
+  });
+  if (btn) {
+    btn.classList.add('on');
+    btn.style.color = '#00D2FF';
+    btn.style.borderBottomColor = '#00D2FF';
+  }
+  ['browse','active','history'].forEach(v => {
+    const p = document.getElementById('myr-pane-'+v);
+    if (p) p.style.display = v === view ? 'block' : 'none';
+  });
+};
+
+// Workflow catalog definition
+const _WF_CATALOG = [
+  { cat:'Resource & scheduling', items:[
+    { id:'resource-alloc', title:'Resource allocation request', icon:'user', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
+      desc:'Request a change to a team member\'s allocation across projects. Routes to PM then management for approval.',
+      steps:5, avgTime:'Avg 28h', usage:'3 this month' },
+    { id:'pto-request', title:'PTO / leave request', icon:'cal', iconBg:'rgba(139,92,246,.1)', iconColor:'#8B5CF6',
+      desc:'Request time off. Automatically blocks your calendar, notifies your PM, and updates assignment constraints for the period.',
+      steps:3, avgTime:'Avg 4h', usage:'Used 6\xD7 this year', isNew:false },
+    { id:'capacity-concern', title:'Capacity overload concern', icon:'warn', iconBg:'rgba(226,75,74,.1)', iconColor:'#E24B4A',
+      desc:'Formally raise a capacity concern with your PM. Pre-populated with your current load, overdue count, and queue summary.',
+      steps:3, avgTime:'Avg 6h', usage:'PM notified immediately' },
+  ]},
+  { cat:'Approvals & reviews', items:[
+    { id:'doc-review', title:'Document review & sign-off', icon:'check', iconBg:'rgba(29,158,117,.1)', iconColor:'#1D9E75',
+      desc:'Submit a document for structured review. Routes to designated reviewers with version tracking and approval chain.',
+      steps:6, avgTime:'Avg 48h', usage:'New this month', isNew:true },
+    { id:'change-request', title:'Change request', icon:'plus-sq', iconBg:'rgba(239,159,39,.1)', iconColor:'#EF9F27',
+      desc:'Submit a scope, timeline, or resource change request. Requires PM and client acknowledgement before taking effect.',
+      steps:7, avgTime:'Avg 72h', usage:'1 this month' },
+    { id:'issue-escalation', title:'Issue escalation', icon:'info-circle', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
+      desc:'Escalate a project issue through the formal chain of custody. Auto-attaches CoC context and intervention history.',
+      steps:4, avgTime:'Avg 12h', usage:'2 this month' },
+  ]},
+  { cat:'HR & admin', items:[
+    { id:'expense', title:'Expense reimbursement', icon:'doc-lines', iconBg:'rgba(255,255,255,.06)', iconColor:'rgba(255,255,255,.5)',
+      desc:'Submit project-related expenses for reimbursement. Routes to PM then finance for approval and processing.',
+      steps:4, avgTime:'Avg 5 days', usage:'' },
+    { id:'training', title:'Training request', icon:'globe', iconBg:'rgba(255,255,255,.06)', iconColor:'rgba(255,255,255,.5)',
+      desc:'Request approval for external training, certification, or conference attendance. Includes cost and schedule impact review.',
+      steps:5, avgTime:'Avg 3 days', usage:'' },
+  ]},
+  { cat:'Project requests', items:[
+    { id:'new-project', title:'New project intake', icon:'grid', iconBg:'rgba(0,210,255,.08)', iconColor:'rgba(0,210,255,.6)',
+      desc:'Initiate a new project request. Triggers the full intake workflow including scoping, resourcing, and executive approval.',
+      steps:8, avgTime:'Avg 5 days', usage:'' },
+    { id:'project-closure', title:'Project closure', icon:'flag', iconBg:'rgba(29,158,117,.08)', iconColor:'rgba(29,158,117,.6)',
+      desc:'Formally close a project. Captures lessons learned, final CoC summary, and triggers financial reconciliation.',
+      steps:6, avgTime:'Avg 2 days', usage:'' },
+  ]},
+];
+
+const _WF_ICONS = {
+  'user': `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="4" r="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 12c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`,
+  'cal':  `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="1" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="1" x2="4.5" y2="3" stroke="currentColor" stroke-width="1.3"/><line x1="9.5" y1="1" x2="9.5" y2="3" stroke="currentColor" stroke-width="1.3"/></svg>`,
+  'warn': `<svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2L13 12H1Z" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="6" x2="7" y2="9" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="10.5" r=".8" fill="currentColor"/></svg>`,
+  'check':`<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
+  'plus-sq':`<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="5" y1="7" x2="9" y2="7" stroke="currentColor" stroke-width="1.3"/><line x1="7" y1="5" x2="7" y2="9" stroke="currentColor" stroke-width="1.3"/></svg>`,
+  'info-circle':`<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="5" x2="7" y2="7.5" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="9.5" r=".8" fill="currentColor"/></svg>`,
+  'doc-lines':`<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4.5" y1="5" x2="9.5" y2="5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>`,
+  'globe':`<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M4 7h6M7 2v10M3 4.5c1 .7 2.5 1 4 1s3-.3 4-1M3 9.5c1-.7 2.5-1 4-1s3 .3 4 1" stroke="currentColor" stroke-width="1" fill="none"/></svg>`,
+  'grid': `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="8" y="1" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="1" y="8" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="8" y="8" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
+  'flag': `<svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 2v10M3 2h8l-2 3 2 3H3" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`,
+};
+
+function renderMyRequestsCatalog() {
+  const el = document.getElementById('myr-catalog-content');
+  if (!el) return;
+  let html = '';
+  _WF_CATALOG.forEach(cat => {
+    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>${_esc(cat.cat)}<div class="myr-cat-line"></div></div>`;
+    html += `<div class="wf-catalog-grid">`;
+    cat.items.forEach(wf => {
+      const icon = _WF_ICONS[wf.icon] || '';
+      html += `<div class="wf-card${wf.isNew?' wf-card-new':''}" onclick="myrOpenWorkflowForm('${wf.id}')">
+        <div class="wf-card-top">
+          <div class="wf-icon" style="background:${wf.iconBg};color:${wf.iconColor}">${icon}</div>
+          <div class="wf-card-title">${_esc(wf.title)}</div>
+        </div>
+        <div class="wf-card-desc">${_esc(wf.desc)}</div>
+        <div class="wf-card-meta">
+          <span>${wf.steps} steps</span>
+          <span>${wf.avgTime}</span>
+          ${wf.usage?`<span>${_esc(wf.usage)}</span>`:''}
+        </div>
+        <button class="wf-card-submit" onclick="event.stopPropagation();myrOpenWorkflowForm('${wf.id}')">Submit &#8594;</button>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderMyRequestsActive() {
+  const el = document.getElementById('myr-active-content');
+  if (!el) return;
+  const reqs = window._myRequests || [];
+  const active = reqs.filter(r => r.status !== 'completed' && r.status !== 'rejected');
+  if (!active.length) {
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
+    return;
+  }
+  let html = '';
+  active.forEach((req, i) => {
+    const statusColor = req.status==='approved'?'#1D9E75': req.status==='awaiting'?'#EF9F27':'#00D2FF';
+    const badgeClass = req.status==='approved'?'style="border:1px solid rgba(29,158,117,.3);color:#1D9E75"':
+                       req.status==='awaiting' ?'style="border:1px solid rgba(239,159,39,.3);color:#EF9F27"':
+                                                'style="border:1px solid rgba(0,210,255,.3);color:#00D2FF"';
+    const badgeLabel = req.status==='approved'?'Approved':req.status==='awaiting'?'Awaiting response':'In progress';
+    const dotAnim = req.status==='awaiting'?'animation:myrActivePulse 1.5s infinite':'';
+    let stepsHtml = (req.steps||[]).map((s,si) => {
+      const cls = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
+      const nameCls = s.done?'done':s.active?'active':'';
+      const label = s.done?'&#10003;':(si+1);
+      return `<div class="myr-pt-step"><div class="myr-pt-dot ${cls}">${label}</div><div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div></div>`;
+    }).join('');
+    html += `<div class="myr-active-req">
+      <div class="myr-ar-head" onclick="myrToggleReq('myr-ar-body-${i}')">
+        <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;${dotAnim}"></div>
+        <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
+        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeClass.slice(7,-1)}">${badgeLabel}</span>
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
+      </div>
+      <div class="myr-ar-body${req.expanded?' open':''}" id="myr-ar-body-${i}">
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
+        <div class="myr-pt-steps">${stepsHtml}</div>
+        ${req.cocNote?`<div style="font-family:var(--font-head);font-size:11px;padding:6px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.35);color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">${_esc(req.cocNote)}</div>`:''}
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button onclick="compassToast('Request withdrawn. CoC event written.')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>
+          <button onclick="compassToast('Context added to request thread.')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
+        </div>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderMyRequestsHistory() {
+  const el = document.getElementById('myr-history-content');
+  if (!el) return;
+  const reqs = window._myRequests || [];
+  const hist = reqs.filter(r => r.status === 'completed' || r.status === 'rejected');
+  if (!hist.length) {
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No completed requests yet.</div>`;
+    return;
+  }
+  let html = `<div style="border:1px solid rgba(255,255,255,.07);overflow:hidden">`;
+  hist.forEach((req, i) => {
+    const isLast = i === hist.length - 1;
+    const outcomeColor = req.status==='completed'?'#1D9E75':req.status==='rejected'?'#E24B4A':'#EF9F27';
+    const outcomeBorder = req.status==='completed'?'rgba(29,158,117,.3)':req.status==='rejected'?'rgba(226,75,74,.3)':'rgba(239,159,39,.3)';
+    const outcomeLabel = req.status==='completed'?'Approved':req.status==='rejected'?'Rejected':'Pending';
+    html += `<div class="myr-hist-row"${isLast?' style="border-bottom:none"':''}>
+      <div style="width:7px;height:7px;border-radius:50%;background:${outcomeColor};flex-shrink:0"></div>
+      <div style="flex:1;font-family:var(--font-head);font-size:11px;color:#F0F6FF">${_esc(req.title)}</div>
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.date||'')}</div>
+      <div style="font-family:var(--font-head);font-size:11px;padding:1px 7px;border:1px solid ${outcomeBorder};color:${outcomeColor}">${outcomeLabel}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+window.myrToggleReq = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+};
+
+window.myrOpenWorkflowForm = function(wfId) {
+  // Find workflow definition
+  let wf = null;
+  _WF_CATALOG.forEach(c => c.items.forEach(w => { if (w.id === wfId) wf = w; }));
+  if (!wf) return;
+  // Build pre-filled form based on workflow type
+  const stepPreviews = {
+    'resource-alloc': ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
+    'pto-request':    ['Submit','PM review','Approved \u2192 cal blocked + team notified'],
+    'capacity-concern':['Submit','PM review','Decision \u2192 queue adjusted'],
+    'doc-review':     ['Submit','Route to reviewers','Review round 1','Revisions','Final review','Sign-off'],
+    'change-request': ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
+    'issue-escalation':['Submit','PM review','Resolution plan','Resolved \u2192 CoC event'],
+    'expense':        ['Submit','PM review','Finance approval','Processed'],
+    'training':       ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
+    'new-project':    ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
+    'project-closure':['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
+  };
+  const steps = stepPreviews[wfId] || ['Submit','Review','Complete'];
+  const stepsHtml = steps.map(s=>`<span style="font-family:var(--font-head);font-size:11px;padding:3px 9px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);background:rgba(255,255,255,.02)">${_esc(s)}</span><span style="font-size:11px;color:rgba(255,255,255,.2)">\u2192</span>`).join('').replace(/→$/, '');
+  const formBody = _buildWorkflowFormBody(wfId, wf);
+  // Show via a compass toast-style modal — reuse existing modal infrastructure if available
+  const prefillNote = wfId === 'capacity-concern' || wfId === 'resource-alloc'
+    ? `<div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.5);padding:5px 8px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);margin-bottom:10px;line-height:1.5">Pre-filled from My Work context where available. Review and adjust before submitting.</div>`
+    : '';
+  const modalHtml = `
+    <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px">
+      <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">${_esc(wf.title)}</div>
+      <button onclick="myrCloseModal()" style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:var(--font-head);font-size:11px;display:flex;align-items:center;justify-content:center">&#x2715;</button>
+    </div>
+    <div style="padding:14px;overflow-y:auto;max-height:60vh">
+      ${prefillNote}
+      <div style="margin-bottom:10px">
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase">Workflow steps</div>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${stepsHtml}</div>
+      </div>
+      ${formBody}
+    </div>
+    <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end">
+      <button onclick="myrCloseModal()" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">Cancel</button>
+      <button onclick="myrSubmitWorkflow('${wfId}')" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Submit request &#8594;</button>
+    </div>`;
+  // Create modal overlay
+  let overlay = document.getElementById('myr-modal-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'myr-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.addEventListener('click', e => { if (e.target === overlay) myrCloseModal(); });
+    document.body.appendChild(overlay);
+  }
+  const modal = document.createElement('div');
+  modal.id = 'myr-modal';
+  modal.style.cssText = 'background:#111827;border:1px solid rgba(0,210,255,.25);width:480px;max-height:85vh;border-radius:4px;overflow:hidden;display:flex;flex-direction:column';
+  modal.innerHTML = modalHtml;
+  overlay.innerHTML = '';
+  overlay.appendChild(modal);
+  overlay.style.display = 'flex';
+};
+
+window.myrCloseModal = function() {
+  const overlay = document.getElementById('myr-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+};
+
+window.myrSubmitWorkflow = function(wfId) {
+  myrCloseModal();
+  const msgs = {
+    'resource-alloc':   'Resource request submitted. Routing to VS for PM review.',
+    'pto-request':      'PTO request submitted. VS will review within 4h. Calendar pre-blocked pending approval.',
+    'capacity-concern': 'Capacity concern submitted to VS. Full queue context attached. 24h response window started.',
+    'doc-review':       'Document review request submitted. Routing to designated reviewers.',
+    'change-request':   'Change request submitted. PM review initiated.',
+    'issue-escalation': 'Issue escalation submitted. CoC context attached. PM notified.',
+    'expense':          'Expense reimbursement submitted. PM review initiated.',
+    'training':         'Training request submitted. Routing to PM for review.',
+    'new-project':      'New project intake submitted. Scoping workflow initiated.',
+    'project-closure':  'Project closure request submitted. Final CoC summary generation started.',
+  };
+  compassToast(msgs[wfId] || 'Request submitted. CoC event written.');
+};
+
+function _buildWorkflowFormBody(wfId, wf) {
+  const inp = (label, val='', required=true) => `<div style="margin-bottom:10px"><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">${label}${required?' <span style="color:#E24B4A">*</span>':''}</div><input style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none" type="text" value="${_esc(val)}"/></div>`;
+  const ta  = (label, val='', rows=3, required=true) => `<div style="margin-bottom:10px"><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">${label}${required?' <span style="color:#E24B4A">*</span>':''}</div><textarea style="width:100%;padding:7px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;resize:none" rows="${rows}">${_esc(val)}</textarea></div>`;
+  const sel = (label, opts, required=true) => `<div style="margin-bottom:10px"><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">${label}${required?' <span style="color:#E24B4A">*</span>':''}</div><select style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;cursor:pointer">${opts.map(o=>`<option>${_esc(o)}</option>`).join('')}</select></div>`;
+  switch(wfId) {
+    case 'resource-alloc': return sel('Resource requested',['Robert Chen','Sandra Okafor','Alan Smith','(Other)']) + sel('New allocation',['40% NovaBio','60% NovaBio','80% NovaBio','100% NovaBio']) + inp('Effective date','Apr 2, 2026') + ta('Justification','Section 4.3 review requires a dedicated resource starting Apr 2. Robert Chen at current 40% is insufficient.',3);
+    case 'pto-request':    return inp('From','Mon Mar 31, 2026') + inp('To','Tue Apr 1, 2026') + ta('Coverage plan','Sandra Okafor to monitor NovaBio items. No Flexscope actions expected in this window.',2,false);
+    case 'capacity-concern': return `<div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);border-left:2px solid #E24B4A;padding:9px 11px;margin-bottom:10px;font-size:12px;color:rgba(240,246,255,.7);line-height:1.6"><div style="font-family:var(--font-head);font-size:11px;color:#E24B4A;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Current load — auto-generated</div><div>Overdue: <strong style="color:#E24B4A">3 items</strong></div><div>Due today: <strong style="color:#EF9F27">4 items</strong></div></div>` + ta('What needs to move, be delegated, or be dropped?','',3);
+    case 'doc-review':     return inp('Document name / version','') + sel('Reviewer(s)',['VS (PM)','Sandra Okafor','Robert Chen','Alan Smith']) + inp('Review deadline','') + ta('Review instructions','',2,false);
+    case 'change-request': return sel('Change type',['Scope change','Timeline change','Resource change','Budget change']) + ta('Change description','',3) + ta('Justification & impact','',2);
+    case 'issue-escalation': return sel('Project',['Flexscope','NovaBio','Internal']) + ta('Issue description','',3) + ta('Steps already taken','',2,false);
+    default: return ta('Details','',3);
+  }
+}
+
+// ── My Calendar tab ────────────────────────────────────────
+window.buildCalendarTab = function() {
+  const grid = document.getElementById('cal-tab-grid');
+  const lbl  = document.getElementById('cal-tab-month-label');
+  if (!grid) return;
+  const now   = new Date();
+  let year    = now.getFullYear();
+  let month   = now.getMonth();
+  window._calTabYear  = year;
+  window._calTabMonth = month;
+  _renderCalTab();
+  document.getElementById('cal-tab-prev')?.addEventListener('click', () => {
+    window._calTabMonth--;
+    if (window._calTabMonth < 0) { window._calTabMonth = 11; window._calTabYear--; }
+    _renderCalTab();
+  });
+  document.getElementById('cal-tab-next')?.addEventListener('click', () => {
+    window._calTabMonth++;
+    if (window._calTabMonth > 11) { window._calTabMonth = 0; window._calTabYear++; }
+    _renderCalTab();
+  });
+  document.getElementById('cal-tab-today')?.addEventListener('click', () => {
+    const t = new Date();
+    window._calTabYear = t.getFullYear();
+    window._calTabMonth = t.getMonth();
+    _renderCalTab();
+  });
+  document.getElementById('cal-tab-add-block')?.addEventListener('click', () => {
+    compassToast('Time block feature coming in next session.');
+  });
+  document.getElementById('myr-pto-quick')?.addEventListener('click', () => {
+    myrOpenWorkflowForm('pto-request');
+  });
+};
+
+function _renderCalTab() {
+  const grid = document.getElementById('cal-tab-grid');
+  const lbl  = document.getElementById('cal-tab-month-label');
+  if (!grid) return;
+  const year = window._calTabYear, month = window._calTabMonth;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames   = ['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  if (lbl) lbl.textContent = monthNames[month] + ' ' + year;
+  // Find start of week containing today's date, anchored to Mon
+  const now = new Date();
+  // Build week anchored to current Monday
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() + diffToMon);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    days.push(d);
+  }
+  grid.innerHTML = '';
+  // Header row
+  const cornerH = document.createElement('div');
+  cornerH.style.cssText = 'border-bottom:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06)';
+  grid.appendChild(cornerH);
+  days.forEach(d => {
+    const isToday = d.toDateString() === now.toDateString();
+    const dH = document.createElement('div');
+    dH.style.cssText = `padding:5px 0;font-family:var(--font-head);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;letter-spacing:.06em;color:${isToday?'#00D2FF':'rgba(255,255,255,.35)'}`;
+    dH.textContent = dayNames[d.getDay()===0?7:d.getDay()] + ' ' + d.getDate();
+    grid.appendChild(dH);
+  });
+  // Time rows 8–17
+  const HOURS = [8,9,10,11,12,13,14,15,16,17];
+  const sampleEvents = {
+    // keyed by "dayIndex-hour": {type, label}
+    '0-9':  {type:'meeting', label:'Design Review align'},
+    '0-10': {type:'focus',   label:'Focus \u2014 PCB docs'},
+    '0-14': {type:'meeting', label:'NovaBio 4.3'},
+    '1-10': {type:'meeting', label:'Weekly sync'},
+    '1-14': {type:'focus',   label:'Focus block'},
+    '2-9':  {type:'meeting', label:'Client call \u2014 TransAtlantic'},
+    '2-11': {type:'focus',   label:'Focus block'},
+    '2-15': {type:'task',    label:'Section 4.3 due'},
+  };
+  HOURS.forEach(h => {
+    const timeLbl = document.createElement('div');
+    timeLbl.style.cssText = 'font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:0 5px;text-align:right;line-height:26px;border-right:1px solid rgba(255,255,255,.06)';
+    timeLbl.textContent = (h<=12?h:h-12)+':00'+(h<12?' AM':h===12?' PM':' PM');
+    grid.appendChild(timeLbl);
+    days.forEach((d, di) => {
+      const isToday = d.toDateString() === now.toDateString();
+      const isWknd  = d.getDay() === 0 || d.getDay() === 6;
+      const cell = document.createElement('div');
+      cell.className = 'cal-tab-cell';
+      if (isToday) cell.style.borderLeft = '1px solid rgba(0,210,255,.15)';
+      cell.style.background = isToday?'rgba(0,210,255,.02)':isWknd?'rgba(255,255,255,.01)':'';
+      const ev = sampleEvents[di+'-'+h];
+      if (ev) {
+        const evEl = document.createElement('div');
+        evEl.className = 'cal-tab-event cal-tab-ce-'+ev.type;
+        evEl.textContent = ev.label;
+        cell.appendChild(evEl);
+      }
+      cell.addEventListener('click', () => compassToast('Time block feature coming in next session.'));
+      grid.appendChild(cell);
+    });
+  });
+}
+
+// ── Since-last-login delta strip ───────────────────────────
+window.renderDeltaStrip = function(deltas) {
+  // deltas: [{label, color:'red'|'amber'|'green'|'cyan', navigate:fn}]
+  const strip = document.getElementById('mw-delta-strip');
+  const chips = document.getElementById('mw-delta-chips');
+  if (!strip || !chips || !deltas || !deltas.length) {
+    if (strip) strip.style.display = 'none';
+    return;
+  }
+  const colorMap = {
+    red:   'border:1px solid rgba(226,75,74,.3);color:#E24B4A',
+    amber: 'border:1px solid rgba(239,159,39,.3);color:#EF9F27',
+    green: 'border:1px solid rgba(29,158,117,.3);color:#1D9E75',
+    cyan:  'border:1px solid rgba(0,210,255,.3);color:#00D2FF',
+  };
+  chips.innerHTML = deltas.map((d, i) =>
+    `<span class="delta-chip" style="${colorMap[d.color]||colorMap.cyan}" data-delta-idx="${i}">${_esc(d.label)}</span>`
+  ).join('');
+  // Store navigate fns
+  window._deltaNavigateFns = deltas.map(d => d.navigate || null);
+  strip.style.display = 'flex';
+};
+
+// Wire delta chip clicks at module level
+document.addEventListener('click', function(ev) {
+  const chip = ev.target.closest('.delta-chip');
+  if (!chip) return;
+  const idx = parseInt(chip.dataset.deltaIdx, 10);
+  const fn = (window._deltaNavigateFns||[])[idx];
+  if (typeof fn === 'function') fn();
+});
+
+// Populate delta strip after user view loads (called from loadUserView)
+window.populateDeltaStrip = function() {
+  // Build deltas from live data — tasks/concerns overdue since last session
+  const tasks    = window._userTasks    || [];
+  const concerns = window._userConcerns || [];
+  const deltas   = [];
+  const newTasks = tasks.filter(t => t._newSinceLogin);
+  if (newTasks.length) {
+    deltas.push({ label: newTasks.length + ' new action item' + (newTasks.length>1?'s':'') + ' assigned', color:'red',
+      navigate: () => uSwitchTab('work', document.querySelector('.ust[data-tab=work]')) });
+  }
+  const overdue = tasks.filter(t => t.status !== 'done' && t.due_date && new Date(t.due_date) < new Date());
+  if (overdue.length) {
+    deltas.push({ label: overdue.length + ' item' + (overdue.length>1?'s':'')+' overdue', color:'amber',
+      navigate: () => uSwitchTab('work', document.querySelector('.ust[data-tab=work]')) });
+  }
+  const unreads = concerns.filter(c => c.status==='unread'||c.status==='not_yet_read');
+  if (unreads.length) {
+    deltas.push({ label: unreads.length + ' unread concern' + (unreads.length>1?'s':''), color:'red',
+      navigate: () => uSwitchTab('concerns', document.querySelector('.ust[data-tab=concerns]')) });
+  }
+  const reqs = window._myRequests || [];
+  const recentApproved = reqs.filter(r => r.status==='completed' && r._newSinceLogin);
+  if (recentApproved.length) {
+    deltas.push({ label: recentApproved.length + ' request'+( recentApproved.length>1?'s':'')+' approved', color:'green',
+      navigate: () => { uSwitchTab('requests', document.querySelector('.ust[data-tab=requests]')); myrSwitchView('active', document.querySelector('.myr-subnav[data-myr=active]')); } });
+  }
+  renderDeltaStrip(deltas);
+};
+
+// ── Action item negotiation state badges ──────────────────
+// Renders a negotiation state badge inline on work item rows
+window.getNegotiationBadgeHtml = function(state) {
+  const cfg = {
+    unrated:     { label:'Unrated', style:'border:1px dashed rgba(255,255,255,.2);color:rgba(255,255,255,.35);background:rgba(255,255,255,.03)' },
+    pending:     { label:'Pending agreement', style:'border:1px dashed rgba(239,159,39,.4);color:#EF9F27;background:rgba(239,159,39,.06)' },
+    negotiating: { label:'Negotiating', style:'border:1px solid rgba(139,92,246,.4);color:#8B5CF6;background:rgba(139,92,246,.07)' },
+    agreed:      { label:'Agreed \u00B7 locked', style:'border:1px solid rgba(29,158,117,.4);color:#1D9E75;background:rgba(29,158,117,.07)' },
+    escalated:   { label:'Escalated', style:'border:1px solid rgba(226,75,74,.4);color:#E24B4A;background:rgba(226,75,74,.07)' },
+  };
+  const c = cfg[state] || cfg.unrated;
+  return `<span style="font-family:var(--font-head);font-size:10px;padding:1px 7px;letter-spacing:.05em;${c.style}">${c.label}</span>`;
+};
+
 
 
 
