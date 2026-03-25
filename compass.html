@@ -7227,11 +7227,16 @@ document.addEventListener('change', function(ev) {
 document.addEventListener('click', function(ev) {
   // ── CoC toggle ─────────────────────────────────────────
   if (ev.target.closest('[data-action="toggle-coc"]')) {
+    console.log('[Compass] CoC toggle clicked');
     const coc = document.getElementById('mw-coc');
+    console.log('[Compass] mw-coc element:', coc, 'display:', coc?.style.display);
     if (coc) {
       const open = coc.style.display === 'flex';
       coc.style.display = open ? 'none' : 'flex';
       coc.style.flexDirection = 'column';
+      console.log('[Compass] CoC display set to:', coc.style.display);
+    } else {
+      console.warn('[Compass] mw-coc NOT FOUND in DOM');
     }
     return;
   }
