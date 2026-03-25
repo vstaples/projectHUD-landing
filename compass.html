@@ -8480,10 +8480,10 @@ function openWorkItemExpanded(item) {
     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
 
       <!-- Rows 2-4: two-column grid — left=controls+work completed, right=CoC full height -->
-      <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 240px;overflow:hidden">
+      <div style="flex:1;min-height:0;display:grid;grid-template-columns:auto 240px;overflow:hidden">
 
         <!-- LEFT column: Row 2 meta + Row 3 sentiment+slider + Row 4 work completed -->
-        <div style="display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(0,210,255,.08)">
+        <div style="display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(0,210,255,.08);min-width:0">
 
           <!-- Row 2: Status + meta tiles + Log time -->
           <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
@@ -8538,7 +8538,7 @@ function openWorkItemExpanded(item) {
           <div style="flex:1;padding:8px 14px 0;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden">
             <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
             <textarea id="wi-comment-${item.id}" placeholder="Describe what was accomplished this session — required to save…" oninput="wiCheckGate('${item.id}')"
-              style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
+              style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:124px;overflow-y:auto"></textarea>
             <!-- Buttons + hint inside work completed pane -->
             <div style="display:flex;gap:6px;flex-shrink:0;padding-top:6px">
               <button id="wi-save-progress-${item.id}" onclick="wiSaveProgress('${item.id}','${item.projectId||''}')" disabled
