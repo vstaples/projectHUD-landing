@@ -1,0 +1,266 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.shell{font-family:var(--font-sans,system-ui);background:var(--color-background-secondary);padding:12px;border-radius:var(--border-radius-lg)}
+.panel{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;max-width:340px}
+.panel-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.panel-title{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.panel-sub{font-size:11px;color:var(--color-text-tertiary);margin-left:auto}
+.badge{font-size:10px;padding:2px 6px;border-radius:20px;white-space:nowrap}
+.b-ok{background:#EAF3DE;color:#27500A}
+.b-warn{background:#FAEEDA;color:#633806}
+.b-cal{background:#E6F1FB;color:#0C447C}
+.b-pto{background:#EEEDFE;color:#3C3489}
+.b-carry{background:#FAEEDA;color:#633806}
+.b-proj{font-size:10px;padding:1px 5px;border-radius:20px;background:#E6F1FB;color:#0C447C;white-space:nowrap}
+.b-over{background:#FCEBEB;color:#791F1F}
+.day-block{border-bottom:0.5px solid var(--color-border-tertiary)}
+.day-block:last-of-type{border-bottom:none}
+.day-hdr{display:flex;align-items:center;gap:7px;padding:8px 12px;cursor:pointer;user-select:none}
+.day-name{font-size:12px;font-weight:500;color:var(--color-text-primary);min-width:76px}
+.day-cap{font-size:11px;color:var(--color-text-tertiary)}
+.day-cap.warn{color:#BA7517}
+.day-cap.over{color:#A32D2D}
+.chev{font-size:10px;color:var(--color-text-tertiary);margin-left:auto;transition:transform .15s;display:inline-block}
+.chev.open{transform:rotate(90deg)}
+.day-body{border-top:0.5px solid var(--color-border-tertiary)}
+.cal-item{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 20px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-info)}
+.cal-dot{width:6px;height:6px;border-radius:50%;background:#185FA5;flex-shrink:0}
+.cal-pto-dot{width:6px;height:6px;border-radius:50%;background:#7F77DD;flex-shrink:0}
+.cal-title{font-size:11px;color:var(--color-text-info);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-time{font-size:10px;color:var(--color-text-tertiary)}
+.task-item{display:flex;align-items:flex-start;gap:7px;padding:7px 12px 7px 20px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.task-item:last-child{border-bottom:none}
+.task-dot{width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-border-secondary);flex-shrink:0;margin-top:3px}
+.task-body{flex:1;min-width:0}
+.task-title{font-size:11px;color:var(--color-text-primary);line-height:1.4}
+.task-meta{font-size:10px;color:var(--color-text-tertiary);margin-top:2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.task-hrs{font-size:11px;color:var(--color-text-secondary);flex-shrink:0;white-space:nowrap}
+.flag-row{padding:5px 12px 7px 20px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.flag-inp{width:100%;font-size:11px;padding:4px 7px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none}
+.flag-inp:focus{border-color:var(--color-border-info)}
+.day-cap-bar{height:4px;background:var(--color-border-tertiary);border-radius:2px;margin:0 12px 0 20px;overflow:hidden}
+.day-cap-fill{height:100%;border-radius:2px}
+.summary{padding:8px 12px;background:var(--color-background-secondary);border-top:0.5px solid var(--color-border-tertiary)}
+.sum-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.sum-lbl{color:var(--color-text-secondary)}
+.sum-val{font-weight:500;color:var(--color-text-primary)}
+.sum-val.warn{color:#BA7517}
+.sum-val.over{color:#A32D2D}
+.submit-row{display:flex;gap:6px;padding:8px 12px;border-top:0.5px solid var(--color-border-tertiary);align-items:center}
+.btn-submit{padding:5px 14px;font-size:11px;font-weight:500;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);border-radius:var(--border-radius-md);cursor:pointer}
+.btn-edit{padding:5px 10px;font-size:11px;color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:none;cursor:pointer}
+</style>
+
+<div class="shell">
+<div class="panel">
+  <div class="panel-hdr">
+    <div class="panel-title">Next week</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--color-text-tertiary)">
+      <div style="width:7px;height:7px;border-radius:50%;background:#185FA5"></div>Meeting
+      <div style="width:7px;height:7px;border-radius:50%;background:#7F77DD;margin-left:4px"></div>PTO
+    </div>
+    <div class="panel-sub">Mar 30 – Apr 5</div>
+  </div>
+
+  <div style="padding:6px 12px;background:var(--color-background-warning);border-bottom:0.5px solid var(--color-border-warning);font-size:10px;color:var(--color-text-warning);line-height:1.5">
+    34h scheduled · 32h available after meetings. 2h over — flag items below if adjustment needed.
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('m')">
+      <div class="day-name">Monday 3/30</div>
+      <div class="day-cap warn">8.5h / 7h avail</div>
+      <div class="chev open" id="c-m">&#9656;</div>
+    </div>
+    <div id="b-m">
+      <div style="height:3px;margin:0 12px 0 20px;background:var(--color-border-tertiary);border-radius:2px;overflow:hidden;border-bottom:none"><div style="height:100%;width:100%;background:#A32D2D;border-radius:2px"></div></div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">Weekly team standup</div>
+        <div class="cal-time">9:00am · 30m</div>
+      </div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">NovaBio project sync</div>
+        <div class="cal-time">2:00pm · 1h</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot" style="border-color:#BA7517"></div>
+        <div class="task-body">
+          <div class="task-title">Production fixture testing — carry-forward</div>
+          <div class="task-meta"><span class="b-proj">Flexscope</span> <span class="badge b-carry">Carry-forward</span></div>
+        </div>
+        <div class="task-hrs">4.0h</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot"></div>
+        <div class="task-body">
+          <div class="task-title">NovaBio Section 4.3 final review</div>
+          <div class="task-meta"><span class="b-proj">NovaBio</span> Due Mar 30</div>
+        </div>
+        <div class="task-hrs">4.0h</div>
+      </div>
+      <div class="flag-row">
+        <input class="flag-inp" placeholder="Flag a concern for PM..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('t')">
+      <div class="day-name">Tuesday 3/31</div>
+      <div class="day-cap">6.5h / 7.5h avail</div>
+      <div class="chev open" id="c-t">&#9656;</div>
+    </div>
+    <div id="b-t">
+      <div style="height:3px;margin:0 12px 0 20px;background:var(--color-border-tertiary);border-radius:2px;overflow:hidden"><div style="height:100%;width:87%;background:#185FA5;border-radius:2px"></div></div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">Weekly team standup</div>
+        <div class="cal-time">9:00am · 30m</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot" style="border-color:#BA7517"></div>
+        <div class="task-body">
+          <div class="task-title">Production fixture testing — complete</div>
+          <div class="task-meta"><span class="b-proj">Flexscope</span> <span class="badge b-carry">Carry-forward</span></div>
+        </div>
+        <div class="task-hrs">4.0h</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot"></div>
+        <div class="task-body">
+          <div class="task-title">Test report draft</div>
+          <div class="task-meta"><span class="b-proj">Flexscope</span> Due Mar 31</div>
+        </div>
+        <div class="task-hrs">2.5h</div>
+      </div>
+      <div class="flag-row">
+        <input class="flag-inp" placeholder="Flag a concern for PM..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('w')">
+      <div class="day-name">Wednesday 4/1</div>
+      <div class="day-cap warn">8.0h / 6h avail</div>
+      <div class="chev" id="c-w">&#9656;</div>
+    </div>
+    <div id="b-w" style="display:none">
+      <div style="height:3px;margin:0 12px 0 20px;background:var(--color-border-tertiary);border-radius:2px;overflow:hidden"><div style="height:100%;width:100%;background:#A32D2D;border-radius:2px"></div></div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">Weekly team standup</div>
+        <div class="cal-time">9:00am · 30m</div>
+      </div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">Flexscope sign-off review</div>
+        <div class="cal-time">10:00am · 2h</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot"></div>
+        <div class="task-body">
+          <div class="task-title">NovaBio Sections 4.4–4.6 gap analysis</div>
+          <div class="task-meta"><span class="b-proj">NovaBio</span> Due Apr 2</div>
+        </div>
+        <div class="task-hrs">8.0h</div>
+      </div>
+      <div class="flag-row">
+        <input class="flag-inp" placeholder="Flag a concern for PM..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('th')">
+      <div class="day-name">Thursday 4/2</div>
+      <div class="day-cap">5.5h / 7.5h avail</div>
+      <div class="chev" id="c-th">&#9656;</div>
+    </div>
+    <div id="b-th" style="display:none">
+      <div style="height:3px;margin:0 12px 0 20px;background:var(--color-border-tertiary);border-radius:2px;overflow:hidden"><div style="height:100%;width:73%;background:#185FA5;border-radius:2px"></div></div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">Weekly team standup</div>
+        <div class="cal-time">9:00am · 30m</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot"></div>
+        <div class="task-body">
+          <div class="task-title">NovaBio QMS sections 4.4–4.6 complete</div>
+          <div class="task-meta"><span class="b-proj">NovaBio</span> Due Apr 2</div>
+        </div>
+        <div class="task-hrs">5.0h</div>
+      </div>
+      <div class="flag-row">
+        <input class="flag-inp" placeholder="Flag a concern for PM..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('f')">
+      <div class="day-name">Friday 4/3</div>
+      <div class="day-cap">3.0h / 4h avail</div>
+      <div class="chev" id="c-f">&#9656;</div>
+    </div>
+    <div id="b-f" style="display:none">
+      <div style="height:3px;margin:0 12px 0 20px;background:var(--color-border-tertiary);border-radius:2px;overflow:hidden"><div style="height:100%;width:75%;background:#185FA5;border-radius:2px"></div></div>
+      <div class="cal-item">
+        <div class="cal-dot"></div>
+        <div class="cal-title">Weekly team standup</div>
+        <div class="cal-time">9:00am · 30m</div>
+      </div>
+      <div class="cal-item">
+        <div class="cal-pto-dot"></div>
+        <div class="cal-title" style="color:var(--color-text-secondary)">PTO — afternoon</div>
+        <div class="cal-time">12:00pm+</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot"></div>
+        <div class="task-body">
+          <div class="task-title">Weekly timesheet + brief</div>
+          <div class="task-meta"><span class="b-proj">Internal</span></div>
+        </div>
+        <div class="task-hrs">1.5h</div>
+      </div>
+      <div class="task-item">
+        <div class="task-dot"></div>
+        <div class="task-body">
+          <div class="task-title">Buffer — unassigned capacity</div>
+          <div class="task-meta">Available · morning only due to PTO</div>
+        </div>
+        <div class="task-hrs">1.5h</div>
+      </div>
+      <div class="flag-row">
+        <input class="flag-inp" placeholder="Flag a concern for PM..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="sum-row"><div class="sum-lbl">Total scheduled</div><div class="sum-val warn">34.0h</div></div>
+    <div class="sum-row"><div class="sum-lbl">Available (after meetings + PTO)</div><div class="sum-val">32.0h</div></div>
+    <div class="sum-row"><div class="sum-lbl">Carry-forward from this week</div><div class="sum-val warn">8.0h</div></div>
+    <div class="sum-row"><div class="sum-lbl">Projected billability</div><div class="sum-val">81%</div></div>
+  </div>
+  <div class="submit-row">
+    <button class="btn-edit">Edit plan</button>
+    <button class="btn-submit">Submit plan to PM</button>
+  </div>
+</div>
+</div>
+
+<script>
+function tog(id){
+  var b=document.getElementById('b-'+id);
+  var c=document.getElementById('c-'+id);
+  if(!b||!c)return;
+  var open=b.style.display!=='none';
+  b.style.display=open?'none':'block';
+  c.classList.toggle('open',!open);
+}
+</script>

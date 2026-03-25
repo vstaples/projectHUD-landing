@@ -1,0 +1,372 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.shell{font-family:var(--font-sans,system-ui);background:var(--color-background-secondary);padding:12px;border-radius:var(--border-radius-lg)}
+.three-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:10px;align-items:start}
+.panel{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+.panel-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.panel-title{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.panel-sub{font-size:11px;color:var(--color-text-tertiary);margin-left:auto}
+.nav-btn{background:none;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:2px 8px;font-size:11px;color:var(--color-text-secondary);cursor:pointer}
+.badge{font-size:10px;padding:2px 6px;border-radius:20px;white-space:nowrap}
+.b-ok{background:#EAF3DE;color:#27500A}
+.b-warn{background:#FAEEDA;color:#633806}
+.b-block{background:#FCEBEB;color:#791F1F}
+.b-unplan{background:#EEEDFE;color:#3C3489}
+.b-wait{background:#E6F1FB;color:#0C447C}
+.b-mile{background:#EAF3DE;color:#085041}
+.b-flag{background:#FCEBEB;color:#791F1F}
+.b-proj{background:#E6F1FB;color:#0C447C}
+
+.seg-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;flex:1}
+.s-bill{background:#185FA5}
+.s-unbill{background:#7F77DD}
+.s-unplan{background:#BA7517}
+.s-block{background:#A32D2D}
+
+.day-block{border-bottom:0.5px solid var(--color-border-tertiary)}
+.day-block:last-child{border-bottom:none}
+.day-hdr{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;user-select:none}
+.day-name{font-size:12px;font-weight:500;color:var(--color-text-primary);min-width:68px}
+.day-hrs{font-size:11px;color:var(--color-text-secondary);min-width:48px}
+.chev{font-size:10px;color:var(--color-text-tertiary);margin-left:auto;transition:transform .15s;display:inline-block}
+.chev.open{transform:rotate(90deg)}
+.ev-grid{display:grid;grid-template-columns:90px 3px 1fr auto;gap:0;border-top:0.5px solid var(--color-border-tertiary)}
+.ev-row{display:contents}
+.ev-time{font-size:10px;color:var(--color-text-tertiary);padding:7px 6px 7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);align-self:center}
+.ev-bar-w{padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.ev-bar{width:3px;height:100%;border-radius:2px}
+.ev-body{padding:7px 8px;border-bottom:0.5px solid var(--color-border-tertiary);min-width:0}
+.ev-title{font-size:11px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-note{font-size:10px;color:var(--color-text-secondary);margin-top:1px;line-height:1.4}
+.ev-right{padding:7px 10px 7px 6px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;align-items:flex-end;gap:3px;white-space:nowrap}
+.ev-h{font-size:11px;font-weight:500;color:var(--color-text-secondary)}
+
+.ts-days{display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding:8px 10px 4px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.ts-day-lbl{font-size:10px;color:var(--color-text-tertiary);text-align:center}
+.ts-row{display:grid;grid-template-columns:1fr repeat(5,32px) 36px;gap:0;border-bottom:0.5px solid var(--color-border-tertiary);align-items:center;min-height:30px}
+.ts-hdr-row{display:grid;grid-template-columns:1fr repeat(5,32px) 36px;gap:0;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);padding:4px 0}
+.ts-proj{font-size:11px;color:var(--color-text-primary);padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-sub{font-size:10px;color:var(--color-text-tertiary);padding:0 8px}
+.ts-cell{font-size:11px;text-align:center;color:var(--color-text-secondary)}
+.ts-cell.filled{color:var(--color-text-primary);font-weight:500}
+.ts-cell.bill{color:#185FA5}
+.ts-total{font-size:11px;font-weight:500;text-align:center;padding-right:8px;color:var(--color-text-primary)}
+.ts-hdr-lbl{font-size:10px;color:var(--color-text-tertiary);text-align:center}
+.ts-foot{display:grid;grid-template-columns:1fr repeat(5,32px) 36px;gap:0;padding:5px 0;background:var(--color-background-secondary);border-top:0.5px solid var(--color-border-tertiary)}
+.ts-foot-lbl{font-size:10px;font-weight:500;color:var(--color-text-secondary);padding:0 8px}
+.ts-foot-val{font-size:11px;font-weight:500;text-align:center;color:var(--color-text-primary)}
+.ts-foot-tot{font-size:11px;font-weight:500;text-align:center;padding-right:8px;color:#185FA5}
+.ts-bill-row{display:grid;grid-template-columns:1fr repeat(5,32px) 36px;gap:0;padding:3px 0}
+.ts-bill-lbl{font-size:10px;color:var(--color-text-tertiary);padding:0 8px}
+.ts-bill-bar{height:3px;border-radius:2px;margin:3px 4px 0}
+.narrative-box{padding:10px 12px;border-top:0.5px solid var(--color-border-tertiary)}
+.nar-lbl{font-size:10px;color:var(--color-text-tertiary);margin-bottom:5px}
+.nar-text{font-size:11px;color:var(--color-text-primary);line-height:1.6;padding:7px 9px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
+.submit-row{display:flex;gap:6px;padding:8px 12px;border-top:0.5px solid var(--color-border-tertiary);align-items:center}
+.btn-submit{padding:5px 14px;font-size:11px;font-weight:500;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);border-radius:var(--border-radius-md);cursor:pointer}
+.btn-edit{padding:5px 10px;font-size:11px;color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:none;cursor:pointer}
+.btn-tot{font-size:11px;color:var(--color-text-tertiary);margin-left:auto}
+
+.nw-proj-row{border-bottom:0.5px solid var(--color-border-tertiary)}
+.nw-proj-hdr{display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:pointer}
+.nw-proj-name{font-size:11px;font-weight:500;color:var(--color-text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nw-proj-hrs{font-size:11px;color:var(--color-text-secondary)}
+.nw-task{display:grid;grid-template-columns:1fr auto auto;gap:0;padding:6px 10px 6px 18px;border-top:0.5px solid var(--color-border-tertiary);align-items:start}
+.nw-task-title{font-size:11px;color:var(--color-text-primary);line-height:1.4}
+.nw-task-meta{font-size:10px;color:var(--color-text-tertiary);margin-top:2px}
+.nw-task-hrs{font-size:11px;color:var(--color-text-secondary);text-align:right;padding:0 0 0 8px;white-space:nowrap}
+.nw-flag-row{padding:5px 10px 5px 18px;border-top:0.5px solid var(--color-border-tertiary)}
+.nw-flag-inp{width:100%;font-size:11px;padding:4px 7px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none}
+.nw-flag-inp:focus{border-color:var(--color-border-info)}
+.nw-summary{padding:8px 10px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.nw-sum-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.nw-sum-lbl{color:var(--color-text-secondary)}
+.nw-sum-val{font-weight:500;color:var(--color-text-primary)}
+.nw-sum-val.warn{color:#BA7517}
+.nw-cap-bar{height:5px;border-radius:3px;overflow:hidden;background:var(--color-border-tertiary);margin:6px 0}
+.nw-cap-fill{height:100%;border-radius:3px;background:#185FA5}
+.nw-cap-over{height:100%;border-radius:3px;background:#A32D2D}
+.nw-submit-row{display:flex;gap:6px;padding:8px 10px;border-top:0.5px solid var(--color-border-tertiary);align-items:center}
+</style>
+
+<div class="shell">
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+  <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">My Time</div>
+  <div style="font-size:11px;color:var(--color-text-tertiary)">Vaughn Staples</div>
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <button class="nav-btn">&#8249; Prev week</button>
+    <div style="font-size:12px;color:var(--color-text-secondary);padding:3px 8px">Mar 23 – Mar 29</div>
+    <button class="nav-btn">Next week &#8250;</button>
+  </div>
+</div>
+
+<div class="three-col">
+
+<div class="panel">
+  <div class="panel-hdr">
+    <div class="panel-title">Story</div>
+    <div style="display:flex;gap:5px;margin-left:8px">
+      <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--color-text-tertiary)"><div style="width:8px;height:8px;border-radius:1px;background:#185FA5"></div>Billable</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--color-text-tertiary)"><div style="width:8px;height:8px;border-radius:1px;background:#7F77DD"></div>Non-bill</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--color-text-tertiary)"><div style="width:8px;height:8px;border-radius:1px;background:#BA7517"></div>Unplanned</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--color-text-tertiary)"><div style="width:8px;height:8px;border-radius:1px;background:#A32D2D"></div>Blocked</div>
+    </div>
+    <div class="panel-sub">29.5h · 71% bill</div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('mon')">
+      <div class="day-name">Mon 3/23</div>
+      <div class="day-hrs">7.5h</div>
+      <div class="seg-bar"><div class="s-unbill" style="width:13%"></div><div class="s-block" style="width:20%"></div><div class="s-unplan" style="width:47%"></div><div class="s-bill" style="width:20%"></div></div>
+      <div style="display:flex;gap:3px;margin-left:6px"><span class="badge b-warn">Deviation</span></div>
+      <div class="chev open" id="c-mon">&#9656;</div>
+    </div>
+    <div id="b-mon">
+      <div style="padding:6px 10px;background:var(--color-background-warning);border-top:0.5px solid var(--color-border-warning);font-size:10px;color:var(--color-text-warning);line-height:1.5">IOPQ review did not close — testing at risk. 3.5h unplanned edits absorbed.</div>
+      <div class="ev-grid">
+        <div class="ev-time">8–9am</div><div class="ev-bar-w"><div class="ev-bar" style="background:#7F77DD"></div></div><div class="ev-body"><div class="ev-title">Morning brief + queue review</div><div class="ev-note">PM shifted 2 priorities overnight</div></div><div class="ev-right"><div class="ev-h">1.0h</div><span class="badge b-ok">Planned</span></div>
+        <div class="ev-time">9–10:30</div><div class="ev-bar-w"><div class="ev-bar" style="background:#A32D2D"></div></div><div class="ev-body"><div class="ev-title">IOPQ documentation review</div><div class="ev-note">Expected consensus. 6 edits opened.</div></div><div class="ev-right"><div class="ev-h">1.5h</div><span class="badge b-block">Slipped</span></div>
+        <div class="ev-time">10:30–2pm</div><div class="ev-bar-w"><div class="ev-bar" style="background:#BA7517"></div></div><div class="ev-body"><div class="ev-title">IOPQ edits — unplanned</div><div class="ev-note">All 6 complete. Huddle: earliest Tue 2pm</div></div><div class="ev-right"><div class="ev-h">3.5h</div><span class="badge b-unplan">Unplanned</span></div>
+        <div class="ev-time">2–3:30pm</div><div class="ev-bar-w"><div class="ev-bar" style="background:#185FA5"></div></div><div class="ev-body"><div class="ev-title">NovaBio Sec 4.3 review</div><div class="ev-note">Per PM weekend reprioritization</div></div><div class="ev-right"><div class="ev-h">1.5h</div><span class="badge b-ok">Planned</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('tue')">
+      <div class="day-name">Tue 3/24</div>
+      <div class="day-hrs">5.0h</div>
+      <div class="seg-bar"><div class="s-block" style="width:56%"></div><div class="s-unplan" style="width:34%"></div><div class="s-bill" style="width:10%"></div></div>
+      <div style="display:flex;gap:3px;margin-left:6px"><span class="badge b-block">Blocked 4.5h</span></div>
+      <div class="chev open" id="c-tue">&#9656;</div>
+    </div>
+    <div id="b-tue">
+      <div style="padding:6px 10px;background:var(--color-background-danger);border-top:0.5px solid var(--color-border-danger);font-size:10px;color:var(--color-text-danger);line-height:1.5">Testing blocked — IOPQ sig pending. 4.5h redirected. Net delay: 1.5 days.</div>
+      <div class="ev-grid">
+        <div class="ev-time">8am–2pm</div><div class="ev-bar-w"><div class="ev-bar" style="background:#A32D2D"></div></div><div class="ev-body"><div class="ev-title">Blocked — awaiting IOPQ sig</div><div class="ev-note">Redirected to NovaBio QMS Sec 4.2</div></div><div class="ev-right"><div class="ev-h">4.5h</div><span class="badge b-block">Blocked</span></div>
+        <div class="ev-time">2–3pm</div><div class="ev-bar-w"><div class="ev-bar" style="background:#1D9E75"></div></div><div class="ev-body"><div class="ev-title">IOPQ consensus + routing</div><div class="ev-note">PM + Manager sig required</div></div><div class="ev-right"><div class="ev-h">0.5h</div><span class="badge b-mile">Milestone</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block">
+    <div class="day-hdr" onclick="tog('wed')">
+      <div class="day-name">Wed 3/25</div><div class="day-hrs">8.0h</div>
+      <div class="seg-bar"><div class="s-bill" style="width:100%"></div></div>
+      <div style="display:flex;gap:3px;margin-left:6px"><span class="badge b-ok">On plan</span></div>
+      <div class="chev" id="c-wed">&#9656;</div>
+    </div>
+    <div id="b-wed" style="display:none">
+      <div class="ev-grid">
+        <div class="ev-time">All day</div><div class="ev-bar-w"><div class="ev-bar" style="background:#185FA5"></div></div><div class="ev-body"><div class="ev-title">NovaBio QMS gap analysis</div><div class="ev-note">Full day on plan. IOPQ sig still pending EOD.</div></div><div class="ev-right"><div class="ev-h">8.0h</div><span class="badge b-ok">Planned</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="day-block" style="border-bottom:none">
+    <div class="day-hdr" onclick="tog('thu')">
+      <div class="day-name">Thu 3/26</div><div class="day-hrs">9.0h</div>
+      <div class="seg-bar"><div class="s-unbill" style="width:22%"></div><div class="s-bill" style="width:78%"></div></div>
+      <div style="display:flex;gap:3px;margin-left:6px"><span class="badge b-ok">Unblocked 10am</span></div>
+      <div class="chev" id="c-thu">&#9656;</div>
+    </div>
+    <div id="b-thu" style="display:none">
+      <div class="ev-grid">
+        <div class="ev-time">10:00am</div><div class="ev-bar-w"><div class="ev-bar" style="background:#1D9E75"></div></div><div class="ev-body"><div class="ev-title">Manager signature received</div><div class="ev-note">43h chain latency · avg this qtr: 38h</div></div><div class="ev-right"><div class="ev-h">—</div><span class="badge b-mile">Unblocked</span></div>
+        <div class="ev-time">1–6pm</div><div class="ev-bar-w"><div class="ev-bar" style="background:#185FA5"></div></div><div class="ev-body"><div class="ev-title">Production fixture testing</div><div class="ev-note">1.5d late from plan. No defects. Cont. Fri.</div></div><div class="ev-right"><div class="ev-h">5.0h</div><span class="badge b-ok">In progress</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-hdr">
+    <div class="panel-title">Weekly timesheet</div>
+    <div class="panel-sub">Draft · 29.5h logged</div>
+  </div>
+  <div class="ts-hdr-row">
+    <div class="ts-sub" style="padding-left:8px">Project / Task</div>
+    <div class="ts-hdr-lbl">M</div><div class="ts-hdr-lbl">T</div><div class="ts-hdr-lbl">W</div><div class="ts-hdr-lbl">T</div><div class="ts-hdr-lbl">F</div>
+    <div class="ts-hdr-lbl" style="padding-right:8px">Total</div>
+  </div>
+
+  <div class="ts-row" style="background:var(--color-background-secondary)">
+    <div class="ts-proj">Flexscope</div>
+    <div class="ts-cell bill">1.5</div><div class="ts-cell">—</div><div class="ts-cell bill">3.0</div><div class="ts-cell bill">5.0</div><div class="ts-cell">—</div>
+    <div class="ts-total">9.5</div>
+  </div>
+  <div class="ts-row">
+    <div class="ts-sub">IOPQ doc review + edits</div>
+    <div class="ts-cell filled">1.5</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div>
+    <div class="ts-total" style="font-size:10px;color:var(--color-text-tertiary)">1.5</div>
+  </div>
+  <div class="ts-row">
+    <div class="ts-sub">IOPQ edits — unplanned</div>
+    <div class="ts-cell filled">3.5</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div>
+    <div class="ts-total" style="font-size:10px;color:var(--color-text-tertiary)">3.5</div>
+  </div>
+  <div class="ts-row">
+    <div class="ts-sub">Production fixture testing</div>
+    <div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell filled">5.0</div><div class="ts-cell">—</div>
+    <div class="ts-total" style="font-size:10px;color:var(--color-text-tertiary)">5.0</div>
+  </div>
+
+  <div class="ts-row" style="background:var(--color-background-secondary)">
+    <div class="ts-proj">NovaBio</div>
+    <div class="ts-cell bill">1.5</div><div class="ts-cell bill">4.5</div><div class="ts-cell bill">8.0</div><div class="ts-cell bill">4.0</div><div class="ts-cell">—</div>
+    <div class="ts-total">18.0</div>
+  </div>
+  <div class="ts-row">
+    <div class="ts-sub">Section 4.3 review</div>
+    <div class="ts-cell filled">1.5</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div>
+    <div class="ts-total" style="font-size:10px;color:var(--color-text-tertiary)">1.5</div>
+  </div>
+  <div class="ts-row">
+    <div class="ts-sub">QMS gap analysis 4.2</div>
+    <div class="ts-cell">—</div><div class="ts-cell filled">4.5</div><div class="ts-cell filled">8.0</div><div class="ts-cell filled">4.0</div><div class="ts-cell">—</div>
+    <div class="ts-total" style="font-size:10px;color:var(--color-text-tertiary)">16.5</div>
+  </div>
+
+  <div class="ts-row" style="background:var(--color-background-secondary)">
+    <div class="ts-proj">Internal</div>
+    <div class="ts-cell">1.0</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div>
+    <div class="ts-total">1.0</div>
+  </div>
+  <div class="ts-row">
+    <div class="ts-sub">Morning brief</div>
+    <div class="ts-cell filled">1.0</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div><div class="ts-cell">—</div>
+    <div class="ts-total" style="font-size:10px;color:var(--color-text-tertiary)">1.0</div>
+  </div>
+
+  <div class="ts-foot">
+    <div class="ts-foot-lbl">Total</div>
+    <div class="ts-foot-val">7.5</div><div class="ts-foot-val">5.0</div><div class="ts-foot-val">8.0</div><div class="ts-foot-val">9.0</div><div class="ts-foot-val">0</div>
+    <div class="ts-foot-tot">29.5</div>
+  </div>
+  <div class="ts-bill-row">
+    <div class="ts-bill-lbl">Billable</div>
+    <div><div class="ts-bill-bar" style="background:#185FA5;width:40%"></div></div>
+    <div><div class="ts-bill-bar" style="background:#185FA5;width:100%"></div></div>
+    <div><div class="ts-bill-bar" style="background:#185FA5;width:100%"></div></div>
+    <div><div class="ts-bill-bar" style="background:#185FA5;width:100%"></div></div>
+    <div><div class="ts-bill-bar" style="background:var(--color-border-tertiary);width:100%"></div></div>
+    <div></div>
+  </div>
+
+  <div class="narrative-box">
+    <div class="nar-lbl">Weekly narrative — auto-generated · edit before submitting</div>
+    <div class="nar-text">IOPQ review did not close Monday — edits required, consensus Tue PM. Signature chain 43h, testing started Thu. 4.5h blocked redirected to NovaBio QMS. 71% billable — 4% below target.</div>
+  </div>
+  <div class="submit-row">
+    <button class="btn-edit">Edit narrative</button>
+    <button class="btn-submit">Submit for PM approval</button>
+    <div class="btn-tot">29.5h · Sun–Sat</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-hdr">
+    <div class="panel-title">Next week plan</div>
+    <div class="panel-sub">Mar 30 – Apr 5 · projected</div>
+  </div>
+
+  <div style="padding:7px 10px;background:var(--color-background-warning);border-bottom:0.5px solid var(--color-border-warning);font-size:10px;color:var(--color-text-warning);line-height:1.5">
+    34h scheduled against 32h available. 2 items likely to slip — flag below.
+  </div>
+
+  <div class="nw-proj-row">
+    <div class="nw-proj-hdr" onclick="tog('nw-flex')">
+      <span class="badge b-proj">Flexscope</span>
+      <div class="nw-proj-name">Production fixture testing</div>
+      <div class="nw-proj-hrs">14h</div>
+      <div class="chev open" id="c-nw-flex">&#9656;</div>
+    </div>
+    <div id="b-nw-flex">
+      <div class="nw-task">
+        <div><div class="nw-task-title">Fixture testing — carry-forward</div><div class="nw-task-meta">Mon–Tue · continuing from this week</div></div>
+        <div class="nw-task-hrs">8.0h</div>
+      </div>
+      <div class="nw-task">
+        <div><div class="nw-task-title">Test report + sign-off</div><div class="nw-task-meta">Wed · due Mar 31</div></div>
+        <div class="nw-task-hrs">6.0h</div>
+      </div>
+      <div class="nw-flag-row">
+        <input class="nw-flag-inp" placeholder="Flag a concern for PM (e.g. need more time)..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="nw-proj-row">
+    <div class="nw-proj-hdr" onclick="tog('nw-nova')">
+      <span class="badge b-proj">NovaBio</span>
+      <div class="nw-proj-name">QMS gap analysis</div>
+      <div class="nw-proj-hrs">12h</div>
+      <div class="chev open" id="c-nw-nova">&#9656;</div>
+    </div>
+    <div id="b-nw-nova">
+      <div class="nw-task">
+        <div><div class="nw-task-title">Section 4.3 final review</div><div class="nw-task-meta">Mon · due Mar 30</div></div>
+        <div class="nw-task-hrs">4.0h</div>
+      </div>
+      <div class="nw-task">
+        <div><div class="nw-task-title">Sections 4.4 – 4.6 gap analysis</div><div class="nw-task-meta">Tue–Thu · due Apr 2</div></div>
+        <div class="nw-task-hrs">8.0h</div>
+      </div>
+      <div class="nw-flag-row">
+        <input class="nw-flag-inp" placeholder="Flag a concern for PM..." />
+      </div>
+    </div>
+  </div>
+
+  <div class="nw-proj-row" style="border-bottom:none">
+    <div class="nw-proj-hdr" onclick="tog('nw-int')">
+      <span class="badge b-proj">Internal</span>
+      <div class="nw-proj-name">Admin + meetings</div>
+      <div class="nw-proj-hrs">8h</div>
+      <div class="chev" id="c-nw-int">&#9656;</div>
+    </div>
+    <div id="b-nw-int" style="display:none">
+      <div class="nw-task">
+        <div><div class="nw-task-title">Weekly team standup</div><div class="nw-task-meta">Daily · 30 min</div></div>
+        <div class="nw-task-hrs">2.5h</div>
+      </div>
+      <div class="nw-task">
+        <div><div class="nw-task-title">Timesheet + morning brief</div><div class="nw-task-meta">Mon + Fri</div></div>
+        <div class="nw-task-hrs">1.5h</div>
+      </div>
+      <div class="nw-task">
+        <div><div class="nw-task-title">Buffer / unassigned</div><div class="nw-task-meta">Available capacity</div></div>
+        <div class="nw-task-hrs">4.0h</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nw-summary">
+    <div class="nw-sum-row"><div class="nw-sum-lbl">Scheduled</div><div class="nw-sum-val warn">34.0h</div></div>
+    <div class="nw-sum-row"><div class="nw-sum-lbl">Available</div><div class="nw-sum-val">32.0h</div></div>
+    <div class="nw-cap-bar"><div class="nw-cap-over" style="width:100%"></div></div>
+    <div class="nw-sum-row"><div class="nw-sum-lbl">Billable (proj.)</div><div class="nw-sum-val">81%</div></div>
+    <div class="nw-sum-row"><div class="nw-sum-lbl">Carry-forward</div><div class="nw-sum-val warn">8.0h from this week</div></div>
+  </div>
+  <div class="nw-submit-row">
+    <button class="btn-edit">Edit plan</button>
+    <button class="btn-submit">Submit plan to PM</button>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+function tog(id){
+  var b=document.getElementById('b-'+id);
+  var c=document.getElementById('c-'+id);
+  if(!b||!c)return;
+  var open=b.style.display!=='none';
+  b.style.display=open?'none':'block';
+  c.classList.toggle('open',!open);
+}
+</script>
