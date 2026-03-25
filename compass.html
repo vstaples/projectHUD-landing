@@ -1322,7 +1322,7 @@ async function loadUserView() {
       }
     }
 
-    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
+    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek, myCocEvents] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id&status=eq.active&limit=20`).catch(() => []),
@@ -1330,6 +1330,7 @@ async function loadUserView() {
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
+      API.get(`workflow_step_instances?select=id,event_type,step_name,event_notes,actor_name,outcome,created_at,instance_id&actor_name=eq.${encodeURIComponent(_myResource?.name||'')}&order=created_at.desc&limit=30`).catch(() => []),
     ]);
 
     // ── Hours per day ─────────────────────────────────────────────────
@@ -1930,23 +1931,22 @@ async function loadUserView() {
           </div>
           <div style="max-height:180px;overflow-y:auto">
             ${(()=>{
-              // Show recent CoC events authored by this resource — from cached wfInstances step events
-              const myName = _myResource?.name||'';
-              const recentEvts = (_teEntries||[]).filter(e=>e.source_type==='step_comment').slice(0,6);
-              // Fallback: show time entries with notes as CoC proxy
-              const cocEntries = myTimeEntries.filter(e=>e.notes&&e.notes.trim()).slice(0,5);
-              if (!cocEntries.length) return '<div style="padding:10px 13px;font-family:var(--font-head);font-size:11px;color:var(--text3)">No recent notes in your time entries.</div>';
-              return cocEntries.map(e=>{
-                const proj=_projects.find(p=>p.id===e.project_id);
+              const evts = (myCocEvents||[]).filter(e=>e.event_notes||e.step_name);
+              if (!evts.length) return '<div style="padding:10px 13px;font-family:var(--font-head);font-size:11px;color:var(--text3)">No recent CoC events.</div>';
+              const evtColors = {step_completed:'var(--compass-green)',step_reset:'var(--compass-red)',management_decision:'var(--compass-amber)',intervention:'var(--compass-purple)',step_activated:'var(--compass-cyan)'};
+              return evts.slice(0,8).map(e=>{
+                const col = evtColors[e.event_type]||'var(--text3)';
+                const wfInst = wfInstances.find(w=>w.id===e.instance_id);
+                const label = e.step_name?.replace(/^CONCERN:\s*/,'').slice(0,50)||e.event_type.replace(/_/g,' ');
+                const note  = e.event_notes?.slice(0,100)||(wfInst?esc(wfInst.title):'');
                 return '<div style="padding:6px 13px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:7px">'
-                  + '<div style="width:6px;height:6px;border-radius:50%;background:var(--compass-cyan);flex-shrink:0;margin-top:4px"></div>'
+                  + '<div style="width:6px;height:6px;border-radius:50%;background:'+col+';flex-shrink:0;margin-top:4px"></div>'
                   + '<div style="flex:1;min-width:0">'
                   + '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-bottom:1px">'
-                  + fmtDate(e.date) + (proj?' · '+esc(proj.name):'') + ' · ' + parseFloat(e.hours||0).toFixed(1)+'h'
+                  + (e.created_at?_timeAgo(e.created_at):'') + ' · ' + esc(label)
                   + '</div>'
-                  + '<div style="font-family:var(--font-body);font-size:11px;color:var(--text1);line-height:1.45;word-break:break-word">'
-                  + esc((e.notes||'').slice(0,120)) + (e.notes&&e.notes.length>120?'…':'')
-                  + '</div></div></div>';
+                  + (note?'<div style="font-family:var(--font-body);font-size:11px;color:var(--text1);line-height:1.45;word-break:break-word">'+esc(note.slice(0,120))+(note.length>120?'…':'')+'</div>':'')
+                  + '</div></div>';
               }).join('');
             })()}
           </div>
