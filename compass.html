@@ -200,7 +200,9 @@
 /* ── Common inner layout ─────────────────────────────────── */
 .view-body {
   padding: 20px 22px;
-  max-width: 1600px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* ── Stat strip ──────────────────────────────────────────── */
@@ -1691,7 +1693,7 @@ async function loadUserView() {
         const sc=item.signal==='green'?'var(--compass-green)':item.signal==='red'?'var(--compass-red)':'var(--compass-amber)';
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border)">
           <span style="color:var(--compass-green);font-size:13px;flex-shrink:0">✓</span>
-          <div style="flex:1;min-width:0">
+          <div style="flex:1;min-width:0;overflow:hidden">
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
             <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
@@ -1750,7 +1752,7 @@ async function loadUserView() {
     <!-- Tab: WORK (existing content wrapper) -->
     <div class="utc on" id="utc-work">
 
-    <div id="mw-flex" style="display:flex;gap:0;align-items:flex-start">
+    <div id="mw-flex" style="display:flex;gap:0;align-items:flex-start;width:100%">
     <div style="flex:1;min-width:0">
 
     <!-- 1.A Greeting -->
