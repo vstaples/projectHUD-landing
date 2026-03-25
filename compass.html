@@ -1238,55 +1238,6 @@ async function loadUserView() {
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
 
-    // ── Populate CoC panel ──────────────────────────────
-    (function() {
-      const body  = document.getElementById('mw-coc-body');
-      const count = document.getElementById('mw-coc-count');
-      const evts  = window._myCocEvents || [];
-      if (count) count.textContent = evts.length + ' events';
-      if (!body) return;
-      if (!evts.length) {
-        body.innerHTML = '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.7">No CoC events found.<br><br>Events appear when you complete workflow steps or save progress updates.</div>';
-        return;
-      }
-      const evtColor = {
-        instance_launched:'#00D2FF',instance_completed:'#1D9E75',
-        step_activated:'#e8a838',step_completed:'#1D9E75',
-        step_reset:'#E24B4A',management_decision:'#EF9F27',
-        intervention:'#8B5CF6',flag_acknowledged:'#00D2FF',meeting_created:'#00D2FF',
-      };
-      const evtLabel = {
-        instance_launched:'Instance Launched',instance_completed:'Instance Completed',
-        step_activated:'Step Activated',step_completed:'Step Completed',
-        step_reset:'Step Reset',management_decision:'Management Decision',
-        intervention:'Intervention',flag_acknowledged:'Flag Acknowledged',meeting_created:'Meeting Created',
-      };
-      const E = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      let html = '';
-      evts.forEach((e, i) => {
-        const col   = evtColor[e.event_type] || '#5A84A8';
-        const label = evtLabel[e.event_type] || (e.event_type||'').replace(/_/g,' ');
-        const step  = (e.step_name||'').replace(/^CONCERN:\s*/,'');
-        const note  = e.event_notes || '';
-        const ts    = e.created_at ? new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
-        const oCol  = e.outcome==='on_track'?'#1D9E75':e.outcome==='at_risk'?'#EF9F27':e.outcome==='blocked'?'#E24B4A':col;
-        const oLbl  = e.outcome==='on_track'?'On track':e.outcome==='at_risk'?'At risk':e.outcome==='blocked'?'Blocked':(e.outcome||'').replace(/_/g,' ');
-        html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
-        html += '<div style="display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0">';
-        html += '<div style="width:7px;height:7px;border-radius:50%;background:'+col+';margin-top:3px"></div>';
-        if (i < evts.length-1) html += '<div style="width:1px;flex:1;min-height:10px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
-        html += '</div><div style="flex:1;min-width:0">';
-        html += '<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(label)+'</div>';
-        if (step) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step)+'</div>';
-        if (oLbl)  html += '<div style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 8px;border-radius:10px;border:1px solid '+oCol+'44"><div style="width:5px;height:5px;border-radius:50%;background:'+oCol+'"></div><span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:'+oCol+'">'+E(oLbl)+'</span></div>';
-        if (e.actor_name) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:2px">By '+E(e.actor_name)+'</div>';
-        if (note) html += '<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);margin-top:3px;padding:3px 7px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.45;word-break:break-word">'+E(note.slice(0,200))+'</div>';
-        if (ts) html += '<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.22);margin-top:2px">'+ts+'</div>';
-        html += '</div></div>';
-      });
-      body.innerHTML = html;
-    })();
-
     // ── Wire CoC drag handle ─────────────────────────────
     (function() {
       const resizer = document.getElementById('mw-coc-resizer');
@@ -1763,6 +1714,8 @@ async function loadUserView() {
       .ust-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27}
       .ust-badge-green{background:rgba(29,158,117,.12);color:#1D9E75}
       .utc{display:none}.utc.on{display:block}
+      #mw-coc-drag:hover{background:rgba(0,210,255,.3)!important}
+      #mw-coc-drag:active{background:rgba(0,210,255,.5)!important}
     </style>
 
     <!-- Tab: WORK (existing content wrapper) -->
@@ -2102,16 +2055,16 @@ async function loadUserView() {
       <!-- CoC Panel — fills remaining space -->
       <div id="mw-coc" style="display:none;flex-direction:column;width:300px;flex-shrink:0;background:#060c18;border-left:1px solid rgba(0,210,255,.15);position:relative">
         <!-- Drag handle on left edge -->
-        <div id="mw-coc-drag" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:10;background:transparent" onmouseenter="this.style.background='rgba(0,210,255,.2)'" onmouseleave="this.style.background='transparent'"></div>
+        <div id="mw-coc-drag" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:10;background:transparent"></div>
         <div style="display:flex;flex-direction:column;height:100%;overflow-y:auto">
         <div style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)">
           <div>
             <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
-            <div id="mw-coc-count" style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px">loading…</div>
+            <div id="mw-coc-count" style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px"></div>
           </div>
         </div>
         <div id="mw-coc-body" style="padding:10px 14px">
-          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">Loading CoC events…</div>
+          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">No history yet.</div>
         </div>
       </div>
 
@@ -2142,6 +2095,56 @@ async function loadUserView() {
 
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+
+    // ── Populate CoC panel ──────────────────────────────
+    (function() {
+      const body  = document.getElementById('mw-coc-body');
+      const count = document.getElementById('mw-coc-count');
+      const evts  = window._myCocEvents || [];
+      if (count) count.textContent = evts.length + ' events';
+      if (!body) return;
+      if (!evts.length) {
+        body.innerHTML = '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.7">No CoC events found.<br><br>Events appear when you complete workflow steps or save progress updates.</div>';
+        return;
+      }
+      const evtColor = {
+        instance_launched:'#00D2FF',instance_completed:'#1D9E75',
+        step_activated:'#e8a838',step_completed:'#1D9E75',
+        step_reset:'#E24B4A',management_decision:'#EF9F27',
+        intervention:'#8B5CF6',flag_acknowledged:'#00D2FF',meeting_created:'#00D2FF',
+      };
+      const evtLabel = {
+        instance_launched:'Instance Launched',instance_completed:'Instance Completed',
+        step_activated:'Step Activated',step_completed:'Step Completed',
+        step_reset:'Step Reset',management_decision:'Management Decision',
+        intervention:'Intervention',flag_acknowledged:'Flag Acknowledged',meeting_created:'Meeting Created',
+      };
+      const E = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      let html = '';
+      evts.forEach((e, i) => {
+        const col   = evtColor[e.event_type] || '#5A84A8';
+        const label = evtLabel[e.event_type] || (e.event_type||'').replace(/_/g,' ');
+        const step  = (e.step_name||'').replace(/^CONCERN:\s*/,'');
+        const note  = e.event_notes || '';
+        const ts    = e.created_at ? new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+        const oCol  = e.outcome==='on_track'?'#1D9E75':e.outcome==='at_risk'?'#EF9F27':e.outcome==='blocked'?'#E24B4A':col;
+        const oLbl  = e.outcome==='on_track'?'On track':e.outcome==='at_risk'?'At risk':e.outcome==='blocked'?'Blocked':(e.outcome||'').replace(/_/g,' ');
+        html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
+        html += '<div style="display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0">';
+        html += '<div style="width:7px;height:7px;border-radius:50%;background:'+col+';margin-top:3px"></div>';
+        if (i < evts.length-1) html += '<div style="width:1px;flex:1;min-height:10px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
+        html += '</div><div style="flex:1;min-width:0">';
+        html += '<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(label)+'</div>';
+        if (step) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step)+'</div>';
+        if (oLbl)  html += '<div style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 8px;border-radius:10px;border:1px solid '+oCol+'44"><div style="width:5px;height:5px;border-radius:50%;background:'+oCol+'"></div><span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:'+oCol+'">'+E(oLbl)+'</span></div>';
+        if (e.actor_name) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:2px">By '+E(e.actor_name)+'</div>';
+        if (note) html += '<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);margin-top:3px;padding:3px 7px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.45;word-break:break-word">'+E(note.slice(0,200))+'</div>';
+        if (ts) html += '<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.22);margin-top:2px">'+ts+'</div>';
+        html += '</div></div>';
+      });
+      body.innerHTML = html;
+    })();
+
 
   } catch (e) {
     console.error('[Compass] loadUserView error:', e);
