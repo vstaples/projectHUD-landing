@@ -8386,8 +8386,8 @@ function openWorkItemExpanded(item) {
     position:fixed;
     top:50%;left:50%;
     transform:translate(-50%,-50%);
-    width:min(900px,92vw);
-    max-height:80vh;
+    width:min(1060px,96vw);
+    height:min(580px,86vh);
     background:#080f1e;
     border:1px solid rgba(0,210,255,.2);
     border-top:3px solid ${accentColor};
@@ -8486,10 +8486,10 @@ function openWorkItemExpanded(item) {
         <div style="display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(0,210,255,.08)">
 
           <!-- Row 2: Status + meta tiles + Log time -->
-          <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
             ${item.type==='task'?`
             <select id="wi-status-${item.id}"
-              style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 7px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer">
+              style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 6px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer;flex-shrink:0">
               <option value="not_started" ${item.status==='not_started'?'selected':''}>Not started</option>
               <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
               <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
@@ -8501,12 +8501,12 @@ function openWorkItemExpanded(item) {
               ['Exp. Hrs',   bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
               ['Logged',     ah.toFixed(1)+'h'+(bh?' / '+bh+'h':''), usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
               ['Budget',     bh?usedPct+'% used':'—', effortColor],
-            ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap"><div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'};">${v}</div></div>`).join('')}
+            ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 6px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.04em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'};">${v}</div></div>`).join('')}
             <div style="width:1px;height:22px;background:rgba(255,255,255,.08);flex-shrink:0"></div>
             <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
               <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log time</span>
               <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
-                style="width:54px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 5px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
+                style="width:52px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 4px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
               <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">
                 <input id="wi-bill-${item.id}" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable
               </label>
@@ -8534,34 +8534,25 @@ function openWorkItemExpanded(item) {
             </div>`:``}
           </div>
 
-          <!-- Row 4: Work Completed textarea -->
-          <div style="flex:1;padding:8px 14px;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden">
+          <!-- Row 4: Work Completed textarea + buttons -->
+          <div style="flex:1;padding:8px 14px 0;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden">
             <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
             <textarea id="wi-comment-${item.id}" placeholder="Describe what was accomplished this session — required to save…" oninput="wiCheckGate('${item.id}')"
               style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
+            <!-- Buttons + hint inside work completed pane -->
+            <div style="display:flex;gap:6px;flex-shrink:0;padding-top:6px">
+              <button id="wi-save-progress-${item.id}" onclick="wiSaveProgress('${item.id}','${item.projectId||''}')" disabled
+                style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
+              <button id="wi-mark-complete-${item.id}" onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')" disabled
+                style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Mark complete →</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding-top:3px;min-height:16px">
+              <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber)"></span>
+              <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Select sentiment and add a note to unlock</div>
+            </div>
           </div>
         </div>
 
-        <!-- RIGHT column: Chain of Custody — full height from row 2 top -->
-        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
-          <div style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
-        </div>
-
-      </div>
-
-      <!-- Row 5: Buttons -->
-      <div style="display:flex;gap:8px;padding:8px 14px;border-top:1px solid rgba(0,210,255,.07);flex-shrink:0">
-        <button id="wi-save-progress-${item.id}" onclick="wiSaveProgress('${item.id}','${item.projectId||''}')" disabled
-          style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
-        <button id="wi-mark-complete-${item.id}" onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')" disabled
-          style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Mark complete →</button>
-        <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);align-self:center;min-width:80px"></span>
-      </div>
-
-      <!-- Row 6: Instruction -->
-      <div style="padding:4px 14px 8px;flex-shrink:0">
-        <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center">Select sentiment and add a note to unlock</div>
       </div>
 
     </div>`;
