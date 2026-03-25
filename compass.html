@@ -8354,6 +8354,7 @@ function openWorkItemDrawer(item) {
 }
 
 function openWorkItemExpanded(item) {
+  console.log('[Compass] Task opened — id:', item.id, '| project_id:', item.projectId, '| type:', item.type, '| title:', item.title);
   document.getElementById('wi-drawer')?.remove();
 
   // Remove any existing expansion
@@ -8566,11 +8567,13 @@ function openWorkItemExpanded(item) {
               oninput="wiCheckGate('${item.id}')"
               style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:80px"></textarea>
           </div>
-          <button id="wi-save-progress-${item.id}"
-            onclick="wiSaveProgress('${item.id}','${item.projectId||''}')"
-            disabled
-            style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
-          <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center">Select sentiment and add a note to unlock</div>
+          <div style="display:flex;gap:0;align-items:stretch">
+            <button id="wi-save-progress-${item.id}"
+              onclick="wiSaveProgress('${item.id}','${item.projectId||''}')"
+              disabled
+              style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
+          </div>
+          <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-align:center;margin-top:4px">Select sentiment and add a note to unlock</div>
           <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px"></span>
         </div>
 
