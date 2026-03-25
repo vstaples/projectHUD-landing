@@ -857,6 +857,10 @@ window._mwLoadUserView = async function() {
               <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#EF9F27"></div>Due today</div>
               <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#00D2FF"></div>Task</div>
               <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#8B5CF6"></div>Action item</div>
+              <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25)">Capacity bar:</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(29,158,117,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#1D9E75"></div>&lt;70%</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(239,159,39,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#EF9F27"></div>&gt;70%</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(226,75,74,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#E24B4A"></div>Over</div>
               <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">Scroll to zoom · drag to pan</div>
             </div>
           </div>
@@ -6597,6 +6601,88 @@ function buildWorkDiagram() {
     tlRow.appendChild(col);
   });
   tlHdr.appendChild(tlRow);
+
+  // ══ CAPACITY BAR ROW (below timeline header) ══════════
+  // One bar per day column. Unrated action items excluded.
+  // Available: 8h/day. Rated items contribute LOE spread across working days to due date.
+  const AVAIL_HRS = 8;
+
+  // Helper: parse LOE string → hours
+  function _loeToHours(loeStr) {
+    if (!loeStr) return 0;
+    const s = loeStr.toLowerCase().trim();
+    if (s.includes('week'))  return parseFloat(s) * 40 || 40;
+    if (s.includes('day'))   return parseFloat(s) * 8  || 8;
+    if (s.includes('hour'))  return parseFloat(s)      || 0;
+    return 0;
+  }
+
+  // Helper: working days between two date strings (inclusive)
+  function _workingDaysBetween(startStr, endStr) {
+    const days = [];
+    const s = new Date(startStr + 'T00:00:00');
+    const e = new Date((endStr || startStr) + 'T00:00:00');
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) days.push(d.toLocaleDateString('en-CA'));
+    }
+    return days;
+  }
+
+  // Build per-date hour allocation map
+  const allocMap = {}; // { dateStr: hours }
+  DATES.forEach(d => { allocMap[d] = 0; });
+
+  items.forEach(item => {
+    let hrs = 0;
+    if (item.type === 'action') {
+      const neg = negGetState(item.id);
+      if (!neg || neg.state === 'unrated') return; // skip unrated
+      hrs = _loeToHours(neg.loe || neg.agreedLoe || '');
+      if (hrs <= 0) return;
+      // Spread evenly across working days from today to proposed/agreed due date
+      const dueDate = neg.agreedDue || neg.proposedDue || item.due;
+      if (!dueDate) { allocMap[today] = (allocMap[today] || 0) + hrs; return; }
+      const spread = _workingDaysBetween(today, dueDate).filter(d => DATES.includes(d));
+      if (!spread.length) return;
+      const hrsPerDay = hrs / spread.length;
+      spread.forEach(d => { allocMap[d] = (allocMap[d] || 0) + hrsPerDay; });
+    } else {
+      // Task: use budgetHours or effortDays
+      hrs = item.budgetHours || (item.effortDays ? item.effortDays * 8 : 0);
+      if (hrs <= 0) return;
+      if (!item.due) { allocMap[today] = (allocMap[today] || 0) + hrs; return; }
+      const spread = _workingDaysBetween(today, item.due).filter(d => DATES.includes(d));
+      if (!spread.length) { allocMap[item.due] = (allocMap[item.due] || 0) + hrs; return; }
+      const hrsPerDay = hrs / spread.length;
+      spread.forEach(d => { allocMap[d] = (allocMap[d] || 0) + hrsPerDay; });
+    }
+  });
+
+  // Render capacity bar row in tlHdr (second row)
+  const capRow = document.createElement('div');
+  capRow.style.cssText = `display:flex;width:${totalCW}px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.08)`;
+  DATES.forEach(d => {
+    const isToday = d === today;
+    const alloc   = allocMap[d] || 0;
+    const pct     = Math.min(alloc / AVAIL_HRS, 1);
+    const over    = alloc > AVAIL_HRS;
+    const warn    = pct > 0.7 && !over;
+    const barColor = over ? '#E24B4A' : warn ? '#EF9F27' : '#1D9E75';
+    const remaining = Math.max(0, AVAIL_HRS - alloc).toFixed(1);
+    const col = document.createElement('div');
+    col.style.cssText = `width:${CW}px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.04);padding:3px 4px;box-sizing:border-box`;
+    col.title = `${d}: ${alloc.toFixed(1)}h allocated / ${AVAIL_HRS}h available`;
+    col.innerHTML = `
+      <div style="height:5px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:2px">
+        <div style="height:100%;width:${Math.round(pct*100)}%;background:${barColor};border-radius:2px;transition:width .3s"></div>
+      </div>
+      <div style="font-family:var(--font-head);font-size:10px;color:${isToday?(over?'#E24B4A':warn?'#EF9F27':'rgba(0,210,255,.7)'):'rgba(255,255,255,.2)'};text-align:center;white-space:nowrap">
+        ${isToday ? remaining + 'h' : alloc > 0 ? alloc.toFixed(1) + 'h' : ''}
+      </div>`;
+    capRow.appendChild(col);
+  });
+  tlHdr.appendChild(capRow);
 
   // ══ BOTTOM-RIGHT: Card canvas (master scroll) ═════════
   // ══ BOTTOM-LEFT:  Stub column (v-scroll synced) ═══════
