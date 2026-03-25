@@ -1716,6 +1716,7 @@ async function loadUserView() {
       .utc{display:none}.utc.on{display:block}
       #mw-coc-drag:hover{background:rgba(0,210,255,.3)!important}
       #mw-coc-drag:active{background:rgba(0,210,255,.5)!important}
+      #mw-done-resize:hover{background:rgba(0,210,255,.25)!important}
     </style>
 
     <!-- Tab: WORK (existing content wrapper) -->
@@ -1958,7 +1959,7 @@ async function loadUserView() {
         </div>
 
         <!-- Time log -->
-        <div class="cmp-panel" style="margin-bottom:14px">
+        <div id="mw-timelog" class="cmp-panel" style="margin-bottom:0;overflow-y:auto;flex-shrink:0">
           <div class="panel-hdr">
             <div class="panel-title">Time log${filterLabel?' — '+filterLabel:' — recent'}</div>
             <div style="display:flex;gap:8px;align-items:center">
@@ -8603,25 +8604,49 @@ function wiMarkComplete(itemId, type, title, projectId) {
 }
 
 // ── Save progress update ──────────────────────────────────
-// ── CoC drag handle ──────────────────────────────────────
+// ── CoC drag handle (horizontal resize) ─────────────────
 document.addEventListener('mousedown', function(ev) {
-  const handle = ev.target.closest('#mw-coc-drag');
-  if (!handle) return;
-  ev.preventDefault();
-  const coc = document.getElementById('mw-coc');
-  if (!coc) return;
-  const startX = ev.clientX;
-  const startW = coc.offsetWidth;
-  function onMove(e) {
-    const newW = Math.max(200, Math.min(600, startW - (e.clientX - startX)));
-    coc.style.width = newW + 'px';
+  // CoC left-edge drag — resize CoC width
+  if (ev.target.closest('#mw-coc-drag')) {
+    ev.preventDefault();
+    const coc = document.getElementById('mw-coc');
+    if (!coc) return;
+    const startX = ev.clientX, startW = coc.offsetWidth;
+    const onMove = e => { coc.style.width = Math.max(200, Math.min(600, startW - (e.clientX - startX))) + 'px'; };
+    const onUp   = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return;
   }
-  function onUp() {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
+  // Done Today top-edge drag — redistributes height between Time Log and Done Today
+  if (ev.target.closest('#mw-done-resize')) {
+    ev.preventDefault();
+    const done    = document.getElementById('mw-done-today');
+    const timelog = document.getElementById('mw-timelog');
+    const handle  = document.getElementById('mw-done-resize');
+    if (!done || !timelog) return;
+    const startY  = ev.clientY;
+    const startDoneH = done.offsetHeight;
+    const startLogH  = timelog.offsetHeight;
+    if (handle) handle.style.background = 'rgba(0,210,255,.4)';
+    const onMove = e => {
+      const delta   = e.clientY - startY;           // drag down = grow log, shrink done
+      const newLogH = Math.max(80, startLogH + delta);
+      const newDoneH= Math.max(60, startDoneH - delta);
+      timelog.style.flex = 'none';
+      timelog.style.height = newLogH + 'px';
+      done.style.flex = 'none';
+      done.style.height = newDoneH + 'px';
+    };
+    const onUp = () => {
+      if (handle) handle.style.background = 'rgba(0,210,255,.08)';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return;
   }
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
 });
 
 function wiCheckGate(itemId) {
