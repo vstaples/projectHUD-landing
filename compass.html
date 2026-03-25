@@ -1928,17 +1928,17 @@ async function loadUserView() {
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
             <div class="panel-title">My work</div>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
-              <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(0,210,255,.12)'};color:${_diagramMode?'rgba(255,255,255,.3)':'var(--compass-cyan)'};border:none;cursor:pointer;transition:all .12s">LIST</button>
-              <button data-action="diagram-diag" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'rgba(0,210,255,.12)':'none'};color:${_diagramMode?'var(--compass-cyan)':'rgba(255,255,255,.3)'};border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .12s">DIAGRAM</button>
+              <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
+              <button data-action="diagram-diag" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'rgba(239,159,39,.2)':'none'};color:${_diagramMode?'#EF9F27':'rgba(255,255,255,.3)'};border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .12s">DIAGRAM</button>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
               ${overdueCount>0?`<span class="panel-badge pb-red">${overdueCount} overdue</span>`:`<span class="panel-badge pb-green">All current</span>`}
               ${_diagramMode?`
-              <button data-action="diag-zoom-out" style="font-family:var(--font-head);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
-              <span id="diag-zoom-lbl" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);min-width:34px;text-align:center">${Math.round(_diagScale*100)}%</span>
-              <button data-action="diag-zoom-in" style="font-family:var(--font-head);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
-              <button data-action="diag-zoom-reset" style="font-family:var(--font-head);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center">↺</button>
-              <button data-action="diag-maximize" style="font-family:var(--font-head);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Maximize">
+              <button data-action="diag-zoom-out" style="font-family:var(--font-head);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:${_diagramMode?'flex':'none'};align-items:center;justify-content:center">−</button>
+              <span id="diag-zoom-lbl" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);min-width:34px;text-align:center;display:${_diagramMode?'':'none'}">${Math.round(_diagScale*100)}%</span>
+              <button data-action="diag-zoom-in" style="font-family:var(--font-head);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:${_diagramMode?'flex':'none'};align-items:center;justify-content:center">+</button>
+              <button data-action="diag-zoom-reset" style="font-family:var(--font-head);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:${_diagramMode?'flex':'none'};align-items:center;justify-content:center">↺</button>
+              <button data-action="diag-maximize" style="font-family:var(--font-head);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:${_diagramMode?'flex':'none'};align-items:center;justify-content:center" title="Maximize">
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="1" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.2"/></svg>
               </button>
               `:''}
@@ -1977,9 +1977,14 @@ async function loadUserView() {
           <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
           <!-- Diagram view -->
           <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
-            <div id="mw-diag-viewport" style="height:480px;overflow:hidden;position:relative;cursor:grab;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
-              <div id="mw-diag-canvas" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform">
-                <div id="mw-diag-root"></div>
+            <div id="mw-diag-viewport" style="height:480px;overflow:hidden;position:relative;display:flex;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
+              <!-- Fixed left stub column — never transforms -->
+              <div id="mw-diag-stubs" style="flex-shrink:0;z-index:10;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);overflow:hidden;position:relative"></div>
+              <!-- Zoomable timeline column -->
+              <div style="flex:1;overflow:hidden;position:relative;cursor:grab" id="mw-diag-tl-wrap">
+                <div id="mw-diag-canvas" style="position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform">
+                  <div id="mw-diag-root"></div>
+                </div>
               </div>
             </div>
             <div style="display:flex;gap:12px;padding:5px 14px;border-top:1px solid rgba(255,255,255,.04);flex-wrap:wrap">
@@ -6735,12 +6740,17 @@ function _diagApplyTransform() {
   const lbl = document.getElementById('diag-zoom-lbl');
   if (c) c.style.transform = `translate(${_diagPanX}px,${_diagPanY}px) scale(${_diagScale})`;
   if (lbl) lbl.textContent = Math.round(_diagScale * 100) + '%';
+  // Sync stub column vertical pan only (no scale, no horizontal pan)
+  const stubs = document.getElementById('mw-diag-stubs');
+  if (stubs) stubs.style.transform = `translateY(${_diagPanY}px)`;
 }
 
 function buildWorkDiagram() {
   const root = document.getElementById('mw-diag-root');
+  const stubsEl = document.getElementById('mw-diag-stubs');
   if (!root) return;
   root.innerHTML = '';
+  if (stubsEl) stubsEl.innerHTML = '';
 
   const today = new Date().toLocaleDateString('en-CA');
   const items = _wiItems || [];
@@ -6753,12 +6763,10 @@ function buildWorkDiagram() {
   const dueDates = [...new Set(items.map(w => w.due).filter(Boolean))].sort();
   const minDate = dueDates[0] || today;
   const maxDate = dueDates[dueDates.length - 1] || today;
-  // Add today if not present, extend lookahead 7 days
   const allDates = new Set(dueDates);
   allDates.add(today);
   const endD = new Date(maxDate); endD.setDate(endD.getDate() + 7);
   for (let d = new Date(minDate); d <= endD; d.setDate(d.getDate() + 1)) {
-    // only add weekdays to keep it clean
     if (d.getDay() !== 0 && d.getDay() !== 6) allDates.add(d.toLocaleDateString('en-CA'));
   }
   const DATES = [...allDates].sort();
@@ -6775,14 +6783,11 @@ function buildWorkDiagram() {
     projMap[key].nodes.push(w);
   });
 
-  const totalW = STUB + DATES.length * CW + 60;
+  const totalW = DATES.length * CW + 60;
 
-  // ── Timeline header ────────────────────────────────────
+  // ── Timeline header (in canvas) ────────────────────────
   const tlH = document.createElement('div');
   tlH.style.cssText = `display:flex;width:${totalW}px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);position:sticky;top:0;z-index:10`;
-  const tlStub = document.createElement('div');
-  tlStub.style.cssText = `width:${STUB}px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08);height:36px`;
-  tlH.appendChild(tlStub);
   DATES.forEach(d => {
     const isToday = d === today;
     const dt = new Date(d + 'T00:00:00');
@@ -6795,31 +6800,51 @@ function buildWorkDiagram() {
   });
   root.appendChild(tlH);
 
+  // ── Stub header spacer ─────────────────────────────────
+  const stubTlH = document.createElement('div');
+  stubTlH.style.cssText = `width:${STUB}px;height:36px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);flex-shrink:0`;
+  if (stubsEl) stubsEl.appendChild(stubTlH);
+
   // ── Swimlanes ──────────────────────────────────────────
   const slContainer = document.createElement('div');
   slContainer.style.cssText = `position:relative;width:${totalW}px`;
+
+  const stubsContainer = document.createElement('div');
+  stubsContainer.style.cssText = `width:${STUB}px`;
 
   Object.values(projMap).forEach(proj => {
     const projColor = _diagProjColor(proj.id === '__actions__' ? null : proj.id);
     const collapsed = _diagCollapsed.has(proj.id);
 
+    // ── Stub side: project header ──────────────────────
+    const stubSw = document.createElement('div');
+    stubSw.style.cssText = 'border-bottom:1px solid rgba(0,210,255,.06)';
+
+    const ph = document.createElement('div');
+    ph.style.cssText = `display:flex;align-items:center;gap:7px;padding:5px 10px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;width:${STUB}px`;
+    ph.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${collapsed?'▸':'▾'}</div>`;
+    ph.dataset.action = 'diag-toggle-proj';
+    ph.dataset.projId = proj.id;
+    stubSw.appendChild(ph);
+
+    // ── Canvas side: swimlane ──────────────────────────
     const sw = document.createElement('div');
     sw.style.cssText = 'border-bottom:1px solid rgba(0,210,255,.06)';
 
-    // Project header
-    const ph = document.createElement('div');
-    ph.style.cssText = `display:flex;align-items:center;gap:7px;padding:5px 10px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;width:${STUB}px;position:sticky;left:0;z-index:6`;
-    ph.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${collapsed?'▸':'▾'}</div>`;
-    ph.dataset.action = 'diag-toggle-proj';
-    ph.dataset.projId = proj.id;
-    sw.appendChild(ph);
+    // Canvas proj header (invisible — just a height spacer matching stub)
+    const swPh = document.createElement('div');
+    swPh.style.cssText = `height:29px;border-bottom:1px solid rgba(255,255,255,.04);background:rgba(255,255,255,.025)`;
+    sw.appendChild(swPh);
 
     const pb = document.createElement('div');
     pb.id = 'diag-pb-' + proj.id;
     pb.style.display = collapsed ? 'none' : '';
 
+    const stubPb = document.createElement('div');
+    stubPb.id = 'diag-stub-pb-' + proj.id;
+    stubPb.style.display = collapsed ? 'none' : '';
+
     if (!collapsed) {
-      // Separate tasks and actions into sub-lanes
       const taskNodes   = proj.nodes.filter(n => n.type === 'task');
       const actionNodes = proj.nodes.filter(n => n.type === 'action');
       const subLanes = [];
@@ -6827,27 +6852,26 @@ function buildWorkDiagram() {
       if (actionNodes.length) subLanes.push({ label: 'Actions', nodes: actionNodes });
       if (!subLanes.length)   subLanes.push({ label: '',        nodes: proj.nodes });
 
-      subLanes.forEach((lane, li) => {
+      subLanes.forEach(lane => {
         const { positions, CARD_H, CARD_GAP, ROW_PAD } = _diagAllocateSlots(lane.nodes, CW);
         const maxSlot = Math.max(0, ...lane.nodes.map(n => positions[n.id]?.slot ?? 0));
         const lh = (maxSlot + 1) * (CARD_H + CARD_GAP) + ROW_PAD * 2;
 
-        const row = document.createElement('div');
-        row.style.cssText = `display:flex;position:relative;width:${totalW}px`;
+        // Stub lane label
+        const stubRow = document.createElement('div');
+        stubRow.style.cssText = `width:${STUB}px;height:${lh}px;border-bottom:1px solid rgba(255,255,255,.03);background:rgba(255,255,255,.01);display:flex;align-items:flex-start;padding:6px 8px`;
+        stubRow.innerHTML = `<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
+        stubPb.appendChild(stubRow);
 
-        const leftStub = document.createElement('div');
-        leftStub.style.cssText = `width:${STUB}px;height:${lh}px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.05);background:rgba(255,255,255,.01);position:sticky;left:0;z-index:4;display:flex;align-items:flex-start;padding:6px 8px`;
-        leftStub.innerHTML = `<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
-
+        // Canvas lane
         const cv = document.createElement('div');
-        cv.style.cssText = `position:relative;width:${DATES.length * CW + 60}px;height:${lh}px`;
+        cv.style.cssText = `position:relative;width:${totalW}px;height:${lh}px;border-bottom:1px solid rgba(255,255,255,.03)`;
 
-        // SVG connector overlay
+        // SVG connector + today line overlay
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:2;width:${DATES.length * CW + 60}px;height:${lh}px`;
+        svg.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:2;width:${totalW}px;height:${lh}px`;
         cv.appendChild(svg);
 
-        // Today vertical line
         const todayIdx = dateIndex[today];
         if (todayIdx !== undefined) {
           const tx = todayIdx * CW + CW / 2;
@@ -6859,7 +6883,7 @@ function buildWorkDiagram() {
           svg.appendChild(vline);
         }
 
-        // Render nodes
+        // Nodes
         lane.nodes.forEach(node => {
           const pos = positions[node.id];
           if (!pos) return;
@@ -6868,83 +6892,62 @@ function buildWorkDiagram() {
           const isOverdue = node.overdue;
           const isToday   = pos.col === today;
           const nodeColor = isOverdue ? '#E24B4A' : isToday ? '#EF9F27' : node.type === 'action' ? '#8B5CF6' : '#00D2FF';
-          const bgAlpha   = isOverdue ? '.06' : '.04';
           const pct = node.pct || 0;
           const statusLabel = (node.status || 'open').replace(/_/g, ' ');
-
           const nd = document.createElement('div');
           nd.style.cssText = `position:absolute;left:${x}px;top:${pos.y}px;width:${CARD_W}px;cursor:pointer;z-index:3`;
           nd.dataset.wiId = node.id;
           nd.dataset.action = 'diag-open-task';
-          nd.innerHTML = `
-            <div style="border:1px solid ${nodeColor}44;border-left:3px solid ${nodeColor};background:rgba(255,255,255,${bgAlpha});border-radius:3px;padding:5px 7px;transition:.1s" class="diag-nd-inner">
-              <div style="font-family:var(--font-head);font-size:11px;color:${nodeColor};letter-spacing:.05em;text-transform:uppercase;opacity:.65;margin-bottom:2px">${node.type}</div>
-              <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W - 16}px" title="${esc(node.title)}">${esc(node.title)}</div>
-              <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>
-              ${pct > 0 ? `<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nodeColor};border-radius:1px"></div></div>` : ''}
-              <div style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${nodeColor}66;color:${nodeColor};display:inline-block;letter-spacing:.04em">${statusLabel}</div>
-            </div>`;
+          nd.innerHTML = `<div style="border:1px solid ${nodeColor}44;border-left:3px solid ${nodeColor};background:rgba(255,255,255,.04);border-radius:3px;padding:5px 7px;transition:all .1s" class="diag-nd-inner"><div style="font-family:var(--font-head);font-size:11px;color:${nodeColor};letter-spacing:.05em;text-transform:uppercase;opacity:.65;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-16}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nodeColor};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${nodeColor}66;color:${nodeColor};display:inline-block;letter-spacing:.04em">${statusLabel}</div></div>`;
           cv.appendChild(nd);
         });
 
-        // Draw orthogonal connectors after a tick (DOM must exist)
-        const nodeMap = {};
-        lane.nodes.forEach(n => nodeMap[n.id] = n);
+        // Connectors
         setTimeout(() => {
           const cvRect = cv.getBoundingClientRect();
           lane.nodes.forEach(node => {
-            if (!node.projectId) return; // action items link to parent tasks by instance
-            // Connect same-project action items to their parent task if same lane
-            const parent = proj.nodes.find(p => p.type === 'task' && p.id !== node.id &&
-              positions[p.id] && positions[node.id] &&
-              dateIndex[positions[p.id].col] < dateIndex[positions[node.id].col]);
-            if (!parent || node.type !== 'action') return;
+            if (node.type !== 'action') return;
+            const parent = proj.nodes.find(p => p.type === 'task' && positions[p.id] && positions[node.id] &&
+              dateIndex[positions[p.id]?.col] < dateIndex[positions[node.id]?.col]);
+            if (!parent) return;
             const pEl = cv.querySelector(`[data-wi-id="${parent.id}"]`);
             const cEl = cv.querySelector(`[data-wi-id="${node.id}"]`);
             if (!pEl || !cEl) return;
-            const pR = pEl.getBoundingClientRect();
-            const cR = cEl.getBoundingClientRect();
-            const fx = pR.right - cvRect.left, fy = pR.top + pR.height / 2 - cvRect.top;
-            const tx = cR.left - cvRect.left,  ty = cR.top + cR.height / 2 - cvRect.top;
+            const pR = pEl.getBoundingClientRect(), cR = cEl.getBoundingClientRect();
+            const fx = pR.right - cvRect.left, fy = pR.top + pR.height/2 - cvRect.top;
+            const tx = cR.left - cvRect.left,   ty = cR.top + cR.height/2 - cvRect.top;
             const mx = (fx + tx) / 2;
-            let d;
-            if (Math.abs(fy - ty) < 4) {
-              d = `M${fx},${fy} H${tx}`;
-            } else {
-              d = `M${fx},${fy} H${mx} V${ty} H${tx}`;
-            }
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', d);
-            path.setAttribute('stroke', 'rgba(0,210,255,.25)');
-            path.setAttribute('stroke-width', '1.2');
-            path.setAttribute('fill', 'none');
-            path.setAttribute('stroke-dasharray', '4,3');
-            const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            arr.setAttribute('points', `${tx},${ty} ${tx-7},${ty-3.5} ${tx-7},${ty+3.5}`);
-            arr.setAttribute('fill', 'rgba(0,210,255,.4)');
-            svg.appendChild(path);
-            svg.appendChild(arr);
+            const d = Math.abs(fy-ty)<4 ? `M${fx},${fy} H${tx}` : `M${fx},${fy} H${mx} V${ty} H${tx}`;
+            const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+            path.setAttribute('d',d); path.setAttribute('stroke','rgba(0,210,255,.25)');
+            path.setAttribute('stroke-width','1.2'); path.setAttribute('fill','none');
+            path.setAttribute('stroke-dasharray','4,3');
+            const arr = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+            arr.setAttribute('points',`${tx},${ty} ${tx-7},${ty-3.5} ${tx-7},${ty+3.5}`);
+            arr.setAttribute('fill','rgba(0,210,255,.4)');
+            svg.appendChild(path); svg.appendChild(arr);
           });
         }, 80);
 
-        row.appendChild(leftStub);
-        row.appendChild(cv);
-        pb.appendChild(row);
+        pb.appendChild(cv);
       });
     }
 
     sw.appendChild(pb);
     slContainer.appendChild(sw);
+    stubSw.appendChild(stubPb);
+    stubsContainer.appendChild(stubSw);
   });
 
   root.appendChild(slContainer);
+  if (stubsEl) stubsEl.appendChild(stubsContainer);
   _diagApplyTransform();
 }
 
 // ── Diagram pan/zoom — module-level listeners ──────────────
 (function _initDiagPanZoom() {
   document.addEventListener('mousedown', function(ev) {
-    const vp = document.getElementById('mw-diag-viewport');
+    const vp = document.getElementById('mw-diag-tl-wrap');
     if (!vp || !_diagramMode) return;
     if (ev.target.closest('[data-action="diag-open-task"]') ||
         ev.target.closest('[data-action="diag-toggle-proj"]') ||
@@ -6969,11 +6972,11 @@ function buildWorkDiagram() {
   document.addEventListener('mouseup', function() {
     if (!_diagPanning) return;
     _diagPanning = false;
-    const vp = document.getElementById('mw-diag-viewport');
+    const vp = document.getElementById('mw-diag-tl-wrap');
     if (vp) vp.style.cursor = 'grab';
   });
   document.addEventListener('wheel', function(ev) {
-    const vp = document.getElementById('mw-diag-viewport');
+    const vp = document.getElementById('mw-diag-tl-wrap');
     if (!vp || !_diagramMode || !vp.contains(ev.target)) return;
     ev.preventDefault();
     const rect = vp.getBoundingClientRect();
@@ -6987,7 +6990,7 @@ function buildWorkDiagram() {
   }, { passive: false });
   // Touch pan
   document.addEventListener('touchstart', function(ev) {
-    const vp = document.getElementById('mw-diag-viewport');
+    const vp = document.getElementById('mw-diag-tl-wrap');
     if (!vp || !_diagramMode || !vp.contains(ev.target)) return;
     if (ev.touches.length === 1) { _diagPanning = true; _diagLastX = ev.touches[0].clientX; _diagLastY = ev.touches[0].clientY; }
   }, { passive: true });
@@ -7619,14 +7622,47 @@ document.addEventListener('click', function(ev) {
   // ── Diagram toggle ──────────────────────────────────────
   if (ev.target.closest('[data-action="diagram-list"]')) {
     _diagramMode = false;
-    _viewLoaded['user'] = false;
-    loadUserView();
+    const listEl = document.getElementById('work-list-rows');
+    const diagEl = document.getElementById('mw-diagram-wrap');
+    if (listEl) listEl.style.display = '';
+    if (diagEl) diagEl.style.display = 'none';
+    // Update pill styles
+    const panel = document.getElementById('mw-worklist-panel');
+    if (panel) {
+      const btns = panel.querySelectorAll('[data-action="diagram-list"],[data-action="diagram-diag"]');
+      btns.forEach(b => {
+        const isActive = b.dataset.action === 'diagram-list';
+        b.style.background = isActive ? 'rgba(239,159,39,.2)' : 'none';
+        b.style.color = isActive ? '#EF9F27' : 'rgba(255,255,255,.3)';
+      });
+      // Hide zoom controls
+      panel.querySelectorAll('[data-action^="diag-zoom"],[data-action="diag-maximize"]').forEach(b=>b.style.display='none');
+      const zlbl = document.getElementById('diag-zoom-lbl');
+      if (zlbl) zlbl.style.display = 'none';
+    }
     return;
   }
   if (ev.target.closest('[data-action="diagram-diag"]')) {
     _diagramMode = true;
-    _viewLoaded['user'] = false;
-    loadUserView();
+    const listEl = document.getElementById('work-list-rows');
+    const diagEl = document.getElementById('mw-diagram-wrap');
+    if (listEl) listEl.style.display = 'none';
+    if (diagEl) diagEl.style.display = '';
+    // Update pill styles
+    const panel = document.getElementById('mw-worklist-panel');
+    if (panel) {
+      const btns = panel.querySelectorAll('[data-action="diagram-list"],[data-action="diagram-diag"]');
+      btns.forEach(b => {
+        const isActive = b.dataset.action === 'diagram-diag';
+        b.style.background = isActive ? 'rgba(239,159,39,.2)' : 'none';
+        b.style.color = isActive ? '#EF9F27' : 'rgba(255,255,255,.3)';
+      });
+      // Show zoom controls
+      panel.querySelectorAll('[data-action^="diag-zoom"],[data-action="diag-maximize"]').forEach(b=>b.style.display='');
+      const zlbl = document.getElementById('diag-zoom-lbl');
+      if (zlbl) zlbl.style.display = '';
+    }
+    buildWorkDiagram();
     return;
   }
   if (ev.target.closest('[data-action="diag-zoom-in"]')) {
@@ -7644,7 +7680,7 @@ document.addEventListener('click', function(ev) {
   if (ev.target.closest('[data-action="diag-maximize"]')) {
     const panel = document.getElementById('mw-worklist-panel');
     if (panel) panel.classList.toggle('diag-maximized');
-    const vp = document.getElementById('mw-diag-viewport');
+    const vp = document.getElementById('mw-diag-tl-wrap');
     if (vp) vp.style.height = panel?.classList.contains('diag-maximized') ? 'calc(100vh - 200px)' : '480px';
     return;
   }
