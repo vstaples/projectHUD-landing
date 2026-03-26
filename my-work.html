@@ -4906,7 +4906,8 @@ window.uSwitchTab = function(tab, btn) {
   if (btn) btn.classList.add('on');
   const panel = document.getElementById('utc-'+tab);
   if (panel) panel.classList.add('on');
-  if (tab === 'meetings' && !window._meetingsLoaded) loadUserMeetings();
+  if (tab === 'meetings' && !window._mtgLoaded) loadMyMeetingsView();
+  else if (tab === 'meetings' && window._mtgRefresh) window._mtgRefresh();
   if (tab === 'concerns' && !window._concernsLoaded) loadUserConcerns();
   if (tab === 'calendar' && !window._calLoaded) loadMyCalView();
   else if (tab === 'calendar' && window._calRefresh) window._calRefresh();
@@ -5105,6 +5106,45 @@ window.loadMyCalView = async function() {
     compassToast('Failed to load My Calendar — check console', 4000);
   }
 };
+
+// ── My Meetings loader ────────────────────────────────────────────────────
+window.loadMyMeetingsView = async function() {
+  if (window._mtgLoaded) {
+    window._mtgRefresh && window._mtgRefresh();
+    return;
+  }
+  const container = document.getElementById('user-meetings-content');
+  if (!container) { console.error('[Compass] #user-meetings-content not found'); return; }
+  try {
+    const resp = await fetch('/my-meetings.html');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(html, 'text/html');
+    for (const st of doc.querySelectorAll('style')) {
+      const el = document.createElement('style');
+      el.textContent = st.textContent;
+      document.head.appendChild(el);
+    }
+    Array.from(doc.body.childNodes).forEach(node => {
+      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
+    });
+    for (const s of doc.querySelectorAll('script')) {
+      const el = document.createElement('script');
+      el.textContent = s.textContent;
+      document.head.appendChild(el);
+    }
+    // Bridge resource
+    window._mtgResource = typeof _myResource !== 'undefined' ? _myResource : null;
+    window._users       = typeof _users       !== 'undefined' ? _users       : (window._users || []);
+    if (window._mtgLoadView) await window._mtgLoadView();
+    else console.error('[Compass] _mtgLoadView not exported by my-meetings.html');
+  } catch(err) {
+    console.error('[Compass] Failed to load my-meetings.html:', err);
+    compassToast('Failed to load My Meetings — check console', 4000);
+  }
+};
+
 
 window.loadUserMeetings = async function() {
   window._meetingsLoaded = true;

@@ -1,0 +1,731 @@
+<!-- my-meetings.html — Compass My Meetings module -->
+<!-- Exports: window._mtgLoadView, window._mtgRefresh -->
+<!-- Loaded dynamically by my-work.html when My Meetings tab clicked -->
+<!-- Depends on: window._mtgResource (bridged by loadMyMeetingsView) -->
+
+<style>
+/* ── My Meetings layout ─────────────────────────────────────────────── */
+#mtg-shell{display:grid;grid-template-columns:280px 1fr;gap:0;height:calc(100vh - 120px);overflow:hidden;background:var(--bg0,#060a10)}
+
+/* ── Left panel — knowledge tree ────────────────────────────────────── */
+#mtg-tree-panel{border-right:1px solid rgba(0,210,255,.1);display:flex;flex-direction:column;overflow:hidden}
+#mtg-tree-header{padding:12px 14px;border-bottom:1px solid rgba(0,210,255,.08);flex-shrink:0}
+#mtg-tree-title{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3,#6A94B8);margin-bottom:8px}
+#mtg-search{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0,#F0F6FF);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 9px;outline:none;transition:border-color .12s}
+#mtg-search:focus{border-color:rgba(0,210,255,.35)}
+#mtg-search::placeholder{color:var(--text3,#6A94B8)}
+#mtg-new-btn{margin-top:7px;width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
+#mtg-new-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.04)}
+#mtg-tree-scroll{flex:1;overflow-y:auto;padding:8px 0}
+
+/* ── Tree nodes ──────────────────────────────────────────────────────── */
+.mtg-client{padding:6px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.mtg-client:hover{color:var(--text0,#F0F6FF)}
+.mtg-project{padding:5px 14px 5px 24px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.mtg-project:hover{color:var(--text0,#F0F6FF)}
+.mtg-stream{padding:4px 14px 4px 34px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.04em}
+.mtg-stream:hover{color:var(--text2,#90B8D8)}
+.mtg-node{padding:4px 14px 4px 46px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);cursor:pointer;display:flex;align-items:center;gap:7px;user-select:none;border-left:2px solid transparent;transition:all .1s}
+.mtg-node:hover{color:var(--text0,#F0F6FF);background:rgba(0,210,255,.03)}
+.mtg-node.active{color:var(--compass-cyan,#00D2FF);background:rgba(0,210,255,.06);border-left-color:var(--compass-cyan,#00D2FF)}
+.mtg-chevron{width:10px;height:10px;transition:transform .15s;flex-shrink:0;opacity:.5}
+.mtg-chevron.open{transform:rotate(90deg)}
+.mtg-children{overflow:hidden}
+.mtg-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;border-radius:2px;margin-left:auto;flex-shrink:0}
+.mtg-badge-red{background:rgba(226,75,74,.15);color:#E24B4A;border:0.5px solid rgba(226,75,74,.3)}
+.mtg-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27;border:0.5px solid rgba(239,159,39,.25)}
+.mtg-badge-cyan{background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2)}
+
+/* ── Outcome dots ────────────────────────────────────────────────────── */
+.mtg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mtg-dot-closed{background:#1D9E75}
+.mtg-dot-deferred{background:#EF9F27}
+.mtg-dot-upcoming{background:#00D2FF}
+.mtg-dot-draft{background:rgba(255,255,255,.2)}
+
+/* ── Right panel — meeting record ───────────────────────────────────── */
+#mtg-record-panel{display:flex;flex-direction:column;overflow:hidden}
+#mtg-record-scroll{flex:1;overflow-y:auto;padding:16px 20px}
+#mtg-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3,#6A94B8);font-family:var(--font-mono,monospace);font-size:11px;text-align:center;gap:10px}
+
+/* ── Record header ───────────────────────────────────────────────────── */
+.mtg-rec-hdr{margin-bottom:14px}
+.mtg-rec-badges{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.mtg-status-badge{font-family:var(--font-mono,monospace);font-size:10px;padding:2px 8px;letter-spacing:.06em;text-transform:uppercase;border-radius:2px;font-weight:600}
+.mtg-status-closed{background:rgba(29,158,117,.15);color:#1D9E75;border:0.5px solid rgba(29,158,117,.3)}
+.mtg-status-deferred{background:rgba(239,159,39,.12);color:#EF9F27;border:0.5px solid rgba(239,159,39,.3)}
+.mtg-status-upcoming{background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2)}
+.mtg-status-draft{background:rgba(255,255,255,.06);color:var(--text3);border:0.5px solid rgba(255,255,255,.12)}
+.mtg-attempt-badge{font-family:var(--font-mono,monospace);font-size:10px;padding:2px 8px;background:rgba(239,159,39,.1);color:#EF9F27;border:0.5px solid rgba(239,159,39,.25)}
+.mtg-closure-rate{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:2px 0}
+.mtg-rec-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:22px;font-weight:700;color:var(--text0,#F0F6FF);letter-spacing:.02em;line-height:1.2;margin-bottom:5px}
+.mtg-rec-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);display:flex;gap:14px;flex-wrap:wrap}
+
+/* ── Sections ────────────────────────────────────────────────────────── */
+.mtg-section{margin-bottom:12px;border:1px solid rgba(0,210,255,.08);background:var(--bg1,#0c1628)}
+.mtg-section-hdr{padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:background .1s}
+.mtg-section-hdr:hover{background:rgba(0,210,255,.03)}
+.mtg-section-hdr.open{border-bottom-color:rgba(0,210,255,.08)}
+.mtg-section-label{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);flex:1}
+.mtg-section-body{padding:12px 14px;display:none}
+.mtg-section-body.open{display:block}
+
+/* ── Consequence box ─────────────────────────────────────────────────── */
+.mtg-consequence{background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.2);border-left:3px solid #EF9F27;padding:10px 12px;margin-top:8px;font-family:var(--font-mono,monospace);font-size:11px;color:rgba(240,246,255,.75);line-height:1.7}
+.mtg-consequence-hdr{font-family:var(--font-mono,monospace);font-size:10px;color:#EF9F27;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+
+/* ── Thread timeline ─────────────────────────────────────────────────── */
+.mtg-thread-item{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mtg-thread-item:last-child{border-bottom:none}
+.mtg-thread-item.current{background:rgba(0,210,255,.03);margin:0 -14px;padding:7px 14px}
+.mtg-thread-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.mtg-thread-date{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);min-width:70px}
+.mtg-thread-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text1,#C8DFF0);flex:1}
+.mtg-thread-status{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Action items ────────────────────────────────────────────────────── */
+.mtg-action-row{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mtg-action-row:last-child{border-bottom:none}
+.mtg-action-icon{width:14px;height:14px;border-radius:50%;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center}
+.mtg-action-icon-done{background:rgba(29,158,117,.2);border:1px solid rgba(29,158,117,.5)}
+.mtg-action-icon-open{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15)}
+.mtg-action-icon-overdue{background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.4)}
+.mtg-action-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text0);flex:1;line-height:1.3}
+.mtg-action-title.done{color:var(--text3);text-decoration:line-through}
+.mtg-action-title.overdue{color:#E24B4A}
+.mtg-action-owner{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);min-width:100px}
+.mtg-action-due{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);min-width:60px;text-align:right}
+.mtg-action-due.overdue{color:#E24B4A}
+
+/* ── Attendee chips ──────────────────────────────────────────────────── */
+.mtg-attendee-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:2px;font-family:var(--font-mono,monospace);font-size:10px;margin:3px;border:0.5px solid}
+.mtg-chip-attended{background:rgba(29,158,117,.08);border-color:rgba(29,158,117,.3);color:#1D9E75}
+.mtg-chip-noshow{background:rgba(226,75,74,.08);border-color:rgba(226,75,74,.25);color:#E24B4A}
+.mtg-chip-invited{background:rgba(0,210,255,.06);border-color:rgba(0,210,255,.2);color:#00D2FF}
+
+/* ── Footer actions ──────────────────────────────────────────────────── */
+#mtg-record-footer{padding:10px 20px;border-top:1px solid rgba(0,210,255,.08);display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
+.mtg-foot-btn{font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;text-transform:uppercase;padding:5px 14px;cursor:pointer;transition:all .12s;border:1px solid}
+.mtg-foot-btn-primary{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.35);color:#00D2FF}
+.mtg-foot-btn-primary:hover{background:rgba(0,210,255,.18)}
+.mtg-foot-btn-secondary{background:none;border-color:rgba(255,255,255,.15);color:var(--text2)}
+.mtg-foot-btn-secondary:hover{border-color:rgba(255,255,255,.3);color:var(--text0)}
+.mtg-foot-next{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-left:auto;align-self:center}
+
+/* ── Purpose field ───────────────────────────────────────────────────── */
+.mtg-purpose-box{background:rgba(0,0,0,.2);border:1px solid rgba(0,210,255,.1);padding:9px 12px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text1);line-height:1.7}
+.mtg-outcome-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.mtg-outcome-label{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase}
+
+/* ── Decisions ───────────────────────────────────────────────────────── */
+.mtg-decision{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--font-mono,monospace);font-size:11px;color:var(--text1);line-height:1.5}
+.mtg-decision:last-child{border-bottom:none}
+.mtg-decision-marker{color:var(--compass-cyan,#00D2FF);flex-shrink:0;margin-top:1px}
+
+/* ── Rating section ──────────────────────────────────────────────────── */
+.mtg-rating-row{display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mtg-rating-row:last-child{border-bottom:none}
+.mtg-rating-stars{display:flex;gap:2px}
+.mtg-star{color:var(--compass-amber,#EF9F27);font-size:12px}
+.mtg-star-empty{color:rgba(255,255,255,.15);font-size:12px}
+.mtg-rating-comment{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text2);flex:1;line-height:1.5}
+.mtg-rating-correction{background:rgba(239,159,39,.06);border-left:2px solid #EF9F27;padding:4px 8px;margin-top:4px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text2);line-height:1.5}
+.mtg-correction-accepted{color:#1D9E75;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+</style>
+
+<div id="mtg-shell">
+
+  <!-- ── Left: Knowledge Tree ─────────────────────────────────────── -->
+  <div id="mtg-tree-panel">
+    <div id="mtg-tree-header">
+      <div id="mtg-tree-title">Knowledge tree</div>
+      <input id="mtg-search" placeholder="Search meetings, decisions, people…" type="text" oninput="_mtgSearch(this.value)"/>
+      <button id="mtg-new-btn" onclick="_mtgNewMeeting()">+ New meeting</button>
+    </div>
+    <div id="mtg-tree-scroll">
+      <div id="mtg-tree-body" style="padding-bottom:20px"></div>
+    </div>
+  </div>
+
+  <!-- ── Right: Meeting Record ────────────────────────────────────── -->
+  <div id="mtg-record-panel">
+    <div id="mtg-record-scroll">
+      <div id="mtg-empty-state">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="18" r="16" stroke="rgba(0,210,255,.2)" stroke-width="1.5"/>
+          <circle cx="18" cy="18" r="11" fill="none" stroke="rgba(0,210,255,.15)" stroke-width="1" stroke-dasharray="2 2"/>
+          <line x1="18" y1="6" x2="18" y2="18" stroke="rgba(0,210,255,.4)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="18" y1="18" x2="25" y2="14" stroke="rgba(0,210,255,.4)" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="18" cy="18" r="2" fill="rgba(0,210,255,.5)"/>
+        </svg>
+        <div>Select a meeting from the knowledge tree</div>
+        <div style="font-size:10px;opacity:.6">Client → Project → Work stream → Session</div>
+      </div>
+      <div id="mtg-record-body" style="display:none"></div>
+    </div>
+    <div id="mtg-record-footer" style="display:none">
+      <button class="mtg-foot-btn mtg-foot-btn-primary" onclick="_mtgOpenMinutes()">Open full minutes →</button>
+      <button class="mtg-foot-btn mtg-foot-btn-secondary" onclick="_mtgScheduleFollowup()">Schedule follow-up</button>
+      <button class="mtg-foot-btn mtg-foot-btn-secondary" onclick="_mtgViewInWork()">View in My Work</button>
+      <div class="mtg-foot-next" id="mtg-foot-next"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+'use strict';
+
+// ── State ─────────────────────────────────────────────────────────────────
+let _meetings    = [];
+let _attendees   = {};  // meeting_id → [attendee rows]
+let _minutes     = {};  // meeting_id → minutes row
+let _actions     = {};  // meeting_id → [action items]
+let _ratings     = {};  // meeting_id → [rating rows]
+let _cocEvents   = {};  // meeting_id → [coc events]
+let _projects    = [];
+let _activeMtgId = null;
+const FIRM_ID    = 'aaaaaaaa-0001-0001-0001-000000000001';
+
+// ── Entry point ───────────────────────────────────────────────────────────
+window._mtgLoadView = async function() {
+  if (window._mtgLoaded) { window._mtgRefresh && window._mtgRefresh(); return; }
+  window._mtgLoaded = true;
+  _projects = window._projects || [];
+  await _mtgFetchAll();
+  _mtgBuildTree();
+};
+
+window._mtgRefresh = async function() {
+  _projects = window._projects || [];
+  await _mtgFetchAll();
+  _mtgBuildTree();
+  if (_activeMtgId) _mtgSelectMeeting(_activeMtgId);
+};
+
+// ── Fetch all meeting data ────────────────────────────────────────────────
+async function _mtgFetchAll() {
+  const resource = window._mtgResource || window._myResource || null;
+  if (!resource) return;
+
+  try {
+    const [mtgs, atts, mins, acts, rats] = await Promise.all([
+      API.get('v_meetings?firm_id=eq.' + FIRM_ID + '&select=*&order=meeting_date.desc&limit=100').catch(()=>[]),
+      API.get('meeting_attendees?select=meeting_id,user_id,attendance_status&limit=500').catch(()=>[]),
+      API.get('meeting_minutes?select=id,meeting_id,summary,decisions_made,status,sent_at&limit=100').catch(()=>[]),
+      API.get('meeting_action_items?select=id,meeting_id,description,assigned_to_resource,due_date,status&limit=200').catch(()=>[]),
+      API.get('meeting_ratings?firm_id=eq.' + FIRM_ID + '&select=*&limit=200').catch(()=>[]),
+    ]);
+
+    _meetings = Array.isArray(mtgs) ? mtgs : [];
+
+    // Index attendees by meeting_id
+    _attendees = {};
+    (Array.isArray(atts) ? atts : []).forEach(a => {
+      if (!_attendees[a.meeting_id]) _attendees[a.meeting_id] = [];
+      _attendees[a.meeting_id].push(a);
+    });
+
+    // Index minutes by meeting_id (latest per meeting)
+    _minutes = {};
+    (Array.isArray(mins) ? mins : []).forEach(m => { _minutes[m.meeting_id] = m; });
+
+    // Index action items by meeting_id
+    _actions = {};
+    (Array.isArray(acts) ? acts : []).forEach(a => {
+      if (!_actions[a.meeting_id]) _actions[a.meeting_id] = [];
+      _actions[a.meeting_id].push(a);
+    });
+
+    // Index ratings by meeting_id
+    _ratings = {};
+    (Array.isArray(rats) ? rats : []).forEach(r => {
+      if (!_ratings[r.meeting_id]) _ratings[r.meeting_id] = [];
+      _ratings[r.meeting_id].push(r);
+    });
+
+    // Fetch CoC events for all meeting IDs
+    const mtgIds = _meetings.map(m => m.id);
+    if (mtgIds.length > 0) {
+      const cocs = await API.get(
+        'coc_events?entity_type=eq.meeting&entity_id=in.(' + mtgIds.join(',') + ')&select=*&limit=200'
+      ).catch(() => []);
+      _cocEvents = {};
+      (Array.isArray(cocs) ? cocs : []).forEach(c => {
+        if (!_cocEvents[c.entity_id]) _cocEvents[c.entity_id] = [];
+        _cocEvents[c.entity_id].push(c);
+      });
+    }
+
+    console.log('[Compass] My Meetings loaded:', _meetings.length, 'meetings');
+  } catch(e) {
+    console.error('[Compass] My Meetings fetch error:', e);
+  }
+}
+
+// ── Build knowledge tree ─────────────────────────────────────────────────
+function _mtgBuildTree() {
+  const body = document.getElementById('mtg-tree-body');
+  if (!body) return;
+  const today = new Date().toISOString().slice(0,10);
+
+  // Group: Client → Project → Work stream → meetings
+  // Derive client from project.client_id, project from meeting.project_id
+  const hierarchy = {}; // clientLabel → { projectLabel → { streamLabel → [meeting] } }
+
+  _meetings.forEach(m => {
+    const proj       = _projects.find(p => p.id === m.project_id);
+    const clientKey  = proj ? (proj.client_id || 'internal') : 'internal';
+    const clientLabel = proj ? (_mtgClientName(proj) || 'Client') : 'Internal';
+    const projLabel  = proj ? proj.name : 'Internal';
+    const streamLabel = m.work_stream || m.meeting_type || 'General';
+
+    if (!hierarchy[clientKey]) hierarchy[clientKey] = { label: clientLabel, projects: {} };
+    const cl = hierarchy[clientKey];
+    if (!cl.projects[m.project_id || 'none']) cl.projects[m.project_id || 'none'] = { label: projLabel, streams: {} };
+    const pr = cl.projects[m.project_id || 'none'];
+    if (!pr.streams[streamLabel]) pr.streams[streamLabel] = [];
+    pr.streams[streamLabel].push(m);
+  });
+
+  let html = '';
+
+  Object.entries(hierarchy).forEach(([clientKey, client]) => {
+    html += _mtgTreeClient(clientKey, client, today);
+  });
+
+  // Firm → Recognition branch
+  html += _mtgFirmBranch();
+
+  body.innerHTML = html;
+  _mtgWireTree();
+}
+
+function _mtgClientName(proj) {
+  // Try to derive client label from project context
+  return null; // will be enhanced when clients table is wired
+}
+
+function _mtgTreeClient(clientKey, client, today) {
+  const id = 'cl-' + clientKey.slice(0,8);
+  let html = '<div class="mtg-client" data-toggle="' + id + '">' +
+    '<svg class="mtg-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+    _esc(client.label) +
+    '</div>' +
+    '<div id="' + id + '" class="mtg-children">';
+
+  Object.entries(client.projects).forEach(([projId, proj]) => {
+    html += _mtgTreeProject(projId, proj, today);
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function _mtgTreeProject(projId, proj, today) {
+  const id = 'pr-' + projId.slice(0,8);
+  // Count open action items across all streams
+  let openActions = 0;
+  Object.values(proj.streams).forEach(meetings => {
+    meetings.forEach(m => {
+      const acts = _actions[m.id] || [];
+      openActions += acts.filter(a => a.status === 'open').length;
+    });
+  });
+
+  let html = '<div class="mtg-project" data-toggle="' + id + '">' +
+    '<svg class="mtg-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+    _esc(proj.label);
+  if (openActions > 0) html += '<span class="mtg-badge mtg-badge-amber">' + openActions + ' open</span>';
+  html += '</div><div id="' + id + '" class="mtg-children">';
+
+  Object.entries(proj.streams).forEach(([streamLabel, meetings]) => {
+    html += _mtgTreeStream(streamLabel, meetings, today);
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function _mtgTreeStream(streamLabel, meetings, today) {
+  const id = 'st-' + streamLabel.replace(/\s+/g,'-').slice(0,16) + '-' + Math.random().toString(36).slice(2,6);
+  const upcoming = meetings.filter(m => m.outcome === 'upcoming' || (m.meeting_date && m.meeting_date.slice(0,10) >= today)).length;
+  const deferred = meetings.filter(m => m.outcome === 'deferred').length;
+
+  let html = '<div class="mtg-stream" data-toggle="' + id + '">' +
+    '<svg class="mtg-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+    _esc(streamLabel);
+  if (deferred > 0) html += '<span class="mtg-badge mtg-badge-amber">' + deferred + ' deferred</span>';
+  else if (upcoming > 0) html += '<span class="mtg-badge mtg-badge-cyan">' + upcoming + ' upcoming</span>';
+  html += '</div><div id="' + id + '" class="mtg-children">';
+
+  // Sort meetings: upcoming first, then by date desc
+  const sorted = [...meetings].sort((a,b) => {
+    const aUp = a.outcome === 'upcoming' ? 0 : 1;
+    const bUp = b.outcome === 'upcoming' ? 0 : 1;
+    if (aUp !== bUp) return aUp - bUp;
+    return (b.meeting_date||'').localeCompare(a.meeting_date||'');
+  });
+
+  sorted.forEach(m => {
+    const dotCls = m.outcome === 'closed' ? 'mtg-dot-closed' :
+                   m.outcome === 'deferred' ? 'mtg-dot-deferred' :
+                   m.outcome === 'upcoming' ? 'mtg-dot-upcoming' : 'mtg-dot-draft';
+    const dateStr = m.meeting_date ? m.meeting_date.slice(0,10) : '—';
+    const hasOpenActions = (_actions[m.id]||[]).some(a => a.status === 'open');
+    html += '<div class="mtg-node' + (m.id === _activeMtgId ? ' active' : '') + '" data-mtgid="' + _esc(m.id) + '">' +
+      '<div class="mtg-dot ' + dotCls + '"></div>' +
+      _esc(dateStr) +
+      (hasOpenActions ? ' <span style="color:#E24B4A;font-size:9px">●</span>' : '') +
+      '</div>';
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function _mtgFirmBranch() {
+  return '<div class="mtg-client" data-toggle="cl-firm">' +
+    '<svg class="mtg-chevron" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+    'Firm</div>' +
+    '<div id="cl-firm" class="mtg-children" style="display:none">' +
+    '<div class="mtg-project" style="pointer-events:none;opacity:.5">Recognition → Compass Award</div>' +
+    '</div>';
+}
+
+function _mtgWireTree() {
+  // Chevron toggles
+  document.querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('click', () => {
+      const target = document.getElementById(el.dataset.toggle);
+      if (!target) return;
+      const isOpen = target.style.display !== 'none';
+      target.style.display = isOpen ? 'none' : '';
+      el.querySelector('.mtg-chevron')?.classList.toggle('open', !isOpen);
+    });
+  });
+
+  // Meeting node clicks
+  document.querySelectorAll('.mtg-node[data-mtgid]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      _mtgSelectMeeting(el.dataset.mtgid);
+    });
+  });
+}
+
+// ── Select and render meeting record ─────────────────────────────────────
+function _mtgSelectMeeting(id) {
+  _activeMtgId = id;
+  // Highlight active node
+  document.querySelectorAll('.mtg-node').forEach(n => {
+    n.classList.toggle('active', n.dataset.mtgid === id);
+  });
+
+  const m = _meetings.find(x => x.id === id);
+  if (!m) return;
+
+  document.getElementById('mtg-empty-state').style.display = 'none';
+  const body = document.getElementById('mtg-record-body');
+  body.style.display = 'block';
+
+  const footer = document.getElementById('mtg-record-footer');
+  footer.style.display = 'flex';
+
+  // Gather related data
+  const atts    = _attendees[id] || [];
+  const mins    = _minutes[id] || null;
+  const acts    = _actions[id] || [];
+  const rats    = _ratings[id] || [];
+  const cocs    = _cocEvents[id] || [];
+  const today   = new Date().toISOString().slice(0,10);
+
+  // Thread — all meetings with same project_id + work_stream
+  const thread  = _meetings.filter(x =>
+    x.project_id === m.project_id &&
+    x.work_stream === m.work_stream &&
+    x.id !== id
+  ).sort((a,b) => (a.meeting_date||'').localeCompare(b.meeting_date||''));
+
+  // Attempt number
+  const attemptNum = _mtgAttemptNumber(m);
+
+  // Closure rate for this work stream
+  const streamMtgs = _meetings.filter(x => x.project_id === m.project_id && x.work_stream === m.work_stream);
+  const closedCount = streamMtgs.filter(x => x.outcome === 'closed').length;
+  const closureRate = streamMtgs.length > 0 ? Math.round((closedCount / streamMtgs.length) * 100) : null;
+
+  // Date/time formatting
+  const dateStr = m.meeting_date ? new Date(m.meeting_date + 'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : '—';
+  const timeStr = m.meeting_date ? new Date(m.meeting_date).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+  const dur     = m.duration_minutes ? (m.duration_minutes >= 60 ? Math.floor(m.duration_minutes/60) + 'h' + (m.duration_minutes%60?(' '+m.duration_minutes%60+'m'):'') : m.duration_minutes + 'm') : '';
+
+  // Next meeting in thread
+  const nextMtg = _meetings.find(x =>
+    x.project_id === m.project_id && x.work_stream === m.work_stream &&
+    x.outcome === 'upcoming' && x.id !== id
+  );
+  const footNext = nextMtg ? 'Next: ' + (nextMtg.meeting_date ? nextMtg.meeting_date.slice(5,10).replace('-','/') : '—') + ' · ' + timeStr : '';
+  const footEl = document.getElementById('mtg-foot-next');
+  if (footEl) footEl.textContent = footNext;
+
+  // Status badge
+  const statusBadge = _mtgStatusBadge(m.outcome);
+
+  // Build HTML
+  let html = '';
+
+  // ── Header ──
+  html += '<div class="mtg-rec-hdr">';
+  html += '<div class="mtg-rec-badges">';
+  html += statusBadge;
+  if (attemptNum > 1) html += '<span class="mtg-attempt-badge">' + _ordinal(attemptNum) + ' attempt</span>';
+  if (closureRate !== null) html += '<span class="mtg-closure-rate">' + closureRate + '% closure rate · this stream</span>';
+  html += '</div>';
+  html += '<div class="mtg-rec-title">' + _esc(m.title) + '</div>';
+  html += '<div class="mtg-rec-meta">';
+  html += '<span>' + dateStr + (timeStr ? ' · ' + timeStr : '') + '</span>';
+  if (dur) html += '<span>' + dur + '</span>';
+  html += '<span>' + atts.length + ' attendee' + (atts.length !== 1 ? 's' : '') + '</span>';
+  if (m.project_name) html += '<span>' + _esc(m.project_name) + (m.work_stream ? ' · ' + _esc(m.work_stream) : '') + '</span>';
+  html += '</div>';
+  html += '</div>'; // .mtg-rec-hdr
+
+  // ── Section 1: Purpose & Outcome ──
+  html += _mtgSection('purpose', 'Purpose & outcome', true, () => {
+    let s = '';
+    if (m.purpose) {
+      s += '<div style="margin-bottom:8px"><div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Purpose</div>';
+      s += '<div class="mtg-purpose-box">' + _esc(m.purpose) + '</div></div>';
+    }
+    s += '<div class="mtg-outcome-row">';
+    s += '<span class="mtg-outcome-label">Outcome:</span>';
+    s += statusBadge;
+    s += '</div>';
+    // Consequence box from CoC events
+    const deferredCocs = cocs.filter(c => c.event_type === 'meeting_deferred');
+    if (deferredCocs.length > 0) {
+      deferredCocs.forEach(c => {
+        s += '<div class="mtg-consequence"><div class="mtg-consequence-hdr">Consequence — auto-derived</div>' + _esc(c.event_notes || '') + '</div>';
+      });
+    }
+    // Corrections
+    const corrections = cocs.filter(c => c.event_type === 'minutes_correction');
+    if (corrections.length > 0) {
+      corrections.forEach(c => {
+        s += '<div class="mtg-consequence" style="border-left-color:#1D9E75;background:rgba(29,158,117,.04)"><div class="mtg-consequence-hdr" style="color:#1D9E75">Correction accepted — ' + _esc(c.actor_name||'') + '</div>' + _esc(c.event_notes||'') + '</div>';
+      });
+    }
+    return s;
+  });
+
+  // ── Section 2: Meeting Thread ──
+  if (thread.length > 0) {
+    html += _mtgSection('thread', 'Meeting thread · ' + (thread.length + 1) + ' sessions', true, () => {
+      const allInThread = [...thread, m].sort((a,b) => (a.meeting_date||'').localeCompare(b.meeting_date||''));
+      const deferred = allInThread.filter(x => x.outcome === 'deferred').length;
+      const closed   = allInThread.filter(x => x.outcome === 'closed').length;
+      let s = '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:8px">' +
+        allInThread.length + ' sessions · ' + deferred + ' deferred · ' + closed + ' closed</div>';
+      allInThread.forEach(t => {
+        const isCurrent = t.id === id;
+        const dotCls = t.outcome === 'closed' ? 'mtg-dot-closed' : t.outcome === 'deferred' ? 'mtg-dot-deferred' : 'mtg-dot-upcoming';
+        const tDate = t.meeting_date ? t.meeting_date.slice(0,10) : '—';
+        s += '<div class="mtg-thread-item' + (isCurrent ? ' current' : '') + '">' +
+          '<div class="mtg-thread-dot ' + dotCls + '"></div>' +
+          '<div class="mtg-thread-date">' + tDate + '</div>' +
+          '<div class="mtg-thread-title">' + _esc(t.title) + '</div>' +
+          '<div class="mtg-thread-status">' + (t.outcome||'—') + '</div>' +
+          '</div>';
+      });
+      return s;
+    });
+  }
+
+  // ── Section 3: Action Items ──
+  if (acts.length > 0) {
+    const overdueActs = acts.filter(a => a.status === 'open' && a.due_date && a.due_date < today).length;
+    html += _mtgSection('actions', 'Action items · ' + acts.length + (overdueActs > 0 ? ' · ' + overdueActs + ' overdue' : ''), true, () => {
+      let s = '';
+      const sorted = [...acts].sort((a,b) => {
+        const aOv = a.status === 'open' && a.due_date && a.due_date < today ? 0 : 1;
+        const bOv = b.status === 'open' && b.due_date && b.due_date < today ? 0 : 1;
+        return aOv - bOv;
+      });
+      sorted.forEach(a => {
+        const isOverdue = a.status === 'open' && a.due_date && a.due_date < today;
+        const isDone    = a.status === 'complete';
+        const iconCls   = isDone ? 'mtg-action-icon-done' : isOverdue ? 'mtg-action-icon-overdue' : 'mtg-action-icon-open';
+        const titleCls  = isDone ? 'done' : isOverdue ? 'overdue' : '';
+        const icon      = isDone ? '✓' : isOverdue ? '!' : '';
+        s += '<div class="mtg-action-row">' +
+          '<div class="mtg-action-icon ' + iconCls + '" style="font-size:8px;color:' + (isDone?'#1D9E75':isOverdue?'#E24B4A':'transparent') + '">' + icon + '</div>' +
+          '<div class="mtg-action-title ' + titleCls + '">' + _esc(a.description||'') + '</div>' +
+          '<div class="mtg-action-due' + (isOverdue?' overdue':'') + '">' + (a.due_date ? a.due_date.slice(5) : '') + '</div>' +
+          '</div>';
+      });
+      return s;
+    });
+  }
+
+  // ── Section 4: Attendees ──
+  if (atts.length > 0) {
+    html += _mtgSection('attendees', 'Attendees · ' + atts.length, false, () => {
+      const users = window._users || [];
+      let s = '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      atts.forEach(a => {
+        const u = users.find(u => u.id === a.user_id);
+        const name = u ? u.name : a.user_id.slice(0,8);
+        const chipCls = a.attendance_status === 'attended' ? 'mtg-chip-attended' :
+                        a.attendance_status === 'no_show'  ? 'mtg-chip-noshow'   : 'mtg-chip-invited';
+        const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        s += '<span class="mtg-attendee-chip ' + chipCls + '">' + initials + ' · ' + _esc(name) + '</span>';
+      });
+      s += '</div>';
+      return s;
+    });
+  }
+
+  // ── Section 5: Decisions ──
+  if (mins && mins.decisions_made) {
+    const decisions = mins.decisions_made.split('||').filter(Boolean);
+    if (decisions.length > 0) {
+      html += _mtgSection('decisions', 'Decisions made · ' + decisions.length, false, () => {
+        return decisions.map(d =>
+          '<div class="mtg-decision"><span class="mtg-decision-marker">→</span>' + _esc(d.trim()) + '</div>'
+        ).join('');
+      });
+    }
+  }
+
+  // ── Section 6: Minutes ──
+  if (mins) {
+    html += _mtgSection('minutes', 'Minutes · ' + (mins.status === 'submitted' ? 'Submitted' : 'Draft'), false, () => {
+      let s = '';
+      if (mins.summary) {
+        s += '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text1);line-height:1.7;margin-bottom:8px">' + _esc(mins.summary) + '</div>';
+      }
+      s += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Status: ' + (mins.status||'draft') +
+        (mins.sent_at ? ' · Sent ' + new Date(mins.sent_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '') + '</div>';
+      return s;
+    });
+  }
+
+  // ── Section 7: Ratings ──
+  if (rats.length > 0) {
+    const avgRating = rats.filter(r=>r.rating).reduce((s,r)=>s+r.rating,0) / rats.filter(r=>r.rating).length;
+    html += _mtgSection('ratings', 'Meeting ratings · avg ' + avgRating.toFixed(1) + '/5', false, () => {
+      let s = '';
+      rats.forEach(r => {
+        const stars = Array.from({length:5}, (_,i) =>
+          '<span class="' + (i < (r.rating||0) ? 'mtg-star' : 'mtg-star-empty') + '">★</span>'
+        ).join('');
+        s += '<div class="mtg-rating-row">' +
+          '<div class="mtg-rating-stars">' + stars + '</div>';
+        if (r.correction_text) {
+          s += '<div style="flex:1"><div class="mtg-rating-correction">' + _esc(r.correction_text) +
+            (r.correction_accepted ? '<div class="mtg-correction-accepted">✓ accepted · record updated</div>' : '') +
+            '</div></div>';
+        } else {
+          s += '<div class="mtg-rating-comment">' + (r.minutes_accurate ? 'Minutes accurate' : 'Flagged inaccuracy') + '</div>';
+        }
+        s += '</div>';
+      });
+      return s;
+    });
+  }
+
+  body.innerHTML = html;
+  _mtgWireSections();
+  body.dataset.currentMtgId = id;
+}
+
+// ── Section builder ───────────────────────────────────────────────────────
+function _mtgSection(key, label, defaultOpen, contentFn) {
+  const content = contentFn();
+  return '<div class="mtg-section" id="mtg-sec-' + key + '">' +
+    '<div class="mtg-section-hdr' + (defaultOpen ? ' open' : '') + '" data-sec="' + key + '">' +
+    '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transition:transform .15s;' + (defaultOpen?'transform:rotate(90deg)':'') + '" class="mtg-sec-chevron"><path d="M3 2l4 3-4 3" stroke="rgba(0,210,255,.5)" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+    '<span class="mtg-section-label">' + label + '</span>' +
+    '</div>' +
+    '<div class="mtg-section-body' + (defaultOpen ? ' open' : '') + '" id="mtg-body-' + key + '">' +
+    content +
+    '</div>' +
+    '</div>';
+}
+
+function _mtgWireSections() {
+  document.querySelectorAll('.mtg-section-hdr').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      const key    = hdr.dataset.sec;
+      const body   = document.getElementById('mtg-body-' + key);
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      hdr.classList.toggle('open', !isOpen);
+      const chevron = hdr.querySelector('.mtg-sec-chevron');
+      if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(90deg)';
+    });
+  });
+}
+
+// ── Search ────────────────────────────────────────────────────────────────
+function _mtgSearch(q) {
+  const query = q.toLowerCase().trim();
+  document.querySelectorAll('.mtg-node[data-mtgid]').forEach(el => {
+    const m = _meetings.find(x => x.id === el.dataset.mtgid);
+    if (!m) return;
+    const haystack = [m.title, m.purpose, m.work_stream, m.project_name].filter(Boolean).join(' ').toLowerCase();
+    el.style.display = (!query || haystack.includes(query)) ? '' : 'none';
+  });
+}
+
+// ── Footer actions ────────────────────────────────────────────────────────
+window._mtgOpenMinutes = function() {
+  compassToast && compassToast('Full minutes view — coming in next session.', 2500);
+};
+window._mtgScheduleFollowup = function() {
+  compassToast && compassToast('Follow-up scheduling — coming in next session.', 2500);
+};
+window._mtgViewInWork = function() {
+  if (window.uSwitchTab) uSwitchTab('work');
+};
+window._mtgNewMeeting = function() {
+  compassToast && compassToast('New meeting — coming in next session.', 2500);
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function _mtgAttemptNumber(m) {
+  // Walk back through prior_meeting_id chain
+  let count = 1, current = m;
+  const seen = new Set([m.id]);
+  while (current.parent_meeting_id) {
+    const prior = _meetings.find(x => x.id === current.parent_meeting_id);
+    if (!prior || seen.has(prior.id)) break;
+    count++; seen.add(prior.id); current = prior;
+  }
+  return count;
+}
+
+function _ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
+function _mtgStatusBadge(outcome) {
+  const cls = outcome === 'closed'   ? 'mtg-status-closed'   :
+              outcome === 'deferred' ? 'mtg-status-deferred' :
+              outcome === 'upcoming' ? 'mtg-status-upcoming' : 'mtg-status-draft';
+  const label = outcome ? outcome.charAt(0).toUpperCase() + outcome.slice(1) : 'Draft';
+  return '<span class="mtg-status-badge ' + cls + '">' + label + '</span>';
+}
+
+function _esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Module exports ────────────────────────────────────────────────────────
+})();
+</script>
