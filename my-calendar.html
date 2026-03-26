@@ -694,18 +694,28 @@ function _kbRender() {
     const pct   = avail > 0 ? Math.min(Math.round((taskH / avail) * 100), 100) : (taskH > 0 ? 100 : 0);
     const over  = taskH > avail;
     const capColor = over ? '#A32D2D' : pct > 85 ? '#BA7517' : '#185FA5';
-    const capCls   = over ? ' over' : pct > 85 ? ' warn' : '';
-    const capText  = isNext || isLast ? (taskBuckets[colId].length + ' item' + (taskBuckets[colId].length!==1?'s':'')) : over ? taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h — over' : taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h avail';
-
-    const colLabel = isLast ? 'Last week' : isNext ? 'Next week' : _kbFmtColDay(colId, colDate);
 
     // Per-day 8-segment bar: each segment = 1h. Cyan=billable, purple=non-bill, white=unallocated
     const dayTeEntries = (window._calTimeEntries || []).filter(e => e.date && e.date.slice(0,10) === colDate);
     const dayBillH    = Math.min(dayTeEntries.filter(e => e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0), 8);
     const dayNonBillH = Math.min(dayTeEntries.filter(e => !e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0), Math.max(0, 8 - dayBillH));
     const dayTotalH   = dayBillH + dayNonBillH;
-    // Build 8 individual segments
-    (function() {})(); // scope guard
+
+    // capText: past days → show actual logged; future days → show scheduled vs available
+    let capText;
+    if (isNext || isLast) {
+      capText = taskBuckets[colId].length + ' item' + (taskBuckets[colId].length !== 1 ? 's' : '');
+    } else if (isPast) {
+      // Past day — show what was actually logged
+      capText = dayTotalH > 0
+        ? dayBillH.toFixed(1) + 'h bill · ' + dayNonBillH.toFixed(1) + 'h non-bill'
+        : '0h logged';
+    } else {
+      // Today or future — show scheduled vs available
+      capText = over
+        ? taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h — over'
+        : taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h avail';
+    }
     // 8 segments: filled cyan (billable), purple (non-bill), white (unallocated)
     const _segs = Array.from({length:8}, (_,i) => {
       const hr = i + 1;
