@@ -849,19 +849,70 @@ function _kbWireEvents() {
       compassToast && compassToast('Cannot schedule items in the past.', 2000);
       _kbDragEnd(); return;
     }
-    _kbDrag.card.classList.remove('kb-dragging');
-    body.insertBefore(_kbDrag.card, body.querySelector('.kb-dz') || null);
-    _kbDrag.card.dataset.colid = destColId;
+    const cardHrs  = parseFloat(_kbDrag.hrs) || 0;
+    const cardType = _kbDrag.type || '';
     const destDate = _kbColDates[destColId];
     const dueDate  = _kbDrag.due;
-    const isPastDue = dueDate && destDate && destDate > dueDate && _kbDrag.type !== 'meeting';
+
+    // Compute available capacity in destination column
+    const destBody  = body;
+    const destCards = Array.from(destBody.querySelectorAll('.kb-card'));
+    const destCap   = _kbComputeCapacity(destColId, destCards);
+    const canFit    = Math.max(0, destCap.available);
+
+    _kbDrag.card.classList.remove('kb-dragging');
+
+    if (cardType !== 'meeting' && canFit < cardHrs && destColId !== 'next') {
+      // ── Capacity split ────────────────────────────────────────────────
+      const fitHrs      = parseFloat(canFit.toFixed(1));
+      const remainHrs   = parseFloat((cardHrs - fitHrs).toFixed(1));
+
+      // Update dropped card to only the hours that fit
+      _kbDrag.card.dataset.hrs = String(fitHrs);
+      _kbDrag.card.dataset.colid = destColId;
+      // Update hrs pill text inside the card
+      const hrsPill = _kbDrag.card.querySelector('.kb-pill-hrs');
+      if (hrsPill && hrsPill.textContent.includes('h') && !hrsPill.textContent.includes('Due')) {
+        hrsPill.textContent = fitHrs + 'h';
+      }
+      destBody.insertBefore(_kbDrag.card, destBody.querySelector('.kb-dz') || null);
+
+      if (remainHrs > 0) {
+        // Clone the card and put remainder back into Last Week
+        const remnant = _kbDrag.card.cloneNode(true);
+        remnant.dataset.hrs    = String(remainHrs);
+        remnant.dataset.colid  = 'last';
+        remnant.dataset.id     = _kbDrag.cardId + '-rem';
+        // Update hrs pill on remnant
+        const rPill = remnant.querySelector('.kb-pill-hrs');
+        if (rPill && rPill.textContent.includes('h') && !rPill.textContent.includes('Due')) {
+          rPill.textContent = remainHrs + 'h';
+        }
+        const lastBody = document.getElementById('kb-body-last');
+        if (lastBody) lastBody.insertBefore(remnant, lastBody.querySelector('.kb-dz') || null);
+        compassToast && compassToast(
+          fitHrs + 'h scheduled on ' + destColId.toUpperCase() + '. ' + remainHrs + 'h remainder returned to Last Week.', 3500
+        );
+      }
+    } else {
+      // Fits entirely — normal move
+      _kbDrag.card.dataset.colid = destColId;
+      destBody.insertBefore(_kbDrag.card, destBody.querySelector('.kb-dz') || null);
+    }
+
+    // Past-due negotiation flag
+    const isPastDue = dueDate && destDate && destDate > dueDate && cardType !== 'meeting';
     if (isPastDue || destColId === 'next') {
       _kbDrag.card.classList.add('kb-pending');
       _kbNeg.active = true; _kbNeg.cardEl = _kbDrag.card;
       _kbNeg.srcColId = _kbDrag.srcColId; _kbNeg.destColId = destColId;
       _kbShowNeg(_kbDrag.card, destColId, dueDate);
     }
+
+    // Re-wire new cards and update all cap bars + KPI strip
+    _kbWireCards();
     _kbUpdateCapBars();
+    _kbUpdateKpis();
     _kbDragEnd();
   });
 
@@ -931,19 +982,129 @@ function _kbDragEnd() {
 }
 
 function _kbUpdateCapBars() {
+  const today = _kbIsoLocal(new Date());
   ['last','mon','tue','wed','thu','fri','sat','sun','next'].forEach(colId => {
     const body = document.getElementById('kb-body-' + colId);
     const col  = document.getElementById('kb-col-' + colId);
     if (!body || !col) return;
-    const cap  = _kbComputeCapacity(colId, Array.from(body.querySelectorAll('.kb-card')));
-    const fill = col.querySelector('.kb-cap-fill');
-    const lbl  = col.querySelector('.kb-cap-lbl');
-    if (fill) { fill.style.width = cap.pct + '%'; fill.style.background = _kbCapColor(cap); }
-    if (lbl && colId !== 'next') {
-      lbl.className = 'kb-cap-lbl' + (cap.over ? ' over' : cap.pct > 85 ? ' warn' : '');
-      lbl.textContent = cap.over ? cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h — over' : cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h avail';
+    const hdr  = col.querySelector('.kb-col-hdr');
+    if (!hdr) return;
+
+    const cap     = _kbComputeCapacity(colId, Array.from(body.querySelectorAll('.kb-card')));
+    const colDate = _kbColDates[colId];
+    const isNext  = colId === 'next';
+    const isLast  = colId === 'last';
+    const isPast  = colDate && colDate < today;
+
+    // Rebuild the sub-header: bar + cap text
+    // Remove old bar+text divs (everything after the day label div)
+    const dayLbl = hdr.firstElementChild;
+    while (hdr.children.length > 1) hdr.removeChild(hdr.lastChild);
+
+    if (!isNext && !isLast) {
+      // 8-segment billable bar
+      const dayTeEntries = (window._calTimeEntries || []).filter(e => e.date && e.date.slice(0,10) === colDate);
+      const dayBillH    = Math.min(dayTeEntries.filter(e => e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0), 8);
+      const dayNonBillH = Math.min(dayTeEntries.filter(e => !e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0), Math.max(0, 8 - dayBillH));
+      const segs = Array.from({length:8}, (_,i) => {
+        const hr = i + 1;
+        if (hr <= dayBillH)                return 'var(--compass-cyan,#00D2FF)';
+        if (hr <= dayBillH + dayNonBillH)  return '#7F77DD';
+        return 'rgba(255,255,255,.15)';
+      });
+      const barDiv = document.createElement('div');
+      barDiv.style.cssText = 'display:flex;height:4px;gap:2px;margin-top:5px';
+      segs.forEach(c => {
+        const seg = document.createElement('div');
+        seg.style.cssText = 'flex:1;height:4px;border-radius:1px;background:' + c;
+        barDiv.appendChild(seg);
+      });
+      hdr.appendChild(barDiv);
+
+      // Cap text
+      let capTxt, capColor;
+      if (isPast) {
+        const dayTotalH = dayBillH + dayNonBillH;
+        capTxt = dayTotalH > 0 ? dayBillH.toFixed(1) + 'h bill · ' + dayNonBillH.toFixed(1) + 'h non-bill' : '0h logged';
+        capColor = 'var(--text3)';
+      } else {
+        capColor = cap.over ? 'var(--compass-red,#E24B4A)' : cap.pct > 85 ? 'var(--compass-amber,#EF9F27)' : 'var(--text3)';
+        capTxt = cap.over ? cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h — over' : cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h avail';
+      }
+      const txtDiv = document.createElement('div');
+      txtDiv.style.cssText = 'font-family:var(--font-mono,monospace);font-size:10px;color:' + capColor + ';margin-top:3px';
+      txtDiv.textContent = capTxt;
+      hdr.appendChild(txtDiv);
+    } else {
+      const count = body.querySelectorAll('.kb-card').length;
+      const txtDiv = document.createElement('div');
+      txtDiv.style.cssText = 'font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:5px';
+      txtDiv.textContent = count + ' item' + (count !== 1 ? 's' : '');
+      hdr.appendChild(txtDiv);
     }
   });
+}
+
+// Update the KPI strip without a full re-render
+function _kbUpdateKpis() {
+  const kpiRow = document.getElementById('kb-kpi-row');
+  if (!kpiRow) return;
+  const today = _kbIsoLocal(new Date());
+
+  let totalItems = 0, totalMtgHrs = 0, totalTaskHrs = 0;
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(colId => {
+    const body = document.getElementById('kb-body-' + colId);
+    if (!body) return;
+    body.querySelectorAll('.kb-card').forEach(c => {
+      const h = parseFloat(c.dataset.hrs)||0;
+      if (c.dataset.type === 'meeting') totalMtgHrs += h;
+      else { totalTaskHrs += h; totalItems++; }
+    });
+  });
+
+  // Last week hours
+  const lastBody = document.getElementById('kb-body-last');
+  let lastHrs = 0, lastCount = 0;
+  if (lastBody) {
+    lastBody.querySelectorAll('.kb-card').forEach(c => {
+      if (c.dataset.type !== 'meeting') { lastHrs += parseFloat(c.dataset.hrs)||0; lastCount++; }
+    });
+  }
+  // Next week hours
+  const nextBody = document.getElementById('kb-body-next');
+  let nextHrs = 0, nextCount = 0;
+  if (nextBody) {
+    nextBody.querySelectorAll('.kb-card').forEach(c => {
+      if (c.dataset.type !== 'meeting') { nextHrs += parseFloat(c.dataset.hrs)||0; nextCount++; }
+    });
+  }
+
+  // Billable stats from time entries (unchanged by drag)
+  const teEntries = window._calTimeEntries || [];
+  const monIso = _kbIsoLocal(_kbGetMonday(_kbWeekOffset));
+  const friIso = _kbIsoLocal(new Date(_kbGetMonday(_kbWeekOffset).getTime() + 4*86400000));
+  const weekTe = teEntries.filter(e => e.date >= monIso && e.date <= friIso);
+  const billHrs = weekTe.filter(e => e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0);
+  const nonBillHrs = weekTe.filter(e => !e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0);
+  const totalLoggedHrs = billHrs + nonBillHrs;
+  const billPct = totalLoggedHrs > 0 ? Math.round((billHrs/totalLoggedHrs)*100) : 0;
+
+  kpiRow.innerHTML =
+    '<div class="kb-kpi" style="border-left:2px solid rgba(226,75,74,.5)">' +
+      '<div class="kb-kpi-lbl">Last week</div>' +
+      '<div class="kb-kpi-val' + (lastCount > 0 ? ' warn' : '') + '">' + lastHrs.toFixed(0) + 'h</div>' +
+      '<div class="kb-kpi-sub">' + lastCount + ' item' + (lastCount !== 1 ? 's' : '') + ' carried</div>' +
+    '</div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Scheduled</div><div class="kb-kpi-val info">' + totalItems + '</div><div class="kb-kpi-sub">items this week</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Billable logged</div><div class="kb-kpi-val' + (billPct >= 80 ? '' : ' warn') + '">' + billHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + billPct + '% of ' + totalLoggedHrs.toFixed(1) + 'h logged</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Non-billable</div><div class="kb-kpi-val">' + nonBillHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + (100-billPct) + '% of logged hours</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Meetings</div><div class="kb-kpi-val">' + totalMtgHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">calendar events</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Pending</div><div class="kb-kpi-val">—</div><div class="kb-kpi-sub">awaiting PM</div></div>' +
+    '<div class="kb-kpi" style="border-right:2px solid rgba(0,210,255,.35)">' +
+      '<div class="kb-kpi-lbl">Next week</div>' +
+      '<div class="kb-kpi-val info">' + nextHrs.toFixed(0) + 'h</div>' +
+      '<div class="kb-kpi-sub">' + nextCount + ' item' + (nextCount !== 1 ? 's' : '') + ' queued</div>' +
+    '</div>';
 }
 
 function _kbShowNeg(cardEl, destColId, dueDate) {
