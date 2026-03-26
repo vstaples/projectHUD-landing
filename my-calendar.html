@@ -179,7 +179,9 @@ window.buildCalendarTab = function() {
         '&event_date=gte.' + weekStart + '&event_date=lte.' + weekEnd +
         '&select=*&order=event_date.asc,start_time.asc'
       ).catch(() => []);
-      window._mtCalEvents = Array.isArray(evs) ? evs : [];
+      window._mtCalEvents  = Array.isArray(evs) ? evs : [];
+      window._calCalEvents = window._mtCalEvents; // sync to grid's source
+      _renderCalTab(); // re-render grid now that cal events are loaded
     } catch(e) { window._mtCalEvents = []; }
   })();
   document.getElementById('cal-tab-prev')?.addEventListener('click', () => {
@@ -240,19 +242,52 @@ function _renderCalTab() {
     dH.textContent = dayNames[d.getDay()===0?7:d.getDay()] + ' ' + d.getDate();
     grid.appendChild(dH);
   });
+  // Build real event map from live data sources
+  // Structure: { 'dayIndex-hour': [{type, label, billable, hours}] }
+  const realEvents = {};
+
+  // Helper: ISO date string for a Date object
+  const isoD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+  // 1. calendar_events → placed at their start_time hour
+  (window._calCalEvents || []).forEach(ev => {
+    const evDate = ev.event_date ? ev.event_date.slice(0,10) : null;
+    if (!evDate) return;
+    const di = days.findIndex(d => isoD(d) === evDate);
+    if (di < 0) return;
+    const startH = ev.start_time ? parseInt(ev.start_time.slice(0,2), 10) : 9;
+    const key = di + '-' + startH;
+    if (!realEvents[key]) realEvents[key] = [];
+    const isPto = (ev.event_type||'').toLowerCase().includes('pto') || (ev.title||'').toLowerCase().includes('pto');
+    realEvents[key].push({ type: isPto ? 'pto' : 'meeting', label: ev.title || 'Event', hours: ev.duration_hours || 0 });
+  });
+
+  // 2. time_entries → no start_time; stack from hour 8 downward within the day
+  //    Group by date first, then assign hour slots sequentially
+  const teByDay = {};
+  (window._calTimeEntries || []).forEach(e => {
+    const d = e.date ? e.date.slice(0,10) : null;
+    if (!d) return;
+    if (!teByDay[d]) teByDay[d] = [];
+    teByDay[d].push(e);
+  });
+  days.forEach((d, di) => {
+    const entries = teByDay[isoD(d)] || [];
+    let slotHour = 8;
+    entries.forEach(e => {
+      if (slotHour > 17) return; // off the visible grid
+      const key = di + '-' + slotHour;
+      if (!realEvents[key]) realEvents[key] = [];
+      // Label: project name from _calItems lookup, or notes, or fallback
+      const projName = (window._mtProjects || []).find(p => p.id === e.project_id);
+      const taskName = (window._calItems || []).find(t => t.id === e.task_id);
+      const label = taskName?.title || taskName?.name || projName?.name || projName?.title || e.notes || (e.is_billable ? 'Billable work' : 'Non-billable');
+      realEvents[key].push({ type: e.is_billable ? 'focus' : 'nonbill', label, hours: parseFloat(e.hours)||0 });
+      slotHour += Math.max(1, Math.round(parseFloat(e.hours)||1)); // advance slot by entry hours
+    });
+  });
   // Time rows 8–17
   const HOURS = [8,9,10,11,12,13,14,15,16,17];
-  const sampleEvents = {
-    // keyed by "dayIndex-hour": {type, label}
-    '0-9':  {type:'meeting', label:'Design Review align'},
-    '0-10': {type:'focus',   label:'Focus \u2014 PCB docs'},
-    '0-14': {type:'meeting', label:'NovaBio 4.3'},
-    '1-10': {type:'meeting', label:'Weekly sync'},
-    '1-14': {type:'focus',   label:'Focus block'},
-    '2-9':  {type:'meeting', label:'Client call \u2014 TransAtlantic'},
-    '2-11': {type:'focus',   label:'Focus block'},
-    '2-15': {type:'task',    label:'Section 4.3 due'},
-  };
   HOURS.forEach(h => {
     const timeLbl = document.createElement('div');
     timeLbl.style.cssText = 'font-family:var(--font-ui,system-ui);font-size:10px;color:rgba(255,255,255,.2);padding:0 5px;text-align:right;line-height:26px;border-right:1px solid rgba(255,255,255,.06)';
@@ -265,13 +300,14 @@ function _renderCalTab() {
       cell.className = 'cal-tab-cell';
       if (isToday) cell.style.borderLeft = '1px solid rgba(0,210,255,.15)';
       cell.style.background = isToday?'rgba(0,210,255,.02)':isWknd?'rgba(255,255,255,.01)':'';
-      const ev = sampleEvents[di+'-'+h];
-      if (ev) {
+      const evList = realEvents[di+'-'+h] || [];
+      evList.forEach(ev => {
         const evEl = document.createElement('div');
         evEl.className = 'cal-tab-event cal-tab-ce-'+ev.type;
-        evEl.textContent = ev.label;
+        evEl.textContent = ev.label + (ev.hours ? ' · ' + ev.hours + 'h' : '');
+        evEl.title = ev.label + (ev.hours ? ' (' + ev.hours + 'h)' : '');
         cell.appendChild(evEl);
-      }
+      });
       cell.addEventListener('click', () => compassToast('Time block feature coming in next session.'));
       grid.appendChild(cell);
     });

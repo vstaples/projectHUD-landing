@@ -325,7 +325,7 @@ window._mwLoadUserView = async function() {
     // ALL visual elements kept: tick marks, dual arc (billable +
     // non-billable purple), needle, centre dot, pill readout.
     // ══════════════════════════════════════════════════════════
-    const gaugeMax = Math.max(maxDayHours, 8);
+    const gaugeMax = 8; // fixed 8h scale: 8h = full right, 6h ≈ 2 o'clock, legend below confirms
     const GW=74, GH=70, GCX=37, GCY=48, GR=30;
 
     function gPt(deg) {
@@ -619,6 +619,7 @@ window._mwLoadUserView = async function() {
       .cal-tab-ce-task{background:rgba(239,159,39,.15);border:1px solid rgba(239,159,39,.3);color:#F5D080}
       .cal-tab-ce-focus{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);color:#7DD8F0}
       .cal-tab-ce-pto{background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.25);color:#F0A0A0}
+      .cal-tab-ce-nonbill{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);color:#C4B5F8}
       .delta-chip{font-family:var(--font-head);font-size:11px;padding:2px 9px;border:1px solid;cursor:pointer;transition:.12s;white-space:nowrap}
       .delta-chip:hover{filter:brightness(1.15)}
       #mw-coc-drag:hover{background:rgba(0,210,255,.3)!important}
