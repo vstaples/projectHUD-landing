@@ -5115,6 +5115,7 @@ window.loadMyMeetingsView = async function() {
   }
   const container = document.getElementById('user-meetings-content');
   if (!container) { console.error('[Compass] #user-meetings-content not found'); return; }
+  container.innerHTML = ''; // clear "Loading meetings…" placeholder
   try {
     const resp = await fetch('/my-meetings.html');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
