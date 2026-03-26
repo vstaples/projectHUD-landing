@@ -31,10 +31,10 @@
     </div>
     <!-- Row 2: centered Grid | Kanban pill -->
     <div style="display:flex;justify-content:center;margin-bottom:10px">
-      <div style="display:inline-flex;border:1px solid rgba(0,210,255,.25);overflow:hidden;border-radius:3px">
-        <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:rgba(0,210,255,.15);border:none;color:#00D2FF;cursor:pointer;text-transform:uppercase;transition:all .12s">Grid</button>
-        <div style="width:1px;background:rgba(0,210,255,.2)"></div>
-        <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:none;border:none;color:rgba(255,255,255,.3);cursor:pointer;text-transform:uppercase;transition:all .12s">Kanban</button>
+      <div style="display:inline-flex;border:1px solid #a07d08;overflow:hidden;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,.4)">
+        <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:linear-gradient(180deg,#f5c842 0%,#c99a0a 100%);border:none;color:#fff;cursor:pointer;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)">Grid</button>
+        <div style="width:1px;background:#a07d08"></div>
+        <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:rgba(0,0,0,.35);border:none;color:rgba(255,255,255,.4);cursor:pointer;text-transform:uppercase">Kanban</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -353,18 +353,22 @@ window.calSwitchView = function(view) {
   const gridBtn  = document.getElementById('cal-view-grid-btn');
   const kbBtn    = document.getElementById('cal-view-kanban-btn');
   if (!gridEl || !kanbanEl) return;
+  const ACTIVE_BG  = 'linear-gradient(180deg,#f5c842 0%,#c99a0a 100%)';
+  const INACTIVE_BG = 'rgba(0,0,0,.35)';
+  function setActive(btn)   { btn.style.background=''; btn.style.cssText += ';background:'+ACTIVE_BG+';color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)'; }
+  function setInactive(btn) { btn.style.background=''; btn.style.cssText += ';background:'+INACTIVE_BG+';color:rgba(255,255,255,.4);text-shadow:none;box-shadow:none'; }
   if (view === 'kanban') {
     gridEl.style.display   = 'none';
     kanbanEl.style.display = 'block';
-    if (gridBtn)  { gridBtn.style.background='none';                gridBtn.style.color='rgba(255,255,255,.3)'; }
-    if (kbBtn)    { kbBtn.style.background='rgba(0,210,255,.15)';   kbBtn.style.color='#00D2FF'; }
+    if (gridBtn) setInactive(gridBtn);
+    if (kbBtn)   setActive(kbBtn);
     if (!_kbLoaded) { _kbLoaded = true; _kbWireEvents(); }
     _kbRender();
   } else {
     gridEl.style.display   = 'block';
     kanbanEl.style.display = 'none';
-    if (gridBtn)  { gridBtn.style.background='rgba(0,210,255,.15)'; gridBtn.style.color='#00D2FF'; }
-    if (kbBtn)    { kbBtn.style.background='none';                  kbBtn.style.color='rgba(255,255,255,.3)'; }
+    if (gridBtn) setActive(gridBtn);
+    if (kbBtn)   setInactive(kbBtn);
   }
 };
 
