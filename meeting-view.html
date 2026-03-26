@@ -195,6 +195,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       editMinutesHref: '/meeting-minutes.html?meeting_id=' + MEETING_ID,
     });
 
+    // Auto-show the comment thread — don't require clicking "↩ Reply" to see it
+    const thread = document.getElementById('mc-thread-' + MEETING_ID);
+    if (thread) thread.style.display = 'block';
+
   } catch(e) {
     console.error('meeting-view error:', e);
     document.getElementById('mc-container').innerHTML =

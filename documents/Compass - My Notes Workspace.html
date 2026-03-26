@@ -1,0 +1,465 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.shell{font-family:var(--font-sans,system-ui);display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;background:var(--color-background-secondary);border-radius:var(--border-radius-lg);overflow:hidden;min-height:680px}
+.left{border-right:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);display:flex;flex-direction:column;min-height:680px}
+.left-hdr{padding:10px 12px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:6px}
+.left-title{font-size:12px;font-weight:500;color:var(--color-text-primary);flex:1}
+.new-btn{font-size:11px;padding:3px 8px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);border-radius:var(--border-radius-md);cursor:pointer}
+.search-wrap{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.search-inp{width:100%;font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none}
+.inbox-section{border-bottom:0.5px solid var(--color-border-tertiary)}
+.inbox-hdr{padding:6px 12px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.inbox-label{font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase;flex:1}
+.inbox-count{font-size:10px;padding:1px 6px;border-radius:20px;background:var(--color-background-warning);color:var(--color-text-warning)}
+.inbox-items{padding:4px 0}
+.inbox-item{display:flex;align-items:flex-start;gap:7px;padding:5px 12px;cursor:pointer;transition:background .1s}
+.inbox-item:hover{background:var(--color-background-secondary)}
+.ii-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.ii-body{flex:1;min-width:0}
+.ii-title{font-size:11px;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ii-meta{font-size:10px;color:var(--color-text-tertiary);margin-top:1px}
+.tree-section{flex:1;overflow-y:auto;padding:6px 0}
+.tree-hdr{padding:6px 12px;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
+.tree-label{font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase;flex:1}
+.tree-chev{font-size:10px;color:var(--color-text-tertiary);transition:transform .15s}
+.tree-chev.open{transform:rotate(90deg)}
+.tree-node{cursor:pointer;user-select:none}
+.tree-row{display:flex;align-items:center;gap:5px;padding:4px 10px;transition:background .1s}
+.tree-row:hover{background:var(--color-background-secondary)}
+.tree-row.active{background:var(--color-background-info)}
+.tree-row.active .tree-node-label{color:var(--color-text-info);font-weight:500}
+.tree-chev-sm{width:10px;font-size:9px;color:var(--color-text-tertiary);flex-shrink:0}
+.tree-icon{width:14px;height:14px;border-radius:2px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500}
+.ti-work{background:#E6F1FB;color:#0C447C}
+.ti-personal{background:#EEEDFE;color:#3C3489}
+.ti-inbox{background:#FAEEDA;color:#633806}
+.ti-note{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);color:var(--color-text-tertiary)}
+.tree-node-label{font-size:11px;color:var(--color-text-primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-node-label.muted{color:var(--color-text-tertiary);font-size:11px}
+.tree-children{display:none}
+.tree-children.open{display:block}
+.right{display:flex;flex-direction:column;background:var(--color-background-secondary)}
+.right-hdr{padding:8px 12px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:8px;background:var(--color-background-primary)}
+.grid-sel{display:flex;gap:3px}
+.gs-btn{width:28px;height:28px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s}
+.gs-btn.active{background:var(--color-background-info);border-color:var(--color-border-info)}
+.gs-icon{display:grid;gap:2px}
+.gs-1x1 .gs-icon{grid-template-columns:1fr}
+.gs-2x2 .gs-icon{grid-template-columns:1fr 1fr}
+.gs-3x3 .gs-icon{grid-template-columns:1fr 1fr 1fr}
+.gs-dot{width:5px;height:5px;border-radius:1px;background:var(--color-text-tertiary)}
+.gs-btn.active .gs-dot{background:var(--color-text-info)}
+.rh-title{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.rh-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.anno-btn{font-size:11px;padding:3px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:none;cursor:pointer;color:var(--color-text-secondary)}
+.grid-wrap{flex:1;padding:10px;display:grid;gap:8px}
+.grid-1{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr))}
+.tile{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);display:flex;flex-direction:column;overflow:hidden;min-height:140px}
+.tile-hdr{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0}
+.tile-title{font-size:11px;font-weight:500;color:var(--color-text-primary);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile-src{font-size:10px;padding:1px 6px;border-radius:20px;flex-shrink:0}
+.ts-task{background:#E6F1FB;color:#0C447C}
+.ts-meeting{background:#FAEEDA;color:#633806}
+.ts-personal{background:#EEEDFE;color:#3C3489}
+.ts-shared{background:#EAF3DE;color:#27500A}
+.tile-presence{width:7px;height:7px;border-radius:50%;background:#1D9E75;flex-shrink:0}
+.tile-ctrl{display:flex;gap:3px}
+.tc-btn{width:18px;height:18px;border:0.5px solid var(--color-border-tertiary);border-radius:3px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--color-text-tertiary)}
+.tc-btn:hover{background:var(--color-background-secondary)}
+.tile-body{flex:1;display:flex;overflow:hidden}
+.canvas{flex:1;padding:9px 10px;font-size:11px;color:var(--color-text-primary);line-height:1.65;overflow-y:auto;cursor:text}
+.canvas-ph{font-size:11px;color:var(--color-text-tertiary);font-style:italic}
+.entity-card{background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:7px 9px;margin:5px 0}
+.ec-type{font-size:9px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px}
+.ec-title{font-size:11px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.ec-meta{font-size:10px;color:var(--color-text-secondary)}
+.ec-status{font-size:10px;padding:1px 6px;border-radius:20px;display:inline-block;margin-top:3px}
+.ecs-blocked{background:#FCEBEB;color:#791F1F}
+.ecs-progress{background:#E6F1FB;color:#0C447C}
+.ecs-deferred{background:#FAEEDA;color:#633806}
+.chat-panel{width:140px;border-left:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;flex-shrink:0}
+.chat-msgs{flex:1;overflow-y:auto;padding:7px 8px;display:flex;flex-direction:column;gap:6px}
+.chat-msg{font-size:10px;line-height:1.5}
+.cm-author{font-weight:500;color:var(--color-text-info);margin-bottom:1px;font-size:9px}
+.cm-body{color:var(--color-text-primary)}
+.cm-me .cm-author{color:var(--color-text-success)}
+.chat-inp{padding:6px 7px;border-top:0.5px solid var(--color-border-tertiary);display:flex;gap:4px}
+.chat-inp input{flex:1;font-size:10px;padding:3px 6px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;min-width:0}
+.chat-send{font-size:10px;padding:3px 6px;border:0.5px solid var(--color-border-info);border-radius:var(--border-radius-md);color:var(--color-text-info);background:none;cursor:pointer}
+.empty-tile{border:0.5px dashed var(--color-border-tertiary);border-radius:var(--border-radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .1s;min-height:140px}
+.empty-tile:hover{background:var(--color-background-secondary)}
+.et-inner{display:flex;flex-direction:column;align-items:center;gap:4px}
+.et-plus{font-size:18px;color:var(--color-text-tertiary);line-height:1}
+.et-label{font-size:10px;color:var(--color-text-tertiary)}
+.anno-demo{margin-top:12px;padding:10px 12px;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg)}
+.anno-demo-hdr{font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px}
+.anno-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-primary)}
+.anno-row:last-child{border-bottom:none}
+.anno-icon{width:16px;height:16px;border-radius:3px;border:0.5px solid var(--color-border-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .1s}
+.anno-icon:hover{background:var(--color-background-info)}
+.anno-icon.has-note{background:var(--color-background-info);border-color:var(--color-border-info)}
+.anno-icon svg{width:9px;height:9px}
+.anno-popover{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:10px;margin-top:6px;display:none}
+.anno-popover.show{display:block}
+.ap-label{font-size:10px;color:var(--color-text-tertiary);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+.ap-inp{width:100%;font-size:11px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);outline:none;margin-bottom:6px}
+.ap-row{display:flex;gap:6px;align-items:center}
+.ap-sel{font-size:11px;padding:4px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);flex:1}
+.ap-send{font-size:11px;padding:4px 10px;background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info);border-radius:var(--border-radius-md);cursor:pointer}
+</style>
+
+<div class="shell">
+
+<div class="left">
+  <div class="left-hdr">
+    <div class="left-title">My Notes</div>
+    <button class="new-btn">+ New</button>
+  </div>
+  <div class="search-wrap">
+    <input class="search-inp" placeholder="Search notes, content, people..."/>
+  </div>
+
+  <div class="inbox-section">
+    <div class="inbox-hdr" onclick="togTree('inbox-items')">
+      <div class="inbox-label">Inbox</div>
+      <span class="inbox-count">3</span>
+      <span class="tree-chev open" id="chev-inbox-items">&#9656;</span>
+    </div>
+    <div class="inbox-items" id="inbox-items">
+      <div class="inbox-item">
+        <div class="ii-dot" style="background:#185FA5"></div>
+        <div class="ii-body">
+          <div class="ii-title">Note from M4 Design Review task</div>
+          <div class="ii-meta">from annotation · 2h ago</div>
+        </div>
+      </div>
+      <div class="inbox-item">
+        <div class="ii-dot" style="background:#1D9E75"></div>
+        <div class="ii-body">
+          <div class="ii-title">Sandra Mitchell sent you a note</div>
+          <div class="ii-meta">re: NovaBio Sec 4.3 · 1d ago</div>
+        </div>
+      </div>
+      <div class="inbox-item">
+        <div class="ii-dot" style="background:#BA7517"></div>
+        <div class="ii-body">
+          <div class="ii-title">Thoughts on IOPQ review process</div>
+          <div class="ii-meta">from annotation · 3d ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tree-section">
+    <div class="tree-hdr">
+      <div class="tree-label">Knowledge tree</div>
+      <span class="tree-chev open" id="chev-ktree">&#9656;</span>
+    </div>
+
+    <div id="ktree">
+      <div class="tree-node">
+        <div class="tree-row" onclick="togTree('branch-work')">
+          <div class="tree-chev-sm" id="chev-branch-work">&#9656;</div>
+          <div class="tree-icon ti-work">W</div>
+          <div class="tree-node-label">Work</div>
+        </div>
+        <div class="tree-children open" id="branch-work">
+          <div class="tree-node">
+            <div class="tree-row" onclick="togTree('branch-flex')">
+              <div style="width:10px"></div>
+              <div class="tree-chev-sm" id="chev-branch-flex">&#9656;</div>
+              <div class="tree-icon ti-work" style="font-size:8px">F</div>
+              <div class="tree-node-label">FlexScope</div>
+            </div>
+            <div class="tree-children open" id="branch-flex">
+              <div class="tree-row active" onclick="">
+                <div style="width:20px"></div>
+                <div class="tree-chev-sm" style="opacity:0">&#9656;</div>
+                <div class="tree-icon ti-note">N</div>
+                <div class="tree-node-label muted">Product vision notes</div>
+              </div>
+              <div class="tree-row" onclick="">
+                <div style="width:20px"></div>
+                <div class="tree-chev-sm" style="opacity:0">&#9656;</div>
+                <div class="tree-icon ti-note">N</div>
+                <div class="tree-node-label muted">IOPQ open questions</div>
+              </div>
+            </div>
+          </div>
+          <div class="tree-node">
+            <div class="tree-row" onclick="togTree('branch-nova')">
+              <div style="width:10px"></div>
+              <div class="tree-chev-sm" id="chev-branch-nova">&#9656;</div>
+              <div class="tree-icon ti-work" style="font-size:8px">N</div>
+              <div class="tree-node-label">NovaBio</div>
+            </div>
+            <div class="tree-children" id="branch-nova">
+              <div class="tree-row" onclick="">
+                <div style="width:20px"></div>
+                <div class="tree-chev-sm" style="opacity:0">&#9656;</div>
+                <div class="tree-icon ti-note">N</div>
+                <div class="tree-node-label muted">Sec 4.3 concerns</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tree-node" style="margin-top:2px">
+        <div class="tree-row" onclick="togTree('branch-personal')">
+          <div class="tree-chev-sm" id="chev-branch-personal">&#9656;</div>
+          <div class="tree-icon ti-personal">P</div>
+          <div class="tree-node-label">Personal</div>
+        </div>
+        <div class="tree-children" id="branch-personal">
+          <div class="tree-row" onclick="">
+            <div style="width:10px"></div>
+            <div class="tree-chev-sm" style="opacity:0">&#9656;</div>
+            <div class="tree-icon ti-note">N</div>
+            <div class="tree-node-label muted">Weekly reflection</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tree-node" style="margin-top:2px">
+        <div class="tree-row" onclick="togTree('branch-inbox-tree')">
+          <div class="tree-chev-sm" id="chev-branch-inbox-tree">&#9656;</div>
+          <div class="tree-icon ti-inbox">I</div>
+          <div class="tree-node-label">Inbox</div>
+          <span style="font-size:10px;padding:1px 5px;border-radius:20px;background:var(--color-background-warning);color:var(--color-text-warning);margin-left:4px">3</span>
+        </div>
+        <div class="tree-children" id="branch-inbox-tree"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="right">
+  <div class="right-hdr">
+    <div class="grid-sel">
+      <button class="gs-btn gs-1x1" onclick="setGrid(1,this)" title="1×1">
+        <div class="gs-icon"><div class="gs-dot"></div></div>
+      </button>
+      <button class="gs-btn gs-2x2 active" onclick="setGrid(2,this)" title="2×2">
+        <div class="gs-icon"><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div></div>
+      </button>
+      <button class="gs-btn gs-3x3" onclick="setGrid(3,this)" title="3×3">
+        <div class="gs-icon"><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div><div class="gs-dot"></div></div>
+      </button>
+    </div>
+    <div class="rh-title" style="margin-left:8px">Workspace</div>
+    <div class="rh-right">
+      <span style="font-size:10px;color:var(--color-text-tertiary)">4 tiles open</span>
+      <button class="anno-btn">Annotation demo ↓</button>
+    </div>
+  </div>
+
+  <div class="grid-wrap grid-2" id="grid-wrap">
+
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="tile-title">Product vision notes</div>
+        <span class="tile-src ts-personal">Work / FlexScope</span>
+        <div class="tile-ctrl">
+          <button class="tc-btn" onclick="togChat('chat1','btn-chat1')" id="btn-chat1" title="toggle chat">&#8942;</button>
+          <button class="tc-btn" title="minimize">&#8722;</button>
+          <button class="tc-btn" title="close">&#x2715;</button>
+        </div>
+      </div>
+      <div class="tile-body">
+        <div class="canvas">
+          <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">My Meetings is the memory layer</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;line-height:1.65">Not a meetings list. A navigable knowledge hierarchy where meetings are the dated evidence nodes at the leaves.</div>
+          <div class="entity-card">
+            <div class="ec-type">Task</div>
+            <div class="ec-title">M4 Design Review — PCB documentation</div>
+            <div class="ec-meta">FlexScope · Due Mar 28 · Vaughn Staples</div>
+            <span class="ec-status ecs-blocked">Blocked</span>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:7px;line-height:1.65">Follow up with Robert Chen on Sec 3.4 sign-off before Apr 2 meeting.</div>
+        </div>
+        <div class="chat-panel" id="chat1" style="display:none">
+          <div class="chat-msgs">
+            <div class="chat-msg cm-me">
+              <div class="cm-author">You</div>
+              <div class="cm-body">Added the M4 task card — it's still blocked on RC</div>
+            </div>
+            <div class="chat-msg">
+              <div class="cm-author">Sandra M.</div>
+              <div class="cm-body">I'll follow up with him today</div>
+            </div>
+          </div>
+          <div class="chat-inp">
+            <input placeholder="Reply..."/>
+            <button class="chat-send">&#8594;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="tile-title">Sandra — NovaBio Sec 4.3</div>
+        <span class="tile-src ts-shared">Shared · Sandra M.</span>
+        <div class="tile-presence" title="Sandra is here"></div>
+        <div class="tile-ctrl">
+          <button class="tc-btn" onclick="togChat('chat2','btn-chat2')" id="btn-chat2" title="toggle chat">&#8942;</button>
+          <button class="tc-btn" title="minimize">&#8722;</button>
+          <button class="tc-btn" title="close">&#x2715;</button>
+        </div>
+      </div>
+      <div class="tile-body">
+        <div class="canvas">
+          <div class="entity-card">
+            <div class="ec-type">Meeting</div>
+            <div class="ec-title">NovaBio QMS Sec 4.3 review</div>
+            <div class="ec-meta">NovaBio · Apr 3, 2026 · 2:00 PM</div>
+            <span class="ec-status ecs-progress">Upcoming</span>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:7px;line-height:1.65">Agenda items we need to pre-align on before the meeting:</div>
+          <div style="font-size:11px;color:var(--color-text-primary);margin-top:5px;line-height:1.8">· Scope boundary for Sec 4.3 vs 4.4<br/>· Robert Chen attendance — required<br/>· Pre-read to distribute by Apr 1</div>
+        </div>
+        <div class="chat-panel" id="chat2">
+          <div class="chat-msgs">
+            <div class="chat-msg">
+              <div class="cm-author">Sandra M.</div>
+              <div class="cm-body">Can you confirm RC is attending? I need his sign-off live</div>
+            </div>
+            <div class="chat-msg cm-me">
+              <div class="cm-author">You</div>
+              <div class="cm-body">Confirmed — he's blocked that slot</div>
+            </div>
+            <div class="chat-msg">
+              <div class="cm-author">Sandra M.</div>
+              <div class="cm-body">Pre-read I'll send by Mar 31 EOD</div>
+            </div>
+          </div>
+          <div class="chat-inp">
+            <input placeholder="Reply..."/>
+            <button class="chat-send">&#8594;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="tile-title">Weekly reflection — Mar 24</div>
+        <span class="tile-src ts-personal">Personal</span>
+        <div class="tile-ctrl">
+          <button class="tc-btn" title="toggle chat">&#8942;</button>
+          <button class="tc-btn" title="minimize">&#8722;</button>
+          <button class="tc-btn" title="close">&#x2715;</button>
+        </div>
+      </div>
+      <div class="tile-body">
+        <div class="canvas">
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px;font-style:italic">Week of Mar 24 · personal notes</div>
+          <div style="font-size:11px;color:var(--color-text-primary);line-height:1.75">The IOPQ thread is taking longer than expected. Third session needed. Need to think about whether the meeting format is right or whether async pre-alignment would work better.<br/><br/>Sandra's corrections this quarter — remarkable. She caught 5 things that would have become problems. Worth mentioning to PM.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-tile" onclick="addTile(this)">
+      <div class="et-inner">
+        <div class="et-plus">+</div>
+        <div class="et-label">Add note</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="anno-demo" id="anno-demo" style="margin:0 10px 10px">
+    <div class="anno-demo-hdr">Annotation layer — hover icon on any element across Compass</div>
+    <div class="anno-row">
+      <div class="anno-icon has-note" onclick="togPopover('pop1')" title="2 notes">
+        <svg viewBox="0 0 10 10" fill="none"><path d="M1 1h8v6H6L5 9l-1-2H1V1z" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="flex:1">M4 Design Review — PCB documentation</span>
+      <span style="font-size:10px;color:var(--color-text-tertiary)">Task · 2 notes</span>
+    </div>
+    <div id="pop1" class="anno-popover show">
+      <div class="ap-label">Add a note</div>
+      <input class="ap-inp" placeholder="Type your note or thought..."/>
+      <div class="ap-row">
+        <select class="ap-sel">
+          <option>Myself</option>
+          <option>Robert Chen (advisor)</option>
+          <option>VS · PM</option>
+          <option>Manager</option>
+        </select>
+        <button class="ap-send">Send</button>
+      </div>
+    </div>
+    <div class="anno-row">
+      <div class="anno-icon" onclick="togPopover('pop2')" title="Add note">
+        <svg viewBox="0 0 10 10" fill="none"><path d="M1 1h8v6H6L5 9l-1-2H1V1z" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="flex:1">Mar 25, 2026 · 6.5h logged · FlexScope</span>
+      <span style="font-size:10px;color:var(--color-text-tertiary)">Timesheet entry</span>
+    </div>
+    <div id="pop2" class="anno-popover"></div>
+    <div class="anno-row">
+      <div class="anno-icon" onclick="togPopover('pop3')" title="Add note">
+        <svg viewBox="0 0 10 10" fill="none"><path d="M1 1h8v6H6L5 9l-1-2H1V1z" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="flex:1">IOPQ documentation review — Apr 2 · 2:00 PM</span>
+      <span style="font-size:10px;color:var(--color-text-tertiary)">Calendar event</span>
+    </div>
+    <div id="pop3" class="anno-popover"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function togTree(id){
+  var el=document.getElementById(id);
+  var ch=document.getElementById('chev-'+id);
+  if(!el)return;
+  var open=el.classList.contains('open')||el.style.display!=='none';
+  if(el.classList.contains('open')){el.classList.remove('open');}
+  else if(el.style.display==='none'){el.style.display='';}
+  else{
+    if(el.tagName==='DIV'&&el.className.includes('tree-children')){el.classList.toggle('open');}
+    else{el.style.display=el.style.display==='none'?'':'none';}
+  }
+  if(ch){
+    var isOpen=el.classList.contains('open')||el.style.display!=='none';
+    ch.classList.toggle('open',isOpen);
+  }
+}
+function togChat(id,btnId){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var hidden=el.style.display==='none'||!el.style.display;
+  el.style.display=hidden?'flex':'none';
+}
+function togPopover(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var others=['pop1','pop2','pop3'].filter(x=>x!==id);
+  others.forEach(function(o){
+    var oe=document.getElementById(o);
+    if(oe)oe.classList.remove('show');
+  });
+  el.innerHTML=el.classList.contains('show')?'':
+    '<div class="ap-label">Add a note</div>'+
+    '<input class="ap-inp" placeholder="Type your note or thought..."/>'+
+    '<div class="ap-row"><select class="ap-sel"><option>Myself</option><option>Robert Chen (advisor)</option><option>VS · PM</option><option>Manager</option></select><button class="ap-send">Send</button></div>';
+  el.classList.toggle('show');
+}
+function setGrid(n,btn){
+  document.querySelectorAll('.gs-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  var wrap=document.getElementById('grid-wrap');
+  wrap.className='grid-wrap grid-'+n;
+}
+function addTile(el){
+  el.outerHTML='<div class="tile"><div class="tile-hdr"><div class="tile-title">New note</div><span class="tile-src ts-personal">Inbox</span><div class="tile-ctrl"><button class="tc-btn">&#8722;</button><button class="tc-btn">&#x2715;</button></div></div><div class="tile-body"><div class="canvas"><div class="canvas-ph">Click anywhere to start writing. Drag a task or meeting here to link it.</div></div></div></div>';
+}
+document.getElementById('chat2').style.display='flex';
+</script>

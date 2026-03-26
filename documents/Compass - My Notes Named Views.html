@@ -1,0 +1,452 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.shell{font-family:var(--font-sans,system-ui);background:var(--color-background-secondary);border-radius:var(--border-radius-lg);overflow:hidden}
+.top-bar{background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);padding:8px 12px;display:flex;align-items:center;gap:8px}
+.tb-title{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.view-tabs{display:flex;gap:4px;flex:1;margin:0 12px;overflow-x:auto}
+.vt{font-size:11px;padding:4px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-secondary);background:none;white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:5px}
+.vt.active{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info)}
+.vt-thumb{display:grid;gap:1px;flex-shrink:0}
+.vt-thumb.t22{grid-template-columns:1fr 1fr;width:12px;height:12px}
+.vt-thumb.t33{grid-template-columns:1fr 1fr 1fr;width:12px;height:12px}
+.vt-thumb.t44{grid-template-columns:1fr 1fr 1fr 1fr;width:12px;height:12px}
+.vt-cell{border-radius:1px;background:currentColor;opacity:.4}
+.vt.active .vt-cell{opacity:.8}
+.new-view-btn{font-size:11px;padding:4px 8px;border:0.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-md);color:var(--color-text-tertiary);background:none;cursor:pointer}
+.grid-sel{display:flex;gap:2px}
+.gs{width:24px;height:24px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.gs.active{background:var(--color-background-info);border-color:var(--color-border-info)}
+.gs svg{width:10px;height:10px}
+.grid-area{padding:8px;display:grid;gap:6px}
+.ga-2x2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,200px)}
+.ga-3x3{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,155px)}
+.ga-4x4{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,120px)}
+.tile{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);display:flex;flex-direction:column;overflow:hidden}
+.tile-hdr{display:flex;align-items:center;gap:5px;padding:6px 9px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0}
+.th-title{font-size:10px;font-weight:500;color:var(--color-text-primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th-badge{font-size:9px;padding:1px 5px;border-radius:20px;flex-shrink:0}
+.tb-live{background:#EAF3DE;color:#27500A}
+.tb-shared{background:#E6F1FB;color:#0C447C}
+.tb-widget{background:#EEEDFE;color:#3C3489}
+.th-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.tile-body{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.widget-zone{flex:1;display:flex;align-items:center;justify-content:center;padding:8px}
+.note-zone{flex:1;padding:7px 9px;font-size:10px;color:var(--color-text-secondary);line-height:1.6;overflow:hidden}
+.note-zone p{margin-bottom:4px}
+.widget-drop-zone{border:0.5px dashed var(--color-border-tertiary);border-radius:var(--border-radius-md);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:background .1s}
+.widget-drop-zone:hover{background:var(--color-background-secondary)}
+.wdz-icon{font-size:16px;color:var(--color-text-tertiary)}
+.wdz-label{font-size:10px;color:var(--color-text-tertiary)}
+.capacity-widget{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.cap-arc-wrap{position:relative;width:90px;height:52px;overflow:hidden}
+.cap-arc-wrap svg{width:90px;height:90px;margin-top:-2px}
+.cap-numbers{display:flex;gap:12px;justify-content:center}
+.cap-num{text-align:center}
+.cap-val{font-size:14px;font-weight:500;color:var(--color-text-primary);line-height:1}
+.cap-lbl{font-size:9px;color:var(--color-text-tertiary);margin-top:2px}
+.cap-legend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.cl-item{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--color-text-secondary)}
+.cl-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.counter-widget{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:100%}
+.cw-big{font-size:32px;font-weight:500;line-height:1}
+.cw-label{font-size:10px;color:var(--color-text-tertiary)}
+.cw-breakdown{display:flex;gap:8px;margin-top:2px}
+.cw-item{display:flex;align-items:center;gap:3px;font-size:10px}
+.cw-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sparkline-widget{display:flex;flex-direction:column;gap:5px;width:100%;padding:2px 0}
+.sw-label{font-size:9px;color:var(--color-text-tertiary);text-align:center}
+.sw-bars{display:flex;align-items:flex-end;gap:3px;height:48px;justify-content:center}
+.sw-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;max-width:22px}
+.sw-bar{width:100%;border-radius:2px 2px 0 0;transition:height .3s}
+.sw-bar-lbl{font-size:8px;color:var(--color-text-tertiary);white-space:nowrap}
+.sw-avg{font-size:9px;color:var(--color-text-tertiary);text-align:center}
+.person-tile .tile-hdr{background:var(--color-background-secondary)}
+.av-sm{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;flex-shrink:0}
+.widget-library{background:var(--color-background-primary);border-top:0.5px solid var(--color-border-tertiary);padding:10px 12px}
+.wl-hdr{font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.wl-badge{font-size:9px;padding:1px 6px;border-radius:20px;background:#EEEDFE;color:#3C3489}
+.wl-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.wl-item{border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 10px;cursor:grab;transition:all .15s}
+.wl-item:hover{border-color:var(--color-border-info);background:var(--color-background-info)}
+.wl-item:hover .wli-label{color:var(--color-text-info)}
+.wl-item:hover .wli-icon{color:var(--color-text-info)}
+.wli-icon{font-size:14px;margin-bottom:4px;color:var(--color-text-secondary);width:16px;height:16px}
+.wli-label{font-size:10px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.wli-desc{font-size:9px;color:var(--color-text-tertiary);line-height:1.4}
+.wli-tag{font-size:9px;padding:1px 5px;border-radius:20px;background:var(--color-background-secondary);color:var(--color-text-tertiary);display:inline-block;margin-top:3px}
+.future-tag{background:#FCEBEB;color:#791F1F}
+.view-panel{display:none}
+.view-panel.active{display:block}
+</style>
+
+<div class="shell">
+<div class="top-bar">
+  <div class="tb-title">My Notes</div>
+  <div class="view-tabs" id="view-tabs">
+    <button class="vt active" onclick="switchView('morning',this)">
+      <div class="vt-thumb t22"><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div></div>
+      Morning standup
+    </button>
+    <button class="vt" onclick="switchView('flexscope',this)">
+      <div class="vt-thumb t22"><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div></div>
+      FlexScope
+    </button>
+    <button class="vt" onclick="switchView('staff',this)">
+      <div class="vt-thumb t44"><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div></div>
+      Staff beehive
+    </button>
+    <button class="vt" onclick="switchView('review',this)">
+      <div class="vt-thumb t22"><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div><div class="vt-cell"></div></div>
+      Weekly review
+    </button>
+    <button class="new-view-btn">+ New view</button>
+  </div>
+  <div class="grid-sel">
+    <button class="gs active" title="2x2"><svg viewBox="0 0 10 10"><rect x="0" y="0" width="4" height="4" fill="currentColor" rx="0.5"/><rect x="6" y="0" width="4" height="4" fill="currentColor" rx="0.5"/><rect x="0" y="6" width="4" height="4" fill="currentColor" rx="0.5"/><rect x="6" y="6" width="4" height="4" fill="currentColor" rx="0.5"/></svg></button>
+    <button class="gs" title="3x3"><svg viewBox="0 0 10 10"><rect x="0" y="0" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="3.75" y="0" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="7.5" y="0" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="0" y="3.75" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="3.75" y="3.75" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="7.5" y="3.75" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="0" y="7.5" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="3.75" y="7.5" width="2.5" height="2.5" fill="currentColor" rx="0.3"/><rect x="7.5" y="7.5" width="2.5" height="2.5" fill="currentColor" rx="0.3"/></svg></button>
+    <button class="gs" title="4x4"><svg viewBox="0 0 10 10"><rect x="0" y="0" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="2.8" y="0" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="5.6" y="0" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="8.4" y="0" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="0" y="2.8" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="2.8" y="2.8" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="5.6" y="2.8" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="8.4" y="2.8" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="0" y="5.6" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="2.8" y="5.6" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="5.6" y="5.6" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="8.4" y="5.6" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="0" y="8.4" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="2.8" y="8.4" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="5.6" y="8.4" width="1.8" height="1.8" fill="currentColor" rx="0.2"/><rect x="8.4" y="8.4" width="1.8" height="1.8" fill="currentColor" rx="0.2"/></svg></button>
+  </div>
+</div>
+
+<div id="view-morning" class="view-panel active">
+  <div class="grid-area ga-2x2">
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="th-title">Today's capacity</div>
+        <span class="th-badge tb-live">Live</span>
+      </div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="capacity-widget">
+            <div class="cap-arc-wrap">
+              <svg viewBox="0 0 90 90">
+                <path d="M10 80 A35 35 0 1 1 80 80" fill="none" stroke="var(--color-border-tertiary)" stroke-width="8" stroke-linecap="round"/>
+                <path d="M10 80 A35 35 0 1 1 80 80" fill="none" stroke="#185FA5" stroke-width="8" stroke-linecap="round" stroke-dasharray="165" stroke-dashoffset="58"/>
+                <text x="45" y="62" text-anchor="middle" font-family="var(--font-sans,system-ui)" font-size="14" font-weight="500" fill="var(--color-text-primary)">4.5h</text>
+                <text x="45" y="74" text-anchor="middle" font-family="var(--font-sans,system-ui)" font-size="8" fill="var(--color-text-tertiary)">left today</text>
+              </svg>
+            </div>
+            <div class="cap-numbers">
+              <div class="cap-num"><div class="cap-val" style="color:#185FA5">3.5h</div><div class="cap-lbl">logged</div></div>
+              <div class="cap-num"><div class="cap-val" style="color:#BA7517">2h</div><div class="cap-lbl">allocated</div></div>
+              <div class="cap-num"><div class="cap-val" style="color:#E24B4A">1</div><div class="cap-lbl">overdue</div></div>
+            </div>
+            <div class="cap-legend">
+              <div class="cl-item"><div class="cl-dot" style="background:#185FA5"></div>used</div>
+              <div class="cl-item"><div class="cl-dot" style="background:#BA7517"></div>allocated</div>
+              <div class="cl-item"><div class="cl-dot" style="background:var(--color-border-tertiary)"></div>free</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="th-title">Open action items</div>
+        <span class="th-badge tb-live">Live</span>
+      </div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="counter-widget">
+            <div class="cw-big" style="color:#185FA5">7</div>
+            <div class="cw-label">action items assigned to you</div>
+            <div class="cw-breakdown">
+              <div class="cw-item"><div class="cw-dot" style="background:#E24B4A"></div><span style="color:#E24B4A;font-size:11px">2 overdue</span></div>
+              <div class="cw-item"><div class="cw-dot" style="background:#BA7517"></div><span style="color:#BA7517;font-size:11px">3 due today</span></div>
+              <div class="cw-item"><div class="cw-dot" style="background:#185FA5"></div><span style="color:#185FA5;font-size:11px">2 upcoming</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="th-title">FlexScope meeting health</div>
+        <span class="th-badge tb-live">Live</span>
+      </div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="sparkline-widget">
+            <div class="sw-label">Last 7 meeting ratings · FlexScope</div>
+            <div class="sw-bars">
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:56%;background:#1D9E75"></div><div class="sw-bar-lbl">M1</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:40%;background:#BA7517"></div><div class="sw-bar-lbl">M2</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:40%;background:#BA7517"></div><div class="sw-bar-lbl">M3</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:28%;background:#E24B4A"></div><div class="sw-bar-lbl">M4</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:28%;background:#E24B4A"></div><div class="sw-bar-lbl">M5</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:56%;background:#1D9E75"></div><div class="sw-bar-lbl">M6</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:80%;background:#1D9E75"></div><div class="sw-bar-lbl">M7</div></div>
+            </div>
+            <div class="sw-avg">avg 3.2 / 5 · trending up</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="th-title">Morning notes</div>
+        <span class="th-badge" style="background:var(--color-background-secondary);color:var(--color-text-tertiary)">Personal</span>
+      </div>
+      <div class="tile-body">
+        <div class="note-zone">
+          <p style="color:var(--color-text-primary);font-weight:500">Mar 27</p>
+          <p>IOPQ Apr 2 — confirm RC attendance today. Sandra sending pre-read by Mar 31.</p>
+          <p>NovaBio Sec 4.3 — Sandra's note still in inbox, needs organizing.</p>
+          <p style="color:var(--color-text-tertiary);font-style:italic">Click to expand...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-flexscope" class="view-panel">
+  <div class="grid-area ga-2x2">
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="th-title">FlexScope open items</div>
+        <span class="th-badge tb-live">Live · project</span>
+      </div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="counter-widget">
+            <div class="cw-big" style="color:#E24B4A">12</div>
+            <div class="cw-label">open action items · FlexScope</div>
+            <div class="cw-breakdown">
+              <div class="cw-item"><div class="cw-dot" style="background:#E24B4A"></div><span style="color:#E24B4A;font-size:11px">4 overdue</span></div>
+              <div class="cw-item"><div class="cw-dot" style="background:#185FA5"></div><span style="color:#185FA5;font-size:11px">8 on track</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr">
+        <div class="th-title">Meeting health · FlexScope</div>
+        <span class="th-badge tb-live">Live</span>
+      </div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="sparkline-widget">
+            <div class="sw-label">All sessions this quarter</div>
+            <div class="sw-bars">
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:80%;background:#1D9E75"></div><div class="sw-bar-lbl">Jan</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:60%;background:#1D9E75"></div><div class="sw-bar-lbl"></div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:40%;background:#BA7517"></div><div class="sw-bar-lbl">Feb</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:28%;background:#E24B4A"></div><div class="sw-bar-lbl"></div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:28%;background:#E24B4A"></div><div class="sw-bar-lbl">Mar</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:56%;background:#1D9E75"></div><div class="sw-bar-lbl"></div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:80%;background:#1D9E75"></div><div class="sw-bar-lbl">Apr</div></div>
+            </div>
+            <div class="sw-avg">IOPQ thread avg 2.8 · improving</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">IOPQ open questions</div></div>
+      <div class="tile-body"><div class="note-zone"><p>Sec 3.4 — RC sign-off still pending. Apr 2 is the deadline.</p><p>Sec 4.1–4.2 — done. Sandra confirmed.</p><p style="color:var(--color-text-tertiary);font-style:italic">3 more items...</p></div></div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Product vision</div></div>
+      <div class="tile-body"><div class="note-zone"><p style="font-weight:500;color:var(--color-text-primary)">My Meetings is the memory layer</p><p>Knowledge hierarchy with time as the leaf node. Not a meetings list — a navigable knowledge graph.</p></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="view-staff" class="view-panel">
+  <div class="grid-area ga-4x4">
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#E6F1FB;color:#0C447C">RC</div><div class="th-title">Robert Chen</div><div class="th-dot" style="background:#1D9E75" title="Active"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#E24B4A;font-size:20px">3</div><div class="cw-label" style="font-size:9px">overdue items</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#EAF3DE;color:#27500A">SM</div><div class="th-title">Sandra Mitchell</div><div class="th-dot" style="background:#1D9E75" title="Active"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#185FA5;font-size:20px">2</div><div class="cw-label" style="font-size:9px">open items · on track</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#EEEDFE;color:#3C3489">AK</div><div class="th-title">Alan Kim</div><div class="th-dot" style="background:var(--color-border-tertiary)" title="Inactive"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#BA7517;font-size:20px">5</div><div class="cw-label" style="font-size:9px">items · 1 due today</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#FAEEDA;color:#633806">JP</div><div class="th-title">Janet Park</div><div class="th-dot" style="background:#1D9E75" title="Active"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#185FA5;font-size:20px">4</div><div class="cw-label" style="font-size:9px">open · all on track</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#FAECE7;color:#712B13">DL</div><div class="th-title">David Lee</div><div class="th-dot" style="background:var(--color-border-tertiary)"></div></div>
+      <div class="tile-body"><div class="note-zone" style="font-size:9px"><p>Sec 4.4 review blocked.</p><p style="color:var(--color-text-tertiary)">No update in 2d</p></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#E1F5EE;color:#085041">MK</div><div class="th-title">Maria Kim</div><div class="th-dot" style="background:#1D9E75"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#1D9E75;font-size:20px">6</div><div class="cw-label" style="font-size:9px">items · ahead of schedule</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#E6F1FB;color:#0C447C">TW</div><div class="th-title">Tom Walsh</div><div class="th-dot" style="background:#BA7517"></div></div>
+      <div class="tile-body"><div class="note-zone" style="font-size:9px"><p>Capacity concern filed yesterday.</p><p style="color:#BA7517">Check in today</p></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#EEEDFE;color:#3C3489">LN</div><div class="th-title">Lisa Nguyen</div><div class="th-dot" style="background:#1D9E75"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#185FA5;font-size:20px">3</div><div class="cw-label" style="font-size:9px">open · on track</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#EAF3DE;color:#27500A">BS</div><div class="th-title">Ben Scott</div><div class="th-dot" style="background:var(--color-border-tertiary)"></div></div>
+      <div class="tile-body"><div class="note-zone" style="font-size:9px"><p style="color:var(--color-text-tertiary)">No items assigned</p></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#FAEEDA;color:#633806">CR</div><div class="th-title">Carol Reed</div><div class="th-dot" style="background:#1D9E75"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#E24B4A;font-size:20px">2</div><div class="cw-label" style="font-size:9px">overdue · follow up</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#FAECE7;color:#712B13">PH</div><div class="th-title">Phil Hart</div><div class="th-dot" style="background:#1D9E75"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#1D9E75;font-size:20px">7</div><div class="cw-label" style="font-size:9px">items · strong week</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#E1F5EE;color:#085041">YC</div><div class="th-title">Yuki Chen</div><div class="th-dot" style="background:var(--color-border-tertiary)"></div></div>
+      <div class="tile-body"><div class="note-zone" style="font-size:9px"><p>On PTO Mar 27–28</p><p style="color:var(--color-text-tertiary)">Returns Mon</p></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#E6F1FB;color:#0C447C">GR</div><div class="th-title">Gina Russo</div><div class="th-dot" style="background:#1D9E75"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#185FA5;font-size:20px">4</div><div class="cw-label" style="font-size:9px">open · 1 due Friday</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#EEEDFE;color:#3C3489">HM</div><div class="th-title">Hassan Malik</div><div class="th-dot" style="background:#1D9E75"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#1D9E75;font-size:20px">5</div><div class="cw-label" style="font-size:9px">items · ahead</div></div></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#EAF3DE;color:#27500A">AO</div><div class="th-title">Amy Osei</div><div class="th-dot" style="background:#BA7517"></div></div>
+      <div class="tile-body"><div class="note-zone" style="font-size:9px"><p>Blocked on RC approval.</p><p style="color:#BA7517">Same blocker 3d</p></div></div>
+    </div>
+    <div class="tile person-tile">
+      <div class="tile-hdr"><div class="av-sm" style="background:#FAEEDA;color:#633806">KP</div><div class="th-title">Kyle Park</div><div class="th-dot" style="background:var(--color-border-tertiary)"></div></div>
+      <div class="tile-body"><div class="widget-zone" style="padding:5px"><div class="counter-widget"><div class="cw-big" style="color:#185FA5;font-size:20px">1</div><div class="cw-label" style="font-size:9px">item · new this week</div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="view-review" class="view-panel">
+  <div class="grid-area ga-2x2">
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">My contribution · Q1</div><span class="th-badge tb-live">Live</span></div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="sparkline-widget">
+            <div class="sw-label">Weekly contribution · 12 weeks</div>
+            <div class="sw-bars">
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:40%;background:#185FA5"></div><div class="sw-bar-lbl">W1</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:50%;background:#185FA5"></div><div class="sw-bar-lbl"></div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:60%;background:#185FA5"></div><div class="sw-bar-lbl">W4</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:45%;background:#185FA5"></div><div class="sw-bar-lbl"></div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:70%;background:#185FA5"></div><div class="sw-bar-lbl">W7</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:55%;background:#185FA5"></div><div class="sw-bar-lbl"></div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:80%;background:#1D9E75"></div><div class="sw-bar-lbl">W10</div></div>
+              <div class="sw-bar-wrap"><div class="sw-bar" style="height:90%;background:#1D9E75"></div><div class="sw-bar-lbl">W12</div></div>
+            </div>
+            <div class="sw-avg">23 ratings · 5 corrections · top 3 this quarter</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">This week — open items</div><span class="th-badge tb-live">Live</span></div>
+      <div class="tile-body">
+        <div class="widget-zone">
+          <div class="capacity-widget">
+            <div class="cap-arc-wrap">
+              <svg viewBox="0 0 90 90">
+                <path d="M10 80 A35 35 0 1 1 80 80" fill="none" stroke="var(--color-border-tertiary)" stroke-width="8" stroke-linecap="round"/>
+                <path d="M10 80 A35 35 0 1 1 80 80" fill="none" stroke="#1D9E75" stroke-width="8" stroke-linecap="round" stroke-dasharray="165" stroke-dashoffset="33"/>
+                <text x="45" y="62" text-anchor="middle" font-family="var(--font-sans,system-ui)" font-size="14" font-weight="500" fill="var(--color-text-primary)">80%</text>
+                <text x="45" y="74" text-anchor="middle" font-family="var(--font-sans,system-ui)" font-size="8" fill="var(--color-text-tertiary)">complete</text>
+              </svg>
+            </div>
+            <div class="cap-numbers">
+              <div class="cap-num"><div class="cap-val" style="color:#1D9E75">12</div><div class="cap-lbl">done</div></div>
+              <div class="cap-num"><div class="cap-val" style="color:#185FA5">3</div><div class="cap-lbl">open</div></div>
+              <div class="cap-num"><div class="cap-val" style="color:#E24B4A">0</div><div class="cap-lbl">overdue</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Weekly reflection</div></div>
+      <div class="tile-body"><div class="note-zone"><p style="font-weight:500;color:var(--color-text-primary)">Week of Mar 24</p><p>Strong finish. IOPQ thread moving again after Sandra's correction. NovaBio Sec 4.3 meeting set for Apr 3.</p><p style="color:var(--color-text-tertiary);font-style:italic">Continue writing...</p></div></div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Next week plan</div></div>
+      <div class="tile-body"><div class="note-zone"><p>· Apr 2 — IOPQ consensus meeting</p><p>· Apr 3 — NovaBio Sec 4.3</p><p>· Apr 4 — FlexScope mech review</p><p style="color:var(--color-text-tertiary)">Capacity: ~6h available</p></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="widget-library">
+  <div class="wl-hdr">
+    Widget library
+    <span class="wl-badge">drag to any tile</span>
+  </div>
+  <div class="wl-grid">
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><path d="M2 14 A6 6 0 1 1 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="8" y1="8" x2="8" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="wli-label">Capacity gauge</div>
+      <div class="wli-desc">Today's hours — used vs. available</div>
+      <span class="wli-tag">✓ Available now</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.5"/><text x="8" y="11" text-anchor="middle" font-size="7" fill="currentColor">7</text></svg>
+      <div class="wli-label">Action item counter</div>
+      <div class="wli-desc">Open items — overdue / today / upcoming</div>
+      <span class="wli-tag">✓ Available now</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="10" width="2" height="5" fill="currentColor" rx="0.5"/><rect x="4.5" y="7" width="2" height="8" fill="currentColor" rx="0.5"/><rect x="8" y="5" width="2" height="10" fill="currentColor" rx="0.5"/><rect x="11.5" y="3" width="2" height="12" fill="currentColor" rx="0.5"/></svg>
+      <div class="wli-label">Meeting health</div>
+      <div class="wli-desc">Last 7 meeting ratings sparkline</div>
+      <span class="wli-tag">✓ Available now</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      <div class="wli-label">Signature latency</div>
+      <div class="wli-desc">Avg time from route to sign</div>
+      <span class="wli-tag future-tag">Future</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><polyline points="1,12 4,7 7,9 10,4 13,6 15,3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="wli-label">Project SPI trend</div>
+      <div class="wli-desc">Schedule performance index over time</div>
+      <span class="wli-tag future-tag">Future</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="wli-label">Team capacity map</div>
+      <div class="wli-desc">Every person's load at a glance</div>
+      <span class="wli-tag future-tag">Future</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div class="wli-label">Billability dial</div>
+      <div class="wli-desc">This week's billable % vs. target</div>
+      <span class="wli-tag future-tag">Future</span>
+    </div>
+    <div class="wl-item">
+      <svg class="wli-icon" viewBox="0 0 16 16" fill="none"><path d="M2 14L5 8l3 3 3-5 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="wli-label">CoC event feed</div>
+      <div class="wli-desc">Live stream of institutional events</div>
+      <span class="wli-tag future-tag">Future</span>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function switchView(id, btn) {
+  document.querySelectorAll('.view-panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.vt').forEach(function(b){b.classList.remove('active');});
+  var el = document.getElementById('view-'+id);
+  if(el) el.classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+</script>

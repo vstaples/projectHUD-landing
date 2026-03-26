@@ -1,0 +1,533 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.shell{font-family:var(--font-sans,system-ui);background:var(--color-background-secondary);border-radius:var(--border-radius-lg);overflow:hidden}
+.top-bar{background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);padding:8px 12px;display:flex;align-items:center;gap:8px}
+.tb-title{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.view-tabs{display:flex;gap:4px;flex:1;margin:0 10px}
+.vt{font-size:11px;padding:4px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-secondary);background:none;white-space:nowrap;transition:all .15s}
+.vt.active{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info)}
+.grid-area{padding:8px;display:grid;gap:6px}
+.ga-3x3{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto)}
+.ga-4x4{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,auto)}
+.ga-2x2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,auto)}
+.tile{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);display:flex;flex-direction:column;overflow:hidden}
+.tile-hdr{display:flex;align-items:center;gap:5px;padding:6px 9px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0}
+.th-title{font-size:10px;font-weight:500;color:var(--color-text-primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th-badge{font-size:9px;padding:1px 5px;border-radius:20px;flex-shrink:0}
+.tb-live{background:#EAF3DE;color:#27500A}
+.tb-blocked{background:#FCEBEB;color:#791F1F}
+.tb-progress{background:#E6F1FB;color:#0C447C}
+.tb-done{background:#EAF3DE;color:#27500A}
+.tb-warn{background:#FAEEDA;color:#633806}
+.tb-future{background:#EEEDFE;color:#3C3489}
+.tile-body{padding:8px 9px;flex:1}
+.flow-steps{display:flex;align-items:center;gap:0;flex-wrap:nowrap;overflow:hidden}
+.fs-step{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0}
+.fs-node{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:500}
+.fn-done{background:#EAF3DE;border:1.5px solid #1D9E75;color:#27500A}
+.fn-active{background:#E6F1FB;border:2px solid #185FA5;color:#0C447C}
+.fn-blocked{background:#FCEBEB;border:1.5px solid #E24B4A;color:#791F1F}
+.fn-pending{background:var(--color-background-secondary);border:1px solid var(--color-border-secondary);color:var(--color-text-tertiary)}
+.fs-label{font-size:8px;color:var(--color-text-tertiary);text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 1px}
+.fs-connector{width:100%;height:1.5px;margin-top:-11px;margin-bottom:13px;flex-shrink:0}
+.fc-done{background:#1D9E75}
+.fc-active{background:#185FA5}
+.fc-pending{background:var(--color-border-tertiary)}
+.flow-status{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.fst-bar{flex:1;height:4px;border-radius:2px;background:var(--color-background-secondary);overflow:hidden;margin-right:8px}
+.fst-fill{height:100%;border-radius:2px}
+.fst-label{font-size:9px;color:var(--color-text-tertiary);white-space:nowrap}
+.fst-owner{font-size:9px;color:var(--color-text-tertiary)}
+.sentiment-feed{display:flex;flex-direction:column;gap:5px}
+.sf-entry{display:flex;align-items:flex-start;gap:7px;padding:5px 7px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
+.sf-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.sf-body{flex:1;min-width:0}
+.sf-project{font-size:9px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
+.sf-signal{font-size:10px;color:var(--color-text-primary);line-height:1.4}
+.sf-time{font-size:9px;color:var(--color-text-tertiary);margin-top:2px}
+.sf-trend{font-size:9px;padding:1px 5px;border-radius:20px;flex-shrink:0;margin-top:2px}
+.invoice-feed{display:flex;flex-direction:column;gap:4px}
+.inv-row{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
+.inv-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.inv-body{flex:1;min-width:0}
+.inv-client{font-size:9px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.inv-num{font-size:10px;color:var(--color-text-primary)}
+.inv-right{text-align:right;flex-shrink:0}
+.inv-amount{font-size:11px;font-weight:500;color:var(--color-text-primary)}
+.inv-days{font-size:9px;color:var(--color-text-tertiary)}
+.inv-days.overdue{color:#791F1F}
+.inv-summary{display:flex;gap:8px;margin-top:6px;padding-top:6px;border-top:0.5px solid var(--color-border-tertiary)}
+.is-item{flex:1;text-align:center}
+.is-val{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.is-lbl{font-size:9px;color:var(--color-text-tertiary)}
+.view-panel{display:none}
+.view-panel.active{display:block}
+.legend-row{display:flex;gap:10px;padding:4px 9px;border-top:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--color-text-secondary)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.overall-bar{padding:6px 9px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:8px}
+.ob-label{font-size:10px;color:var(--color-text-secondary);white-space:nowrap}
+.ob-bar{flex:1;height:6px;border-radius:3px;background:var(--color-background-secondary);overflow:hidden}
+.ob-fill{height:100%;border-radius:3px}
+.ob-pct{font-size:10px;font-weight:500;color:var(--color-text-primary);white-space:nowrap}
+.ob-employee{font-size:11px;font-weight:500;color:var(--color-text-primary);margin-right:4px}
+.ob-day{font-size:10px;color:var(--color-text-tertiary)}
+</style>
+
+<div class="shell">
+<div class="top-bar">
+  <div class="tb-title">My Notes</div>
+  <div class="view-tabs">
+    <button class="vt active" onclick="sv('onboard',this)">Onboarding · Alex Rivera</button>
+    <button class="vt" onclick="sv('sentiment',this)">Project intelligence</button>
+    <button class="vt" onclick="sv('billing',this)">Billing live feed</button>
+  </div>
+</div>
+
+<div id="view-onboard" class="view-panel active">
+  <div class="overall-bar">
+    <span class="ob-employee">Alex Rivera</span>
+    <span class="ob-day">Day 3 of onboarding</span>
+    <div class="ob-bar" style="flex:1;margin:0 10px"><div class="ob-fill" style="width:42%;background:#185FA5"></div></div>
+    <span class="ob-pct">5 of 12 flows complete</span>
+  </div>
+  <div class="grid-area ga-4x4">
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">IT access</div><span class="th-badge tb-done">Done</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Ticket</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Laptop</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Email</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">VPN</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:100%;background:#1D9E75"></div></div><span class="fst-label">Complete</span></div>
+        <div class="fst-owner">IT · Day 1</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">HR paperwork</div><span class="th-badge tb-done">Done</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Offer</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">I-9</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">W-4</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">NDA</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:100%;background:#1D9E75"></div></div><span class="fst-label">Complete</span></div>
+        <div class="fst-owner">HR · Day 1</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Payroll setup</div><span class="th-badge tb-done">Done</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Profile</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Banking</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Confirm</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:100%;background:#1D9E75"></div></div><span class="fst-label">Complete</span></div>
+        <div class="fst-owner">Finance · Day 1</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Badge &amp; access</div><span class="th-badge tb-done">Done</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Photo</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Badge</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Floors</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:100%;background:#1D9E75"></div></div><span class="fst-label">Complete</span></div>
+        <div class="fst-owner">Facilities · Day 1</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Project assignment</div><span class="th-badge tb-progress">In progress</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">PM brief</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-active">2</div><div class="fs-label">Compass</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">3</div><div class="fs-label">Tasks</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">4</div><div class="fs-label">Start</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:40%;background:#185FA5"></div></div><span class="fst-label">Step 2 of 4</span></div>
+        <div class="fst-owner">VS (PM) · Due today</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Tool provisioning</div><span class="th-badge tb-progress">In progress</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Compass</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Slack</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-active">3</div><div class="fs-label">GitHub</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">4</div><div class="fs-label">Jira</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:60%;background:#185FA5"></div></div><span class="fst-label">Step 3 of 4</span></div>
+        <div class="fst-owner">IT · Due today</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Advisor designation</div><span class="th-badge tb-done">Done</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Assign</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Intro</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Meet</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:100%;background:#1D9E75"></div></div><span class="fst-label">Complete · Sandra M.</span></div>
+        <div class="fst-owner">HR · Day 1</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Benefits enrollment</div><span class="th-badge tb-warn">Waiting</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Sent</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-active">2</div><div class="fs-label">Review</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">3</div><div class="fs-label">Select</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">4</div><div class="fs-label">Confirm</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:25%;background:#BA7517"></div></div><span class="fst-label">Waiting on Alex</span></div>
+        <div class="fst-owner">HR · Due Day 5</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Compliance training</div><span class="th-badge tb-blocked">Blocked</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Assign</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-blocked">!</div><div class="fs-label">Login</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">3</div><div class="fs-label">Modules</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">4</div><div class="fs-label">Cert</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:20%;background:#E24B4A"></div></div><span class="fst-label" style="color:#791F1F">Alex not logged in</span></div>
+        <div class="fst-owner">HR · Due Day 5 · nudge sent</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Client introduction</div><span class="th-badge tb-warn">Pending</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-pending">1</div><div class="fs-label">Brief</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">2</div><div class="fs-label">Intro</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">3</div><div class="fs-label">Meeting</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:0%;background:#BA7517"></div></div><span class="fst-label">Not started · Day 5</span></div>
+        <div class="fst-owner">VS (PM) · Due Day 7</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Emergency contacts</div><span class="th-badge tb-warn">Waiting</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Form sent</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-active">2</div><div class="fs-label">Complete</div></div>
+          <div class="fs-connector fc-pending"></div>
+          <div class="fs-step"><div class="fs-node fn-pending">3</div><div class="fs-label">Filed</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:33%;background:#BA7517"></div></div><span class="fst-label">Waiting on Alex</span></div>
+        <div class="fst-owner">HR · Due Day 3</div>
+      </div>
+    </div>
+
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Org chart &amp; team intro</div><span class="th-badge tb-done">Done</span></div>
+      <div class="tile-body">
+        <div class="flow-steps">
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Chart</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Intros</div></div>
+          <div class="fs-connector fc-done"></div>
+          <div class="fs-step"><div class="fs-node fn-done">✓</div><div class="fs-label">Slack</div></div>
+        </div>
+        <div class="flow-status"><div class="fst-bar"><div class="fst-fill" style="width:100%;background:#1D9E75"></div></div><span class="fst-label">Complete</span></div>
+        <div class="fst-owner">HR · Day 1</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="legend-row">
+    <div class="leg"><div class="leg-dot" style="background:#1D9E75"></div>Complete</div>
+    <div class="leg"><div class="leg-dot" style="background:#185FA5"></div>In progress</div>
+    <div class="leg"><div class="leg-dot" style="background:#BA7517"></div>Waiting on employee</div>
+    <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div>Blocked</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--color-border-secondary)"></div>Not started</div>
+  </div>
+</div>
+
+<div id="view-sentiment" class="view-panel">
+  <div class="grid-area ga-2x2">
+    <div class="tile" style="grid-row:span 2">
+      <div class="tile-hdr"><div class="th-title">AI sentiment · all projects</div><span class="th-badge tb-live">Live · updated 6am</span></div>
+      <div class="tile-body">
+        <div class="sentiment-feed">
+          <div class="sf-entry" style="border-color:#FCEBEB;background:#fdf8f8">
+            <div class="sf-dot" style="background:#E24B4A"></div>
+            <div class="sf-body">
+              <div class="sf-project">FlexScope · IOPQ thread</div>
+              <div class="sf-signal">Three consecutive meeting deferrals. Two overdue action items owned by the same person. Signature chain latency up 40% vs last month. Pattern suggests a decision authority gap — Robert Chen may be a required presence rather than an optional one.</div>
+              <div class="sf-time">Updated this morning · based on 18 CoC events</div>
+            </div>
+            <span class="sf-trend" style="background:#FCEBEB;color:#791F1F">Declining</span>
+          </div>
+          <div class="sf-entry" style="border-color:#FAEEDA;background:#fdf9f0">
+            <div class="sf-dot" style="background:#BA7517"></div>
+            <div class="sf-body">
+              <div class="sf-project">NovaBio · QMS Sec 4.3</div>
+              <div class="sf-signal">Meeting scheduled Apr 3 after two weeks of async alignment. Pre-read distributed. Robert Chen attendance confirmed. Pattern improving — this thread has historically closed on third attempt when RC is present.</div>
+              <div class="sf-time">Updated this morning · based on 11 CoC events</div>
+            </div>
+            <span class="sf-trend" style="background:#FAEEDA;color:#633806">Watch</span>
+          </div>
+          <div class="sf-entry" style="border-color:#EAF3DE;background:#f6fcf3">
+            <div class="sf-dot" style="background:#1D9E75"></div>
+            <div class="sf-body">
+              <div class="sf-project">NovaBio · Regulatory review</div>
+              <div class="sf-signal">Sec 4.1 and 4.2 closed on first attempt. Meeting productivity ratings averaging 4.1 this month. No overdue action items. Thread on track for M3 milestone by Apr 15.</div>
+              <div class="sf-time">Updated this morning · based on 9 CoC events</div>
+            </div>
+            <span class="sf-trend" style="background:#EAF3DE;color:#27500A">Healthy</span>
+          </div>
+          <div class="sf-entry" style="border-color:#EAF3DE;background:#f6fcf3">
+            <div class="sf-dot" style="background:#1D9E75"></div>
+            <div class="sf-body">
+              <div class="sf-project">FlexScope · Mechanical design</div>
+              <div class="sf-signal">Mar 20 session rated 5/5 by all four attendees — best-rated meeting this quarter firm-wide. Decisions documented. All action items completed within 24 hours. This format is a model for the IOPQ thread.</div>
+              <div class="sf-time">Updated this morning · based on 7 CoC events</div>
+            </div>
+            <span class="sf-trend" style="background:#EAF3DE;color:#27500A">Healthy</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">FlexScope · project health</div><span class="th-badge tb-warn">Needs attention</span></div>
+      <div class="tile-body">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Meeting health</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:52%;height:100%;border-radius:2px;background:#BA7517"></div></div>
+            <span style="font-size:9px;color:#BA7517;width:24px">2.8</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Action items</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:35%;height:100%;border-radius:2px;background:#E24B4A"></div></div>
+            <span style="font-size:9px;color:#E24B4A;width:24px">4 OD</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Sig latency</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:80%;height:100%;border-radius:2px;background:#E24B4A"></div></div>
+            <span style="font-size:9px;color:#E24B4A;width:24px">43h</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Correction rate</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:70%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:24px">High</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">NovaBio · project health</div><span class="th-badge tb-live">Healthy</span></div>
+      <div class="tile-body">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Meeting health</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:82%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:24px">4.1</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Action items</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:88%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:24px">0 OD</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">Sig latency</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:28%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:24px">18h</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:72px;flex-shrink:0">On track M3</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:90%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:24px">Yes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-billing" class="view-panel">
+  <div class="grid-area ga-2x2">
+    <div class="tile" style="grid-row:span 2">
+      <div class="tile-hdr"><div class="th-title">Outstanding invoices · all clients</div><span class="th-badge tb-live">Live</span></div>
+      <div class="tile-body">
+        <div class="invoice-feed">
+          <div class="inv-row" style="border-color:#FCEBEB;background:#fdf8f8">
+            <div class="inv-status" style="background:#E24B4A"></div>
+            <div class="inv-body">
+              <div class="inv-client">TransEnterix · FlexScope</div>
+              <div class="inv-num">INV-2026-0341 · Feb services</div>
+            </div>
+            <div class="inv-right">
+              <div class="inv-amount">$47,200</div>
+              <div class="inv-days overdue">62 days overdue</div>
+            </div>
+          </div>
+          <div class="inv-row" style="border-color:#FCEBEB;background:#fdf8f8">
+            <div class="inv-status" style="background:#E24B4A"></div>
+            <div class="inv-body">
+              <div class="inv-client">TransEnterix · FlexScope</div>
+              <div class="inv-num">INV-2026-0378 · Mar services</div>
+            </div>
+            <div class="inv-right">
+              <div class="inv-amount">$52,800</div>
+              <div class="inv-days overdue">31 days overdue</div>
+            </div>
+          </div>
+          <div class="inv-row" style="border-color:#FAEEDA;background:#fdf9f0">
+            <div class="inv-status" style="background:#BA7517"></div>
+            <div class="inv-body">
+              <div class="inv-client">NovaBio · QMS Phase 2</div>
+              <div class="inv-num">INV-2026-0392 · Mar services</div>
+            </div>
+            <div class="inv-right">
+              <div class="inv-amount">$31,500</div>
+              <div class="inv-days overdue">14 days · due Apr 9</div>
+            </div>
+          </div>
+          <div class="inv-row" style="border-color:#FAEEDA;background:#fdf9f0">
+            <div class="inv-status" style="background:#BA7517"></div>
+            <div class="inv-body">
+              <div class="inv-client">MedDevice Co · Audit prep</div>
+              <div class="inv-num">INV-2026-0401 · Mar services</div>
+            </div>
+            <div class="inv-right">
+              <div class="inv-amount">$18,900</div>
+              <div class="inv-days">8 days · due Apr 4</div>
+            </div>
+          </div>
+          <div class="inv-row" style="border-color:#EAF3DE;background:#f6fcf3">
+            <div class="inv-status" style="background:#1D9E75"></div>
+            <div class="inv-body">
+              <div class="inv-client">RegPath Inc · Phase 1</div>
+              <div class="inv-num">INV-2026-0388 · Mar services</div>
+            </div>
+            <div class="inv-right">
+              <div class="inv-amount">$24,400</div>
+              <div class="inv-days" style="color:#27500A">Paid Mar 24</div>
+            </div>
+          </div>
+          <div class="inv-row" style="border-color:#EAF3DE;background:#f6fcf3">
+            <div class="inv-status" style="background:#1D9E75"></div>
+            <div class="inv-body">
+              <div class="inv-client">TransEnterix · Vision Cart</div>
+              <div class="inv-num">INV-2026-0356 · Feb services</div>
+            </div>
+            <div class="inv-right">
+              <div class="inv-amount">$29,750</div>
+              <div class="inv-days" style="color:#27500A">Paid Mar 18</div>
+            </div>
+          </div>
+        </div>
+        <div class="inv-summary">
+          <div class="is-item"><div class="is-val" style="color:#E24B4A">$100k</div><div class="is-lbl">overdue</div></div>
+          <div class="is-item"><div class="is-val" style="color:#BA7517">$50.4k</div><div class="is-lbl">due soon</div></div>
+          <div class="is-item"><div class="is-val" style="color:#1D9E75">$54.2k</div><div class="is-lbl">paid this month</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">TransEnterix · relationship health</div><span class="th-badge tb-blocked">Action needed</span></div>
+      <div class="tile-body">
+        <div style="font-size:10px;color:var(--color-text-primary);line-height:1.6;margin-bottom:6px">Two invoices totaling $100k overdue. Project health on FlexScope declining. Meeting deferrals correlating with billing delays — pattern seen in Q4 last year before scope renegotiation.</div>
+        <div style="font-size:9px;color:#791F1F;padding:5px 7px;background:#FCEBEB;border-radius:var(--border-radius-md)">Compass signal: billing delays on this client have historically preceded scope change requests. Consider proactive conversation before Apr 2 meeting.</div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-hdr"><div class="th-title">Billability · this week</div><span class="th-badge tb-live">Live</span></div>
+      <div class="tile-body">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:60px;flex-shrink:0">Vaughn S.</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:82%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:28px">82%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:60px;flex-shrink:0">Sandra M.</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:91%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:28px">91%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:60px;flex-shrink:0">Robert C.</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:58%;height:100%;border-radius:2px;background:#BA7517"></div></div>
+            <span style="font-size:9px;color:#BA7517;width:28px">58%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:60px;flex-shrink:0">Alan K.</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:74%;height:100%;border-radius:2px;background:#1D9E75"></div></div>
+            <span style="font-size:9px;color:#1D9E75;width:28px">74%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--color-text-tertiary);width:60px;flex-shrink:0">Team avg</span>
+            <div style="flex:1;height:5px;border-radius:2px;background:var(--color-background-secondary)"><div style="width:76%;height:100%;border-radius:2px;background:#185FA5"></div></div>
+            <span style="font-size:9px;color:#185FA5;width:28px">76%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function sv(id,btn){
+  document.querySelectorAll('.view-panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.vt').forEach(function(b){b.classList.remove('active');});
+  var el=document.getElementById('view-'+id);
+  if(el)el.classList.add('active');
+  if(btn)btn.classList.add('active');
+}
+</script>
