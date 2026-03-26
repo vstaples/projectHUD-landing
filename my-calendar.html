@@ -571,12 +571,21 @@ function _kbRender() {
     const due = t.due ? t.due.slice(0,10) : null;
     if (!due) { taskBuckets['next'].push(t); return; }
     let placed = false;
-    // Only bucket into sat/sun if weekend is visible
+    // Only bucket into a day column if that day is today or future
+    // Past days within this week → push to 'last' (already missed)
     const checkIds = _kbShowWeekend
       ? ['mon','tue','wed','thu','fri','sat','sun']
       : ['mon','tue','wed','thu','fri'];
     checkIds.forEach(id => {
-      if (!placed && _kbColDates[id] === due) { taskBuckets[id].push(t); placed = true; }
+      if (!placed && _kbColDates[id] === due) {
+        // If this day has already passed, treat as last week
+        if (_kbColDates[id] < today) {
+          taskBuckets['last'].push(t);
+        } else {
+          taskBuckets[id].push(t);
+        }
+        placed = true;
+      }
     });
     if (!placed) {
       if (due > _kbColDates['sun'])  taskBuckets['next'].push(t);
@@ -652,10 +661,20 @@ function _kbRender() {
     if (dayLogged.length > 0 && !isNext) {
       cardsHtml += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:5px 6px 3px;margin-top:4px;border-top:1px solid rgba(255,255,255,.06)">Logged</div>';
       dayLogged.forEach(e => {
-        const projName = (window._mtProjects || []).find(p => p.id === e.project_id);
+        // Look up project name from all available project sources
+        const _allProjects = window._projects || window._mtProjects || [];
+        const projName = _allProjects.find(p => p.id === e.project_id);
+        // Look up task from both open items and the full task name via step_name
         const taskItem = (window._calItems || []).find(t => t.id === e.task_id);
-        const title    = taskItem?.title || taskItem?.name || projName?.name || projName?.title || 'Time entry';
-        const desc     = e.notes || (e.step_name ? e.step_name : null);
+        // Build title: prefer task title, then project + step, then notes, then project name
+        const _projLabel = projName?.name || projName?.title || null;
+        const _stepLabel = e.step_name && e.step_name !== 'general' ? e.step_name : null;
+        const title = taskItem?.title || taskItem?.name
+          || (_projLabel && _stepLabel ? _projLabel + ' — ' + _stepLabel : null)
+          || e.notes
+          || _projLabel
+          || 'Time entry';
+        const desc = e.notes && e.notes !== title ? e.notes : (_stepLabel && _projLabel ? null : _stepLabel);
         const h        = parseFloat(e.hours) || 0;
         const billCls  = e.is_billable ? 'var(--compass-cyan,#00D2FF)' : '#7F77DD';
         cardsHtml += '<div style="padding:5px 7px;border-left:2px solid ' + billCls + ';margin:2px 0;background:rgba(255,255,255,.03)">' +
