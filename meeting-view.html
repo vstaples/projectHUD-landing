@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Meeting — ProjectHUD</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #0f1117;
+  --surface: #181c27;
+  --surf2:   #1e2436;
+  --surf3:   #232a3e;
+  --border:  rgba(255,255,255,.08);
+  --border2: rgba(255,255,255,.14);
+  --text:    #e8eaf0;
+  --muted:   #7a8099;
+  --accent:  #4f8ef7;
+  --green:   #2a9d40;
+  --amber:   #d4901f;
+  --red:     #c0404a;
+}
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.view-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.view-title {
+  flex: 1;
+  min-width: 0;
+}
+.view-title-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.view-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+.view-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--surf2); color: var(--text);
+  transition: background .15s; text-decoration: none;
+}
+.btn:hover { background: var(--surf3); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+
+/* ── Content ─────────────────────────────────────────── */
+.view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; font-size: 12px; color: var(--muted);
+}
+.error-msg {
+  padding: 20px; color: var(--red); font-size: 12px; text-align: center;
+}
+
+/* meet-card expand styles (match prospect-detail) */
+.meet-expand {
+  padding: 12px 0 4px;
+}
+</style>
+</head>
+<body>
+
+<div class="view-header" id="view-header">
+  <div class="view-title">
+    <div class="view-title-text" id="view-title-text">Loading…</div>
+    <div class="view-meta" id="view-meta"></div>
+  </div>
+  <div class="view-actions" id="view-actions">
+    <div class="loading" style="height:auto;padding:0;font-size:11px">Loading…</div>
+  </div>
+</div>
+
+<div class="view-body">
+  <div id="mc-container">
+    <div class="loading">Loading meeting details…</div>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/meetings.js"></script>
+<script>
+const params     = new URLSearchParams(location.search);
+const MEETING_ID = params.get('meeting_id');
+
+if (!MEETING_ID) {
+  document.getElementById('mc-container').innerHTML =
+    '<div class="error-msg">No meeting_id specified.</div>';
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!MEETING_ID) return;
+
+  try {
+    // Resolve current user resource id for comment authorship
+    try {
+      const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+      const sub   = JSON.parse(atob(token.split('.')[1])).sub;
+      const uRows = await API.get(`users?id=eq.${sub}&select=resource_id`).catch(()=>[]);
+      window._myResourceId = uRows?.[0]?.resource_id || null;
+    } catch(e) {}
+
+    // Load meeting header data for the title bar
+    const meetings = await API.get(
+      `v_meetings?id=eq.${MEETING_ID}&select=id,title,meeting_date,duration_minutes,` +
+      `location_or_link,meeting_type,status,outcome,project_name,work_stream&limit=1`
+    ).catch(() => []);
+    const m = meetings?.[0];
+
+    if (m) {
+      document.getElementById('view-title-text').textContent = m.title || 'Meeting';
+      const dateStr = m.meeting_date
+        ? new Date(m.meeting_date).toLocaleDateString('en-US',
+            {weekday:'short', month:'short', day:'numeric', year:'numeric',
+             hour:'2-digit', minute:'2-digit'})
+        : '';
+      const dur = m.duration_minutes
+        ? (m.duration_minutes >= 60
+            ? Math.floor(m.duration_minutes/60) + 'h' +
+              (m.duration_minutes % 60 ? ' ' + (m.duration_minutes % 60) + 'm' : '')
+            : m.duration_minutes + ' min')
+        : '';
+      const parts = [dateStr, dur, m.location_or_link].filter(Boolean);
+      document.getElementById('view-meta').textContent = parts.join(' · ');
+
+      // Status chip
+      const outcome  = m.outcome || m.status || 'draft';
+      const chipColor = outcome === 'closed' || outcome === 'completed'
+        ? 'background:rgba(42,157,64,.15);color:#7af0a0;border:1px solid rgba(42,157,64,.3)'
+        : outcome === 'deferred'
+        ? 'background:rgba(212,144,31,.12);color:#f5c842;border:1px solid rgba(212,144,31,.3)'
+        : outcome === 'upcoming' || outcome === 'scheduled'
+        ? 'background:rgba(79,142,247,.12);color:#4f8ef7;border:1px solid rgba(79,142,247,.3)'
+        : 'background:rgba(255,255,255,.07);color:#7a8099;border:1px solid rgba(255,255,255,.12)';
+      const chipLabel = outcome.charAt(0).toUpperCase() + outcome.slice(1);
+
+      // Build action bar
+      const actionsEl = document.getElementById('view-actions');
+      actionsEl.innerHTML =
+        `<span class="status-chip" style="${chipColor}">${chipLabel}</span>` +
+        `<a class="btn btn-primary" ` +
+        `href="/meeting-minutes.html?meeting_id=${encodeURIComponent(MEETING_ID)}" ` +
+        `style="text-decoration:none">✎ Edit minutes</a>` +
+        `<button class="btn" onclick="closeView()" ` +
+        `style="border-color:rgba(255,255,255,.15);color:#7a8099;padding:6px 10px" ` +
+        `title="Close">✕</button>`;
+    }
+
+    // Render the full meeting card
+    const container = document.getElementById('mc-container');
+    container.innerHTML = '';
+    await MeetingCard.render(MEETING_ID, container, {
+      editMinutesHref: '/meeting-minutes.html?meeting_id=' + MEETING_ID,
+    });
+
+  } catch(e) {
+    console.error('meeting-view error:', e);
+    document.getElementById('mc-container').innerHTML =
+      '<div class="error-msg">Failed to load meeting: ' + e.message + '</div>';
+  }
+});
+
+function closeView() {
+  // Notify parent MY MEETINGS if embedded in iframe
+  if (window.parent && window.parent !== window && window.parent._mtgMinutesClosed) {
+    window.parent._mtgMinutesClosed(MEETING_ID);
+  }
+}
+</script>
+</body>
+</html>

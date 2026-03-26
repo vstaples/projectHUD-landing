@@ -428,7 +428,7 @@ function _mtgSelectMeeting(id) {
   frame.style.flex    = '1';
 
   // Load meeting-minutes.html with the meeting_id parameter
-  frame.src = '/meeting-minutes.html?meeting_id=' + encodeURIComponent(id);
+  frame.src = '/meeting-view.html?meeting_id=' + encodeURIComponent(id);
 }
 
 // ── Search ────────────────────────────────────────────────────────────────
@@ -495,7 +495,9 @@ window._mtgViewInWork = function() {
   if (window.uSwitchTab) uSwitchTab('work');
 };
 window._mtgNewMeeting = function() {
-  compassToast && compassToast('New meeting — coming in next session.', 2500);
+  const frame = document.getElementById('mtg-minutes-frame');
+  document.getElementById('mtg-empty-state').style.display = 'none';
+  if (frame) { frame.style.display = 'flex'; frame.style.flex = '1'; frame.src = '/meeting-minutes.html'; }
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
