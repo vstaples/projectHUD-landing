@@ -53,7 +53,7 @@
     <!-- Kanban view — hidden until toggled -->
     <div id="cal-kanban-view" style="display:none">
       <!-- KPI strip -->
-      <div id="kb-kpi-row" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px"></div>
+      <div id="kb-kpi-row" style="display:grid;grid-template-columns:minmax(0,1fr) repeat(5,minmax(0,1fr)) minmax(0,1fr);gap:8px;margin-bottom:12px"></div>
       <!-- Week nav -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <button id="kb-prev-btn" style="font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249; Prev week</button>
@@ -754,12 +754,31 @@ function _kbRender() {
   board.innerHTML = colsHtml;
 
   const kpiRow = document.getElementById('kb-kpi-row');
-  if (kpiRow) kpiRow.innerHTML =
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Scheduled</div><div class="kb-kpi-val info">' + totalItems + '</div><div class="kb-kpi-sub">items this week</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Billable logged</div><div class="kb-kpi-val' + (billPct >= 80 ? '' : billPct >= 60 ? ' warn' : ' warn') + '">' + billHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + billPct + '% of ' + totalLoggedHrs.toFixed(1) + 'h logged</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Non-billable</div><div class="kb-kpi-val">' + nonBillHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + (100 - billPct) + '% of logged hours</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Meetings</div><div class="kb-kpi-val">' + totalMtgHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">calendar events</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Pending approval</div><div class="kb-kpi-val' + (pendingCount > 0 ? ' warn' : '') + '">' + pendingCount + '</div><div class="kb-kpi-sub">awaiting PM</div></div>';
+  if (kpiRow) {
+    // Last week: sum budget hours of all items in the 'last' bucket
+    const lastHrs = taskBuckets['last'].reduce((s,t) => s + parseFloat(t.budgetHours||(t.effortDays?t.effortDays*8:0)||2), 0);
+    const lastCount = taskBuckets['last'].length;
+    // Next week: sum budget hours of all items in the 'next' bucket
+    const nextHrs = taskBuckets['next'].reduce((s,t) => s + parseFloat(t.budgetHours||(t.effortDays?t.effortDays*8:0)||2), 0);
+    const nextCount = taskBuckets['next'].length;
+
+    kpiRow.innerHTML =
+      '<div class="kb-kpi" style="border-left:2px solid rgba(226,75,74,.5)">' +
+        '<div class="kb-kpi-lbl">Last week</div>' +
+        '<div class="kb-kpi-val' + (lastCount > 0 ? ' warn' : '') + '">' + lastHrs.toFixed(0) + 'h</div>' +
+        '<div class="kb-kpi-sub">' + lastCount + ' item' + (lastCount !== 1 ? 's' : '') + ' carried</div>' +
+      '</div>' +
+      '<div class="kb-kpi"><div class="kb-kpi-lbl">Scheduled</div><div class="kb-kpi-val info">' + totalItems + '</div><div class="kb-kpi-sub">items this week</div></div>' +
+      '<div class="kb-kpi"><div class="kb-kpi-lbl">Billable logged</div><div class="kb-kpi-val' + (billPct >= 80 ? '' : ' warn') + '">' + billHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + billPct + '% of ' + totalLoggedHrs.toFixed(1) + 'h logged</div></div>' +
+      '<div class="kb-kpi"><div class="kb-kpi-lbl">Non-billable</div><div class="kb-kpi-val">' + nonBillHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + (100 - billPct) + '% of logged hours</div></div>' +
+      '<div class="kb-kpi"><div class="kb-kpi-lbl">Meetings</div><div class="kb-kpi-val">' + totalMtgHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">calendar events</div></div>' +
+      '<div class="kb-kpi"><div class="kb-kpi-lbl">Pending approval</div><div class="kb-kpi-val' + (pendingCount > 0 ? ' warn' : '') + '">' + pendingCount + '</div><div class="kb-kpi-sub">awaiting PM</div></div>' +
+      '<div class="kb-kpi" style="border-right:2px solid rgba(0,210,255,.35)">' +
+        '<div class="kb-kpi-lbl">Next week</div>' +
+        '<div class="kb-kpi-val info">' + nextHrs.toFixed(0) + 'h</div>' +
+        '<div class="kb-kpi-sub">' + nextCount + ' item' + (nextCount !== 1 ? 's' : '') + ' queued</div>' +
+      '</div>';
+  }
 
   _kbWireCards();
 }
