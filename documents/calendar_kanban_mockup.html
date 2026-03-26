@@ -1,0 +1,372 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,system-ui)}
+.kb{background:var(--color-background-secondary);padding:12px;border-radius:var(--border-radius-lg)}
+.kb-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.kb-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.kb-week{font-size:12px;color:var(--color-text-tertiary)}
+.view-toggle{display:flex;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);overflow:hidden;margin-left:auto}
+.vt-btn{font-size:11px;padding:4px 10px;background:none;border:none;color:var(--color-text-secondary);cursor:pointer}
+.vt-btn.on{background:var(--color-background-info);color:var(--color-text-info)}
+.kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.kpi{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px 10px}
+.kpi-lbl{font-size:11px;color:var(--color-text-secondary);margin-bottom:3px}
+.kpi-val{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+.kpi-sub{font-size:10px;color:var(--color-text-tertiary);margin-top:1px}
+.kpi-val.warn{color:var(--color-text-warning)}
+.kpi-val.good{color:var(--color-text-success)}
+.kpi-val.info{color:var(--color-text-info)}
+.board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 140px;gap:6px;align-items:start}
+.col{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;min-height:300px}
+.col.weekend{opacity:.7}
+.col.next-week{background:var(--color-background-secondary)}
+.col-hdr{padding:7px 9px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.col-day{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.col-day.today{color:var(--color-text-info)}
+.cap-bar{height:4px;border-radius:2px;overflow:hidden;background:var(--color-border-tertiary);margin-top:5px}
+.cap-fill{height:100%;border-radius:2px;transition:width .2s}
+.cap-lbl{font-size:10px;color:var(--color-text-tertiary);margin-top:3px}
+.cap-lbl.warn{color:var(--color-text-warning)}
+.cap-lbl.over{color:var(--color-text-danger)}
+.col-body{padding:6px;display:flex;flex-direction:column;gap:4px;min-height:240px}
+.card{border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:7px 8px;cursor:grab;background:var(--color-background-primary);user-select:none;transition:opacity .15s}
+.card:active{cursor:grabbing;opacity:.7}
+.card.meeting{background:var(--color-background-info);border-color:var(--color-border-info)}
+.card.amber{background:#FAEEDA;border:1.5px dashed #BA7517}
+.card.green{background:#EAF3DE;border:1.5px solid #3B6D11}
+.card.red{background:#FCEBEB;border:1.5px solid #A32D2D}
+.card.bin{background:#FAEEDA;border:1.5px dashed #BA7517}
+.card-proj{font-size:10px;color:var(--color-text-tertiary);margin-bottom:2px}
+.card-title{font-size:12px;font-weight:500;color:var(--color-text-primary);line-height:1.3;margin-bottom:3px}
+.card.meeting .card-title{color:#0C447C}
+.card.meeting .card-proj{color:#185FA5}
+.card.amber .card-title{color:#633806}
+.card.amber .card-proj{color:#854F0B}
+.card.green .card-title{color:#27500A}
+.card.red .card-title{color:#791F1F}
+.card.bin .card-title{color:#633806}
+.card-footer{display:flex;align-items:center;gap:5px;margin-top:4px;flex-wrap:wrap}
+.pill{font-size:10px;padding:1px 6px;border-radius:20px;white-space:nowrap}
+.p-task{background:#E6F1FB;color:#0C447C}
+.p-mtg{background:#B5D4F4;color:#0C447C}
+.p-hrs{background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-tertiary)}
+.p-amber{background:#FAEEDA;color:#633806}
+.p-red{background:#FCEBEB;color:#791F1F}
+.p-green{background:#EAF3DE;color:#27500A}
+.p-bin{background:#FAC775;color:#412402}
+.drop-zone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-md);height:36px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--color-text-tertiary)}
+.drop-zone.active{border-color:var(--color-border-info);background:var(--color-background-info);color:var(--color-text-info)}
+.negotiation-toast{background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-lg);padding:10px 14px;margin-top:10px;display:none}
+.nt-title{font-size:12px;font-weight:500;color:var(--color-text-warning);margin-bottom:4px}
+.nt-body{font-size:11px;color:var(--color-text-warning);margin-bottom:8px;line-height:1.5}
+.nt-btns{display:flex;gap:6px;flex-wrap:wrap}
+.nt-btn{font-size:11px;padding:4px 10px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid}
+.nt-btn-a{background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success)}
+.nt-btn-b{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.nt-btn-c{background:none;color:var(--color-text-secondary);border-color:var(--color-border-secondary)}
+.del-toast{background:var(--color-background-danger);border:0.5px solid var(--color-border-danger);border-radius:var(--border-radius-lg);padding:10px 14px;margin-top:8px;display:none}
+.del-title{font-size:12px;font-weight:500;color:var(--color-text-danger);margin-bottom:5px}
+.del-inp{width:100%;font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);margin-bottom:7px;outline:none}
+.del-btns{display:flex;gap:6px}
+.del-btn-confirm{font-size:11px;padding:4px 12px;background:var(--color-background-danger);color:var(--color-text-danger);border:0.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);cursor:pointer}
+.del-btn-cancel{font-size:11px;padding:4px 10px;background:none;color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0 2px;margin-top:4px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary)}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+</style>
+
+<div class="kb">
+
+<div class="kb-header">
+  <div class="kb-title">My Calendar</div>
+  <div class="kb-week">Week of Mar 30 – Apr 5, 2026</div>
+  <div class="view-toggle">
+    <button class="vt-btn">Grid</button>
+    <button class="vt-btn on">Kanban</button>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">This week</div><div class="kpi-val info">7</div><div class="kpi-sub">items · 29h committed</div></div>
+  <div class="kpi"><div class="kpi-lbl">Meetings</div><div class="kpi-val">3</div><div class="kpi-sub">6.5h consumed</div></div>
+  <div class="kpi"><div class="kpi-lbl">Outcomes (30d)</div><div class="kpi-val warn">58%</div><div class="kpi-sub">consensus on first attempt</div></div>
+  <div class="kpi"><div class="kpi-lbl">Open action items</div><div class="kpi-val warn">4</div><div class="kpi-sub">2 overdue from last week</div></div>
+  <div class="kpi"><div class="kpi-lbl">Sig. chain avg</div><div class="kpi-val">38h</div><div class="kpi-sub">this quarter</div></div>
+</div>
+
+<div class="board">
+
+  <div class="col">
+    <div class="col-hdr">
+      <div class="col-day today">Mon 3/30</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:88%;background:#185FA5"></div></div>
+      <div class="cap-lbl">7.0h / 8h avail</div>
+    </div>
+    <div class="col-body" id="col-mon">
+      <div class="card meeting" draggable="true" data-id="mtg-standup-mon" data-hrs="0.5" data-type="meeting">
+        <div class="card-proj">Meeting</div>
+        <div class="card-title">Team standup</div>
+        <div class="card-footer"><span class="pill p-mtg">9:00am</span><span class="pill p-hrs">0.5h</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="schematic-mon" data-hrs="5" data-type="task" data-task="schematic" data-due="2026-04-03">
+        <div class="card-proj">Flexscope</div>
+        <div class="card-title">PCB schematic — Mon slice</div>
+        <div class="card-footer"><span class="pill p-task">Task · 5 of 25h</span><span class="pill p-hrs" id="schematic-total">25h total</span></div>
+      </div>
+      <div class="card amber" draggable="true" data-id="ai-novabio-mon" data-hrs="1.5" data-type="action" data-due="2026-03-30">
+        <div class="card-proj">NovaBio · Action item</div>
+        <div class="card-title">Section 4.3 final sign-off</div>
+        <div class="card-footer"><span class="pill p-amber">Due today</span><span class="pill p-hrs">1.5h</span></div>
+      </div>
+      <div class="drop-zone" id="dz-mon">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="col-hdr">
+      <div class="col-day">Tue 4/1</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:75%;background:#185FA5"></div></div>
+      <div class="cap-lbl">6.0h / 8h avail</div>
+    </div>
+    <div class="col-body" id="col-tue">
+      <div class="card meeting" draggable="true" data-id="mtg-standup-tue" data-hrs="0.5" data-type="meeting">
+        <div class="card-proj">Meeting</div>
+        <div class="card-title">Team standup</div>
+        <div class="card-footer"><span class="pill p-mtg">9:00am</span><span class="pill p-hrs">0.5h</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="schematic-tue" data-hrs="5" data-type="task" data-task="schematic" data-due="2026-04-03">
+        <div class="card-proj">Flexscope</div>
+        <div class="card-title">PCB schematic — Tue slice</div>
+        <div class="card-footer"><span class="pill p-task">Task · 5 of 25h</span><span class="pill p-hrs">25h total</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="candidate-tue" data-hrs="1" data-type="task" data-due="2026-04-04">
+        <div class="card-proj">Internal · Interview</div>
+        <div class="card-title">Candidate review — Sarah K.</div>
+        <div class="card-footer"><span class="pill p-task">Task</span><span class="pill p-hrs">1.0h</span></div>
+      </div>
+      <div class="drop-zone" id="dz-tue">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="col-hdr">
+      <div class="col-day">Wed 4/2</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:63%;background:#185FA5"></div></div>
+      <div class="cap-lbl">5.0h / 8h avail</div>
+    </div>
+    <div class="col-body" id="col-wed">
+      <div class="card meeting" draggable="true" data-id="mtg-standup-wed" data-hrs="0.5" data-type="meeting">
+        <div class="card-proj">Meeting</div>
+        <div class="card-title">Team standup</div>
+        <div class="card-footer"><span class="pill p-mtg">9:00am</span><span class="pill p-hrs">0.5h</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="schematic-wed" data-hrs="5" data-type="task" data-task="schematic" data-due="2026-04-03">
+        <div class="card-proj">Flexscope</div>
+        <div class="card-title">PCB schematic — Wed slice</div>
+        <div class="card-footer"><span class="pill p-task">Task · 5 of 25h</span><span class="pill p-hrs">25h total</span></div>
+      </div>
+      <div class="drop-zone" id="dz-wed">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="col-hdr">
+      <div class="col-day">Thu 4/3</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:100%;background:#A32D2D"></div></div>
+      <div class="cap-lbl over">9.5h / 6h avail — over</div>
+    </div>
+    <div class="col-body" id="col-thu">
+      <div class="card meeting" draggable="true" data-id="mtg-allhands" data-hrs="2" data-type="meeting">
+        <div class="card-proj">Meeting · All hands</div>
+        <div class="card-title">Q2 all-hands review</div>
+        <div class="card-footer"><span class="pill p-mtg">9:00am · 2h</span><span class="pill p-hrs">6 attendees</span></div>
+      </div>
+      <div class="card meeting" draggable="true" data-id="mtg-standup-thu" data-hrs="0.5" data-type="meeting">
+        <div class="card-proj">Meeting</div>
+        <div class="card-title">Team standup</div>
+        <div class="card-footer"><span class="pill p-mtg">moved · post all-hands</span><span class="pill p-hrs">0.5h</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="schematic-thu" data-hrs="5" data-type="task" data-task="schematic" data-due="2026-04-03">
+        <div class="card-proj">Flexscope</div>
+        <div class="card-title">PCB schematic — Thu slice</div>
+        <div class="card-footer"><span class="pill p-task">Task · 5 of 25h</span><span class="pill p-hrs">25h total</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="qms-thu" data-hrs="2" data-type="task" data-due="2026-04-04">
+        <div class="card-proj">NovaBio</div>
+        <div class="card-title">QMS sections 4.4–4.6</div>
+        <div class="card-footer"><span class="pill p-task">Task</span><span class="pill p-hrs">2.0h</span></div>
+      </div>
+      <div class="drop-zone" id="dz-thu">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="col-hdr">
+      <div class="col-day">Fri 4/4</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:63%;background:#185FA5"></div></div>
+      <div class="cap-lbl">5.0h / 8h avail</div>
+    </div>
+    <div class="col-body" id="col-fri">
+      <div class="card meeting" draggable="true" data-id="mtg-standup-fri" data-hrs="0.5" data-type="meeting">
+        <div class="card-proj">Meeting</div>
+        <div class="card-title">Team standup</div>
+        <div class="card-footer"><span class="pill p-mtg">9:00am</span><span class="pill p-hrs">0.5h</span></div>
+      </div>
+      <div class="card" draggable="true" data-id="schematic-fri" data-hrs="5" data-type="task" data-task="schematic" data-due="2026-04-03">
+        <div class="card-proj">Flexscope</div>
+        <div class="card-title">PCB schematic — Fri slice</div>
+        <div class="card-footer"><span class="pill p-task">Task · 5 of 25h</span><span class="pill p-hrs">25h total</span></div>
+      </div>
+      <div class="drop-zone" id="dz-fri">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col weekend">
+    <div class="col-hdr">
+      <div class="col-day">Sat 4/5</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:0%;background:#185FA5"></div></div>
+      <div class="cap-lbl">0h planned</div>
+    </div>
+    <div class="col-body" id="col-sat">
+      <div class="drop-zone" id="dz-sat">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col weekend">
+    <div class="col-hdr">
+      <div class="col-day">Sun 4/6</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:0%;background:#185FA5"></div></div>
+      <div class="cap-lbl">0h planned</div>
+    </div>
+    <div class="col-body" id="col-sun">
+      <div class="drop-zone" id="dz-sun">+ drop here</div>
+    </div>
+  </div>
+
+  <div class="col next-week">
+    <div class="col-hdr">
+      <div class="col-day">Next week</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:0%;background:#888780"></div></div>
+      <div class="cap-lbl">Backlog bucket</div>
+    </div>
+    <div class="col-body" id="col-next">
+      <div class="drop-zone" id="dz-next">+ drop here</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:#E6F1FB;border:0.5px solid #185FA5"></div>Task / action item</div>
+  <div class="leg"><div class="leg-dot" style="background:#B5D4F4;border:0.5px solid #185FA5"></div>Meeting (moveable)</div>
+  <div class="leg"><div class="leg-dot" style="background:#FAEEDA;border:1.5px dashed #BA7517"></div>Pending PM approval</div>
+  <div class="leg"><div class="leg-dot" style="background:#EAF3DE;border:1.5px solid #3B6D11"></div>Approved · locked</div>
+  <div class="leg"><div class="leg-dot" style="background:#FCEBEB;border:1.5px solid #A32D2D"></div>Overdue / over capacity</div>
+</div>
+
+<div class="negotiation-toast" id="neg-toast">
+  <div class="nt-title" id="nt-title">Approval required — moving past due date</div>
+  <div class="nt-body" id="nt-body">PCB schematic — Fri slice moved to next week. Due date is Apr 3. This requires PM approval before the slip is confirmed. A CoC event will be logged.</div>
+  <div class="nt-btns">
+    <button class="nt-btn nt-btn-c" onclick="dismissNeg()">Move it back</button>
+    <button class="nt-btn nt-btn-b" onclick="requestNeg()">Ask Compass to find a slot</button>
+    <button class="nt-btn nt-btn-a" onclick="submitNeg()">Submit for PM approval</button>
+  </div>
+</div>
+
+<div class="del-toast" id="del-toast">
+  <div class="del-title">Removing hours from PCB schematic — reason required</div>
+  <div style="font-size:11px;color:var(--color-text-danger);margin-bottom:7px;line-height:1.5">Deleting this slice reduces your committed hours below the task LOE. This will be logged in the Chain of Custody and your PM will be notified.</div>
+  <input class="del-inp" id="del-reason" placeholder="Why are you reducing committed hours? (required)" />
+  <div class="del-btns">
+    <button class="del-btn-cancel" onclick="cancelDel()">Cancel — keep the slice</button>
+    <button class="del-btn-confirm" onclick="confirmDel()">Confirm deletion + notify PM</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var dragCard=null, dragSrc=null;
+var DUE_DATES={'schematic-mon':'2026-04-03','schematic-tue':'2026-04-03','schematic-wed':'2026-04-03','schematic-thu':'2026-04-03','schematic-fri':'2026-04-03'};
+var LATE_COLS=['col-sat','col-sun','col-next'];
+var ALL_COLS=['col-mon','col-tue','col-wed','col-thu','col-fri','col-sat','col-sun','col-next'];
+
+document.querySelectorAll('[draggable]').forEach(function(c){
+  c.addEventListener('dragstart',function(e){
+    dragCard=c; dragSrc=c.parentElement.id;
+    setTimeout(function(){c.style.opacity='0.4';},0);
+  });
+  c.addEventListener('dragend',function(){
+    c.style.opacity='1';
+    document.querySelectorAll('.drop-zone').forEach(function(d){d.classList.remove('active');});
+  });
+});
+
+document.querySelectorAll('.col-body').forEach(function(col){
+  col.addEventListener('dragover',function(e){
+    e.preventDefault();
+    var dz=col.querySelector('.drop-zone');
+    if(dz) dz.classList.add('active');
+  });
+  col.addEventListener('dragleave',function(){
+    var dz=col.querySelector('.drop-zone');
+    if(dz) dz.classList.remove('active');
+  });
+  col.addEventListener('drop',function(e){
+    e.preventDefault();
+    if(!dragCard) return;
+    var dz=col.querySelector('.drop-zone');
+    if(dz) dz.classList.remove('active');
+    var destId=col.id;
+    var cardId=dragCard.dataset.id;
+    var due=DUE_DATES[cardId]||dragCard.dataset.due||null;
+    var isLate=LATE_COLS.includes(destId);
+    var isPastDue=false;
+    if(due){
+      var dueMap={'col-mon':'2026-03-30','col-tue':'2026-04-01','col-wed':'2026-04-02','col-thu':'2026-04-03','col-fri':'2026-04-04','col-sat':'2026-04-05','col-sun':'2026-04-06','col-next':'2026-04-07'};
+      var destDate=dueMap[destId];
+      if(destDate&&destDate>due) isPastDue=true;
+    }
+    col.insertBefore(dragCard,dz||null);
+    if(isPastDue||isLate){
+      dragCard.className='card amber';
+      document.getElementById('neg-toast').style.display='block';
+      document.getElementById('nt-body').textContent=(dragCard.querySelector('.card-title').textContent)+' moved '+(isLate?'to next week':'past its due date')+'. Due date is '+(due||'unknown')+'. This requires PM approval. A CoC event will be logged.';
+    }
+    dragCard=null;
+  });
+});
+
+document.querySelectorAll('.card').forEach(function(c){
+  var delBtn=document.createElement('button');
+  delBtn.textContent='×';
+  delBtn.style.cssText='position:absolute;top:4px;right:4px;background:none;border:none;font-size:13px;color:var(--color-text-tertiary);cursor:pointer;padding:0;line-height:1;display:none';
+  c.style.position='relative';
+  c.appendChild(delBtn);
+  c.addEventListener('mouseenter',function(){if(c.dataset.type!=='meeting') delBtn.style.display='block';});
+  c.addEventListener('mouseleave',function(){delBtn.style.display='none';});
+  delBtn.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(c.dataset.task){
+      document.getElementById('del-toast').style.display='block';
+      document.getElementById('del-reason').value='';
+      document.getElementById('del-reason').focus();
+    } else {
+      c.remove();
+    }
+  });
+});
+
+function dismissNeg(){document.getElementById('neg-toast').style.display='none';}
+function requestNeg(){document.getElementById('neg-toast').style.display='none';alert('Compass will find the next available slot that works for all required attendees.');}
+function submitNeg(){document.getElementById('neg-toast').style.display='none';var c=document.querySelector('.card.amber');if(c){c.querySelector('.card-footer').innerHTML+='<span class="pill p-amber">Pending PM approval</span>';};}
+function cancelDel(){document.getElementById('del-toast').style.display='none';}
+function confirmDel(){
+  var r=document.getElementById('del-reason').value.trim();
+  if(!r){document.getElementById('del-reason').style.borderColor='var(--color-border-danger)';return;}
+  document.getElementById('del-toast').style.display='none';
+  alert('CoC event logged. PM notified. Reason: "'+r+'"');
+}
+</script>
