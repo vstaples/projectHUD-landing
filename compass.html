@@ -832,6 +832,7 @@
   .role-tab span.tab-label { display: none; }
 }
 </style>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
 
@@ -877,13 +878,13 @@
     <div class="nav-sep"></div>
 
     <!-- Role tabs -->
-    <button class="role-tab" id="tab-user"       onclick="switchView('user')"       title="User">
+    <button class="role-tab" id="tab-user"       onclick="switchView('user')"       title="My Work">
       <div class="tab-dot"></div>
-      <span class="tab-label">User</span>
+      <span class="tab-label">My Work</span>
     </button>
     <button class="role-tab" id="tab-pm"         onclick="switchView('pm')"         title="Project Manager">
       <div class="tab-dot"></div>
-      <span class="tab-label">Project Manager</span>
+      <span class="tab-label">PM View</span>
     </button>
     <button class="role-tab" id="tab-management" onclick="switchView('management')" title="Management">
       <div class="tab-dot"></div>
@@ -1222,6 +1223,13 @@ function avatarHtml(name, size = 24, cls = 'av-cyan') {
 
 window._myWorkLoaded = false;
 
+// ── My Time — loaded dynamically from my-time.html ──────────
+// Injected into #mt-root inside the My Time suite tab.
+// Entry point: window._mtLoadView(); refresh: window._mtRefresh()
+// Called by my-work.html when the "My Time" suite tab is clicked.
+
+window._myTimeLoaded = false;
+
 async function loadUserView() {
   // If my-work.html scripts already executed, just refresh the data
   if (window._myWorkLoaded) {
@@ -1269,10 +1277,63 @@ async function loadUserView() {
   }
 }
 
+// ── My Time loader ────────────────────────────────────────
+// Called by my-work.html's "My Time" tab click handler.
+// Fetches /my-time.html, injects into #mt-root, executes script,
+// calls window._mtLoadView(). Subsequent calls trigger _mtRefresh().
+
+async function loadMyTimeView() {
+  if (window._myTimeLoaded) {
+    window._mtRefresh && window._mtRefresh();
+    return;
+  }
+
+  // #mt-root is rendered by my-work.html when the My Time tab is first shown
+  const container = document.getElementById('mt-root');
+  if (!container) {
+    console.error('[Compass] #mt-root not found — My Time tab not yet rendered by my-work.html');
+    return;
+  }
+
+  try {
+    const resp = await fetch('/my-time.html');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(html, 'text/html');
+
+    // Inject non-script nodes into container
+    Array.from(doc.body.childNodes).forEach(node => {
+      if (node.nodeName !== 'SCRIPT') {
+        container.appendChild(document.importNode(node, true));
+      }
+    });
+
+    // Execute scripts in declaration order
+    for (const s of doc.querySelectorAll('script')) {
+      const el = document.createElement('script');
+      el.textContent = s.textContent;
+      document.head.appendChild(el);
+    }
+
+    window._myTimeLoaded = true;
+
+    if (window._mtLoadView) {
+      await window._mtLoadView();
+    } else {
+      console.error('[Compass] _mtLoadView not exported by my-time.html');
+    }
+  } catch (err) {
+    console.error('[Compass] Failed to load my-time.html:', err);
+    compassToast('Failed to load My Time — check console', 4000);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBaseData();
   // Restore last view or default to PM
-  const saved = sessionStorage.getItem('compass-view') || 'user';
+  const saved = sessionStorage.getItem('compass-view') || 'pm';
   switchView(saved);
 });
 
