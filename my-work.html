@@ -5077,6 +5077,12 @@ window.loadMyCalView = async function() {
     const html = await resp.text();
     const parser = new DOMParser();
     const doc    = parser.parseFromString(html, 'text/html');
+    // Inject <style> blocks from doc.head — DOMParser puts them there, not in body
+    for (const st of doc.querySelectorAll('style')) {
+      const el = document.createElement('style');
+      el.textContent = st.textContent;
+      document.head.appendChild(el);
+    }
     Array.from(doc.body.childNodes).forEach(node => {
       if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
     });
