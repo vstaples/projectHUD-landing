@@ -1030,7 +1030,8 @@ window._mwLoadUserView = async function() {
     <!-- Tab: MY CALENDAR -->
     <div class="utc" id="utc-calendar">
       <div id="user-calendar-content">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <!-- Row 1: month label + right controls -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text0)" id="cal-tab-month-label">March 2026</div>
           <div style="display:flex;gap:5px;align-items:center">
             <button id="cal-tab-prev" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249;</button>
@@ -1039,12 +1040,14 @@ window._mwLoadUserView = async function() {
             <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px"></div>
             <button id="cal-tab-add-block" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer">+ Block time</button>
             <button id="myr-pto-quick" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer">+ PTO</button>
-            <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px"></div>
-            <!-- View toggle -->
-            <div style="display:flex;border:1px solid rgba(255,255,255,.15);overflow:hidden">
-              <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:rgba(0,210,255,.12);border:none;color:#00D2FF;cursor:pointer;letter-spacing:.06em">Grid</button>
-              <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:none;color:rgba(255,255,255,.35);cursor:pointer;letter-spacing:.06em">Kanban</button>
-            </div>
+          </div>
+        </div>
+        <!-- Row 2: centered Grid | Kanban pill -->
+        <div style="display:flex;justify-content:center;margin-bottom:10px">
+          <div style="display:inline-flex;border:1px solid rgba(0,210,255,.25);overflow:hidden;border-radius:3px">
+            <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:rgba(0,210,255,.15);border:none;color:#00D2FF;cursor:pointer;text-transform:uppercase;transition:all .12s">Grid</button>
+            <div style="width:1px;background:rgba(0,210,255,.2)"></div>
+            <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:none;border:none;color:rgba(255,255,255,.3);cursor:pointer;text-transform:uppercase;transition:all .12s">Kanban</button>
           </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -1070,8 +1073,8 @@ window._mwLoadUserView = async function() {
             <div id="kb-week-lbl" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);padding:3px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">—</div>
             <button id="kb-next-btn" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Next week &#8250;</button>
           </div>
-          <!-- Board -->
-          <div id="kb-board" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 130px;gap:6px;align-items:start;overflow-x:auto"></div>
+          <!-- Board: Last week | Mon-Sun | Next week -->
+          <div id="kb-board" style="display:grid;grid-template-columns:130px repeat(7,minmax(0,1fr)) 130px;gap:6px;align-items:start;overflow-x:auto"></div>
           <!-- Legend -->
           <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0 4px;margin-top:6px">
             <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(0,210,255,.3);background:rgba(0,210,255,.06)"></div>Task / action</div>
@@ -5872,15 +5875,15 @@ window.calSwitchView = function(view) {
   if (view === 'kanban') {
     gridEl.style.display   = 'none';
     kanbanEl.style.display = 'block';
-    if (gridBtn) { gridBtn.style.background='none'; gridBtn.style.color='rgba(255,255,255,.35)'; }
-    if (kbBtn)   { kbBtn.style.background='rgba(0,210,255,.12)'; kbBtn.style.color='#00D2FF'; }
+    if (gridBtn)  { gridBtn.style.background='none';                gridBtn.style.color='rgba(255,255,255,.3)'; }
+    if (kbBtn)    { kbBtn.style.background='rgba(0,210,255,.15)';   kbBtn.style.color='#00D2FF'; }
     if (!_kbLoaded) { _kbLoaded = true; _kbWireEvents(); }
     _kbRender();
   } else {
     gridEl.style.display   = 'block';
     kanbanEl.style.display = 'none';
-    if (gridBtn) { gridBtn.style.background='rgba(0,210,255,.12)'; gridBtn.style.color='#00D2FF'; }
-    if (kbBtn)   { kbBtn.style.background='none'; kbBtn.style.color='rgba(255,255,255,.35)'; }
+    if (gridBtn)  { gridBtn.style.background='rgba(0,210,255,.15)'; gridBtn.style.color='#00D2FF'; }
+    if (kbBtn)    { kbBtn.style.background='none';                  kbBtn.style.color='rgba(255,255,255,.3)'; }
   }
 };
 
@@ -5902,6 +5905,9 @@ function _kbBuildColDates(mon) {
   const out = {};
   ids.forEach((id, i) => { out[id] = _kbIsoLocal(new Date(mon.getTime() + i * 86400000)); });
   out['next'] = _kbIsoLocal(new Date(mon.getTime() + 7 * 86400000));
+  // Last week = previous Monday through Sunday
+  const prevMon = new Date(mon.getTime() - 7 * 86400000);
+  out['last'] = _kbIsoLocal(prevMon); // anchor date for last-week bucket
   return out;
 }
 
@@ -5945,30 +5951,49 @@ function _kbRender() {
   const today   = _kbIsoLocal(new Date());
   const resource = window._mtResource || window._myResource || null;
   const uid     = resource ? resource.user_id : null;
-  const allTasks = window._mtTasks || [];
-  const calEvs  = window._mtCalEvents || [];
 
-  const openTasks = allTasks.filter(t =>
-    t.assigned_to === uid &&
-    t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved'
-  );
+  // Use _wiItems (always populated by my-work.html) — fall back to _mtTasks
+  const wiItems  = typeof _wiItems !== 'undefined' ? _wiItems : (window._mtTasks || []);
+  const calEvs   = window._mtCalEvents || [];
 
-  const colIds = ['mon','tue','wed','thu','fri','sat','sun','next'];
+  // Filter open tasks/actions assigned to this user
+  const openItems = wiItems.filter(t => {
+    if (!t || !t.id) return false;
+    const notDone = t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved';
+    const mine    = t.assigned_to === uid || t.owner_resource_id === resource?.id || !uid;
+    return notDone && mine;
+  });
+
+  // Col order: last | mon tue wed thu fri sat sun | next
+  const colIds = ['last','mon','tue','wed','thu','fri','sat','sun','next'];
   const taskBuckets = {}, calBuckets = {};
   colIds.forEach(id => { taskBuckets[id] = []; calBuckets[id] = []; });
 
-  openTasks.forEach(t => {
-    if (!t.due_date) { taskBuckets['next'].push(t); return; }
-    const due = t.due_date.slice(0,10);
+  const prevMonDate = _kbColDates['last'];
+  const prevSunDate = _kbIsoLocal(new Date(mon.getTime() - 86400000)); // Sun before this Mon
+
+  openItems.forEach(t => {
+    const due = t.due_date ? t.due_date.slice(0,10) : null;
+    if (!due) { taskBuckets['next'].push(t); return; }
     let placed = false;
-    colIds.slice(0,7).forEach(id => { if (!placed && _kbColDates[id] === due) { taskBuckets[id].push(t); placed = true; } });
-    if (!placed) { if (due > _kbColDates['sun']) taskBuckets['next'].push(t); else taskBuckets['mon'].push(t); }
+    // Check Mon–Sun of current week
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(id => {
+      if (!placed && _kbColDates[id] === due) { taskBuckets[id].push(t); placed = true; }
+    });
+    if (!placed) {
+      if (due > _kbColDates['sun'])      { taskBuckets['next'].push(t); }   // future
+      else if (due >= prevMonDate)       { taskBuckets['last'].push(t); }   // last week
+      else                               { taskBuckets['last'].push(t); }   // older — still last week bucket
+    }
   });
 
   calEvs.forEach(ev => {
     const evDate = ev.event_date ? ev.event_date.slice(0,10) : null;
     if (!evDate) return;
-    colIds.forEach(id => { if (_kbColDates[id] === evDate) calBuckets[id].push(ev); });
+    colIds.forEach(id => {
+      if (id === 'last' || id === 'next') return; // don't bucket cal events into overflow cols
+      if (_kbColDates[id] === evDate) calBuckets[id].push(ev);
+    });
   });
 
   let totalItems = 0, totalMtgHrs = 0, totalTaskHrs = 0, pendingCount = 0;
@@ -5979,6 +6004,7 @@ function _kbRender() {
     const isPast   = colDate < today && colId !== 'next';
     const isWknd   = colId === 'sat' || colId === 'sun';
     const isNext   = colId === 'next';
+    const isLast   = colId === 'last';
     let cardsHtml  = '';
 
     calBuckets[colId].forEach(ev => {
@@ -5994,7 +6020,7 @@ function _kbRender() {
     });
 
     taskBuckets[colId].forEach(t => {
-      const h = parseFloat(t.budget_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
+      const h = parseFloat(t.budget_hours || t.loe_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
       const neg = t.negotiation_state ? (typeof t.negotiation_state === 'string' ? JSON.parse(t.negotiation_state) : t.negotiation_state) : null;
       const negState = neg ? neg.state : null;
       const projName = _kbGetProjectName(t.project_id);
@@ -6005,15 +6031,15 @@ function _kbRender() {
       if (negState === 'pending') cardCls += ' kb-pending';
       else if (negState === 'agreed') cardCls += ' kb-approved';
       else if (isOverdue) cardCls += ' kb-overdue';
-      let pills = '<span class="kb-pill kb-pill-task">' + _esc(t.status || 'task') + '</span><span class="kb-pill kb-pill-hrs">' + h + 'h</span>';
+      let pills = '<span class="kb-pill kb-pill-task">' + _esc(t.type || t.status || 'task') + '</span><span class="kb-pill kb-pill-hrs">' + h + 'h</span>';
       if (negState === 'pending')  pills += '<span class="kb-pill kb-pill-warn">Pending PM</span>';
       if (negState === 'agreed')   pills += '<span class="kb-pill kb-pill-green">Approved</span>';
       if (isOverdue && negState !== 'pending') pills += '<span class="kb-pill kb-pill-red">Overdue</span>';
       if (t.due_date) pills += '<span class="kb-pill kb-pill-hrs">Due ' + t.due_date.slice(5) + '</span>';
       cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due_date||'') + '" data-colid="' + colId + '">' +
         '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
-        '<div class="kb-card-proj">' + _esc(projName || 'Project') + '</div>' +
-        '<div class="kb-card-title">' + _esc(t.name) + '</div>' +
+        '<div class="kb-card-proj">' + _esc(projName || t.project_name || 'Project') + '</div>' +
+        '<div class="kb-card-title">' + _esc(t.name || t.title || 'Item') + '</div>' +
         '<div class="kb-card-foot">' + pills + '</div>' +
         '</div>';
     });
@@ -6021,18 +6047,20 @@ function _kbRender() {
     cardsHtml += '<div class="kb-dz" data-colid="' + colId + '">+ drop here</div>';
 
     const mtgH  = calBuckets[colId].reduce((s,ev) => s + parseFloat(ev.duration_hours||0), 0);
-    const taskH = taskBuckets[colId].reduce((s,t) => s + parseFloat(t.budget_hours||(t.effort_days?t.effort_days*8:0)||2), 0);
+    const taskH = taskBuckets[colId].reduce((s,t) => s + parseFloat(t.budget_hours||t.loe_hours||(t.effort_days?t.effort_days*8:0)||2), 0);
     const avail = Math.max(0, 8 - mtgH);
     const pct   = avail > 0 ? Math.min(Math.round((taskH / avail) * 100), 100) : (taskH > 0 ? 100 : 0);
     const over  = taskH > avail;
     const capColor = over ? '#A32D2D' : pct > 85 ? '#BA7517' : '#185FA5';
     const capCls   = over ? ' over' : pct > 85 ? ' warn' : '';
-    const capText  = isNext ? 'Backlog' : over ? taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h — over' : taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h avail';
+    const capText  = isNext || isLast ? (taskBuckets[colId].length + ' item' + (taskBuckets[colId].length!==1?'s':'')) : over ? taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h — over' : taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h avail';
 
-    return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
+    const colLabel = isLast ? 'Last week' : isNext ? 'Next week' : _kbFmtColDay(colId, colDate);
+
+    return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + (isLast?' kb-next':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
       '<div class="kb-col-hdr">' +
-      '<div class="kb-col-day' + (isTdy?' kb-today':isPast?' kb-past':'') + '">' + _kbFmtColDay(colId, colDate) + '</div>' +
-      (!isNext ? '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div><div class="kb-cap-lbl' + capCls + '">' + capText + '</div>' : '<div class="kb-cap-lbl" style="margin-top:5px">Backlog</div>') +
+      '<div class="kb-col-day' + (isTdy?' kb-today':isPast?' kb-past':'') + '">' + colLabel + '</div>' +
+      ((!isNext && !isLast) ? '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div><div class="kb-cap-lbl' + capCls + '">' + capText + '</div>' : '<div class="kb-cap-lbl" style="margin-top:5px">' + capText + '</div>') +
       '</div>' +
       '<div class="kb-col-body" id="kb-body-' + colId + '">' + cardsHtml + '</div>' +
       '</div>';
@@ -6140,7 +6168,7 @@ function _kbDragEnd() {
 }
 
 function _kbUpdateCapBars() {
-  ['mon','tue','wed','thu','fri','sat','sun','next'].forEach(colId => {
+  ['last','mon','tue','wed','thu','fri','sat','sun','next'].forEach(colId => {
     const body = document.getElementById('kb-body-' + colId);
     const col  = document.getElementById('kb-col-' + colId);
     if (!body || !col) return;
