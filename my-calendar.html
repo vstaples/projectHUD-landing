@@ -4,6 +4,17 @@
 <!-- Depends on shared globals bridged by loadMyCalView():          -->
 <!--   window._calResource, window._calItems, window._calCalEvents  -->
 
+<style>
+/* ── Kanban pill overrides — explicit !important beats hud.css ── */
+.kb-pill           { font-family:var(--font-mono,monospace)!important; font-size:10px!important; padding:1px 6px!important; white-space:nowrap!important; border-radius:2px!important; display:inline-block!important; }
+.kb-pill-task      { background:linear-gradient(180deg,rgba(0,210,255,.28) 0%,rgba(0,210,255,.13) 100%)!important; color:var(--compass-cyan,#00D2FF)!important; border:0.5px solid rgba(0,210,255,.4)!important; }
+.kb-pill-mtg       { background:linear-gradient(180deg,rgba(139,92,246,.32) 0%,rgba(139,92,246,.16) 100%)!important; color:#c4b5fd!important; border:0.5px solid rgba(139,92,246,.45)!important; }
+.kb-pill-hrs       { background:rgba(255,255,255,.06)!important; color:var(--text2,#90B8D8)!important; border:0.5px solid rgba(255,255,255,.12)!important; }
+.kb-pill-warn      { background:linear-gradient(180deg,#f5c842 0%,#c99a0a 100%)!important; color:#fff!important; border:0.5px solid #a07d08!important; box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)!important; text-shadow:0 1px 2px rgba(0,0,0,.5)!important; font-weight:600!important; }
+.kb-pill-red       { background:linear-gradient(180deg,#e24b4a 0%,#a83232 100%)!important; color:#fff!important; border:0.5px solid #8b2020!important; box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2)!important; text-shadow:0 1px 2px rgba(0,0,0,.5)!important; font-weight:600!important; }
+.kb-pill-green     { background:linear-gradient(180deg,#1d9e75 0%,#126a4e 100%)!important; color:#fff!important; border:0.5px solid #0e5540!important; box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15)!important; text-shadow:0 1px 2px rgba(0,0,0,.5)!important; font-weight:600!important; }
+</style>
+
 <div id="cal-root">
   <div id="user-calendar-content">
     <!-- Row 1: month label + right controls -->
@@ -307,13 +318,7 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-card.kb-approved .kb-card-title{color:var(--compass-green,#1D9E75)}',
     '.kb-card.kb-meeting .kb-card-title{color:rgba(139,92,246,.95)}',
     '.kb-card-foot{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px}',
-    '.kb-pill{font-family:var(--font-mono);font-size:10px;padding:1px 6px;white-space:nowrap;border-radius:2px}',
-    '.kb-pill-task{background:linear-gradient(180deg,rgba(0,210,255,.25) 0%,rgba(0,210,255,.12) 100%);color:var(--compass-cyan,#00D2FF);border:0.5px solid rgba(0,210,255,.4);text-shadow:0 1px 2px rgba(0,0,0,.4)}',
-    '.kb-pill-mtg{background:linear-gradient(180deg,rgba(139,92,246,.3) 0%,rgba(139,92,246,.15) 100%);color:#c4b5fd;border:0.5px solid rgba(139,92,246,.45);text-shadow:0 1px 2px rgba(0,0,0,.4)}',
-    '.kb-pill-hrs{background:rgba(255,255,255,.06);color:var(--text2);border:0.5px solid rgba(255,255,255,.12)}',
-    '.kb-pill-warn{background:linear-gradient(180deg,#f5c842 0%,#c99a0a 100%);color:#fff;border:0.5px solid #a07d08;box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25);text-shadow:0 1px 2px rgba(0,0,0,.5);font-weight:600}',
-    '.kb-pill-red{background:linear-gradient(180deg,#e24b4a 0%,#a83232 100%);color:#fff;border:0.5px solid #8b2020;box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2);text-shadow:0 1px 2px rgba(0,0,0,.5);font-weight:600}',
-    '.kb-pill-green{background:linear-gradient(180deg,#1d9e75 0%,#126a4e 100%);color:#fff;border:0.5px solid #0e5540;box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15);text-shadow:0 1px 2px rgba(0,0,0,.5);font-weight:600}',
+    '.kb-pill{font-family:var(--font-mono);font-size:10px;padding:1px 6px;white-space:nowrap;border-radius:2px;display:inline-block}',
     '.kb-del-btn{position:absolute;top:4px;right:5px;background:none;border:none;font-size:14px;color:var(--text3);cursor:pointer;padding:0;line-height:1;display:none}',
     '.kb-del-btn:hover{color:var(--compass-red,#E24B4A)}',
     '.kb-card:hover .kb-del-btn{display:block}',
