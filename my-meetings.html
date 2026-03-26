@@ -431,7 +431,7 @@ function _mtgSelectMeeting(id) {
   frame.src = '/meeting-minutes.html?meeting_id=' + encodeURIComponent(id);
 }
 
-// ── Searchs ────────────────────────────────────────────────────────────────
+// ── Search ────────────────────────────────────────────────────────────────
 function _mtgSearch(q) {
   const query = q.toLowerCase().trim();
   document.querySelectorAll('.mtg-node[data-mtgid]').forEach(el => {
