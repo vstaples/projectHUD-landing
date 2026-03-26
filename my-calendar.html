@@ -695,6 +695,8 @@ function _kbRender() {
     const over  = taskH > avail;
     const capColor = over ? '#A32D2D' : pct > 85 ? '#BA7517' : '#185FA5';
 
+    const colLabel = isLast ? 'Last week' : isNext ? 'Next week' : _kbFmtColDay(colId, colDate);
+
     // Per-day 8-segment bar: each segment = 1h. Cyan=billable, purple=non-bill, white=unallocated
     const dayTeEntries = (window._calTimeEntries || []).filter(e => e.date && e.date.slice(0,10) === colDate);
     const dayBillH    = Math.min(dayTeEntries.filter(e => e.is_billable).reduce((s,e) => s+(parseFloat(e.hours)||0), 0), 8);
