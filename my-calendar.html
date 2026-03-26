@@ -1,0 +1,869 @@
+<!-- my-calendar.html — Compass My Calendar module -->
+<!-- Exports: window._calLoadView, window._calRefresh            -->
+<!-- Loaded dynamically by my-work.html when My Calendar tab clicked -->
+<!-- Depends on shared globals bridged by loadMyCalView():          -->
+<!--   window._calResource, window._calItems, window._calCalEvents  -->
+
+<div id="cal-root">
+  <div id="user-calendar-content">
+    <!-- Row 1: month label + right controls -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text0)" id="cal-tab-month-label">March 2026</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <button id="cal-tab-prev" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249;</button>
+        <button id="cal-tab-today" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);background:none;cursor:pointer">Today</button>
+        <button id="cal-tab-next" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8250;</button>
+        <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px"></div>
+        <button id="cal-tab-add-block" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer">+ Block time</button>
+        <button id="myr-pto-quick" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer">+ PTO</button>
+      </div>
+    </div>
+    <!-- Row 2: centered Grid | Kanban pill -->
+    <div style="display:flex;justify-content:center;margin-bottom:10px">
+      <div style="display:inline-flex;border:1px solid rgba(0,210,255,.25);overflow:hidden;border-radius:3px">
+        <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:rgba(0,210,255,.15);border:none;color:#00D2FF;cursor:pointer;text-transform:uppercase;transition:all .12s">Grid</button>
+        <div style="width:1px;background:rgba(0,210,255,.2)"></div>
+        <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:none;border:none;color:rgba(255,255,255,.3);cursor:pointer;text-transform:uppercase;transition:all .12s">Kanban</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(139,92,246,.5)"></div>Meeting</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(0,210,255,.5)"></div>Focus block</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(239,159,39,.5)"></div>Task due</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(226,75,74,.5)"></div>PTO / out</div>
+    </div>
+    <div id="cal-grid-view">
+      <div style="overflow-x:auto;margin-bottom:10px">
+        <div id="cal-tab-grid" style="display:grid;grid-template-columns:52px repeat(7,1fr);min-width:480px"></div>
+      </div>
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);line-height:1.5">Click any hour block to add a focus block. PTO requests propagate to assignment constraints automatically on approval.</div>
+    </div>
+
+    <!-- Kanban view — hidden until toggled -->
+    <div id="cal-kanban-view" style="display:none">
+      <!-- KPI strip -->
+      <div id="kb-kpi-row" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px"></div>
+      <!-- Week nav -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button id="kb-prev-btn" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249; Prev week</button>
+        <div id="kb-week-lbl" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);padding:3px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">—</div>
+        <button id="kb-next-btn" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Next week &#8250;</button>
+      </div>
+      <!-- Board: Last week | Mon-Sun | Next week -->
+      <div id="kb-board" style="display:grid;grid-template-columns:130px repeat(7,minmax(0,1fr)) 130px;gap:6px;align-items:start;overflow-x:auto"></div>
+      <!-- Legend -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0 4px;margin-top:6px">
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(0,210,255,.3);background:rgba(0,210,255,.06)"></div>Task / action</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.1)"></div>Meeting</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px dashed rgba(239,159,39,.6);background:rgba(239,159,39,.08)"></div>Pending PM approval</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px solid rgba(29,158,117,.5);background:rgba(29,158,117,.08)"></div>Approved · locked</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px solid rgba(226,75,74,.5);background:rgba(226,75,74,.08)"></div>Overdue / over cap</div>
+      </div>
+      <!-- Negotiation panel (hidden) -->
+      <div id="kb-neg-panel" style="display:none;margin-top:10px;background:rgba(239,159,39,.07);border:1px solid rgba(239,159,39,.3);border-left:3px solid var(--compass-amber,#EF9F27);padding:12px 14px">
+        <div id="kb-neg-title" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--compass-amber,#EF9F27);margin-bottom:4px">Approval required — moving past due date</div>
+        <div id="kb-neg-body" style="font-family:var(--font-mono);font-size:11px;color:var(--text1);line-height:1.6;margin-bottom:10px">—</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <button id="kb-neg-btn-a" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.2);color:var(--text2);cursor:pointer;letter-spacing:.06em">↩ Move it back</button>
+          <button id="kb-neg-btn-b" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.06em">◈ Ask Compass to find a slot</button>
+          <button id="kb-neg-btn-c" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.4);color:var(--compass-amber,#EF9F27);cursor:pointer;letter-spacing:.06em">✓ Submit for PM approval</button>
+        </div>
+      </div>
+      <!-- Delete panel (hidden) -->
+      <div id="kb-del-panel" style="display:none;margin-top:8px;background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.3);border-left:3px solid var(--compass-red,#E24B4A);padding:12px 14px">
+        <div id="kb-del-title" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--compass-red,#E24B4A);margin-bottom:4px">Removing hours — reason required</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text1);line-height:1.5;margin-bottom:8px">Deleting this slice reduces committed hours below task LOE. This will be logged in Chain of Custody and your PM will be notified.</div>
+        <input id="kb-del-reason" placeholder="Why are you reducing committed hours? (required)" style="width:100%;font-family:var(--font-mono);font-size:11px;padding:5px 9px;background:var(--bg2);border:1px solid rgba(226,75,74,.4);color:var(--text0);margin-bottom:8px;outline:none" />
+        <div style="display:flex;gap:7px">
+          <button id="kb-del-cancel" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.2);color:var(--text2);cursor:pointer;letter-spacing:.06em">Cancel — keep the slice</button>
+          <button id="kb-del-confirm" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.4);color:var(--compass-red,#E24B4A);cursor:pointer;letter-spacing:.06em">Confirm deletion + notify PM</button>
+        </div>
+      </div>
+    </div><!-- /cal-kanban-view -->
+
+    <!-- Add-item modal (shared across all columns) -->
+    <div id="kb-add-modal">
+      <div class="kb-modal-box">
+        <div class="kb-modal-title">Add item to <span id="kb-modal-day-lbl">—</span></div>
+        <div class="kb-modal-field">
+          <div class="kb-modal-lbl">Title</div>
+          <input class="kb-modal-inp" id="kb-modal-title" placeholder="Item title…" />
+        </div>
+        <div class="kb-modal-field">
+          <div class="kb-modal-lbl">Type</div>
+          <select class="kb-modal-sel" id="kb-modal-type">
+            <option value="admin">Admin</option>
+            <option value="personal">Personal</option>
+            <option value="pto">PTO</option>
+            <option value="focus">Focus block</option>
+            <option value="task">Task</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="kb-modal-field">
+          <div class="kb-modal-lbl">Description (optional)</div>
+          <input class="kb-modal-inp" id="kb-modal-desc" placeholder="Brief description…" />
+        </div>
+        <div class="kb-modal-field">
+          <div class="kb-modal-lbl">Duration (hours)</div>
+          <input class="kb-modal-inp" id="kb-modal-dur" type="number" min="0.25" max="12" step="0.25" value="1" />
+        </div>
+        <div class="kb-modal-btns">
+          <button class="kb-modal-btn-cancel" id="kb-modal-cancel">Cancel</button>
+          <button class="kb-modal-btn-add" id="kb-modal-confirm">+ Add to day</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /cal-root -->
+
+<script>
+(function() {
+'use strict';
+
+/* ─── Globals available from my-work.html bridge ────────────────────── */
+// window._calResource  — _myResource equivalent
+// window._calItems     — _wiItems (open work items for this user)
+// window._calCalEvents — calendar_events for current week
+
+const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+
+/* ─── Local escape helper ────────────────────────────────────────────── */
+const _esc = s => (String(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* ─── Extracted calendar functions ──────────────────────────────────── */
+window.buildCalendarTab = function() {
+  const grid = document.getElementById('cal-tab-grid');
+  const lbl  = document.getElementById('cal-tab-month-label');
+  if (!grid) return;
+  const now   = new Date();
+  let year    = now.getFullYear();
+  let month   = now.getMonth();
+  window._calTabYear  = year;
+  window._calTabMonth = month;
+  _renderCalTab();
+
+  // Fetch calendar_events for current week → available to Kanban via window._mtCalEvents
+  (async () => {
+    try {
+      const resource = window._calResource || window._mtResource || window._myResource;
+      if (!resource || !window.API) return;
+      const day = now.getDay(), diff = day === 0 ? -6 : 1 - day;
+      const mon = new Date(now); mon.setDate(now.getDate() + diff); mon.setHours(0,0,0,0);
+      const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      const weekStart = isoLocal(mon);
+      const weekEnd   = isoLocal(new Date(mon.getTime() + 6*86400000));
+      const evs = await API.get(
+        'calendar_events?firm_id=eq.' + FIRM_ID + '&resource_id=eq.' + resource.id +
+        '&event_date=gte.' + weekStart + '&event_date=lte.' + weekEnd +
+        '&select=*&order=event_date.asc,start_time.asc'
+      ).catch(() => []);
+      window._mtCalEvents = Array.isArray(evs) ? evs : [];
+    } catch(e) { window._mtCalEvents = []; }
+  })();
+  document.getElementById('cal-tab-prev')?.addEventListener('click', () => {
+    window._calTabMonth--;
+    if (window._calTabMonth < 0) { window._calTabMonth = 11; window._calTabYear--; }
+    _renderCalTab();
+  });
+  document.getElementById('cal-tab-next')?.addEventListener('click', () => {
+    window._calTabMonth++;
+    if (window._calTabMonth > 11) { window._calTabMonth = 0; window._calTabYear++; }
+    _renderCalTab();
+  });
+  document.getElementById('cal-tab-today')?.addEventListener('click', () => {
+    const t = new Date();
+    window._calTabYear = t.getFullYear();
+    window._calTabMonth = t.getMonth();
+    _renderCalTab();
+  });
+  document.getElementById('cal-tab-add-block')?.addEventListener('click', () => {
+    compassToast('Time block feature coming in next session.');
+  });
+  document.getElementById('myr-pto-quick')?.addEventListener('click', () => {
+    if (window.myrOpenWorkflowForm) myrOpenWorkflowForm('pto-request');
+    else compassToast('PTO request — open My Requests tab to submit.', 2500);
+  });
+};
+
+function _renderCalTab() {
+  const grid = document.getElementById('cal-tab-grid');
+  const lbl  = document.getElementById('cal-tab-month-label');
+  if (!grid) return;
+  const year = window._calTabYear, month = window._calTabMonth;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames   = ['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  if (lbl) lbl.textContent = monthNames[month] + ' ' + year;
+  // Find start of week containing today's date, anchored to Mon
+  const now = new Date();
+  // Build week anchored to current Monday
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() + diffToMon);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    days.push(d);
+  }
+  grid.innerHTML = '';
+  // Header row
+  const cornerH = document.createElement('div');
+  cornerH.style.cssText = 'border-bottom:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06)';
+  grid.appendChild(cornerH);
+  days.forEach(d => {
+    const isToday = d.toDateString() === now.toDateString();
+    const dH = document.createElement('div');
+    dH.style.cssText = `padding:5px 0;font-family:var(--font-head);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;letter-spacing:.06em;color:${isToday?'#00D2FF':'rgba(255,255,255,.35)'}`;
+    dH.textContent = dayNames[d.getDay()===0?7:d.getDay()] + ' ' + d.getDate();
+    grid.appendChild(dH);
+  });
+  // Time rows 8–17
+  const HOURS = [8,9,10,11,12,13,14,15,16,17];
+  const sampleEvents = {
+    // keyed by "dayIndex-hour": {type, label}
+    '0-9':  {type:'meeting', label:'Design Review align'},
+    '0-10': {type:'focus',   label:'Focus \u2014 PCB docs'},
+    '0-14': {type:'meeting', label:'NovaBio 4.3'},
+    '1-10': {type:'meeting', label:'Weekly sync'},
+    '1-14': {type:'focus',   label:'Focus block'},
+    '2-9':  {type:'meeting', label:'Client call \u2014 TransAtlantic'},
+    '2-11': {type:'focus',   label:'Focus block'},
+    '2-15': {type:'task',    label:'Section 4.3 due'},
+  };
+  HOURS.forEach(h => {
+    const timeLbl = document.createElement('div');
+    timeLbl.style.cssText = 'font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:0 5px;text-align:right;line-height:26px;border-right:1px solid rgba(255,255,255,.06)';
+    timeLbl.textContent = (h<=12?h:h-12)+':00'+(h<12?' AM':h===12?' PM':' PM');
+    grid.appendChild(timeLbl);
+    days.forEach((d, di) => {
+      const isToday = d.toDateString() === now.toDateString();
+      const isWknd  = d.getDay() === 0 || d.getDay() === 6;
+      const cell = document.createElement('div');
+      cell.className = 'cal-tab-cell';
+      if (isToday) cell.style.borderLeft = '1px solid rgba(0,210,255,.15)';
+      cell.style.background = isToday?'rgba(0,210,255,.02)':isWknd?'rgba(255,255,255,.01)':'';
+      const ev = sampleEvents[di+'-'+h];
+      if (ev) {
+        const evEl = document.createElement('div');
+        evEl.className = 'cal-tab-event cal-tab-ce-'+ev.type;
+        evEl.textContent = ev.label;
+        cell.appendChild(evEl);
+      }
+      cell.addEventListener('click', () => compassToast('Time block feature coming in next session.'));
+      grid.appendChild(cell);
+    });
+  });
+}
+
+
+// ── Calendar view toggle ──────────────────────────────────
+
+let _kbWeekOffset   = 0;
+let _kbLoaded       = false;
+let _kbColDates     = {};
+let _kbDrag         = { card: null, srcColId: null, cardId: null, hrs: 0, type: '', due: null, taskId: null };
+let _kbNeg          = { active: false, cardEl: null, srcColId: null, destColId: null };
+let _kbDel          = { active: false, cardEl: null, cardId: null, taskId: null };
+let _kbAddTarget    = null; // colId receiving the add-item action
+
+// Kanban CSS — injected once on first toggle
+(function injectKbCss() {
+  if (document.getElementById('kb-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'kb-styles';
+  s.textContent = [
+    '.kb-col{background:var(--bg1);border:1px solid var(--border);overflow:hidden;min-height:300px;display:flex;flex-direction:column}',
+    '.kb-col.weekend{opacity:.6}',
+    '.kb-col.kb-next{background:var(--bg2);border-style:dashed}',
+    '.kb-col.kb-drag-over{border-color:var(--compass-cyan,#00D2FF)!important;background:rgba(0,210,255,.04)}',
+    '.kb-col-hdr{padding:7px 9px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}',
+    '.kb-col-day{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text0)}',
+    '.kb-col-day.kb-today{color:var(--compass-cyan,#00D2FF)}',
+    '.kb-col-day.kb-past{color:var(--text3)}',
+    '.kb-cap-bar{height:4px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,.06);margin-top:5px}',
+    '.kb-cap-fill{height:100%;border-radius:2px;transition:width .2s}',
+    '.kb-cap-lbl{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:3px}',
+    '.kb-cap-lbl.warn{color:var(--compass-amber,#EF9F27)}',
+    '.kb-cap-lbl.over{color:var(--compass-red,#E24B4A)}',
+    '.kb-col-body{padding:6px;display:flex;flex-direction:column;gap:4px;flex:1}',
+    '.kb-dz{border:1px dashed rgba(0,210,255,.18);padding:7px 6px;text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.05em;transition:all .12s}',
+    '.kb-dz.active{border-color:var(--compass-cyan,#00D2FF);background:rgba(0,210,255,.05);color:var(--compass-cyan,#00D2FF)}',
+    '.kb-card{border:1px solid rgba(0,210,255,.2);padding:7px 8px;cursor:grab;background:rgba(0,210,255,.04);user-select:none;position:relative;transition:opacity .12s}',
+    '.kb-card:active{cursor:grabbing;opacity:.5}',
+    '.kb-card.kb-dragging{opacity:.3}',
+    '.kb-card.kb-meeting{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.35)}',
+    '.kb-card.kb-pending{background:rgba(239,159,39,.08);border:1.5px dashed rgba(239,159,39,.55)}',
+    '.kb-card.kb-approved{background:rgba(29,158,117,.08);border:1.5px solid rgba(29,158,117,.45)}',
+    '.kb-card.kb-overdue{background:rgba(226,75,74,.08);border:1.5px solid rgba(226,75,74,.45)}',
+    '.kb-card-proj{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em}',
+    '.kb-card.kb-meeting .kb-card-proj{color:rgba(139,92,246,.75)}',
+    '.kb-card-title{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--text0);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.kb-card.kb-pending .kb-card-title{color:var(--compass-amber,#EF9F27)}',
+    '.kb-card.kb-overdue .kb-card-title{color:var(--compass-red,#E24B4A)}',
+    '.kb-card.kb-approved .kb-card-title{color:var(--compass-green,#1D9E75)}',
+    '.kb-card.kb-meeting .kb-card-title{color:rgba(139,92,246,.95)}',
+    '.kb-card-foot{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px}',
+    '.kb-pill{font-family:var(--font-mono);font-size:10px;padding:1px 6px;white-space:nowrap;border-radius:2px}',
+    '.kb-pill-task{background:linear-gradient(180deg,rgba(0,210,255,.25) 0%,rgba(0,210,255,.12) 100%);color:var(--compass-cyan,#00D2FF);border:0.5px solid rgba(0,210,255,.4);text-shadow:0 1px 2px rgba(0,0,0,.4)}',
+    '.kb-pill-mtg{background:linear-gradient(180deg,rgba(139,92,246,.3) 0%,rgba(139,92,246,.15) 100%);color:#c4b5fd;border:0.5px solid rgba(139,92,246,.45);text-shadow:0 1px 2px rgba(0,0,0,.4)}',
+    '.kb-pill-hrs{background:rgba(255,255,255,.06);color:var(--text2);border:0.5px solid rgba(255,255,255,.12)}',
+    '.kb-pill-warn{background:linear-gradient(180deg,#f5c842 0%,#c99a0a 100%);color:#fff;border:0.5px solid #a07d08;box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25);text-shadow:0 1px 2px rgba(0,0,0,.5);font-weight:600}',
+    '.kb-pill-red{background:linear-gradient(180deg,#e24b4a 0%,#a83232 100%);color:#fff;border:0.5px solid #8b2020;box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2);text-shadow:0 1px 2px rgba(0,0,0,.5);font-weight:600}',
+    '.kb-pill-green{background:linear-gradient(180deg,#1d9e75 0%,#126a4e 100%);color:#fff;border:0.5px solid #0e5540;box-shadow:0 1px 3px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15);text-shadow:0 1px 2px rgba(0,0,0,.5);font-weight:600}',
+    '.kb-del-btn{position:absolute;top:4px;right:5px;background:none;border:none;font-size:14px;color:var(--text3);cursor:pointer;padding:0;line-height:1;display:none}',
+    '.kb-del-btn:hover{color:var(--compass-red,#E24B4A)}',
+    '.kb-card:hover .kb-del-btn{display:block}',
+    '.kb-kpi{background:var(--bg1);border:1px solid var(--border);padding:8px 11px}',
+    '.kb-kpi-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:3px}',
+    '.kb-kpi-val{font-family:var(--font-hud,"Rajdhani",system-ui);font-size:20px;font-weight:700;color:var(--text0);line-height:1}',
+    '.kb-kpi-sub{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px}',
+    '.kb-kpi-val.warn{color:var(--compass-amber,#EF9F27)}',
+    '.kb-kpi-val.info{color:var(--compass-cyan,#00D2FF)}',
+    '.kb-add-btn{width:100%;margin-top:4px;padding:5px;background:none;border:1px dashed rgba(0,210,255,.15);color:rgba(0,210,255,.4);font-family:var(--font-head);font-size:11px;letter-spacing:.06em;cursor:pointer;transition:all .12s}',
+    '.kb-add-btn:hover{border-color:rgba(0,210,255,.4);color:#00D2FF;background:rgba(0,210,255,.04)}',
+    '#kb-add-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}',
+    '#kb-add-modal.open{display:flex}',
+    '.kb-modal-box{background:var(--bg1,#0c1628);border:1px solid rgba(0,210,255,.2);padding:20px 22px;width:380px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.6)}',
+    '.kb-modal-title{font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text0);margin-bottom:14px}',
+    '.kb-modal-field{margin-bottom:11px}',
+    '.kb-modal-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}',
+    '.kb-modal-inp{width:100%;font-family:var(--font-mono);font-size:12px;padding:6px 9px;background:var(--bg2,#0f1f35);border:1px solid rgba(0,210,255,.15);color:var(--text0);outline:none;transition:border-color .12s}',
+    '.kb-modal-inp:focus{border-color:rgba(0,210,255,.45)}',
+    '.kb-modal-sel{width:100%;font-family:var(--font-mono);font-size:12px;padding:6px 9px;background:var(--bg2,#0f1f35);border:1px solid rgba(0,210,255,.15);color:var(--text0);outline:none;cursor:pointer}',
+    '.kb-modal-btns{display:flex;gap:8px;margin-top:16px}',
+    '.kb-modal-btn-add{flex:1;font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:7px;background:rgba(0,210,255,.12);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;transition:opacity .12s}',
+    '.kb-modal-btn-add:hover{opacity:.8}',
+    '.kb-modal-btn-cancel{font-family:var(--font-head);font-size:12px;letter-spacing:.06em;padding:7px 16px;background:none;border:1px solid rgba(255,255,255,.15);color:var(--text2);cursor:pointer}'
+  ].join('');
+  document.head.appendChild(s);
+})();
+
+window.calSwitchView = function(view) {
+  const gridEl   = document.getElementById('cal-grid-view');
+  const kanbanEl = document.getElementById('cal-kanban-view');
+  const gridBtn  = document.getElementById('cal-view-grid-btn');
+  const kbBtn    = document.getElementById('cal-view-kanban-btn');
+  if (!gridEl || !kanbanEl) return;
+  if (view === 'kanban') {
+    gridEl.style.display   = 'none';
+    kanbanEl.style.display = 'block';
+    if (gridBtn)  { gridBtn.style.background='none';                gridBtn.style.color='rgba(255,255,255,.3)'; }
+    if (kbBtn)    { kbBtn.style.background='rgba(0,210,255,.15)';   kbBtn.style.color='#00D2FF'; }
+    if (!_kbLoaded) { _kbLoaded = true; _kbWireEvents(); }
+    _kbRender();
+  } else {
+    gridEl.style.display   = 'block';
+    kanbanEl.style.display = 'none';
+    if (gridBtn)  { gridBtn.style.background='rgba(0,210,255,.15)'; gridBtn.style.color='#00D2FF'; }
+    if (kbBtn)    { kbBtn.style.background='none';                  kbBtn.style.color='rgba(255,255,255,.3)'; }
+  }
+};
+
+function _kbIsoLocal(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function _kbGetMonday(offset) {
+  const now = new Date(), day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + diff + offset * 7);
+  mon.setHours(0,0,0,0);
+  return mon;
+}
+
+function _kbBuildColDates(mon) {
+  const ids = ['mon','tue','wed','thu','fri','sat','sun'];
+  const out = {};
+  ids.forEach((id, i) => { out[id] = _kbIsoLocal(new Date(mon.getTime() + i * 86400000)); });
+  out['next'] = _kbIsoLocal(new Date(mon.getTime() + 7 * 86400000));
+  // Last week = previous Monday through Sunday
+  const prevMon = new Date(mon.getTime() - 7 * 86400000);
+  out['last'] = _kbIsoLocal(prevMon); // anchor date for last-week bucket
+  return out;
+}
+
+function _kbFmtColDay(id, iso) {
+  if (id === 'next') return 'Next week';
+  const d = new Date(iso + 'T00:00:00');
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] + ' ' + (d.getMonth()+1) + '/' + d.getDate();
+}
+
+function _kbComputeCapacity(colId, cards) {
+  let mtgH = 0, taskH = 0;
+  cards.forEach(c => {
+    const h = parseFloat(c.dataset.hrs) || 0;
+    if (c.dataset.type === 'meeting') mtgH += h; else taskH += h;
+  });
+  const available = Math.max(0, 8 - mtgH);
+  const pct = available > 0 ? Math.min(Math.round((taskH / available) * 100), 100) : (taskH > 0 ? 100 : 0);
+  return { scheduled: taskH, available, mtgHours: mtgH, pct, over: taskH > available };
+}
+
+function _kbCapColor(cap) {
+  return cap.over ? '#A32D2D' : cap.pct > 85 ? '#BA7517' : '#185FA5';
+}
+
+function _kbGetProjectName(pid) {
+  if (!pid) return null;
+  const p = (window._mtProjects || window._projects || []).find(x => x.id === pid);
+  return p ? (p.name || p.title || null) : null;
+}
+
+function _kbRender() {
+  const mon = _kbGetMonday(_kbWeekOffset);
+  _kbColDates = _kbBuildColDates(mon);
+  const fri = new Date(mon.getTime() + 4 * 86400000);
+  const fmt = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  const lbl = document.getElementById('kb-week-lbl');
+  if (lbl) lbl.textContent = fmt(mon) + ' - ' + fmt(fri) + ', ' + mon.getFullYear();
+
+  const board   = document.getElementById('kb-board');
+  if (!board) return;
+  const today   = _kbIsoLocal(new Date());
+  const resource = window._calResource || window._mtResource || window._myResource || null;
+  const uid     = resource ? resource.user_id : null;
+
+  // Use _calItems bridged from my-work.html — falls back to _mtTasks
+  const wiItems  = window._calItems || window._mtTasks || [];
+  const calEvs   = window._mtCalEvents || [];
+
+  // Filter open tasks/actions assigned to this user
+  const openItems = wiItems.filter(t => {
+    if (!t || !t.id) return false;
+    const notDone = t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved';
+    const mine    = t.assigned_to === uid || t.owner_resource_id === resource?.id || !uid;
+    return notDone && mine;
+  });
+
+  // Col order: last | mon tue wed thu fri sat sun | next
+  const colIds = ['last','mon','tue','wed','thu','fri','sat','sun','next'];
+  const taskBuckets = {}, calBuckets = {};
+  colIds.forEach(id => { taskBuckets[id] = []; calBuckets[id] = []; });
+
+  const prevMonDate = _kbColDates['last'];
+  const prevSunDate = _kbIsoLocal(new Date(mon.getTime() - 86400000)); // Sun before this Mon
+
+  openItems.forEach(t => {
+    const due = t.due_date ? t.due_date.slice(0,10) : null;
+    if (!due) { taskBuckets['next'].push(t); return; }
+    let placed = false;
+    // Check Mon–Sun of current week
+    ['mon','tue','wed','thu','fri','sat','sun'].forEach(id => {
+      if (!placed && _kbColDates[id] === due) { taskBuckets[id].push(t); placed = true; }
+    });
+    if (!placed) {
+      if (due > _kbColDates['sun'])      { taskBuckets['next'].push(t); }   // future
+      else if (due >= prevMonDate)       { taskBuckets['last'].push(t); }   // last week
+      else                               { taskBuckets['last'].push(t); }   // older — still last week bucket
+    }
+  });
+
+  calEvs.forEach(ev => {
+    const evDate = ev.event_date ? ev.event_date.slice(0,10) : null;
+    if (!evDate) return;
+    colIds.forEach(id => {
+      if (id === 'last' || id === 'next') return; // don't bucket cal events into overflow cols
+      if (_kbColDates[id] === evDate) calBuckets[id].push(ev);
+    });
+  });
+
+  let totalItems = 0, totalMtgHrs = 0, totalTaskHrs = 0, pendingCount = 0;
+
+  const colsHtml = colIds.map(colId => {
+    const colDate  = _kbColDates[colId];
+    const isTdy    = colDate === today;
+    const isPast   = colDate < today && colId !== 'next';
+    const isWknd   = colId === 'sat' || colId === 'sun';
+    const isNext   = colId === 'next';
+    const isLast   = colId === 'last';
+    let cardsHtml  = '';
+
+    calBuckets[colId].forEach(ev => {
+      const h = parseFloat(ev.duration_hours || 0);
+      const isPto = (ev.event_type||'').toLowerCase().includes('pto') || (ev.title||'').toLowerCase().includes('pto');
+      totalMtgHrs += h; totalItems++;
+      const timeStr = ev.start_time ? ev.start_time.slice(0,5) : '';
+      cardsHtml += '<div class="kb-card kb-meeting" draggable="true" data-id="cal-' + _esc(String(ev.id)) + '" data-hrs="' + h + '" data-type="meeting" data-colid="' + colId + '">' +
+        '<div class="kb-card-proj">' + _esc(isPto ? 'PTO' : 'Meeting') + '</div>' +
+        '<div class="kb-card-title">' + _esc(ev.title || 'Event') + '</div>' +
+        '<div class="kb-card-foot">' + (timeStr ? '<span class="kb-pill kb-pill-mtg">' + _esc(timeStr) + '</span>' : '') + (h ? '<span class="kb-pill kb-pill-hrs">' + h + 'h</span>' : '') + '</div>' +
+        '</div>';
+    });
+
+    taskBuckets[colId].forEach(t => {
+      const h = parseFloat(t.budget_hours || t.loe_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
+      const neg = t.negotiation_state ? (typeof t.negotiation_state === 'string' ? JSON.parse(t.negotiation_state) : t.negotiation_state) : null;
+      const negState = neg ? neg.state : null;
+      const projName = _kbGetProjectName(t.project_id);
+      const isOverdue = t.due_date && t.due_date.slice(0,10) < today;
+      totalTaskHrs += h; totalItems++;
+      if (negState === 'pending') pendingCount++;
+      let cardCls = 'kb-card';
+      if (negState === 'pending') cardCls += ' kb-pending';
+      else if (negState === 'agreed') cardCls += ' kb-approved';
+      else if (isOverdue) cardCls += ' kb-overdue';
+      let pills = '<span class="kb-pill kb-pill-task">' + _esc(t.type || t.status || 'task') + '</span><span class="kb-pill kb-pill-hrs">' + h + 'h</span>';
+      if (negState === 'pending')  pills += '<span class="kb-pill kb-pill-warn">Pending PM</span>';
+      if (negState === 'agreed')   pills += '<span class="kb-pill kb-pill-green">Approved</span>';
+      if (isOverdue && negState !== 'pending') pills += '<span class="kb-pill kb-pill-red">Overdue</span>';
+      if (t.due_date) pills += '<span class="kb-pill kb-pill-hrs">Due ' + t.due_date.slice(5) + '</span>';
+      cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due_date||'') + '" data-colid="' + colId + '">' +
+        '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
+        '<div class="kb-card-proj">' + _esc(projName || t.project_name || 'Project') + '</div>' +
+        '<div class="kb-card-title">' + _esc(t.name || t.title || 'Item') + '</div>' +
+        '<div class="kb-card-foot">' + pills + '</div>' +
+        '</div>';
+    });
+
+    cardsHtml += '<div class="kb-dz" data-colid="' + colId + '">+ drop here</div>';
+    if (!isLast) cardsHtml += '<button class="kb-add-btn" data-addcol="' + colId + '">+ Add item</button>';
+
+    const mtgH  = calBuckets[colId].reduce((s,ev) => s + parseFloat(ev.duration_hours||0), 0);
+    const taskH = taskBuckets[colId].reduce((s,t) => s + parseFloat(t.budget_hours||t.loe_hours||(t.effort_days?t.effort_days*8:0)||2), 0);
+    const avail = Math.max(0, 8 - mtgH);
+    const pct   = avail > 0 ? Math.min(Math.round((taskH / avail) * 100), 100) : (taskH > 0 ? 100 : 0);
+    const over  = taskH > avail;
+    const capColor = over ? '#A32D2D' : pct > 85 ? '#BA7517' : '#185FA5';
+    const capCls   = over ? ' over' : pct > 85 ? ' warn' : '';
+    const capText  = isNext || isLast ? (taskBuckets[colId].length + ' item' + (taskBuckets[colId].length!==1?'s':'')) : over ? taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h — over' : taskH.toFixed(1) + 'h / ' + avail.toFixed(1) + 'h avail';
+
+    const colLabel = isLast ? 'Last week' : isNext ? 'Next week' : _kbFmtColDay(colId, colDate);
+
+    return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + (isLast?' kb-next':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
+      '<div class="kb-col-hdr">' +
+      '<div class="kb-col-day' + (isTdy?' kb-today':isPast?' kb-past':'') + '">' + colLabel + '</div>' +
+      ((!isNext && !isLast) ? '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div><div class="kb-cap-lbl' + capCls + '">' + capText + '</div>' : '<div class="kb-cap-lbl" style="margin-top:5px">' + capText + '</div>') +
+      '</div>' +
+      '<div class="kb-col-body" id="kb-body-' + colId + '">' + cardsHtml + '</div>' +
+      '</div>';
+  }).join('');
+
+  board.innerHTML = colsHtml;
+
+  const kpiRow = document.getElementById('kb-kpi-row');
+  if (kpiRow) kpiRow.innerHTML =
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">This week</div><div class="kb-kpi-val info">' + totalItems + '</div><div class="kb-kpi-sub">items scheduled</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Meetings</div><div class="kb-kpi-val">' + totalMtgHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">time consumed</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Committed hours</div><div class="kb-kpi-val info">' + totalTaskHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">tasks + actions</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Pending approval</div><div class="kb-kpi-val' + (pendingCount>0?' warn':'') + '">' + pendingCount + '</div><div class="kb-kpi-sub">awaiting PM</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Sig. chain avg</div><div class="kb-kpi-val">38h</div><div class="kb-kpi-sub">this quarter</div></div>';
+
+  _kbWireCards();
+}
+
+function _kbWireEvents() {
+  document.getElementById('kb-prev-btn')?.addEventListener('click', () => { _kbWeekOffset--; _kbRender(); });
+  document.getElementById('kb-next-btn')?.addEventListener('click', () => { _kbWeekOffset++; _kbRender(); });
+
+  const board = document.getElementById('kb-board');
+  if (!board) return;
+
+  board.addEventListener('dragover', e => {
+    e.preventDefault();
+    const body = e.target.closest('.kb-col-body');
+    if (body) {
+      document.querySelectorAll('.kb-col').forEach(c => c.classList.remove('kb-drag-over'));
+      body.closest('.kb-col')?.classList.add('kb-drag-over');
+      body.querySelector('.kb-dz')?.classList.add('active');
+    }
+  });
+
+  board.addEventListener('dragleave', e => {
+    const leaving = e.target.closest('.kb-col');
+    const entering = document.elementFromPoint(e.clientX, e.clientY)?.closest('.kb-col');
+    if (leaving && leaving !== entering) {
+      leaving.classList.remove('kb-drag-over');
+      leaving.querySelector('.kb-dz')?.classList.remove('active');
+    }
+  });
+
+  board.addEventListener('drop', e => {
+    e.preventDefault();
+    document.querySelectorAll('.kb-col').forEach(c => { c.classList.remove('kb-drag-over'); c.querySelector('.kb-dz')?.classList.remove('active'); });
+    if (!_kbDrag.card) return;
+    const body = e.target.closest('.kb-col-body');
+    if (!body) { _kbDragEnd(); return; }
+    const destColId = body.closest('.kb-col')?.dataset.colid;
+    if (!destColId || destColId === _kbDrag.srcColId) { _kbDragEnd(); return; }
+    _kbDrag.card.classList.remove('kb-dragging');
+    body.insertBefore(_kbDrag.card, body.querySelector('.kb-dz') || null);
+    _kbDrag.card.dataset.colid = destColId;
+    const destDate = _kbColDates[destColId];
+    const dueDate  = _kbDrag.due;
+    const isPastDue = dueDate && destDate && destDate > dueDate && _kbDrag.type !== 'meeting';
+    if (isPastDue || destColId === 'next') {
+      _kbDrag.card.classList.add('kb-pending');
+      _kbNeg.active = true; _kbNeg.cardEl = _kbDrag.card;
+      _kbNeg.srcColId = _kbDrag.srcColId; _kbNeg.destColId = destColId;
+      _kbShowNeg(_kbDrag.card, destColId, dueDate);
+    }
+    _kbUpdateCapBars();
+    _kbDragEnd();
+  });
+
+  document.getElementById('kb-neg-btn-a')?.addEventListener('click', _kbNegMoveBack);
+  document.getElementById('kb-neg-btn-b')?.addEventListener('click', _kbNegFindSlot);
+  document.getElementById('kb-neg-btn-c')?.addEventListener('click', _kbNegSubmit);
+  document.getElementById('kb-del-cancel')?.addEventListener('click', () => {
+    document.getElementById('kb-del-panel').style.display = 'none';
+    _kbDel = { active: false, cardEl: null, cardId: null, taskId: null };
+  });
+  document.getElementById('kb-del-confirm')?.addEventListener('click', _kbDelConfirm);
+
+  // Add-item modal
+  document.getElementById('kb-modal-cancel')?.addEventListener('click', _kbAddClose);
+  document.getElementById('kb-add-modal')?.addEventListener('click', e => { if (e.target === e.currentTarget) _kbAddClose(); });
+  document.getElementById('kb-modal-confirm')?.addEventListener('click', _kbAddConfirm);
+
+  // Delegated: + Add item buttons (re-wired after each render via _kbWireCards)
+  document.getElementById('kb-board')?.addEventListener('click', e => {
+    const btn = e.target.closest('.kb-add-btn');
+    if (!btn) return;
+    _kbAddOpen(btn.dataset.addcol);
+  });
+}
+
+function _kbWireCards() {
+  document.querySelectorAll('.kb-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      _kbDrag.card = card; _kbDrag.srcColId = card.dataset.colid;
+      _kbDrag.cardId = card.dataset.id; _kbDrag.hrs = parseFloat(card.dataset.hrs)||0;
+      _kbDrag.type = card.dataset.type||''; _kbDrag.due = card.dataset.due||null;
+      _kbDrag.taskId = card.dataset.taskid||null;
+      setTimeout(() => card.classList.add('kb-dragging'), 0);
+    });
+    card.addEventListener('dragend', _kbDragEnd);
+    const delBtn = card.querySelector('.kb-del-btn');
+    if (delBtn) delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (card.dataset.type === 'meeting') { card.remove(); _kbUpdateCapBars(); return; }
+      _kbDel = { active: true, cardEl: card, cardId: card.dataset.id, taskId: card.dataset.taskid };
+      const panel = document.getElementById('kb-del-panel');
+      if (panel) panel.style.display = 'block';
+      const inp = document.getElementById('kb-del-reason');
+      if (inp) { inp.value = ''; inp.style.borderColor = ''; inp.focus(); }
+    });
+  });
+}
+
+function _kbDragEnd() {
+  if (_kbDrag.card) _kbDrag.card.classList.remove('kb-dragging');
+  _kbDrag = { card: null, srcColId: null, cardId: null, hrs: 0, type: '', due: null, taskId: null };
+}
+
+function _kbUpdateCapBars() {
+  ['last','mon','tue','wed','thu','fri','sat','sun','next'].forEach(colId => {
+    const body = document.getElementById('kb-body-' + colId);
+    const col  = document.getElementById('kb-col-' + colId);
+    if (!body || !col) return;
+    const cap  = _kbComputeCapacity(colId, Array.from(body.querySelectorAll('.kb-card')));
+    const fill = col.querySelector('.kb-cap-fill');
+    const lbl  = col.querySelector('.kb-cap-lbl');
+    if (fill) { fill.style.width = cap.pct + '%'; fill.style.background = _kbCapColor(cap); }
+    if (lbl && colId !== 'next') {
+      lbl.className = 'kb-cap-lbl' + (cap.over ? ' over' : cap.pct > 85 ? ' warn' : '');
+      lbl.textContent = cap.over ? cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h — over' : cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h avail';
+    }
+  });
+}
+
+function _kbShowNeg(cardEl, destColId, dueDate) {
+  const panel = document.getElementById('kb-neg-panel');
+  const body  = document.getElementById('kb-neg-body');
+  if (!panel) return;
+  const title = cardEl.querySelector('.kb-card-title')?.textContent || 'Item';
+  if (body) body.textContent = '"' + title + '" moved ' + (destColId === 'next' ? 'to backlog' : 'past its due date') + (dueDate ? ' (was due ' + dueDate + ')' : '') + '. PM approval required before the slip is confirmed. A CoC event will be logged.';
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function _kbNegMoveBack() {
+  if (_kbNeg.cardEl && _kbNeg.srcColId) {
+    const srcBody = document.getElementById('kb-body-' + _kbNeg.srcColId);
+    if (srcBody) {
+      _kbNeg.cardEl.classList.remove('kb-pending');
+      _kbNeg.cardEl.dataset.colid = _kbNeg.srcColId;
+      srcBody.insertBefore(_kbNeg.cardEl, srcBody.querySelector('.kb-dz') || null);
+      _kbUpdateCapBars();
+    }
+  }
+  document.getElementById('kb-neg-panel').style.display = 'none';
+  _kbNeg = { active: false, cardEl: null, srcColId: null, destColId: null };
+}
+
+function _kbNegFindSlot() {
+  document.getElementById('kb-neg-panel').style.display = 'none';
+  compassToast('Compass is checking attendee availability \u2014 feature coming soon.', 3000);
+  _kbNeg = { active: false, cardEl: null, srcColId: null, destColId: null };
+}
+
+async function _kbNegSubmit() {
+  const card   = _kbNeg.cardEl;
+  const taskId = card?.dataset.taskid;
+  document.getElementById('kb-neg-panel').style.display = 'none';
+  if (taskId && window.API) {
+    try {
+      const resource = window._calResource || window._mtResource || window._myResource;
+      await API.post('coc_events', {
+        id: crypto.randomUUID(), firm_id: FIRM_ID, entity_id: taskId, entity_type: 'task',
+        event_type: 'calendar_reposition', step_name: 'Calendar slot moved past due date',
+        event_notes: 'Moved to ' + (_kbNeg.destColId||'unknown') + ' past original due date. Submitted for PM approval.',
+        actor_name: resource?.name||null, actor_resource_id: resource?.id||null,
+        outcome: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      });
+    } catch(err) { console.error('[Compass] Kanban CoC write failed:', err); }
+  }
+  compassToast('Submitted for PM approval \u2014 CoC logged.', 3000);
+  _kbNeg = { active: false, cardEl: null, srcColId: null, destColId: null };
+}
+
+// ── Add-item modal ────────────────────────────────────────
+function _kbAddOpen(colId) {
+  _kbAddTarget = colId;
+  const modal  = document.getElementById('kb-add-modal');
+  const dayLbl = document.getElementById('kb-modal-day-lbl');
+  if (!modal) return;
+  if (dayLbl) {
+    const colDate = _kbColDates[colId] || '';
+    dayLbl.textContent = colId === 'next' ? 'Next week' : _kbFmtColDay(colId, colDate);
+  }
+  document.getElementById('kb-modal-title').value = '';
+  document.getElementById('kb-modal-desc').value  = '';
+  document.getElementById('kb-modal-dur').value   = '1';
+  document.getElementById('kb-modal-type').value  = 'admin';
+  modal.classList.add('open');
+  document.getElementById('kb-modal-title').focus();
+}
+
+function _kbAddClose() {
+  document.getElementById('kb-add-modal')?.classList.remove('open');
+  _kbAddTarget = null;
+}
+
+function _kbAddConfirm() {
+  const title = (document.getElementById('kb-modal-title')?.value || '').trim();
+  const type  = document.getElementById('kb-modal-type')?.value || 'admin';
+  const desc  = (document.getElementById('kb-modal-desc')?.value || '').trim();
+  const dur   = parseFloat(document.getElementById('kb-modal-dur')?.value) || 1;
+  const colId = _kbAddTarget;
+
+  if (!title) {
+    document.getElementById('kb-modal-title').style.borderColor = 'rgba(226,75,74,.6)';
+    document.getElementById('kb-modal-title').focus();
+    return;
+  }
+
+  const body = document.getElementById('kb-body-' + colId);
+  if (!body) { _kbAddClose(); return; }
+
+  // Build a card for the new item
+  const typeLabels = { admin:'Admin', personal:'Personal', pto:'PTO', focus:'Focus block', task:'Task', other:'Other' };
+  const newId = 'local-' + Date.now();
+  const card  = document.createElement('div');
+  card.className = 'kb-card';
+  card.draggable = true;
+  card.dataset.id     = newId;
+  card.dataset.hrs    = String(dur);
+  card.dataset.type   = type === 'task' ? 'task' : 'local';
+  card.dataset.colid  = colId;
+  card.dataset.due    = _kbColDates[colId] || '';
+  card.innerHTML =
+    '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
+    '<div class="kb-card-proj">' + _esc(typeLabels[type] || type) + '</div>' +
+    '<div class="kb-card-title">' + _esc(title) + '</div>' +
+    (desc ? '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(desc) + '</div>' : '') +
+    '<div class="kb-card-foot"><span class="kb-pill kb-pill-hrs">' + dur + 'h</span></div>';
+
+  // Insert before drop zone
+  const dz = body.querySelector('.kb-dz');
+  body.insertBefore(card, dz || null);
+
+  // Wire the new card's drag + delete
+  card.addEventListener('dragstart', e => {
+    _kbDrag.card = card; _kbDrag.srcColId = card.dataset.colid;
+    _kbDrag.cardId = card.dataset.id; _kbDrag.hrs = parseFloat(card.dataset.hrs)||0;
+    _kbDrag.type = card.dataset.type; _kbDrag.due = card.dataset.due||null;
+    _kbDrag.taskId = null;
+    setTimeout(() => card.classList.add('kb-dragging'), 0);
+  });
+  card.addEventListener('dragend', _kbDragEnd);
+  card.querySelector('.kb-del-btn')?.addEventListener('click', e => {
+    e.stopPropagation(); card.remove(); _kbUpdateCapBars();
+  });
+
+  _kbUpdateCapBars();
+
+  // Write a CoC event for non-local types if API available
+  if ((type === 'task' || type === 'focus') && window.API) {
+    const resource = window._calResource || window._mtResource || window._myResource;
+    API.post('coc_events', {
+      id: crypto.randomUUID(), firm_id: FIRM_ID,
+      entity_id: newId, entity_type: 'calendar_item',
+      event_type: 'calendar_reposition',
+      step_name: 'Item added to calendar',
+      event_notes: title + (desc ? ': ' + desc : '') + ' — ' + dur + 'h on ' + (card.dataset.due||colId),
+      actor_name: resource?.name||null, actor_resource_id: resource?.id||null,
+      outcome: 'scheduled', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+    }).catch(() => {});
+  }
+
+  _kbAddClose();
+  compassToast && compassToast('"' + title + '" added to ' + (colId === 'next' ? 'next week' : _kbFmtColDay(colId, _kbColDates[colId])), 2500);
+}
+
+async function _kbDelConfirm() {
+  const reasonEl = document.getElementById('kb-del-reason');
+  const reason   = reasonEl?.value.trim() || '';
+  if (reason.length < 10) {
+    if (reasonEl) reasonEl.style.borderColor = 'var(--compass-red,#E24B4A)';
+    compassToast('Please enter a reason (min 10 characters).', 2500);
+    return;
+  }
+  document.getElementById('kb-del-panel').style.display = 'none';
+  const taskId  = _kbDel.taskId;
+  const resource = window._calResource || window._mtResource || window._myResource;
+  if (taskId && window.API) {
+    try {
+      await API.post('coc_events', {
+        id: crypto.randomUUID(), firm_id: FIRM_ID, entity_id: taskId, entity_type: 'task',
+        event_type: 'slice_deleted', step_name: 'Calendar slice removed',
+        event_notes: reason, actor_name: resource?.name||null, actor_resource_id: resource?.id||null,
+        outcome: 'hours_reduced', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      });
+    } catch(err) { console.error('[Compass] Kanban delete CoC failed:', err); }
+  }
+  _kbDel.cardEl?.remove();
+  _kbUpdateCapBars();
+  compassToast('Slice removed \u2014 CoC logged, PM notified.', 3000);
+  _kbDel = { active: false, cardEl: null, cardId: null, taskId: null };
+}
+
+
+/* ─── Module entry points ────────────────────────────────────────────── */
+window._calLoadView = async function() {
+  if (window._calLoaded) { window._calRefresh && window._calRefresh(); return; }
+  window._calLoaded = true;
+  _calWireBaseEvents();
+  buildCalendarTab();
+};
+
+window._calRefresh = async function() {
+  // Re-stamp bridged globals in case they were updated
+  if (typeof _myResource !== 'undefined' && _myResource) window._calResource  = _myResource;
+  if (typeof _wiItems    !== 'undefined' && _wiItems)    window._calItems     = _wiItems;
+  buildCalendarTab();
+};
+
+function _calWireBaseEvents() {
+  // The Grid view button listeners are wired inside buildCalendarTab.
+  // calSwitchView and Kanban events are wired inside _kbWireEvents (called on first Kanban toggle).
+  // Nothing additional needed at module level.
+}
+
+})();
+</script>
