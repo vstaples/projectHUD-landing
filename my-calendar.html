@@ -169,32 +169,43 @@ window.buildCalendarTab = function() {
   (async () => {
     try {
       const resource = window._calResource || window._mtResource || window._myResource;
-      if (!resource || !window.API) return;
-      const day = now.getDay(), diff = day === 0 ? -6 : 1 - day;
-      const mon = new Date(now); mon.setDate(now.getDate() + diff); mon.setHours(0,0,0,0);
+      console.log('[Compass] buildCalendarTab fetch: resource=', resource?.name||'NULL', 'API=', typeof window.API, '_calResource=', window._calResource?.name||'NULL');
+      if (!resource || !window.API) { console.warn('[Compass] buildCalendarTab: aborting — missing resource or API'); return; }
+
+      // Compute Mon–Sun of current week using local date arithmetic (avoids DST/UTC shift)
+      const todayLocal = new Date();
+      const dow = todayLocal.getDay(); // 0=Sun
+      const diffToMon = dow === 0 ? -6 : 1 - dow;
+      // Use year/month/date directly — never rely on getTime() arithmetic across DST boundaries
+      const monDate = new Date(todayLocal.getFullYear(), todayLocal.getMonth(), todayLocal.getDate() + diffToMon);
+      const sunDate = new Date(monDate.getFullYear(), monDate.getMonth(), monDate.getDate() + 6);
       const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      const weekStart = isoLocal(mon);
-      const weekEnd   = isoLocal(new Date(mon.getTime() + 6*86400000));
+      const weekStart = isoLocal(monDate);
+      const weekEnd   = isoLocal(sunDate);
+
+      console.log('[Compass] My Calendar fetching week:', weekStart, '–', weekEnd, 'resource:', resource.id);
 
       const [evs, tes] = await Promise.all([
         API.get(
           'calendar_events?firm_id=eq.' + FIRM_ID + '&resource_id=eq.' + resource.id +
           '&event_date=gte.' + weekStart + '&event_date=lte.' + weekEnd +
           '&select=*&order=event_date.asc,start_time.asc'
-        ).catch(() => []),
+        ).catch(e => { console.error('[Compass] calendar_events fetch failed:', e); return []; }),
         API.get(
           'time_entries?resource_id=eq.' + resource.id +
           '&date=gte.' + weekStart + '&date=lte.' + weekEnd +
           '&select=id,date,hours,is_billable,project_id,task_id,notes,step_name' +
           '&order=date.asc'
-        ).catch(() => [])
+        ).catch(e => { console.error('[Compass] time_entries fetch failed:', e); return []; })
       ]);
 
+      console.log('[Compass] My Calendar got', tes?.length, 'time entries,', evs?.length, 'cal events');
       window._mtCalEvents    = Array.isArray(evs) ? evs : [];
       window._calCalEvents   = window._mtCalEvents;
       window._calTimeEntries = Array.isArray(tes) ? tes : [];
       _renderCalTab(); // re-render now that both data sources are loaded
     } catch(e) {
+      console.error('[Compass] My Calendar fetch error:', e);
       window._mtCalEvents = [];
       window._calCalEvents = [];
     }
