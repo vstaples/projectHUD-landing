@@ -1,0 +1,626 @@
+<!-- my-notes.html — Compass My Notes module -->
+<!-- Exports: window._notesLoadView, window._notesRefresh -->
+<!-- Replaces utc-concerns / My Concerns tab -->
+
+<style>
+/* ── Shell ───────────────────────────────────────────────────────────────── */
+#notes-shell{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 120px);overflow:hidden;background:var(--bg0,#060a10)}
+
+/* ── Left panel ──────────────────────────────────────────────────────────── */
+#notes-left{border-right:1px solid rgba(0,210,255,.1);display:flex;flex-direction:column;overflow:hidden}
+#notes-left-header{padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.08);flex-shrink:0}
+#notes-search{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0,#F0F6FF);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 9px;outline:none;margin-bottom:7px}
+#notes-search:focus{border-color:rgba(0,210,255,.35)}
+#notes-search::placeholder{color:var(--text3,#6A94B8)}
+#notes-new-btn{width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
+#notes-new-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.04)}
+
+/* ── Inbox section ───────────────────────────────────────────────────────── */
+#notes-inbox-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
+.notes-section-hdr{padding:6px 14px;font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3,#6A94B8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.notes-section-hdr:hover{color:var(--text2,#90B8D8)}
+.notes-inbox-count{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
+#notes-inbox-list{max-height:180px;overflow-y:auto}
+
+/* ── Tree section ────────────────────────────────────────────────────────── */
+#notes-tree-section{flex:1;overflow:hidden;display:flex;flex-direction:column}
+#notes-tree-scroll{flex:1;overflow-y:auto;padding-bottom:16px}
+
+/* ── Left panel items ────────────────────────────────────────────────────── */
+.notes-item{padding:6px 14px 6px 14px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;border-left:2px solid transparent;transition:all .1s}
+.notes-item:hover{background:rgba(0,210,255,.03);border-left-color:rgba(0,210,255,.15)}
+.notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
+.notes-item.in-grid{border-left-color:rgba(0,210,255,.4)}
+.notes-item-body{flex:1;min-width:0}
+.notes-item-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text0,#F0F6FF);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.notes-item-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.notes-item-source{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);color:var(--text3);border-radius:2px;flex-shrink:0;margin-top:2px}
+
+/* ── Tree nodes ──────────────────────────────────────────────────────────── */
+.notes-branch{padding:5px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.04em}
+.notes-branch:hover{color:var(--text0,#F0F6FF)}
+.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:var(--text3,#6A94B8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.notes-subbranch:hover{color:var(--text2)}
+.notes-chevron{width:10px;height:10px;transition:transform .15s;flex-shrink:0;opacity:.5}
+.notes-chevron.open{transform:rotate(90deg)}
+.notes-children{overflow:hidden}
+.notes-branch-items .notes-item{padding-left:28px}
+.notes-subbranch-items .notes-item{padding-left:40px}
+
+/* ── Grid workspace ──────────────────────────────────────────────────────── */
+#notes-right{display:flex;flex-direction:column;overflow:hidden}
+#notes-grid-header{padding:8px 16px;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:10px;flex-shrink:0}
+#notes-grid-label{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);flex:1}
+.notes-grid-btn{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
+.notes-grid-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
+.notes-grid-btn.active{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
+#notes-grid-area{flex:1;overflow:hidden;padding:12px}
+#notes-grid{display:grid;gap:8px;height:100%}
+#notes-tray{border-top:1px solid rgba(0,210,255,.08);padding:8px 12px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;min-height:0}
+#notes-tray:empty{display:none}
+.notes-tray-chip{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 10px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.notes-tray-chip:hover{background:rgba(0,210,255,.12);color:#00D2FF}
+
+/* ── Note tile ───────────────────────────────────────────────────────────── */
+.notes-tile{display:flex;flex-direction:column;background:var(--bg1,#0c1628);border:1px solid rgba(0,210,255,.1);overflow:hidden;min-height:0;height:100%}
+.notes-tile.empty{border:1px dashed rgba(0,210,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s}
+.notes-tile.empty:hover{background:rgba(0,210,255,.03);border-color:rgba(0,210,255,.25)}
+.notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}
+.notes-tile-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none}
+.notes-tile-title:focus{color:#00D2FF}
+.notes-tile-source{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.08);border:0.5px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);border-radius:2px;flex-shrink:0}
+.notes-tile-ctrl{width:16px;height:16px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;display:flex;align-items:center;justify-content:center;transition:color .1s;flex-shrink:0}
+.notes-tile-ctrl:hover{color:var(--text0)}
+.notes-tile-body{display:flex;flex:1;overflow:hidden;min-height:0}
+.notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
+.notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
+
+/* ── Chat panel ──────────────────────────────────────────────────────────── */
+.notes-chat{width:220px;border-left:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.notes-chat.hidden{display:none}
+.notes-chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.notes-chat-msg{font-family:var(--font-mono,monospace);font-size:10px;line-height:1.5}
+.notes-chat-author{font-weight:600;color:var(--text2);margin-bottom:1px}
+.notes-chat-body{color:var(--text1)}
+.notes-chat-time{color:var(--text3);font-size:9px}
+.notes-chat-compose{border-top:1px solid rgba(0,210,255,.08);padding:6px 8px;display:flex;gap:5px}
+.notes-chat-input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0);font-family:var(--font-mono,monospace);font-size:10px;padding:4px 7px;outline:none;resize:none}
+.notes-chat-input:focus{border-color:rgba(0,210,255,.3)}
+.notes-chat-send{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.3);color:#00D2FF;font-family:var(--font-mono,monospace);font-size:10px;padding:4px 8px;cursor:pointer}
+.notes-chat-send:hover{background:rgba(0,210,255,.18)}
+
+/* ── Empty grid slot ─────────────────────────────────────────────────────── */
+.notes-slot-plus{font-size:18px;color:rgba(0,210,255,.2)}
+</style>
+
+<div id="notes-shell">
+
+  <!-- ── Left panel ──────────────────────────────────────────────────────── -->
+  <div id="notes-left">
+    <div id="notes-left-header">
+      <input id="notes-search" type="text" placeholder="Search notes…" oninput="_notesSearch(this.value)"/>
+      <button id="notes-new-btn" onclick="_notesNew()">+ New note</button>
+    </div>
+
+    <!-- Inbox -->
+    <div id="notes-inbox-section">
+      <div class="notes-section-hdr" onclick="_notesToggleSection('inbox')">
+        <svg class="notes-chevron open" id="notes-chev-inbox" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Inbox
+        <span class="notes-inbox-count" id="notes-inbox-count">0</span>
+      </div>
+      <div id="notes-inbox-list"></div>
+    </div>
+
+    <!-- Knowledge tree -->
+    <div id="notes-tree-section">
+      <div class="notes-section-hdr" onclick="_notesToggleSection('tree')">
+        <svg class="notes-chevron open" id="notes-chev-tree" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Notes
+      </div>
+      <div id="notes-tree-scroll">
+        <div id="notes-tree-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Grid workspace ──────────────────────────────────────────────────── -->
+  <div id="notes-right">
+    <div id="notes-grid-header">
+      <span id="notes-grid-label">Workspace</span>
+      <button class="notes-grid-btn" data-grid="1x1" onclick="_notesSetGrid('1x1',this)">1×1</button>
+      <button class="notes-grid-btn active" data-grid="2x2" onclick="_notesSetGrid('2x2',this)">2×2</button>
+      <button class="notes-grid-btn" data-grid="3x3" onclick="_notesSetGrid('3x3',this)">3×3</button>
+    </div>
+    <div id="notes-grid-area">
+      <div id="notes-grid"></div>
+    </div>
+    <div id="notes-tray"></div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+'use strict';
+
+// ── State ─────────────────────────────────────────────────────────────────
+const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
+let _userId    = null;
+let _userName  = 'Vaughn Staples';
+let _notes     = [];      // all notes for this user
+let _messages  = {};      // noteId → [messages]
+let _workspace = {        // restored from notes_workspace
+  gridSize: '2x2',
+  tiles: [],              // [{slot, noteId, chatOpen}]
+  tray: []                // [noteId]
+};
+let _saveTimer = null;
+
+// ── Entry point ───────────────────────────────────────────────────────────
+window._notesLoadView = async function() {
+  if (window._notesLoaded) { window._notesRefresh && window._notesRefresh(); return; }
+  window._notesLoaded = true;
+
+  const res = window._notesResource || window._myResource || null;
+  _userId   = res?.user_id || null;
+  _userName = res?.name || 'Vaughn Staples';
+
+  await _notesFetchAll();
+  await _notesLoadWorkspace();
+  _notesRenderLeft();
+  _notesRenderGrid();
+};
+
+window._notesRefresh = async function() {
+  await _notesFetchAll();
+  _notesRenderLeft();
+  _notesRenderGrid();
+};
+
+// ── Fetch ─────────────────────────────────────────────────────────────────
+async function _notesFetchAll() {
+  if (!_userId) return;
+  try {
+    const [notes, msgs] = await Promise.all([
+      API.get('notes?owner_user_id=eq.' + _userId + '&firm_id=eq.' + FIRM_ID + '&order=updated_at.desc&limit=200').catch(()=>[]),
+      API.get('note_messages?note_id=in.(' + '00000000-0000-0000-0000-000000000000' + ')&limit=1').catch(()=>[]), // placeholder — load per tile
+    ]);
+    _notes = Array.isArray(notes) ? notes : [];
+  } catch(e) { console.error('[Compass] Notes fetch error:', e); }
+}
+
+async function _notesLoadMessages(noteId) {
+  if (_messages[noteId]) return _messages[noteId];
+  try {
+    const rows = await API.get('note_messages?note_id=eq.' + noteId + '&order=created_at.asc&limit=100').catch(()=>[]);
+    _messages[noteId] = Array.isArray(rows) ? rows : [];
+  } catch(e) { _messages[noteId] = []; }
+  return _messages[noteId];
+}
+
+async function _notesLoadWorkspace() {
+  if (!_userId) return;
+  try {
+    const rows = await API.get('notes_workspace?user_id=eq.' + _userId + '&limit=1').catch(()=>[]);
+    if (rows?.[0]?.state) {
+      const s = rows[0].state;
+      _workspace.gridSize = s.gridSize || '2x2';
+      _workspace.tiles    = Array.isArray(s.tiles) ? s.tiles : [];
+      _workspace.tray     = Array.isArray(s.tray)  ? s.tray  : [];
+    }
+  } catch(e) { console.error('[Compass] Workspace load error:', e); }
+}
+
+async function _notesSaveWorkspace() {
+  if (!_userId) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    try {
+      await API.post('notes_workspace', {
+        firm_id:    FIRM_ID,
+        user_id:    _userId,
+        state:      _workspace,
+        updated_at: new Date().toISOString(),
+      }, { upsert: true, onConflict: 'user_id' });
+    } catch(e) {
+      // fallback — try patch
+      try {
+        await API.patch('notes_workspace?user_id=eq.' + _userId, {
+          state:      _workspace,
+          updated_at: new Date().toISOString(),
+        });
+      } catch(e2) { console.error('[Compass] Workspace save error:', e2); }
+    }
+  }, 800);
+}
+
+// ── Left panel ────────────────────────────────────────────────────────────
+function _notesRenderLeft() {
+  _notesRenderInbox();
+  _notesRenderTree();
+}
+
+function _notesRenderInbox() {
+  const inbox = _notes.filter(n => n.is_inbox);
+  const el    = document.getElementById('notes-inbox-list');
+  const badge = document.getElementById('notes-inbox-count');
+  if (!el) return;
+  if (badge) badge.textContent = inbox.length;
+  el.innerHTML = inbox.length === 0
+    ? '<div style="padding:8px 14px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Empty inbox</div>'
+    : inbox.map(n => _notesItemHTML(n)).join('');
+}
+
+function _notesRenderTree() {
+  const body = document.getElementById('notes-tree-body');
+  if (!body) return;
+
+  // Group non-inbox notes by top-level branch
+  const organized = _notes.filter(n => !n.is_inbox);
+  const branches  = {};
+  organized.forEach(n => {
+    const parts  = (n.hierarchy_path || 'Work').split('/');
+    const top    = parts[0] || 'Work';
+    const sub    = parts[1] || null;
+    if (!branches[top]) branches[top] = {};
+    const subKey = sub || '__root__';
+    if (!branches[top][subKey]) branches[top][subKey] = [];
+    branches[top][subKey].push(n);
+  });
+
+  // Always show Work, Personal even if empty
+  ['Work', 'Personal'].forEach(b => { if (!branches[b]) branches[b] = {}; });
+
+  let html = '';
+  Object.entries(branches).forEach(([branch, subs]) => {
+    const bid = 'nb-' + branch.replace(/\s+/g,'-');
+    const totalCount = Object.values(subs).reduce((s,a) => s + a.length, 0);
+    html += '<div class="notes-branch" data-toggle="' + bid + '">' +
+      '<svg class="notes-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+      _esc(branch) +
+      (totalCount > 0 ? '<span style="margin-left:auto;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)">' + totalCount + '</span>' : '') +
+      '</div>' +
+      '<div id="' + bid + '" class="notes-children">';
+
+    // Root-level notes (no sub-branch)
+    const rootNotes = subs['__root__'] || [];
+    if (rootNotes.length > 0) {
+      html += '<div class="notes-branch-items">' + rootNotes.map(n => _notesItemHTML(n)).join('') + '</div>';
+    }
+
+    // Sub-branches
+    Object.entries(subs).forEach(([sub, notes]) => {
+      if (sub === '__root__') return;
+      const sid = 'ns-' + branch + '-' + sub.replace(/\s+/g,'-');
+      html += '<div class="notes-subbranch" data-toggle="' + sid + '">' +
+        '<svg class="notes-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+        _esc(sub) +
+        '<span style="margin-left:auto;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)">' + notes.length + '</span>' +
+        '</div>' +
+        '<div id="' + sid + '" class="notes-children notes-subbranch-items">' +
+        notes.map(n => _notesItemHTML(n)).join('') +
+        '</div>';
+    });
+
+    html += '</div>';
+  });
+
+  body.innerHTML = html;
+  _notesWireLeft();
+}
+
+function _notesItemHTML(n) {
+  const inGrid = _workspace.tiles.some(t => t.noteId === n.id);
+  const age    = _notesRelTime(n.updated_at);
+  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
+    '<div class="notes-item-body">' +
+    '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
+    '<div class="notes-item-meta">' + age + (n.entity_type ? ' · ' + n.entity_type : '') + '</div>' +
+    '</div>' +
+    (n.entity_type ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
+    '</div>';
+}
+
+function _notesWireLeft() {
+  document.querySelectorAll('#notes-shell [data-toggle]').forEach(el => {
+    el.onclick = () => {
+      const target = document.getElementById(el.dataset.toggle);
+      if (!target) return;
+      const open = target.style.display !== 'none';
+      target.style.display = open ? 'none' : '';
+      el.querySelector('.notes-chevron')?.classList.toggle('open', !open);
+    };
+  });
+  document.querySelectorAll('.notes-item[data-noteid]').forEach(el => {
+    el.onclick = () => _notesOpenNote(el.dataset.noteid);
+  });
+}
+
+function _notesToggleSection(which) {
+  const listId = which === 'inbox' ? 'notes-inbox-list' : 'notes-tree-scroll';
+  const chevId = 'notes-chev-' + which;
+  const el     = document.getElementById(listId);
+  const chev   = document.getElementById(chevId);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  chev?.classList.toggle('open', !open);
+}
+
+// ── Grid ──────────────────────────────────────────────────────────────────
+function _notesRenderGrid() {
+  const grid = document.getElementById('notes-grid');
+  if (!grid) return;
+
+  const size = _workspace.gridSize || '2x2';
+  const cols = size === '1x1' ? 1 : size === '2x2' ? 2 : 3;
+  const rows = cols;
+  const slots = cols * rows;
+
+  // Update grid CSS
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  grid.style.gridTemplateRows    = 'repeat(' + rows + ', 1fr)';
+
+  // Update active button
+  document.querySelectorAll('.notes-grid-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.grid === size);
+  });
+
+  grid.innerHTML = '';
+  for (let i = 0; i < slots; i++) {
+    const tile = _workspace.tiles.find(t => t.slot === i);
+    const note = tile ? _notes.find(n => n.id === tile.noteId) : null;
+    const div  = document.createElement('div');
+    if (note) {
+      div.className = 'notes-tile';
+      div.innerHTML = _notesTileHTML(note, tile);
+      div.dataset.slot   = i;
+      div.dataset.noteid = note.id;
+    } else {
+      div.className = 'notes-tile empty';
+      div.dataset.slot = i;
+      div.innerHTML = '<span class="notes-slot-plus">+</span>';
+      div.onclick = () => _notesNew(i);
+    }
+    grid.appendChild(div);
+  }
+
+  _notesWireTiles();
+  _notesRenderTray();
+}
+
+function _notesTileHTML(note, tileState) {
+  const chatOpen = tileState?.chatOpen || false;
+  return '<div class="notes-tile-header">' +
+    '<div class="notes-tile-title" contenteditable="true" spellcheck="false" ' +
+      'data-noteid="' + _esc(note.id) + '" ' +
+      'onblur="_notesSaveTitle(this)">' + _esc(note.title || 'Untitled') + '</div>' +
+    (note.entity_type ? '<span class="notes-tile-source">' + _esc(note.entity_type) + '</span>' : '') +
+    '<button class="notes-tile-ctrl" title="Toggle chat" onclick="_notesToggleChat(\'' + note.id + '\')">' +
+      (chatOpen ? '💬' : '○') + '</button>' +
+    '<button class="notes-tile-ctrl" title="Close tile" onclick="_notesCloseTile(\'' + note.id + '\')" ' +
+      'style="color:rgba(226,75,74,.6)">✕</button>' +
+    '</div>' +
+    '<div class="notes-tile-body" id="notes-tbody-' + note.id + '">' +
+    '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
+      'placeholder="Start writing…" ' +
+      'oninput="_notesSaveContent(this)">' + _esc(note.content || '') + '</textarea>' +
+    '<div class="notes-chat' + (chatOpen ? '' : ' hidden') + '" id="notes-chat-' + note.id + '">' +
+      '<div class="notes-chat-msgs" id="notes-chat-msgs-' + note.id + '">' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:8px">Loading…</div>' +
+      '</div>' +
+      '<div class="notes-chat-compose">' +
+        '<textarea class="notes-chat-input" id="notes-chat-inp-' + note.id + '" ' +
+          'placeholder="Message…" rows="1" ' +
+          'onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();_notesSendMsg(\'' + note.id + '\')}"></textarea>' +
+        '<button class="notes-chat-send" onclick="_notesSendMsg(\'' + note.id + '\')">↑</button>' +
+      '</div>' +
+    '</div>' +
+    '</div>';
+}
+
+function _notesWireTiles() {
+  // Load messages for tiles with chat open
+  _workspace.tiles.forEach(t => {
+    if (t.chatOpen) _notesLoadAndRenderMsgs(t.noteId);
+  });
+}
+
+function _notesRenderTray() {
+  const tray = document.getElementById('notes-tray');
+  if (!tray) return;
+  const trayNotes = _workspace.tray.map(id => _notes.find(n => n.id === id)).filter(Boolean);
+  tray.innerHTML = trayNotes.map(n =>
+    '<div class="notes-tray-chip" data-noteid="' + _esc(n.id) + '" ' +
+      'onclick="_notesOpenNote(\'' + n.id + '\')">' +
+      _esc(n.title || 'Untitled') + '</div>'
+  ).join('');
+}
+
+// ── Grid actions ──────────────────────────────────────────────────────────
+function _notesSetGrid(size, btn) {
+  _workspace.gridSize = size;
+  _notesSaveWorkspace();
+  _notesRenderGrid();
+}
+
+function _notesOpenNote(noteId) {
+  // Already in grid?
+  if (_workspace.tiles.some(t => t.noteId === noteId)) return;
+  // Find first empty slot
+  const size  = _workspace.gridSize || '2x2';
+  const slots = size === '1x1' ? 1 : size === '2x2' ? 4 : 9;
+  const usedSlots = new Set(_workspace.tiles.map(t => t.slot));
+  let emptySlot = -1;
+  for (let i = 0; i < slots; i++) {
+    if (!usedSlots.has(i)) { emptySlot = i; break; }
+  }
+  if (emptySlot >= 0) {
+    _workspace.tiles.push({ slot: emptySlot, noteId, chatOpen: false });
+  } else {
+    // All slots full — add to tray
+    if (!_workspace.tray.includes(noteId)) _workspace.tray.push(noteId);
+  }
+  _notesSaveWorkspace();
+  _notesRenderGrid();
+  _notesRenderLeft();
+}
+
+function _notesCloseTile(noteId) {
+  _workspace.tiles = _workspace.tiles.filter(t => t.noteId !== noteId);
+  _workspace.tray  = _workspace.tray.filter(id => id !== noteId);
+  _notesSaveWorkspace();
+  _notesRenderGrid();
+  _notesRenderLeft();
+}
+
+function _notesToggleChat(noteId) {
+  const tile = _workspace.tiles.find(t => t.noteId === noteId);
+  if (!tile) return;
+  tile.chatOpen = !tile.chatOpen;
+  const chatEl = document.getElementById('notes-chat-' + noteId);
+  if (chatEl) {
+    chatEl.classList.toggle('hidden', !tile.chatOpen);
+    if (tile.chatOpen) _notesLoadAndRenderMsgs(noteId);
+  }
+  // Update ctrl button icon
+  const header = chatEl?.closest('.notes-tile')?.querySelector('.notes-tile-header');
+  if (header) {
+    const btn = header.querySelectorAll('.notes-tile-ctrl')[0];
+    if (btn) btn.textContent = tile.chatOpen ? '💬' : '○';
+  }
+  _notesSaveWorkspace();
+}
+
+async function _notesNew(slot) {
+  if (!_userId) return;
+  try {
+    const res = await API.post('notes', {
+      firm_id:       FIRM_ID,
+      owner_user_id: _userId,
+      title:         'New note',
+      content:       '',
+      hierarchy_path:'Inbox',
+      is_inbox:      true,
+      created_at:    new Date().toISOString(),
+      updated_at:    new Date().toISOString(),
+    });
+    const newNote = res?.[0];
+    if (!newNote?.id) return;
+    _notes.unshift(newNote);
+    if (typeof slot === 'number') {
+      _workspace.tiles = _workspace.tiles.filter(t => t.slot !== slot);
+      _workspace.tiles.push({ slot, noteId: newNote.id, chatOpen: false });
+    } else {
+      _notesOpenNote(newNote.id);
+    }
+    _notesSaveWorkspace();
+    _notesRenderLeft();
+    _notesRenderGrid();
+    // Focus the title of the new tile
+    setTimeout(() => {
+      const titleEl = document.querySelector('[data-noteid="' + newNote.id + '"].notes-tile-title');
+      if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
+    }, 50);
+  } catch(e) { console.error('[Compass] New note error:', e); }
+}
+
+// ── Save handlers ─────────────────────────────────────────────────────────
+let _contentTimers = {};
+
+function _notesSaveContent(el) {
+  const noteId = el.dataset.noteid;
+  if (!noteId) return;
+  const note = _notes.find(n => n.id === noteId);
+  if (note) note.content = el.value;
+  clearTimeout(_contentTimers[noteId]);
+  _contentTimers[noteId] = setTimeout(async () => {
+    try {
+      await API.patch('notes?id=eq.' + noteId, { content: el.value, updated_at: new Date().toISOString() });
+    } catch(e) { console.error('[Compass] Note save error:', e); }
+  }, 1200);
+}
+
+function _notesSaveTitle(el) {
+  const noteId = el.dataset.noteid;
+  if (!noteId) return;
+  const newTitle = el.textContent.trim() || 'Untitled';
+  el.textContent = newTitle;
+  const note = _notes.find(n => n.id === noteId);
+  if (note) note.title = newTitle;
+  API.patch('notes?id=eq.' + noteId, { title: newTitle, updated_at: new Date().toISOString() }).catch(()=>{});
+  // Update left panel
+  document.querySelectorAll('.notes-item[data-noteid="' + noteId + '"] .notes-item-title').forEach(t => {
+    t.textContent = newTitle;
+  });
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────
+async function _notesLoadAndRenderMsgs(noteId) {
+  const msgs    = await _notesLoadMessages(noteId);
+  const msgsEl  = document.getElementById('notes-chat-msgs-' + noteId);
+  if (!msgsEl) return;
+  if (!msgs.length) {
+    msgsEl.innerHTML = '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:8px">No messages yet</div>';
+    return;
+  }
+  msgsEl.innerHTML = msgs.map(m =>
+    '<div class="notes-chat-msg">' +
+    '<div class="notes-chat-author">' + _esc(m.author_name || 'You') + ' <span class="notes-chat-time">' + _notesRelTime(m.created_at) + '</span></div>' +
+    '<div class="notes-chat-body">' + _esc(m.body) + '</div>' +
+    '</div>'
+  ).join('');
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function _notesSendMsg(noteId) {
+  const inp  = document.getElementById('notes-chat-inp-' + noteId);
+  const body = inp?.value?.trim();
+  if (!body || !_userId) return;
+  inp.value = '';
+  try {
+    await API.post('note_messages', {
+      note_id:        noteId,
+      author_user_id: _userId,
+      author_name:    _userName,
+      body,
+      created_at:     new Date().toISOString(),
+    });
+    delete _messages[noteId]; // bust cache
+    await _notesLoadAndRenderMsgs(noteId);
+  } catch(e) { console.error('[Compass] Send message error:', e); }
+}
+
+// ── Search ────────────────────────────────────────────────────────────────
+function _notesSearch(q) {
+  const query = q.toLowerCase().trim();
+  document.querySelectorAll('.notes-item[data-noteid]').forEach(el => {
+    const n = _notes.find(x => x.id === el.dataset.noteid);
+    if (!n) return;
+    const hay = [n.title, n.content, n.hierarchy_path].filter(Boolean).join(' ').toLowerCase();
+    el.style.display = (!query || hay.includes(query)) ? '' : 'none';
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function _notesRelTime(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  const d = Math.floor(h / 24);
+  if (d < 7)  return d + 'd ago';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function _esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+})();
+</script>

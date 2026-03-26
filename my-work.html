@@ -1023,7 +1023,8 @@ window._mwLoadUserView = async function() {
     </div>
 
     <!-- Tab: CONCERNS -->
-    <div class="utc" id="utc-concerns">
+    <div class="utc" id="utc-notes">
+      <div id="user-notes-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading notes…</div></div>
       <div id="user-concerns-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading concerns…</div></div>
     </div>
 
@@ -4908,7 +4909,8 @@ window.uSwitchTab = function(tab, btn) {
   if (panel) panel.classList.add('on');
   if (tab === 'meetings' && !window._mtgLoaded) loadMyMeetingsView();
   else if (tab === 'meetings' && window._mtgRefresh) window._mtgRefresh();
-  if (tab === 'concerns' && !window._concernsLoaded) loadUserConcerns();
+  if (tab === 'concerns' && !window._notesLoaded) loadMyNotesView();
+  else if (tab === 'concerns' && window._notesRefresh) window._notesRefresh();
   if (tab === 'calendar' && !window._calLoaded) loadMyCalView();
   else if (tab === 'calendar' && window._calRefresh) window._calRefresh();
   if (tab === 'requests' && !window._requestsLoaded) loadUserRequests();
@@ -5143,6 +5145,44 @@ window.loadMyMeetingsView = async function() {
   } catch(err) {
     console.error('[Compass] Failed to load my-meetings.html:', err);
     compassToast('Failed to load My Meetings — check console', 4000);
+  }
+};
+
+// ── My Notes loader ───────────────────────────────────────────────────────
+window.loadMyNotesView = async function() {
+  if (window._notesLoaded) {
+    window._notesRefresh && window._notesRefresh();
+    return;
+  }
+  const container = document.getElementById('user-notes-content');
+  if (!container) { console.error('[Compass] #user-notes-content not found'); return; }
+  container.innerHTML = '';
+  try {
+    const resp = await fetch('/my-notes.html');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(html, 'text/html');
+    for (const st of doc.querySelectorAll('style')) {
+      const el = document.createElement('style');
+      el.textContent = st.textContent;
+      document.head.appendChild(el);
+    }
+    Array.from(doc.body.childNodes).forEach(node => {
+      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
+    });
+    for (const s of doc.querySelectorAll('script')) {
+      const el = document.createElement('script');
+      el.textContent = s.textContent;
+      document.head.appendChild(el);
+    }
+    // Bridge resource
+    window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
+    if (window._notesLoadView) await window._notesLoadView();
+    else console.error('[Compass] _notesLoadView not exported by my-notes.html');
+  } catch(err) {
+    console.error('[Compass] Failed to load my-notes.html:', err);
+    compassToast('Failed to load My Notes — check console', 4000);
   }
 };
 
