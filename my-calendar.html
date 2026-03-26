@@ -44,7 +44,7 @@
       <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,system-ui);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(226,75,74,.5)"></div>PTO / out</div>
     </div>
     <div id="cal-grid-view">
-      <div style="overflow-x:auto;margin-bottom:10px">
+      <div style="overflow-x:auto;height:calc(100vh - 220px);overflow-y:auto">
         <div id="cal-tab-grid" style="display:grid;grid-template-columns:52px repeat(7,1fr);min-width:480px"></div>
       </div>
       <div style="font-family:var(--font-ui,system-ui);font-size:11px;color:rgba(255,255,255,.2);line-height:1.5">Click any hour block to add a focus block. PTO requests propagate to assignment constraints automatically on approval.</div>
@@ -322,7 +322,7 @@ function _renderCalTab() {
 
   HOURS.forEach(h => {
     const timeLbl = document.createElement('div');
-    timeLbl.style.cssText = 'font-family:var(--font-mono,monospace);font-size:10px;color:rgba(255,255,255,.2);padding:4px 5px 0;text-align:right;border-right:1px solid rgba(255,255,255,.06);line-height:1.4';
+    timeLbl.style.cssText = 'font-family:var(--font-mono,monospace);font-size:11px;font-weight:600;color:rgba(255,255,255,.7);padding:4px 6px 0;text-align:right;border-right:1px solid rgba(255,255,255,.15);line-height:1.4;white-space:nowrap';
     timeLbl.textContent = (h<=12?h:h-12)+':00'+(h<12?' AM':h===12?' PM':' PM');
     grid.appendChild(timeLbl);
     days.forEach((d, di) => {
