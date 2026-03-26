@@ -272,9 +272,9 @@ let _kbAddTarget    = null; // colId receiving the add-item action
 
 // Kanban CSS — injected once on first toggle
 (function injectKbCss() {
-  if (document.getElementById('kb-styles')) return;
+  if (document.getElementById('kb-styles-v2')) return;
   const s = document.createElement('style');
-  s.id = 'kb-styles';
+  s.id = 'kb-styles-v2';
   s.textContent = [
     '.kb-col{background:var(--bg1);border:1px solid var(--border);overflow:hidden;min-height:300px;display:flex;flex-direction:column}',
     '.kb-col.weekend{opacity:.6}',
@@ -429,16 +429,25 @@ function _kbRender() {
   const uid     = resource ? resource.user_id : null;
 
   // Use _calItems bridged from my-work.html — falls back to _mtTasks
+  // _wiItems shape: { type, id, title, project, projectId, status, due, overdue, budgetHours, effortDays }
   const wiItems  = window._calItems || window._mtTasks || [];
-  const calEvs   = window._mtCalEvents || [];
+  const calEvs   = window._calCalEvents || window._mtCalEvents || [];
 
-  // Filter open tasks/actions assigned to this user
+  // _wiItems are pre-filtered to this user already — just remove done items
   const openItems = wiItems.filter(t => {
     if (!t || !t.id) return false;
-    const notDone = t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved';
-    const mine    = t.assigned_to === uid || t.owner_resource_id === resource?.id || !uid;
-    return notDone && mine;
+    return t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved';
   });
+
+  // Time entries for billable KPI (bridged from my-work.html)
+  const teEntries = window._calTimeEntries || [];
+  const monIso    = _kbIsoLocal(mon);
+  const friIso    = _kbIsoLocal(fri);
+  const weekEntries = teEntries.filter(e => e.date >= monIso && e.date <= friIso);
+  const billHrs   = weekEntries.filter(e => e.is_billable).reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
+  const nonBillHrs = weekEntries.filter(e => !e.is_billable).reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
+  const totalLoggedHrs = billHrs + nonBillHrs;
+  const billPct   = totalLoggedHrs > 0 ? Math.round((billHrs / totalLoggedHrs) * 100) : 0;
 
   // Col order: last | mon tue wed thu fri sat sun | next
   const colIds = ['last','mon','tue','wed','thu','fri','sat','sun','next'];
@@ -449,17 +458,15 @@ function _kbRender() {
   const prevSunDate = _kbIsoLocal(new Date(mon.getTime() - 86400000)); // Sun before this Mon
 
   openItems.forEach(t => {
-    const due = t.due_date ? t.due_date.slice(0,10) : null;
+    const due = t.due ? t.due.slice(0,10) : null;  // _wiItems uses .due not .due_date
     if (!due) { taskBuckets['next'].push(t); return; }
     let placed = false;
-    // Check Mon–Sun of current week
     ['mon','tue','wed','thu','fri','sat','sun'].forEach(id => {
       if (!placed && _kbColDates[id] === due) { taskBuckets[id].push(t); placed = true; }
     });
     if (!placed) {
-      if (due > _kbColDates['sun'])      { taskBuckets['next'].push(t); }   // future
-      else if (due >= prevMonDate)       { taskBuckets['last'].push(t); }   // last week
-      else                               { taskBuckets['last'].push(t); }   // older — still last week bucket
+      if (due > _kbColDates['sun'])  taskBuckets['next'].push(t);
+      else                           taskBuckets['last'].push(t);
     }
   });
 
@@ -496,26 +503,21 @@ function _kbRender() {
     });
 
     taskBuckets[colId].forEach(t => {
-      const h = parseFloat(t.budget_hours || t.loe_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
-      const neg = t.negotiation_state ? (typeof t.negotiation_state === 'string' ? JSON.parse(t.negotiation_state) : t.negotiation_state) : null;
-      const negState = neg ? neg.state : null;
-      const projName = _kbGetProjectName(t.project_id);
-      const isOverdue = t.due_date && t.due_date.slice(0,10) < today;
+      // _wiItems fields: title, project, projectId, budgetHours, effortDays, due, overdue, type, status
+      const h = parseFloat(t.budgetHours || (t.effortDays ? t.effortDays * 8 : 0) || 2);
+      const isOverdue = t.overdue || (t.due && t.due.slice(0,10) < today);
       totalTaskHrs += h; totalItems++;
-      if (negState === 'pending') pendingCount++;
       let cardCls = 'kb-card';
-      if (negState === 'pending') cardCls += ' kb-pending';
-      else if (negState === 'agreed') cardCls += ' kb-approved';
-      else if (isOverdue) cardCls += ' kb-overdue';
-      let pills = '<span class="kb-pill kb-pill-task">' + _esc(t.type || t.status || 'task') + '</span><span class="kb-pill kb-pill-hrs">' + h + 'h</span>';
-      if (negState === 'pending')  pills += '<span class="kb-pill kb-pill-warn">Pending PM</span>';
-      if (negState === 'agreed')   pills += '<span class="kb-pill kb-pill-green">Approved</span>';
-      if (isOverdue && negState !== 'pending') pills += '<span class="kb-pill kb-pill-red">Overdue</span>';
-      if (t.due_date) pills += '<span class="kb-pill kb-pill-hrs">Due ' + t.due_date.slice(5) + '</span>';
-      cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due_date||'') + '" data-colid="' + colId + '">' +
+      if (isOverdue) cardCls += ' kb-overdue';
+      const dueStr = t.due ? t.due.slice(5) : null;
+      let pills = '<span class="kb-pill kb-pill-task">' + _esc(t.type || 'task') + '</span>' +
+                  '<span class="kb-pill kb-pill-hrs">' + h + 'h</span>';
+      if (isOverdue) pills += '<span class="kb-pill kb-pill-red">Overdue</span>';
+      if (dueStr)    pills += '<span class="kb-pill kb-pill-hrs">Due ' + _esc(dueStr) + '</span>';
+      cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due||'') + '" data-colid="' + colId + '">' +
         '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
-        '<div class="kb-card-proj">' + _esc(projName || t.project_name || 'Project') + '</div>' +
-        '<div class="kb-card-title">' + _esc(t.name || t.title || 'Item') + '</div>' +
+        '<div class="kb-card-proj">' + _esc(t.project || 'Project') + '</div>' +
+        '<div class="kb-card-title">' + _esc(t.title || t.name || 'Item') + '</div>' +
         '<div class="kb-card-foot">' + pills + '</div>' +
         '</div>';
     });
@@ -524,7 +526,7 @@ function _kbRender() {
     if (!isLast) cardsHtml += '<button class="kb-add-btn" data-addcol="' + colId + '">+ Add item</button>';
 
     const mtgH  = calBuckets[colId].reduce((s,ev) => s + parseFloat(ev.duration_hours||0), 0);
-    const taskH = taskBuckets[colId].reduce((s,t) => s + parseFloat(t.budget_hours||t.loe_hours||(t.effort_days?t.effort_days*8:0)||2), 0);
+    const taskH = taskBuckets[colId].reduce((s,t) => s + parseFloat(t.budgetHours||(t.effortDays?t.effortDays*8:0)||2), 0);
     const avail = Math.max(0, 8 - mtgH);
     const pct   = avail > 0 ? Math.min(Math.round((taskH / avail) * 100), 100) : (taskH > 0 ? 100 : 0);
     const over  = taskH > avail;
@@ -547,11 +549,11 @@ function _kbRender() {
 
   const kpiRow = document.getElementById('kb-kpi-row');
   if (kpiRow) kpiRow.innerHTML =
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">This week</div><div class="kb-kpi-val info">' + totalItems + '</div><div class="kb-kpi-sub">items scheduled</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Meetings</div><div class="kb-kpi-val">' + totalMtgHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">time consumed</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Committed hours</div><div class="kb-kpi-val info">' + totalTaskHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">tasks + actions</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Pending approval</div><div class="kb-kpi-val' + (pendingCount>0?' warn':'') + '">' + pendingCount + '</div><div class="kb-kpi-sub">awaiting PM</div></div>' +
-    '<div class="kb-kpi"><div class="kb-kpi-lbl">Sig. chain avg</div><div class="kb-kpi-val">38h</div><div class="kb-kpi-sub">this quarter</div></div>';
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Scheduled</div><div class="kb-kpi-val info">' + totalItems + '</div><div class="kb-kpi-sub">items this week</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Billable logged</div><div class="kb-kpi-val' + (billPct >= 80 ? '' : billPct >= 60 ? ' warn' : ' warn') + '">' + billHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + billPct + '% of ' + totalLoggedHrs.toFixed(1) + 'h logged</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Non-billable</div><div class="kb-kpi-val">' + nonBillHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">' + (100 - billPct) + '% of logged hours</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Meetings</div><div class="kb-kpi-val">' + totalMtgHrs.toFixed(1) + 'h</div><div class="kb-kpi-sub">calendar events</div></div>' +
+    '<div class="kb-kpi"><div class="kb-kpi-lbl">Pending approval</div><div class="kb-kpi-val' + (pendingCount > 0 ? ' warn' : '') + '">' + pendingCount + '</div><div class="kb-kpi-sub">awaiting PM</div></div>';
 
   _kbWireCards();
 }
@@ -856,6 +858,7 @@ window._calRefresh = async function() {
   // Re-stamp bridged globals in case they were updated
   if (typeof _myResource !== 'undefined' && _myResource) window._calResource  = _myResource;
   if (typeof _wiItems    !== 'undefined' && _wiItems)    window._calItems     = _wiItems;
+  if (typeof _teEntries  !== 'undefined' && _teEntries)  window._calTimeEntries = _teEntries;
   buildCalendarTab();
 };
 

@@ -5086,9 +5086,10 @@ window.loadMyCalView = async function() {
       document.head.appendChild(el);
     }
     // Bridge scoped vars from compass.html / my-work.html into my-calendar.html
-    window._calResource  = typeof _myResource !== 'undefined' ? _myResource : null;
-    window._calItems     = typeof _wiItems    !== 'undefined' ? _wiItems    : [];
-    window._calCalEvents = window._mtCalEvents || [];
+    window._calResource    = typeof _myResource !== 'undefined' ? _myResource : null;
+    window._calItems       = typeof _wiItems    !== 'undefined' ? _wiItems    : [];
+    window._calCalEvents   = window._mtCalEvents || [];
+    window._calTimeEntries = typeof _teEntries  !== 'undefined' ? _teEntries  : [];
     if (window._calLoadView) await window._calLoadView();
     else console.error('[Compass] _calLoadView not exported by my-calendar.html');
   } catch (err) {
