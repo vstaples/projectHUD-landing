@@ -385,6 +385,14 @@ textarea.editor-area.lg { min-height: 120px; }
     </div>
     <div class="hdr-actions">
       <div class="autosave" id="autosave-indicator"></div>
+      <!-- Recurring toggle -->
+      <label id="recurring-toggle" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+        padding:5px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;
+        font-size:11px;color:var(--muted);user-select:none" title="Recurring meetings are standing instances. Non-recurring follow-ups become 2nd attempt, 3rd attempt, etc.">
+        <input type="checkbox" id="chk-recurring" onchange="toggleRecurring(this.checked)"
+          style="width:13px;height:13px;accent-color:#4f8ef7;cursor:pointer"/>
+        Recurring
+      </label>
       <span class="status-chip" id="status-chip"
         style="background:rgba(255,255,255,.07);color:var(--muted)">Draft</span>
       <button class="btn" onclick="saveDraft()">Save draft</button>
@@ -618,6 +626,17 @@ let ccRecipients  = [];
 let _autosaveTimer = null;
 let _agendaNotes  = {};   // { [agendaItemId]: string } — per-item discussion notes
 let _agendaItems  = [];   // agenda items loaded with meeting
+let _isRecurring  = false;  // tracks recurring state for this meeting
+
+async function toggleRecurring(val) {
+  _isRecurring = val;
+  // Persist immediately to meetings table
+  if (MEETING_ID) {
+    try {
+      await API.patch('meetings?id=eq.' + MEETING_ID, { is_recurring: val });
+    } catch(e) { console.error('Failed to save recurring flag:', e); }
+  }
+}
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1170,6 +1189,11 @@ function populateForm() {
     document.getElementById('f-next-meeting').value = '';
   }
 
+  // Recurring toggle
+  _isRecurring = meeting.is_recurring || false;
+  const chk = document.getElementById('chk-recurring');
+  if (chk) chk.checked = _isRecurring;
+
   // Subject
   const dateStr = new Date(meeting.meeting_date).toLocaleDateString('en-US',
     { month:'short', day:'numeric', year:'numeric' });
@@ -1607,6 +1631,11 @@ async function exitEditor() {
       document.getElementById('f-discussion').value ||
       document.getElementById('f-decisions').value) {
     await saveDraft();
+  }
+  // If embedded in MY MEETINGS iframe, notify parent instead of navigating
+  if (window.parent && window.parent !== window && window.parent._mtgMinutesClosed) {
+    window.parent._mtgMinutesClosed(MEETING_ID);
+    return;
   }
   if (PROSPECT_ID) {
     location.href = '/prospect-detail.html?id=' + PROSPECT_ID + '&tab=meetings';
