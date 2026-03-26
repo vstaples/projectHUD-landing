@@ -19,35 +19,35 @@
   <div id="user-calendar-content">
     <!-- Row 1: month label + right controls -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text0)" id="cal-tab-month-label">March 2026</div>
+      <div style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;font-weight:700;color:var(--text0)" id="cal-tab-month-label">March 2026</div>
       <div style="display:flex;gap:5px;align-items:center">
-        <button id="cal-tab-prev" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249;</button>
-        <button id="cal-tab-today" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);background:none;cursor:pointer">Today</button>
-        <button id="cal-tab-next" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8250;</button>
+        <button id="cal-tab-prev" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249;</button>
+        <button id="cal-tab-today" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:3px 9px;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);background:none;cursor:pointer">Today</button>
+        <button id="cal-tab-next" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8250;</button>
         <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px"></div>
-        <button id="cal-tab-add-block" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer">+ Block time</button>
-        <button id="myr-pto-quick" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer">+ PTO</button>
+        <button id="cal-tab-add-block" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer">+ Block time</button>
+        <button id="myr-pto-quick" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer">+ PTO</button>
       </div>
     </div>
     <!-- Row 2: centered Grid | Kanban pill -->
     <div style="display:flex;justify-content:center;margin-bottom:10px">
       <div style="display:inline-flex;border:1px solid #a07d08;overflow:hidden;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,.4)">
-        <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:linear-gradient(180deg,#f5c842 0%,#c99a0a 100%);border:none;color:#fff;cursor:pointer;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)">Grid</button>
+        <button id="cal-view-grid-btn" onclick="calSwitchView('grid')" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:linear-gradient(180deg,#f5c842 0%,#c99a0a 100%);border:none;color:#fff;cursor:pointer;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)">Grid</button>
         <div style="width:1px;background:#a07d08"></div>
-        <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:rgba(0,0,0,.35);border:none;color:rgba(255,255,255,.4);cursor:pointer;text-transform:uppercase">Kanban</button>
+        <button id="cal-view-kanban-btn" onclick="calSwitchView('kanban')" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;padding:5px 22px;background:rgba(0,0,0,.35);border:none;color:rgba(255,255,255,.4);cursor:pointer;text-transform:uppercase">Kanban</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(139,92,246,.5)"></div>Meeting</div>
-      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(0,210,255,.5)"></div>Focus block</div>
-      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(239,159,39,.5)"></div>Task due</div>
-      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(226,75,74,.5)"></div>PTO / out</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(139,92,246,.5)"></div>Meeting</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(0,210,255,.5)"></div>Focus block</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(239,159,39,.5)"></div>Task due</div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border-radius:1px;background:rgba(226,75,74,.5)"></div>PTO / out</div>
     </div>
     <div id="cal-grid-view">
       <div style="overflow-x:auto;margin-bottom:10px">
         <div id="cal-tab-grid" style="display:grid;grid-template-columns:52px repeat(7,1fr);min-width:480px"></div>
       </div>
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);line-height:1.5">Click any hour block to add a focus block. PTO requests propagate to assignment constraints automatically on approval.</div>
+      <div style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.2);line-height:1.5">Click any hour block to add a focus block. PTO requests propagate to assignment constraints automatically on approval.</div>
     </div>
 
     <!-- Kanban view — hidden until toggled -->
@@ -55,39 +55,47 @@
       <!-- KPI strip -->
       <div id="kb-kpi-row" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px"></div>
       <!-- Week nav -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <button id="kb-prev-btn" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249; Prev week</button>
-        <div id="kb-week-lbl" style="font-family:var(--font-mono);font-size:11px;color:var(--text2);padding:3px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">—</div>
-        <button id="kb-next-btn" style="font-family:var(--font-head);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Next week &#8250;</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button id="kb-prev-btn" style="font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">&#8249; Prev week</button>
+        <div id="kb-week-lbl" style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text2);padding:3px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">—</div>
+        <button id="kb-next-btn" style="font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;padding:3px 9px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Next week &#8250;</button>
+        <button id="kb-wknd-btn" title="Show/hide Saturday &amp; Sunday" style="font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;gap:5px;margin-left:4px;transition:all .12s">
+          <svg id="kb-wknd-eye" width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+            <path d="M1 5C1 5 3 1 7 1C11 1 13 5 13 5C13 5 11 9 7 9C3 9 1 5 1 5Z" stroke="currentColor" stroke-width="1.2"/>
+            <circle cx="7" cy="5" r="2" fill="currentColor"/>
+            <line id="kb-wknd-slash" x1="2" y1="1" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" style="display:none"/>
+          </svg>
+          Weekend
+        </button>
       </div>
-      <!-- Board: Last week | Mon-Sun | Next week -->
-      <div id="kb-board" style="display:grid;grid-template-columns:130px repeat(7,minmax(0,1fr)) 130px;gap:6px;align-items:start;overflow-x:auto"></div>
+      <!-- Board: grid-template-columns set dynamically by _kbRender based on weekend visibility -->
+      <div id="kb-board" style="display:grid;gap:6px;align-items:start;overflow-x:auto"></div>
       <!-- Legend -->
       <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0 4px;margin-top:6px">
-        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(0,210,255,.3);background:rgba(0,210,255,.06)"></div>Task / action</div>
-        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.1)"></div>Meeting</div>
-        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px dashed rgba(239,159,39,.6);background:rgba(239,159,39,.08)"></div>Pending PM approval</div>
-        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px solid rgba(29,158,117,.5);background:rgba(29,158,117,.08)"></div>Approved · locked</div>
-        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px solid rgba(226,75,74,.5);background:rgba(226,75,74,.08)"></div>Overdue / over cap</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(0,210,255,.3);background:rgba(0,210,255,.06)"></div>Task / action</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.1)"></div>Meeting</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px dashed rgba(239,159,39,.6);background:rgba(239,159,39,.08)"></div>Pending PM approval</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px solid rgba(29,158,117,.5);background:rgba(29,158,117,.08)"></div>Approved · locked</div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:10px;height:10px;border:1.5px solid rgba(226,75,74,.5);background:rgba(226,75,74,.08)"></div>Overdue / over cap</div>
       </div>
       <!-- Negotiation panel (hidden) -->
       <div id="kb-neg-panel" style="display:none;margin-top:10px;background:rgba(239,159,39,.07);border:1px solid rgba(239,159,39,.3);border-left:3px solid var(--compass-amber,#EF9F27);padding:12px 14px">
-        <div id="kb-neg-title" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--compass-amber,#EF9F27);margin-bottom:4px">Approval required — moving past due date</div>
+        <div id="kb-neg-title" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--compass-amber,#EF9F27);margin-bottom:4px">Approval required — moving past due date</div>
         <div id="kb-neg-body" style="font-family:var(--font-mono);font-size:11px;color:var(--text1);line-height:1.6;margin-bottom:10px">—</div>
         <div style="display:flex;gap:7px;flex-wrap:wrap">
-          <button id="kb-neg-btn-a" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.2);color:var(--text2);cursor:pointer;letter-spacing:.06em">↩ Move it back</button>
-          <button id="kb-neg-btn-b" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.06em">◈ Ask Compass to find a slot</button>
-          <button id="kb-neg-btn-c" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.4);color:var(--compass-amber,#EF9F27);cursor:pointer;letter-spacing:.06em">✓ Submit for PM approval</button>
+          <button id="kb-neg-btn-a" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.2);color:var(--text2);cursor:pointer;letter-spacing:.06em">↩ Move it back</button>
+          <button id="kb-neg-btn-b" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:5px 13px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.06em">◈ Ask Compass to find a slot</button>
+          <button id="kb-neg-btn-c" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:5px 13px;background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.4);color:var(--compass-amber,#EF9F27);cursor:pointer;letter-spacing:.06em">✓ Submit for PM approval</button>
         </div>
       </div>
       <!-- Delete panel (hidden) -->
       <div id="kb-del-panel" style="display:none;margin-top:8px;background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.3);border-left:3px solid var(--compass-red,#E24B4A);padding:12px 14px">
-        <div id="kb-del-title" style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--compass-red,#E24B4A);margin-bottom:4px">Removing hours — reason required</div>
+        <div id="kb-del-title" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--compass-red,#E24B4A);margin-bottom:4px">Removing hours — reason required</div>
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--text1);line-height:1.5;margin-bottom:8px">Deleting this slice reduces committed hours below task LOE. This will be logged in Chain of Custody and your PM will be notified.</div>
         <input id="kb-del-reason" placeholder="Why are you reducing committed hours? (required)" style="width:100%;font-family:var(--font-mono);font-size:11px;padding:5px 9px;background:var(--bg2);border:1px solid rgba(226,75,74,.4);color:var(--text0);margin-bottom:8px;outline:none" />
         <div style="display:flex;gap:7px">
-          <button id="kb-del-cancel" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.2);color:var(--text2);cursor:pointer;letter-spacing:.06em">Cancel — keep the slice</button>
-          <button id="kb-del-confirm" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.4);color:var(--compass-red,#E24B4A);cursor:pointer;letter-spacing:.06em">Confirm deletion + notify PM</button>
+          <button id="kb-del-cancel" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:5px 13px;background:none;border:1px solid rgba(255,255,255,.2);color:var(--text2);cursor:pointer;letter-spacing:.06em">Cancel — keep the slice</button>
+          <button id="kb-del-confirm" style="font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;padding:5px 13px;background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.4);color:var(--compass-red,#E24B4A);cursor:pointer;letter-spacing:.06em">Confirm deletion + notify PM</button>
         </div>
       </div>
     </div><!-- /cal-kanban-view -->
@@ -228,7 +236,7 @@ function _renderCalTab() {
   days.forEach(d => {
     const isToday = d.toDateString() === now.toDateString();
     const dH = document.createElement('div');
-    dH.style.cssText = `padding:5px 0;font-family:var(--font-head);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;letter-spacing:.06em;color:${isToday?'#00D2FF':'rgba(255,255,255,.35)'}`;
+    dH.style.cssText = `padding:5px 0;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06);text-align:center;letter-spacing:.06em;color:${isToday?'#00D2FF':'rgba(255,255,255,.35)'}`;
     dH.textContent = dayNames[d.getDay()===0?7:d.getDay()] + ' ' + d.getDate();
     grid.appendChild(dH);
   });
@@ -247,7 +255,7 @@ function _renderCalTab() {
   };
   HOURS.forEach(h => {
     const timeLbl = document.createElement('div');
-    timeLbl.style.cssText = 'font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:0 5px;text-align:right;line-height:26px;border-right:1px solid rgba(255,255,255,.06)';
+    timeLbl.style.cssText = 'font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:10px;color:rgba(255,255,255,.2);padding:0 5px;text-align:right;line-height:26px;border-right:1px solid rgba(255,255,255,.06)';
     timeLbl.textContent = (h<=12?h:h-12)+':00'+(h<12?' AM':h===12?' PM':' PM');
     grid.appendChild(timeLbl);
     days.forEach((d, di) => {
@@ -276,6 +284,7 @@ function _renderCalTab() {
 let _kbWeekOffset   = 0;
 let _kbLoaded       = false;
 let _kbColDates     = {};
+let _kbShowWeekend  = false; // hidden by default in Kanban
 let _kbDrag         = { card: null, srcColId: null, cardId: null, hrs: 0, type: '', due: null, taskId: null };
 let _kbNeg          = { active: false, cardEl: null, srcColId: null, destColId: null };
 let _kbDel          = { active: false, cardEl: null, cardId: null, taskId: null };
@@ -292,7 +301,7 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-col.kb-next{background:var(--bg2);border-style:dashed}',
     '.kb-col.kb-drag-over{border-color:var(--compass-cyan,#00D2FF)!important;background:rgba(0,210,255,.04)}',
     '.kb-col-hdr{padding:7px 9px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}',
-    '.kb-col-day{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text0)}',
+    '.kb-col-day{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text0)}',
     '.kb-col-day.kb-today{color:var(--compass-cyan,#00D2FF)}',
     '.kb-col-day.kb-past{color:var(--text3)}',
     '.kb-cap-bar{height:4px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,.06);margin-top:5px}',
@@ -312,7 +321,7 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-card.kb-overdue{background:rgba(226,75,74,.08);border:1.5px solid rgba(226,75,74,.45)}',
     '.kb-card-proj{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em}',
     '.kb-card.kb-meeting .kb-card-proj{color:rgba(139,92,246,.75)}',
-    '.kb-card-title{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--text0);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.kb-card-title{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--text0);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.kb-card.kb-pending .kb-card-title{color:var(--compass-amber,#EF9F27)}',
     '.kb-card.kb-overdue .kb-card-title{color:var(--compass-red,#E24B4A)}',
     '.kb-card.kb-approved .kb-card-title{color:var(--compass-green,#1D9E75)}',
@@ -323,26 +332,26 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-del-btn:hover{color:var(--compass-red,#E24B4A)}',
     '.kb-card:hover .kb-del-btn{display:block}',
     '.kb-kpi{background:var(--bg1);border:1px solid var(--border);padding:8px 11px}',
-    '.kb-kpi-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:3px}',
-    '.kb-kpi-val{font-family:var(--font-hud,"Rajdhani",system-ui);font-size:20px;font-weight:700;color:var(--text0);line-height:1}',
-    '.kb-kpi-sub{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px}',
+    '.kb-kpi-lbl{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:3px}',
+    '.kb-kpi-val{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:22px;font-weight:700;color:var(--text0);line-height:1}',
+    '.kb-kpi-sub{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:2px}',
     '.kb-kpi-val.warn{color:var(--compass-amber,#EF9F27)}',
     '.kb-kpi-val.info{color:var(--compass-cyan,#00D2FF)}',
-    '.kb-add-btn{width:100%;margin-top:4px;padding:5px;background:none;border:1px dashed rgba(0,210,255,.15);color:rgba(0,210,255,.4);font-family:var(--font-head);font-size:11px;letter-spacing:.06em;cursor:pointer;transition:all .12s}',
+    '.kb-add-btn{width:100%;margin-top:4px;padding:5px;background:none;border:1px dashed rgba(0,210,255,.15);color:rgba(0,210,255,.4);font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:11px;letter-spacing:.06em;cursor:pointer;transition:all .12s}',
     '.kb-add-btn:hover{border-color:rgba(0,210,255,.4);color:#00D2FF;background:rgba(0,210,255,.04)}',
     '#kb-add-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}',
     '#kb-add-modal.open{display:flex}',
     '.kb-modal-box{background:var(--bg1,#0c1628);border:1px solid rgba(0,210,255,.2);padding:20px 22px;width:380px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.6)}',
-    '.kb-modal-title{font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text0);margin-bottom:14px}',
+    '.kb-modal-title{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text0);margin-bottom:14px}',
     '.kb-modal-field{margin-bottom:11px}',
     '.kb-modal-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}',
     '.kb-modal-inp{width:100%;font-family:var(--font-mono);font-size:12px;padding:6px 9px;background:var(--bg2,#0f1f35);border:1px solid rgba(0,210,255,.15);color:var(--text0);outline:none;transition:border-color .12s}',
     '.kb-modal-inp:focus{border-color:rgba(0,210,255,.45)}',
     '.kb-modal-sel{width:100%;font-family:var(--font-mono);font-size:12px;padding:6px 9px;background:var(--bg2,#0f1f35);border:1px solid rgba(0,210,255,.15);color:var(--text0);outline:none;cursor:pointer}',
     '.kb-modal-btns{display:flex;gap:8px;margin-top:16px}',
-    '.kb-modal-btn-add{flex:1;font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:7px;background:rgba(0,210,255,.12);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;transition:opacity .12s}',
+    '.kb-modal-btn-add{flex:1;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:7px;background:rgba(0,210,255,.12);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;transition:opacity .12s}',
     '.kb-modal-btn-add:hover{opacity:.8}',
-    '.kb-modal-btn-cancel{font-family:var(--font-head);font-size:12px;letter-spacing:.06em;padding:7px 16px;background:none;border:1px solid rgba(255,255,255,.15);color:var(--text2);cursor:pointer}'
+    '.kb-modal-btn-cancel{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;letter-spacing:.06em;padding:7px 16px;background:none;border:1px solid rgba(255,255,255,.15);color:var(--text2);cursor:pointer}'
   ].join('');
   document.head.appendChild(s);
 })();
@@ -437,18 +446,15 @@ function _kbRender() {
   const resource = window._calResource || window._mtResource || window._myResource || null;
   const uid     = resource ? resource.user_id : null;
 
-  // Use _calItems bridged from my-work.html — falls back to _mtTasks
-  // _wiItems shape: { type, id, title, project, projectId, status, due, overdue, budgetHours, effortDays }
   const wiItems  = window._calItems || window._mtTasks || [];
   const calEvs   = window._calCalEvents || window._mtCalEvents || [];
 
-  // _wiItems are pre-filtered to this user already — just remove done items
   const openItems = wiItems.filter(t => {
     if (!t || !t.id) return false;
     return t.status !== 'completed' && t.status !== 'done' && t.status !== 'approved';
   });
 
-  // Time entries for billable KPI (bridged from my-work.html)
+  // Time entries for billable KPI
   const teEntries = window._calTimeEntries || [];
   const monIso    = _kbIsoLocal(mon);
   const friIso    = _kbIsoLocal(fri);
@@ -458,8 +464,12 @@ function _kbRender() {
   const totalLoggedHrs = billHrs + nonBillHrs;
   const billPct   = totalLoggedHrs > 0 ? Math.round((billHrs / totalLoggedHrs) * 100) : 0;
 
-  // Col order: last | mon tue wed thu fri sat sun | next
-  const colIds = ['last','mon','tue','wed','thu','fri','sat','sun','next'];
+  // Col order: last | Mon Tue Wed Thu Fri [Sat Sun] | next — weekend visibility controlled by toggle
+  const allColIds = ['last','mon','tue','wed','thu','fri','sat','sun','next'];
+  const colIds = _kbShowWeekend ? allColIds : allColIds.filter(id => id !== 'sat' && id !== 'sun');
+  const workCols = colIds.filter(id => id !== 'last' && id !== 'next').length;
+  board.style.gridTemplateColumns = '120px repeat(' + workCols + ',minmax(0,1fr)) 120px';
+
   const taskBuckets = {}, calBuckets = {};
   colIds.forEach(id => { taskBuckets[id] = []; calBuckets[id] = []; });
 
@@ -467,10 +477,14 @@ function _kbRender() {
   const prevSunDate = _kbIsoLocal(new Date(mon.getTime() - 86400000)); // Sun before this Mon
 
   openItems.forEach(t => {
-    const due = t.due ? t.due.slice(0,10) : null;  // _wiItems uses .due not .due_date
+    const due = t.due ? t.due.slice(0,10) : null;
     if (!due) { taskBuckets['next'].push(t); return; }
     let placed = false;
-    ['mon','tue','wed','thu','fri','sat','sun'].forEach(id => {
+    // Only bucket into sat/sun if weekend is visible
+    const checkIds = _kbShowWeekend
+      ? ['mon','tue','wed','thu','fri','sat','sun']
+      : ['mon','tue','wed','thu','fri'];
+    checkIds.forEach(id => {
       if (!placed && _kbColDates[id] === due) { taskBuckets[id].push(t); placed = true; }
     });
     if (!placed) {
@@ -505,9 +519,9 @@ function _kbRender() {
       totalMtgHrs += h; totalItems++;
       const timeStr = ev.start_time ? ev.start_time.slice(0,5) : '';
       cardsHtml += '<div class="kb-card kb-meeting" draggable="true" data-id="cal-' + _esc(String(ev.id)) + '" data-hrs="' + h + '" data-type="meeting" data-colid="' + colId + '">' +
-        '<div class="kb-card-proj">' + _esc(isPto ? 'PTO' : 'Meeting') + '</div>' +
-        '<div class="kb-card-title">' + _esc(ev.title || 'Event') + '</div>' +
-        '<div class="kb-card-foot">' + (timeStr ? '<span class="kb-pill kb-pill-mtg">' + _esc(timeStr) + '</span>' : '') + (h ? '<span class="kb-pill kb-pill-hrs">' + h + 'h</span>' : '') + '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:rgba(139,92,246,.75);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em">' + _esc(isPto ? 'PTO' : 'Meeting') + '</div>' +
+        '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:500;color:rgba(139,92,246,.95);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(ev.title || 'Event') + '</div>' +
+        '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">' + (timeStr ? '<span class="kb-pill kb-pill-mtg">' + _esc(timeStr) + '</span>' : '') + (h ? '<span class="kb-pill kb-pill-hrs">' + h + 'h</span>' : '') + '</div>' +
         '</div>';
     });
 
@@ -525,9 +539,9 @@ function _kbRender() {
       if (dueStr)    pills += '<span class="kb-pill kb-pill-hrs">Due ' + _esc(dueStr) + '</span>';
       cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due||'') + '" data-colid="' + colId + '">' +
         '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
-        '<div class="kb-card-proj">' + _esc(t.project || 'Project') + '</div>' +
-        '<div class="kb-card-title">' + _esc(t.title || t.name || 'Item') + '</div>' +
-        '<div class="kb-card-foot">' + pills + '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em">' + _esc(t.project || 'Project') + '</div>' +
+        '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:500;color:var(--text0);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(t.title || t.name || 'Item') + '</div>' +
+        '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">' + pills + '</div>' +
         '</div>';
     });
 
@@ -547,8 +561,8 @@ function _kbRender() {
 
     return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + (isLast?' kb-next':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
       '<div class="kb-col-hdr">' +
-      '<div class="kb-col-day' + (isTdy?' kb-today':isPast?' kb-past':'') + '">' + colLabel + '</div>' +
-      ((!isNext && !isLast) ? '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div><div class="kb-cap-lbl' + capCls + '">' + capText + '</div>' : '<div class="kb-cap-lbl" style="margin-top:5px">' + capText + '</div>') +
+      '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:700;letter-spacing:.06em;color:' + (isTdy?'var(--compass-cyan,#00D2FF)':isPast?'var(--text3)':'var(--text0)') + '">' + colLabel + '</div>' +
+      ((!isNext && !isLast) ? '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div><div style="font-family:var(--font-mono,monospace);font-size:10px;color:' + (over?'var(--compass-red,#E24B4A)':pct>85?'var(--compass-amber,#EF9F27)':'var(--text3)') + ';margin-top:3px">' + capText + '</div>' : '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:5px">' + capText + '</div>') +
       '</div>' +
       '<div class="kb-col-body" id="kb-body-' + colId + '">' + cardsHtml + '</div>' +
       '</div>';
@@ -570,6 +584,19 @@ function _kbRender() {
 function _kbWireEvents() {
   document.getElementById('kb-prev-btn')?.addEventListener('click', () => { _kbWeekOffset--; _kbRender(); });
   document.getElementById('kb-next-btn')?.addEventListener('click', () => { _kbWeekOffset++; _kbRender(); });
+
+  // Weekend toggle
+  document.getElementById('kb-wknd-btn')?.addEventListener('click', () => {
+    _kbShowWeekend = !_kbShowWeekend;
+    const btn   = document.getElementById('kb-wknd-btn');
+    const slash = document.getElementById('kb-wknd-slash');
+    if (btn) {
+      btn.style.color  = _kbShowWeekend ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.25)';
+      btn.style.border = _kbShowWeekend ? '1px solid rgba(255,255,255,.3)' : '1px solid rgba(255,255,255,.1)';
+    }
+    if (slash) slash.style.display = _kbShowWeekend ? 'none' : 'block';
+    _kbRender();
+  });
 
   const board = document.getElementById('kb-board');
   if (!board) return;
