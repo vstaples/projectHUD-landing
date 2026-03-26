@@ -169,8 +169,8 @@ window.buildCalendarTab = function() {
   (async () => {
     try {
       const resource = window._calResource || window._mtResource || window._myResource;
-      console.log('[Compass] buildCalendarTab fetch: resource=', resource?.name||'NULL', 'API=', typeof window.API, '_calResource=', window._calResource?.name||'NULL');
-      if (!resource || !window.API) { console.warn('[Compass] buildCalendarTab: aborting — missing resource or API'); return; }
+      console.log('[Compass] buildCalendarTab fetch: resource=', resource?.name||'NULL', 'API=', typeof API, '_calResource=', window._calResource?.name||'NULL');
+      if (!resource || !API) { console.warn('[Compass] buildCalendarTab: aborting — missing resource or API'); return; }
 
       // Compute Mon–Sun of current week using local date arithmetic (avoids DST/UTC shift)
       const todayLocal = new Date();
@@ -849,7 +849,7 @@ async function _kbNegSubmit() {
   const card   = _kbNeg.cardEl;
   const taskId = card?.dataset.taskid;
   document.getElementById('kb-neg-panel').style.display = 'none';
-  if (taskId && window.API) {
+  if (taskId && API) {
     try {
       const resource = window._calResource || window._mtResource || window._myResource;
       await API.post('coc_events', {
@@ -942,7 +942,7 @@ function _kbAddConfirm() {
   _kbUpdateCapBars();
 
   // Write a CoC event for non-local types if API available
-  if ((type === 'task' || type === 'focus') && window.API) {
+  if ((type === 'task' || type === 'focus') && API) {
     const resource = window._calResource || window._mtResource || window._myResource;
     API.post('coc_events', {
       id: crypto.randomUUID(), firm_id: FIRM_ID,
@@ -970,7 +970,7 @@ async function _kbDelConfirm() {
   document.getElementById('kb-del-panel').style.display = 'none';
   const taskId  = _kbDel.taskId;
   const resource = window._calResource || window._mtResource || window._myResource;
-  if (taskId && window.API) {
+  if (taskId && API) {
     try {
       await API.post('coc_events', {
         id: crypto.randomUUID(), firm_id: FIRM_ID, entity_id: taskId, entity_type: 'task',
