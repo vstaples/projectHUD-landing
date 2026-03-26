@@ -509,9 +509,10 @@ function _kbComputeCapacity(colId, cards) {
     const h = parseFloat(c.dataset.hrs) || 0;
     if (c.dataset.type === 'meeting') mtgH += h; else taskH += h;
   });
-  const available = Math.max(0, 8 - mtgH);
+  const available = Math.max(0, 8 - mtgH);           // hours not consumed by meetings
+  const freeHrs   = Math.max(0, available - taskH);   // hours not yet filled by tasks either
   const pct = available > 0 ? Math.min(Math.round((taskH / available) * 100), 100) : (taskH > 0 ? 100 : 0);
-  return { scheduled: taskH, available, mtgHours: mtgH, pct, over: taskH > available };
+  return { scheduled: taskH, available, freeHrs, mtgHours: mtgH, pct, over: taskH > available };
 }
 
 function _kbCapColor(cap) {
@@ -858,7 +859,7 @@ function _kbWireEvents() {
     const destBody  = body;
     const destCards = Array.from(destBody.querySelectorAll('.kb-card'));
     const destCap   = _kbComputeCapacity(destColId, destCards);
-    const canFit    = Math.max(0, destCap.available);
+    const canFit    = Math.max(0, destCap.freeHrs);
 
     _kbDrag.card.classList.remove('kb-dragging');
 
@@ -891,7 +892,7 @@ function _kbWireEvents() {
         const lastBody = document.getElementById('kb-body-last');
         if (lastBody) lastBody.insertBefore(remnant, lastBody.querySelector('.kb-dz') || null);
         compassToast && compassToast(
-          fitHrs + 'h scheduled on ' + destColId.toUpperCase() + '. ' + remainHrs + 'h remainder returned to Last Week.', 3500
+          fitHrs + 'h of ' + cardHrs + 'h fits on ' + destColId.toUpperCase() + '. ' + remainHrs + 'h overflow returned to Last Week.', 3500
         );
       }
     } else {
