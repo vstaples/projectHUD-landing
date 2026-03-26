@@ -5096,7 +5096,7 @@ window.loadMyCalView = async function() {
     window._calResource    = typeof _myResource !== 'undefined' ? _myResource : null;
     window._calItems       = typeof _wiItems    !== 'undefined' ? _wiItems    : [];
     window._calCalEvents   = window._mtCalEvents || [];
-    window._calTimeEntries = typeof _teEntries  !== 'undefined' ? _teEntries  : [];
+    // Note: _calTimeEntries is fetched directly by buildCalendarTab — no bridge needed
     if (window._calLoadView) await window._calLoadView();
     else console.error('[Compass] _calLoadView not exported by my-calendar.html');
   } catch (err) {

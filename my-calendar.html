@@ -164,7 +164,8 @@ window.buildCalendarTab = function() {
   window._calTabMonth = month;
   _renderCalTab();
 
-  // Fetch calendar_events for current week → available to Kanban via window._mtCalEvents
+  // Fetch calendar_events AND time_entries for current week
+  // Both fetched here so My Calendar works standalone without My Work having loaded first
   (async () => {
     try {
       const resource = window._calResource || window._mtResource || window._myResource;
@@ -174,15 +175,29 @@ window.buildCalendarTab = function() {
       const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
       const weekStart = isoLocal(mon);
       const weekEnd   = isoLocal(new Date(mon.getTime() + 6*86400000));
-      const evs = await API.get(
-        'calendar_events?firm_id=eq.' + FIRM_ID + '&resource_id=eq.' + resource.id +
-        '&event_date=gte.' + weekStart + '&event_date=lte.' + weekEnd +
-        '&select=*&order=event_date.asc,start_time.asc'
-      ).catch(() => []);
-      window._mtCalEvents  = Array.isArray(evs) ? evs : [];
-      window._calCalEvents = window._mtCalEvents; // sync to grid's source
-      _renderCalTab(); // re-render grid now that cal events are loaded
-    } catch(e) { window._mtCalEvents = []; }
+
+      const [evs, tes] = await Promise.all([
+        API.get(
+          'calendar_events?firm_id=eq.' + FIRM_ID + '&resource_id=eq.' + resource.id +
+          '&event_date=gte.' + weekStart + '&event_date=lte.' + weekEnd +
+          '&select=*&order=event_date.asc,start_time.asc'
+        ).catch(() => []),
+        API.get(
+          'time_entries?resource_id=eq.' + resource.id +
+          '&date=gte.' + weekStart + '&date=lte.' + weekEnd +
+          '&select=id,date,hours,is_billable,project_id,task_id,notes,step_name' +
+          '&order=date.asc'
+        ).catch(() => [])
+      ]);
+
+      window._mtCalEvents    = Array.isArray(evs) ? evs : [];
+      window._calCalEvents   = window._mtCalEvents;
+      window._calTimeEntries = Array.isArray(tes) ? tes : [];
+      _renderCalTab(); // re-render now that both data sources are loaded
+    } catch(e) {
+      window._mtCalEvents = [];
+      window._calCalEvents = [];
+    }
   })();
   document.getElementById('cal-tab-prev')?.addEventListener('click', () => {
     window._calTabMonth--;
@@ -970,10 +985,10 @@ window._calLoadView = async function() {
 };
 
 window._calRefresh = async function() {
-  // Re-stamp bridged globals in case they were updated
+  // Re-stamp any bridged globals that may have been updated since first load
   if (typeof _myResource !== 'undefined' && _myResource) window._calResource  = _myResource;
   if (typeof _wiItems    !== 'undefined' && _wiItems)    window._calItems     = _wiItems;
-  if (typeof _teEntries  !== 'undefined' && _teEntries)  window._calTimeEntries = _teEntries;
+  // buildCalendarTab fetches time_entries and calendar_events fresh — always call it
   buildCalendarTab();
 };
 
