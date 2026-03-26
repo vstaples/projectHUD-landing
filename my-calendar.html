@@ -581,8 +581,16 @@ function _kbRender() {
     return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + (isLast?' kb-next':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
       '<div class="kb-col-hdr">' +
       '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:700;letter-spacing:.06em;color:' + (isTdy?'var(--compass-cyan,#00D2FF)':isPast?'var(--text3)':'var(--text0)') + '">' + colLabel + '</div>' +
-      ((!isNext && !isLast) ? '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div><div style="font-family:var(--font-mono,monospace);font-size:10px;color:' + (over?'var(--compass-red,#E24B4A)':pct>85?'var(--compass-amber,#EF9F27)':'var(--text3)') + ';margin-top:3px">' + capText + '</div>' : '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:5px">' + capText + '</div>') +
-      billBar +
+      ((!isNext && !isLast) ?
+        (dayTotalH > 0
+          ? '<div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:5px;background:rgba(255,255,255,.06)">' +
+            '<div title="Billable ' + dayBillH.toFixed(1) + 'h" style="flex:' + billBarPct + ';background:var(--compass-cyan,#00D2FF);border-radius:2px"></div>' +
+            (nonBillBarPct > 0 ? '<div title="Non-billable ' + dayNonBillH.toFixed(1) + 'h" style="flex:' + nonBillBarPct + ';background:#7F77DD;border-radius:2px"></div>' : '') +
+            '</div>'
+          : '<div class="kb-cap-bar"><div class="kb-cap-fill" style="width:' + pct + '%;background:' + capColor + '"></div></div>'
+        ) +
+        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:' + (over?'var(--compass-red,#E24B4A)':pct>85?'var(--compass-amber,#EF9F27)':'var(--text3)') + ';margin-top:3px">' + capText + '</div>'
+      : '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:5px">' + capText + '</div>') +
       '</div>' +
       '<div class="kb-col-body" id="kb-body-' + colId + '">' + cardsHtml + '</div>' +
       '</div>';
