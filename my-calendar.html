@@ -6,7 +6,7 @@
 
 <style>
 /* ── Kanban pill overrides — explicit !important beats hud.css ── */
-.kb-pill           { font-family:var(--font-mono,monospace)!important; font-size:10px!important; padding:1px 6px!important; white-space:nowrap!important; border-radius:2px!important; display:inline-block!important; }
+.kb-pill           { font-family:var(--font-mono,monospace)!important; font-size:11px!important; padding:1px 6px!important; white-space:nowrap!important; border-radius:2px!important; display:inline-block!important; }
 .kb-pill-task      { background:linear-gradient(180deg,rgba(0,210,255,.28) 0%,rgba(0,210,255,.13) 100%)!important; color:var(--compass-cyan,#00D2FF)!important; border:0.5px solid rgba(0,210,255,.4)!important; }
 .kb-pill-mtg       { background:linear-gradient(180deg,rgba(139,92,246,.32) 0%,rgba(139,92,246,.16) 100%)!important; color:#c4b5fd!important; border:0.5px solid rgba(139,92,246,.45)!important; }
 .kb-pill-hrs       { background:rgba(255,255,255,.06)!important; color:var(--text2,#90B8D8)!important; border:0.5px solid rgba(255,255,255,.12)!important; }
@@ -356,7 +356,7 @@ function _renderCalTab() {
         // Line 2: notes/description (10px, dimmer)
         if (ev.notes || ev.hours) {
           const line2 = document.createElement('div');
-          line2.style.cssText = 'font-family:var(--font-mono,monospace);font-size:10px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;line-height:1.3';
+          line2.style.cssText = 'font-family:var(--font-mono,monospace);font-size:11px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;line-height:1.3';
           line2.textContent = (ev.notes || '') + (ev.hours ? (ev.notes ? ' · ' : '') + ev.hours + 'h' : '');
           evEl.appendChild(line2);
         }
@@ -398,11 +398,11 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-col-day.kb-past{color:var(--text3)}',
     '.kb-cap-bar{height:4px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,.06);margin-top:5px}',
     '.kb-cap-fill{height:100%;border-radius:2px;transition:width .2s}',
-    '.kb-cap-lbl{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:3px}',
+    '.kb-cap-lbl{font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px}',
     '.kb-cap-lbl.warn{color:var(--compass-amber,#EF9F27)}',
     '.kb-cap-lbl.over{color:var(--compass-red,#E24B4A)}',
     '.kb-col-body{padding:6px;display:flex;flex-direction:column;gap:4px;flex:1}',
-    '.kb-dz{border:1px dashed rgba(0,210,255,.18);padding:7px 6px;text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.05em;transition:all .12s}',
+    '.kb-dz{border:1px dashed rgba(0,210,255,.18);padding:7px 6px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text3);letter-spacing:.05em;transition:all .12s}',
     '.kb-dz.active{border-color:var(--compass-cyan,#00D2FF);background:rgba(0,210,255,.05);color:var(--compass-cyan,#00D2FF)}',
     '.kb-card{border:1px solid rgba(0,210,255,.2);padding:7px 8px;cursor:grab;background:rgba(0,210,255,.04);user-select:none;position:relative;transition:opacity .12s}',
     '.kb-card:active{cursor:grabbing;opacity:.5}',
@@ -411,7 +411,7 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-card.kb-pending{background:rgba(239,159,39,.08);border:1.5px dashed rgba(239,159,39,.55)}',
     '.kb-card.kb-approved{background:rgba(29,158,117,.08);border:1.5px solid rgba(29,158,117,.45)}',
     '.kb-card.kb-overdue{background:rgba(226,75,74,.08);border:1.5px solid rgba(226,75,74,.45)}',
-    '.kb-card-proj{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em}',
+    '.kb-card-proj{font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em}',
     '.kb-card.kb-meeting .kb-card-proj{color:rgba(139,92,246,.75)}',
     '.kb-card-title{font-family:var(--font-ui,system-ui);font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--text0);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.kb-card.kb-pending .kb-card-title{color:var(--compass-amber,#EF9F27)}',
@@ -419,14 +419,14 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-card.kb-approved .kb-card-title{color:var(--compass-green,#1D9E75)}',
     '.kb-card.kb-meeting .kb-card-title{color:rgba(139,92,246,.95)}',
     '.kb-card-foot{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px}',
-    '.kb-pill{font-family:var(--font-mono);font-size:10px;padding:1px 6px;white-space:nowrap;border-radius:2px;display:inline-block}',
+    '.kb-pill{font-family:var(--font-mono);font-size:11px;padding:1px 6px;white-space:nowrap;border-radius:2px;display:inline-block}',
     '.kb-del-btn{position:absolute;top:4px;right:5px;background:none;border:none;font-size:14px;color:var(--text3);cursor:pointer;padding:0;line-height:1;display:none}',
     '.kb-del-btn:hover{color:var(--compass-red,#E24B4A)}',
     '.kb-card:hover .kb-del-btn{display:block}',
     '.kb-kpi{background:var(--bg1);border:1px solid var(--border);padding:8px 11px}',
-    '.kb-kpi-lbl{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:3px}',
+    '.kb-kpi-lbl{font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:3px}',
     '.kb-kpi-val{font-family:var(--font-ui,system-ui);font-size:22px;font-weight:700;color:var(--text0);line-height:1}',
-    '.kb-kpi-sub{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:2px}',
+    '.kb-kpi-sub{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);margin-top:2px}',
     '.kb-kpi-val.warn{color:var(--compass-amber,#EF9F27)}',
     '.kb-kpi-val.info{color:var(--compass-cyan,#00D2FF)}',
     '.kb-add-btn{width:100%;margin-top:4px;padding:5px;background:none;border:1px dashed rgba(0,210,255,.15);color:rgba(0,210,255,.4);font-family:var(--font-ui,system-ui);font-size:11px;letter-spacing:.06em;cursor:pointer;transition:all .12s}',
@@ -436,7 +436,7 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-modal-box{background:var(--bg1,#0c1628);border:1px solid rgba(0,210,255,.2);padding:20px 22px;width:380px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.6)}',
     '.kb-modal-title{font-family:var(--font-ui,system-ui);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text0);margin-bottom:14px}',
     '.kb-modal-field{margin-bottom:11px}',
-    '.kb-modal-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}',
+    '.kb-modal-lbl{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}',
     '.kb-modal-inp{width:100%;font-family:var(--font-mono);font-size:12px;padding:6px 9px;background:var(--bg2,#0f1f35);border:1px solid rgba(0,210,255,.15);color:var(--text0);outline:none;transition:border-color .12s}',
     '.kb-modal-inp:focus{border-color:rgba(0,210,255,.45)}',
     '.kb-modal-sel{width:100%;font-family:var(--font-mono);font-size:12px;padding:6px 9px;background:var(--bg2,#0f1f35);border:1px solid rgba(0,210,255,.15);color:var(--text0);outline:none;cursor:pointer}',
@@ -621,7 +621,7 @@ function _kbRender() {
       totalMtgHrs += h; totalItems++;
       const timeStr = ev.start_time ? ev.start_time.slice(0,5) : '';
       cardsHtml += '<div class="kb-card kb-meeting" draggable="true" data-id="cal-' + _esc(String(ev.id)) + '" data-hrs="' + h + '" data-type="meeting" data-colid="' + colId + '">' +
-        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:rgba(139,92,246,.75);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em">' + _esc(isPto ? 'PTO' : 'Meeting') + '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:rgba(139,92,246,.75);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em">' + _esc(isPto ? 'PTO' : 'Meeting') + '</div>' +
         '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:500;color:rgba(139,92,246,.95);line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(ev.title || 'Event') + '</div>' +
         '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">' + (timeStr ? '<span class="kb-pill kb-pill-mtg">' + _esc(timeStr) + '</span>' : '') + (h ? '<span class="kb-pill kb-pill-hrs">' + h + 'h</span>' : '') + '</div>' +
         '</div>';
@@ -658,9 +658,9 @@ function _kbRender() {
       cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due||'') + '" data-colid="' + colId + '">' +
         '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
         lockIcon +
-        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.05em;text-transform:uppercase">' + _esc(row1Label) + '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.05em;text-transform:uppercase">' + _esc(row1Label) + '</div>' +
         '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:600;color:var(--text0);line-height:1.25;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(t.title || t.name || 'Item') + '</div>' +
-        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(ownerName || 'Owner: None') + '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(ownerName || 'Owner: None') + '</div>' +
         '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">' + r4pills + '</div>' +
         '</div>';
     });
@@ -668,7 +668,7 @@ function _kbRender() {
     // ── Logged section: actual time_entries for this day (past cols only) ──
     const dayLogged = (window._calTimeEntries || []).filter(e => e.date && e.date.slice(0,10) === colDate);
     if (dayLogged.length > 0 && !isNext) {
-      cardsHtml += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:5px 6px 3px;margin-top:4px;border-top:1px solid rgba(255,255,255,.06)">— Worked —</div>';
+      cardsHtml += '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:5px 6px 3px;margin-top:4px;border-top:1px solid rgba(255,255,255,.06)">— Worked —</div>';
       dayLogged.forEach(e => {
         // Look up project name from all available project sources
         const _allProjects = window._projects || window._mtProjects || [];
@@ -688,8 +688,8 @@ function _kbRender() {
         const billCls  = e.is_billable ? 'var(--compass-cyan,#00D2FF)' : '#7F77DD';
         cardsHtml += '<div style="padding:5px 7px;border-left:2px solid ' + billCls + ';margin:2px 0;background:rgba(255,255,255,.03)">' +
           '<div style="font-family:var(--font-ui,system-ui);font-size:12px;font-weight:600;color:var(--compass-green,#1D9E75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3">' + _esc(title) + '</div>' +
-          (desc ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">' + _esc(desc) + '</div>' : '') +
-          '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:' + billCls + ';margin-top:2px">' + h + 'h · ' + (e.is_billable ? 'Billable' : 'Non-bill') + '</div>' +
+          (desc ? '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">' + _esc(desc) + '</div>' : '') +
+          '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:' + billCls + ';margin-top:2px">' + h + 'h · ' + (e.is_billable ? 'Billable' : 'Non-bill') + '</div>' +
           '</div>';
       });
     }
@@ -745,8 +745,8 @@ function _kbRender() {
       '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:700;letter-spacing:.06em;color:' + (isTdy?'var(--compass-cyan,#00D2FF)':isPast?'var(--text3)':'var(--text0)') + '">' + colLabel + '</div>' +
       ((!isNext && !isLast) ?
         billBar +
-        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:' + (over?'var(--compass-red,#E24B4A)':pct>85?'var(--compass-amber,#EF9F27)':'var(--text3)') + ';margin-top:3px">' + capText + '</div>'
-      : '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:5px">' + capText + '</div>') +
+        '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:' + (over?'var(--compass-red,#E24B4A)':pct>85?'var(--compass-amber,#EF9F27)':'var(--text3)') + ';margin-top:3px">' + capText + '</div>'
+      : '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);margin-top:5px">' + capText + '</div>') +
       '</div>' +
       '<div class="kb-col-body" id="kb-body-' + colId + '">' + cardsHtml + '</div>' +
       '</div>';
@@ -1033,13 +1033,13 @@ function _kbUpdateCapBars() {
         capTxt = cap.over ? cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h — over' : cap.scheduled.toFixed(1) + 'h / ' + cap.available.toFixed(1) + 'h avail';
       }
       const txtDiv = document.createElement('div');
-      txtDiv.style.cssText = 'font-family:var(--font-mono,monospace);font-size:10px;color:' + capColor + ';margin-top:3px';
+      txtDiv.style.cssText = 'font-family:var(--font-mono,monospace);font-size:11px;color:' + capColor + ';margin-top:3px';
       txtDiv.textContent = capTxt;
       hdr.appendChild(txtDiv);
     } else {
       const count = body.querySelectorAll('.kb-card').length;
       const txtDiv = document.createElement('div');
-      txtDiv.style.cssText = 'font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:5px';
+      txtDiv.style.cssText = 'font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);margin-top:5px';
       txtDiv.textContent = count + ' item' + (count !== 1 ? 's' : '');
       hdr.appendChild(txtDiv);
     }
@@ -1212,7 +1212,7 @@ function _kbAddConfirm() {
     '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
     '<div class="kb-card-proj">' + _esc(typeLabels[type] || type) + '</div>' +
     '<div class="kb-card-title">' + _esc(title) + '</div>' +
-    (desc ? '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(desc) + '</div>' : '') +
+    (desc ? '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(desc) + '</div>' : '') +
     '<div class="kb-card-foot"><span class="kb-pill kb-pill-hrs">' + dur + 'h</span></div>';
 
   // Insert before drop zone
