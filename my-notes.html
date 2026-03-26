@@ -72,7 +72,7 @@
 .notes-tile-ctrl{width:16px;height:16px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;display:flex;align-items:center;justify-content:center;transition:color .1s;flex-shrink:0}
 .notes-tile-ctrl:hover{color:var(--text0)}
 .notes-tile-body{display:flex;flex:1;overflow:hidden;min-height:0}
-.notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:14px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
+.notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
 .notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
 
 /* ── Chat panel ──────────────────────────────────────────────────────────── */
@@ -229,6 +229,7 @@ async function _notesSaveWorkspace() {
 function _notesRenderLeft() {
   _notesRenderInbox();
   _notesRenderTree();
+  _notesWireLeft(); // wire after both inbox and tree are in DOM
 }
 
 function _notesRenderInbox() {
@@ -323,7 +324,10 @@ function _notesWireLeft() {
     };
   });
   document.querySelectorAll('.notes-item[data-noteid]').forEach(el => {
-    el.onclick = () => _notesOpenNote(el.dataset.noteid);
+    el.onclick = (e) => {
+      e.stopPropagation();
+      _notesOpenNote(el.dataset.noteid);
+    };
   });
 }
 
