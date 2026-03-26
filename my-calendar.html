@@ -391,6 +391,7 @@ let _kbAddTarget    = null; // colId receiving the add-item action
     '.kb-col.weekend{opacity:.6}',
     '.kb-col.kb-next{background:var(--bg2);border-style:dashed}',
     '.kb-col.kb-drag-over{border-color:var(--compass-cyan,#00D2FF)!important;background:rgba(0,210,255,.04)}',
+    '.kb-col.kb-col-today{border-top:2px solid var(--compass-cyan,#00D2FF);background:rgba(0,210,255,.03)}',
     '.kb-col-hdr{padding:7px 9px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}',
     '.kb-col-day{font-family:var(--font-ui,system-ui);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text0)}',
     '.kb-col-day.kb-today{color:var(--compass-cyan,#00D2FF)}',
@@ -649,7 +650,7 @@ function _kbRender() {
       cardsHtml += '<div class="' + cardCls + '" draggable="true" data-id="task-' + _esc(t.id) + '" data-hrs="' + h + '" data-type="task" data-taskid="' + _esc(t.id) + '" data-due="' + _esc(t.due||'') + '" data-colid="' + colId + '">' +
         '<button class="kb-del-btn" aria-label="Remove">\u00D7</button>' +
         lockIcon +
-        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em">' + _esc(t.project || 'Project') + '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.04em">' + _esc(t.project || 'Internal') + '</div>' +
         '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:500;color:var(--text0);line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(t.title || t.name || 'Item') + '</div>' +
         '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.8">' + (ownerName ? _esc(ownerName) : 'Owner: None') + '</div>' +
         '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">' + pills + '</div>' +
@@ -731,7 +732,7 @@ function _kbRender() {
         + '</div>'
       : '';
 
-    return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + (isLast?' kb-next':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
+    return '<div class="kb-col' + (isWknd?' weekend':'') + (isNext?' kb-next':'') + (isLast?' kb-next':'') + (isTdy?' kb-col-today':'') + '" data-colid="' + colId + '" id="kb-col-' + colId + '">' +
       '<div class="kb-col-hdr">' +
       '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:700;letter-spacing:.06em;color:' + (isTdy?'var(--compass-cyan,#00D2FF)':isPast?'var(--text3)':'var(--text0)') + '">' + colLabel + '</div>' +
       ((!isNext && !isLast) ?
@@ -777,12 +778,24 @@ function _kbWireEvents() {
   if (!board) return;
 
   board.addEventListener('dragover', e => {
-    e.preventDefault();
     const body = e.target.closest('.kb-col-body');
     if (body) {
+      const col = body.closest('.kb-col');
+      const overColId = col?.dataset.colid;
+      const overDate  = _kbColDates[overColId];
+      const todayStr  = _kbIsoLocal(new Date());
+      const isPastCol = overColId === 'last' || (overDate && overDate < todayStr);
+      if (isPastCol) {
+        e.dataTransfer.dropEffect = 'none';
+        // don't preventDefault — let browser show no-drop cursor
+        return;
+      }
+      e.preventDefault();
       document.querySelectorAll('.kb-col').forEach(c => c.classList.remove('kb-drag-over'));
-      body.closest('.kb-col')?.classList.add('kb-drag-over');
+      col?.classList.add('kb-drag-over');
       body.querySelector('.kb-dz')?.classList.add('active');
+    } else {
+      e.preventDefault();
     }
   });
 
@@ -803,6 +816,13 @@ function _kbWireEvents() {
     if (!body) { _kbDragEnd(); return; }
     const destColId = body.closest('.kb-col')?.dataset.colid;
     if (!destColId || destColId === _kbDrag.srcColId) { _kbDragEnd(); return; }
+    // Block drops onto past day columns and the 'last' bucket
+    const _dropDestDate = _kbColDates[destColId];
+    const todayStr = _kbIsoLocal(new Date());
+    if (destColId === 'last' || (_dropDestDate && _dropDestDate < todayStr)) {
+      compassToast && compassToast('Cannot schedule items in the past.', 2000);
+      _kbDragEnd(); return;
+    }
     _kbDrag.card.classList.remove('kb-dragging');
     body.insertBefore(_kbDrag.card, body.querySelector('.kb-dz') || null);
     _kbDrag.card.dataset.colid = destColId;
