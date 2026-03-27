@@ -1620,8 +1620,25 @@ function _notesStopPresence(noteId) {
 }
 
 // ── Show invite popover ───────────────────────────────────────────────────
-window._notesShowInvite = function(noteId, btn) {
-  // Close any existing popover
+// Resource cache for invite popover
+let _inviteResources = null;
+
+async function _notesLoadInviteResources() {
+  if (_inviteResources) return _inviteResources;
+  try {
+    const rows = await API.get(
+      'resources?select=id,first_name,last_name,email,department,is_external,user_id,is_active' +
+      '&is_active=eq.true&firm_id=eq.' + FIRM_ID + '&order=department.asc,last_name.asc&limit=200'
+    ).catch(() => []);
+    _inviteResources = (Array.isArray(rows) ? rows : []).map(r => ({
+      ...r,
+      name: ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || r.email || r.id,
+    }));
+  } catch(e) { _inviteResources = []; }
+  return _inviteResources;
+}
+
+window._notesShowInvite = async function(noteId, btn) {
   document.querySelectorAll('.notes-invite-pop').forEach(p => p.remove());
 
   const pop = document.createElement('div');
@@ -1629,10 +1646,11 @@ window._notesShowInvite = function(noteId, btn) {
   pop.innerHTML =
     '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;' +
       'color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Invite to note</div>' +
-    '<input id="notes-invite-input" placeholder="Search team members…" autocomplete="off"/>' +
-    '<div class="notes-invite-result" id="notes-invite-results"></div>';
+    '<input id="notes-invite-input" placeholder="Search by name or department…" autocomplete="off"/>' +
+    '<div class="notes-invite-result" id="notes-invite-results">' +
+      '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">Loading…</div>' +
+    '</div>';
 
-  // Position relative to the tile header
   const header = btn.closest('.notes-tile-header');
   if (header) header.appendChild(pop);
   else document.body.appendChild(pop);
@@ -1640,30 +1658,67 @@ window._notesShowInvite = function(noteId, btn) {
   const input = pop.querySelector('#notes-invite-input');
   input.focus();
 
+  const allResources = await _notesLoadInviteResources();
+
   function renderResults(q) {
-    const resources = (window._users || window._resources || [])
-      .filter(r => r.user_id !== window._notesResource?.user_id)
-      .filter(r => !q || r.name?.toLowerCase().includes(q.toLowerCase()));
+    const lower = q.toLowerCase().trim();
+    const selfId = window._notesResource?.user_id;
     const existingIds = new Set((_participants[noteId] || []).map(p => p.user_id));
+    let colorIdx = existingIds.size;
+
+    const filtered = allResources.filter(r => {
+      if (!r.user_id || r.user_id === selfId) return false;
+      if (!lower) return true;
+      return (r.name || '').toLowerCase().includes(lower) ||
+             (r.department || '').toLowerCase().includes(lower) ||
+             (r.email || '').toLowerCase().includes(lower);
+    });
+
     const resultsEl = pop.querySelector('#notes-invite-results');
-    if (!resources.length) {
-      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">No team members found</div>';
+    if (!filtered.length) {
+      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">No results</div>';
       return;
     }
-    resultsEl.innerHTML = resources.map(r => {
-      const initials = (r.name || 'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      const already  = existingIds.has(r.user_id);
-      const color    = already
-        ? (_participants[noteId]?.find(p=>p.user_id===r.user_id)?.color || '#00D2FF')
-        : PARTICIPANT_COLORS[existingIds.size % PARTICIPANT_COLORS.length];
-      return '<div class="notes-invite-row" data-userid="' + _esc(r.user_id) + '" ' +
-        'data-color="' + _esc(color) + '" data-already="' + already + '">' +
-        '<div class="notes-avatar" style="background:' + color + '">' + _esc(initials) + '</div>' +
-        '<span>' + _esc(r.name || r.email || r.user_id) + '</span>' +
-        (already ? '<span style="margin-left:auto;font-size:10px;color:var(--text3)">✓ invited</span>' : '') +
-        '</div>';
-    }).join('');
 
+    // Group by department, External last
+    const groups = {};
+    filtered.forEach(r => {
+      const grp = r.is_external ? 'External' : (r.department || 'Other');
+      if (!groups[grp]) groups[grp] = [];
+      groups[grp].push(r);
+    });
+
+    const keys = Object.keys(groups).sort((a,b) => {
+      if (a === 'External') return 1;
+      if (b === 'External') return -1;
+      return a.localeCompare(b);
+    });
+
+    let html = '';
+    keys.forEach(grp => {
+      html += '<div style="padding:4px 7px 2px;font-family:var(--font-mono,monospace);font-size:10px;' +
+        'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
+        'border-top:1px solid rgba(0,210,255,.08);margin-top:2px">' + _esc(grp) + '</div>';
+      groups[grp].forEach(r => {
+        const initials = r.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        const already  = existingIds.has(r.user_id);
+        const color    = already
+          ? (_participants[noteId]?.find(p=>p.user_id===r.user_id)?.color || '#00D2FF')
+          : PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length];
+        if (!already) colorIdx++;
+        html += '<div class="notes-invite-row" data-userid="' + _esc(r.user_id) + '" ' +
+          'data-color="' + _esc(color) + '" data-already="' + already + '">' +
+          '<div class="notes-avatar" style="background:' + _esc(color) + ';color:#000">' + _esc(initials) + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
+            (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
+          '</div>' +
+          (already ? '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">✓</span>' : '') +
+          '</div>';
+      });
+    });
+
+    resultsEl.innerHTML = html;
     resultsEl.querySelectorAll('.notes-invite-row[data-already="false"]').forEach(row => {
       row.onclick = () => _notesInvite(noteId, row.dataset.userid, row.dataset.color, pop);
     });
@@ -1672,7 +1727,6 @@ window._notesShowInvite = function(noteId, btn) {
   renderResults('');
   input.addEventListener('input', () => renderResults(input.value));
 
-  // Close on outside click
   setTimeout(() => {
     document.addEventListener('mousedown', function _close(e) {
       if (!pop.contains(e.target) && e.target !== btn) {
