@@ -1968,9 +1968,9 @@ async function _notesHeartbeat(noteId) {
 async function _notesSyncContent(noteId) {
   const parts = _participants[noteId] || [];
   const selfUserId = window._notesResource?.user_id;
-  // Always sync if there are any non-self participants with accepted invites
   const hasOthers = parts.some(p => p.user_id !== selfUserId && p.accepted_at);
-  if (!hasOthers && parts.length <= 1) return; // skip if definitely no collaborators
+  console.log('[Sync]', noteId.slice(0,8), 'parts:', parts.length, 'hasOthers:', hasOthers, parts.map(p=>({u:p.user_id?.slice(0,8),acc:!!p.accepted_at})));
+  if (!hasOthers && parts.length <= 1) return;
 
   try {
     const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
