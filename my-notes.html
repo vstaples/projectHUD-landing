@@ -125,7 +125,9 @@
 <div id="notes-shell">
 
   <!-- ── Left panel ──────────────────────────────────────────────────────── -->
-  <div id="notes-left">
+  <div id="notes-left" style="position:relative">
+    <!-- Invisible drag capture overlay — shown only during left-panel drags -->
+    <div id="notes-drag-overlay" style="display:none;position:absolute;inset:0;z-index:100"></div>
     <div id="notes-left-header">
       <div style="position:relative;display:flex;align-items:center;margin-bottom:7px">
         <input id="notes-search" type="text" placeholder="Search notes…"
@@ -1158,6 +1160,8 @@ function _notesDndInit() {
   }
 
   // ── dragstart — attach to scroll containers directly too ─────────────────
+  const overlay = document.getElementById('notes-drag-overlay');
+
   function _leftPanelDragStart(e) {
     const item = e.target.closest('.notes-item[data-noteid]');
     if (!item) return;
@@ -1166,28 +1170,68 @@ function _notesDndInit() {
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', _dragNoteId);
-    console.log('[DnD] dragstart from left panel:', _dragNoteId?.slice(0,8));
+    // Show overlay after a tick so it doesn't interfere with dragstart
+    setTimeout(() => { if (overlay) overlay.style.display = 'block'; }, 0);
   }
   function _leftPanelDragEnd(e) {
+    if (overlay) overlay.style.display = 'none';
     shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
     shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
     _dragNoteId = null;
     _dragSlot   = null;
   }
 
+  // ── Overlay handles dragover/drop for left panel ──────────────────────
+  if (overlay) {
+    overlay.addEventListener('dragover', e => {
+      if (!_dragNoteId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      // Find what's actually under the overlay at this position
+      overlay.style.display = 'none';
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      overlay.style.display = 'block';
+      const item = under?.closest('.notes-item[data-noteid]');
+      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+      if (item && item.dataset.noteid !== _dragNoteId) {
+        item.classList.add('notes-drop-line');
+      }
+    });
+
+    overlay.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (overlay) overlay.style.display = 'none';
+      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+      // Find what's under the drop point
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const dropItem = under?.closest('.notes-item[data-noteid]');
+      if (!dropItem || dropItem.dataset.noteid === _dragNoteId) return;
+      const targetNote = _notes.find(n => n.id === dropItem.dataset.noteid);
+      const dragNote   = _notes.find(n => n.id === _dragNoteId);
+      if (!targetNote || !dragNote) return;
+      const newPath = targetNote.hierarchy_path || 'Inbox';
+      const isInbox = !newPath || newPath === 'Inbox';
+      try {
+        await API.patch('notes?id=eq.' + _dragNoteId, {
+          hierarchy_path: newPath,
+          is_inbox:       isInbox,
+          updated_at:     new Date().toISOString(),
+        });
+        dragNote.hierarchy_path = newPath;
+        dragNote.is_inbox       = isInbox;
+        _notesRenderLeft();
+      } catch(err) { console.error('Tree drop error:', err); }
+    });
+  }
+
+  // dragstart/dragend still needed on the containers to detect when drag begins
   if (treeScroll) {
     treeScroll.addEventListener('dragstart', _leftPanelDragStart);
     treeScroll.addEventListener('dragend',   _leftPanelDragEnd);
-    treeScroll.addEventListener('dragover',  _leftPanelDragOver);
-    treeScroll.addEventListener('dragleave', _leftPanelDragLeave);
-    treeScroll.addEventListener('drop',      _leftPanelDrop);
   }
   if (inboxList) {
     inboxList.addEventListener('dragstart', _leftPanelDragStart);
     inboxList.addEventListener('dragend',   _leftPanelDragEnd);
-    inboxList.addEventListener('dragover',  _leftPanelDragOver);
-    inboxList.addEventListener('dragleave', _leftPanelDragLeave);
-    inboxList.addEventListener('drop',      _leftPanelDrop);
   }
 
   // ── dragstart (shell level — grid tiles and tray chips only) ────────────
