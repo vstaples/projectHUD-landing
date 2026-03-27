@@ -635,7 +635,7 @@ function _notesItemHTML(n) {
       'onclick="event.stopPropagation();_notesDeleteInboxNote(\'' + _esc(n.id) + '\')">✕</button>'
     : '';
 
-  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
+  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" draggable="true" data-noteid="' + _esc(n.id) + '">' +
     '<div class="notes-item-body">' +
     '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
     '<div class="notes-item-meta">' + age + '</div>' +
@@ -648,7 +648,7 @@ function _notesWireLeft() {
   document.querySelectorAll('#notes-shell [data-toggle]').forEach(el => {
     el.onclick = (e) => {
       // Don't toggle if clicking a button, contenteditable label, or input
-      if (e.target.closest('button, [contenteditable]')) return;
+      if (e.target?.closest?.('button, [contenteditable]')) return;
       const target = document.getElementById(el.dataset.toggle);
       if (!target) return;
       const open = target.style.display !== 'none';
@@ -1518,7 +1518,7 @@ function _notesDndInit() {
   let _mouseDownPos = null;
 
   document.addEventListener('mousedown', e => {
-    const item = e.target.closest('#notes-left .notes-item[data-noteid]');
+    const item = e.target?.closest?.('#notes-left .notes-item[data-noteid]');
     if (!item) return;
     _dragNoteId   = item.dataset.noteid;
     _dragSlot     = null;
@@ -1636,9 +1636,10 @@ function _notesDndInit() {
 
   // ── Grid: standard HTML5 drag (no overflow:auto issue there) ─────────────
   shell.addEventListener('dragstart', e => {
-    const tile = e.target.closest('.notes-tile[data-noteid]');
-    const chip = e.target.closest('.notes-tray-chip[data-noteid]');
-    if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
+    const tile = e.target.closest?.('.notes-tile[data-noteid]');
+    const chip = e.target.closest?.('.notes-tray-chip[data-noteid]');
+    const item = e.target.closest?.('.notes-item[data-noteid]');
+    if (tile && !e.target.closest?.('.notes-tile-title[contenteditable]')) {
       _dragNoteId = tile.dataset.noteid;
       _dragSlot   = parseInt(tile.dataset.slot);
       tile.classList.add('dragging');
@@ -1649,7 +1650,13 @@ function _notesDndInit() {
       _dragSlot   = null;
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
-    } else if (!e.target.closest('#notes-left')) {
+    } else if (item) {
+      _dragNoteId = item.dataset.noteid;
+      _dragSlot   = null;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _dragNoteId);
+    } else if (!e.target.closest?.('#notes-left')) {
       e.preventDefault();
     }
   });
@@ -1662,7 +1669,7 @@ function _notesDndInit() {
 
   shell.addEventListener('dragover', e => {
     if (!_dragNoteId || _leftDragActive) return;
-    const tile = e.target.closest('.notes-tile');
+    const tile = e.target?.closest?.('.notes-tile');
     if (tile && !tile.closest('#notes-left')) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -1672,7 +1679,7 @@ function _notesDndInit() {
   });
 
   shell.addEventListener('dragleave', e => {
-    const tile = e.target.closest('.notes-tile');
+    const tile = e.target?.closest?.('.notes-tile');
     if (tile) tile.classList.remove('drag-over');
   });
 
@@ -1680,7 +1687,7 @@ function _notesDndInit() {
     e.preventDefault();
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    const dropTile = e.target.closest('.notes-tile');
+    const dropTile = e.target?.closest?.('.notes-tile');
     if (!dropTile || dropTile.closest('#notes-left')) return;
     const targetSlot   = parseInt(dropTile.dataset.slot);
     const targetNoteId = dropTile.dataset.noteid || null;
