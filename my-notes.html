@@ -1050,7 +1050,13 @@ async function _notesShowInviteDialog(inviteNote) {
 
   overlay.querySelector('#nid-accept').onclick = async () => {
     overlay.remove();
-    // Mark participant as accepted — leave invitation in inbox
+    // Delete invitation note from inbox — shared note now visible in tree
+    try {
+      await API.del('notes?id=eq.' + inviteNote.id);
+      _notes = _notes.filter(n => n.id !== inviteNote.id);
+      _notesRenderLeft();
+    } catch(e) {}
+    // Mark participant as accepted
     try {
       const userId = window._notesResource?.user_id;
       if (userId) {
@@ -1904,9 +1910,46 @@ async function _notesHeartbeat(noteId) {
       { last_seen_at: new Date().toISOString() }
     );
   } catch(e) {}
-  // Also refresh other participants' presence
+  // Refresh participants presence
   await _notesLoadParticipants(noteId);
   _notesRenderPresence(noteId);
+  // Sync content if others are active on this note
+  await _notesSyncContent(noteId);
+}
+
+async function _notesSyncContent(noteId) {
+  // Only sync if someone else is active (presence within 15s)
+  const parts = _participants[noteId] || [];
+  const selfUserId = window._notesResource?.user_id;
+  const othersActive = parts.some(p => {
+    if (p.user_id === selfUserId) return false;
+    if (!p.last_seen_at) return false;
+    return (Date.now() - new Date(p.last_seen_at).getTime()) < 15000;
+  });
+  if (!othersActive) return;
+
+  try {
+    const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
+    const remote = rows?.[0];
+    if (!remote) return;
+    // Find the textarea for this note
+    const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
+    if (!ta) return;
+    // Only update if remote is newer and user isn't currently typing
+    const local = _notes.find(n => n.id === noteId);
+    if (!local) return;
+    const remoteTime = new Date(remote.updated_at).getTime();
+    const localTime  = new Date(local.updated_at).getTime();
+    if (remoteTime > localTime && document.activeElement !== ta) {
+      // Preserve cursor position
+      const selStart = ta.selectionStart;
+      const selEnd   = ta.selectionEnd;
+      ta.value = remote.content || '';
+      local.content    = remote.content;
+      local.updated_at = remote.updated_at;
+      try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
+    }
+  } catch(e) {}
 }
 
 // ── Start/stop presence polling for a tile ────────────────────────────────
