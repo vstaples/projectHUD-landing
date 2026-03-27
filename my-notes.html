@@ -317,7 +317,7 @@ window._notesLoadView = async function() {
   if (window._notesSplitterInit) window._notesSplitterInit();
   _notesDndInit();
   if (window._notesStartInboxPoll) window._notesStartInboxPoll();
-  if (window._notesStartSyncPoll) window._notesStartSyncPoll();
+  _notesStartSyncPoll();
   // Wire collaboration after a tick to ensure collab script has patched _notesWireTiles
   setTimeout(() => {
     if (typeof _notesWireTilesCollab === 'function') _notesWireTilesCollab();
@@ -1829,6 +1829,49 @@ function _notesStopInboxPoll() {
   _inboxPollInterval = null;
 }
 
+// ── Shared note content sync poller ─────────────────────────────────────
+let _syncPollInterval = null;
+
+async function _notesSyncPoll() {
+  const now = new Date();
+  const ts  = now.toISOString().replace('T',' ').slice(0,19);
+  const tiles = _cv()?.tiles || [];
+  for (const tile of tiles) {
+    const noteId = tile.noteId;
+    const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
+    if (!ta) continue;
+    const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
+    if (typedAgo < 3000) continue;
+    try {
+      const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
+      const remote = rows?.[0];
+      if (!remote) continue;
+      const remoteContent    = remote.content || '';
+      const displayedContent = ta.value;
+      if (remoteContent !== displayedContent) {
+        console.log(ts + '  Received text:  ' + remoteContent.slice(-40).split('\n').join(' '));
+        const selStart = ta.selectionStart;
+        const selEnd   = ta.selectionEnd;
+        ta.value = remoteContent;
+        const local = _notes.find(n => n.id === noteId);
+        if (local) { local.content = remoteContent; local.updated_at = remote.updated_at; }
+        try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
+      } else {
+        console.log(ts + '  None  [' + noteId.slice(0,8) + ']');
+      }
+    } catch(e) {}
+  }
+}
+
+function _notesStartSyncPoll() {
+  if (_syncPollInterval) return;
+  _syncPollInterval = setInterval(_notesSyncPoll, 5000);
+}
+function _notesStopSyncPoll() {
+  clearInterval(_syncPollInterval);
+  _syncPollInterval = null;
+}
+
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSaveNow         = _notesSaveNow;
 window._notesCv              = _cv;
@@ -2002,52 +2045,6 @@ async function _notesSyncContent(noteId) {
       try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
     }
   } catch(e) {}
-}
-
-// ── Shared note content sync poller ─────────────────────────────────────
-// Runs every 5s, checks all notes that have accepted participants
-let _syncPollInterval = null;
-
-async function _notesSyncPoll() {
-  const now = new Date();
-  const ts  = now.toISOString().replace('T',' ').slice(0,19);
-  // Find all notes in grid that have other participants
-  const tiles = _cv()?.tiles || [];
-  for (const tile of tiles) {
-    const noteId = tile.noteId;
-    const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
-    if (!ta) continue;
-    // Check if typed recently
-    const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
-    if (typedAgo < 3000) continue;
-    try {
-      const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
-      const remote = rows?.[0];
-      if (!remote) continue;
-      const remoteContent   = remote.content || '';
-      const displayedContent = ta.value;
-      if (remoteContent !== displayedContent) {
-        console.log(ts + '  Received text:  ' + remoteContent.slice(-40).replace(/\n/g,' '));
-        const selStart = ta.selectionStart;
-        const selEnd   = ta.selectionEnd;
-        ta.value = remoteContent;
-        const local = _notes.find(n => n.id === noteId);
-        if (local) { local.content = remoteContent; local.updated_at = remote.updated_at; }
-        try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
-      } else {
-        console.log(ts + '  Received text:  None  [' + noteId.slice(0,8) + ']');
-      }
-    } catch(e) {}
-  }
-}
-
-function _notesStartSyncPoll() {
-  if (_syncPollInterval) return;
-  _syncPollInterval = setInterval(_notesSyncPoll, 5000);
-}
-function _notesStopSyncPoll() {
-  clearInterval(_syncPollInterval);
-  _syncPollInterval = null;
 }
 
 // ── Start/stop presence polling for a tile ────────────────────────────────
