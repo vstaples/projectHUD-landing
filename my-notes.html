@@ -21,7 +21,7 @@
 #notes-inbox-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
 .notes-section-hdr{padding:6px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
 .notes-section-hdr:hover{color:var(--text2,#90B8D8)}
-.notes-inbox-count{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
+.notes-inbox-count{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
 #notes-inbox-list{max-height:180px;overflow-y:auto}#notes-inbox-list .notes-item{padding-left:24px}
 
 /* ── Tree section ────────────────────────────────────────────────────────── */
@@ -32,11 +32,11 @@
 .notes-item{padding:6px 14px 6px 14px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;border-left:2px solid transparent;transition:all .1s}
 .notes-item:hover{background:rgba(0,210,255,.03);border-left-color:rgba(0,210,255,.15)}
 .notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
-.notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
+.notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
 .notes-item-body{flex:1;min-width:0}
 .notes-item-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:400;color:var(--text1,#C8DFF0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .notes-item-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.notes-item-source{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);color:var(--text3);border-radius:2px;flex-shrink:0;margin-top:2px}
+.notes-item-source{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);color:var(--text3);border-radius:2px;flex-shrink:0;margin-top:2px}
 
 /* ── Tree nodes ──────────────────────────────────────────────────────────── */
 .notes-branch{padding:5px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:700;color:var(--text0,#F0F6FF);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.02em}
@@ -48,7 +48,7 @@
 .notes-subbranch:hover .notes-branch-add,.notes-subbranch:hover .notes-branch-del{opacity:1}
 .notes-add-root{padding:4px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:rgba(0,210,255,.4);cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:none;width:100%;transition:color .12s}
 .notes-add-root:hover{color:#00D2FF}
-.notes-drop-target{background:rgba(0,210,255,.08)!important;border-left:2px solid #00D2FF!important}
+.notes-drop-target{background:rgba(0,210,255,.08)!important;border-left:2px solid rgba(0,210,255,.6)!important}.notes-children.notes-drop-target{background:transparent!important;border-left:none!important}
 .notes-drop-line{position:relative}
 .notes-drop-line::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;
   background:#00D2FF;z-index:10;pointer-events:none;
@@ -89,7 +89,7 @@
 .notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}
 .notes-tile-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none}
 .notes-tile-title:focus{color:#00D2FF}
-.notes-tile-source{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.08);border:0.5px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);border-radius:2px;flex-shrink:0}
+.notes-tile-source{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.08);border:0.5px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);border-radius:2px;flex-shrink:0}
 .notes-tile-ctrl{width:16px;height:16px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;display:flex;align-items:center;justify-content:center;transition:color .1s;flex-shrink:0}
 .notes-tile-ctrl:hover{color:var(--text0)}
 .notes-tile-body{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
@@ -487,7 +487,7 @@ function _notesRenderTree() {
       subLabel.addEventListener('blur', () => _notesRenameBranch(subLabel, branch, sub));
 
       const countSpan = document.createElement('span');
-      countSpan.style.cssText = 'margin-left:auto;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)';
+      countSpan.style.cssText = 'margin-left:auto;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3)';
       countSpan.textContent   = notes.length;
 
       subDiv.appendChild(subChev);
@@ -1053,19 +1053,28 @@ function _notesDeleteBranch(topBranch, subBranch) {
 function _notesBranchDragOver(e) {
   e.preventDefault();
   e.stopPropagation();
-  // Highlight the branch row, not the children container
   const el = e.currentTarget;
-  el.classList.add('notes-drop-target');
-  // If this is a children container, also highlight its preceding branch/subbranch row
+  // If this is a children container, highlight its preceding branch/subbranch label only
   if (el.classList.contains('notes-children')) {
     const prev = el.previousElementSibling;
     if (prev) prev.classList.add('notes-drop-target');
+  } else {
+    el.classList.add('notes-drop-target');
   }
 }
 function _notesBranchDragLeave(e) {
-  e.currentTarget.classList.remove('notes-drop-target');
-  const prev = e.currentTarget.previousElementSibling;
-  if (prev) prev.classList.remove('notes-drop-target');
+  const el = e.currentTarget;
+  if (el.classList.contains('notes-children')) {
+    // Only remove if we actually left the element (not into a child)
+    const rect = el.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right ||
+        e.clientY < rect.top  || e.clientY > rect.bottom) {
+      const prev = el.previousElementSibling;
+      if (prev) prev.classList.remove('notes-drop-target');
+    }
+  } else {
+    el.classList.remove('notes-drop-target');
+  }
 }
 async function _notesBranchDrop(e) {
   e.currentTarget.classList.remove('notes-drop-target');
@@ -1150,15 +1159,15 @@ function _notesDndInit() {
   shell.addEventListener('dragover', e => {
     if (!_dragNoteId) return;
 
-    // Clear all indicators first
-    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-
-    // Left panel: show horizontal drop line on items
+    // Left panel: show horizontal drop line on items only
+    // (branch containers handle their own highlighting)
     const leftItem = e.target.closest('#notes-left .notes-item[data-noteid]');
     if (leftItem && leftItem.dataset.noteid !== _dragNoteId) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      // Clear grid highlights and other drop lines
+      shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
       leftItem.classList.add('notes-drop-line');
       return;
     }
@@ -1168,6 +1177,8 @@ function _notesDndInit() {
     if (tile && !tile.closest('#notes-left')) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
       tile.classList.add('drag-over');
     }
   });
