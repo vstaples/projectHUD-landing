@@ -1539,7 +1539,6 @@ document.addEventListener('keydown', e => {
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSaveNow         = _notesSaveNow;
 window._notesCv              = _cv;          // expose _cv() for collab block
-window._notesParticipants    = _participants; // expose participants cache
 window._notesMinimizeTile    = _notesMinimizeTile;
 window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
@@ -1841,9 +1840,9 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   if (!resourceId) return;
 
   const [skills, profile, domains, assignments] = await Promise.all([
-    API.get('resource_skills?resource_id=eq.' + resourceId).catch(()=>[]),
+    API.get('resource_skills?resource_id=eq.' + resourceId + '&select=id,proficiency,skill_id,skills(name)').catch(()=>[]),
     API.get('resource_profiles?resource_id=eq.' + resourceId + '&limit=1').catch(()=>[]),
-    API.get('resource_domain_experience?resource_id=eq.' + resourceId).catch(()=>[]),
+    API.get('resource_domain_experience?resource_id=eq.' + resourceId + '&select=id,years_experience,regulatory_class,context,subsystem,domain_id,domains(name)').catch(()=>[]),
     API.get('task_resource_assignments?resource_id=eq.' + resourceId + '&select=*,tasks(name,start_date,due_date,status)&limit=10').catch(()=>[]),
   ]);
 
@@ -1881,7 +1880,7 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
     sorted.slice(0,8).forEach(s => {
       const pc = profColors[s.proficiency] || 'var(--text3)';
-      html += '<span style="font-family:var(--font-mono,monospace);font-size:10px;padding:2px 7px;border:1px solid ' + pc + '44;color:' + pc + ';background:' + pc + '0d;white-space:nowrap;">' + _esc(s.skill_name || s.skill_id) + '</span>';
+      html += '<span style="font-family:var(--font-mono,monospace);font-size:10px;padding:2px 7px;border:1px solid ' + pc + '44;color:' + pc + ';background:' + pc + '0d;white-space:nowrap;">' + _esc(s.skills?.name || s.skill_name || s.skill_id) + '</span>';
     });
     if (sorted.length > 8) html += '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:2px 4px;">+' + (sorted.length-8) + ' more</span>';
     html += '</div></div>';
@@ -1892,7 +1891,7 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
     html += '<div class="npc-section"><div class="npc-section-lbl">DOMAIN EXPERIENCE</div>';
     domains.slice(0,3).forEach(d => {
       html += '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);">';
-      html += '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;font-weight:700;color:var(--text0)">' + _esc(d.domain_name || '—') + '</div>';
+      html += '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;font-weight:700;color:var(--text0)">' + _esc(d.domains?.name || d.domain_name || '—') + '</div>';
       if (d.subsystem) html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:#00D2FF;margin-top:1px">' + _esc(d.subsystem) + '</div>';
       const meta = [d.years_experience ? d.years_experience+'yr exp' : null, d.regulatory_class && d.regulatory_class!=='N/A' ? d.regulatory_class : null].filter(Boolean);
       if (meta.length) html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + _esc(meta.join(' · ')) + '</div>';
