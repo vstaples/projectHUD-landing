@@ -556,7 +556,7 @@ function _notesItemHTML(n) {
     const col = (tile.slot % cols) + 1;
     slotLabel = row + ',' + col;
   }
-  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '" draggable="true">' +
+  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
     '<div class="notes-item-body">' +
     '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
     '<div class="notes-item-meta">' + age + (n.entity_type ? ' · ' + n.entity_type : '') + '</div>' +
@@ -1140,19 +1140,23 @@ function _notesDndInit() {
     return null;
   }
 
+  let _mouseIsDown = false;
+
   document.addEventListener('mousedown', e => {
     const item = e.target.closest('#notes-left .notes-item[data-noteid]');
     if (!item) return;
-    // Only start tracking — actual drag begins on mousemove
-    _dragNoteId = item.dataset.noteid;
-    _dragSlot   = null;
+    _dragNoteId  = item.dataset.noteid;
+    _dragSlot    = null;
+    _mouseIsDown = true;
   });
+
+  document.addEventListener('mouseup', () => { _mouseIsDown = false; });
 
   // Track insert position: {noteId, position: 'before'|'after'}
   let _dropInsert = null;
 
   document.addEventListener('mousemove', e => {
-    if (!_dragNoteId || e.buttons !== 1) return;
+    if (!_dragNoteId || !_mouseIsDown) return;
     if (!_leftDragActive) {
       _leftDragActive = true;
       const srcItem = document.querySelector('#notes-left .notes-item[data-noteid="' + _dragNoteId + '"]');
@@ -1193,6 +1197,7 @@ function _notesDndInit() {
   });
 
   document.addEventListener('mouseup', async e => {
+    _mouseIsDown = false;
     if (!_dragNoteId || !_leftDragActive) {
       _dragNoteId = null;
       return;
