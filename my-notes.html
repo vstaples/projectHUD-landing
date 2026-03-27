@@ -1627,8 +1627,7 @@ async function _notesLoadInviteResources() {
   if (_inviteResources) return _inviteResources;
   try {
     const rows = await API.get(
-      'resources?select=id,first_name,last_name,email,department,is_external,user_id,is_active' +
-      '&is_active=eq.true&firm_id=eq.' + FIRM_ID + '&order=department.asc,last_name.asc&limit=200'
+      'resources?select=id,first_name,last_name,email,department,is_external,user_id&order=last_name.asc&limit=200'
     ).catch(() => []);
     _inviteResources = (Array.isArray(rows) ? rows : []).map(r => ({
       ...r,
