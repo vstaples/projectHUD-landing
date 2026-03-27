@@ -138,10 +138,10 @@
 .npc-remove:hover{background:rgba(226,75,74,.15);color:#E24B4A}
 .notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
 .notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
-.notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;cursor:default;user-select:none;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:220px}
+.notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;cursor:default;user-select:none;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:260px;max-height:560px}
 .notes-invite-pop input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;padding:5px 8px;outline:none;margin-bottom:6px;box-sizing:border-box}
 .notes-invite-pop input:focus{border-color:rgba(0,210,255,.4)}
-.notes-invite-result{max-height:140px;overflow-y:auto;cursor:default}.notes-invite-pop .notes-invite-row{cursor:pointer}
+.notes-invite-result{max-height:480px;overflow-y:auto;cursor:default}.notes-invite-pop .notes-invite-row{cursor:pointer}
 .notes-invite-row{padding:5px 7px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;color:var(--text1);transition:background .1s}
 .notes-invite-row:hover{background:rgba(0,210,255,.06)}
 .notes-invite-row .notes-avatar{width:22px;height:22px;font-size:10px}
@@ -666,12 +666,31 @@ function _notesWireLeft() {
       if (note?.entity_id && note?.is_inbox) {
         // Check if it's a removal notification (title contains 'removed themselves')
         if (note.title?.includes('removed themselves from:')) {
-          // Just delete the notification — avatar already gone via participant removal
-          API.del('notes?id=eq.' + note.id).then(() => {
-            _notes = _notes.filter(n => n.id !== note.id);
-            _notesRenderLeft();
-            if (window._notesRenderPresence) window._notesRenderPresence(note.entity_id);
-          }).catch(()=>{});
+          // Show acknowledgment dialog
+          const overlay = document.createElement('div');
+          overlay.className = 'notes-invite-dialog-overlay';
+          overlay.innerHTML =
+            '<div class="notes-invite-dialog">' +
+              '<div class="nid-header">' +
+                '<div class="nid-from">Collaboration Update</div>' +
+                '<div class="nid-title">' + _esc(note.title) + '</div>' +
+              '</div>' +
+              '<div class="nid-body">' + _esc(note.content || '') + '</div>' +
+              '<div class="nid-actions">' +
+                '<button class="nid-btn nid-btn-accept" id="nid-ack">Dismiss</button>' +
+              '</div>' +
+            '</div>';
+          document.body.appendChild(overlay);
+          const dismiss = () => {
+            overlay.remove();
+            API.del('notes?id=eq.' + note.id).then(() => {
+              _notes = _notes.filter(n => n.id !== note.id);
+              _notesRenderLeft();
+              if (window._notesRenderPresence) window._notesRenderPresence(note.entity_id);
+            }).catch(()=>{});
+          };
+          overlay.querySelector('#nid-ack').onclick = dismiss;
+          overlay.addEventListener('mousedown', e => { if (e.target === overlay) dismiss(); });
           return;
         }
         // Check if already accepted
@@ -880,24 +899,20 @@ async function _notesCloseTile(noteId) {
 
   // If this is a shared note (we're a participant, not owner), notify the owner
   try {
-    const parts = await API.get(
-      'note_participants?note_id=eq.' + noteId + '&select=user_id,role,resource_id&limit=20'
-    ).catch(()=>[]);
-    if (!parts?.length) return;
-    const selfUserId = _userId;
-    const selfPart   = parts.find(p => p.user_id === selfUserId);
-    if (!selfPart || selfPart.role === 'owner') return; // we own it, no notification needed
+    // Check if we own this note
+    const noteRows = await API.get('notes?id=eq.' + noteId + '&select=owner_user_id,title&limit=1').catch(()=>[]);
+    const noteOwnerUserId = noteRows?.[0]?.owner_user_id;
+    const noteName        = noteRows?.[0]?.title || _notes.find(n => n.id === noteId)?.title || 'a note';
+    const selfUserId      = _userId;
 
-    const ownerPart  = parts.find(p => p.role === 'owner');
-    if (!ownerPart?.user_id) return;
+    // If we own it, no notification needed
+    if (!noteOwnerUserId || noteOwnerUserId === selfUserId) return;
 
-    const note       = _notes.find(n => n.id === noteId);
-    const noteName   = note?.title || 'a note';
-    const myName     = window._notesResource?.name || 'Someone';
+    const myName = window._notesResource?.name || 'Someone';
 
     await API.post('notes', {
       firm_id:        FIRM_ID,
-      owner_user_id:  ownerPart.user_id,
+      owner_user_id:  noteOwnerUserId,
       title:          myName + ' removed themselves from: ' + noteName,
       content:        myName + ' has removed the shared note "' + noteName + '" from their workspace.',
       hierarchy_path: 'Inbox',
@@ -908,8 +923,8 @@ async function _notesCloseTile(noteId) {
       updated_at:     new Date().toISOString(),
     });
 
-    // Also remove self from note_participants
-    await API.del('note_participants?note_id=eq.' + noteId + '&user_id=eq.' + selfUserId);
+    // Remove self from note_participants if present
+    await API.del('note_participants?note_id=eq.' + noteId + '&user_id=eq.' + selfUserId).catch(()=>{});
   } catch(e) { console.warn('[Compass] Close notification error:', e); }
 }
 
