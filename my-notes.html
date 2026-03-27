@@ -1108,8 +1108,17 @@ async function _notesOpenFloatingNote(noteId, noteName) {
   _notesWireFloatDrag(win, win.querySelector('#nfw-tb-' + noteId));
 
   // Start presence heartbeat for this shared note so others can see activity
-  if (window._notesStartPresence) window._notesStartPresence(noteId);
-  else if (typeof _notesStartPresence === 'function') _notesStartPresence(noteId);
+  console.log('[Compass] Float open: starting presence for', noteId, 'fn:', typeof window._notesStartPresence);
+  if (window._notesStartPresence) {
+    window._notesStartPresence(noteId);
+    console.log('[Compass] Presence started');
+  } else {
+    console.warn('[Compass] _notesStartPresence not available yet');
+    // Retry after collab script has run
+    setTimeout(() => {
+      if (window._notesStartPresence) window._notesStartPresence(noteId);
+    }, 500);
+  }
 
   // Stop presence when window is closed
   const origClose = win.querySelector('.notes-float-close');
@@ -1938,32 +1947,26 @@ async function _notesHeartbeat(noteId) {
 }
 
 async function _notesSyncContent(noteId) {
-  // Sync if there are any accepted participants other than self
   const parts = _participants[noteId] || [];
   const selfUserId = window._notesResource?.user_id;
-  const hasOthers = parts.some(p => {
-    if (p.user_id === selfUserId) return false;
-    return !!p.accepted_at; // accepted participants may have edited
-  });
-  if (!hasOthers) return;
+  // Always sync if there are any non-self participants with accepted invites
+  const hasOthers = parts.some(p => p.user_id !== selfUserId && p.accepted_at);
+  if (!hasOthers && parts.length <= 1) return; // skip if definitely no collaborators
 
   try {
     const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
     const remote = rows?.[0];
     if (!remote) return;
-    // Find the textarea for this note
     const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
     if (!ta) return;
-    // Only update if remote is newer and user isn't currently typing
     const local = _notes.find(n => n.id === noteId);
     if (!local) return;
     const remoteTime = new Date(remote.updated_at).getTime();
-    const localTime  = new Date(local.updated_at).getTime();
+    const localTime  = new Date(local.updated_at || 0).getTime();
     if (remoteTime > localTime && document.activeElement !== ta) {
-      // Preserve cursor position
       const selStart = ta.selectionStart;
       const selEnd   = ta.selectionEnd;
-      ta.value = remote.content || '';
+      ta.value        = remote.content || '';
       local.content    = remote.content;
       local.updated_at = remote.updated_at;
       try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
@@ -2364,6 +2367,8 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
 window._notesRemoveParticipant  = _notesRemoveParticipant;
 window._notesStartPresence      = _notesStartPresence;
 window._notesStopPresence       = _notesStopPresence;
+window._notesGetParticipants    = (noteId) => _participants[noteId];
+window._notesGetPresenceKeys    = () => Object.keys(_presenceIntervals);
 
 // ── Wire presence on tile open ────────────────────────────────────────────
 const _origWireTiles = window._notesWireTiles || null;
