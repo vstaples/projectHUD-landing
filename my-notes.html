@@ -79,6 +79,28 @@
 #notes-tray{border-top:1px solid rgba(0,210,255,.08);padding:8px 12px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;min-height:0}
 #notes-tray:empty{display:none}
 .notes-tray-chip{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 10px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
+/* ── Invitation dialog ── */
+.notes-invite-dialog-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.notes-invite-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:420px;max-width:95vw;padding:0}
+.nid-header{padding:20px 24px 16px;border-bottom:1px solid rgba(0,210,255,.1)}
+.nid-from{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.nid-title{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:18px;font-weight:700;color:var(--text0,#F0F6FF);margin-bottom:4px}
+.nid-note-name{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;color:#00D2FF;margin-top:2px}
+.nid-body{padding:18px 24px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;color:var(--text2);line-height:1.6}
+.nid-actions{padding:14px 24px;border-top:1px solid rgba(0,210,255,.1);display:flex;gap:10px;justify-content:flex-end}
+.nid-btn{font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.08em;padding:9px 20px;cursor:pointer;transition:all .15s}
+.nid-btn-reject{background:none;border:1px solid rgba(226,75,74,.3);color:rgba(226,75,74,.7)}
+.nid-btn-reject:hover{background:rgba(226,75,74,.08);color:#E24B4A}
+.nid-btn-accept{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.4);color:#00D2FF}
+.nid-btn-accept:hover{background:rgba(0,210,255,.18)}
+/* ── Floating shared note window ── */
+.notes-float-window{position:fixed;z-index:500;background:var(--bg1,#0c1628);border:1px solid rgba(0,210,255,.35);box-shadow:0 16px 60px rgba(0,0,0,.8);width:520px;height:400px;display:flex;flex-direction:column;cursor:default}
+.notes-float-titlebar{padding:8px 12px;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(0,210,255,.15);display:flex;align-items:center;gap:8px;cursor:move;user-select:none;flex-shrink:0}
+.notes-float-label{font-family:var(--font-mono,monospace);font-size:10px;color:#00D2FF;letter-spacing:.08em;text-transform:uppercase;margin-right:auto}
+.notes-float-hint{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.04em}
+.notes-float-close{background:none;border:none;color:rgba(226,75,74,.6);cursor:pointer;font-size:12px;padding:0 4px}
+.notes-float-close:hover{color:#E24B4A}
+.notes-float-body{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
 .notes-tray-chip:hover{background:rgba(0,210,255,.12);color:#00D2FF}
 
 /* ── Note tile ───────────────────────────────────────────────────────────── */
@@ -287,6 +309,7 @@ window._notesLoadView = async function() {
   }
   if (window._notesSplitterInit) window._notesSplitterInit();
   _notesDndInit();
+  _notesStartInboxPoll();
   // Wire collaboration after a tick to ensure collab script has patched _notesWireTiles
   setTimeout(() => {
     if (typeof _notesWireTilesCollab === 'function') _notesWireTilesCollab();
@@ -600,7 +623,7 @@ function _notesItemHTML(n) {
     '<div class="notes-item-meta">' + age + (n.entity_type ? ' · ' + n.entity_type : '') + '</div>' +
     '</div>' +
     (inGrid ? '<div class="notes-slot-badge">Grid ' + slotLabel + '</div>' : '') +
-    (n.entity_type && !inGrid ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
+    (n.entity_type && n.entity_type !== 'note' && !inGrid ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
     '</div>';
 }
 
@@ -620,9 +643,18 @@ function _notesWireLeft() {
     el.onclick = (e) => {
       e.stopPropagation();
       const noteId = el.dataset.noteid;
-      // Already in grid — do nothing, user can see it
+      const note   = _notes.find(n => n.id === noteId);
+
+      // Invitation note — show accept/reject dialog
+      if (note?.entity_id && note?.is_inbox) {
+        _notesShowInviteDialog(note);
+        return;
+      }
+
+      // Already in grid — do nothing
       if (_cv().tiles.some(t => t.noteId === noteId)) return;
-      // Find first empty slot — never displace on click, only on drag
+
+      // Find first empty slot
       const size  = _cv().gridSize || '2x2';
       const sp    = size.split('x');
       const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
@@ -637,7 +669,6 @@ function _notesWireLeft() {
         _notesRenderGrid();
         _notesRenderLeft();
       }
-      // If grid is full, do nothing — user must drag to displace
     };
   });
 }
@@ -705,7 +736,7 @@ function _notesTileHTML(note, tileState) {
     '<div class="notes-tile-title" contenteditable="true" spellcheck="false" ' +
       'data-noteid="' + _esc(note.id) + '" ' +
       'onblur="_notesSaveTitle(this)">' + _esc(note.title || 'Untitled') + '</div>' +
-    (note.entity_type ? '<span class="notes-tile-source">' + _esc(note.entity_type) + '</span>' : '') +
+    (note.entity_type && note.entity_type !== 'note' ? '<span class="notes-tile-source">' + _esc(note.entity_type) + '</span>' : '') +
     _presDiv +
     '<button class="notes-invite-btn" title="Invite to note" onclick="_notesShowInvite(\'' + note.id + '\',this)">+</button>' +
     '<button class="notes-tile-ctrl" title="Toggle chat" onclick="_notesToggleChat(\'' + note.id + '\')" ' +
@@ -956,6 +987,159 @@ function _esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Invitation accept/reject dialog ──────────────────────────────────────
+async function _notesShowInviteDialog(inviteNote) {
+  const titleMatch  = (inviteNote.title || '').match(/^(.+?) invited you to: (.+)$/);
+  const inviterName = titleMatch?.[1] || 'Someone';
+  const noteName    = titleMatch?.[2] || 'a note';
+  const sharedNoteId = inviteNote.entity_id;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'notes-invite-dialog-overlay';
+  overlay.innerHTML =
+    '<div class="notes-invite-dialog">' +
+      '<div class="nid-header">' +
+        '<div class="nid-from">Collaboration Invitation</div>' +
+        '<div class="nid-title">' + _esc(inviterName) + ' invited you to collaborate</div>' +
+        '<div class="nid-note-name">✎ ' + _esc(noteName) + '</div>' +
+      '</div>' +
+      '<div class="nid-body">' +
+        _esc(inviterName) + ' has shared this note with you.' +
+        '<br><br>Accepting will open a live view of the shared note in a floating window. You can then drag it into any grid tile.' +
+        '<br><br>Declining will leave this invitation in your inbox.' +
+      '</div>' +
+      '<div class="nid-actions">' +
+        '<button class="nid-btn nid-btn-reject" id="nid-reject">✕ Decline</button>' +
+        '<button class="nid-btn nid-btn-accept" id="nid-accept">✓ Accept &amp; Open →</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#nid-reject').onclick = async () => {
+    overlay.remove();
+    try {
+      const parts = await API.get('note_participants?note_id=eq.' + sharedNoteId + '&role=eq.owner&limit=1').catch(()=>[]);
+      const ownerUserId = parts?.[0]?.user_id;
+      if (ownerUserId) {
+        const myName = window._notesResource?.name || 'Someone';
+        await API.post('notes', {
+          firm_id: FIRM_ID, owner_user_id: ownerUserId,
+          title:   myName + ' declined your invitation to: ' + noteName,
+          content: myName + ' has declined your invitation to collaborate on "' + noteName + '".',
+          hierarchy_path: 'Inbox', is_inbox: true,
+          entity_id: null, entity_type: null,
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        });
+      }
+    } catch(e) { console.warn('[Compass] Rejection notification failed:', e); }
+  };
+
+  overlay.querySelector('#nid-accept').onclick = async () => {
+    overlay.remove();
+    try {
+      await API.del('notes?id=eq.' + inviteNote.id);
+      _notes = _notes.filter(n => n.id !== inviteNote.id);
+      _notesRenderLeft();
+    } catch(e) {}
+    // Mark participant as accepted
+    try {
+      const userId = window._notesResource?.user_id;
+      if (userId) {
+        await API.patch(
+          'note_participants?note_id=eq.' + sharedNoteId + '&user_id=eq.' + userId,
+          { accepted_at: new Date().toISOString() }
+        );
+      }
+    } catch(e) {}
+    await _notesOpenFloatingNote(sharedNoteId, noteName);
+  };
+}
+
+// ── Floating shared note window ───────────────────────────────────────────
+async function _notesOpenFloatingNote(noteId, noteName) {
+  let note = _notes.find(n => n.id === noteId);
+  if (!note) {
+    const rows = await API.get('notes?id=eq.' + noteId + '&limit=1').catch(()=>[]);
+    note = rows?.[0];
+    if (note) _notes.push(note);
+  }
+  if (!note) { alert('Could not load the shared note. It may have been deleted.'); return; }
+
+  const win = document.createElement('div');
+  win.className = 'notes-float-window';
+  win.style.cssText = 'top:80px;left:calc(50% - 260px)';
+  win.dataset.noteId = noteId;
+
+  win.innerHTML =
+    '<div class="notes-float-titlebar" id="nfw-tb-' + _esc(noteId) + '">' +
+      '<div class="notes-float-label">SHARED NOTE</div>' +
+      '<span style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(note.title || noteName) + '</span>' +
+      '<span class="notes-float-hint">drag title bar to move</span>' +
+      '<button class="notes-float-close" onclick="this.closest(\'.notes-float-window\').remove()">✕</button>' +
+    '</div>' +
+    '<div class="notes-float-body">' +
+      '<textarea class="notes-tile-canvas" data-noteid="' + _esc(noteId) + '" ' +
+        'placeholder="Start writing…" oninput="_notesSaveContent(this)">' + _esc(note.content || '') + '</textarea>' +
+    '</div>' +
+    '<div style="padding:7px 12px;border-top:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:8px;flex-shrink:0">' +
+      '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Drag title bar to move · Pin to grid when ready</span>' +
+      '<button onclick="_notesAddFloatToGrid(\'' + _esc(noteId) + '\',this.closest(\'.notes-float-window\'))" ' +
+        'style="margin-left:auto;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.3);' +
+        'color:#00D2FF;font-family:var(--font-mono,monospace);font-size:10px;padding:4px 12px;cursor:pointer">Pin to grid →</button>' +
+    '</div>';
+
+  document.body.appendChild(win);
+  _notesWireFloatDrag(win, win.querySelector('#nfw-tb-' + noteId));
+}
+
+function _notesAddFloatToGrid(noteId, winEl) {
+  if (winEl) winEl.remove();
+  const size  = _cv().gridSize || '2x2';
+  const sp    = size.split('x');
+  const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
+  const usedSlots = new Set(_cv().tiles.map(t => t.slot));
+  let emptySlot = -1;
+  for (let i = 0; i < slots; i++) {
+    if (!usedSlots.has(i)) { emptySlot = i; break; }
+  }
+  if (emptySlot >= 0) {
+    _cv().tiles.push({ slot: emptySlot, noteId, chatOpen: false });
+  } else {
+    const displaced = _cv().tiles.find(t => t.slot === 0);
+    if (displaced) _cv().tray.push(displaced.noteId);
+    _cv().tiles = _cv().tiles.filter(t => t.slot !== 0);
+    _cv().tiles.push({ slot: 0, noteId, chatOpen: false });
+  }
+  _notesSaveWorkspace(true);
+  _notesRenderGrid();
+  _notesRenderLeft();
+}
+
+function _notesWireFloatDrag(win, handle) {
+  if (!handle) return;
+  let dragging = false, ox = 0, oy = 0;
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    win.style.transform = 'none';
+    const r = win.getBoundingClientRect();
+    win.style.left = r.left + 'px';
+    win.style.top  = r.top  + 'px';
+    ox = e.clientX - r.left;
+    oy = e.clientY - r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    win.style.left = Math.max(0, Math.min(window.innerWidth  - win.offsetWidth,  e.clientX - ox)) + 'px';
+    win.style.top  = Math.max(0, Math.min(window.innerHeight - win.offsetHeight, e.clientY - oy)) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+}
+
+window._notesAddFloatToGrid = _notesAddFloatToGrid;
 
 // ── View management ──────────────────────────────────────────────────────
 function _notesRenderViewSwitcher() {
@@ -1538,7 +1722,9 @@ document.addEventListener('keydown', e => {
 
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSaveNow         = _notesSaveNow;
-window._notesCv              = _cv;          // expose _cv() for collab block
+window._notesCv              = _cv;
+window._notesStartInboxPoll  = _notesStartInboxPoll;
+window._notesStopInboxPoll   = _notesStopInboxPoll;
 window._notesMinimizeTile    = _notesMinimizeTile;
 window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
@@ -1599,7 +1785,7 @@ async function _notesLoadParticipants(noteId) {
   try {
     const rows = await API.get(
       'note_participants?note_id=eq.' + noteId +
-      '&select=id,user_id,resource_id,role,color,invited_at,last_seen_at&order=invited_at.asc'
+      '&select=id,user_id,resource_id,role,color,invited_at,accepted_at,last_seen_at&order=invited_at.asc'
     ).catch(() => []);
     _participants[noteId] = Array.isArray(rows) ? rows : [];
   } catch(e) { _participants[noteId] = []; }
@@ -1631,9 +1817,17 @@ async function _notesRenderPresence(noteId) {
     const seenAgo  = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
     const active   = seenAgo < 10000;
 
-    const avatar = document.createElement('div');
-    avatar.className = 'notes-avatar' + (active ? ' active' : '');
-    avatar.style.background = color;
+    const pending = !p.accepted_at;
+    const avatar  = document.createElement('div');
+    if (pending) {
+      // Pending — outline only, no fill
+      avatar.className = 'notes-avatar notes-avatar-pending';
+      avatar.style.cssText = 'background:transparent;color:' + color + ';border:1.5px solid ' + color + ';opacity:.6';
+    } else {
+      // Accepted — filled, active dot if online
+      avatar.className = 'notes-avatar' + (active ? ' active' : '');
+      avatar.style.background = color;
+    }
     avatar.textContent = initials;
     avatar.dataset.participantId = p.id;
     avatar.dataset.noteId        = noteId;
@@ -1648,7 +1842,7 @@ async function _notesRenderPresence(noteId) {
   });
 }
 
-// ── Heartbeat — update own last_seen_at every 30s ─────────────────────────
+// ── Heartbeat — update own last_seen_at every 5s ──────────────────────────
 async function _notesHeartbeat(noteId) {
   const userId = window._notesResource?.user_id;
   if (!userId) return;
@@ -1661,6 +1855,38 @@ async function _notesHeartbeat(noteId) {
   // Also refresh other participants' presence
   await _notesLoadParticipants(noteId);
   _notesRenderPresence(noteId);
+}
+
+// ── Inbox poller — check for new notes every 10s ─────────────────────────
+let _inboxPollInterval = null;
+let _inboxLastChecked  = new Date().toISOString();
+
+async function _notesInboxPoll() {
+  if (!window._notesResource?.user_id) return;
+  try {
+    const newNotes = await API.get(
+      'notes?owner_user_id=eq.' + window._notesResource.user_id +
+      '&is_inbox=eq.true&created_at=gt.' + _inboxLastChecked +
+      '&order=created_at.desc&limit=10'
+    ).catch(() => []);
+    if (newNotes?.length) {
+      // Add to local cache and re-render left panel
+      newNotes.forEach(n => {
+        if (!_notes.find(x => x.id === n.id)) _notes.unshift(n);
+      });
+      _inboxLastChecked = new Date().toISOString();
+      _notesRenderLeft();
+    }
+  } catch(e) {}
+}
+
+function _notesStartInboxPoll() {
+  if (_inboxPollInterval) return;
+  _inboxPollInterval = setInterval(_notesInboxPoll, 10000);
+}
+function _notesStopInboxPoll() {
+  clearInterval(_inboxPollInterval);
+  _inboxPollInterval = null;
 }
 
 // ── Start/stop presence polling for a tile ────────────────────────────────
@@ -1866,7 +2092,8 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   const prof     = profile?.[0];
   const now      = Date.now();
   const seenAgo  = participant.last_seen_at ? now - new Date(participant.last_seen_at).getTime() : Infinity;
-  const seenText = active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never');
+  const isPending = !participant.accepted_at;
+  const seenText  = isPending ? 'Invitation pending' : (active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never'));
 
   const totalPct  = (assignments||[]).reduce((s,a) => s + (a.allocation_pct||0), 0);
   const displayRes = resolvedRes || res;
@@ -1997,11 +2224,11 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
           firm_id:        'aaaaaaaa-0001-0001-0001-000000000001',
           owner_user_id:  resolvedUserId,
           title:          inviterName + ' invited you to: ' + noteName,
-          content:        'You have been invited to collaborate on a note. Open MY NOTES to view it.',
+          content:        inviterName + ' has shared "' + noteName + '" with you. Click the note in your inbox to open it, or find it in the shared notes tree.',
           hierarchy_path: 'Inbox',
           is_inbox:       true,
           entity_id:      noteId,
-          entity_type:    'note',
+          entity_type:    null,
           created_at:     new Date().toISOString(),
           updated_at:     new Date().toISOString(),
         });
