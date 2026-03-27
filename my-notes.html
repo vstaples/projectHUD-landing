@@ -1089,7 +1089,7 @@ async function _notesOpenFloatingNote(noteId, noteName) {
       '<div class="notes-float-label">SHARED NOTE</div>' +
       '<span style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(note.title || noteName) + '</span>' +
       '<span class="notes-float-hint">drag title bar to move</span>' +
-      '<button class="notes-float-close" onclick="this.closest(\'.notes-float-window\').remove()">✕</button>' +
+    '<button class="notes-float-close" onclick="_notesFloatClose(\'' + _esc(noteId) + '\',this)">✕</button>' +
     '</div>' +
     '<div class="notes-float-body">' +
       '<textarea class="notes-tile-canvas" data-noteid="' + _esc(noteId) + '" ' +
@@ -1105,6 +1105,18 @@ async function _notesOpenFloatingNote(noteId, noteName) {
   document.body.appendChild(win);
   _notesWireFloatDrag(win, win.querySelector('#nfw-tb-' + noteId));
 }
+
+function _notesFloatClose(noteId, btn) {
+  btn.closest('.notes-float-window').remove();
+  // Add to tray so user can still access it
+  if (!_cv().tray.includes(noteId)) {
+    _cv().tray.push(noteId);
+    _notesSaveWorkspace(true);
+    _notesRenderTray();
+    _notesRenderLeft();
+  }
+}
+window._notesFloatClose = _notesFloatClose;
 
 function _notesAddFloatToGrid(noteId, winEl) {
   if (winEl) winEl.remove();
