@@ -1144,6 +1144,7 @@ function switchView(viewId) {
 
   _currentView = viewId;
   sessionStorage.setItem('compass-view', viewId);
+  localStorage.setItem('compass-view', viewId);
 
   // Lazy-load view data on first activation
   if (!_viewLoaded[viewId]) {
@@ -1267,6 +1268,12 @@ async function loadUserView() {
     window._myWorkLoaded = true;
     // Now call the real loadUserView that was just loaded
     if (window._mwLoadUserView) await window._mwLoadUserView();
+    // Restore last active inner tab
+    const savedTab = localStorage.getItem('compass-user-tab');
+    if (savedTab && savedTab !== 'work' && window.uSwitchTab) {
+      const btn = document.querySelector('.ust[data-tab="' + savedTab + '"]');
+      window.uSwitchTab(savedTab, btn || null);
+    }
   } catch(e) {
     console.error('[Compass] Failed to load my-work.html:', e);
     if (loading) loading.style.display = 'none';
@@ -1333,7 +1340,7 @@ async function loadMyTimeView() {
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBaseData();
   // Restore last view or default to PM
-  const saved = sessionStorage.getItem('compass-view') || 'pm';
+  const saved = localStorage.getItem('compass-view') || sessionStorage.getItem('compass-view') || 'user';
   switchView(saved);
 });
 

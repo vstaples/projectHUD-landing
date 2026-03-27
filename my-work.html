@@ -4900,6 +4900,7 @@ window.mbToggleCard = function(cardId) {
 let _uActiveTab = 'work';
 window.uSwitchTab = function(tab, btn) {
   _uActiveTab = tab;
+  localStorage.setItem('compass-user-tab', tab);
   document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
   document.querySelectorAll('.utc').forEach(c => c.classList.remove('on'));
   if (btn) btn.classList.add('on');
