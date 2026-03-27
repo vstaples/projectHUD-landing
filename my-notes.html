@@ -1157,32 +1157,45 @@ function _notesDndInit() {
     } catch(err) { console.error('Tree drop error:', err); }
   }
 
+  // ── dragstart — attach to scroll containers directly too ─────────────────
+  function _leftPanelDragStart(e) {
+    const item = e.target.closest('.notes-item[data-noteid]');
+    if (!item) return;
+    _dragNoteId = item.dataset.noteid;
+    _dragSlot   = null;
+    item.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', _dragNoteId);
+    console.log('[DnD] dragstart from left panel:', _dragNoteId?.slice(0,8));
+  }
+  function _leftPanelDragEnd(e) {
+    shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+    _dragNoteId = null;
+    _dragSlot   = null;
+  }
+
   if (treeScroll) {
+    treeScroll.addEventListener('dragstart', _leftPanelDragStart);
+    treeScroll.addEventListener('dragend',   _leftPanelDragEnd);
     treeScroll.addEventListener('dragover',  _leftPanelDragOver);
     treeScroll.addEventListener('dragleave', _leftPanelDragLeave);
     treeScroll.addEventListener('drop',      _leftPanelDrop);
   }
   if (inboxList) {
+    inboxList.addEventListener('dragstart', _leftPanelDragStart);
+    inboxList.addEventListener('dragend',   _leftPanelDragEnd);
     inboxList.addEventListener('dragover',  _leftPanelDragOver);
     inboxList.addEventListener('dragleave', _leftPanelDragLeave);
     inboxList.addEventListener('drop',      _leftPanelDrop);
   }
 
-  // ── dragstart ────────────────────────────────────────────────────────────
+  // ── dragstart (shell level — grid tiles and tray chips only) ────────────
   shell.addEventListener('dragstart', e => {
-    const item = e.target.closest('.notes-item[data-noteid]');
     const tile = e.target.closest('.notes-tile[data-noteid]');
     const chip = e.target.closest('.notes-tray-chip[data-noteid]');
 
-    // Tree/inbox item (in left panel)
-    if (item && item.closest('#notes-left')) {
-      _dragNoteId = item.dataset.noteid;
-      _dragSlot   = null;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', _dragNoteId);
-    // Grid tile
-    } else if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
+    if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
       _dragNoteId = tile.dataset.noteid;
       _dragSlot   = parseInt(tile.dataset.slot);
       tile.classList.add('dragging');
