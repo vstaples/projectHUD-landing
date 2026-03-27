@@ -271,19 +271,29 @@ async function _notesLoadWorkspace() {
   } catch(e) { console.error('[Compass] Workspace load error:', e); }
 }
 
-async function _notesSaveWorkspace() {
+async function _notesSaveNow() {
   if (!_userId) return;
+  // Deep clone to capture state at this exact moment
+  const snapshot = JSON.parse(JSON.stringify(_workspace));
+  try {
+    const res = await API.patch(
+      'notes_workspace?user_id=eq.' + _userId,
+      { state: snapshot, updated_at: new Date().toISOString() }
+    );
+    if (!res || (Array.isArray(res) && res.length === 0)) {
+      await API.post('notes_workspace', {
+        firm_id: FIRM_ID, user_id: _userId,
+        state: snapshot, updated_at: new Date().toISOString(),
+      });
+    }
+  } catch(e) { console.error('[Compass] Workspace save error:', e); }
+}
+
+async function _notesSaveWorkspace(immediate) {
+  if (!_userId) return;
+  if (immediate) { clearTimeout(_saveTimer); return _notesSaveNow(); }
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async () => {
-    try {
-      await API.patch(
-        'notes_workspace?user_id=eq.' + _userId,
-        { state: _workspace, updated_at: new Date().toISOString() }
-      );
-      const lbl = document.getElementById('notes-grid-label');
-      if (lbl) { lbl.textContent = 'Saved ✓'; setTimeout(()=>{ lbl.textContent=''; }, 1500); }
-    } catch(e) { console.error('[Compass] Workspace save error:', e); }
-  }, 800);
+  _saveTimer = setTimeout(_notesSaveNow, 800);
 }
 
 // ── Left panel ────────────────────────────────────────────────────────────
@@ -513,7 +523,7 @@ function _notesRenderTray() {
 // ── Grid actions ──────────────────────────────────────────────────────────
 function _notesSetGrid(size, btn) {
   _cv().gridSize = size;
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderGrid();
 }
 
@@ -548,7 +558,7 @@ function _notesOpenNote(noteId) {
     _cv().tiles.push({ slot: 0, noteId, chatOpen: false });
   }
 
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
 }
@@ -556,7 +566,7 @@ function _notesOpenNote(noteId) {
 function _notesCloseTile(noteId) {
   _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
   _cv().tray  = _cv().tray.filter(id => id !== noteId);
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
 }
@@ -732,7 +742,7 @@ function _notesSwitchView(viewName) {
   if (!viewName || viewName === _workspace.activeView) return;
   if (!_workspace.views[viewName]) return;
   _workspace.activeView = viewName;
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
   _notesRenderViewSwitcher();
@@ -751,7 +761,7 @@ function _notesNewView() {
   _cv().tray  = [];
   _workspace.views[trimmed] = { gridSize: '2x2', tiles: [], tray: [] };
   _workspace.activeView = trimmed;
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
   _notesRenderViewSwitcher();
@@ -769,14 +779,14 @@ function _notesRenameView(newName) {
   _workspace.views[newName] = _workspace.views[oldName];
   delete _workspace.views[oldName];
   _workspace.activeView = newName;
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderViewSwitcher();
 }
 
 function _notesClearWorkspace() {
   _cv().tiles = [];
   _cv().tray  = [];
-  _notesSaveWorkspace();
+  _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
 }
