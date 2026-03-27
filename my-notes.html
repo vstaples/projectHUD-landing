@@ -1072,6 +1072,20 @@ async function _notesShowInviteDialog(inviteNote) {
 
   overlay.querySelector('#nid-accept').onclick = async () => {
     overlay.remove();
+    // Update inbox invitation title to match the actual note title
+    try {
+      const noteRows = await API.get('notes?id=eq.' + sharedNoteId + '&select=title&limit=1').catch(()=>[]);
+      const sharedTitle = noteRows?.[0]?.title;
+      if (sharedTitle && inviteNote.id) {
+        await API.patch('notes?id=eq.' + inviteNote.id, {
+          title:      sharedTitle,
+          updated_at: new Date().toISOString(),
+        });
+        const local = _notes.find(n => n.id === inviteNote.id);
+        if (local) local.title = sharedTitle;
+        _notesRenderLeft();
+      }
+    } catch(e) {}
     // Keep invitation in inbox as persistent pointer — clicking it reopens the float
     // Mark participant as accepted — upsert in case row was removed
     try {
@@ -1866,7 +1880,7 @@ async function _notesSyncPoll() {
       const remoteContent    = remote.content || '';
       const displayedContent = ta.value;
       if (remoteContent !== displayedContent) {
-        console.log(ts + '  Received text:  ' + remoteContent.slice(-40).split('\n').join(' '));
+
         const selStart = ta.selectionStart;
         const selEnd   = ta.selectionEnd;
         ta.value = remoteContent;
@@ -1874,7 +1888,7 @@ async function _notesSyncPoll() {
         if (local) { local.content = remoteContent; local.updated_at = remote.updated_at; }
         try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
       } else {
-        console.log(ts + '  None  [' + noteId.slice(0,8) + ']');
+
       }
     } catch(e) {}
   }
