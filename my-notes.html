@@ -30,7 +30,7 @@
 .notes-item{padding:6px 14px 6px 14px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;border-left:2px solid transparent;transition:all .1s}
 .notes-item:hover{background:rgba(0,210,255,.03);border-left-color:rgba(0,210,255,.15)}
 .notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
-.notes-item.in-grid{border-left-color:rgba(0,210,255,.4)}
+.notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
 .notes-item-body{flex:1;min-width:0}
 .notes-item-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text0,#F0F6FF);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .notes-item-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -302,14 +302,25 @@ function _notesRenderTree() {
 }
 
 function _notesItemHTML(n) {
-  const inGrid = _workspace.tiles.some(t => t.noteId === n.id);
+  const tile   = _workspace.tiles.find(t => t.noteId === n.id);
+  const inGrid = !!tile;
   const age    = _notesRelTime(n.updated_at);
+  const size   = _workspace.gridSize || '2x2';
+  const cols   = size === '1x1' ? 1 : size === '2x2' ? 2 : 3;
+  // Convert slot index to grid position label e.g. slot 0 = "1,1", slot 1 = "1,2"
+  let slotLabel = '';
+  if (tile) {
+    const row = Math.floor(tile.slot / cols) + 1;
+    const col = (tile.slot % cols) + 1;
+    slotLabel = row + ',' + col;
+  }
   return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
     '<div class="notes-item-body">' +
     '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
     '<div class="notes-item-meta">' + age + (n.entity_type ? ' · ' + n.entity_type : '') + '</div>' +
     '</div>' +
-    (n.entity_type ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
+    (inGrid ? '<div class="notes-slot-badge">Grid ' + slotLabel + '</div>' : '') +
+    (n.entity_type && !inGrid ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
     '</div>';
 }
 
