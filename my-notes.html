@@ -98,6 +98,14 @@
 
 /* ── Empty grid slot ─────────────────────────────────────────────────────── */
 .notes-slot-plus{font-size:18px;color:rgba(0,210,255,.2)}
+/* ── Drag and drop ───────────────────────────────────────────────────────── */
+.notes-item[draggable]{cursor:grab}
+.notes-item[draggable]:active{cursor:grabbing}
+.notes-item.dragging{opacity:.4}
+.notes-tile[draggable]{cursor:grab}
+.notes-tile.drag-over{border-color:#00D2FF;background:rgba(0,210,255,.06)}
+.notes-tile.empty.drag-over{border-color:#00D2FF;background:rgba(0,210,255,.06)}
+.notes-tray-chip[draggable]{cursor:grab}
 </style>
 
 <div id="notes-shell">
@@ -227,6 +235,7 @@ window._notesLoadView = async function() {
     if (shell) shell.style.setProperty('--notes-left-w', savedW + 'px');
   }
   if (window._notesSplitterInit) window._notesSplitterInit();
+  _notesDndInit();
 };
 
 window._notesRefresh = async function() {
@@ -262,9 +271,25 @@ async function _notesLoadWorkspace() {
     const rows = await API.get('notes_workspace?user_id=eq.' + _userId + '&limit=1').catch(()=>[]);
     if (rows?.[0]?.state) {
       const s = rows[0].state;
-      _cv().gridSize = s.gridSize || '2x2';
-      _cv().tiles    = Array.isArray(s.tiles) ? s.tiles : [];
-      _cv().tray     = Array.isArray(s.tray)  ? s.tray  : [];
+      if (s.views) {
+        // Multi-view format — restore fully
+        _workspace.activeView = s.activeView || 'Default';
+        _workspace.views      = s.views;
+        // Ensure active view exists
+        if (!_workspace.views[_workspace.activeView]) {
+          _workspace.views[_workspace.activeView] = { gridSize: '2x2', tiles: [], tray: [] };
+        }
+      } else {
+        // Legacy flat format — migrate into Default view
+        _workspace.activeView = 'Default';
+        _workspace.views = {
+          'Default': {
+            gridSize: s.gridSize || '2x2',
+            tiles:    Array.isArray(s.tiles) ? s.tiles : [],
+            tray:     Array.isArray(s.tray)  ? s.tray  : [],
+          }
+        };
+      }
     }
   } catch(e) { console.error('[Compass] Workspace load error:', e); }
 }
@@ -383,7 +408,7 @@ function _notesItemHTML(n) {
     const col = (tile.slot % cols) + 1;
     slotLabel = row + ',' + col;
   }
-  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
+  return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '" draggable="true">' +
     '<div class="notes-item-body">' +
     '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
     '<div class="notes-item-meta">' + age + (n.entity_type ? ' · ' + n.entity_type : '') + '</div>' +
@@ -449,6 +474,7 @@ function _notesRenderGrid() {
     const div  = document.createElement('div');
     if (note) {
       div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
+      div.setAttribute('draggable', 'true');
       div.innerHTML = _notesTileHTML(note, tile);
       div.dataset.slot   = i;
       div.dataset.noteid = note.id;
@@ -799,6 +825,140 @@ function _notesClearWorkspace() {
   _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
+}
+
+// ── Drag and drop ─────────────────────────────────────────────────────────
+let _dragNoteId  = null;  // noteId being dragged
+let _dragSlot    = null;  // slot index if dragging from grid (-1 if from left panel)
+
+function _notesDndInit() {
+  // Delegate all drag events at the shell level
+  const shell = document.getElementById('notes-shell');
+  if (!shell || shell._dndWired) return;
+  shell._dndWired = true;
+
+  // ── dragstart ────────────────────────────────────────────────────────────
+  shell.addEventListener('dragstart', e => {
+    const item = e.target.closest('.notes-item[data-noteid]');
+    const tile = e.target.closest('.notes-tile[data-noteid]');
+    const chip = e.target.closest('.notes-tray-chip[data-noteid]');
+
+    if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
+      _dragNoteId = tile.dataset.noteid;
+      _dragSlot   = parseInt(tile.dataset.slot);
+      tile.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    } else if (item) {
+      _dragNoteId = item.dataset.noteid;
+      _dragSlot   = null;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'copy';
+    } else if (chip) {
+      _dragNoteId = chip.dataset.noteid;
+      _dragSlot   = null;
+      e.dataTransfer.effectAllowed = 'move';
+    } else {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('text/plain', _dragNoteId);
+  });
+
+  // ── dragend ───────────────────────────────────────────────────────────────
+  shell.addEventListener('dragend', e => {
+    shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    _dragNoteId = null;
+    _dragSlot   = null;
+  });
+
+  // ── dragover ──────────────────────────────────────────────────────────────
+  shell.addEventListener('dragover', e => {
+    const target = e.target.closest('.notes-tile, .notes-item');
+    if (!target || !_dragNoteId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    target.classList.add('drag-over');
+  });
+
+  // ── dragleave ─────────────────────────────────────────────────────────────
+  shell.addEventListener('dragleave', e => {
+    const target = e.target.closest('.notes-tile, .notes-item');
+    if (target) target.classList.remove('drag-over');
+  });
+
+  // ── drop ──────────────────────────────────────────────────────────────────
+  shell.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!_dragNoteId) return;
+    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+
+    const dropTile = e.target.closest('.notes-tile');
+    const dropItem = e.target.closest('.notes-item[data-noteid]');
+
+    if (dropTile) {
+      const targetSlot    = parseInt(dropTile.dataset.slot);
+      const targetNoteId  = dropTile.dataset.noteid || null; // null if empty slot
+      const cv            = _cv();
+
+      if (dropTile.classList.contains('empty')) {
+        // Drop onto empty slot
+        if (_dragSlot !== null) {
+          // Move from one grid slot to another
+          const t = cv.tiles.find(t => t.noteId === _dragNoteId);
+          if (t) t.slot = targetSlot;
+        } else {
+          // From left panel or tray into empty slot
+          cv.tray = cv.tray.filter(id => id !== _dragNoteId);
+          const existing = cv.tiles.find(t => t.noteId === _dragNoteId);
+          if (existing) {
+            existing.slot = targetSlot;
+          } else {
+            cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
+          }
+        }
+      } else if (targetNoteId && targetNoteId !== _dragNoteId) {
+        // Drop onto occupied slot — displace occupant to tray
+        const dragTile   = cv.tiles.find(t => t.noteId === _dragNoteId);
+        const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
+
+        if (_dragSlot !== null && dragTile && targetTile) {
+          // Grid → Grid: move drag to target slot, displace target to tray
+          cv.tiles = cv.tiles.filter(t => t.noteId !== _dragNoteId);
+          targetTile.slot = _dragSlot; // displaced tile takes dragged tile's old slot? No — displace to tray
+          cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
+          if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
+          cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: dragTile.chatOpen || false });
+        } else if (dragTile) {
+          // Already in grid at another slot — move it
+          cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
+          if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
+          dragTile.slot = targetSlot;
+        } else {
+          // From left panel → occupied slot: displace occupant to tray
+          cv.tray = cv.tray.filter(id => id !== _dragNoteId);
+          cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
+          if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
+          cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
+        }
+      }
+
+      _notesSaveWorkspace(true);
+      _notesRenderGrid();
+      _notesRenderLeft();
+
+    } else if (dropItem) {
+      // Dropped onto a left panel item — remove from grid (move back to panel only)
+      if (_dragSlot !== null) {
+        _cv().tiles = _cv().tiles.filter(t => t.noteId !== _dragNoteId);
+        _cv().tray  = _cv().tray.filter(id => id !== _dragNoteId);
+        _notesSaveWorkspace(true);
+        _notesRenderGrid();
+        _notesRenderLeft();
+      }
+    }
+  });
 }
 
 // ── Resizable splitter ───────────────────────────────────────────────────
