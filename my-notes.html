@@ -145,18 +145,11 @@
     <div id="notes-grid-header">
       <!-- View name — editable inline -->
       <div id="notes-view-name-wrap" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
-        <span id="notes-view-name"
-          contenteditable="true" spellcheck="false"
-          style="font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:600;
-            color:var(--text0,#F0F6FF);cursor:text;outline:none;min-width:40px;max-width:180px;
-            white-space:nowrap;overflow:hidden"
-          onblur="_notesRenameView(this.textContent.trim())"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">Default</span>
         <!-- View switcher dropdown -->
         <select id="notes-view-switcher"
-          style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.2);color:var(--text2,#90B8D8);
-            font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 4px;cursor:pointer;outline:none;
-            max-width:140px"
+          style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
+            font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
+            max-width:180px;font-weight:600"
           onchange="_notesSwitchView(this.value)">
         </select>
       </div>
@@ -730,7 +723,16 @@ function _notesRenderViewSwitcher() {
     '<option value="' + _esc(v) + '"' + (v === _workspace.activeView ? ' selected' : '') + '>' +
     _esc(v) + '</option>'
   ).join('');
-  if (name) name.textContent = _workspace.activeView;
+  // Add rename on double-click
+  const sel2 = document.getElementById('notes-view-switcher');
+  if (sel2 && !sel2._renameWired) {
+    sel2._renameWired = true;
+    sel2.addEventListener('dblclick', () => {
+      const cur = _workspace.activeView;
+      const n   = prompt('Rename view "' + cur + '" to:', cur);
+      if (n?.trim() && n.trim() !== cur) _notesRenameView(n.trim());
+    });
+  }
   // Sync grid size buttons
   const activeSize = _cv().gridSize || '2x2';
   document.querySelectorAll('.notes-grid-btn[data-grid]').forEach(b => {
@@ -756,9 +758,7 @@ function _notesNewView() {
     alert('A view named "' + trimmed + '" already exists.');
     return;
   }
-  // Auto-clear current view tiles, create new empty view
-  _cv().tiles = [];
-  _cv().tray  = [];
+  // Create new empty view and switch to it — current view tiles are preserved
   _workspace.views[trimmed] = { gridSize: '2x2', tiles: [], tray: [] };
   _workspace.activeView = trimmed;
   _notesSaveWorkspace(true);
@@ -771,8 +771,6 @@ function _notesRenameView(newName) {
   if (!newName || newName === _workspace.activeView) return;
   if (_workspace.views[newName]) {
     // Name already taken — revert
-    const el = document.getElementById('notes-view-name');
-    if (el) el.textContent = _workspace.activeView;
     return;
   }
   const oldName = _workspace.activeView;
@@ -846,7 +844,8 @@ function _notesClearWorkspace() {
 })();
 
 // ── Expose to window for onclick handlers ────────────────────────────────
-window._notesSetGrid    = _notesSetGrid;
+window._notesSaveNow       = _notesSaveNow;
+window._notesSetGrid       = _notesSetGrid;
 window._notesOpenNote   = _notesOpenNote;
 window._notesToggleChat = _notesToggleChat;
 window._notesCloseTile  = _notesCloseTile;
