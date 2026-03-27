@@ -134,10 +134,10 @@
 .npc-remove:hover{background:rgba(226,75,74,.15);color:#E24B4A}
 .notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
 .notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
-.notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:220px}
+.notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;cursor:default;user-select:none;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:220px}
 .notes-invite-pop input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;padding:5px 8px;outline:none;margin-bottom:6px;box-sizing:border-box}
 .notes-invite-pop input:focus{border-color:rgba(0,210,255,.4)}
-.notes-invite-result{max-height:140px;overflow-y:auto}
+.notes-invite-result{max-height:140px;overflow-y:auto;cursor:default}.notes-invite-pop .notes-invite-row{cursor:pointer}
 .notes-invite-row{padding:5px 7px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;color:var(--text1);transition:background .1s}
 .notes-invite-row:hover{background:rgba(0,210,255,.06)}
 .notes-invite-row .notes-avatar{width:22px;height:22px;font-size:10px}
@@ -264,6 +264,8 @@
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
+let _inboxPollInterval = null;
+let _inboxLastChecked  = new Date().toISOString();
 let _userId    = null;
 let _userName  = 'Vaughn Staples';
 let _notes     = [];      // all notes for this user
@@ -1858,8 +1860,6 @@ async function _notesHeartbeat(noteId) {
 }
 
 // ── Inbox poller — check for new notes every 10s ─────────────────────────
-let _inboxPollInterval = null;
-let _inboxLastChecked  = new Date().toISOString();
 
 async function _notesInboxPoll() {
   if (!window._notesResource?.user_id) return;
@@ -2002,7 +2002,13 @@ window._notesShowInvite = async function(noteId, btn) {
 
     resultsEl.innerHTML = html;
     resultsEl.querySelectorAll('.notes-invite-row[data-already="false"]').forEach(row => {
-      row.onclick = () => _notesInvite(noteId, row.dataset.resourceid, row.dataset.userid || null, row.dataset.color, pop);
+      row.onclick = () => {
+        if (row._inviting) return;
+        row._inviting = true;
+        row.style.opacity = '0.5';
+        row.style.pointerEvents = 'none';
+        _notesInvite(noteId, row.dataset.resourceid, row.dataset.userid || null, row.dataset.color, pop);
+      };
     });
   }
 
