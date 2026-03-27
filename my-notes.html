@@ -440,8 +440,15 @@ function _notesSetGrid(size, btn) {
 }
 
 function _notesOpenNote(noteId) {
-  // Already in grid?
-  if (_workspace.tiles.some(t => t.noteId === noteId)) return;
+  // Already in grid — scroll to it visually
+  if (_workspace.tiles.some(t => t.noteId === noteId)) {
+    const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
+    if (tileEl) tileEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+  // Remove from tray if it was there
+  _workspace.tray = _workspace.tray.filter(id => id !== noteId);
+
   // Find first empty slot
   const size  = _workspace.gridSize || '2x2';
   const slots = size === '1x1' ? 1 : size === '2x2' ? 4 : 9;
@@ -450,12 +457,18 @@ function _notesOpenNote(noteId) {
   for (let i = 0; i < slots; i++) {
     if (!usedSlots.has(i)) { emptySlot = i; break; }
   }
+
   if (emptySlot >= 0) {
+    // Empty slot available — use it
     _workspace.tiles.push({ slot: emptySlot, noteId, chatOpen: false });
   } else {
-    // All slots full — add to tray
-    if (!_workspace.tray.includes(noteId)) _workspace.tray.push(noteId);
+    // Grid full — replace slot 0 (oldest), push displaced note to tray
+    const displaced = _workspace.tiles.find(t => t.slot === 0);
+    if (displaced) _workspace.tray.push(displaced.noteId);
+    _workspace.tiles = _workspace.tiles.filter(t => t.slot !== 0);
+    _workspace.tiles.push({ slot: 0, noteId, chatOpen: false });
   }
+
   _notesSaveWorkspace();
   _notesRenderGrid();
   _notesRenderLeft();
@@ -618,6 +631,7 @@ function _esc(s) {
 
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSetGrid    = _notesSetGrid;
+window._notesOpenNote   = _notesOpenNote;
 window._notesToggleChat = _notesToggleChat;
 window._notesCloseTile  = _notesCloseTile;
 window._notesSaveTitle  = _notesSaveTitle;
