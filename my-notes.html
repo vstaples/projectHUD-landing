@@ -1683,7 +1683,7 @@ async function _notesLoadInviteResources() {
   if (_inviteResources) return _inviteResources;
   try {
     const rows = await API.get(
-      'resources?select=id,first_name,last_name,email,department,is_external,user_id&order=last_name.asc&limit=200'
+      'resources?select=id,first_name,last_name,email,department,title,is_external,user_id,avatar_url&order=last_name.asc&limit=200'
     ).catch(() => []);
     _inviteResources = (Array.isArray(rows) ? rows : []).map(r => ({
       ...r,
@@ -1801,12 +1801,18 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   card.className = 'notes-participant-card';
 
   const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const title    = res?.title || '—';
+  const title    = resolvedRes?.title || res?.title || '—';
 
-  // Initial skeleton
+  // Initial skeleton — use resolvedRes for photo
+  const photoUrl = resolvedRes?.avatar_url || res?.avatar_url;
+  const avatarHtml = photoUrl
+    ? '<img src="' + _esc(photoUrl) + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+      '<div class="npc-avatar" style="background:' + _esc(color) + '18;color:' + _esc(color) + ';border:1px solid ' + _esc(color) + '44;display:none">' + _esc(initials) + '</div>'
+    : '<div class="npc-avatar" style="background:' + _esc(color) + '18;color:' + _esc(color) + ';border:1px solid ' + _esc(color) + '44">' + _esc(initials) + '</div>';
+
   card.innerHTML =
     '<div class="npc-top">' +
-      '<div class="npc-avatar" style="background:' + _esc(color) + '18;color:' + _esc(color) + ';border:1px solid ' + _esc(color) + '44">' + _esc(initials) + '</div>' +
+      avatarHtml +
       '<div><div class="npc-name">' + _esc(name) + '</div>' +
       '<div class="npc-title">' + _esc(title) + '</div></div>' +
     '</div>' +
@@ -1836,7 +1842,17 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   }, 50);
 
   // Fetch rich data in parallel
-  const resourceId = res?.id || participant.resource_id;
+  // Ensure resources are loaded before looking up
+  if (!_inviteResources) await _notesLoadInviteResources();
+
+  // Resolve resource from cache if not passed in
+  let resolvedRes = res;
+  if (!resolvedRes && _inviteResources) {
+    resolvedRes = (participant.resource_id && _inviteResources.find(r => r.id === participant.resource_id)) ||
+                  (participant.user_id    && _inviteResources.find(r => r.user_id === participant.user_id)) ||
+                  null;
+  }
+  const resourceId = resolvedRes?.id || participant.resource_id;
   if (!resourceId) return;
 
   const [skills, profile, domains, assignments, allSkills, allDomains] = await Promise.all([
@@ -1854,21 +1870,24 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   const seenText = active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never');
 
   const totalPct  = (assignments||[]).reduce((s,a) => s + (a.allocation_pct||0), 0);
-  const availPct  = res?.availability_pct ?? 100;
+  const availPct  = displayRes?.availability_pct ?? 100;
   const utilColor = totalPct > availPct ? 'var(--red,#E24B4A)' : totalPct > availPct*0.8 ? 'var(--amber,#EF9F27)' : 'var(--green,#1D9E75)';
 
   const profColors = { aware:'var(--text2)', practitioner:'var(--cyan,#00D2FF)', expert:'var(--amber,#EF9F27)', authority:'var(--purple,#8B5CF6)' };
 
   let html = '';
 
+  // Use resolvedRes for all data display
+  const displayRes = resolvedRes || res;
+
   // Contact & Info
   html += '<div class="npc-section">';
   html += '<div class="npc-section-lbl">CONTACT &amp; INFO</div>';
-  if (res?.email)      html += '<div class="npc-row"><span class="npc-row-lbl">EMAIL</span><span class="npc-row-val">' + _esc(res.email) + '</span></div>';
-  if (res?.phone)      html += '<div class="npc-row"><span class="npc-row-lbl">PHONE</span><span class="npc-row-val">' + _esc(res.phone) + '</span></div>';
-  if (res?.department) html += '<div class="npc-row"><span class="npc-row-lbl">DEPT</span><span class="npc-row-val">' + _esc(res.department) + '</span></div>';
-  if (res?.hire_date)  html += '<div class="npc-row"><span class="npc-row-lbl">HIRED</span><span class="npc-row-val">' + new Date(res.hire_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span></div>';
-  if (res?.availability_pct != null) html += '<div class="npc-row"><span class="npc-row-lbl">AVAILABILITY</span><span class="npc-row-val">' + res.availability_pct + '%</span></div>';
+  if (displayRes?.email)      html += '<div class="npc-row"><span class="npc-row-lbl">EMAIL</span><span class="npc-row-val">' + _esc(displayRes.email) + '</span></div>';
+  if (displayRes?.phone)      html += '<div class="npc-row"><span class="npc-row-lbl">PHONE</span><span class="npc-row-val">' + _esc(displayRes.phone) + '</span></div>';
+  if (displayRes?.department) html += '<div class="npc-row"><span class="npc-row-lbl">DEPT</span><span class="npc-row-val">' + _esc(displayRes.department) + '</span></div>';
+  if (displayRes?.hire_date)  html += '<div class="npc-row"><span class="npc-row-lbl">HIRED</span><span class="npc-row-val">' + new Date(displayRes.hire_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span></div>';
+  if (displayRes?.availability_pct != null) html += '<div class="npc-row"><span class="npc-row-lbl">AVAILABILITY</span><span class="npc-row-val">' + displayRes.availability_pct + '%</span></div>';
   html += '<div class="npc-row"><span class="npc-row-lbl">PRESENCE</span><span class="npc-row-val">' + (active ? '<span class="npc-active-dot"></span>' : '') + _esc(seenText) + '</span></div>';
   html += '</div>';
 
@@ -1957,6 +1976,8 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
       const r = _inviteResources.find(r => r.id === resolvedResourceId);
       if (r) resolvedUserId = r.user_id || null;
     }
+
+    // 1. Add to note_participants
     await API.post('note_participants', {
       note_id:      noteId,
       resource_id:  resolvedResourceId,
@@ -1966,6 +1987,32 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
       invited_at:   new Date().toISOString(),
       last_seen_at: null,
     });
+
+    // 2. Send inbox notification to invitee if they have a user_id
+    if (resolvedUserId) {
+      const sourceNote = typeof _notes !== 'undefined'
+        ? _notes.find(n => n.id === noteId)
+        : null;
+      const inviterName = window._notesResource?.name || 'A colleague';
+      const noteName    = sourceNote?.title || 'a note';
+      try {
+        await API.post('notes', {
+          firm_id:        'aaaaaaaa-0001-0001-0001-000000000001',
+          owner_user_id:  resolvedUserId,
+          title:          inviterName + ' invited you to: ' + noteName,
+          content:        'You have been invited to collaborate on a note. Open MY NOTES to view it.',
+          hierarchy_path: 'Inbox',
+          is_inbox:       true,
+          entity_id:      noteId,
+          entity_type:    'note',
+          created_at:     new Date().toISOString(),
+          updated_at:     new Date().toISOString(),
+        });
+      } catch(e) {
+        console.warn('[Compass] Inbox notification failed:', e);
+      }
+    }
+
     await _notesLoadParticipants(noteId);
     _notesRenderPresence(noteId);
     pop.remove();
