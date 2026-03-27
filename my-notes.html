@@ -127,7 +127,28 @@
   <!-- ── Grid workspace ──────────────────────────────────────────────────── -->
   <div id="notes-right">
     <div id="notes-grid-header">
-      <span id="notes-grid-label">Workspace</span>
+      <!-- View name — editable inline -->
+      <div id="notes-view-name-wrap" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+        <span id="notes-view-name"
+          contenteditable="true" spellcheck="false"
+          style="font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:600;
+            color:var(--text0,#F0F6FF);cursor:text;outline:none;min-width:40px;max-width:180px;
+            white-space:nowrap;overflow:hidden"
+          onblur="_notesRenameView(this.textContent.trim())"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">Default</span>
+        <!-- View switcher dropdown -->
+        <select id="notes-view-switcher"
+          style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.2);color:var(--text2,#90B8D8);
+            font-family:var(--font-mono,monospace);font-size:10px;padding:2px 4px;cursor:pointer;outline:none;
+            max-width:120px"
+          onchange="_notesSwitchView(this.value)">
+        </select>
+      </div>
+      <button class="notes-grid-btn" onclick="_notesNewView()" title="New view"
+        style="font-size:10px;padding:3px 8px">+ View</button>
+      <button class="notes-grid-btn" onclick="_notesClearWorkspace()" title="Clear all tiles from this view"
+        style="font-size:10px;padding:3px 8px;color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
+      <div style="width:1px;height:16px;background:rgba(255,255,255,.08);margin:0 2px"></div>
       <button class="notes-grid-btn" data-grid="1x1" onclick="_notesSetGrid('1x1',this)">1×1</button>
       <button class="notes-grid-btn active" data-grid="2x2" onclick="_notesSetGrid('2x2',this)">2×2</button>
       <button class="notes-grid-btn" data-grid="3x3" onclick="_notesSetGrid('3x3',this)">3×3</button>
@@ -150,11 +171,19 @@ let _userId    = null;
 let _userName  = 'Vaughn Staples';
 let _notes     = [];      // all notes for this user
 let _messages  = {};      // noteId → [messages]
-let _workspace = {        // restored from notes_workspace
-  gridSize: '2x2',
-  tiles: [],              // [{slot, noteId, chatOpen}]
-  tray: []                // [noteId]
+let _workspace = {        // full workspace state in Supabase
+  activeView: 'Default',
+  views: {
+    'Default': { gridSize: '2x2', tiles: [], tray: [] }
+  }
 };
+// Convenience accessor for current view
+function _cv() {
+  if (!_workspace.views[_workspace.activeView]) {
+    _workspace.views[_workspace.activeView] = { gridSize: '2x2', tiles: [], tray: [] };
+  }
+  return _workspace.views[_workspace.activeView];
+}
 let _saveTimer = null;
 
 // ── Entry point ───────────────────────────────────────────────────────────
@@ -205,9 +234,9 @@ async function _notesLoadWorkspace() {
     const rows = await API.get('notes_workspace?user_id=eq.' + _userId + '&limit=1').catch(()=>[]);
     if (rows?.[0]?.state) {
       const s = rows[0].state;
-      _workspace.gridSize = s.gridSize || '2x2';
-      _workspace.tiles    = Array.isArray(s.tiles) ? s.tiles : [];
-      _workspace.tray     = Array.isArray(s.tray)  ? s.tray  : [];
+      _cv().gridSize = s.gridSize || '2x2';
+      _cv().tiles    = Array.isArray(s.tiles) ? s.tiles : [];
+      _cv().tray     = Array.isArray(s.tray)  ? s.tray  : [];
     }
   } catch(e) { console.error('[Compass] Workspace load error:', e); }
 }
@@ -302,10 +331,10 @@ function _notesRenderTree() {
 }
 
 function _notesItemHTML(n) {
-  const tile   = _workspace.tiles.find(t => t.noteId === n.id);
+  const tile   = _cv().tiles.find(t => t.noteId === n.id);
   const inGrid = !!tile;
   const age    = _notesRelTime(n.updated_at);
-  const size   = _workspace.gridSize || '2x2';
+  const size   = _cv().gridSize || '2x2';
   const cols   = size === '1x1' ? 1 : size === '2x2' ? 2 : 3;
   // Convert slot index to grid position label e.g. slot 0 = "1,1", slot 1 = "1,2"
   let slotLabel = '';
@@ -358,7 +387,7 @@ function _notesRenderGrid() {
   const grid = document.getElementById('notes-grid');
   if (!grid) return;
 
-  const size = _workspace.gridSize || '2x2';
+  const size = _cv().gridSize || '2x2';
   const cols = size === '1x1' ? 1 : size === '2x2' ? 2 : 3;
   const rows = cols;
   const slots = cols * rows;
@@ -374,7 +403,7 @@ function _notesRenderGrid() {
 
   grid.innerHTML = '';
   for (let i = 0; i < slots; i++) {
-    const tile = _workspace.tiles.find(t => t.slot === i);
+    const tile = _cv().tiles.find(t => t.slot === i);
     const note = tile ? _notes.find(n => n.id === tile.noteId) : null;
     const div  = document.createElement('div');
     if (note) {
@@ -393,6 +422,7 @@ function _notesRenderGrid() {
 
   _notesWireTiles();
   _notesRenderTray();
+  _notesRenderViewSwitcher();
 }
 
 function _notesTileHTML(note, tileState) {
@@ -427,7 +457,7 @@ function _notesTileHTML(note, tileState) {
 
 function _notesWireTiles() {
   // Load messages for tiles with chat open
-  _workspace.tiles.forEach(t => {
+  _cv().tiles.forEach(t => {
     if (t.chatOpen) _notesLoadAndRenderMsgs(t.noteId);
   });
 }
@@ -435,7 +465,7 @@ function _notesWireTiles() {
 function _notesRenderTray() {
   const tray = document.getElementById('notes-tray');
   if (!tray) return;
-  const trayNotes = _workspace.tray.map(id => _notes.find(n => n.id === id)).filter(Boolean);
+  const trayNotes = _cv().tray.map(id => _notes.find(n => n.id === id)).filter(Boolean);
   tray.innerHTML = trayNotes.map(n =>
     '<div class="notes-tray-chip" data-noteid="' + _esc(n.id) + '" ' +
       'onclick="_notesOpenNote(\'' + n.id + '\')">' +
@@ -445,25 +475,25 @@ function _notesRenderTray() {
 
 // ── Grid actions ──────────────────────────────────────────────────────────
 function _notesSetGrid(size, btn) {
-  _workspace.gridSize = size;
+  _cv().gridSize = size;
   _notesSaveWorkspace();
   _notesRenderGrid();
 }
 
 function _notesOpenNote(noteId) {
   // Already in grid — scroll to it visually
-  if (_workspace.tiles.some(t => t.noteId === noteId)) {
+  if (_cv().tiles.some(t => t.noteId === noteId)) {
     const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
     if (tileEl) tileEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
   // Remove from tray if it was there
-  _workspace.tray = _workspace.tray.filter(id => id !== noteId);
+  _cv().tray = _cv().tray.filter(id => id !== noteId);
 
   // Find first empty slot
-  const size  = _workspace.gridSize || '2x2';
+  const size  = _cv().gridSize || '2x2';
   const slots = size === '1x1' ? 1 : size === '2x2' ? 4 : 9;
-  const usedSlots = new Set(_workspace.tiles.map(t => t.slot));
+  const usedSlots = new Set(_cv().tiles.map(t => t.slot));
   let emptySlot = -1;
   for (let i = 0; i < slots; i++) {
     if (!usedSlots.has(i)) { emptySlot = i; break; }
@@ -471,13 +501,13 @@ function _notesOpenNote(noteId) {
 
   if (emptySlot >= 0) {
     // Empty slot available — use it
-    _workspace.tiles.push({ slot: emptySlot, noteId, chatOpen: false });
+    _cv().tiles.push({ slot: emptySlot, noteId, chatOpen: false });
   } else {
     // Grid full — replace slot 0 (oldest), push displaced note to tray
-    const displaced = _workspace.tiles.find(t => t.slot === 0);
-    if (displaced) _workspace.tray.push(displaced.noteId);
-    _workspace.tiles = _workspace.tiles.filter(t => t.slot !== 0);
-    _workspace.tiles.push({ slot: 0, noteId, chatOpen: false });
+    const displaced = _cv().tiles.find(t => t.slot === 0);
+    if (displaced) _cv().tray.push(displaced.noteId);
+    _cv().tiles = _cv().tiles.filter(t => t.slot !== 0);
+    _cv().tiles.push({ slot: 0, noteId, chatOpen: false });
   }
 
   _notesSaveWorkspace();
@@ -486,15 +516,15 @@ function _notesOpenNote(noteId) {
 }
 
 function _notesCloseTile(noteId) {
-  _workspace.tiles = _workspace.tiles.filter(t => t.noteId !== noteId);
-  _workspace.tray  = _workspace.tray.filter(id => id !== noteId);
+  _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
+  _cv().tray  = _cv().tray.filter(id => id !== noteId);
   _notesSaveWorkspace();
   _notesRenderGrid();
   _notesRenderLeft();
 }
 
 function _notesToggleChat(noteId) {
-  const tile = _workspace.tiles.find(t => t.noteId === noteId);
+  const tile = _cv().tiles.find(t => t.noteId === noteId);
   if (!tile) return;
   tile.chatOpen = !tile.chatOpen;
   const chatEl = document.getElementById('notes-chat-' + noteId);
@@ -528,8 +558,8 @@ async function _notesNew(slot) {
     if (!newNote?.id) return;
     _notes.unshift(newNote);
     if (typeof slot === 'number') {
-      _workspace.tiles = _workspace.tiles.filter(t => t.slot !== slot);
-      _workspace.tiles.push({ slot, noteId: newNote.id, chatOpen: false });
+      _cv().tiles = _cv().tiles.filter(t => t.slot !== slot);
+      _cv().tiles.push({ slot, noteId: newNote.id, chatOpen: false });
     } else {
       _notesOpenNote(newNote.id);
     }
@@ -640,6 +670,75 @@ function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── View management ──────────────────────────────────────────────────────
+function _notesRenderViewSwitcher() {
+  const sel  = document.getElementById('notes-view-switcher');
+  const name = document.getElementById('notes-view-name');
+  if (!sel) return;
+  const views = Object.keys(_workspace.views);
+  sel.innerHTML = views.map(v =>
+    '<option value="' + _esc(v) + '"' + (v === _workspace.activeView ? ' selected' : '') + '>' +
+    _esc(v) + '</option>'
+  ).join('');
+  if (name) name.textContent = _workspace.activeView;
+  // Sync grid size buttons
+  document.querySelectorAll('.notes-grid-btn[data-grid]').forEach(b => {
+    b.classList.toggle('active', b.dataset.grid === _cv().gridSize);
+  });
+}
+
+function _notesSwitchView(viewName) {
+  if (!viewName || viewName === _workspace.activeView) return;
+  if (!_workspace.views[viewName]) return;
+  _workspace.activeView = viewName;
+  _notesSaveWorkspace();
+  _notesRenderGrid();
+  _notesRenderLeft();
+  _notesRenderViewSwitcher();
+}
+
+function _notesNewView() {
+  const name = prompt('Name this view:');
+  if (!name?.trim()) return;
+  const trimmed = name.trim();
+  if (_workspace.views[trimmed]) {
+    alert('A view named "' + trimmed + '" already exists.');
+    return;
+  }
+  // Save current view first, then create new empty one
+  _workspace.views[trimmed] = { gridSize: '2x2', tiles: [], tray: [] };
+  _workspace.activeView = trimmed;
+  _notesSaveWorkspace();
+  _notesRenderGrid();
+  _notesRenderLeft();
+  _notesRenderViewSwitcher();
+}
+
+function _notesRenameView(newName) {
+  if (!newName || newName === _workspace.activeView) return;
+  if (_workspace.views[newName]) {
+    // Name already taken — revert
+    const el = document.getElementById('notes-view-name');
+    if (el) el.textContent = _workspace.activeView;
+    return;
+  }
+  const oldName = _workspace.activeView;
+  _workspace.views[newName] = _workspace.views[oldName];
+  delete _workspace.views[oldName];
+  _workspace.activeView = newName;
+  _notesSaveWorkspace();
+  _notesRenderViewSwitcher();
+}
+
+function _notesClearWorkspace() {
+  if (!confirm('Clear all tiles from "' + _workspace.activeView + '"? Notes will remain in your inbox and tree.')) return;
+  _cv().tiles = [];
+  _cv().tray  = [];
+  _notesSaveWorkspace();
+  _notesRenderGrid();
+  _notesRenderLeft();
+}
+
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSetGrid    = _notesSetGrid;
 window._notesOpenNote   = _notesOpenNote;
@@ -649,8 +748,12 @@ window._notesSaveTitle  = _notesSaveTitle;
 window._notesSaveContent= _notesSaveContent;
 window._notesSendMsg    = _notesSendMsg;
 window._notesNew        = _notesNew;
-window._notesSearch     = _notesSearch;
+window._notesSearch        = _notesSearch;
 window._notesToggleSection = _notesToggleSection;
+window._notesSwitchView    = _notesSwitchView;
+window._notesNewView       = _notesNewView;
+window._notesRenameView    = _notesRenameView;
+window._notesClearWorkspace= _notesClearWorkspace;
 
 })();
 </script>
