@@ -126,8 +126,8 @@
 
   <!-- ── Left panel ──────────────────────────────────────────────────────── -->
   <div id="notes-left" style="position:relative">
-    <!-- Invisible drag capture overlay — shown only during left-panel drags -->
-    <div id="notes-drag-overlay" style="display:none;position:absolute;inset:0;z-index:100"></div>
+    <!-- Invisible drag capture overlay — pointer-events enabled only during left-panel drags -->
+    <div id="notes-drag-overlay" style="display:block;position:absolute;inset:0;z-index:100;pointer-events:none"></div>
     <div id="notes-left-header">
       <div style="position:relative;display:flex;align-items:center;margin-bottom:7px">
         <input id="notes-search" type="text" placeholder="Search notes…"
@@ -1170,11 +1170,11 @@ function _notesDndInit() {
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', _dragNoteId);
-    // Show overlay after a tick so it doesn't interfere with dragstart
-    setTimeout(() => { if (overlay) overlay.style.display = 'block'; }, 0);
+    // Enable overlay immediately — pointer-events:all captures dragover
+    if (overlay) overlay.style.pointerEvents = 'all';
   }
   function _leftPanelDragEnd(e) {
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) overlay.style.pointerEvents = 'none';
     shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
     shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
     _dragNoteId = null;
@@ -1187,10 +1187,10 @@ function _notesDndInit() {
       if (!_dragNoteId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      // Find what's actually under the overlay at this position
-      overlay.style.display = 'none';
+      // Temporarily disable pointer-events to find element underneath
+      overlay.style.pointerEvents = 'none';
       const under = document.elementFromPoint(e.clientX, e.clientY);
-      overlay.style.display = 'block';
+      overlay.style.pointerEvents = 'all';
       const item = under?.closest('.notes-item[data-noteid]');
       shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
       if (item && item.dataset.noteid !== _dragNoteId) {
@@ -1200,9 +1200,8 @@ function _notesDndInit() {
 
     overlay.addEventListener('drop', async e => {
       e.preventDefault();
-      if (overlay) overlay.style.display = 'none';
+      overlay.style.pointerEvents = 'none';
       shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-      // Find what's under the drop point
       const under = document.elementFromPoint(e.clientX, e.clientY);
       const dropItem = under?.closest('.notes-item[data-noteid]');
       if (!dropItem || dropItem.dataset.noteid === _dragNoteId) return;
