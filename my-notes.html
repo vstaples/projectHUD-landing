@@ -9,7 +9,6 @@
 /* ── Left panel ──────────────────────────────────────────────────────────── */
 #notes-left{border-right:1px solid rgba(0,210,255,.1);display:flex;flex-direction:column;overflow:hidden}
 #notes-left-header{padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.08);flex-shrink:0}
-#notes-search{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0,#F0F6FF);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 9px;outline:none;margin-bottom:7px}
 #notes-search:focus{border-color:rgba(0,210,255,.35)}
 #notes-search::placeholder{color:var(--text3,#6A94B8)}
 #notes-new-btn{width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
@@ -98,7 +97,18 @@
   <!-- ── Left panel ──────────────────────────────────────────────────────── -->
   <div id="notes-left">
     <div id="notes-left-header">
-      <input id="notes-search" type="text" placeholder="Search notes…" oninput="_notesSearch(this.value)"/>
+      <div style="position:relative;display:flex;align-items:center;margin-bottom:7px">
+        <input id="notes-search" type="text" placeholder="Search notes…"
+          oninput="_notesSearch(this.value);document.getElementById('notes-search-clear').style.opacity=this.value?'1':'0'"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);
+            color:var(--text0,#F0F6FF);font-family:var(--font-mono,monospace);font-size:11px;
+            padding:5px 24px 5px 9px;outline:none;margin-bottom:0"/>
+        <button id="notes-search-clear"
+          onclick="document.getElementById('notes-search').value='';_notesSearch('');this.style.opacity='0'"
+          style="position:absolute;right:6px;background:none;border:none;color:var(--text3,#6A94B8);
+            cursor:pointer;font-size:13px;padding:0;line-height:1;opacity:0;transition:opacity .15s"
+          tabindex="-1">×</button>
+      </div>
       <button id="notes-new-btn" onclick="_notesNew()">+ New note</button>
     </div>
 
@@ -145,9 +155,9 @@
         </select>
       </div>
       <button class="notes-grid-btn" onclick="_notesNewView()" title="New view"
-        style="font-size:10px;padding:3px 8px">+ View</button>
+        >+ View</button>
       <button class="notes-grid-btn" onclick="_notesClearWorkspace()" title="Clear all tiles from this view"
-        style="font-size:10px;padding:3px 8px;color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
+        style="color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
       <div style="width:1px;height:16px;background:rgba(255,255,255,.08);margin:0 2px"></div>
       <button class="notes-grid-btn" data-grid="1x1" onclick="_notesSetGrid('1x1',this)">1×1</button>
       <button class="notes-grid-btn" data-grid="1x2" onclick="_notesSetGrid('1x2',this)">1×2</button>
@@ -253,10 +263,12 @@ async function _notesSaveWorkspace() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async () => {
     try {
-      await API.patch('notes_workspace?user_id=eq.' + _userId, {
-        state:      _workspace,
-        updated_at: new Date().toISOString(),
-      });
+      await API.patch(
+        'notes_workspace?user_id=eq.' + _userId,
+        { state: _workspace, updated_at: new Date().toISOString() }
+      );
+      const lbl = document.getElementById('notes-grid-label');
+      if (lbl) { lbl.textContent = 'Saved ✓'; setTimeout(()=>{ lbl.textContent=''; }, 1500); }
     } catch(e) { console.error('[Compass] Workspace save error:', e); }
   }, 800);
 }
