@@ -505,13 +505,10 @@ function _notesTileHTML(note, tileState) {
       '<path d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10C14 10.5523 13.5523 11 13 11H9L6 14V11H3C2.44772 11 2 10.5523 2 10V3Z" ' +
       'stroke="#00D2FF" stroke-width="1.3" fill="' + (chatOpen ? 'rgba(0,210,255,.2)' : 'none') + '"/>' +
       '</svg></button>' +
-    '<button class="notes-tile-ctrl" id="notes-min-btn-' + note.id + '" title="Minimize tile" ' +
-      'onclick="_notesMinimizeTile(\'' + note.id + '\')" ' +
-      'style="font-size:11px;opacity:.6">—</button>' +
-    '<button class="notes-tile-ctrl" id="notes-max-btn-' + note.id + '" title="Maximize tile" ' +
+    '<button class="notes-tile-ctrl" id="notes-max-btn-' + note.id + '" title="Maximize" ' +
       'onclick="_notesMaximizeTile(\'' + note.id + '\')" ' +
-      'style="font-size:11px;opacity:.6">⤢</button>' +
-    '<button class="notes-tile-ctrl" title="Close tile" onclick="_notesCloseTile(\'' + note.id + '\')" ' +
+      'style="font-size:13px;opacity:.6">◻</button>' +
+    '<button class="notes-tile-ctrl" title="Close" onclick="_notesCloseTile(\'' + note.id + '\')" ' +
       'style="color:rgba(226,75,74,.6)">✕</button>' +
     '</div>' +
     '<div class="notes-tile-body" id="notes-tbody-' + note.id + '" ' +
@@ -874,18 +871,20 @@ function _notesDndInit() {
 
   // ── dragover ──────────────────────────────────────────────────────────────
   shell.addEventListener('dragover', e => {
-    const target = e.target.closest('.notes-tile, .notes-item');
-    if (!target || !_dragNoteId) return;
+    if (!_dragNoteId) return;
+    // Only allow drop on grid tiles — not on left panel items
+    const tile = e.target.closest('.notes-tile');
+    if (!tile || tile.closest('#notes-left')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    target.classList.add('drag-over');
+    tile.classList.add('drag-over');
   });
 
   // ── dragleave ─────────────────────────────────────────────────────────────
   shell.addEventListener('dragleave', e => {
-    const target = e.target.closest('.notes-tile, .notes-item');
-    if (target) target.classList.remove('drag-over');
+    const tile = e.target.closest('.notes-tile');
+    if (tile) tile.classList.remove('drag-over');
   });
 
   // ── drop ──────────────────────────────────────────────────────────────────
@@ -894,70 +893,45 @@ function _notesDndInit() {
     if (!_dragNoteId) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
 
+    // Only handle drops on grid tiles — ignore drops on left panel
     const dropTile = e.target.closest('.notes-tile');
-    const dropItem = e.target.closest('.notes-item[data-noteid]');
+    if (!dropTile || dropTile.closest('#notes-left')) return;
 
-    if (dropTile) {
-      const targetSlot    = parseInt(dropTile.dataset.slot);
-      const targetNoteId  = dropTile.dataset.noteid || null; // null if empty slot
-      const cv            = _cv();
+    const targetSlot   = parseInt(dropTile.dataset.slot);
+    const targetNoteId = dropTile.dataset.noteid || null;
+    const cv           = _cv();
 
-      if (dropTile.classList.contains('empty')) {
-        // Drop onto empty slot
-        if (_dragSlot !== null) {
-          // Move from one grid slot to another
-          const t = cv.tiles.find(t => t.noteId === _dragNoteId);
-          if (t) t.slot = targetSlot;
-        } else {
-          // From left panel or tray into empty slot
-          cv.tray = cv.tray.filter(id => id !== _dragNoteId);
-          const existing = cv.tiles.find(t => t.noteId === _dragNoteId);
-          if (existing) {
-            existing.slot = targetSlot;
-          } else {
-            cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
-          }
-        }
-      } else if (targetNoteId && targetNoteId !== _dragNoteId) {
-        // Drop onto occupied slot — displace occupant to tray
-        const dragTile   = cv.tiles.find(t => t.noteId === _dragNoteId);
-        const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
-
-        if (_dragSlot !== null && dragTile && targetTile) {
-          // Grid → Grid: move drag to target slot, displace target to tray
-          cv.tiles = cv.tiles.filter(t => t.noteId !== _dragNoteId);
-          targetTile.slot = _dragSlot; // displaced tile takes dragged tile's old slot? No — displace to tray
-          cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
-          if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
-          cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: dragTile.chatOpen || false });
-        } else if (dragTile) {
-          // Already in grid at another slot — move it
-          cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
-          if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
-          dragTile.slot = targetSlot;
-        } else {
-          // From left panel → occupied slot: displace occupant to tray
-          cv.tray = cv.tray.filter(id => id !== _dragNoteId);
-          cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
-          if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
-          cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
-        }
+    if (dropTile.classList.contains('empty')) {
+      // Drop onto empty slot
+      cv.tray = cv.tray.filter(id => id !== _dragNoteId);
+      const existing = cv.tiles.find(t => t.noteId === _dragNoteId);
+      if (existing) {
+        existing.slot = targetSlot;
+      } else {
+        cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
       }
+    } else if (targetNoteId && targetNoteId !== _dragNoteId) {
+      // Drop onto occupied slot
+      const dragTile   = cv.tiles.find(t => t.noteId === _dragNoteId);
+      const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
 
-      _notesSaveWorkspace(true);
-      _notesRenderGrid();
-      _notesRenderLeft();
-
-    } else if (dropItem) {
-      // Dropped onto a left panel item — remove from grid (move back to panel only)
-      if (_dragSlot !== null) {
-        _cv().tiles = _cv().tiles.filter(t => t.noteId !== _dragNoteId);
-        _cv().tray  = _cv().tray.filter(id => id !== _dragNoteId);
-        _notesSaveWorkspace(true);
-        _notesRenderGrid();
-        _notesRenderLeft();
+      if (dragTile && targetTile) {
+        // Grid → Grid: swap slots
+        const fromSlot  = dragTile.slot;
+        dragTile.slot   = targetSlot;
+        targetTile.slot = fromSlot;
+      } else {
+        // Left panel / tray → occupied slot: displace occupant to tray
+        cv.tray = cv.tray.filter(id => id !== _dragNoteId);
+        cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
+        if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
+        cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
       }
     }
+
+    _notesSaveWorkspace(true);
+    _notesRenderGrid();
+    _notesRenderLeft();
   });
 }
 
@@ -1045,7 +1019,7 @@ function _notesMaximizeTile(noteId) {
     const prevEl = document.querySelector('.notes-tile.maximized');
     if (prevEl) prevEl.classList.remove('maximized');
     const prevBtn = document.getElementById('notes-max-btn-' + _maximizedNoteId);
-    if (prevBtn) { prevBtn.textContent = '⤢'; prevBtn.title = 'Maximize tile'; prevBtn.style.opacity = '.6'; }
+    if (prevBtn) { prevBtn.textContent = '◻'; prevBtn.title = 'Maximize'; prevBtn.style.opacity = '.6'; }
     _maximizedNoteId = null;
   }
 
@@ -1057,7 +1031,7 @@ function _notesMaximizeTile(noteId) {
     if (tileEl.classList.contains('minimized')) _notesMinimizeTile(noteId);
     tileEl.classList.add('maximized');
     const btn = document.getElementById('notes-max-btn-' + noteId);
-    if (btn) { btn.textContent = '⤡'; btn.title = 'Restore tile'; btn.style.opacity = '1'; }
+    if (btn) { btn.textContent = '⧉'; btn.title = 'Restore'; btn.style.opacity = '1'; }
     _maximizedNoteId = noteId;
     // Focus canvas
     setTimeout(() => tileEl.querySelector('.notes-tile-canvas')?.focus(), 50);
