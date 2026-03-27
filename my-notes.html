@@ -429,10 +429,15 @@ function _notesRenderTree() {
 
     body.appendChild(branchDiv);
 
-    // Children container
+    // Children container — also a drop target for the branch
     const childrenDiv = document.createElement('div');
-    childrenDiv.id        = bid;
-    childrenDiv.className = 'notes-children';
+    childrenDiv.id              = bid;
+    childrenDiv.className       = 'notes-children';
+    childrenDiv.dataset.branchpath = branch;
+    childrenDiv.style.minHeight = '8px'; // ensure drop area even when empty
+    childrenDiv.addEventListener('dragover', _notesBranchDragOver);
+    childrenDiv.addEventListener('dragleave', _notesBranchDragLeave);
+    childrenDiv.addEventListener('drop', _notesBranchDrop);
 
     // Root-level notes
     const rootNotes = subs['__root__'] || [];
@@ -501,9 +506,14 @@ function _notesRenderTree() {
       childrenDiv.appendChild(subDiv);
 
       const subItemsDiv = document.createElement('div');
-      subItemsDiv.id        = sid;
-      subItemsDiv.className = 'notes-children notes-subbranch-items';
-      subItemsDiv.innerHTML = notes.map(n => _notesItemHTML(n)).join('');
+      subItemsDiv.id              = sid;
+      subItemsDiv.className       = 'notes-children notes-subbranch-items';
+      subItemsDiv.dataset.branchpath = fullPath;
+      subItemsDiv.style.minHeight = '8px';
+      subItemsDiv.innerHTML       = notes.map(n => _notesItemHTML(n)).join('');
+      subItemsDiv.addEventListener('dragover', _notesBranchDragOver);
+      subItemsDiv.addEventListener('dragleave', _notesBranchDragLeave);
+      subItemsDiv.addEventListener('drop', _notesBranchDrop);
       childrenDiv.appendChild(subItemsDiv);
     });
 
@@ -1043,13 +1053,26 @@ function _notesDeleteBranch(topBranch, subBranch) {
 function _notesBranchDragOver(e) {
   e.preventDefault();
   e.stopPropagation();
-  e.currentTarget.classList.add('notes-drop-target');
+  // Highlight the branch row, not the children container
+  const el = e.currentTarget;
+  el.classList.add('notes-drop-target');
+  // If this is a children container, also highlight its preceding branch/subbranch row
+  if (el.classList.contains('notes-children')) {
+    const prev = el.previousElementSibling;
+    if (prev) prev.classList.add('notes-drop-target');
+  }
 }
 function _notesBranchDragLeave(e) {
   e.currentTarget.classList.remove('notes-drop-target');
+  const prev = e.currentTarget.previousElementSibling;
+  if (prev) prev.classList.remove('notes-drop-target');
 }
 async function _notesBranchDrop(e) {
+  e.currentTarget.classList.remove('notes-drop-target');
+  const prev = e.currentTarget.previousElementSibling;
+  if (prev) prev.classList.remove('notes-drop-target');
   const targetPath = e.currentTarget.dataset.branchpath;
+  if (!targetPath) return;
   return _notesDropOnBranch(e, targetPath);
 }
 
