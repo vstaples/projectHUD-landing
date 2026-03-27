@@ -48,8 +48,9 @@ const Sidebar = (() => {
         display: flex !important;
         flex-direction: column !important;
         height: 100vh !important;
-        overflow: visible !important;
-        min-height: 0;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
       }
       .sidebar-logo { flex-shrink: 0; }
 
