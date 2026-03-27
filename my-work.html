@@ -4899,6 +4899,18 @@ window.mbToggleCard = function(cardId) {
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
 window.uSwitchTab = function(tab, btn) {
+  // Flush any pending notes save before leaving the tab
+  if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesSaveNow) {
+    window._notesSaveNow();
+  }
+  // Stop inbox poll when leaving MY NOTES
+  if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesStopInboxPoll) {
+    window._notesStopInboxPoll();
+  }
+  // Restart inbox poll when entering MY NOTES
+  if (tab === 'concerns' && window._notesStartInboxPoll) {
+    window._notesStartInboxPoll();
+  }
   _uActiveTab = tab;
   localStorage.setItem('compass-user-tab', tab);
   document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
