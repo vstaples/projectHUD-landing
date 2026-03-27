@@ -40,6 +40,15 @@
 
 /* ── Tree nodes ──────────────────────────────────────────────────────────── */
 .notes-branch{padding:5px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.04em}
+.notes-branch-label,.notes-subbranch-label{flex:1;outline:none;cursor:text}
+.notes-branch-label:focus,.notes-subbranch-label:focus{color:var(--text0,#F0F6FF)}
+.notes-branch-add{width:14px;height:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0;opacity:0;transition:opacity .1s;flex-shrink:0;line-height:1}
+.notes-branch-del{width:14px;height:14px;background:none;border:none;color:rgba(226,75,74,.5);cursor:pointer;font-size:11px;padding:0;opacity:0;transition:opacity .1s;flex-shrink:0;line-height:1}
+.notes-branch:hover .notes-branch-add,.notes-branch:hover .notes-branch-del,
+.notes-subbranch:hover .notes-branch-add,.notes-subbranch:hover .notes-branch-del{opacity:1}
+.notes-add-root{padding:4px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:rgba(0,210,255,.4);cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:none;width:100%;transition:color .12s}
+.notes-add-root:hover{color:#00D2FF}
+.notes-drop-target{background:rgba(0,210,255,.08)!important;border-left:2px solid #00D2FF!important}
 .notes-branch:hover{color:var(--text0,#F0F6FF)}
 .notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:var(--text3,#6A94B8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
 .notes-subbranch:hover{color:var(--text2)}
@@ -341,7 +350,6 @@ function _notesRenderTree() {
   const body = document.getElementById('notes-tree-body');
   if (!body) return;
 
-  // Group non-inbox notes by top-level branch
   const organized = _notes.filter(n => !n.is_inbox);
   const branches  = {};
   organized.forEach(n => {
@@ -354,44 +362,142 @@ function _notesRenderTree() {
     branches[top][subKey].push(n);
   });
 
-  // Always show Work, Personal even if empty
-  ['Work', 'Personal'].forEach(b => { if (!branches[b]) branches[b] = {}; });
+  ['Work','Personal'].forEach(b => { if (!branches[b]) branches[b] = {}; });
 
-  let html = '';
+  body.innerHTML = '';
+
   Object.entries(branches).forEach(([branch, subs]) => {
-    const bid = 'nb-' + branch.replace(/\s+/g,'-');
+    const bid        = 'nb-' + branch.replace(/\s+/g,'-');
     const totalCount = Object.values(subs).reduce((s,a) => s + a.length, 0);
-    html += '<div class="notes-branch" data-toggle="' + bid + '">' +
-      '<svg class="notes-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
-      _esc(branch) +
-      (totalCount > 0 ? '<span style="margin-left:auto;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)">' + totalCount + '</span>' : '') +
-      '</div>' +
-      '<div id="' + bid + '" class="notes-children">';
 
-    // Root-level notes (no sub-branch)
+    // Branch row
+    const branchDiv = document.createElement('div');
+    branchDiv.className = 'notes-branch';
+    branchDiv.dataset.toggle     = bid;
+    branchDiv.dataset.branchpath = branch;
+    branchDiv.addEventListener('dragover', _notesBranchDragOver);
+    branchDiv.addEventListener('dragleave', _notesBranchDragLeave);
+    branchDiv.addEventListener('drop', _notesBranchDrop);
+
+    const chev = document.createElement('svg');
+    chev.setAttribute('viewBox','0 0 10 10');
+    chev.setAttribute('fill','none');
+    chev.classList.add('notes-chevron','open');
+    chev.innerHTML = '<path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>';
+
+    const label = document.createElement('span');
+    label.className     = 'notes-branch-label';
+    label.contentEditable = 'true';
+    label.spellcheck    = false;
+    label.textContent   = branch;
+    label.dataset.branch = branch;
+    label.addEventListener('click',  e => e.stopPropagation());
+    label.addEventListener('mousedown', e => e.stopPropagation());
+    label.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); label.blur(); } });
+    label.addEventListener('blur', () => _notesRenameBranch(label, branch, null));
+
+    const addBtn = document.createElement('button');
+    addBtn.className   = 'notes-branch-add';
+    addBtn.title       = 'Add sub-branch';
+    addBtn.textContent = '+';
+    addBtn.addEventListener('click', e => { e.stopPropagation(); _notesAddBranch(branch); });
+
+    branchDiv.appendChild(chev);
+    branchDiv.appendChild(label);
+    branchDiv.appendChild(addBtn);
+
+    if (totalCount === 0) {
+      const delBtn = document.createElement('button');
+      delBtn.className   = 'notes-branch-del';
+      delBtn.title       = 'Delete branch';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', e => { e.stopPropagation(); _notesDeleteBranch(branch, null); });
+      branchDiv.appendChild(delBtn);
+    }
+
+    body.appendChild(branchDiv);
+
+    // Children container
+    const childrenDiv = document.createElement('div');
+    childrenDiv.id        = bid;
+    childrenDiv.className = 'notes-children';
+
+    // Root-level notes
     const rootNotes = subs['__root__'] || [];
     if (rootNotes.length > 0) {
-      html += '<div class="notes-branch-items">' + rootNotes.map(n => _notesItemHTML(n)).join('') + '</div>';
+      const rootWrap = document.createElement('div');
+      rootWrap.className = 'notes-branch-items';
+      rootWrap.innerHTML = rootNotes.map(n => _notesItemHTML(n)).join('');
+      childrenDiv.appendChild(rootWrap);
     }
 
     // Sub-branches
     Object.entries(subs).forEach(([sub, notes]) => {
       if (sub === '__root__') return;
-      const sid = 'ns-' + branch + '-' + sub.replace(/\s+/g,'-');
-      html += '<div class="notes-subbranch" data-toggle="' + sid + '">' +
-        '<svg class="notes-chevron open" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
-        _esc(sub) +
-        '<span style="margin-left:auto;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)">' + notes.length + '</span>' +
-        '</div>' +
-        '<div id="' + sid + '" class="notes-children notes-subbranch-items">' +
-        notes.map(n => _notesItemHTML(n)).join('') +
-        '</div>';
+      const sid      = 'ns-' + branch + '-' + sub.replace(/\s+/g,'-');
+      const fullPath = branch + '/' + sub;
+
+      const subDiv = document.createElement('div');
+      subDiv.className = 'notes-subbranch';
+      subDiv.dataset.toggle     = sid;
+      subDiv.dataset.branchpath = fullPath;
+      subDiv.addEventListener('dragover', _notesBranchDragOver);
+      subDiv.addEventListener('dragleave', _notesBranchDragLeave);
+      subDiv.addEventListener('drop', _notesBranchDrop);
+
+      const subChev = document.createElement('svg');
+      subChev.setAttribute('viewBox','0 0 10 10');
+      subChev.setAttribute('fill','none');
+      subChev.classList.add('notes-chevron','open');
+      subChev.innerHTML = '<path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>';
+
+      const subLabel = document.createElement('span');
+      subLabel.className      = 'notes-subbranch-label';
+      subLabel.contentEditable = 'true';
+      subLabel.spellcheck     = false;
+      subLabel.textContent    = sub;
+      subLabel.dataset.branch = fullPath;
+      subLabel.addEventListener('click', e => e.stopPropagation());
+      subLabel.addEventListener('mousedown', e => e.stopPropagation());
+      subLabel.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); subLabel.blur(); } });
+      subLabel.addEventListener('blur', () => _notesRenameBranch(subLabel, branch, sub));
+
+      const countSpan = document.createElement('span');
+      countSpan.style.cssText = 'margin-left:auto;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)';
+      countSpan.textContent   = notes.length;
+
+      subDiv.appendChild(subChev);
+      subDiv.appendChild(subLabel);
+      subDiv.appendChild(countSpan);
+
+      if (notes.length === 0) {
+        const delBtn2 = document.createElement('button');
+        delBtn2.className   = 'notes-branch-del';
+        delBtn2.title       = 'Delete branch';
+        delBtn2.textContent = '×';
+        delBtn2.addEventListener('click', e => { e.stopPropagation(); _notesDeleteBranch(branch, sub); });
+        subDiv.appendChild(delBtn2);
+      }
+
+      childrenDiv.appendChild(subDiv);
+
+      const subItemsDiv = document.createElement('div');
+      subItemsDiv.id        = sid;
+      subItemsDiv.className = 'notes-children notes-subbranch-items';
+      subItemsDiv.innerHTML = notes.map(n => _notesItemHTML(n)).join('');
+      childrenDiv.appendChild(subItemsDiv);
     });
 
-    html += '</div>';
+    body.appendChild(childrenDiv);
   });
 
-  body.innerHTML = html;
+  // Add root branch button
+  const addRoot = document.createElement('button');
+  addRoot.className   = 'notes-add-root';
+  addRoot.textContent = '+ Add branch';
+  addRoot.addEventListener('click', () => _notesAddBranch(null));
+  body.appendChild(addRoot);
+
   _notesWireLeft();
 }
 
@@ -429,9 +535,16 @@ function _notesWireLeft() {
     };
   });
   document.querySelectorAll('.notes-item[data-noteid]').forEach(el => {
+    // Only trigger open on click if NOT starting a drag
+    el.addEventListener('mousedown', () => { el._maybeDrag = false; });
+    el.addEventListener('dragstart', () => { el._maybeDrag = true; });
     el.onclick = (e) => {
       e.stopPropagation();
-      _notesOpenNote(el.dataset.noteid);
+      if (el._maybeDrag) { el._maybeDrag = false; return; }
+      const noteId = el.dataset.noteid;
+      // If already in grid — do nothing
+      if (_cv().tiles.some(t => t.noteId === noteId)) return;
+      _notesOpenNote(noteId);
     };
   });
 }
@@ -824,6 +937,110 @@ function _notesClearWorkspace() {
   _notesRenderLeft();
 }
 
+// ── Branch management ────────────────────────────────────────────────────
+function _notesWireBranchEditing() {
+  // Prevent branch label clicks from toggling the branch collapse
+  document.querySelectorAll('.notes-branch-label, .notes-subbranch-label').forEach(el => {
+    el.addEventListener('click', e => e.stopPropagation());
+    el.addEventListener('mousedown', e => e.stopPropagation());
+  });
+}
+
+function _notesAddBranch(parentBranch) {
+  const name = prompt(parentBranch ? 'New sub-branch under "' + parentBranch + '":' : 'New top-level branch name:');
+  if (!name?.trim()) return;
+  const trimmed = name.trim();
+  const path    = parentBranch ? parentBranch + '/' + trimmed : trimmed;
+  // Create a placeholder note to establish the branch, or just add an empty branch
+  // We store branches implicitly via note hierarchy_path — create a stub entry
+  // Actually: branches exist only when notes are in them. Add a welcome note.
+  API.post('notes', {
+    firm_id:        FIRM_ID,
+    owner_user_id:  _userId,
+    title:          'New note',
+    content:        '',
+    hierarchy_path: path,
+    is_inbox:       false,
+    created_at:     new Date().toISOString(),
+    updated_at:     new Date().toISOString(),
+  }).then(res => {
+    const note = res?.[0];
+    if (note) {
+      _notes.unshift(note);
+      _notesRenderLeft();
+      // Auto-open the new note
+      _notesOpenNote(note.id);
+    }
+  }).catch(e => console.error('Add branch error:', e));
+}
+
+async function _notesRenameBranch(el, topBranch, subBranch) {
+  const newName = el.textContent.trim();
+  const oldPath = subBranch ? topBranch + '/' + subBranch : topBranch;
+  if (!newName || newName === (subBranch || topBranch)) return;
+  const newPath = subBranch ? topBranch + '/' + newName : newName;
+
+  // Update all notes with this hierarchy_path prefix
+  const affected = _notes.filter(n =>
+    n.hierarchy_path === oldPath || n.hierarchy_path?.startsWith(oldPath + '/')
+  );
+  for (const n of affected) {
+    const updatedPath = n.hierarchy_path.replace(oldPath, newPath);
+    try {
+      await API.patch('notes?id=eq.' + n.id, {
+        hierarchy_path: updatedPath,
+        updated_at: new Date().toISOString()
+      });
+      n.hierarchy_path = updatedPath;
+    } catch(e) { console.error('Rename branch error:', e); }
+  }
+  _notesRenderLeft();
+}
+
+function _notesDeleteBranch(topBranch, subBranch) {
+  const path = subBranch ? topBranch + '/' + subBranch : topBranch;
+  const notes = _notes.filter(n => n.hierarchy_path === path || n.hierarchy_path?.startsWith(path + '/'));
+  if (notes.length > 0) {
+    alert('Branch "' + path + '" is not empty. Move or delete its notes first.');
+    return;
+  }
+  if (!confirm('Delete branch "' + path + '"?')) return;
+  _notesRenderLeft();
+}
+
+function _notesBranchDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.add('notes-drop-target');
+}
+function _notesBranchDragLeave(e) {
+  e.currentTarget.classList.remove('notes-drop-target');
+}
+async function _notesBranchDrop(e) {
+  const targetPath = e.currentTarget.dataset.branchpath;
+  return _notesDropOnBranch(e, targetPath);
+}
+
+async function _notesDropOnBranch(e, targetPath) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('notes-drop-target');
+  const noteId = e.dataTransfer.getData('text/plain') || _dragNoteId;
+  if (!noteId) return;
+  const note = _notes.find(n => n.id === noteId);
+  if (!note) return;
+  try {
+    await API.patch('notes?id=eq.' + noteId, {
+      hierarchy_path: targetPath,
+      is_inbox:       false,
+      updated_at:     new Date().toISOString()
+    });
+    note.hierarchy_path = targetPath;
+    note.is_inbox       = false;
+    _notesRenderLeft();
+  } catch(e2) { console.error('Drop on branch error:', e2); }
+}
+
 // ── Drag and drop ─────────────────────────────────────────────────────────
 let _dragNoteId  = null;  // noteId being dragged
 let _dragSlot    = null;  // slot index if dragging from grid (-1 if from left panel)
@@ -840,25 +1057,30 @@ function _notesDndInit() {
     const tile = e.target.closest('.notes-tile[data-noteid]');
     const chip = e.target.closest('.notes-tray-chip[data-noteid]');
 
-    if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
+    // Tree/inbox item (in left panel)
+    if (item && item.closest('#notes-left')) {
+      _dragNoteId = item.dataset.noteid;
+      _dragSlot   = null;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _dragNoteId);
+    // Grid tile
+    } else if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
       _dragNoteId = tile.dataset.noteid;
       _dragSlot   = parseInt(tile.dataset.slot);
       tile.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
-    } else if (item) {
-      _dragNoteId = item.dataset.noteid;
-      _dragSlot   = null;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', _dragNoteId);
+    // Tray chip
     } else if (chip) {
       _dragNoteId = chip.dataset.noteid;
       _dragSlot   = null;
       e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _dragNoteId);
     } else {
       e.preventDefault();
       return;
     }
-    e.dataTransfer.setData('text/plain', _dragNoteId);
   });
 
   // ── dragend ───────────────────────────────────────────────────────────────
@@ -1057,7 +1279,14 @@ window._notesSendMsg    = _notesSendMsg;
 window._notesNew        = _notesNew;
 window._notesSearch        = _notesSearch;
 window._notesToggleSection = _notesToggleSection;
-window._notesSwitchView    = _notesSwitchView;
+window._notesSwitchView      = _notesSwitchView;
+window._notesAddBranch       = _notesAddBranch;
+window._notesRenameBranch    = _notesRenameBranch;
+window._notesDeleteBranch    = _notesDeleteBranch;
+window._notesDropOnBranch    = _notesDropOnBranch;
+window._notesBranchDragOver  = _notesBranchDragOver;
+window._notesBranchDragLeave = _notesBranchDragLeave;
+window._notesBranchDrop      = _notesBranchDrop;
 window._notesNewView       = _notesNewView;
 window._notesRenameView    = _notesRenameView;
 window._notesClearWorkspace= _notesClearWorkspace;
