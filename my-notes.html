@@ -49,9 +49,9 @@
 
 /* ── Grid workspace ──────────────────────────────────────────────────────── */
 #notes-right{display:flex;flex-direction:column;overflow:hidden}
-#notes-grid-header{padding:8px 16px;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:10px;flex-shrink:0}
+#notes-grid-header{padding:6px 16px;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap}
 #notes-grid-label{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);flex:1}
-.notes-grid-btn{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
+.notes-grid-btn{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
 .notes-grid-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
 .notes-grid-btn.active{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
 #notes-grid-area{flex:1;overflow:hidden;padding:12px}
@@ -71,12 +71,12 @@
 .notes-tile-source{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.08);border:0.5px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);border-radius:2px;flex-shrink:0}
 .notes-tile-ctrl{width:16px;height:16px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;display:flex;align-items:center;justify-content:center;transition:color .1s;flex-shrink:0}
 .notes-tile-ctrl:hover{color:var(--text0)}
-.notes-tile-body{display:flex;flex:1;overflow:hidden;min-height:0}
+.notes-tile-body{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
 .notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
 .notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
 
-/* ── Chat panel ──────────────────────────────────────────────────────────── */
-.notes-chat{width:220px;border-left:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+/* ── Chat panel — bottom strip ───────────────────────────────────────────── */
+.notes-chat{border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;max-height:160px}
 .notes-chat.hidden{display:none}
 .notes-chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 .notes-chat-msg{font-family:var(--font-mono,monospace);font-size:10px;line-height:1.5}
@@ -139,8 +139,8 @@
         <!-- View switcher dropdown -->
         <select id="notes-view-switcher"
           style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.2);color:var(--text2,#90B8D8);
-            font-family:var(--font-mono,monospace);font-size:10px;padding:2px 4px;cursor:pointer;outline:none;
-            max-width:120px"
+            font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 4px;cursor:pointer;outline:none;
+            max-width:140px"
           onchange="_notesSwitchView(this.value)">
         </select>
       </div>
@@ -150,8 +150,15 @@
         style="font-size:10px;padding:3px 8px;color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
       <div style="width:1px;height:16px;background:rgba(255,255,255,.08);margin:0 2px"></div>
       <button class="notes-grid-btn" data-grid="1x1" onclick="_notesSetGrid('1x1',this)">1×1</button>
+      <button class="notes-grid-btn" data-grid="1x2" onclick="_notesSetGrid('1x2',this)">1×2</button>
+      <button class="notes-grid-btn" data-grid="1x3" onclick="_notesSetGrid('1x3',this)">1×3</button>
+      <button class="notes-grid-btn" data-grid="1x4" onclick="_notesSetGrid('1x4',this)">1×4</button>
       <button class="notes-grid-btn active" data-grid="2x2" onclick="_notesSetGrid('2x2',this)">2×2</button>
+      <button class="notes-grid-btn" data-grid="2x3" onclick="_notesSetGrid('2x3',this)">2×3</button>
+      <button class="notes-grid-btn" data-grid="2x4" onclick="_notesSetGrid('2x4',this)">2×4</button>
       <button class="notes-grid-btn" data-grid="3x3" onclick="_notesSetGrid('3x3',this)">3×3</button>
+      <button class="notes-grid-btn" data-grid="3x4" onclick="_notesSetGrid('3x4',this)">3×4</button>
+      <button class="notes-grid-btn" data-grid="4x4" onclick="_notesSetGrid('4x4',this)">4×4</button>
     </div>
     <div id="notes-grid-area">
       <div id="notes-grid"></div>
@@ -387,10 +394,11 @@ function _notesRenderGrid() {
   const grid = document.getElementById('notes-grid');
   if (!grid) return;
 
-  const size = _cv().gridSize || '2x2';
-  const cols = size === '1x1' ? 1 : size === '2x2' ? 2 : 3;
-  const rows = cols;
-  const slots = cols * rows;
+  const size  = _cv().gridSize || '2x2';
+  const parts = size.split('x');
+  const rows  = parseInt(parts[0]) || 2;
+  const cols  = parseInt(parts[1]) || 2;
+  const slots = rows * cols;
 
   // Update grid CSS
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
@@ -432,8 +440,12 @@ function _notesTileHTML(note, tileState) {
       'data-noteid="' + _esc(note.id) + '" ' +
       'onblur="_notesSaveTitle(this)">' + _esc(note.title || 'Untitled') + '</div>' +
     (note.entity_type ? '<span class="notes-tile-source">' + _esc(note.entity_type) + '</span>' : '') +
-    '<button class="notes-tile-ctrl" title="Toggle chat" onclick="_notesToggleChat(\'' + note.id + '\')">' +
-      (chatOpen ? '💬' : '○') + '</button>' +
+    '<button class="notes-tile-ctrl" title="Toggle chat" onclick="_notesToggleChat(\'' + note.id + '\')" ' +
+      'style="width:20px;height:20px;opacity:' + (chatOpen ? '1' : '.4') + '">' +
+      '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14">' +
+      '<path d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10C14 10.5523 13.5523 11 13 11H9L6 14V11H3C2.44772 11 2 10.5523 2 10V3Z" ' +
+      'stroke="#00D2FF" stroke-width="1.3" fill="' + (chatOpen ? 'rgba(0,210,255,.2)' : 'none') + '"/>' +
+      '</svg></button>' +
     '<button class="notes-tile-ctrl" title="Close tile" onclick="_notesCloseTile(\'' + note.id + '\')" ' +
       'style="color:rgba(226,75,74,.6)">✕</button>' +
     '</div>' +
@@ -492,7 +504,8 @@ function _notesOpenNote(noteId) {
 
   // Find first empty slot
   const size  = _cv().gridSize || '2x2';
-  const slots = size === '1x1' ? 1 : size === '2x2' ? 4 : 9;
+  const sp    = size.split('x');
+  const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
   const usedSlots = new Set(_cv().tiles.map(t => t.slot));
   let emptySlot = -1;
   for (let i = 0; i < slots; i++) {
@@ -532,11 +545,13 @@ function _notesToggleChat(noteId) {
     chatEl.classList.toggle('hidden', !tile.chatOpen);
     if (tile.chatOpen) _notesLoadAndRenderMsgs(noteId);
   }
-  // Update ctrl button icon
-  const header = chatEl?.closest('.notes-tile')?.querySelector('.notes-tile-header');
-  if (header) {
-    const btn = header.querySelectorAll('.notes-tile-ctrl')[0];
-    if (btn) btn.textContent = tile.chatOpen ? '💬' : '○';
+  // Update SVG icon fill and opacity
+  const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
+  if (tileEl) {
+    const btn  = tileEl.querySelector('[title="Toggle chat"]');
+    const path = btn?.querySelector('path');
+    if (btn)  btn.style.opacity = tile.chatOpen ? '1' : '.4';
+    if (path) path.setAttribute('fill', tile.chatOpen ? 'rgba(0,210,255,.2)' : 'none');
   }
   _notesSaveWorkspace();
 }
@@ -682,8 +697,9 @@ function _notesRenderViewSwitcher() {
   ).join('');
   if (name) name.textContent = _workspace.activeView;
   // Sync grid size buttons
+  const activeSize = _cv().gridSize || '2x2';
   document.querySelectorAll('.notes-grid-btn[data-grid]').forEach(b => {
-    b.classList.toggle('active', b.dataset.grid === _cv().gridSize);
+    b.classList.toggle('active', b.dataset.grid === activeSize);
   });
 }
 
@@ -705,7 +721,9 @@ function _notesNewView() {
     alert('A view named "' + trimmed + '" already exists.');
     return;
   }
-  // Save current view first, then create new empty one
+  // Auto-clear current view tiles, create new empty view
+  _cv().tiles = [];
+  _cv().tray  = [];
   _workspace.views[trimmed] = { gridSize: '2x2', tiles: [], tray: [] };
   _workspace.activeView = trimmed;
   _notesSaveWorkspace();
@@ -731,7 +749,6 @@ function _notesRenameView(newName) {
 }
 
 function _notesClearWorkspace() {
-  if (!confirm('Clear all tiles from "' + _workspace.activeView + '"? Notes will remain in your inbox and tree.')) return;
   _cv().tiles = [];
   _cv().tray  = [];
   _notesSaveWorkspace();
