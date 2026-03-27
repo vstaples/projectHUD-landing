@@ -138,7 +138,7 @@
 .npc-remove:hover{background:rgba(226,75,74,.15);color:#E24B4A}
 .notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
 .notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
-.notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;cursor:default;user-select:none;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:260px;max-height:560px}
+.notes-invite-pop{position:fixed;z-index:1000;cursor:default;user-select:none;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:260px;max-height:70vh;overflow-y:auto}
 .notes-invite-pop input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;padding:5px 8px;outline:none;margin-bottom:6px;box-sizing:border-box}
 .notes-invite-pop input:focus{border-color:rgba(0,210,255,.4)}
 .notes-invite-result{max-height:480px;overflow-y:auto;cursor:default}.notes-invite-pop .notes-invite-row{cursor:pointer}
@@ -629,11 +629,10 @@ function _notesItemHTML(n) {
     slotLabel = row + ',' + col;
   }
 
-  // Delete button for inbox notes; branch notes use branch × button
-  const delBtn = n.is_inbox
-    ? '<button class="notes-item-del" title="Delete" ' +
-      'onclick="event.stopPropagation();_notesDeleteInboxNote(\'' + _esc(n.id) + '\')">✕</button>'
-    : '';
+  // Delete button — shows on hover for all notes
+  const delFn  = n.is_inbox ? '_notesDeleteInboxNote' : '_notesDeleteTreeNote';
+  const delBtn = '<button class="notes-item-del" title="Delete" ' +
+    'onclick="event.stopPropagation();' + delFn + '(\'' + _esc(n.id) + '\')">✕</button>';
 
   return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" draggable="true" data-noteid="' + _esc(n.id) + '">' +
     '<div class="notes-item-body">' +
@@ -1111,9 +1110,21 @@ async function _notesShowInviteDialog(inviteNote) {
 
   overlay.querySelector('#nid-reject').onclick = async () => {
     overlay.remove();
+    // Delete the invitation from Alan's inbox
     try {
+      await API.del('notes?id=eq.' + inviteNote.id);
+      _notes = _notes.filter(n => n.id !== inviteNote.id);
+      _notesRenderLeft();
+    } catch(e) {}
+    // Notify Vaughn — try participants table first, fall back to notes.owner_user_id
+    try {
+      let ownerUserId = null;
       const parts = await API.get('note_participants?note_id=eq.' + sharedNoteId + '&role=eq.owner&limit=1').catch(()=>[]);
-      const ownerUserId = parts?.[0]?.user_id;
+      ownerUserId = parts?.[0]?.user_id;
+      if (!ownerUserId) {
+        const noteRows = await API.get('notes?id=eq.' + sharedNoteId + '&select=owner_user_id&limit=1').catch(()=>[]);
+        ownerUserId = noteRows?.[0]?.owner_user_id;
+      }
       if (ownerUserId) {
         const myName = window._notesResource?.name || 'Someone';
         await API.post('notes', {
@@ -1121,7 +1132,7 @@ async function _notesShowInviteDialog(inviteNote) {
           title:   myName + ' declined your invitation to: ' + noteName,
           content: myName + ' has declined your invitation to collaborate on "' + noteName + '".',
           hierarchy_path: 'Inbox', is_inbox: true,
-          entity_id: null, entity_type: null,
+          entity_id: sharedNoteId, entity_type: null,
           created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         });
       }
@@ -1906,6 +1917,21 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Delete inbox note ────────────────────────────────────────────────────
+async function _notesDeleteTreeNote(noteId) {
+  const note = _notes.find(n => n.id === noteId);
+  if (!confirm('Delete "' + (note?.title || 'this note') + '"? This cannot be undone.')) return;
+  try {
+    await API.del('notes?id=eq.' + noteId);
+    _notes = _notes.filter(n => n.id !== noteId);
+    _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
+    _cv().tray  = _cv().tray.filter(id => id !== noteId);
+    _notesSaveWorkspace(true);
+    _notesRenderLeft();
+    _notesRenderGrid();
+  } catch(e) { console.error('[Compass] Delete note error:', e); }
+}
+window._notesDeleteTreeNote = _notesDeleteTreeNote;
+
 async function _notesDeleteInboxNote(noteId) {
   const note = _notes.find(n => n.id === noteId);
 
@@ -2283,9 +2309,18 @@ window._notesShowInvite = async function(noteId, btn) {
       '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">Loading…</div>' +
     '</div>';
 
-  const header = btn.closest('.notes-tile-header');
-  if (header) header.appendChild(pop);
-  else document.body.appendChild(pop);
+  // Position fixed relative to the + button
+  document.body.appendChild(pop);
+  const btnRect = btn.getBoundingClientRect();
+  const popW    = 280;
+  let left = btnRect.right - popW;
+  let top  = btnRect.bottom + 4;
+  // Keep on screen
+  if (left < 8) left = 8;
+  if (top + 400 > window.innerHeight) top = btnRect.top - 420;
+  pop.style.left = left + 'px';
+  pop.style.top  = top  + 'px';
+  pop.style.width = popW + 'px';
 
   const input = pop.querySelector('#notes-invite-input');
   input.focus();
