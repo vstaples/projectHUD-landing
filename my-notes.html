@@ -126,8 +126,6 @@
 
   <!-- ── Left panel ──────────────────────────────────────────────────────── -->
   <div id="notes-left" style="position:relative">
-    <!-- Invisible drag capture overlay — pointer-events enabled only during left-panel drags -->
-    <div id="notes-drag-overlay" style="display:block;position:absolute;inset:0;z-index:100;pointer-events:none"></div>
     <div id="notes-left-header">
       <div style="position:relative;display:flex;align-items:center;margin-bottom:7px">
         <input id="notes-search" type="text" placeholder="Search notes…"
@@ -1112,43 +1110,92 @@ let _dragNoteId  = null;  // noteId being dragged
 let _dragSlot    = null;  // slot index if dragging from grid (-1 if from left panel)
 
 function _notesDndInit() {
-  const shell      = document.getElementById('notes-shell');
-  const treeScroll = document.getElementById('notes-tree-scroll');
-  const inboxList  = document.getElementById('notes-inbox-list');
+  const shell = document.getElementById('notes-shell');
   if (!shell || shell._dndWired) return;
   shell._dndWired = true;
 
-  // ── Left panel drag helpers (attached directly to scrollable containers) ─
-  // Chrome does not reliably fire dragover inside overflow:auto containers
-  // when listening at a parent level — attach directly here instead.
-  function _leftPanelDragOver(e) {
-    if (!_dragNoteId) return;
-    const leftItem = e.target.closest('.notes-item[data-noteid]');
-    if (leftItem && leftItem.dataset.noteid !== _dragNoteId) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-      leftItem.classList.add('notes-drop-line');
+  // ── Left panel: manual mouse tracking (bypasses overflow:auto dragover bug) ──
+  let _leftDragActive = false;
+  let _leftDragGhost  = null;
+
+  function _getItemAt(x, y) {
+    const els = document.elementsFromPoint(x, y);
+    for (const el of els) {
+      const item = el.closest('.notes-item[data-noteid]');
+      if (item) return item;
     }
+    return null;
   }
-  function _leftPanelDragLeave(e) {
-    const item = e.target.closest('.notes-item');
-    if (item) item.classList.remove('notes-drop-line');
-  }
-  async function _leftPanelDrop(e) {
-    if (!_dragNoteId) return;
+
+  document.addEventListener('mousedown', e => {
+    const item = e.target.closest('#notes-left .notes-item[data-noteid]');
+    if (!item) return;
+    // Only start tracking — actual drag begins on mousemove
+    _dragNoteId = item.dataset.noteid;
+    _dragSlot   = null;
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!_dragNoteId || e.buttons !== 1) return;
+    if (!_leftDragActive) {
+      // Drag has begun — create ghost
+      _leftDragActive = true;
+      const srcItem = document.querySelector('#notes-left .notes-item[data-noteid="' + _dragNoteId + '"]');
+      if (srcItem) srcItem.style.opacity = '0.4';
+      _leftDragGhost = document.createElement('div');
+      _leftDragGhost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;' +
+        'background:rgba(6,10,16,.9);border:1px solid rgba(0,210,255,.4);' +
+        'padding:4px 10px;font-family:var(--font-ui,sans-serif);' +
+        'font-size:12px;color:#00D2FF;border-radius:2px;white-space:nowrap;' +
+        'box-shadow:0 4px 16px rgba(0,0,0,.6)';
+      const note = _notes.find(n => n.id === _dragNoteId);
+      _leftDragGhost.textContent = note?.title || 'Note';
+      document.body.appendChild(_leftDragGhost);
+    }
+    // Move ghost
+    if (_leftDragGhost) {
+      _leftDragGhost.style.left = (e.clientX + 12) + 'px';
+      _leftDragGhost.style.top  = (e.clientY - 10) + 'px';
+    }
+    // Find drop target
+    if (_leftDragGhost) _leftDragGhost.style.display = 'none';
+    const target = _getItemAt(e.clientX, e.clientY);
+    if (_leftDragGhost) _leftDragGhost.style.display = '';
     shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-    const dropItem = e.target.closest('.notes-item[data-noteid]');
-    if (!dropItem || dropItem.dataset.noteid === _dragNoteId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const targetNote = _notes.find(n => n.id === dropItem.dataset.noteid);
-    const dragNote   = _notes.find(n => n.id === _dragNoteId);
+    if (target && target.dataset.noteid !== _dragNoteId) {
+      target.classList.add('notes-drop-line');
+    }
+  });
+
+  document.addEventListener('mouseup', async e => {
+    if (!_dragNoteId || !_leftDragActive) {
+      _dragNoteId = null;
+      return;
+    }
+    // Clean up ghost
+    if (_leftDragGhost) { _leftDragGhost.remove(); _leftDragGhost = null; }
+    const srcItem = document.querySelector('#notes-left .notes-item[data-noteid="' + _dragNoteId + '"]');
+    if (srcItem) srcItem.style.opacity = '';
+    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+
+    // Find drop target
+    const target = _getItemAt(e.clientX, e.clientY);
+    const savedDragId = _dragNoteId;
+    _dragNoteId     = null;
+    _leftDragActive = false;
+
+    if (!target || target.dataset.noteid === savedDragId) return;
+    // Only process if drop is within notes-left
+    if (!target.closest('#notes-left')) return;
+
+    const targetNote = _notes.find(n => n.id === target.dataset.noteid);
+    const dragNote   = _notes.find(n => n.id === savedDragId);
     if (!targetNote || !dragNote) return;
+
     const newPath = targetNote.hierarchy_path || 'Inbox';
-    const isInbox = newPath === 'Inbox' || !newPath;
+    const isInbox = !newPath || newPath === 'Inbox';
     try {
-      await API.patch('notes?id=eq.' + _dragNoteId, {
+      await API.patch('notes?id=eq.' + savedDragId, {
         hierarchy_path: newPath,
         is_inbox:       isInbox,
         updated_at:     new Date().toISOString(),
@@ -1157,117 +1204,36 @@ function _notesDndInit() {
       dragNote.is_inbox       = isInbox;
       _notesRenderLeft();
     } catch(err) { console.error('Tree drop error:', err); }
-  }
+  });
 
-  // ── dragstart — attach to scroll containers directly too ─────────────────
-  const overlay = document.getElementById('notes-drag-overlay');
-
-  function _leftPanelDragStart(e) {
-    const item = e.target.closest('.notes-item[data-noteid]');
-    if (!item) return;
-    _dragNoteId = item.dataset.noteid;
-    _dragSlot   = null;
-    item.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', _dragNoteId);
-    // Enable overlay immediately — pointer-events:all captures dragover
-    if (overlay) overlay.style.pointerEvents = 'all';
-  }
-  function _leftPanelDragEnd(e) {
-    if (overlay) overlay.style.pointerEvents = 'none';
-    shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-    _dragNoteId = null;
-    _dragSlot   = null;
-  }
-
-  // ── Overlay handles dragover/drop for left panel ──────────────────────
-  if (overlay) {
-    overlay.addEventListener('dragover', e => {
-      if (!_dragNoteId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      // Temporarily disable pointer-events to find element underneath
-      overlay.style.pointerEvents = 'none';
-      const under = document.elementFromPoint(e.clientX, e.clientY);
-      overlay.style.pointerEvents = 'all';
-      const item = under?.closest('.notes-item[data-noteid]');
-      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-      if (item && item.dataset.noteid !== _dragNoteId) {
-        item.classList.add('notes-drop-line');
-      }
-    });
-
-    overlay.addEventListener('drop', async e => {
-      e.preventDefault();
-      overlay.style.pointerEvents = 'none';
-      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-      const under = document.elementFromPoint(e.clientX, e.clientY);
-      const dropItem = under?.closest('.notes-item[data-noteid]');
-      if (!dropItem || dropItem.dataset.noteid === _dragNoteId) return;
-      const targetNote = _notes.find(n => n.id === dropItem.dataset.noteid);
-      const dragNote   = _notes.find(n => n.id === _dragNoteId);
-      if (!targetNote || !dragNote) return;
-      const newPath = targetNote.hierarchy_path || 'Inbox';
-      const isInbox = !newPath || newPath === 'Inbox';
-      try {
-        await API.patch('notes?id=eq.' + _dragNoteId, {
-          hierarchy_path: newPath,
-          is_inbox:       isInbox,
-          updated_at:     new Date().toISOString(),
-        });
-        dragNote.hierarchy_path = newPath;
-        dragNote.is_inbox       = isInbox;
-        _notesRenderLeft();
-      } catch(err) { console.error('Tree drop error:', err); }
-    });
-  }
-
-  // dragstart/dragend still needed on the containers to detect when drag begins
-  if (treeScroll) {
-    treeScroll.addEventListener('dragstart', _leftPanelDragStart);
-    treeScroll.addEventListener('dragend',   _leftPanelDragEnd);
-  }
-  if (inboxList) {
-    inboxList.addEventListener('dragstart', _leftPanelDragStart);
-    inboxList.addEventListener('dragend',   _leftPanelDragEnd);
-  }
-
-  // ── dragstart (shell level — grid tiles and tray chips only) ────────────
+  // ── Grid: standard HTML5 drag (no overflow:auto issue there) ─────────────
   shell.addEventListener('dragstart', e => {
     const tile = e.target.closest('.notes-tile[data-noteid]');
     const chip = e.target.closest('.notes-tray-chip[data-noteid]');
-
     if (tile && !e.target.closest('.notes-tile-title[contenteditable]')) {
       _dragNoteId = tile.dataset.noteid;
       _dragSlot   = parseInt(tile.dataset.slot);
       tile.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
-    // Tray chip
     } else if (chip) {
       _dragNoteId = chip.dataset.noteid;
       _dragSlot   = null;
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
-    } else {
+    } else if (!e.target.closest('#notes-left')) {
       e.preventDefault();
-      return;
     }
   });
 
-  // ── dragend ───────────────────────────────────────────────────────────────
   shell.addEventListener('dragend', e => {
     shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    _dragNoteId = null;
-    _dragSlot   = null;
+    if (!_leftDragActive) { _dragNoteId = null; _dragSlot = null; }
   });
 
-  // ── dragover ──────────────────────────────────────────────────────────────
   shell.addEventListener('dragover', e => {
-    if (!_dragNoteId) return;
-    // Grid tiles only — left panel is handled by treeScroll/inboxList listeners
+    if (!_dragNoteId || _leftDragActive) return;
     const tile = e.target.closest('.notes-tile');
     if (tile && !tile.closest('#notes-left')) {
       e.preventDefault();
@@ -1277,43 +1243,31 @@ function _notesDndInit() {
     }
   });
 
-  // ── dragleave ─────────────────────────────────────────────────────────────
   shell.addEventListener('dragleave', e => {
     const tile = e.target.closest('.notes-tile');
     if (tile) tile.classList.remove('drag-over');
   });
 
-  // ── drop ──────────────────────────────────────────────────────────────────
   shell.addEventListener('drop', async e => {
     e.preventDefault();
-    if (!_dragNoteId) return;
-    shell.querySelectorAll('.drag-over, .notes-drop-line').forEach(el => {
-      el.classList.remove('drag-over');
-      el.classList.remove('notes-drop-line');
-    });
-
-    // Grid drop only — left panel drops handled by treeScroll/inboxList
+    if (!_dragNoteId || _leftDragActive) return;
+    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     const dropTile = e.target.closest('.notes-tile');
     if (!dropTile || dropTile.closest('#notes-left')) return;
-
     const targetSlot   = parseInt(dropTile.dataset.slot);
     const targetNoteId = dropTile.dataset.noteid || null;
     const cv           = _cv();
-
     if (dropTile.classList.contains('empty')) {
       cv.tray = cv.tray.filter(id => id !== _dragNoteId);
       const existing = cv.tiles.find(t => t.noteId === _dragNoteId);
-      if (existing) {
-        existing.slot = targetSlot;
-      } else {
-        cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
-      }
+      if (existing) { existing.slot = targetSlot; }
+      else { cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false }); }
     } else if (targetNoteId && targetNoteId !== _dragNoteId) {
       const dragTile   = cv.tiles.find(t => t.noteId === _dragNoteId);
       const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
       if (dragTile && targetTile) {
-        const fromSlot  = dragTile.slot;
-        dragTile.slot   = targetSlot;
+        const fromSlot = dragTile.slot;
+        dragTile.slot  = targetSlot;
         targetTile.slot = fromSlot;
       } else {
         cv.tray = cv.tray.filter(id => id !== _dragNoteId);
@@ -1322,7 +1276,6 @@ function _notesDndInit() {
         cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
       }
     }
-
     _notesSaveWorkspace(true);
     _notesRenderGrid();
     _notesRenderLeft();
