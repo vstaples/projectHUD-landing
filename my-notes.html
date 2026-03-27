@@ -22,7 +22,7 @@
 .notes-section-hdr{padding:6px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
 .notes-section-hdr:hover{color:var(--text2,#90B8D8)}
 .notes-inbox-count{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
-#notes-inbox-list{max-height:180px;overflow-y:auto}
+#notes-inbox-list{max-height:180px;overflow-y:auto}#notes-inbox-list .notes-item{padding-left:24px}
 
 /* ── Tree section ────────────────────────────────────────────────────────── */
 #notes-tree-section{flex:1;overflow:hidden;display:flex;flex-direction:column}
@@ -384,11 +384,18 @@ function _notesRenderTree() {
     branchDiv.addEventListener('dragleave', _notesBranchDragLeave);
     branchDiv.addEventListener('drop', _notesBranchDrop);
 
-    const chev = document.createElement('svg');
+    const chev = document.createElementNS('http://www.w3.org/2000/svg','svg');
     chev.setAttribute('viewBox','0 0 10 10');
     chev.setAttribute('fill','none');
+    chev.setAttribute('width','10');
+    chev.setAttribute('height','10');
     chev.classList.add('notes-chevron','open');
-    chev.innerHTML = '<path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>';
+    const chevPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    chevPath.setAttribute('d','M3 2l4 3-4 3');
+    chevPath.setAttribute('stroke','currentColor');
+    chevPath.setAttribute('stroke-width','1.2');
+    chevPath.setAttribute('stroke-linecap','round');
+    chev.appendChild(chevPath);
 
     const label = document.createElement('span');
     label.className     = 'notes-branch-label';
@@ -450,11 +457,18 @@ function _notesRenderTree() {
       subDiv.addEventListener('dragleave', _notesBranchDragLeave);
       subDiv.addEventListener('drop', _notesBranchDrop);
 
-      const subChev = document.createElement('svg');
+      const subChev = document.createElementNS('http://www.w3.org/2000/svg','svg');
       subChev.setAttribute('viewBox','0 0 10 10');
       subChev.setAttribute('fill','none');
+      subChev.setAttribute('width','10');
+      subChev.setAttribute('height','10');
       subChev.classList.add('notes-chevron','open');
-      subChev.innerHTML = '<path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>';
+      const subChevPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+      subChevPath.setAttribute('d','M3 2l4 3-4 3');
+      subChevPath.setAttribute('stroke','currentColor');
+      subChevPath.setAttribute('stroke-width','1.2');
+      subChevPath.setAttribute('stroke-linecap','round');
+      subChev.appendChild(subChevPath);
 
       const subLabel = document.createElement('span');
       subLabel.className      = 'notes-subbranch-label';
