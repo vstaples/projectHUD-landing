@@ -1050,12 +1050,7 @@ async function _notesShowInviteDialog(inviteNote) {
 
   overlay.querySelector('#nid-accept').onclick = async () => {
     overlay.remove();
-    try {
-      await API.del('notes?id=eq.' + inviteNote.id);
-      _notes = _notes.filter(n => n.id !== inviteNote.id);
-      _notesRenderLeft();
-    } catch(e) {}
-    // Mark participant as accepted
+    // Mark participant as accepted — leave invitation in inbox
     try {
       const userId = window._notesResource?.user_id;
       if (userId) {
@@ -1095,11 +1090,8 @@ async function _notesOpenFloatingNote(noteId, noteName) {
       '<textarea class="notes-tile-canvas" data-noteid="' + _esc(noteId) + '" ' +
         'placeholder="Start writing…" oninput="_notesSaveContent(this)">' + _esc(note.content || '') + '</textarea>' +
     '</div>' +
-    '<div style="padding:7px 12px;border-top:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:8px;flex-shrink:0">' +
-      '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Drag title bar to move · Pin to grid when ready</span>' +
-      '<button onclick="_notesAddFloatToGrid(\'' + _esc(noteId) + '\',this.closest(\'.notes-float-window\'))" ' +
-        'style="margin-left:auto;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.3);' +
-        'color:#00D2FF;font-family:var(--font-mono,monospace);font-size:10px;padding:4px 12px;cursor:pointer">Pin to grid →</button>' +
+    '<div style="padding:5px 12px;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0">' +
+      '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Drag title bar to move · Close to return to inbox</span>' +
     '</div>';
 
   document.body.appendChild(win);
@@ -1108,13 +1100,7 @@ async function _notesOpenFloatingNote(noteId, noteName) {
 
 function _notesFloatClose(noteId, btn) {
   btn.closest('.notes-float-window').remove();
-  // Add to tray so user can still access it
-  if (!_cv().tray.includes(noteId)) {
-    _cv().tray.push(noteId);
-    _notesSaveWorkspace(true);
-    _notesRenderTray();
-    _notesRenderLeft();
-  }
+  // Note stays in inbox — user can click it again anytime
 }
 window._notesFloatClose = _notesFloatClose;
 
