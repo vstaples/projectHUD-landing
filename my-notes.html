@@ -270,6 +270,7 @@
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
 let _inboxPollInterval = null;
 let _inboxLastChecked  = new Date().toISOString();
+let _lastTyped         = {}; // noteId → timestamp of last keystroke
 let _userId    = null;
 let _userName  = 'Vaughn Staples';
 let _notes     = [];      // all notes for this user
@@ -915,6 +916,8 @@ function _notesSaveContent(el) {
   if (!noteId) return;
   const note = _notes.find(n => n.id === noteId);
   if (note) note.content = el.value;
+  // Track when user last typed for sync collision avoidance
+  _lastTyped[noteId] = Date.now();
   clearTimeout(_contentTimers[noteId]);
   _contentTimers[noteId] = setTimeout(async () => {
     try {
@@ -1977,13 +1980,16 @@ async function _notesSyncContent(noteId) {
     if (!remote) return;
     const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
     if (!ta) return;
-    // Skip if user is actively typing
-    if (document.activeElement === ta) return;
+    // Skip if user typed in this note within the last 3 seconds
+    const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
+    if (typedAgo < 3000) return;
     const local = _notes.find(n => n.id === noteId);
     // Update if remote content differs from what's currently displayed
-    const remoteContent = remote.content || '';
+    const remoteContent    = remote.content || '';
     const displayedContent = ta.value;
+    console.log('[SyncCheck]', noteId.slice(0,8), 'match:', remoteContent === displayedContent, 'remoteLen:', remoteContent.length, 'displayLen:', displayedContent.length, 'typedAgo:', typedAgo);
     if (remoteContent !== displayedContent) {
+      console.log('[SyncApply] updating textarea');
       const selStart = ta.selectionStart;
       const selEnd   = ta.selectionEnd;
       ta.value = remoteContent;
