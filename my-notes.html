@@ -1692,23 +1692,38 @@ function _notesDndInit() {
     const targetSlot   = parseInt(dropTile.dataset.slot);
     const targetNoteId = dropTile.dataset.noteid || null;
     const cv           = _cv();
+
+    // If dragging an inbox invitation, use the shared note ID instead
+    const draggedNote = _notes.find(n => n.id === _dragNoteId);
+    const effectiveNoteId = (draggedNote?.is_inbox && draggedNote?.entity_id)
+      ? draggedNote.entity_id
+      : _dragNoteId;
+
+    // Fetch shared note if not in local cache
+    if (effectiveNoteId !== _dragNoteId && !_notes.find(n => n.id === effectiveNoteId)) {
+      try {
+        const rows = await API.get('notes?id=eq.' + effectiveNoteId + '&limit=1').catch(()=>[]);
+        if (rows?.[0]) _notes.push(rows[0]);
+      } catch(e) {}
+    }
+
     if (dropTile.classList.contains('empty')) {
-      cv.tray = cv.tray.filter(id => id !== _dragNoteId);
-      const existing = cv.tiles.find(t => t.noteId === _dragNoteId);
+      cv.tray = cv.tray.filter(id => id !== effectiveNoteId && id !== _dragNoteId);
+      const existing = cv.tiles.find(t => t.noteId === effectiveNoteId);
       if (existing) { existing.slot = targetSlot; }
-      else { cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false }); }
-    } else if (targetNoteId && targetNoteId !== _dragNoteId) {
-      const dragTile   = cv.tiles.find(t => t.noteId === _dragNoteId);
+      else { cv.tiles.push({ slot: targetSlot, noteId: effectiveNoteId, chatOpen: false }); }
+    } else if (targetNoteId && targetNoteId !== effectiveNoteId) {
+      const dragTile   = cv.tiles.find(t => t.noteId === effectiveNoteId);
       const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
       if (dragTile && targetTile) {
         const fromSlot = dragTile.slot;
-        dragTile.slot  = targetSlot;
+        dragTile.slot   = targetSlot;
         targetTile.slot = fromSlot;
       } else {
-        cv.tray = cv.tray.filter(id => id !== _dragNoteId);
+        cv.tray = cv.tray.filter(id => id !== effectiveNoteId && id !== _dragNoteId);
         cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
         if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
-        cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
+        cv.tiles.push({ slot: targetSlot, noteId: effectiveNoteId, chatOpen: false });
       }
     }
     _notesSaveWorkspace(true);
