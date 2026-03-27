@@ -19,7 +19,7 @@
 
 /* ── Inbox section ───────────────────────────────────────────────────────── */
 #notes-inbox-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
-.notes-section-hdr{padding:6px 14px;font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3,#6A94B8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.notes-section-hdr{padding:6px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
 .notes-section-hdr:hover{color:var(--text2,#90B8D8)}
 .notes-inbox-count{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
 #notes-inbox-list{max-height:180px;overflow-y:auto}
@@ -34,12 +34,12 @@
 .notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
 .notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
 .notes-item-body{flex:1;min-width:0}
-.notes-item-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text0,#F0F6FF);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.notes-item-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:400;color:var(--text1,#C8DFF0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .notes-item-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .notes-item-source{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);color:var(--text3);border-radius:2px;flex-shrink:0;margin-top:2px}
 
 /* ── Tree nodes ──────────────────────────────────────────────────────────── */
-.notes-branch{padding:5px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.04em}
+.notes-branch{padding:5px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:700;color:var(--text0,#F0F6FF);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.02em}
 .notes-branch-label,.notes-subbranch-label{flex:1;outline:none;cursor:text}
 .notes-branch-label:focus,.notes-subbranch-label:focus{color:var(--text0,#F0F6FF)}
 .notes-branch-add{width:14px;height:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0;opacity:0;transition:opacity .1s;flex-shrink:0;line-height:1}
@@ -49,11 +49,16 @@
 .notes-add-root{padding:4px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:rgba(0,210,255,.4);cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:none;width:100%;transition:color .12s}
 .notes-add-root:hover{color:#00D2FF}
 .notes-drop-target{background:rgba(0,210,255,.08)!important;border-left:2px solid #00D2FF!important}
+.notes-drop-line{position:relative}
+.notes-drop-line::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;
+  background:#00D2FF;z-index:10;pointer-events:none;
+  box-shadow:0 0 6px rgba(0,210,255,.6)}
 .notes-branch:hover{color:var(--text0,#F0F6FF)}
-.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:var(--text3,#6A94B8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
 .notes-subbranch:hover{color:var(--text2)}
-.notes-chevron{width:10px;height:10px;transition:transform .15s;flex-shrink:0;opacity:.5}
+.notes-chevron{width:10px;height:10px;transition:transform .15s;flex-shrink:0;opacity:.7;color:var(--text2,#90B8D8)}
 .notes-chevron.open{transform:rotate(90deg)}
+.notes-branch .notes-chevron{opacity:.8;color:var(--text0,#F0F6FF)}
 .notes-children{overflow:hidden}
 .notes-branch-items .notes-item{padding-left:28px}
 .notes-subbranch-items .notes-item{padding-left:40px}
@@ -526,7 +531,9 @@ function _notesItemHTML(n) {
 
 function _notesWireLeft() {
   document.querySelectorAll('#notes-shell [data-toggle]').forEach(el => {
-    el.onclick = () => {
+    el.onclick = (e) => {
+      // Don't toggle if clicking a button, contenteditable label, or input
+      if (e.target.closest('button, [contenteditable]')) return;
       const target = document.getElementById(el.dataset.toggle);
       if (!target) return;
       const open = target.style.display !== 'none';
@@ -535,16 +542,27 @@ function _notesWireLeft() {
     };
   });
   document.querySelectorAll('.notes-item[data-noteid]').forEach(el => {
-    // Only trigger open on click if NOT starting a drag
-    el.addEventListener('mousedown', () => { el._maybeDrag = false; });
-    el.addEventListener('dragstart', () => { el._maybeDrag = true; });
     el.onclick = (e) => {
       e.stopPropagation();
-      if (el._maybeDrag) { el._maybeDrag = false; return; }
       const noteId = el.dataset.noteid;
-      // If already in grid — do nothing
+      // Already in grid — do nothing, user can see it
       if (_cv().tiles.some(t => t.noteId === noteId)) return;
-      _notesOpenNote(noteId);
+      // Find first empty slot — never displace on click, only on drag
+      const size  = _cv().gridSize || '2x2';
+      const sp    = size.split('x');
+      const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
+      const usedSlots = new Set(_cv().tiles.map(t => t.slot));
+      let emptySlot = -1;
+      for (let i = 0; i < slots; i++) {
+        if (!usedSlots.has(i)) { emptySlot = i; break; }
+      }
+      if (emptySlot >= 0) {
+        _cv().tiles.push({ slot: emptySlot, noteId, chatOpen: false });
+        _notesSaveWorkspace(true);
+        _notesRenderGrid();
+        _notesRenderLeft();
+      }
+      // If grid is full, do nothing — user must drag to displace
     };
   });
 }
@@ -1094,17 +1112,33 @@ function _notesDndInit() {
   // ── dragover ──────────────────────────────────────────────────────────────
   shell.addEventListener('dragover', e => {
     if (!_dragNoteId) return;
-    // Only allow drop on grid tiles — not on left panel items
-    const tile = e.target.closest('.notes-tile');
-    if (!tile || tile.closest('#notes-left')) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+
+    // Clear all indicators first
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    tile.classList.add('drag-over');
+    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+
+    // Left panel: show horizontal drop line on items
+    const leftItem = e.target.closest('#notes-left .notes-item[data-noteid]');
+    if (leftItem && leftItem.dataset.noteid !== _dragNoteId) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      leftItem.classList.add('notes-drop-line');
+      return;
+    }
+
+    // Grid tiles: show background highlight
+    const tile = e.target.closest('.notes-tile');
+    if (tile && !tile.closest('#notes-left')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      tile.classList.add('drag-over');
+    }
   });
 
   // ── dragleave ─────────────────────────────────────────────────────────────
   shell.addEventListener('dragleave', e => {
+    const item = e.target.closest('.notes-item');
+    if (item) item.classList.remove('notes-drop-line');
     const tile = e.target.closest('.notes-tile');
     if (tile) tile.classList.remove('drag-over');
   });
