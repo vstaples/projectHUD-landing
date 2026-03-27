@@ -322,7 +322,6 @@ window._notesLoadView = async function() {
   setTimeout(() => {
     if (typeof _notesWireTilesCollab === 'function') _notesWireTilesCollab();
     else if (window._notesWireTilesCollab) window._notesWireTilesCollab();
-    if (window._notesStartPingSystem) window._notesStartPingSystem();
   }, 0);
 };
 
@@ -2058,6 +2057,8 @@ window._notesStartInboxPoll  = _notesStartInboxPoll;
 window._notesStopInboxPoll   = _notesStopInboxPoll;
 window._notesStartSyncPoll   = _notesStartSyncPoll;
 window._notesStopSyncPoll    = _notesStopSyncPoll;
+window._notesStartPingSystem = function(){};
+window._notesStopPingSystem  = function(){};
 window._notesMinimizeTile    = _notesMinimizeTile;
 window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
@@ -2211,9 +2212,7 @@ async function _notesSyncContent(noteId) {
     // Update if remote content differs from what's currently displayed
     const remoteContent    = remote.content || '';
     const displayedContent = ta.value;
-    console.log('[SyncCheck]', noteId.slice(0,8), 'match:', remoteContent === displayedContent, 'remoteLen:', remoteContent.length, 'displayLen:', displayedContent.length, 'typedAgo:', typedAgo);
     if (remoteContent !== displayedContent) {
-      console.log('[SyncApply] updating textarea');
       const selStart = ta.selectionStart;
       const selEnd   = ta.selectionEnd;
       ta.value = remoteContent;
@@ -2615,113 +2614,6 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
     console.error('[Compass] Invite error:', e);
   }
 }
-
-// ── Presence ping/ack system ─────────────────────────────────────────────
-// Vaughn pings collaborators every 5s; they ack immediately; Vaughn logs receipt.
-
-let _pingInterval   = null;
-let _ackInterval    = null;
-const _pingTtl      = 30000; // clean up pings older than 30s
-
-function _ts() {
-  return new Date().toISOString().replace('T',' ').slice(0,19);
-}
-
-// ── PINGER (runs on note owner side) ─────────────────────────────────────
-// Sends a ping row for each participant on each open grid tile
-async function _presencePingCycle() {
-  const selfUserId = window._notesResource?.user_id;
-  if (!selfUserId) return;
-
-  const cv = typeof _cv === 'function' ? _cv() : (typeof window._notesCv === 'function' ? window._notesCv() : null);
-  if (!cv) return;
-
-  // Collect all participants across open tiles
-  for (const tile of (cv.tiles || [])) {
-    const noteId = tile.noteId;
-    const parts  = _participants[noteId] || [];
-    const others = parts.filter(p => p.user_id && p.user_id !== selfUserId && p.accepted_at);
-    if (!others.length) continue;
-
-    for (const p of others) {
-      try {
-        await API.post('presence_pings', {
-          from_user_id: selfUserId,
-          to_user_id:   p.user_id,
-          note_id:      noteId,
-          pinged_at:    new Date().toISOString(),
-          acked_at:     null,
-        });
-        console.log(_ts() + '  Pulsed ' + (p.user_id?.slice(0,8)));
-      } catch(e) {}
-    }
-  }
-
-  // Check for acks to our pings
-  try {
-    const cutoff = new Date(Date.now() - _pingTtl).toISOString();
-    const acks = await API.get(
-      'presence_pings?from_user_id=eq.' + selfUserId +
-      '&acked_at=not.is.null' +
-      '&pinged_at=gte.' + cutoff +
-      '&select=id,to_user_id,note_id,acked_at&limit=50'
-    ).catch(()=>[]);
-    for (const ack of (acks||[])) {
-      console.log(_ts() + '  Pulse received from ' + ack.to_user_id?.slice(0,8));
-      // Update last_seen_at in local participants cache
-      const parts = _participants[ack.note_id] || [];
-      const p = parts.find(x => x.user_id === ack.to_user_id);
-      if (p) p.last_seen_at = ack.acked_at;
-      _notesRenderPresence(ack.note_id);
-      // Delete the acked ping to keep table clean
-      API.del('presence_pings?id=eq.' + ack.id).catch(()=>{});
-    }
-  } catch(e) {}
-
-  // Clean up old unacked pings from self
-  try {
-    const stale = new Date(Date.now() - _pingTtl).toISOString();
-    await API.del('presence_pings?from_user_id=eq.' + selfUserId + '&pinged_at=lt.' + stale).catch(()=>{});
-  } catch(e) {}
-}
-
-// ── ACKER (runs on participant side) ─────────────────────────────────────
-// Watches for incoming pings and immediately acks them
-async function _presenceAckCycle() {
-  const selfUserId = window._notesResource?.user_id;
-  if (!selfUserId) return;
-  try {
-    const cutoff = new Date(Date.now() - _pingTtl).toISOString();
-    const pings = await API.get(
-      'presence_pings?to_user_id=eq.' + selfUserId +
-      '&acked_at=is.null' +
-      '&pinged_at=gte.' + cutoff +
-      '&select=id,from_user_id,note_id&limit=20'
-    ).catch(()=>[]);
-    for (const ping of (pings||[])) {
-      const ackedAt = new Date().toISOString();
-      await API.patch('presence_pings?id=eq.' + ping.id, { acked_at: ackedAt }).catch(()=>{});
-      console.log(_ts() + '  Pulse received from ' + ping.from_user_id?.slice(0,8));
-      console.log(_ts() + '  Sent acknowledgement to ' + ping.from_user_id?.slice(0,8));
-    }
-  } catch(e) {}
-}
-
-function _notesStartPingSystem() {
-  if (_pingInterval) return;
-  // Run both pinger and acker — user may be owner on some notes, participant on others
-  _presencePingCycle();
-  _presenceAckCycle();
-  _pingInterval = setInterval(_presencePingCycle, 5000);
-  _ackInterval  = setInterval(_presenceAckCycle,  5000);
-}
-function _notesStopPingSystem() {
-  clearInterval(_pingInterval); _pingInterval = null;
-  clearInterval(_ackInterval);  _ackInterval  = null;
-}
-
-window._notesStartPingSystem = _notesStartPingSystem;
-window._notesStopPingSystem  = _notesStopPingSystem;
 
 window._notesRemoveParticipant  = _notesRemoveParticipant;
 window._notesStartPresence      = _notesStartPresence;
