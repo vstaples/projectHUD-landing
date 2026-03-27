@@ -1215,7 +1215,7 @@ async function _notesOpenFloatingNote(noteId, noteName) {
   if (closeBtn) {
     closeBtn.removeAttribute('onclick');
     closeBtn.addEventListener('click', () => {
-      if (window._notesStopPresence) window._notesStopPresence(noteId);
+      // Don't stop presence — keep heartbeat running so avatar stays active in owner's view
       _notesFloatClose(noteId, closeBtn);
     });
   }
@@ -1917,7 +1917,7 @@ async function _notesDeleteInboxNote(noteId) {
           '</div>' +
           '<div class="nid-body">' +
             'Removing this note will delete it from your inbox.' +
-            (isAccepted && ownerPart ? '<br><br>The note owner will be notified that you have left.' : '') +
+            (ownerPart ? '<br><br>The note owner will be notified that you have left.' : '') +
           '</div>' +
           '<div class="nid-actions">' +
             '<button class="nid-btn nid-btn-reject" id="nid-cancel-del">Cancel</button>' +
@@ -1932,7 +1932,7 @@ async function _notesDeleteInboxNote(noteId) {
     if (!confirmed) return;
 
     // Notify owner if participant had accepted
-    if (isAccepted && ownerPart?.user_id) {
+    if (ownerPart?.user_id) {
       const myName   = window._notesResource?.name || 'Someone';
       const noteTitle = note.title?.replace(/^.+invited you to: /, '') || noteName;
       try {
@@ -2628,10 +2628,16 @@ window._notesWireTiles = function() {
   _notesWireTilesCollab();
 };
 
-// Also stop presence when tile is closed
+// Also stop presence when tile is closed — only if user owns the note
 const _origClose = window._notesCloseTile;
 window._notesCloseTile = function(noteId) {
-  _notesStopPresence(noteId);
+  // Keep presence running for shared notes (participant role)
+  // Only stop for own notes
+  const parts = _participants[noteId] || [];
+  const selfUserId = window._notesResource?.user_id;
+  const isOwner = parts.some(p => p.user_id === selfUserId && p.role === 'owner') ||
+                  parts.length === 0; // assume owner if no participants loaded
+  if (isOwner) _notesStopPresence(noteId);
   if (typeof _origClose === 'function') _origClose(noteId);
 };
 
