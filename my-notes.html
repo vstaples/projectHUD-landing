@@ -1110,10 +1110,63 @@ let _dragNoteId  = null;  // noteId being dragged
 let _dragSlot    = null;  // slot index if dragging from grid (-1 if from left panel)
 
 function _notesDndInit() {
-  // Delegate all drag events at the shell level
-  const shell = document.getElementById('notes-shell');
+  const shell      = document.getElementById('notes-shell');
+  const treeScroll = document.getElementById('notes-tree-scroll');
+  const inboxList  = document.getElementById('notes-inbox-list');
   if (!shell || shell._dndWired) return;
   shell._dndWired = true;
+
+  // ── Left panel drag helpers (attached directly to scrollable containers) ─
+  // Chrome does not reliably fire dragover inside overflow:auto containers
+  // when listening at a parent level — attach directly here instead.
+  function _leftPanelDragOver(e) {
+    if (!_dragNoteId) return;
+    const leftItem = e.target.closest('.notes-item[data-noteid]');
+    if (leftItem && leftItem.dataset.noteid !== _dragNoteId) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+      leftItem.classList.add('notes-drop-line');
+    }
+  }
+  function _leftPanelDragLeave(e) {
+    const item = e.target.closest('.notes-item');
+    if (item) item.classList.remove('notes-drop-line');
+  }
+  async function _leftPanelDrop(e) {
+    if (!_dragNoteId) return;
+    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+    const dropItem = e.target.closest('.notes-item[data-noteid]');
+    if (!dropItem || dropItem.dataset.noteid === _dragNoteId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const targetNote = _notes.find(n => n.id === dropItem.dataset.noteid);
+    const dragNote   = _notes.find(n => n.id === _dragNoteId);
+    if (!targetNote || !dragNote) return;
+    const newPath = targetNote.hierarchy_path || 'Inbox';
+    const isInbox = newPath === 'Inbox' || !newPath;
+    try {
+      await API.patch('notes?id=eq.' + _dragNoteId, {
+        hierarchy_path: newPath,
+        is_inbox:       isInbox,
+        updated_at:     new Date().toISOString(),
+      });
+      dragNote.hierarchy_path = newPath;
+      dragNote.is_inbox       = isInbox;
+      _notesRenderLeft();
+    } catch(err) { console.error('Tree drop error:', err); }
+  }
+
+  if (treeScroll) {
+    treeScroll.addEventListener('dragover',  _leftPanelDragOver);
+    treeScroll.addEventListener('dragleave', _leftPanelDragLeave);
+    treeScroll.addEventListener('drop',      _leftPanelDrop);
+  }
+  if (inboxList) {
+    inboxList.addEventListener('dragover',  _leftPanelDragOver);
+    inboxList.addEventListener('dragleave', _leftPanelDragLeave);
+    inboxList.addEventListener('drop',      _leftPanelDrop);
+  }
 
   // ── dragstart ────────────────────────────────────────────────────────────
   shell.addEventListener('dragstart', e => {
@@ -1158,35 +1211,18 @@ function _notesDndInit() {
   // ── dragover ──────────────────────────────────────────────────────────────
   shell.addEventListener('dragover', e => {
     if (!_dragNoteId) return;
-
-    // Left panel: show horizontal drop line on items only
-    // (branch containers handle their own highlighting)
-    const leftItem = e.target.closest('#notes-left .notes-item[data-noteid]');
-    if (leftItem && leftItem.dataset.noteid !== _dragNoteId) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      // Clear grid highlights and other drop lines
-      shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-      leftItem.classList.add('notes-drop-line');
-      return;
-    }
-
-    // Grid tiles: show background highlight
+    // Grid tiles only — left panel is handled by treeScroll/inboxList listeners
     const tile = e.target.closest('.notes-tile');
     if (tile && !tile.closest('#notes-left')) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-      shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
       tile.classList.add('drag-over');
     }
   });
 
   // ── dragleave ─────────────────────────────────────────────────────────────
   shell.addEventListener('dragleave', e => {
-    const item = e.target.closest('.notes-item');
-    if (item) item.classList.remove('notes-drop-line');
     const tile = e.target.closest('.notes-tile');
     if (tile) tile.classList.remove('drag-over');
   });
@@ -1200,30 +1236,7 @@ function _notesDndInit() {
       el.classList.remove('notes-drop-line');
     });
 
-    // ── Left panel drop: reorder within tree ──────────────────────────────
-    const dropItem = e.target.closest('#notes-left .notes-item[data-noteid]');
-    if (dropItem && dropItem.dataset.noteid !== _dragNoteId) {
-      // Move dragged note to same hierarchy_path as drop target
-      const targetNote = _notes.find(n => n.id === dropItem.dataset.noteid);
-      const dragNote   = _notes.find(n => n.id === _dragNoteId);
-      if (targetNote && dragNote) {
-        const newPath   = targetNote.hierarchy_path || 'Inbox';
-        const isInbox   = newPath === 'Inbox' || !newPath;
-        try {
-          await API.patch('notes?id=eq.' + _dragNoteId, {
-            hierarchy_path: newPath,
-            is_inbox:       isInbox,
-            updated_at:     new Date().toISOString(),
-          });
-          dragNote.hierarchy_path = newPath;
-          dragNote.is_inbox       = isInbox;
-          _notesRenderLeft();
-        } catch(err) { console.error('Tree drop error:', err); }
-      }
-      return;
-    }
-
-    // ── Grid drop: tile placement ─────────────────────────────────────────
+    // Grid drop only — left panel drops handled by treeScroll/inboxList
     const dropTile = e.target.closest('.notes-tile');
     if (!dropTile || dropTile.closest('#notes-left')) return;
 
