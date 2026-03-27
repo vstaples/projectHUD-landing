@@ -91,6 +91,18 @@
 .notes-tile.empty{border:1px dashed rgba(0,210,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s}
 .notes-tile.empty:hover{background:rgba(0,210,255,.03);border-color:rgba(0,210,255,.25)}
 .notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}
+.notes-presence{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:default;position:relative}
+.notes-avatar.active::after{content:"";position:absolute;bottom:-1px;right:-1px;width:5px;height:5px;border-radius:50%;background:#1D9E75;border:1px solid #0c1628}
+.notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
+.notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
+.notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:220px}
+.notes-invite-pop input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;padding:5px 8px;outline:none;margin-bottom:6px;box-sizing:border-box}
+.notes-invite-pop input:focus{border-color:rgba(0,210,255,.4)}
+.notes-invite-result{max-height:140px;overflow-y:auto}
+.notes-invite-row{padding:5px 7px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;color:var(--text1);transition:background .1s}
+.notes-invite-row:hover{background:rgba(0,210,255,.06)}
+.notes-invite-row .notes-avatar{width:22px;height:22px;font-size:10px}
 .notes-tile-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none}
 .notes-tile-title:focus{color:#00D2FF}
 .notes-tile-source{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.08);border:0.5px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);border-radius:2px;flex-shrink:0}
@@ -667,11 +679,14 @@ function _notesRenderGrid() {
 
 function _notesTileHTML(note, tileState) {
   const chatOpen = tileState?.chatOpen || false;
-  return '<div class="notes-tile-header">' +
+  const _presDiv = '<div class="notes-presence" id="notes-presence-' + note.id + '"></div>';
+  return '<div class="notes-tile-header" style="position:relative">' +
     '<div class="notes-tile-title" contenteditable="true" spellcheck="false" ' +
       'data-noteid="' + _esc(note.id) + '" ' +
       'onblur="_notesSaveTitle(this)">' + _esc(note.title || 'Untitled') + '</div>' +
     (note.entity_type ? '<span class="notes-tile-source">' + _esc(note.entity_type) + '</span>' : '') +
+    _presDiv +
+    '<button class="notes-invite-btn" title="Invite to note" onclick="_notesShowInvite(\'' + note.id + '\',this)">+</button>' +
     '<button class="notes-tile-ctrl" title="Toggle chat" onclick="_notesToggleChat(\'' + note.id + '\')" ' +
       'style="width:20px;height:20px;opacity:' + (chatOpen ? '1' : '.4') + '">' +
       '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14">' +
@@ -1525,6 +1540,198 @@ window._notesBranchDrop      = _notesBranchDrop;
 window._notesNewView       = _notesNewView;
 window._notesRenameView    = _notesRenameView;
 window._notesClearWorkspace= _notesClearWorkspace;
+
+})();
+</script>
+<script>
+// ── Collaboration — invite model & presence ───────────────────────────────
+(function() {
+
+const PARTICIPANT_COLORS = [
+  '#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'
+];
+
+// Cache: noteId → [{user_id, name, color, last_seen_at}]
+const _participants = {};
+// Presence poll intervals: noteId → intervalId
+const _presenceIntervals = {};
+
+// ── Load participants for a note ──────────────────────────────────────────
+async function _notesLoadParticipants(noteId) {
+  try {
+    const rows = await API.get(
+      'note_participants?note_id=eq.' + noteId +
+      '&select=id,user_id,role,color,invited_at,last_seen_at&order=invited_at.asc'
+    ).catch(() => []);
+    _participants[noteId] = Array.isArray(rows) ? rows : [];
+  } catch(e) { _participants[noteId] = []; }
+  return _participants[noteId];
+}
+
+// ── Render presence avatars ───────────────────────────────────────────────
+async function _notesRenderPresence(noteId) {
+  const el = document.getElementById('notes-presence-' + noteId);
+  if (!el) return;
+  const parts = _participants[noteId] || await _notesLoadParticipants(noteId);
+  const now   = Date.now();
+  // Get resource names
+  const resources = window._users || window._resources || [];
+  el.innerHTML = parts
+    .filter(p => p.user_id !== window._notesResource?.user_id) // exclude self
+    .map(p => {
+      const res     = resources.find(r => r.user_id === p.user_id);
+      const name    = res?.name || 'User';
+      const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const color   = p.color || '#00D2FF';
+      const seenAgo = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
+      const active  = seenAgo < 60000; // active within 60s
+      const title   = name + (active ? ' (active)' : ' (last seen ' + _notesRelTime(p.last_seen_at) + ')');
+      return '<div class="notes-avatar' + (active ? ' active' : '') + '" ' +
+        'style="background:' + color + '" title="' + _esc(title) + '">' +
+        _esc(initials) + '</div>';
+    }).join('');
+}
+
+// ── Heartbeat — update own last_seen_at every 30s ─────────────────────────
+async function _notesHeartbeat(noteId) {
+  const userId = window._notesResource?.user_id;
+  if (!userId) return;
+  try {
+    await API.patch(
+      'note_participants?note_id=eq.' + noteId + '&user_id=eq.' + userId,
+      { last_seen_at: new Date().toISOString() }
+    );
+  } catch(e) {}
+  // Also refresh other participants' presence
+  await _notesLoadParticipants(noteId);
+  _notesRenderPresence(noteId);
+}
+
+// ── Start/stop presence polling for a tile ────────────────────────────────
+function _notesStartPresence(noteId) {
+  if (_presenceIntervals[noteId]) return; // already running
+  _notesHeartbeat(noteId); // immediate first tick
+  _presenceIntervals[noteId] = setInterval(() => _notesHeartbeat(noteId), 30000);
+}
+
+function _notesStopPresence(noteId) {
+  clearInterval(_presenceIntervals[noteId]);
+  delete _presenceIntervals[noteId];
+}
+
+// ── Show invite popover ───────────────────────────────────────────────────
+window._notesShowInvite = function(noteId, btn) {
+  // Close any existing popover
+  document.querySelectorAll('.notes-invite-pop').forEach(p => p.remove());
+
+  const pop = document.createElement('div');
+  pop.className = 'notes-invite-pop';
+  pop.innerHTML =
+    '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;' +
+      'color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Invite to note</div>' +
+    '<input id="notes-invite-input" placeholder="Search team members…" autocomplete="off"/>' +
+    '<div class="notes-invite-result" id="notes-invite-results"></div>';
+
+  // Position relative to the tile header
+  const header = btn.closest('.notes-tile-header');
+  if (header) header.appendChild(pop);
+  else document.body.appendChild(pop);
+
+  const input = pop.querySelector('#notes-invite-input');
+  input.focus();
+
+  function renderResults(q) {
+    const resources = (window._users || window._resources || [])
+      .filter(r => r.user_id !== window._notesResource?.user_id)
+      .filter(r => !q || r.name?.toLowerCase().includes(q.toLowerCase()));
+    const existingIds = new Set((_participants[noteId] || []).map(p => p.user_id));
+    const resultsEl = pop.querySelector('#notes-invite-results');
+    if (!resources.length) {
+      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">No team members found</div>';
+      return;
+    }
+    resultsEl.innerHTML = resources.map(r => {
+      const initials = (r.name || 'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const already  = existingIds.has(r.user_id);
+      const color    = already
+        ? (_participants[noteId]?.find(p=>p.user_id===r.user_id)?.color || '#00D2FF')
+        : PARTICIPANT_COLORS[existingIds.size % PARTICIPANT_COLORS.length];
+      return '<div class="notes-invite-row" data-userid="' + _esc(r.user_id) + '" ' +
+        'data-color="' + _esc(color) + '" data-already="' + already + '">' +
+        '<div class="notes-avatar" style="background:' + color + '">' + _esc(initials) + '</div>' +
+        '<span>' + _esc(r.name || r.email || r.user_id) + '</span>' +
+        (already ? '<span style="margin-left:auto;font-size:10px;color:var(--text3)">✓ invited</span>' : '') +
+        '</div>';
+    }).join('');
+
+    resultsEl.querySelectorAll('.notes-invite-row[data-already="false"]').forEach(row => {
+      row.onclick = () => _notesInvite(noteId, row.dataset.userid, row.dataset.color, pop);
+    });
+  }
+
+  renderResults('');
+  input.addEventListener('input', () => renderResults(input.value));
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!pop.contains(e.target) && e.target !== btn) {
+        pop.remove();
+        document.removeEventListener('mousedown', _close);
+      }
+    });
+  }, 50);
+};
+
+// ── Invite a user to a note ───────────────────────────────────────────────
+async function _notesInvite(noteId, userId, color, pop) {
+  try {
+    // Add to note_participants
+    await API.post('note_participants', {
+      note_id:     noteId,
+      user_id:     userId,
+      role:        'participant',
+      color:       color,
+      invited_at:  new Date().toISOString(),
+      last_seen_at: null,
+    });
+    // Reload participants and re-render presence
+    await _notesLoadParticipants(noteId);
+    _notesRenderPresence(noteId);
+    pop.remove();
+  } catch(e) {
+    console.error('[Compass] Invite error:', e);
+  }
+}
+
+// ── Wire presence on tile open ────────────────────────────────────────────
+// Hook into _notesWireTiles to start presence for each open tile
+const _origWireTiles = window._notesWireTiles || null;
+function _notesWireTilesCollab() {
+  // Start presence for all currently open tiles
+  const cv = typeof _cv === 'function' ? _cv() : null;
+  if (!cv) return;
+  cv.tiles.forEach(t => {
+    _notesLoadParticipants(t.noteId).then(() => {
+      _notesRenderPresence(t.noteId);
+      _notesStartPresence(t.noteId);
+    });
+  });
+}
+
+// Patch _notesWireTiles to also wire collaboration
+const _origFn = window._notesWireTiles;
+window._notesWireTiles = function() {
+  if (typeof _origFn === 'function') _origFn();
+  _notesWireTilesCollab();
+};
+
+// Also stop presence when tile is closed
+const _origClose = window._notesCloseTile;
+window._notesCloseTile = function(noteId) {
+  _notesStopPresence(noteId);
+  if (typeof _origClose === 'function') _origClose(noteId);
+};
 
 })();
 </script>
