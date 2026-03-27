@@ -49,8 +49,12 @@
 .notes-add-root{padding:4px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:rgba(0,210,255,.4);cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:none;width:100%;transition:color .12s}
 .notes-add-root:hover{color:#00D2FF}
 .notes-drop-target{background:rgba(0,210,255,.08)!important;border-left:2px solid rgba(0,210,255,.6)!important}.notes-children.notes-drop-target{background:transparent!important;border-left:none!important}
-.notes-drop-line{position:relative}
-.notes-drop-line::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;
+.notes-drop-before{position:relative}
+.notes-drop-before::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;
+  background:#00D2FF;z-index:10;pointer-events:none;
+  box-shadow:0 0 6px rgba(0,210,255,.6)}
+.notes-drop-after{position:relative}
+.notes-drop-after::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;
   background:#00D2FF;z-index:10;pointer-events:none;
   box-shadow:0 0 6px rgba(0,210,255,.6)}
 .notes-branch:hover{color:var(--text0,#F0F6FF)}
@@ -365,6 +369,15 @@ function _notesRenderTree() {
     const subKey = sub || '__root__';
     if (!branches[top][subKey]) branches[top][subKey] = [];
     branches[top][subKey].push(n);
+  });
+  // Sort each group by sort_order, then updated_at as fallback
+  Object.values(branches).forEach(subs => {
+    Object.keys(subs).forEach(key => {
+      subs[key].sort((a,b) => {
+        if (a.sort_order !== b.sort_order) return (a.sort_order||0) - (b.sort_order||0);
+        return (b.updated_at||'').localeCompare(a.updated_at||'');
+      });
+    });
   });
 
   ['Work','Personal'].forEach(b => { if (!branches[b]) branches[b] = {}; });
@@ -1135,35 +1148,47 @@ function _notesDndInit() {
     _dragSlot   = null;
   });
 
+  // Track insert position: {noteId, position: 'before'|'after'}
+  let _dropInsert = null;
+
   document.addEventListener('mousemove', e => {
     if (!_dragNoteId || e.buttons !== 1) return;
     if (!_leftDragActive) {
-      // Drag has begun — create ghost
       _leftDragActive = true;
       const srcItem = document.querySelector('#notes-left .notes-item[data-noteid="' + _dragNoteId + '"]');
       if (srcItem) srcItem.style.opacity = '0.4';
       _leftDragGhost = document.createElement('div');
       _leftDragGhost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;' +
-        'background:rgba(6,10,16,.9);border:1px solid rgba(0,210,255,.4);' +
-        'padding:4px 10px;font-family:var(--font-ui,sans-serif);' +
+        'background:rgba(6,10,16,.95);border:1px solid rgba(0,210,255,.5);' +
+        'padding:3px 10px;font-family:var(--font-ui,sans-serif);' +
         'font-size:12px;color:#00D2FF;border-radius:2px;white-space:nowrap;' +
-        'box-shadow:0 4px 16px rgba(0,0,0,.6)';
+        'box-shadow:0 4px 16px rgba(0,0,0,.7)';
       const note = _notes.find(n => n.id === _dragNoteId);
       _leftDragGhost.textContent = note?.title || 'Note';
       document.body.appendChild(_leftDragGhost);
     }
-    // Move ghost
     if (_leftDragGhost) {
-      _leftDragGhost.style.left = (e.clientX + 12) + 'px';
-      _leftDragGhost.style.top  = (e.clientY - 10) + 'px';
+      _leftDragGhost.style.left = (e.clientX + 14) + 'px';
+      _leftDragGhost.style.top  = (e.clientY - 8) + 'px';
     }
-    // Find drop target
-    if (_leftDragGhost) _leftDragGhost.style.display = 'none';
+    // Clear all drop indicators
+    shell.querySelectorAll('.notes-drop-before,.notes-drop-after').forEach(el => {
+      el.classList.remove('notes-drop-before','notes-drop-after');
+    });
+    _dropInsert = null;
+
+    // Find item under cursor
+    if (_leftDragGhost) _leftDragGhost.style.visibility = 'hidden';
     const target = _getItemAt(e.clientX, e.clientY);
-    if (_leftDragGhost) _leftDragGhost.style.display = '';
-    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
-    if (target && target.dataset.noteid !== _dragNoteId) {
-      target.classList.add('notes-drop-line');
+    if (_leftDragGhost) _leftDragGhost.style.visibility = '';
+
+    if (target && target.dataset.noteid !== _dragNoteId &&
+        target.closest('#notes-left')) {
+      const rect = target.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const pos  = e.clientY < midY ? 'before' : 'after';
+      target.classList.add(pos === 'before' ? 'notes-drop-before' : 'notes-drop-after');
+      _dropInsert = { noteId: target.dataset.noteid, position: pos };
     }
   });
 
@@ -1172,38 +1197,55 @@ function _notesDndInit() {
       _dragNoteId = null;
       return;
     }
-    // Clean up ghost
     if (_leftDragGhost) { _leftDragGhost.remove(); _leftDragGhost = null; }
     const srcItem = document.querySelector('#notes-left .notes-item[data-noteid="' + _dragNoteId + '"]');
     if (srcItem) srcItem.style.opacity = '';
-    shell.querySelectorAll('.notes-drop-line').forEach(el => el.classList.remove('notes-drop-line'));
+    shell.querySelectorAll('.notes-drop-before,.notes-drop-after').forEach(el => {
+      el.classList.remove('notes-drop-before','notes-drop-after');
+    });
 
-    // Find drop target
-    const target = _getItemAt(e.clientX, e.clientY);
-    const savedDragId = _dragNoteId;
-    _dragNoteId     = null;
-    _leftDragActive = false;
+    const savedDragId  = _dragNoteId;
+    const savedInsert  = _dropInsert;
+    _dragNoteId        = null;
+    _leftDragActive    = false;
+    _dropInsert        = null;
 
-    if (!target || target.dataset.noteid === savedDragId) return;
-    // Only process if drop is within notes-left
-    if (!target.closest('#notes-left')) return;
+    if (!savedInsert) return;
 
-    const targetNote = _notes.find(n => n.id === target.dataset.noteid);
+    const targetNote = _notes.find(n => n.id === savedInsert.noteId);
     const dragNote   = _notes.find(n => n.id === savedDragId);
     if (!targetNote || !dragNote) return;
 
+    // Move to same branch as target
     const newPath = targetNote.hierarchy_path || 'Inbox';
     const isInbox = !newPath || newPath === 'Inbox';
-    try {
-      await API.patch('notes?id=eq.' + savedDragId, {
+    dragNote.hierarchy_path = newPath;
+    dragNote.is_inbox       = isInbox;
+
+    // Recalculate sort_order for all notes in this branch
+    const branchNotes = _notes
+      .filter(n => n.hierarchy_path === newPath && n.id !== savedDragId)
+      .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+
+    const targetIdx = branchNotes.findIndex(n => n.id === savedInsert.noteId);
+    const insertAt  = savedInsert.position === 'before' ? targetIdx : targetIdx + 1;
+    branchNotes.splice(insertAt, 0, dragNote);
+
+    // Assign new sort_order values (10, 20, 30... leaves room for future inserts)
+    const patches = branchNotes.map((n, i) => {
+      n.sort_order = (i + 1) * 10;
+      return API.patch('notes?id=eq.' + n.id, {
         hierarchy_path: newPath,
         is_inbox:       isInbox,
+        sort_order:     n.sort_order,
         updated_at:     new Date().toISOString(),
       });
-      dragNote.hierarchy_path = newPath;
-      dragNote.is_inbox       = isInbox;
+    });
+
+    try {
+      await Promise.all(patches);
       _notesRenderLeft();
-    } catch(err) { console.error('Tree drop error:', err); }
+    } catch(err) { console.error('Tree reorder error:', err); }
   });
 
   // ── Grid: standard HTML5 drag (no overflow:auto issue there) ─────────────
