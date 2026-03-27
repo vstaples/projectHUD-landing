@@ -287,6 +287,11 @@ window._notesLoadView = async function() {
   }
   if (window._notesSplitterInit) window._notesSplitterInit();
   _notesDndInit();
+  // Wire collaboration after a tick to ensure collab script has patched _notesWireTiles
+  setTimeout(() => {
+    if (typeof _notesWireTilesCollab === 'function') _notesWireTilesCollab();
+    else if (window._notesWireTilesCollab) window._notesWireTilesCollab();
+  }, 0);
 };
 
 window._notesRefresh = async function() {
@@ -1952,15 +1957,15 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
   }
 }
 
-window._notesRemoveParticipant = _notesRemoveParticipant;
+window._notesRemoveParticipant  = _notesRemoveParticipant;
 
 // ── Wire presence on tile open ────────────────────────────────────────────
-// Hook into _notesWireTiles to start presence for each open tile
 const _origWireTiles = window._notesWireTiles || null;
-function _notesWireTilesCollab() {
-  // Start presence for all currently open tiles
+async function _notesWireTilesCollab() {
   const cv = typeof _cv === 'function' ? _cv() : null;
   if (!cv) return;
+  // Pre-load resources so avatars have names immediately
+  await _notesLoadInviteResources();
   cv.tiles.forEach(t => {
     _notesLoadParticipants(t.noteId).then(() => {
       _notesRenderPresence(t.noteId);
@@ -1968,6 +1973,7 @@ function _notesWireTilesCollab() {
     });
   });
 }
+window._notesWireTilesCollab = _notesWireTilesCollab;
 
 // Patch _notesWireTiles to also wire collaboration
 const _origFn = window._notesWireTiles;
