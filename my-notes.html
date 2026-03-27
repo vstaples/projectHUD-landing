@@ -244,6 +244,11 @@ window._notesLoadView = async function() {
 
   await _notesFetchAll();
   await _notesLoadWorkspace();
+  // First launch seeding — new user with no notes and no workspace
+  if (_notes.length === 0 && Object.keys(_workspace.views).length === 1 &&
+      _cv().tiles.length === 0) {
+    await _notesFirstLaunchSeed();
+  }
   _notesRenderLeft();
   _notesRenderGrid();
   // Restore saved panel width and init splitter
@@ -990,6 +995,57 @@ function _notesClearWorkspace() {
   _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
+}
+
+// ── First launch seeding ─────────────────────────────────────────────────
+async function _notesFirstLaunchSeed() {
+  if (!_userId) return;
+  try {
+    // Create three default branches by seeding one note in each
+    const seedNotes = [
+      {
+        title:          'Welcome to My Notes',
+        content:        'This is your personal workspace. Click any note in the tree to open it here. Drag notes between tiles to rearrange. Use + New note to capture a thought.',
+        hierarchy_path: 'Work',
+        is_inbox:       false,
+        sort_order:     10,
+      },
+      {
+        title:          'Ideas',
+        content:        'Use this space for ideas, goals, and anything personal.',
+        hierarchy_path: 'Personal',
+        is_inbox:       false,
+        sort_order:     10,
+      },
+    ];
+
+    const created = [];
+    for (const n of seedNotes) {
+      const res = await API.post('notes', {
+        firm_id:        FIRM_ID,
+        owner_user_id:  _userId,
+        title:          n.title,
+        content:        n.content,
+        hierarchy_path: n.hierarchy_path,
+        is_inbox:       n.is_inbox,
+        sort_order:     n.sort_order,
+        created_at:     new Date().toISOString(),
+        updated_at:     new Date().toISOString(),
+      });
+      if (res?.[0]) { created.push(res[0]); _notes.push(res[0]); }
+    }
+
+    // Set up initial 2×2 workspace with welcome note in slot 0
+    _workspace.activeView = 'Default';
+    _workspace.views = {
+      'Default': {
+        gridSize: '2x2',
+        tiles:    created[0] ? [{ slot: 0, noteId: created[0].id, chatOpen: false }] : [],
+        tray:     [],
+      }
+    };
+    await _notesSaveNow();
+  } catch(e) { console.error('[Compass] First launch seed error:', e); }
 }
 
 // ── Branch management ────────────────────────────────────────────────────
