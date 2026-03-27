@@ -1538,6 +1538,8 @@ document.addEventListener('keydown', e => {
 
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSaveNow         = _notesSaveNow;
+window._notesCv              = _cv;          // expose _cv() for collab block
+window._notesParticipants    = _participants; // expose participants cache
 window._notesMinimizeTile    = _notesMinimizeTile;
 window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
@@ -1611,7 +1613,8 @@ async function _notesRenderPresence(noteId) {
   if (!el) return;
   const parts = _participants[noteId] || await _notesLoadParticipants(noteId);
   const now   = Date.now();
-  // Look up names from cached invite resources
+  // Ensure resources are loaded
+  if (!_inviteResources) await _notesLoadInviteResources();
   const resources = _inviteResources || [];
   const filtered = parts.filter(p => {
     const selfUserId = window._notesResource?.user_id;
@@ -1940,10 +1943,21 @@ async function _notesRemoveParticipant(participantId, noteId) {
 // ── Invite a user to a note ───────────────────────────────────────────────
 async function _notesInvite(noteId, resourceId, userId, color, pop) {
   try {
+    // If resource_id is empty string or null, try to find it from cached resources
+    let resolvedResourceId = resourceId || null;
+    let resolvedUserId = userId || null;
+    if (!resolvedResourceId && resolvedUserId && _inviteResources) {
+      const r = _inviteResources.find(r => r.user_id === resolvedUserId);
+      if (r) resolvedResourceId = r.id;
+    }
+    if (!resolvedUserId && resolvedResourceId && _inviteResources) {
+      const r = _inviteResources.find(r => r.id === resolvedResourceId);
+      if (r) resolvedUserId = r.user_id || null;
+    }
     await API.post('note_participants', {
       note_id:      noteId,
-      resource_id:  resourceId,
-      user_id:      userId || null,
+      resource_id:  resolvedResourceId,
+      user_id:      resolvedUserId,
       role:         'participant',
       color:        color,
       invited_at:   new Date().toISOString(),
@@ -1962,8 +1976,9 @@ window._notesRemoveParticipant  = _notesRemoveParticipant;
 // ── Wire presence on tile open ────────────────────────────────────────────
 const _origWireTiles = window._notesWireTiles || null;
 async function _notesWireTilesCollab() {
-  const cv = typeof _cv === 'function' ? _cv() : null;
-  if (!cv) return;
+  const cvFn = typeof _cv === 'function' ? _cv : window._notesCv;
+  const cv   = typeof cvFn === 'function' ? cvFn() : null;
+  if (!cv) { console.warn('[Compass] _notesWireTilesCollab: _cv not available'); return; }
   // Pre-load resources so avatars have names immediately
   await _notesLoadInviteResources();
   cv.tiles.forEach(t => {
