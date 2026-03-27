@@ -614,26 +614,31 @@ function _notesItemHTML(n) {
   const tile   = _cv().tiles.find(t => t.noteId === n.id);
   const inGrid = !!tile;
   const age    = _notesRelTime(n.updated_at);
+
+  // Fix cols calculation for all grid sizes (RxC format)
   const size   = _cv().gridSize || '2x2';
-  const cols   = size === '1x1' ? 1 : size === '2x2' ? 2 : 3;
-  // Convert slot index to grid position label e.g. slot 0 = "1,1", slot 1 = "1,2"
+  const lparts = size.split('x');
+  const cols   = parseInt(lparts[1]) || 2;
+
   let slotLabel = '';
   if (tile) {
     const row = Math.floor(tile.slot / cols) + 1;
     const col = (tile.slot % cols) + 1;
     slotLabel = row + ',' + col;
   }
+
+  // Delete button for inbox notes; branch notes use branch × button
   const delBtn = n.is_inbox
     ? '<button class="notes-item-del" title="Delete" ' +
       'onclick="event.stopPropagation();_notesDeleteInboxNote(\'' + _esc(n.id) + '\')">✕</button>'
     : '';
+
   return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
     '<div class="notes-item-body">' +
     '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
-    '<div class="notes-item-meta">' + age + (n.entity_type ? ' · ' + n.entity_type : '') + '</div>' +
+    '<div class="notes-item-meta">' + age + '</div>' +
     '</div>' +
     (inGrid ? '<div class="notes-slot-badge">Grid ' + slotLabel + '</div>' : '') +
-    (n.entity_type && n.entity_type !== 'note' && !inGrid ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
     delBtn +
     '</div>';
 }
@@ -2247,11 +2252,39 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
 async function _notesRemoveParticipant(participantId, noteId) {
   document.querySelectorAll('.notes-participant-card').forEach(c => c.remove());
   try {
+    // Get participant details before deleting
+    const parts = await API.get('note_participants?id=eq.' + participantId + '&select=user_id,resource_id').catch(()=>[]);
+    const removedUserId = parts?.[0]?.user_id;
+
     await API.del('note_participants?id=eq.' + participantId);
     if (_participants[noteId]) {
       _participants[noteId] = _participants[noteId].filter(p => p.id !== participantId);
     }
     _notesRenderPresence(noteId);
+
+    // Remove the shared note from the removed user's workspace
+    if (removedUserId) {
+      try {
+        const wsRows = await API.get('notes_workspace?user_id=eq.' + removedUserId + '&limit=1').catch(()=>[]);
+        if (wsRows?.[0]?.state) {
+          const state = wsRows[0].state;
+          let changed = false;
+          // Remove from all views
+          Object.values(state.views || {}).forEach(v => {
+            const before = (v.tiles || []).length + (v.tray || []).length;
+            v.tiles = (v.tiles || []).filter(t => t.noteId !== noteId);
+            v.tray  = (v.tray  || []).filter(id => id !== noteId);
+            if ((v.tiles.length + v.tray.length) < before) changed = true;
+          });
+          if (changed) {
+            await API.patch('notes_workspace?user_id=eq.' + removedUserId, {
+              state:      state,
+              updated_at: new Date().toISOString(),
+            });
+          }
+        }
+      } catch(e) { console.warn('[Compass] Could not clean workspace for removed participant:', e); }
+    }
   } catch(e) { console.error('[Compass] Remove participant error:', e); }
 }
 
