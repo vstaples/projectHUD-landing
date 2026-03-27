@@ -1584,7 +1584,7 @@ async function _notesRenderPresence(noteId) {
       const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
       const color   = p.color || '#00D2FF';
       const seenAgo = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
-      const active  = seenAgo < 60000; // active within 60s
+      const active  = seenAgo < 10000; // active within 10s
       const title   = name + (active ? ' (active)' : ' (last seen ' + _notesRelTime(p.last_seen_at) + ')');
       return '<div class="notes-avatar' + (active ? ' active' : '') + '" ' +
         'style="background:' + color + '" title="' + _esc(title) + '">' +
@@ -1611,7 +1611,7 @@ async function _notesHeartbeat(noteId) {
 function _notesStartPresence(noteId) {
   if (_presenceIntervals[noteId]) return; // already running
   _notesHeartbeat(noteId); // immediate first tick
-  _presenceIntervals[noteId] = setInterval(() => _notesHeartbeat(noteId), 30000);
+  _presenceIntervals[noteId] = setInterval(() => _notesHeartbeat(noteId), 5000);
 }
 
 function _notesStopPresence(noteId) {
