@@ -47,8 +47,8 @@ const Sidebar = (() => {
       #sidebar {
         display: flex !important;
         flex-direction: column !important;
-        height: 100vh !important;
-        max-height: 100vh !important;
+        height: calc(100vh - 32px) !important;
+        max-height: calc(100vh - 32px) !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
       }
