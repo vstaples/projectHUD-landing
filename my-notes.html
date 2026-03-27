@@ -663,9 +663,10 @@ function _notesWireLeft() {
 
       // Invitation or removal notification — check which type
       if (note?.entity_id && note?.is_inbox) {
-        // Check if it's a removal notification (title contains 'removed themselves')
-        if (note.title?.includes('removed themselves from:')) {
-          // Show acknowledgment dialog
+        // Check if it's a removal or declined notification
+        if (note.title?.includes('removed themselves from:') ||
+            note.title?.includes('declined your invitation')) {
+          // Show simple acknowledgment dialog
           const overlay = document.createElement('div');
           overlay.className = 'notes-invite-dialog-overlay';
           overlay.innerHTML =
@@ -676,7 +677,7 @@ function _notesWireLeft() {
               '</div>' +
               '<div class="nid-body">' + _esc(note.content || '') + '</div>' +
               '<div class="nid-actions">' +
-                '<button class="nid-btn nid-btn-accept" id="nid-ack">Dismiss</button>' +
+                '<button class="nid-btn nid-btn-accept" id="nid-ack">OK</button>' +
               '</div>' +
             '</div>';
           document.body.appendChild(overlay);
@@ -685,7 +686,9 @@ function _notesWireLeft() {
             API.del('notes?id=eq.' + note.id).then(() => {
               _notes = _notes.filter(n => n.id !== note.id);
               _notesRenderLeft();
-              if (window._notesRenderPresence) window._notesRenderPresence(note.entity_id);
+              if (note.entity_id && window._notesRenderPresence) {
+                window._notesRenderPresence(note.entity_id);
+              }
             }).catch(()=>{});
           };
           overlay.querySelector('#nid-ack').onclick = dismiss;
