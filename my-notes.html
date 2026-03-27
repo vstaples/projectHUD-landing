@@ -1892,10 +1892,68 @@ document.addEventListener('keydown', e => {
 
 // ── Delete inbox note ────────────────────────────────────────────────────
 async function _notesDeleteInboxNote(noteId) {
+  const note = _notes.find(n => n.id === noteId);
+
+  // If it's a shared invitation (entity_id set), confirm and notify owner
+  if (note?.entity_id && note?.is_inbox) {
+    // Check if already accepted (i.e. they've been collaborating)
+    const userId = _userId;
+    const parts  = userId ? await API.get(
+      'note_participants?note_id=eq.' + note.entity_id + '&select=user_id,role&limit=20'
+    ).catch(()=>[]) : [];
+    const ownerPart   = (parts||[]).find(p => p.role === 'owner');
+    const isAccepted  = (parts||[]).some(p => p.user_id === userId && p.role === 'participant');
+
+    // Show confirmation dialog
+    const confirmed = await new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'notes-invite-dialog-overlay';
+      const noteName = note.title || 'this shared note';
+      overlay.innerHTML =
+        '<div class="notes-invite-dialog">' +
+          '<div class="nid-header">' +
+            '<div class="nid-from">Remove Shared Note</div>' +
+            '<div class="nid-title">' + _esc(noteName) + '</div>' +
+          '</div>' +
+          '<div class="nid-body">' +
+            'Removing this note will delete it from your inbox.' +
+            (isAccepted && ownerPart ? '<br><br>The note owner will be notified that you have left.' : '') +
+          '</div>' +
+          '<div class="nid-actions">' +
+            '<button class="nid-btn nid-btn-reject" id="nid-cancel-del">Cancel</button>' +
+            '<button class="nid-btn nid-btn-accept" style="border-color:rgba(226,75,74,.4);color:#E24B4A;background:rgba(226,75,74,.08)" id="nid-confirm-del">Remove</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#nid-cancel-del').onclick  = () => { overlay.remove(); resolve(false); };
+      overlay.querySelector('#nid-confirm-del').onclick = () => { overlay.remove(); resolve(true); };
+      overlay.addEventListener('mousedown', e => { if (e.target === overlay) { overlay.remove(); resolve(false); }});
+    });
+    if (!confirmed) return;
+
+    // Notify owner if participant had accepted
+    if (isAccepted && ownerPart?.user_id) {
+      const myName   = window._notesResource?.name || 'Someone';
+      const noteTitle = note.title?.replace(/^.+invited you to: /, '') || noteName;
+      try {
+        await API.post('notes', {
+          firm_id: FIRM_ID, owner_user_id: ownerPart.user_id,
+          title:   myName + ' removed themselves from: ' + noteTitle,
+          content: myName + ' has left the shared note "' + noteTitle + '".',
+          hierarchy_path: 'Inbox', is_inbox: true,
+          entity_id: note.entity_id, entity_type: null,
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        });
+      } catch(e) {}
+      // Remove from note_participants
+      try { await API.del('note_participants?note_id=eq.' + note.entity_id + '&user_id=eq.' + userId); } catch(e) {}
+    }
+  }
+
+  // Delete the inbox note and clean up workspace
   try {
     await API.del('notes?id=eq.' + noteId);
     _notes = _notes.filter(n => n.id !== noteId);
-    // Also remove from grid/tray if open
     _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
     _cv().tray  = _cv().tray.filter(id => id !== noteId);
     _notesSaveWorkspace(true);
@@ -2072,7 +2130,7 @@ async function _notesRenderPresence(noteId) {
     const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const color    = p.color || '#00D2FF';
     const seenAgo  = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
-    const active   = seenAgo < 10000;
+    const active   = seenAgo < 15000;
 
     const pending = !p.accepted_at;
     const avatar  = document.createElement('div');
