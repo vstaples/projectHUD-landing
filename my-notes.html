@@ -1106,6 +1106,22 @@ async function _notesOpenFloatingNote(noteId, noteName) {
 
   document.body.appendChild(win);
   _notesWireFloatDrag(win, win.querySelector('#nfw-tb-' + noteId));
+
+  // Start presence heartbeat for this shared note so others can see activity
+  if (window._notesStartPresence) window._notesStartPresence(noteId);
+  else if (typeof _notesStartPresence === 'function') _notesStartPresence(noteId);
+
+  // Stop presence when window is closed
+  const origClose = win.querySelector('.notes-float-close');
+  if (origClose) {
+    const origOnclick = origClose.getAttribute('onclick');
+    origClose.setAttribute('onclick', '');
+    origClose.addEventListener('click', () => {
+      if (window._notesStopPresence) window._notesStopPresence(noteId);
+      else if (typeof _notesStopPresence === 'function') _notesStopPresence(noteId);
+      eval(origOnclick);
+    });
+  }
 }
 
 function _notesFloatClose(noteId, btn) {
@@ -1922,15 +1938,14 @@ async function _notesHeartbeat(noteId) {
 }
 
 async function _notesSyncContent(noteId) {
-  // Only sync if someone else is active (presence within 15s)
+  // Sync if there are any accepted participants other than self
   const parts = _participants[noteId] || [];
   const selfUserId = window._notesResource?.user_id;
-  const othersActive = parts.some(p => {
+  const hasOthers = parts.some(p => {
     if (p.user_id === selfUserId) return false;
-    if (!p.last_seen_at) return false;
-    return (Date.now() - new Date(p.last_seen_at).getTime()) < 15000;
+    return !!p.accepted_at; // accepted participants may have edited
   });
-  if (!othersActive) return;
+  if (!hasOthers) return;
 
   try {
     const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
@@ -2347,6 +2362,8 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
 }
 
 window._notesRemoveParticipant  = _notesRemoveParticipant;
+window._notesStartPresence      = _notesStartPresence;
+window._notesStopPresence       = _notesStopPresence;
 
 // ── Wire presence on tile open ────────────────────────────────────────────
 const _origWireTiles = window._notesWireTiles || null;
