@@ -662,9 +662,23 @@ function _notesWireLeft() {
       const noteId = el.dataset.noteid;
       const note   = _notes.find(n => n.id === noteId);
 
-      // Invitation note — show accept/reject dialog
+      // Invitation note — show accept/reject dialog or reopen float
       if (note?.entity_id && note?.is_inbox) {
-        _notesShowInviteDialog(note);
+        // Check if already accepted
+        const userId = _userId;
+        if (userId) {
+          API.get('note_participants?note_id=eq.' + note.entity_id + '&user_id=eq.' + userId + '&select=accepted_at&limit=1')
+            .then(rows => {
+              if (rows?.[0]?.accepted_at) {
+                // Already accepted — just reopen the float window
+                _notesOpenFloatingNote(note.entity_id, note.title?.replace(/^.+invited you to: /, '') || 'Shared Note');
+              } else {
+                _notesShowInviteDialog(note);
+              }
+            }).catch(() => _notesShowInviteDialog(note));
+        } else {
+          _notesShowInviteDialog(note);
+        }
         return;
       }
 
@@ -1058,12 +1072,7 @@ async function _notesShowInviteDialog(inviteNote) {
 
   overlay.querySelector('#nid-accept').onclick = async () => {
     overlay.remove();
-    // Delete invitation note from inbox — shared note now visible in tree
-    try {
-      await API.del('notes?id=eq.' + inviteNote.id);
-      _notes = _notes.filter(n => n.id !== inviteNote.id);
-      _notesRenderLeft();
-    } catch(e) {}
+    // Keep invitation in inbox as persistent pointer — clicking it reopens the float
     // Mark participant as accepted — upsert in case row was removed
     try {
       const userId     = window._notesResource?.user_id;
@@ -1150,14 +1159,22 @@ async function _notesOpenFloatingNote(noteId, noteName) {
     closeBtn.removeAttribute('onclick');
     closeBtn.addEventListener('click', () => {
       if (window._notesStopPresence) window._notesStopPresence(noteId);
-      win.remove();
+      _notesFloatClose(noteId, closeBtn);
     });
   }
 }
 
 function _notesFloatClose(noteId, btn) {
-  const win = btn?.closest?.('.notes-float-window') || document.querySelector('.notes-float-window[data-note-id="' + noteId + '"]');
+  const win = btn?.closest?.('.notes-float-window') || document.querySelector('.notes-float-window');
   if (win) win.remove();
+  // Add shared note to tray so it persists and can be dragged to grid
+  if (noteId && !_cv().tiles.some(t => t.noteId === noteId)) {
+    if (!_cv().tray.includes(noteId)) {
+      _cv().tray.push(noteId);
+      _notesSaveWorkspace(true);
+      _notesRenderTray();
+    }
+  }
 }
 window._notesFloatClose = _notesFloatClose;
 
