@@ -48,7 +48,8 @@ const Sidebar = (() => {
         display: flex !important;
         flex-direction: column !important;
         height: 100vh !important;
-        overflow: hidden !important;
+        overflow: visible !important;
+        min-height: 0;
       }
       .sidebar-logo { flex-shrink: 0; }
 
@@ -82,7 +83,17 @@ const Sidebar = (() => {
       /* Operator section — pinned to bottom, never pushed off-screen */
       .sidebar-operator {
         flex-shrink: 0 !important;
-        margin-top: auto;        /* pushes to bottom if nav is short */
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+      }
+      /* Ensure nav shrinks to give operator room */
+      #sidebar-nav {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
       }
 
       /* ── Right icon toolbar (dashboard only) ────────────── */
