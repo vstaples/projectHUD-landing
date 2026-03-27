@@ -1797,14 +1797,23 @@ window._notesShowInvite = async function(noteId, btn) {
 async function _notesShowParticipantCard(anchor, participant, res, name, color, active, noteId) {
   document.querySelectorAll('.notes-participant-card').forEach(c => c.remove());
 
+  // Resolve resource first — needed for photo and title
+  if (!_inviteResources) await _notesLoadInviteResources();
+  let resolvedRes = res;
+  if (!resolvedRes && _inviteResources) {
+    resolvedRes = (participant.resource_id && _inviteResources.find(r => r.id === participant.resource_id)) ||
+                  (participant.user_id    && _inviteResources.find(r => r.user_id === participant.user_id)) ||
+                  null;
+  }
+  const resourceId = resolvedRes?.id || participant.resource_id;
+
   const card = document.createElement('div');
   card.className = 'notes-participant-card';
 
-  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const title    = resolvedRes?.title || res?.title || '—';
+  const initials  = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const title     = resolvedRes?.title || res?.title || '—';
+  const photoUrl  = resolvedRes?.avatar_url || res?.avatar_url;
 
-  // Initial skeleton — use resolvedRes for photo
-  const photoUrl = resolvedRes?.avatar_url || res?.avatar_url;
   const avatarHtml = photoUrl
     ? '<img src="' + _esc(photoUrl) + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
       '<div class="npc-avatar" style="background:' + _esc(color) + '18;color:' + _esc(color) + ';border:1px solid ' + _esc(color) + '44;display:none">' + _esc(initials) + '</div>'
@@ -1816,8 +1825,8 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
       '<div><div class="npc-name">' + _esc(name) + '</div>' +
       '<div class="npc-title">' + _esc(title) + '</div></div>' +
     '</div>' +
-    '<div id="npc-body-' + _esc(participant.id) + '"><div style="padding:14px 16px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Loading…</div></div>' +
-    '<button class="npc-remove" onclick="_notesRemoveParticipant(\'' + _esc(participant.id) + '\',\'' + _esc(noteId) + '\')">✕ REMOVE FROM NOTE</button>';
+    '<div id="npc-body-' + _esc(participant.id) + '"><div style="padding:14px 16px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + (resourceId ? 'Loading…' : 'No resource data available') + '</div></div>' +
+    '<button class="npc-remove" onclick="window._notesRemoveParticipant(\'' + _esc(participant.id) + '\',\'' + _esc(noteId) + '\')">✕ REMOVE FROM NOTE</button>';
 
   // Position
   document.body.appendChild(card);
@@ -1841,19 +1850,9 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
     });
   }, 50);
 
-  // Fetch rich data in parallel
-  // Ensure resources are loaded before looking up
-  if (!_inviteResources) await _notesLoadInviteResources();
-
-  // Resolve resource from cache if not passed in
-  let resolvedRes = res;
-  if (!resolvedRes && _inviteResources) {
-    resolvedRes = (participant.resource_id && _inviteResources.find(r => r.id === participant.resource_id)) ||
-                  (participant.user_id    && _inviteResources.find(r => r.user_id === participant.user_id)) ||
-                  null;
-  }
-  const resourceId = resolvedRes?.id || participant.resource_id;
   if (!resourceId) return;
+
+  // Fetch rich data in parallel
 
   const [skills, profile, domains, assignments, allSkills, allDomains] = await Promise.all([
     API.get('resource_skills?resource_id=eq.' + resourceId).catch(()=>[]),
@@ -1870,15 +1869,13 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   const seenText = active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never');
 
   const totalPct  = (assignments||[]).reduce((s,a) => s + (a.allocation_pct||0), 0);
+  const displayRes = resolvedRes || res;
   const availPct  = displayRes?.availability_pct ?? 100;
   const utilColor = totalPct > availPct ? 'var(--red,#E24B4A)' : totalPct > availPct*0.8 ? 'var(--amber,#EF9F27)' : 'var(--green,#1D9E75)';
 
   const profColors = { aware:'var(--text2)', practitioner:'var(--cyan,#00D2FF)', expert:'var(--amber,#EF9F27)', authority:'var(--purple,#8B5CF6)' };
 
   let html = '';
-
-  // Use resolvedRes for all data display
-  const displayRes = resolvedRes || res;
 
   // Contact & Info
   html += '<div class="npc-section">';
