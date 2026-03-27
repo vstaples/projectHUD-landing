@@ -65,6 +65,11 @@
 
 /* ── Note tile ───────────────────────────────────────────────────────────── */
 .notes-tile{display:flex;flex-direction:column;background:var(--bg1,#0c1628);border:1px solid rgba(0,210,255,.1);overflow:hidden;min-height:0;height:100%}
+.notes-tile.minimized{height:auto;min-height:0;border-color:rgba(0,210,255,.2)}
+.notes-tile.minimized .notes-tile-header{border-bottom:none;background:rgba(0,0,0,.25)}
+.notes-tile.maximized{position:fixed;inset:60px 0 0 0;z-index:500;border:none;
+  border-top:2px solid rgba(0,210,255,.4);box-shadow:0 0 60px rgba(0,0,0,.8)}
+.notes-tile.maximized .notes-tile-header{background:rgba(6,10,16,.98)}
 .notes-tile.empty{border:1px dashed rgba(0,210,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s}
 .notes-tile.empty:hover{background:rgba(0,210,255,.03);border-color:rgba(0,210,255,.25)}
 .notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}
@@ -443,7 +448,7 @@ function _notesRenderGrid() {
     const note = tile ? _notes.find(n => n.id === tile.noteId) : null;
     const div  = document.createElement('div');
     if (note) {
-      div.className = 'notes-tile';
+      div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
       div.innerHTML = _notesTileHTML(note, tile);
       div.dataset.slot   = i;
       div.dataset.noteid = note.id;
@@ -474,10 +479,17 @@ function _notesTileHTML(note, tileState) {
       '<path d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10C14 10.5523 13.5523 11 13 11H9L6 14V11H3C2.44772 11 2 10.5523 2 10V3Z" ' +
       'stroke="#00D2FF" stroke-width="1.3" fill="' + (chatOpen ? 'rgba(0,210,255,.2)' : 'none') + '"/>' +
       '</svg></button>' +
+    '<button class="notes-tile-ctrl" id="notes-min-btn-' + note.id + '" title="Minimize tile" ' +
+      'onclick="_notesMinimizeTile(\'' + note.id + '\')" ' +
+      'style="font-size:11px;opacity:.6">—</button>' +
+    '<button class="notes-tile-ctrl" id="notes-max-btn-' + note.id + '" title="Maximize tile" ' +
+      'onclick="_notesMaximizeTile(\'' + note.id + '\')" ' +
+      'style="font-size:11px;opacity:.6">⤢</button>' +
     '<button class="notes-tile-ctrl" title="Close tile" onclick="_notesCloseTile(\'' + note.id + '\')" ' +
       'style="color:rgba(226,75,74,.6)">✕</button>' +
     '</div>' +
-    '<div class="notes-tile-body" id="notes-tbody-' + note.id + '">' +
+    '<div class="notes-tile-body" id="notes-tbody-' + note.id + '" ' +
+      'style="' + (tileState?.minimized ? 'display:none' : '') + '">' +
     '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
       'placeholder="Start writing…" ' +
       'oninput="_notesSaveContent(this)">' + _esc(note.content || '') + '</textarea>' +
@@ -843,8 +855,64 @@ function _notesClearWorkspace() {
   window._notesSplitterInit = initSplitter;
 })();
 
+// ── Minimize tile ─────────────────────────────────────────────────────────
+function _notesMinimizeTile(noteId) {
+  const tile = _workspace.views[_workspace.activeView]?.tiles?.find(t => t.noteId === noteId);
+  if (!tile) return;
+  tile.minimized = !tile.minimized;
+
+  // Toggle body visibility
+  const body   = document.getElementById('notes-tbody-' + noteId);
+  const tileEl = body?.closest('.notes-tile');
+  const btn    = document.getElementById('notes-min-btn-' + noteId);
+
+  if (body)   body.style.display   = tile.minimized ? 'none' : '';
+  if (tileEl) tileEl.classList.toggle('minimized', tile.minimized);
+  if (btn)    btn.title = tile.minimized ? 'Restore tile' : 'Minimize tile';
+  if (btn)    btn.textContent = tile.minimized ? '▢' : '—';
+
+  _notesSaveWorkspace(true);
+}
+
+// ── Maximize tile ─────────────────────────────────────────────────────────
+let _maximizedNoteId = null;
+
+function _notesMaximizeTile(noteId) {
+  const isMaximized = _maximizedNoteId === noteId;
+
+  // Restore any currently maximized tile first
+  if (_maximizedNoteId) {
+    const prevEl = document.querySelector('.notes-tile.maximized');
+    if (prevEl) prevEl.classList.remove('maximized');
+    const prevBtn = document.getElementById('notes-max-btn-' + _maximizedNoteId);
+    if (prevBtn) { prevBtn.textContent = '⤢'; prevBtn.title = 'Maximize tile'; prevBtn.style.opacity = '.6'; }
+    _maximizedNoteId = null;
+  }
+
+  if (!isMaximized) {
+    // Maximize this tile
+    const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
+    if (!tileEl) return;
+    // Restore if minimized first
+    if (tileEl.classList.contains('minimized')) _notesMinimizeTile(noteId);
+    tileEl.classList.add('maximized');
+    const btn = document.getElementById('notes-max-btn-' + noteId);
+    if (btn) { btn.textContent = '⤡'; btn.title = 'Restore tile'; btn.style.opacity = '1'; }
+    _maximizedNoteId = noteId;
+    // Focus canvas
+    setTimeout(() => tileEl.querySelector('.notes-tile-canvas')?.focus(), 50);
+  }
+}
+
+// Close maximize on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _maximizedNoteId) _notesMaximizeTile(_maximizedNoteId);
+});
+
 // ── Expose to window for onclick handlers ────────────────────────────────
-window._notesSaveNow       = _notesSaveNow;
+window._notesSaveNow         = _notesSaveNow;
+window._notesMinimizeTile    = _notesMinimizeTile;
+window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
 window._notesOpenNote   = _notesOpenNote;
 window._notesToggleChat = _notesToggleChat;
