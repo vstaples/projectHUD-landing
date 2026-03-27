@@ -92,8 +92,21 @@
 .notes-tile.empty:hover{background:rgba(0,210,255,.03);border-color:rgba(0,210,255,.25)}
 .notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}
 .notes-presence{display:flex;align-items:center;gap:3px;flex-shrink:0}
-.notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:default;position:relative}
+.notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:pointer;position:relative}
 .notes-avatar.active::after{content:"";position:absolute;bottom:-1px;right:-1px;width:5px;height:5px;border-radius:50%;background:#1D9E75;border:1px solid #0c1628}
+.notes-participant-card{position:fixed;z-index:1000;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.8);padding:14px;min-width:240px;max-width:280px;pointer-events:all}
+.npc-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.npc-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;font-weight:700;color:#000;flex-shrink:0}
+.npc-name{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;font-weight:700;color:var(--text0,#F0F6FF)}
+.npc-title{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:1px}
+.npc-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--font-mono,monospace);font-size:10px;border-bottom:1px solid rgba(0,210,255,.06)}
+.npc-label{color:var(--text3);letter-spacing:.06em}
+.npc-value{color:var(--text1);text-align:right;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.npc-status{display:flex;gap:5px;margin:8px 0 10px}
+.npc-chip{font-family:var(--font-mono,monospace);font-size:9px;padding:2px 7px;letter-spacing:.08em;text-transform:uppercase;border:1px solid}
+.npc-remove{width:100%;margin-top:10px;background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.3);color:rgba(226,75,74,.8);font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.08em;padding:6px;cursor:pointer;transition:all .12s}
+.npc-remove:hover{background:rgba(226,75,74,.15);color:#E24B4A}
+.npc-active-dot{width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;margin-right:4px}
 .notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
 .notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
 .notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:220px}
@@ -1577,7 +1590,7 @@ async function _notesLoadParticipants(noteId) {
   try {
     const rows = await API.get(
       'note_participants?note_id=eq.' + noteId +
-      '&select=id,user_id,role,color,invited_at,last_seen_at&order=invited_at.asc'
+      '&select=id,user_id,resource_id,role,color,invited_at,last_seen_at&order=invited_at.asc'
     ).catch(() => []);
     _participants[noteId] = Array.isArray(rows) ? rows : [];
   } catch(e) { _participants[noteId] = []; }
@@ -1590,22 +1603,39 @@ async function _notesRenderPresence(noteId) {
   if (!el) return;
   const parts = _participants[noteId] || await _notesLoadParticipants(noteId);
   const now   = Date.now();
-  // Get resource names
-  const resources = window._users || window._resources || [];
-  el.innerHTML = parts
-    .filter(p => p.user_id !== window._notesResource?.user_id) // exclude self
-    .map(p => {
-      const res     = resources.find(r => r.user_id === p.user_id);
-      const name    = res?.name || 'User';
-      const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-      const color   = p.color || '#00D2FF';
-      const seenAgo = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
-      const active  = seenAgo < 10000; // active within 10s
-      const title   = name + (active ? ' (active)' : ' (last seen ' + _notesRelTime(p.last_seen_at) + ')');
-      return '<div class="notes-avatar' + (active ? ' active' : '') + '" ' +
-        'style="background:' + color + '" title="' + _esc(title) + '">' +
-        _esc(initials) + '</div>';
-    }).join('');
+  // Look up names from cached invite resources
+  const resources = _inviteResources || [];
+  const filtered = parts.filter(p => {
+    const selfUserId = window._notesResource?.user_id;
+    if (p.user_id && p.user_id === selfUserId) return false;
+    return true;
+  });
+
+  el.innerHTML = '';
+  filtered.forEach(p => {
+    const res      = resources.find(r => r.id === p.resource_id) ||
+                     resources.find(r => r.user_id === p.user_id);
+    const name     = res ? ((res.first_name || '') + ' ' + (res.last_name || '')).trim() : (p.user_id ? 'User' : '?');
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const color    = p.color || '#00D2FF';
+    const seenAgo  = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
+    const active   = seenAgo < 10000;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'notes-avatar' + (active ? ' active' : '');
+    avatar.style.background = color;
+    avatar.textContent = initials;
+    avatar.dataset.participantId = p.id;
+    avatar.dataset.noteId        = noteId;
+
+    // Click to show profile card
+    avatar.addEventListener('click', e => {
+      e.stopPropagation();
+      _notesShowParticipantCard(avatar, p, res, name, color, active, noteId);
+    });
+
+    el.appendChild(avatar);
+  });
 }
 
 // ── Heartbeat — update own last_seen_at every 30s ─────────────────────────
@@ -1678,11 +1708,12 @@ window._notesShowInvite = async function(noteId, btn) {
   function renderResults(q) {
     const lower = q.toLowerCase().trim();
     const selfId = window._notesResource?.user_id;
-    const existingIds = new Set((_participants[noteId] || []).map(p => p.user_id));
+    const existingIds = new Set((_participants[noteId] || []).map(p => p.resource_id || p.user_id));
     let colorIdx = existingIds.size;
 
     const filtered = allResources.filter(r => {
-      if (!r.user_id || r.user_id === selfId) return false;
+      if (r.user_id === selfId) return false; // exclude self (by user_id if set)
+      if (!r.id) return false;
       if (!lower) return true;
       return (r.name || '').toLowerCase().includes(lower) ||
              (r.department || '').toLowerCase().includes(lower) ||
@@ -1735,7 +1766,7 @@ window._notesShowInvite = async function(noteId, btn) {
 
     resultsEl.innerHTML = html;
     resultsEl.querySelectorAll('.notes-invite-row[data-already="false"]').forEach(row => {
-      row.onclick = () => _notesInvite(noteId, row.dataset.userid, row.dataset.color, pop);
+      row.onclick = () => _notesInvite(noteId, row.dataset.resourceid, row.dataset.userid || null, row.dataset.color, pop);
     });
   }
 
@@ -1752,19 +1783,81 @@ window._notesShowInvite = async function(noteId, btn) {
   }, 50);
 };
 
-// ── Invite a user to a note ───────────────────────────────────────────────
-async function _notesInvite(noteId, userId, color, pop) {
+// ── Participant profile card ──────────────────────────────────────────────
+function _notesShowParticipantCard(anchor, participant, res, name, color, active, noteId) {
+  // Close any existing card
+  document.querySelectorAll('.notes-participant-card').forEach(c => c.remove());
+
+  const card = document.createElement('div');
+  card.className = 'notes-participant-card';
+
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const dept     = res?.department || '—';
+  const title    = res?.title || '—';
+  const email    = res?.email || '—';
+  const seenText = active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never');
+
+  card.innerHTML =
+    '<div class="npc-header">' +
+      '<div class="npc-avatar" style="background:' + _esc(color) + '">' + _esc(initials) + '</div>' +
+      '<div><div class="npc-name">' + _esc(name) + '</div>' +
+      '<div class="npc-title">' + _esc(title) + '</div></div>' +
+    '</div>' +
+    '<div class="npc-row"><span class="npc-label">DEPT</span><span class="npc-value">' + _esc(dept) + '</span></div>' +
+    '<div class="npc-row"><span class="npc-label">EMAIL</span><span class="npc-value">' + _esc(email) + '</span></div>' +
+    '<div class="npc-row"><span class="npc-label">PRESENCE</span><span class="npc-value">' +
+      (active ? '<span class="npc-active-dot"></span>' : '') + _esc(seenText) + '</span></div>' +
+    '<div class="npc-row"><span class="npc-label">INVITED</span><span class="npc-value">' +
+      _esc(participant.invited_at ? _notesRelTime(participant.invited_at) + ' ago' : '—') + '</span></div>' +
+    '<button class="npc-remove" onclick="_notesRemoveParticipant(\'' + _esc(participant.id) + '\',\'' + _esc(noteId) + '\')">✕ REMOVE FROM NOTE</button>';
+
+  // Position near anchor
+  document.body.appendChild(card);
+  const rect = anchor.getBoundingClientRect();
+  const cw   = card.offsetWidth || 260;
+  const ch   = card.offsetHeight || 200;
+  let left   = rect.right + 6;
+  let top    = rect.top;
+  if (left + cw > window.innerWidth - 10)  left = rect.left - cw - 6;
+  if (top  + ch > window.innerHeight - 10) top  = window.innerHeight - ch - 10;
+  card.style.left = left + 'px';
+  card.style.top  = top  + 'px';
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!card.contains(e.target) && e.target !== anchor) {
+        card.remove();
+        document.removeEventListener('mousedown', _close);
+      }
+    });
+  }, 50);
+}
+
+// ── Remove participant from note ──────────────────────────────────────────
+async function _notesRemoveParticipant(participantId, noteId) {
+  document.querySelectorAll('.notes-participant-card').forEach(c => c.remove());
   try {
-    // Add to note_participants
+    await API.del('note_participants?id=eq.' + participantId);
+    if (_participants[noteId]) {
+      _participants[noteId] = _participants[noteId].filter(p => p.id !== participantId);
+    }
+    _notesRenderPresence(noteId);
+  } catch(e) { console.error('[Compass] Remove participant error:', e); }
+}
+
+// ── Invite a user to a note ───────────────────────────────────────────────
+async function _notesInvite(noteId, resourceId, userId, color, pop) {
+  try {
     await API.post('note_participants', {
-      note_id:     noteId,
-      user_id:     userId,
-      role:        'participant',
-      color:       color,
-      invited_at:  new Date().toISOString(),
+      note_id:      noteId,
+      resource_id:  resourceId,
+      user_id:      userId || null,
+      role:         'participant',
+      color:        color,
+      invited_at:   new Date().toISOString(),
       last_seen_at: null,
     });
-    // Reload participants and re-render presence
     await _notesLoadParticipants(noteId);
     _notesRenderPresence(noteId);
     pop.remove();
@@ -1772,6 +1865,8 @@ async function _notesInvite(noteId, userId, color, pop) {
     console.error('[Compass] Invite error:', e);
   }
 }
+
+window._notesRemoveParticipant = _notesRemoveParticipant;
 
 // ── Wire presence on tile open ────────────────────────────────────────────
 // Hook into _notesWireTiles to start presence for each open tile
