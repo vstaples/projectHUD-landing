@@ -78,8 +78,34 @@
 .notes-grid-btn{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
 .notes-grid-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
 .notes-grid-btn.active{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
-#notes-grid-area{flex:1;overflow:hidden;padding:12px}
-#notes-grid{display:grid;gap:8px;height:100%}
+/* ── Row editor bar ── */
+#notes-row-editor{display:flex;align-items:stretch;gap:6px;padding:6px 12px;border-bottom:1px solid rgba(0,210,255,.08);flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;background:rgba(0,0,0,.15)}
+#notes-row-editor:empty{display:none}
+.nre-row{display:flex;align-items:center;gap:4px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);padding:3px 6px;flex-shrink:0}
+.nre-grip{cursor:grab;color:var(--text3);font-size:12px;padding:0 2px;line-height:1;user-select:none}
+.nre-grip:active{cursor:grabbing}
+.nre-label{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.06em;white-space:nowrap;padding:0 3px}
+.nre-stepper{display:flex;align-items:center;gap:2px}
+.nre-step-btn{width:16px;height:16px;background:none;border:1px solid rgba(0,210,255,.2);color:var(--text2);font-size:11px;cursor:pointer;padding:0;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .1s}
+.nre-step-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF}
+.nre-step-btn:disabled{opacity:.25;cursor:not-allowed}
+.nre-col-val{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text0);min-width:14px;text-align:center}
+.nre-height-sel{background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.15);color:var(--text2);font-family:var(--font-mono,monospace);font-size:10px;padding:1px 3px;cursor:pointer;outline:none}
+.nre-height-sel:focus{border-color:rgba(0,210,255,.4)}
+.nre-del{background:none;border:none;color:rgba(226,75,74,.3);cursor:pointer;font-size:11px;padding:0 2px;line-height:1;transition:color .1s}
+.nre-del:hover{color:#E24B4A}
+.nre-del:disabled{opacity:.15;cursor:not-allowed}
+.nre-add-row{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 8px;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);cursor:pointer;transition:all .12s;letter-spacing:.04em;flex-shrink:0;white-space:nowrap;align-self:center}
+.nre-add-row:hover{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.04)}
+.nre-add-row:disabled{opacity:.25;cursor:not-allowed}
+/* ── Grid area — row-based ── */
+#notes-grid-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
+.nre-grid-row{display:grid;gap:8px;flex-shrink:0}
+.nre-grid-row[data-height="small"] .notes-tile{min-height:120px}
+.nre-grid-row[data-height="medium"] .notes-tile{min-height:180px}
+.nre-grid-row[data-height="large"] .notes-tile{min-height:260px}
+.nre-grid-row[data-height="auto"] .notes-tile{min-height:120px}
+#notes-grid{display:contents}/* legacy compat — children render into #notes-grid-area */
 #notes-tray{border-top:1px solid rgba(0,210,255,.08);padding:8px 12px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;min-height:0}
 #notes-tray:empty{display:none}
 .notes-tray-chip{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 10px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
@@ -242,18 +268,8 @@
         >+ View</button>
       <button class="notes-grid-btn" onclick="_notesClearWorkspace()" title="Clear all tiles from this view"
         style="color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
-      <div style="width:1px;height:16px;background:rgba(255,255,255,.08);margin:0 2px"></div>
-      <button class="notes-grid-btn" data-grid="1x1" onclick="_notesSetGrid('1x1',this)">1×1</button>
-      <button class="notes-grid-btn" data-grid="1x2" onclick="_notesSetGrid('1x2',this)">1×2</button>
-      <button class="notes-grid-btn" data-grid="1x3" onclick="_notesSetGrid('1x3',this)">1×3</button>
-      <button class="notes-grid-btn" data-grid="1x4" onclick="_notesSetGrid('1x4',this)">1×4</button>
-      <button class="notes-grid-btn active" data-grid="2x2" onclick="_notesSetGrid('2x2',this)">2×2</button>
-      <button class="notes-grid-btn" data-grid="2x3" onclick="_notesSetGrid('2x3',this)">2×3</button>
-      <button class="notes-grid-btn" data-grid="2x4" onclick="_notesSetGrid('2x4',this)">2×4</button>
-      <button class="notes-grid-btn" data-grid="3x3" onclick="_notesSetGrid('3x3',this)">3×3</button>
-      <button class="notes-grid-btn" data-grid="3x4" onclick="_notesSetGrid('3x4',this)">3×4</button>
-      <button class="notes-grid-btn" data-grid="4x4" onclick="_notesSetGrid('4x4',this)">4×4</button>
     </div>
+    <div id="notes-row-editor"></div>
     <div id="notes-grid-area">
       <div id="notes-grid"></div>
     </div>
@@ -278,13 +294,13 @@ let _messages  = {};      // noteId → [messages]
 let _workspace = {        // full workspace state in Supabase
   activeView: 'Default',
   views: {
-    'Default': { gridSize: '2x2', tiles: [], tray: [] }
+    'Default': _notesDefaultView()
   }
 };
 // Convenience accessor for current view
 function _cv() {
   if (!_workspace.views[_workspace.activeView]) {
-    _workspace.views[_workspace.activeView] = { gridSize: '2x2', tiles: [], tray: [] };
+    _workspace.views[_workspace.activeView] = _notesDefaultView();
   }
   return _workspace.views[_workspace.activeView];
 }
@@ -352,6 +368,26 @@ async function _notesLoadMessages(noteId) {
   return _messages[noteId];
 }
 
+// ── Workspace migration: gridSize → rows ─────────────────────────────────
+function _notesMigrateView(view) {
+  if (!view.gridSize || view.rows) return view; // already migrated
+  const parts  = view.gridSize.split('x');
+  const cols   = parseInt(parts[1]) || 2;
+  const rowCnt = parseInt(parts[0]) || 2;
+  view.rows = Array.from({ length: rowCnt }, (_, i) => ({
+    id:      'row' + i,
+    columns: cols,
+    height:  'medium'
+  }));
+  view.tiles = (view.tiles || []).map(t => ({
+    ...t,
+    row:  'row' + Math.floor(t.slot / cols),
+    slot: t.slot % cols,
+  }));
+  delete view.gridSize;
+  return view;
+}
+
 async function _notesLoadWorkspace() {
   if (!_userId) return;
   try {
@@ -359,26 +395,41 @@ async function _notesLoadWorkspace() {
     if (rows?.[0]?.state) {
       const s = rows[0].state;
       if (s.views) {
-        // Multi-view format — restore fully
         _workspace.activeView = s.activeView || 'Default';
         _workspace.views      = s.views;
         // Ensure active view exists
         if (!_workspace.views[_workspace.activeView]) {
-          _workspace.views[_workspace.activeView] = { gridSize: '2x2', tiles: [], tray: [] };
+          _workspace.views[_workspace.activeView] = _notesDefaultView();
         }
+        // Migrate any views still using gridSize
+        let migrated = false;
+        Object.keys(_workspace.views).forEach(vn => {
+          const v = _workspace.views[vn];
+          if (v.gridSize && !v.rows) { _notesMigrateView(v); migrated = true; }
+        });
+        if (migrated) _notesSaveWorkspace(true); // persist migration immediately
       } else {
         // Legacy flat format — migrate into Default view
         _workspace.activeView = 'Default';
-        _workspace.views = {
-          'Default': {
-            gridSize: s.gridSize || '2x2',
-            tiles:    Array.isArray(s.tiles) ? s.tiles : [],
-            tray:     Array.isArray(s.tray)  ? s.tray  : [],
-          }
+        const legacy = {
+          gridSize: s.gridSize || '2x2',
+          tiles:    Array.isArray(s.tiles) ? s.tiles : [],
+          tray:     Array.isArray(s.tray)  ? s.tray  : [],
         };
+        _workspace.views = { 'Default': _notesMigrateView(legacy) };
+        _notesSaveWorkspace(true);
       }
     }
   } catch(e) { console.error('[Compass] Workspace load error:', e); }
+}
+
+function _notesDefaultView() {
+  return {
+    rows:  [{ id: 'row0', columns: 2, height: 'medium' },
+            { id: 'row1', columns: 2, height: 'medium' }],
+    tiles: [],
+    tray:  [],
+  };
 }
 
 async function _notesSaveNow() {
@@ -617,17 +668,7 @@ function _notesItemHTML(n) {
   const inGrid = !!tile;
   const age    = _notesRelTime(n.updated_at);
 
-  // Fix cols calculation for all grid sizes (RxC format)
-  const size   = _cv().gridSize || '2x2';
-  const lparts = size.split('x');
-  const cols   = parseInt(lparts[1]) || 2;
-
-  let slotLabel = '';
-  if (tile) {
-    const row = Math.floor(tile.slot / cols) + 1;
-    const col = (tile.slot % cols) + 1;
-    slotLabel = row + ',' + col;
-  }
+  // (slot badge removed — row-based layout makes individual slot labels confusing)
 
   // Delete button — shows on hover for all notes
   const delFn  = n.is_inbox ? '_notesDeleteInboxNote' : '_notesDeleteTreeNote';
@@ -715,21 +756,7 @@ function _notesWireLeft() {
       // Already in grid — do nothing
       if (_cv().tiles.some(t => t.noteId === noteId)) return;
 
-      // Find first empty slot
-      const size  = _cv().gridSize || '2x2';
-      const sp    = size.split('x');
-      const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
-      const usedSlots = new Set(_cv().tiles.map(t => t.slot));
-      let emptySlot = -1;
-      for (let i = 0; i < slots; i++) {
-        if (!usedSlots.has(i)) { emptySlot = i; break; }
-      }
-      if (emptySlot >= 0) {
-        _cv().tiles.push({ slot: emptySlot, noteId, chatOpen: false });
-        _notesSaveWorkspace(true);
-        _notesRenderGrid();
-        _notesRenderLeft();
-      }
+      _notesOpenNote(noteId);
     };
   });
 }
@@ -747,47 +774,164 @@ function _notesToggleSection(which) {
 
 // ── Grid ──────────────────────────────────────────────────────────────────
 function _notesRenderGrid() {
-  const grid = document.getElementById('notes-grid');
-  if (!grid) return;
+  const gridArea = document.getElementById('notes-grid-area');
+  if (!gridArea) return;
+  const cv   = _cv();
+  const rows = cv.rows || [];
 
-  const size  = _cv().gridSize || '2x2';
-  const parts = size.split('x');
-  const rows  = parseInt(parts[0]) || 2;
-  const cols  = parseInt(parts[1]) || 2;
-  const slots = rows * cols;
+  gridArea.innerHTML = '';
+  rows.forEach(function(row) {
+    const cols   = Math.max(1, Math.min(8, row.columns || 2));
+    const height = row.height || 'medium';
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'nre-grid-row';
+    rowDiv.dataset.rowId  = row.id;
+    rowDiv.dataset.height = height;
+    rowDiv.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
 
-  // Update grid CSS
-  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-  grid.style.gridTemplateRows    = 'repeat(' + rows + ', 1fr)';
-
-  // Update active button
-  document.querySelectorAll('.notes-grid-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.grid === size);
-  });
-
-  grid.innerHTML = '';
-  for (let i = 0; i < slots; i++) {
-    const tile = _cv().tiles.find(t => t.slot === i);
-    const note = tile ? _notes.find(n => n.id === tile.noteId) : null;
-    const div  = document.createElement('div');
-    if (note) {
-      div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
-      div.setAttribute('draggable', 'true');
-      div.innerHTML = _notesTileHTML(note, tile);
-      div.dataset.slot   = i;
-      div.dataset.noteid = note.id;
-    } else {
-      div.className = 'notes-tile empty';
-      div.dataset.slot = i;
-      div.innerHTML = '<span class="notes-slot-plus">+</span>';
-      div.onclick = () => _notesNew(i);
+    for (let s = 0; s < cols; s++) {
+      const tile = cv.tiles.find(function(t) { return t.row === row.id && t.slot === s; });
+      const note = tile ? _notes.find(function(n) { return n.id === tile.noteId; }) : null;
+      const div  = document.createElement('div');
+      if (note) {
+        div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
+        div.setAttribute('draggable', 'true');
+        div.innerHTML = _notesTileHTML(note, tile);
+        div.dataset.rowId  = row.id;
+        div.dataset.slot   = s;
+        div.dataset.noteid = note.id;
+      } else {
+        div.className = 'notes-tile empty';
+        div.dataset.rowId = row.id;
+        div.dataset.slot  = s;
+        div.innerHTML = '<span class="notes-slot-plus">+</span>';
+        (function(rid, sl) { div.onclick = function() { _notesNew(rid, sl); }; })(row.id, s);
+      }
+      rowDiv.appendChild(div);
     }
-    grid.appendChild(div);
-  }
+    gridArea.appendChild(rowDiv);
+  });
 
   _notesWireTiles();
   _notesRenderTray();
   _notesRenderViewSwitcher();
+  _notesRenderRowEditor();
+}
+
+// ── Row editor bar ────────────────────────────────────────────────────────
+function _notesRenderRowEditor() {
+  const bar = document.getElementById('notes-row-editor');
+  if (!bar) return;
+  const cv      = _cv();
+  const rows    = cv.rows || [];
+  bar.innerHTML = '';
+
+  rows.forEach(function(row, idx) {
+    const cols     = Math.max(1, Math.min(8, row.columns || 2));
+    const height   = row.height || 'medium';
+    const occupied = (cv.tiles || []).some(function(t) { return t.row === row.id; });
+    const seg      = document.createElement('div');
+    seg.className    = 'nre-row';
+    seg.dataset.rowId = row.id;
+    seg.innerHTML =
+      '<span class="nre-grip" title="Drag to reorder rows">⠿</span>' +
+      '<span class="nre-label">R' + (idx + 1) + '</span>' +
+      '<div class="nre-stepper">' +
+        '<button class="nre-step-btn" data-action="col-dec" data-rowid="' + row.id + '"' + (cols <= 1 ? ' disabled' : '') + '>−</button>' +
+        '<span class="nre-col-val">' + cols + '</span>' +
+        '<button class="nre-step-btn" data-action="col-inc" data-rowid="' + row.id + '"' + (cols >= 8 ? ' disabled' : '') + '>+</button>' +
+      '</div>' +
+      '<select class="nre-height-sel" data-action="height" data-rowid="' + row.id + '">' +
+        ['small','medium','large','auto'].map(function(h) {
+          return '<option value="' + h + '"' + (h === height ? ' selected' : '') + '>' + h[0].toUpperCase() + h.slice(1) + '</option>';
+        }).join('') +
+      '</select>' +
+      '<button class="nre-del" data-action="del-row" data-rowid="' + row.id + '"' +
+        (occupied ? ' disabled title="Move or close tiles first"' : ' title="Remove row"') + '>×</button>';
+    bar.appendChild(seg);
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className   = 'nre-add-row';
+  addBtn.textContent = '+ Add row';
+  addBtn.disabled    = rows.length >= 8;
+  addBtn.title       = rows.length >= 8 ? 'Maximum 8 rows' : 'Add a new row';
+  addBtn.onclick     = _notesAddRow;
+  bar.appendChild(addBtn);
+
+  bar.querySelectorAll('[data-action]').forEach(function(el) {
+    const action = el.dataset.action;
+    const rowId  = el.dataset.rowid;
+    if (action === 'col-dec') el.onclick  = function() { _notesRowSetCols(rowId, -1); };
+    if (action === 'col-inc') el.onclick  = function() { _notesRowSetCols(rowId,  1); };
+    if (action === 'height')  el.onchange = function() { _notesRowSetHeight(rowId, el.value); };
+    if (action === 'del-row') el.onclick  = function() { _notesRowDelete(rowId); };
+  });
+
+  _notesWireRowDrag(bar);
+}
+
+function _notesRowSetCols(rowId, delta) {
+  const cv  = _cv();
+  const row = cv.rows.find(function(r) { return r.id === rowId; });
+  if (!row) return;
+  const newCols = Math.max(1, Math.min(8, (row.columns || 2) + delta));
+  if (newCols === row.columns) return;
+  if (newCols < (row.columns || 2)) {
+    const displaced = cv.tiles.filter(function(t) { return t.row === rowId && t.slot >= newCols; });
+    displaced.forEach(function(t) { if (!cv.tray.includes(t.noteId)) cv.tray.push(t.noteId); });
+    cv.tiles = cv.tiles.filter(function(t) { return !(t.row === rowId && t.slot >= newCols); });
+  }
+  row.columns = newCols;
+  _notesSaveWorkspace(true);
+  _notesRenderGrid();
+}
+
+function _notesRowSetHeight(rowId, height) {
+  const row = _cv().rows.find(function(r) { return r.id === rowId; });
+  if (row) { row.height = height; _notesSaveWorkspace(false); _notesRenderGrid(); }
+}
+
+function _notesAddRow() {
+  const cv = _cv();
+  if ((cv.rows || []).length >= 8) return;
+  cv.rows.push({ id: 'row' + Date.now(), columns: 2, height: 'medium' });
+  _notesSaveWorkspace(true);
+  _notesRenderGrid();
+}
+
+function _notesRowDelete(rowId) {
+  const cv = _cv();
+  if ((cv.tiles || []).some(function(t) { return t.row === rowId; })) return;
+  cv.rows = cv.rows.filter(function(r) { return r.id !== rowId; });
+  if (cv.rows.length === 0) cv.rows.push({ id: 'row0', columns: 2, height: 'medium' });
+  _notesSaveWorkspace(true);
+  _notesRenderGrid();
+}
+
+function _notesWireRowDrag(bar) {
+  let dragging = null;
+  bar.querySelectorAll('.nre-grip').forEach(function(grip) {
+    grip.addEventListener('mousedown', function(e) {
+      const seg = grip.closest('.nre-row');
+      dragging = seg ? seg.dataset.rowId : null;
+      e.preventDefault();
+    });
+  });
+  document.addEventListener('mouseup', function() { dragging = null; });
+  bar.addEventListener('mouseover', function(e) {
+    if (!dragging) return;
+    const targetSeg = e.target && e.target.closest && e.target.closest('.nre-row');
+    if (!targetSeg || targetSeg.dataset.rowId === dragging) return;
+    const cv      = _cv();
+    const fromIdx = cv.rows.findIndex(function(r) { return r.id === dragging; });
+    const toIdx   = cv.rows.findIndex(function(r) { return r.id === targetSeg.dataset.rowId; });
+    if (fromIdx < 0 || toIdx < 0) return;
+    const moved = cv.rows.splice(fromIdx, 1)[0];
+    cv.rows.splice(toIdx, 0, moved);
+    _notesSaveWorkspace(false);
+    _notesRenderGrid();
+  });
 }
 
 function _notesTileHTML(note, tileState) {
@@ -850,11 +994,7 @@ function _notesRenderTray() {
 }
 
 // ── Grid actions ──────────────────────────────────────────────────────────
-function _notesSetGrid(size, btn) {
-  _cv().gridSize = size;
-  _notesSaveWorkspace(true);
-  _notesRenderGrid();
-}
+function _notesSetGrid(size, btn) { /* no-op — replaced by row editor */ }
 
 function _notesOpenNote(noteId) {
   // Already in grid — scroll to it visually
@@ -866,25 +1006,29 @@ function _notesOpenNote(noteId) {
   // Remove from tray if it was there
   _cv().tray = _cv().tray.filter(id => id !== noteId);
 
-  // Find first empty slot
-  const size  = _cv().gridSize || '2x2';
-  const sp    = size.split('x');
-  const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
-  const usedSlots = new Set(_cv().tiles.map(t => t.slot));
-  let emptySlot = -1;
-  for (let i = 0; i < slots; i++) {
-    if (!usedSlots.has(i)) { emptySlot = i; break; }
+  // Find first empty {row, slot}
+  const cv    = _cv();
+  const rows  = cv.rows || [];
+  let placed  = false;
+  for (const row of rows) {
+    const cols = Math.max(1, Math.min(8, row.columns || 2));
+    for (let s = 0; s < cols; s++) {
+      if (!cv.tiles.some(t => t.row === row.id && t.slot === s)) {
+        cv.tiles.push({ row: row.id, slot: s, noteId, chatOpen: false });
+        placed = true; break;
+      }
+    }
+    if (placed) break;
   }
-
-  if (emptySlot >= 0) {
-    // Empty slot available — use it
-    _cv().tiles.push({ slot: emptySlot, noteId, chatOpen: false });
-  } else {
-    // Grid full — replace slot 0 (oldest), push displaced note to tray
-    const displaced = _cv().tiles.find(t => t.slot === 0);
-    if (displaced) _cv().tray.push(displaced.noteId);
-    _cv().tiles = _cv().tiles.filter(t => t.slot !== 0);
-    _cv().tiles.push({ slot: 0, noteId, chatOpen: false });
+  if (!placed) {
+    // Grid full — displace first tile of first row to tray
+    const first = rows[0];
+    if (first) {
+      const displaced = cv.tiles.find(t => t.row === first.id && t.slot === 0);
+      if (displaced) cv.tray.push(displaced.noteId);
+      cv.tiles = cv.tiles.filter(t => !(t.row === first.id && t.slot === 0));
+      cv.tiles.push({ row: first.id, slot: 0, noteId, chatOpen: false });
+    }
   }
 
   _notesSaveWorkspace(true);
@@ -950,7 +1094,7 @@ function _notesToggleChat(noteId) {
   _notesSaveWorkspace();
 }
 
-async function _notesNew(slot) {
+async function _notesNew(rowId, slot) {
   if (!_userId) return;
   try {
     const res = await API.post('notes', {
@@ -958,24 +1102,26 @@ async function _notesNew(slot) {
       owner_user_id: _userId,
       title:         'New note',
       content:       '',
-      hierarchy_path:'Inbox',
-      is_inbox:      true,
+      hierarchy_path:'Work',
+      is_inbox:      false,
       created_at:    new Date().toISOString(),
       updated_at:    new Date().toISOString(),
     });
     const newNote = res?.[0];
     if (!newNote?.id) return;
     _notes.unshift(newNote);
-    if (typeof slot === 'number') {
-      _cv().tiles = _cv().tiles.filter(t => t.slot !== slot);
-      _cv().tiles.push({ slot, noteId: newNote.id, chatOpen: false });
+    if (rowId && typeof slot === 'number') {
+      // Place in specific row+slot, displacing any existing tile to tray
+      const cv = _cv();
+      const existing = cv.tiles.find(t => t.row === rowId && t.slot === slot);
+      if (existing) { cv.tray.push(existing.noteId); cv.tiles = cv.tiles.filter(t => !(t.row === rowId && t.slot === slot)); }
+      cv.tiles.push({ row: rowId, slot, noteId: newNote.id, chatOpen: false });
     } else {
       _notesOpenNote(newNote.id);
     }
     _notesSaveWorkspace();
     _notesRenderLeft();
     _notesRenderGrid();
-    // Focus the title of the new tile
     setTimeout(() => {
       const titleEl = document.querySelector('[data-noteid="' + newNote.id + '"].notes-tile-title');
       if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
@@ -1273,25 +1419,7 @@ window._notesFloatClose = _notesFloatClose;
 
 function _notesAddFloatToGrid(noteId, winEl) {
   if (winEl) winEl.remove();
-  const size  = _cv().gridSize || '2x2';
-  const sp    = size.split('x');
-  const slots = (parseInt(sp[0])||2) * (parseInt(sp[1])||2);
-  const usedSlots = new Set(_cv().tiles.map(t => t.slot));
-  let emptySlot = -1;
-  for (let i = 0; i < slots; i++) {
-    if (!usedSlots.has(i)) { emptySlot = i; break; }
-  }
-  if (emptySlot >= 0) {
-    _cv().tiles.push({ slot: emptySlot, noteId, chatOpen: false });
-  } else {
-    const displaced = _cv().tiles.find(t => t.slot === 0);
-    if (displaced) _cv().tray.push(displaced.noteId);
-    _cv().tiles = _cv().tiles.filter(t => t.slot !== 0);
-    _cv().tiles.push({ slot: 0, noteId, chatOpen: false });
-  }
-  _notesSaveWorkspace(true);
-  _notesRenderGrid();
-  _notesRenderLeft();
+  _notesOpenNote(noteId);
 }
 
 function _notesWireFloatDrag(win, handle) {
@@ -1338,11 +1466,6 @@ function _notesRenderViewSwitcher() {
       if (n?.trim() && n.trim() !== cur) _notesRenameView(n.trim());
     });
   }
-  // Sync grid size buttons
-  const activeSize = _cv().gridSize || '2x2';
-  document.querySelectorAll('.notes-grid-btn[data-grid]').forEach(b => {
-    b.classList.toggle('active', b.dataset.grid === activeSize);
-  });
 }
 
 function _notesSwitchView(viewName) {
@@ -1364,7 +1487,7 @@ function _notesNewView() {
     return;
   }
   // Create new empty view and switch to it — current view tiles are preserved
-  _workspace.views[trimmed] = { gridSize: '2x2', tiles: [], tray: [] };
+  _workspace.views[trimmed] = _notesDefaultView();
   _workspace.activeView = trimmed;
   _notesSaveWorkspace(true);
   _notesRenderGrid();
@@ -1436,8 +1559,8 @@ async function _notesFirstLaunchSeed() {
     _workspace.activeView = 'Default';
     _workspace.views = {
       'Default': {
-        gridSize: '2x2',
-        tiles:    created[0] ? [{ slot: 0, noteId: created[0].id, chatOpen: false }] : [],
+        rows:  [{ id: 'row0', columns: 2, height: 'medium' }, { id: 'row1', columns: 2, height: 'medium' }],
+        tiles: created[0] ? [{ row: 'row0', slot: 0, noteId: created[0].id, chatOpen: false }] : [],
         tray:     [],
       }
     };
@@ -1573,7 +1696,8 @@ async function _notesDropOnBranch(e, targetPath) {
 
 // ── Drag and drop ─────────────────────────────────────────────────────────
 let _dragNoteId  = null;  // noteId being dragged
-let _dragSlot    = null;  // slot index if dragging from grid (-1 if from left panel)
+let _dragSlot    = null;  // slot index if dragging from grid
+let _dragRowId   = null;  // row id if dragging from grid
 
 function _notesDndInit() {
   const shell = document.getElementById('notes-shell');
@@ -1719,8 +1843,9 @@ function _notesDndInit() {
     const chip = e.target.closest?.('.notes-tray-chip[data-noteid]');
     const item = e.target.closest?.('.notes-item[data-noteid]');
     if (tile && !e.target.closest?.('.notes-tile-title[contenteditable]')) {
-      _dragNoteId = tile.dataset.noteid;
-      _dragSlot   = parseInt(tile.dataset.slot);
+      _dragNoteId  = tile.dataset.noteid;
+      _dragRowId   = tile.dataset.rowid || null;
+      _dragSlot    = tile.dataset.slot !== undefined ? parseInt(tile.dataset.slot) : null;
       tile.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
@@ -1775,41 +1900,53 @@ function _notesDndInit() {
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     const dropTile = e.target?.closest?.('.notes-tile');
     if (!dropTile || dropTile.closest('#notes-left')) return;
-    const targetSlot   = parseInt(dropTile.dataset.slot);
+
+    const targetRowId  = dropTile.dataset.rowid || null;
+    const targetSlot   = dropTile.dataset.slot !== undefined ? parseInt(dropTile.dataset.slot) : 0;
     const targetNoteId = dropTile.dataset.noteid || null;
     const cv           = _cv();
 
     // If dragging an inbox invitation, use the shared note ID instead
     const draggedNote = _notes.find(n => n.id === _dragNoteId);
     const effectiveNoteId = (draggedNote?.is_inbox && draggedNote?.entity_id)
-      ? draggedNote.entity_id
-      : _dragNoteId;
+      ? draggedNote.entity_id : _dragNoteId;
 
     // Fetch shared note if not in local cache
     if (effectiveNoteId !== _dragNoteId && !_notes.find(n => n.id === effectiveNoteId)) {
       try {
-        const rows = await API.get('notes?id=eq.' + effectiveNoteId + '&limit=1').catch(()=>[]);
-        if (rows?.[0]) _notes.push(rows[0]);
-      } catch(e) {}
+        const fetched = await API.get('notes?id=eq.' + effectiveNoteId + '&limit=1').catch(()=>[]);
+        if (fetched?.[0]) _notes.push(fetched[0]);
+      } catch(ex) {}
     }
 
     if (dropTile.classList.contains('empty')) {
+      // Move to empty slot
       cv.tray = cv.tray.filter(id => id !== effectiveNoteId && id !== _dragNoteId);
       const existing = cv.tiles.find(t => t.noteId === effectiveNoteId);
-      if (existing) { existing.slot = targetSlot; }
-      else { cv.tiles.push({ slot: targetSlot, noteId: effectiveNoteId, chatOpen: false }); }
+      if (existing) {
+        existing.row  = targetRowId;
+        existing.slot = targetSlot;
+      } else {
+        cv.tiles.push({ row: targetRowId, slot: targetSlot, noteId: effectiveNoteId, chatOpen: false });
+      }
     } else if (targetNoteId && targetNoteId !== effectiveNoteId) {
+      // Swap or displace
       const dragTile   = cv.tiles.find(t => t.noteId === effectiveNoteId);
       const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
       if (dragTile && targetTile) {
+        // Swap {row, slot}
+        const fromRow  = dragTile.row;
         const fromSlot = dragTile.slot;
-        dragTile.slot   = targetSlot;
+        dragTile.row   = targetTile.row;
+        dragTile.slot  = targetTile.slot;
+        targetTile.row  = fromRow;
         targetTile.slot = fromSlot;
       } else {
+        // Displace target to tray, place dragged in target position
         cv.tray = cv.tray.filter(id => id !== effectiveNoteId && id !== _dragNoteId);
         cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
         if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
-        cv.tiles.push({ slot: targetSlot, noteId: effectiveNoteId, chatOpen: false });
+        cv.tiles.push({ row: targetRowId, slot: targetSlot, noteId: effectiveNoteId, chatOpen: false });
       }
     }
     _notesSaveWorkspace(true);
@@ -2110,6 +2247,10 @@ window._notesStartSyncPoll   = _notesStartSyncPoll;
 window._notesStopSyncPoll    = _notesStopSyncPoll;
 window._notesStartPingSystem = function(){};
 window._notesStopPingSystem  = function(){};
+window._notesAddRow          = _notesAddRow;
+window._notesRowSetCols      = _notesRowSetCols;
+window._notesRowSetHeight    = _notesRowSetHeight;
+window._notesRowDelete       = _notesRowDelete;
 window._notesMinimizeTile    = _notesMinimizeTile;
 window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
