@@ -31,6 +31,10 @@
 /* ── Left panel items ────────────────────────────────────────────────────── */
 .notes-item{padding:6px 14px 6px 14px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;border-left:2px solid transparent;transition:all .1s}
 .notes-item:hover{background:rgba(0,210,255,.03);border-left-color:rgba(0,210,255,.15)}
+.notes-item-del{width:14px;height:14px;background:none;border:none;color:rgba(226,75,74,0);
+  cursor:pointer;font-size:12px;padding:0;flex-shrink:0;line-height:1;transition:color .1s}
+.notes-item:hover .notes-item-del{color:rgba(226,75,74,.5)}
+.notes-item-del:hover{color:#E24B4A!important}
 .notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
 .notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
 .notes-item-body{flex:1;min-width:0}
@@ -311,7 +315,7 @@ window._notesLoadView = async function() {
   }
   if (window._notesSplitterInit) window._notesSplitterInit();
   _notesDndInit();
-  _notesStartInboxPoll();
+  if (window._notesStartInboxPoll) window._notesStartInboxPoll();
   // Wire collaboration after a tick to ensure collab script has patched _notesWireTiles
   setTimeout(() => {
     if (typeof _notesWireTilesCollab === 'function') _notesWireTilesCollab();
@@ -619,6 +623,10 @@ function _notesItemHTML(n) {
     const col = (tile.slot % cols) + 1;
     slotLabel = row + ',' + col;
   }
+  const delBtn = n.is_inbox
+    ? '<button class="notes-item-del" title="Delete" ' +
+      'onclick="event.stopPropagation();_notesDeleteInboxNote(\'' + _esc(n.id) + '\')">✕</button>'
+    : '';
   return '<div class="notes-item' + (inGrid ? ' in-grid' : '') + '" data-noteid="' + _esc(n.id) + '">' +
     '<div class="notes-item-body">' +
     '<div class="notes-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
@@ -626,6 +634,7 @@ function _notesItemHTML(n) {
     '</div>' +
     (inGrid ? '<div class="notes-slot-badge">Grid ' + slotLabel + '</div>' : '') +
     (n.entity_type && n.entity_type !== 'note' && !inGrid ? '<div class="notes-item-source">' + _esc(n.entity_type) + '</div>' : '') +
+    delBtn +
     '</div>';
 }
 
@@ -1141,7 +1150,8 @@ function _notesWireFloatDrag(win, handle) {
   document.addEventListener('mouseup', () => { dragging = false; });
 }
 
-window._notesAddFloatToGrid = _notesAddFloatToGrid;
+window._notesAddFloatToGrid    = _notesAddFloatToGrid;
+window._notesDeleteInboxNote   = _notesDeleteInboxNote;
 
 // ── View management ──────────────────────────────────────────────────────
 function _notesRenderViewSwitcher() {
@@ -1722,6 +1732,48 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && _maximizedNoteId) _notesMaximizeTile(_maximizedNoteId);
 });
 
+// ── Delete inbox note ────────────────────────────────────────────────────
+async function _notesDeleteInboxNote(noteId) {
+  try {
+    await API.del('notes?id=eq.' + noteId);
+    _notes = _notes.filter(n => n.id !== noteId);
+    // Also remove from grid/tray if open
+    _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
+    _cv().tray  = _cv().tray.filter(id => id !== noteId);
+    _notesSaveWorkspace(true);
+    _notesRenderLeft();
+    _notesRenderGrid();
+  } catch(e) { console.error('[Compass] Delete inbox note error:', e); }
+}
+
+// ── Inbox poller — check for new notes every 10s ─────────────────────────
+async function _notesInboxPoll() {
+  if (!_userId) return;
+  try {
+    const newNotes = await API.get(
+      'notes?owner_user_id=eq.' + _userId +
+      '&is_inbox=eq.true&created_at=gt.' + _inboxLastChecked +
+      '&order=created_at.desc&limit=10'
+    ).catch(() => []);
+    if (newNotes?.length) {
+      newNotes.forEach(n => {
+        if (!_notes.find(x => x.id === n.id)) _notes.unshift(n);
+      });
+      _inboxLastChecked = new Date().toISOString();
+      _notesRenderLeft();
+    }
+  } catch(e) {}
+}
+
+function _notesStartInboxPoll() {
+  if (_inboxPollInterval) return;
+  _inboxPollInterval = setInterval(_notesInboxPoll, 10000);
+}
+function _notesStopInboxPoll() {
+  clearInterval(_inboxPollInterval);
+  _inboxPollInterval = null;
+}
+
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._notesSaveNow         = _notesSaveNow;
 window._notesCv              = _cv;
@@ -1857,36 +1909,6 @@ async function _notesHeartbeat(noteId) {
   // Also refresh other participants' presence
   await _notesLoadParticipants(noteId);
   _notesRenderPresence(noteId);
-}
-
-// ── Inbox poller — check for new notes every 10s ─────────────────────────
-
-async function _notesInboxPoll() {
-  if (!window._notesResource?.user_id) return;
-  try {
-    const newNotes = await API.get(
-      'notes?owner_user_id=eq.' + window._notesResource.user_id +
-      '&is_inbox=eq.true&created_at=gt.' + _inboxLastChecked +
-      '&order=created_at.desc&limit=10'
-    ).catch(() => []);
-    if (newNotes?.length) {
-      // Add to local cache and re-render left panel
-      newNotes.forEach(n => {
-        if (!_notes.find(x => x.id === n.id)) _notes.unshift(n);
-      });
-      _inboxLastChecked = new Date().toISOString();
-      _notesRenderLeft();
-    }
-  } catch(e) {}
-}
-
-function _notesStartInboxPoll() {
-  if (_inboxPollInterval) return;
-  _inboxPollInterval = setInterval(_notesInboxPoll, 10000);
-}
-function _notesStopInboxPoll() {
-  clearInterval(_inboxPollInterval);
-  _inboxPollInterval = null;
 }
 
 // ── Start/stop presence polling for a tile ────────────────────────────────
