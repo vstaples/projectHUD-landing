@@ -94,19 +94,22 @@
 .notes-presence{display:flex;align-items:center;gap:3px;flex-shrink:0}
 .notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:pointer;position:relative}
 .notes-avatar.active::after{content:"";position:absolute;bottom:-1px;right:-1px;width:5px;height:5px;border-radius:50%;background:#1D9E75;border:1px solid #0c1628}
-.notes-participant-card{position:fixed;z-index:1000;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.8);padding:14px;min-width:240px;max-width:280px;pointer-events:all}
-.npc-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.npc-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;font-weight:700;color:#000;flex-shrink:0}
-.npc-name{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;font-weight:700;color:var(--text0,#F0F6FF)}
-.npc-title{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:1px}
-.npc-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--font-mono,monospace);font-size:10px;border-bottom:1px solid rgba(0,210,255,.06)}
-.npc-label{color:var(--text3);letter-spacing:.06em}
-.npc-value{color:var(--text1);text-align:right;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.npc-status{display:flex;gap:5px;margin:8px 0 10px}
-.npc-chip{font-family:var(--font-mono,monospace);font-size:9px;padding:2px 7px;letter-spacing:.08em;text-transform:uppercase;border:1px solid}
-.npc-remove{width:100%;margin-top:10px;background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.3);color:rgba(226,75,74,.8);font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.08em;padding:6px;cursor:pointer;transition:all .12s}
-.npc-remove:hover{background:rgba(226,75,74,.15);color:#E24B4A}
+.notes-participant-card{position:fixed;z-index:1000;width:340px;background:var(--bg1,#0c1628);border:1px solid var(--border2,rgba(0,210,255,.2));box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 0 1px rgba(0,210,255,.08);pointer-events:all;overflow-y:auto;max-height:calc(100vh - 20px)}
+.npc-top{padding:14px 16px 10px;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:flex-start;gap:12px}
+.npc-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:15px;font-weight:700;flex-shrink:0}
+.npc-name{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:15px;font-weight:700;color:var(--text0,#F0F6FF)}
+.npc-title{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:2px}
+.npc-section{padding:10px 16px;border-bottom:1px solid rgba(0,210,255,.06)}
+.npc-section:last-child{border-bottom:none}
+.npc-section-lbl{font-family:var(--font-mono,monospace);font-size:10px;color:#00D2FF;letter-spacing:.14em;margin-bottom:7px}
+.npc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.npc-row-lbl{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);letter-spacing:.08em}
+.npc-row-val{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text2,#90B8D8)}
 .npc-active-dot{width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;margin-right:4px}
+.npc-alloc-bar{height:5px;background:rgba(255,255,255,.05);margin:5px 0}
+.npc-alloc-fill{height:100%;transition:width .3s}
+.npc-remove{width:100%;background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.3);color:rgba(226,75,74,.8);font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.08em;padding:7px;cursor:pointer;transition:all .12s;margin:0}
+.npc-remove:hover{background:rgba(226,75,74,.15);color:#E24B4A}
 .notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
 .notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
 .notes-invite-pop{position:absolute;top:32px;right:10px;z-index:200;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:220px}
@@ -1784,44 +1787,36 @@ window._notesShowInvite = async function(noteId, btn) {
 };
 
 // ── Participant profile card ──────────────────────────────────────────────
-function _notesShowParticipantCard(anchor, participant, res, name, color, active, noteId) {
-  // Close any existing card
+async function _notesShowParticipantCard(anchor, participant, res, name, color, active, noteId) {
   document.querySelectorAll('.notes-participant-card').forEach(c => c.remove());
 
   const card = document.createElement('div');
   card.className = 'notes-participant-card';
 
   const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const dept     = res?.department || '—';
   const title    = res?.title || '—';
-  const email    = res?.email || '—';
-  const seenText = active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never');
 
+  // Initial skeleton
   card.innerHTML =
-    '<div class="npc-header">' +
-      '<div class="npc-avatar" style="background:' + _esc(color) + '">' + _esc(initials) + '</div>' +
+    '<div class="npc-top">' +
+      '<div class="npc-avatar" style="background:' + _esc(color) + '18;color:' + _esc(color) + ';border:1px solid ' + _esc(color) + '44">' + _esc(initials) + '</div>' +
       '<div><div class="npc-name">' + _esc(name) + '</div>' +
       '<div class="npc-title">' + _esc(title) + '</div></div>' +
     '</div>' +
-    '<div class="npc-row"><span class="npc-label">DEPT</span><span class="npc-value">' + _esc(dept) + '</span></div>' +
-    '<div class="npc-row"><span class="npc-label">EMAIL</span><span class="npc-value">' + _esc(email) + '</span></div>' +
-    '<div class="npc-row"><span class="npc-label">PRESENCE</span><span class="npc-value">' +
-      (active ? '<span class="npc-active-dot"></span>' : '') + _esc(seenText) + '</span></div>' +
-    '<div class="npc-row"><span class="npc-label">INVITED</span><span class="npc-value">' +
-      _esc(participant.invited_at ? _notesRelTime(participant.invited_at) + ' ago' : '—') + '</span></div>' +
+    '<div id="npc-body-' + _esc(participant.id) + '"><div style="padding:14px 16px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Loading…</div></div>' +
     '<button class="npc-remove" onclick="_notesRemoveParticipant(\'' + _esc(participant.id) + '\',\'' + _esc(noteId) + '\')">✕ REMOVE FROM NOTE</button>';
 
-  // Position near anchor
+  // Position
   document.body.appendChild(card);
   const rect = anchor.getBoundingClientRect();
-  const cw   = card.offsetWidth || 260;
-  const ch   = card.offsetHeight || 200;
-  let left   = rect.right + 6;
-  let top    = rect.top;
-  if (left + cw > window.innerWidth - 10)  left = rect.left - cw - 6;
+  const cw   = 340;
+  const ch   = Math.min(card.scrollHeight + 20, window.innerHeight - 20);
+  let left = rect.right + 12;
+  let top  = rect.top;
+  if (left + cw > window.innerWidth  - 10) left = rect.left - cw - 12;
   if (top  + ch > window.innerHeight - 10) top  = window.innerHeight - ch - 10;
-  card.style.left = left + 'px';
-  card.style.top  = top  + 'px';
+  card.style.left = Math.max(10, left) + 'px';
+  card.style.top  = Math.max(10, top)  + 'px';
 
   // Close on outside click
   setTimeout(() => {
@@ -1832,6 +1827,97 @@ function _notesShowParticipantCard(anchor, participant, res, name, color, active
       }
     });
   }, 50);
+
+  // Fetch rich data in parallel
+  const resourceId = res?.id || participant.resource_id;
+  if (!resourceId) return;
+
+  const [skills, profile, domains, assignments] = await Promise.all([
+    API.get('resource_skills?resource_id=eq.' + resourceId).catch(()=>[]),
+    API.get('resource_profiles?resource_id=eq.' + resourceId + '&limit=1').catch(()=>[]),
+    API.get('resource_domain_experience?resource_id=eq.' + resourceId).catch(()=>[]),
+    API.get('task_resource_assignments?resource_id=eq.' + resourceId + '&select=*,tasks(name,start_date,due_date,status)&limit=10').catch(()=>[]),
+  ]);
+
+  const prof     = profile?.[0];
+  const now      = Date.now();
+  const seenAgo  = participant.last_seen_at ? now - new Date(participant.last_seen_at).getTime() : Infinity;
+  const seenText = active ? 'Active now' : (participant.last_seen_at ? _notesRelTime(participant.last_seen_at) + ' ago' : 'Never');
+
+  const totalPct  = (assignments||[]).reduce((s,a) => s + (a.allocation_pct||0), 0);
+  const availPct  = res?.availability_pct ?? 100;
+  const utilColor = totalPct > availPct ? 'var(--red,#E24B4A)' : totalPct > availPct*0.8 ? 'var(--amber,#EF9F27)' : 'var(--green,#1D9E75)';
+
+  const profColors = { aware:'var(--text2)', practitioner:'var(--cyan,#00D2FF)', expert:'var(--amber,#EF9F27)', authority:'var(--purple,#8B5CF6)' };
+
+  let html = '';
+
+  // Contact & Info
+  html += '<div class="npc-section">';
+  html += '<div class="npc-section-lbl">CONTACT &amp; INFO</div>';
+  if (res?.email)      html += '<div class="npc-row"><span class="npc-row-lbl">EMAIL</span><span class="npc-row-val">' + _esc(res.email) + '</span></div>';
+  if (res?.phone)      html += '<div class="npc-row"><span class="npc-row-lbl">PHONE</span><span class="npc-row-val">' + _esc(res.phone) + '</span></div>';
+  if (res?.department) html += '<div class="npc-row"><span class="npc-row-lbl">DEPT</span><span class="npc-row-val">' + _esc(res.department) + '</span></div>';
+  if (res?.hire_date)  html += '<div class="npc-row"><span class="npc-row-lbl">HIRED</span><span class="npc-row-val">' + new Date(res.hire_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span></div>';
+  if (res?.availability_pct != null) html += '<div class="npc-row"><span class="npc-row-lbl">AVAILABILITY</span><span class="npc-row-val">' + res.availability_pct + '%</span></div>';
+  html += '<div class="npc-row"><span class="npc-row-lbl">PRESENCE</span><span class="npc-row-val">' + (active ? '<span class="npc-active-dot"></span>' : '') + _esc(seenText) + '</span></div>';
+  html += '</div>';
+
+  // Skills
+  if (skills?.length) {
+    const sorted = [...skills].sort((a,b) => {
+      const o = {authority:0,expert:1,practitioner:2,aware:3};
+      return (o[a.proficiency]||9)-(o[b.proficiency]||9);
+    });
+    html += '<div class="npc-section"><div class="npc-section-lbl">SKILLS &amp; PROFICIENCY</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    sorted.slice(0,8).forEach(s => {
+      const pc = profColors[s.proficiency] || 'var(--text3)';
+      html += '<span style="font-family:var(--font-mono,monospace);font-size:10px;padding:2px 7px;border:1px solid ' + pc + '44;color:' + pc + ';background:' + pc + '0d;white-space:nowrap;">' + _esc(s.skill_name || s.skill_id) + '</span>';
+    });
+    if (sorted.length > 8) html += '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:2px 4px;">+' + (sorted.length-8) + ' more</span>';
+    html += '</div></div>';
+  }
+
+  // Domain experience
+  if (domains?.length) {
+    html += '<div class="npc-section"><div class="npc-section-lbl">DOMAIN EXPERIENCE</div>';
+    domains.slice(0,3).forEach(d => {
+      html += '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);">';
+      html += '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;font-weight:700;color:var(--text0)">' + _esc(d.domain_name || '—') + '</div>';
+      if (d.subsystem) html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:#00D2FF;margin-top:1px">' + _esc(d.subsystem) + '</div>';
+      const meta = [d.years_experience ? d.years_experience+'yr exp' : null, d.regulatory_class && d.regulatory_class!=='N/A' ? d.regulatory_class : null].filter(Boolean);
+      if (meta.length) html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + _esc(meta.join(' · ')) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Allocation
+  html += '<div class="npc-section"><div class="npc-section-lbl">ALLOCATION — FIRM-WIDE</div>';
+  html += '<div class="npc-row"><span class="npc-row-lbl">CAPACITY</span><span class="npc-row-val">' + availPct + '%</span></div>';
+  html += '<div class="npc-row"><span class="npc-row-lbl">COMMITTED</span><span style="font-family:var(--font-mono,monospace);font-size:11px;color:' + utilColor + ';font-weight:700;">' + totalPct.toFixed(0) + '%' + (totalPct > availPct ? ' ⚠ OVERLOADED' : '') + '</span></div>';
+  html += '<div class="npc-alloc-bar"><div class="npc-alloc-fill" style="width:' + Math.min(totalPct/Math.max(availPct,1)*100,100) + '%;background:' + utilColor + '"></div></div>';
+  if (assignments?.length) {
+    assignments.slice(0,3).forEach(a => {
+      const t = a.tasks || {};
+      html += '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text1);padding:2px 0">' + _esc(t.name||'—') + '</div>';
+    });
+  } else {
+    html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:4px 0">No active task assignments</div>';
+  }
+  html += '</div>';
+
+  const bodyEl = document.getElementById('npc-body-' + participant.id);
+  if (bodyEl) bodyEl.innerHTML = html;
+
+  // Reposition after content loaded
+  const newH = Math.min(card.scrollHeight + 20, window.innerHeight - 20);
+  card.style.maxHeight = (window.innerHeight - 20) + 'px';
+  card.style.overflowY = 'auto';
+  if (parseFloat(card.style.top) + newH > window.innerHeight - 10) {
+    card.style.top = Math.max(10, window.innerHeight - newH - 10) + 'px';
+  }
 }
 
 // ── Remove participant from note ──────────────────────────────────────────
