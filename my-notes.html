@@ -1140,25 +1140,32 @@ function _notesDndInit() {
     return null;
   }
 
-  let _mouseIsDown = false;
+  let _mouseIsDown  = false;
+  let _mouseDownPos = null;
 
   document.addEventListener('mousedown', e => {
     const item = e.target.closest('#notes-left .notes-item[data-noteid]');
     if (!item) return;
-    _dragNoteId  = item.dataset.noteid;
-    _dragSlot    = null;
-    _mouseIsDown = true;
+    _dragNoteId   = item.dataset.noteid;
+    _dragSlot     = null;
+    _mouseIsDown  = true;
+    _mouseDownPos = { x: e.clientX, y: e.clientY };
   });
-
-  document.addEventListener('mouseup', () => { _mouseIsDown = false; });
 
   // Track insert position: {noteId, position: 'before'|'after'}
   let _dropInsert = null;
 
   document.addEventListener('mousemove', e => {
     if (!_dragNoteId || !_mouseIsDown) return;
+    // Require 5px movement before activating drag
+    if (!_leftDragActive && _mouseDownPos) {
+      const dx = Math.abs(e.clientX - _mouseDownPos.x);
+      const dy = Math.abs(e.clientY - _mouseDownPos.y);
+      if (dx < 5 && dy < 5) return;
+    }
     if (!_leftDragActive) {
       _leftDragActive = true;
+      document.getElementById('notes-left').style.userSelect = 'none';
       const srcItem = document.querySelector('#notes-left .notes-item[data-noteid="' + _dragNoteId + '"]');
       if (srcItem) srcItem.style.opacity = '0.4';
       _leftDragGhost = document.createElement('div');
