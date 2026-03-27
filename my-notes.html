@@ -1119,6 +1119,13 @@ async function _notesShowInviteDialog(inviteNote) {
       _notes = _notes.filter(n => n.id !== inviteNote.id);
       _notesRenderLeft();
     } catch(e) {}
+    // Remove Alan from note_participants so avatar disappears from Vaughn's view
+    try {
+      const userId = window._notesResource?.user_id;
+      if (userId) {
+        await API.del('note_participants?note_id=eq.' + sharedNoteId + '&user_id=eq.' + userId);
+      }
+    } catch(e) {}
     // Notify Vaughn — try participants table first, fall back to notes.owner_user_id
     try {
       let ownerUserId = null;
