@@ -1158,12 +1158,38 @@ function _notesDndInit() {
   });
 
   // ── drop ──────────────────────────────────────────────────────────────────
-  shell.addEventListener('drop', e => {
+  shell.addEventListener('drop', async e => {
     e.preventDefault();
     if (!_dragNoteId) return;
-    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    shell.querySelectorAll('.drag-over, .notes-drop-line').forEach(el => {
+      el.classList.remove('drag-over');
+      el.classList.remove('notes-drop-line');
+    });
 
-    // Only handle drops on grid tiles — ignore drops on left panel
+    // ── Left panel drop: reorder within tree ──────────────────────────────
+    const dropItem = e.target.closest('#notes-left .notes-item[data-noteid]');
+    if (dropItem && dropItem.dataset.noteid !== _dragNoteId) {
+      // Move dragged note to same hierarchy_path as drop target
+      const targetNote = _notes.find(n => n.id === dropItem.dataset.noteid);
+      const dragNote   = _notes.find(n => n.id === _dragNoteId);
+      if (targetNote && dragNote) {
+        const newPath   = targetNote.hierarchy_path || 'Inbox';
+        const isInbox   = newPath === 'Inbox' || !newPath;
+        try {
+          await API.patch('notes?id=eq.' + _dragNoteId, {
+            hierarchy_path: newPath,
+            is_inbox:       isInbox,
+            updated_at:     new Date().toISOString(),
+          });
+          dragNote.hierarchy_path = newPath;
+          dragNote.is_inbox       = isInbox;
+          _notesRenderLeft();
+        } catch(err) { console.error('Tree drop error:', err); }
+      }
+      return;
+    }
+
+    // ── Grid drop: tile placement ─────────────────────────────────────────
     const dropTile = e.target.closest('.notes-tile');
     if (!dropTile || dropTile.closest('#notes-left')) return;
 
@@ -1172,7 +1198,6 @@ function _notesDndInit() {
     const cv           = _cv();
 
     if (dropTile.classList.contains('empty')) {
-      // Drop onto empty slot
       cv.tray = cv.tray.filter(id => id !== _dragNoteId);
       const existing = cv.tiles.find(t => t.noteId === _dragNoteId);
       if (existing) {
@@ -1181,17 +1206,13 @@ function _notesDndInit() {
         cv.tiles.push({ slot: targetSlot, noteId: _dragNoteId, chatOpen: false });
       }
     } else if (targetNoteId && targetNoteId !== _dragNoteId) {
-      // Drop onto occupied slot
       const dragTile   = cv.tiles.find(t => t.noteId === _dragNoteId);
       const targetTile = cv.tiles.find(t => t.noteId === targetNoteId);
-
       if (dragTile && targetTile) {
-        // Grid → Grid: swap slots
         const fromSlot  = dragTile.slot;
         dragTile.slot   = targetSlot;
         targetTile.slot = fromSlot;
       } else {
-        // Left panel / tray → occupied slot: displace occupant to tray
         cv.tray = cv.tray.filter(id => id !== _dragNoteId);
         cv.tiles = cv.tiles.filter(t => t.noteId !== targetNoteId);
         if (!cv.tray.includes(targetNoteId)) cv.tray.push(targetNoteId);
