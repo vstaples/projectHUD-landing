@@ -1969,7 +1969,6 @@ async function _notesSyncContent(noteId) {
   const parts = _participants[noteId] || [];
   const selfUserId = window._notesResource?.user_id;
   const hasOthers = parts.some(p => p.user_id !== selfUserId && p.accepted_at);
-  console.log('[Sync]', noteId.slice(0,8), 'parts:', parts.length, 'hasOthers:', hasOthers, parts.map(p=>({u:p.user_id?.slice(0,8),acc:!!p.accepted_at})));
   if (!hasOthers && parts.length <= 1) return;
 
   try {
@@ -1978,16 +1977,20 @@ async function _notesSyncContent(noteId) {
     if (!remote) return;
     const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
     if (!ta) return;
+    // Skip if user is actively typing
+    if (document.activeElement === ta) return;
     const local = _notes.find(n => n.id === noteId);
-    if (!local) return;
-    const remoteTime = new Date(remote.updated_at).getTime();
-    const localTime  = new Date(local.updated_at || 0).getTime();
-    if (remoteTime > localTime && document.activeElement !== ta) {
+    // Update if remote content differs from what's currently displayed
+    const remoteContent = remote.content || '';
+    const displayedContent = ta.value;
+    if (remoteContent !== displayedContent) {
       const selStart = ta.selectionStart;
       const selEnd   = ta.selectionEnd;
-      ta.value        = remote.content || '';
-      local.content    = remote.content;
-      local.updated_at = remote.updated_at;
+      ta.value = remoteContent;
+      if (local) {
+        local.content    = remoteContent;
+        local.updated_at = remote.updated_at;
+      }
       try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
     }
   } catch(e) {}
