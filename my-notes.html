@@ -662,15 +662,24 @@ function _notesWireLeft() {
       const noteId = el.dataset.noteid;
       const note   = _notes.find(n => n.id === noteId);
 
-      // Invitation note — show accept/reject dialog or reopen float
+      // Invitation or removal notification — check which type
       if (note?.entity_id && note?.is_inbox) {
+        // Check if it's a removal notification (title contains 'removed themselves')
+        if (note.title?.includes('removed themselves from:')) {
+          // Just delete the notification — avatar already gone via participant removal
+          API.del('notes?id=eq.' + note.id).then(() => {
+            _notes = _notes.filter(n => n.id !== note.id);
+            _notesRenderLeft();
+            if (window._notesRenderPresence) window._notesRenderPresence(note.entity_id);
+          }).catch(()=>{});
+          return;
+        }
         // Check if already accepted
         const userId = _userId;
         if (userId) {
           API.get('note_participants?note_id=eq.' + note.entity_id + '&user_id=eq.' + userId + '&select=accepted_at&limit=1')
             .then(rows => {
               if (rows?.[0]?.accepted_at) {
-                // Already accepted — just reopen the float window
                 _notesOpenFloatingNote(note.entity_id, note.title?.replace(/^.+invited you to: /, '') || 'Shared Note');
               } else {
                 _notesShowInviteDialog(note);
@@ -862,12 +871,46 @@ function _notesOpenNote(noteId) {
   _notesRenderLeft();
 }
 
-function _notesCloseTile(noteId) {
+async function _notesCloseTile(noteId) {
   _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
   _cv().tray  = _cv().tray.filter(id => id !== noteId);
   _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
+
+  // If this is a shared note (we're a participant, not owner), notify the owner
+  try {
+    const parts = await API.get(
+      'note_participants?note_id=eq.' + noteId + '&select=user_id,role,resource_id&limit=20'
+    ).catch(()=>[]);
+    if (!parts?.length) return;
+    const selfUserId = _userId;
+    const selfPart   = parts.find(p => p.user_id === selfUserId);
+    if (!selfPart || selfPart.role === 'owner') return; // we own it, no notification needed
+
+    const ownerPart  = parts.find(p => p.role === 'owner');
+    if (!ownerPart?.user_id) return;
+
+    const note       = _notes.find(n => n.id === noteId);
+    const noteName   = note?.title || 'a note';
+    const myName     = window._notesResource?.name || 'Someone';
+
+    await API.post('notes', {
+      firm_id:        FIRM_ID,
+      owner_user_id:  ownerPart.user_id,
+      title:          myName + ' removed themselves from: ' + noteName,
+      content:        myName + ' has removed the shared note "' + noteName + '" from their workspace.',
+      hierarchy_path: 'Inbox',
+      is_inbox:       true,
+      entity_id:      noteId,
+      entity_type:    null,
+      created_at:     new Date().toISOString(),
+      updated_at:     new Date().toISOString(),
+    });
+
+    // Also remove self from note_participants
+    await API.del('note_participants?note_id=eq.' + noteId + '&user_id=eq.' + selfUserId);
+  } catch(e) { console.warn('[Compass] Close notification error:', e); }
 }
 
 function _notesToggleChat(noteId) {
@@ -1656,6 +1699,13 @@ function _notesDndInit() {
       item.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
+      // Use a small custom drag image to prevent the full element ghost
+      const ghost = document.createElement('div');
+      ghost.textContent = item.querySelector('.notes-item-title')?.textContent || 'Note';
+      ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;background:#0d1e35;border:1px solid rgba(0,210,255,.35);color:#00D2FF;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;font-weight:600;padding:4px 12px;pointer-events:none;white-space:nowrap;';
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 0, 0);
+      setTimeout(() => ghost.remove(), 0);
     } else if (!e.target.closest?.('#notes-left')) {
       e.preventDefault();
     }
