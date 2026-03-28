@@ -622,9 +622,12 @@ async function _notesLoadWorkspace() {
   try {
     const rows = await API.get('notes_workspace?user_id=eq.' + _userId + '&limit=1').catch(()=>[]);
     if (rows?.[0]?.state) {
-      // MY VIEWS isolation: read from state.viewsWorkspace sub-key only
       const fullState = rows[0].state;
-      const s = fullState.viewsWorkspace || {};
+      // MY VIEWS: read from state.viewsWorkspace if it exists (own saved state),
+      // otherwise fall back to state.views (MY NOTES dashboards) so they're visible on first visit.
+      const s = (fullState.viewsWorkspace && fullState.viewsWorkspace.views)
+        ? fullState.viewsWorkspace
+        : fullState;
       if (s.views) {
         _workspace.activeView = s.activeView || 'Default';
         _workspace.views      = s.views;
@@ -639,7 +642,6 @@ async function _notesLoadWorkspace() {
         });
         if (migrated) _viewsSaveWorkspace(true);
       }
-      // No legacy migration for MY VIEWS — starts fresh if sub-key absent
     }
   } catch(e) { console.error('[Compass] Views workspace load error:', e); }
   _notesCleanTiles();
