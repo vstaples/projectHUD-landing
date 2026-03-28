@@ -6104,9 +6104,9 @@ window.WIDGET_REGISTRY.register({
       return;
     }
 
-    // Column widths — mirror my-work layout
-    // grid: [type 32px] [title 1fr] [progress 80px] [due 36px] [status 62px]
-    const COLS = '32px 1fr 80px 36px 62px';
+    // Column widths — type badge · title · progress bar · due · status pill
+    // minmax on title prevents it from squeezing the fixed right columns
+    const COLS = '28px minmax(0,1fr) 100px 44px 76px';
     const mono = 'font-family:var(--font-mono,monospace)';
 
     function fmtDue(due, overdue) {
@@ -6125,7 +6125,7 @@ window.WIDGET_REGISTRY.register({
     function fmtProgress(t) {
       if (t.pct <= 0) return '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.25)">—</span>';
       const fc = t.pct>=80?'#1D9E75':t.pct>=40?'#00D2FF':'rgba(255,255,255,.35)';
-      return '<div style="display:flex;flex-direction:column;gap:2px;padding-right:6px">'+
+      return '<div style="display:flex;flex-direction:column;gap:2px;padding-right:8px;min-width:0">'+
         '<div style="'+mono+';font-size:10px;color:'+fc+'">'+t.pct+'%</div>'+
         '<div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">'+
           '<div style="height:100%;width:'+Math.min(t.pct,100)+'%;background:'+fc+';border-radius:2px"></div>'+
@@ -6135,10 +6135,10 @@ window.WIDGET_REGISTRY.register({
 
     function fmtStatus(t) {
       if (t.status==='blocked')
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 5px;text-align:center;white-space:nowrap">BLOCKED</div>';
+        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLOCKED</div>';
       if (t.status==='in_progress')
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:2px 5px;text-align:center;white-space:nowrap">In Progress</div>';
-      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 5px;text-align:center;white-space:nowrap">Start</div>';
+        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:2px 6px;text-align:center;white-space:nowrap">In Progress</div>';
+      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 6px;text-align:center;white-space:nowrap">Start</div>';
     }
 
     // Column header row
@@ -6284,8 +6284,8 @@ window.WIDGET_REGISTRY.register({
       return;
     }
 
-    // Action items have no progress column — grid: [type 32px] [title 1fr] [due 42px] [status 62px]
-    const COLS = '32px 1fr 42px 62px';
+    // Action items have no progress column — type badge · title · due · from
+    const COLS = '28px minmax(0,1fr) 48px 72px';
     const mono = 'font-family:var(--font-mono,monospace)';
 
     function fmtDue(due, overdue) {
