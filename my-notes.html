@@ -511,19 +511,16 @@ async function _notesLoadWorkspace() {
         _workspace.activeView = s.activeView || 'Default';
         _workspace.views      = s.views;
         _workspace.library    = s.library || {};
-        // Ensure active view exists
         if (!_workspace.views[_workspace.activeView]) {
           _workspace.views[_workspace.activeView] = _notesDefaultView();
         }
-        // Migrate any views still using gridSize
         let migrated = false;
         Object.keys(_workspace.views).forEach(vn => {
           const v = _workspace.views[vn];
           if (v.gridSize && !v.rows) { _notesMigrateView(v); migrated = true; }
         });
-        if (migrated) _notesSaveWorkspace(true); // persist migration immediately
+        if (migrated) _notesSaveWorkspace(true);
       } else {
-        // Legacy flat format — migrate into Default view
         _workspace.activeView = 'Default';
         const legacy = {
           gridSize: s.gridSize || '2x2',
@@ -533,10 +530,63 @@ async function _notesLoadWorkspace() {
         _workspace.views = { 'Default': _notesMigrateView(legacy) };
         _notesSaveWorkspace(true);
       }
+      // STEP 5: restore sharedViews reference
+      if (s.sharedViews) _workspace.sharedViews = s.sharedViews;
     }
   } catch(e) { console.error('[Compass] Workspace load error:', e); }
-  // Clean up any tiles with null/missing row references
   _notesCleanTiles();
+  // STEP 5: rebuild shared view entries from accepted view_participants rows
+  await _notesRestoreSharedViews();
+}
+
+async function _notesRestoreSharedViews() {
+  if (!_userId) return;
+  try {
+    const parts = await API.get(
+      'view_participants?user_id=eq.' + _userId +
+      '&accepted_at=not.is.null' +
+      '&select=workspace_owner_user_id,view_name,view_role,tile_edit_overrides' +
+      '&limit=50'
+    ).catch(function() { return []; });
+    if (!parts || !parts.length) return;
+
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.workspace_owner_user_id === _userId) continue; // skip own views
+      var ownerUserId = p.workspace_owner_user_id;
+      var viewName    = p.view_name;
+      var sharedKey   = '__shared__' + ownerUserId + '__' + viewName;
+      if (_workspace.views[sharedKey]) continue; // already restored
+      try {
+        var wsRows = await API.get(
+          'notes_workspace?user_id=eq.' + ownerUserId + '&limit=1'
+        ).catch(function() { return []; });
+        var ownerState = wsRows && wsRows[0] && wsRows[0].state;
+        if (!ownerState) continue;
+        var ownerView = (ownerState.views || {})[viewName];
+        if (!ownerView) continue;
+        // Fetch referenced notes into local _notes array
+        var tileNoteIds = (ownerView.tiles || []).map(function(t) { return t.noteId; }).filter(Boolean);
+        if (tileNoteIds.length) {
+          var sharedNotes = await API.get(
+            'notes?id=in.(' + tileNoteIds.join(',') + ')&limit=50'
+          ).catch(function() { return []; });
+          (sharedNotes || []).forEach(function(n) {
+            if (!_notes.find(function(x) { return x.id === n.id; })) _notes.push(n);
+          });
+        }
+        _workspace.views[sharedKey] = Object.assign({}, ownerView, {
+          _isSharedView:   true,
+          _sharedOwner:    ownerUserId,
+          _sharedViewName: viewName,
+        });
+      } catch(e) {
+        console.warn('[Compass] Could not restore shared view:', viewName, e);
+      }
+    }
+  } catch(e) {
+    console.warn('[Compass] _notesRestoreSharedViews error:', e);
+  }
 }
 
 function _notesCleanTiles() {
