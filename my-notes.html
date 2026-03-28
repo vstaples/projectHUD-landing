@@ -829,6 +829,33 @@ function _notesWireLeft() {
       const noteId = el.dataset.noteid;
       const note   = _notes.find(n => n.id === noteId);
 
+      // ── STEP 5: view_invite / view_removed notifications ─────────────
+      if (note?.is_inbox && note?.entity_type === 'view_invite') {
+        if (window._notesShowViewInviteDialog) window._notesShowViewInviteDialog(note);
+        return;
+      }
+      if (note?.is_inbox && note?.entity_type === 'view_removed') {
+        const overlay = document.createElement('div');
+        overlay.className = 'notes-invite-dialog-overlay';
+        overlay.innerHTML =
+          '<div class="notes-invite-dialog">' +
+            '<div class="nid-header"><div class="nid-from">View Access</div>' +
+            '<div class="nid-title">' + _esc(note.title || '') + '</div></div>' +
+            '<div class="nid-body">' + _esc(note.content || '') + '</div>' +
+            '<div class="nid-actions"><button class="nid-btn nid-btn-accept" id="nid-vr-ack">OK</button></div>' +
+          '</div>';
+        document.body.appendChild(overlay);
+        const dismiss = () => {
+          overlay.remove();
+          API.del('notes?id=eq.' + note.id).catch(()=>{});
+          _notes = _notes.filter(n => n.id !== note.id);
+          _notesRenderLeft();
+        };
+        overlay.querySelector('#nid-vr-ack').onclick = dismiss;
+        overlay.addEventListener('mousedown', e => { if (e.target === overlay) dismiss(); });
+        return;
+      }
+
       // Invitation or removal notification — check which type
       if (note?.entity_id && note?.is_inbox) {
         // Check if it's a removal or declined notification
@@ -4388,24 +4415,6 @@ async function _notesShowViewInviteDialog(inviteNote) {
   };
 }
 window._notesShowViewInviteDialog = _notesShowViewInviteDialog;
-
-// ── Patch inbox wire to route view_invite notes to correct dialog ─────────
-const _origWireLeft = window._notesWireLeft;
-window._notesWireLeft = function() {
-  if (typeof _origWireLeft === 'function') _origWireLeft();
-  document.querySelectorAll('#notes-inbox-list .notes-item[data-noteid]').forEach(function(el) {
-    const noteId = el.dataset.noteid;
-    const notesArr = typeof _notes !== 'undefined' ? _notes : [];
-    const note = notesArr.find(function(n) { return n.id === noteId; });
-    if (!note || note.entity_type !== 'view_invite') return;
-    const fresh = el.cloneNode(true);
-    el.parentNode.replaceChild(fresh, el);
-    fresh.addEventListener('click', function(e) {
-      if (e.target.closest && e.target.closest('.notes-item-del')) return;
-      _notesShowViewInviteDialog(note);
-    });
-  });
-};
 
 })();
 </script>
