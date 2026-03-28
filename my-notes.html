@@ -1873,6 +1873,7 @@ function _notesDndInit() {
 
   document.addEventListener('mouseup', async e => {
     _mouseIsDown = false;
+    if (_html5DragActive) return; // HTML5 drag handles its own cleanup
     if (!_dragNoteId || !_leftDragActive) {
       _dragNoteId = null;
       return;
@@ -1940,6 +1941,7 @@ function _notesDndInit() {
       tile.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
+      e.dataTransfer.setData('application/noteid', _dragNoteId);
     } else if (chip) {
       _dragNoteId = chip.dataset.noteid;
       _dragSlot   = null;
@@ -1952,8 +1954,9 @@ function _notesDndInit() {
       _leftDragActive  = false; // ensure left drag doesn't block grid drop
       item.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
+      // Store in dataTransfer so drop handler can read it even if _dragNoteId is cleared
       e.dataTransfer.setData('text/plain', _dragNoteId);
-      // Use a small custom drag image to prevent the full element ghost
+      e.dataTransfer.setData('application/noteid', _dragNoteId);
       const ghost = document.createElement('div');
       ghost.textContent = item.querySelector('.notes-item-title')?.textContent || 'Note';
       ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;background:#0d1e35;border:1px solid rgba(0,210,255,.35);color:#00D2FF;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;font-weight:600;padding:4px 12px;pointer-events:none;white-space:nowrap;';
@@ -1994,6 +1997,9 @@ function _notesDndInit() {
 
   document.addEventListener('drop', async e => {
     e.preventDefault();
+    // Recover noteId from dataTransfer in case _dragNoteId was cleared by mouseup
+    const transferredId = e.dataTransfer.getData('application/noteid') || e.dataTransfer.getData('text/plain');
+    if (!_dragNoteId && transferredId) _dragNoteId = transferredId;
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     // Must be dropping into the grid area (not left panel)
