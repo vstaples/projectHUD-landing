@@ -6318,14 +6318,18 @@ function refreshTileWidget(noteId) {
 window._viewsShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
 window._viewsPostWire = function() {
   const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
+  console.log('[ViewsPostWire] cv:', !!cv, '| tiles:', cv ? cv.tiles.length : 0);
   if (!cv) return;
   const isLocked = !!cv.locked;
+  const allTiles = document.querySelectorAll('.notes-tile[data-noteid]');
+  console.log('[ViewsPostWire] DOM .notes-tile[data-noteid] count:', allTiles.length);
   cv.tiles.forEach(function(tileState) {
     const tileEl = document.querySelector('.notes-tile[data-noteid="' + tileState.noteId + '"]');
+    console.log('[ViewsPostWire] tile:', tileState.widgetId || tileState.noteId, '| mode:', tileState.canvasMode, '| tileEl:', !!tileEl);
     if (!tileEl) return;
-    // Don't inject mode switcher on locked views — prevents widget/note switching
     if (!isLocked) injectModeSwitcher(tileEl, tileState);
     if (tileState.canvasMode === 'widget' && tileState.widgetId) {
+      console.log('[ViewsPostWire] calling renderTileCanvas for', tileState.widgetId);
       renderTileCanvas(tileEl, tileState, null);
     }
   });
@@ -7597,16 +7601,12 @@ window.WIDGET_REGISTRY.register({
 // (Moved here from mid-block so task_list and action_item_list are included)
 
 setTimeout(function() {
-  if (typeof window._viewsPostWire === 'function') {
-    
-    window._viewsPostWire();
-  }
+  console.log('[Views] 50ms refire — _viewsPostWire exists:', typeof window._viewsPostWire === 'function');
+  if (typeof window._viewsPostWire === 'function') window._viewsPostWire();
 }, 50);
 setTimeout(function() {
-  if (typeof window._viewsPostWire === 'function') {
-    
-    window._viewsPostWire();
-  }
+  console.log('[Views] 200ms refire — _viewsPostWire exists:', typeof window._viewsPostWire === 'function');
+  if (typeof window._viewsPostWire === 'function') window._viewsPostWire();
 }, 200);
 
 })();
