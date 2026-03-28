@@ -5655,7 +5655,7 @@ window.WIDGET_REGISTRY.register({
     // Measure available height — boost by 1.4x to compensate for late render
     const availH = Math.max(70, (container.offsetHeight || 120) - 34);
     const svgH   = availH;
-    const scale  = (svgH / 80) * 1.4;
+    const scale  = (svgH / 80) * 1.05;
     const sW     = Math.round(120 * scale);
     const sr     = Math.round(44 * scale);
     const scx    = Math.round(60 * scale);
