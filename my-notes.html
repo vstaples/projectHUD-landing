@@ -196,6 +196,40 @@
 
 /* ── Empty grid slot ─────────────────────────────────────────────────────── */
 .notes-slot-plus{font-size:18px;color:rgba(0,210,255,.2)}
+/* ── Library section ────────────────────────────────────────────────────── */
+#notes-library-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
+.notes-lib-entry{padding:5px 14px 5px 28px;display:flex;align-items:center;gap:6px;cursor:default}
+.notes-lib-entry:hover{background:rgba(0,210,255,.03)}
+.notes-lib-name{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notes-lib-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;border:0.5px solid rgba(0,210,255,.2);color:var(--text3);background:rgba(0,210,255,.06);flex-shrink:0}
+.notes-lib-launch{font-family:var(--font-mono,monospace);font-size:9px;padding:2px 7px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF;cursor:pointer;opacity:0;transition:opacity .1s;flex-shrink:0}
+.notes-lib-entry:hover .notes-lib-launch{opacity:1}
+.notes-lib-launch:hover{background:rgba(0,210,255,.18)}
+.notes-lib-del{width:14px;height:14px;background:none;border:none;color:rgba(226,75,74,0);cursor:pointer;font-size:11px;padding:0;flex-shrink:0;transition:color .1s}
+.notes-lib-entry:hover .notes-lib-del{color:rgba(226,75,74,.5)}
+.notes-lib-del:hover{color:#E24B4A!important}
+/* ── Template save dialog ────────────────────────────────────────────────── */
+.ntd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.ntd-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:460px;max-width:95vw}
+.ntd-header{padding:18px 24px 14px;border-bottom:1px solid rgba(0,210,255,.1)}
+.ntd-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:17px;font-weight:700;color:var(--text0);margin-bottom:2px}
+.ntd-sub{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.ntd-body{padding:16px 24px;display:flex;flex-direction:column;gap:12px}
+.ntd-field{display:flex;flex-direction:column;gap:4px}
+.ntd-label{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.ntd-input{background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:6px 10px;outline:none;width:100%;box-sizing:border-box}
+.ntd-input:focus{border-color:rgba(0,210,255,.4)}
+.ntd-select{background:#0a1628;border:1px solid rgba(0,210,255,.15);color:var(--text2);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 8px;outline:none;width:100%;cursor:pointer}
+.ntd-select:focus{border-color:rgba(0,210,255,.4)}
+.ntd-textarea{background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text1);font-family:var(--font-mono,monospace);font-size:11px;padding:6px 10px;outline:none;width:100%;box-sizing:border-box;resize:vertical;min-height:54px}
+.ntd-textarea:focus{border-color:rgba(0,210,255,.4)}
+.ntd-hint{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-top:2px}
+.ntd-actions{padding:12px 24px;border-top:1px solid rgba(0,210,255,.1);display:flex;gap:10px;justify-content:flex-end}
+.ntd-btn{font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.08em;padding:8px 18px;cursor:pointer;transition:all .15s;background:none}
+.ntd-btn-cancel{border:1px solid rgba(255,255,255,.12);color:var(--text2)}
+.ntd-btn-cancel:hover{border-color:rgba(255,255,255,.3);color:var(--text0)}
+.ntd-btn-save{border:1px solid rgba(0,210,255,.4);color:#00D2FF;background:rgba(0,210,255,.08)}
+.ntd-btn-save:hover{background:rgba(0,210,255,.18)}
 /* ── Drag and drop ───────────────────────────────────────────────────────── */
 .notes-item[draggable]{cursor:grab}
 .notes-item[draggable]:active{cursor:grabbing}
@@ -224,6 +258,15 @@
           tabindex="-1">×</button>
       </div>
       <button id="notes-new-btn" onclick="_notesNew()">+ New note</button>
+    </div>
+
+    <!-- Library -->
+    <div id="notes-library-section">
+      <div class="notes-section-hdr" onclick="_notesToggleSection('library')">
+        <svg class="notes-chevron open" id="notes-chev-library" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Library
+      </div>
+      <div id="notes-library-list"></div>
     </div>
 
     <!-- Inbox -->
@@ -258,14 +301,21 @@
       <div id="notes-view-name-wrap" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
         <!-- View switcher dropdown -->
         <select id="notes-view-switcher"
-          style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
+          style="background:#0a1628;border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
             font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
-            max-width:180px;font-weight:600"
+            max-width:180px;font-weight:600;-webkit-appearance:auto"
           onchange="_notesSwitchView(this.value)">
         </select>
+        <button onclick="_notesShowRenameViewDialog(_workspace.activeView)"
+          title="Rename current view"
+          style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
+          onmouseover="this.style.color='#00D2FF'" onmouseout="this.style.color=''"
+          >✎</button>
       </div>
       <button class="notes-grid-btn" onclick="_notesNewView()" title="New view"
         >+ View</button>
+      <button class="notes-grid-btn" onclick="_notesSaveAsTemplate()" title="Save current view as a reusable template"
+        style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⊞ Template</button>
       <button class="notes-grid-btn" onclick="_notesClearWorkspace()" title="Clear all tiles from this view"
         style="color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
     </div>
@@ -295,7 +345,8 @@ let _workspace = {        // full workspace state in Supabase
   activeView: 'Default',
   views: {
     'Default': _notesDefaultView()
-  }
+  },
+  library: {}               // template blueprints keyed by template name
 };
 // Convenience accessor for current view
 function _cv() {
@@ -397,6 +448,7 @@ async function _notesLoadWorkspace() {
       if (s.views) {
         _workspace.activeView = s.activeView || 'Default';
         _workspace.views      = s.views;
+        _workspace.library    = s.library || {};
         // Ensure active view exists
         if (!_workspace.views[_workspace.activeView]) {
           _workspace.views[_workspace.activeView] = _notesDefaultView();
@@ -471,6 +523,7 @@ async function _notesSaveWorkspace(immediate) {
 
 // ── Left panel ────────────────────────────────────────────────────────────
 function _notesRenderLeft() {
+  _notesRenderLibrary();
   _notesRenderInbox();
   _notesRenderTree();
   _notesWireLeft(); // wire after both inbox and tree are in DOM
@@ -774,7 +827,7 @@ function _notesWireLeft() {
 }
 
 function _notesToggleSection(which) {
-  const listId = which === 'inbox' ? 'notes-inbox-list' : 'notes-tree-scroll';
+  const listId = which === 'inbox' ? 'notes-inbox-list' : which === 'library' ? 'notes-library-list' : 'notes-tree-scroll';
   const chevId = 'notes-chev-' + which;
   const el     = document.getElementById(listId);
   const chev   = document.getElementById(chevId);
@@ -1530,6 +1583,128 @@ function _notesWireFloatDrag(win, handle) {
 window._notesAddFloatToGrid    = _notesAddFloatToGrid;
 window._notesDeleteInboxNote   = _notesDeleteInboxNote;
 
+// ── Library / Template functions ─────────────────────────────────────────
+
+function _notesRenderLibrary() {
+  const list = document.getElementById('notes-library-list');
+  if (!list) return;
+  const lib  = _workspace.library || {};
+  const keys = Object.keys(lib);
+  if (!keys.length) {
+    list.innerHTML = '<div style="padding:5px 14px 8px 28px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">No templates saved</div>';
+    return;
+  }
+  list.innerHTML = keys.map(function(name) {
+    const t   = lib[name];
+    const cat = t.category || 'Custom';
+    return '<div class="notes-lib-entry" data-tplname="' + _esc(name) + '">' +
+      '<span class="notes-lib-name" title="' + _esc(name) + '">' + _esc(name) + '</span>' +
+      '<span class="notes-lib-badge">' + _esc(cat) + '</span>' +
+      '<button class="notes-lib-launch" data-action="launch">Launch</button>' +
+      '<button class="notes-lib-del" data-action="del" title="Delete template">\u00d7</button>' +
+    '</div>';
+  }).join('');
+  // Wire buttons via event delegation
+  list.querySelectorAll('[data-action]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const name = btn.closest('[data-tplname]').dataset.tplname;
+      if (btn.dataset.action === 'launch') _notesLaunchTemplate(name);
+      if (btn.dataset.action === 'del')    _notesDeleteTemplate(name);
+    });
+  });
+}
+
+function _notesSaveAsTemplate() {
+  const viewName = _workspace.activeView;
+  const cv       = _cv();
+  const overlay  = document.createElement('div');
+  overlay.className = 'ntd-overlay';
+  overlay.innerHTML =
+    '<div class="ntd-dialog">' +
+      '<div class="ntd-header">' +
+        '<div class="ntd-sub">Save as Template</div>' +
+        '<div class="ntd-title">' + _esc(viewName) + '</div>' +
+      '</div>' +
+      '<div class="ntd-body">' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Template name</label>' +
+          '<input class="ntd-input" id="ntd-name" value="' + _esc(viewName) + '" placeholder="Template name"/>' +
+        '</div>' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Category</label>' +
+          '<select class="ntd-select" id="ntd-category">' +
+            ['Project','Onboarding','QMS','Custom'].map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Parameters <span style="text-transform:none;letter-spacing:0">(comma-separated variable names)</span></label>' +
+          '<input class="ntd-input" id="ntd-params" placeholder="e.g. projectName, clientName"/>' +
+          '<div class="ntd-hint">These become fill-in fields when launching an instance</div>' +
+        '</div>' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Description</label>' +
+          '<textarea class="ntd-textarea" id="ntd-desc" placeholder="Optional description\u2026"></textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ntd-actions">' +
+        '<button class="ntd-btn ntd-btn-cancel" id="ntd-cancel">Cancel</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="ntd-save">Save Template</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  const nameEl = overlay.querySelector('#ntd-name');
+  nameEl.focus(); nameEl.select();
+  overlay.querySelector('#ntd-cancel').onclick = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#ntd-save').onclick = function() {
+    const tplName  = overlay.querySelector('#ntd-name').value.trim();
+    if (!tplName) { overlay.querySelector('#ntd-name').focus(); return; }
+    const params   = overlay.querySelector('#ntd-params').value.split(',').map(function(p) { return p.trim(); }).filter(Boolean);
+    const category = overlay.querySelector('#ntd-category').value;
+    const desc     = overlay.querySelector('#ntd-desc').value.trim();
+    const tplView  = JSON.parse(JSON.stringify({ rows: cv.rows || [], tiles: cv.tiles || [] }));
+    if (!_workspace.library) _workspace.library = {};
+    _workspace.library[tplName] = {
+      isTemplate: true, category: category, description: desc,
+      parameters: params, createdAt: new Date().toISOString(),
+      rows: tplView.rows, tiles: tplView.tiles,
+    };
+    _notesSaveWorkspace(true);
+    _notesRenderLibrary();
+    overlay.remove();
+  };
+}
+
+function _notesDeleteTemplate(name) {
+  _notesConfirmDialog(
+    'Delete Template',
+    '\u201c' + name + '\u201d',
+    'This template will be removed from your library.',
+    'Delete', 'rgba(226,75,74,.4)', '#E24B4A', 'rgba(226,75,74,.08)'
+  ).then(function(confirmed) {
+    if (!confirmed) return;
+    delete _workspace.library[name];
+    _notesSaveWorkspace(true);
+    _notesRenderLibrary();
+  });
+}
+
+function _notesLaunchTemplate(name) {
+  const tpl = (_workspace.library || {})[name];
+  if (!tpl) return;
+  const base = name + ' \u2014 ' + new Date().toLocaleDateString();
+  let viewName = base; let idx = 2;
+  while (_workspace.views[viewName]) { viewName = base + ' (' + idx++ + ')'; }
+  _workspace.views[viewName] = {
+    rows: JSON.parse(JSON.stringify(tpl.rows || [])),
+    tiles: JSON.parse(JSON.stringify(tpl.tiles || [])),
+    tray: [], clonedFrom: name, createdAt: new Date().toISOString(),
+  };
+  _workspace.activeView = viewName;
+  _notesSaveWorkspace(true);
+  _notesRenderGrid(); _notesRenderLeft(); _notesRenderViewSwitcher();
+}
+
 // ── View management ──────────────────────────────────────────────────────
 function _notesRenderViewSwitcher() {
   const sel  = document.getElementById('notes-view-switcher');
@@ -1545,9 +1720,7 @@ function _notesRenderViewSwitcher() {
   if (sel2 && !sel2._renameWired) {
     sel2._renameWired = true;
     sel2.addEventListener('dblclick', () => {
-      const cur = _workspace.activeView;
-      const n   = prompt('Rename view "' + cur + '" to:', cur);
-      if (n?.trim() && n.trim() !== cur) _notesRenameView(n.trim());
+      _notesShowRenameViewDialog(_workspace.activeView);
     });
   }
 }
@@ -1563,20 +1736,100 @@ function _notesSwitchView(viewName) {
 }
 
 function _notesNewView() {
-  const name = prompt('Name this view:');
-  if (!name?.trim()) return;
-  const trimmed = name.trim();
-  if (_workspace.views[trimmed]) {
-    alert('A view named "' + trimmed + '" already exists.');
-    return;
-  }
-  // Create new empty view and switch to it — current view tiles are preserved
-  _workspace.views[trimmed] = _notesDefaultView();
-  _workspace.activeView = trimmed;
-  _notesSaveWorkspace(true);
-  _notesRenderGrid();
-  _notesRenderLeft();
-  _notesRenderViewSwitcher();
+  const overlay = document.createElement('div');
+  overlay.className = 'ntd-overlay';
+  overlay.innerHTML =
+    '<div class="ntd-dialog" style="width:360px">' +
+      '<div class="ntd-header">' +
+        '<div class="ntd-sub">Workspace</div>' +
+        '<div class="ntd-title">New View</div>' +
+      '</div>' +
+      '<div class="ntd-body">' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">View name</label>' +
+          '<input class="ntd-input" id="nnv-name" placeholder="e.g. NovaBio Sprint, Weekly Review"/>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ntd-actions">' +
+        '<button class="ntd-btn ntd-btn-cancel" id="nnv-cancel">Cancel</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="nnv-create">Create</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector('#nnv-name');
+  input.focus();
+
+  const doCreate = function() {
+    const trimmed = input.value.trim();
+    if (!trimmed) { input.focus(); return; }
+    if (_workspace.views[trimmed]) {
+      input.style.borderColor = 'rgba(226,75,74,.6)';
+      input.title = 'A view named "' + trimmed + '" already exists';
+      input.focus(); return;
+    }
+    overlay.remove();
+    _workspace.views[trimmed] = _notesDefaultView();
+    _workspace.activeView = trimmed;
+    _notesSaveWorkspace(true);
+    _notesRenderGrid();
+    _notesRenderLeft();
+    _notesRenderViewSwitcher();
+  };
+
+  overlay.querySelector('#nnv-create').onclick  = doCreate;
+  overlay.querySelector('#nnv-cancel').onclick   = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doCreate();
+    if (e.key === 'Escape') overlay.remove();
+  });
+}
+
+function _notesShowRenameViewDialog(currentName) {
+  const overlay = document.createElement('div');
+  overlay.className = 'ntd-overlay';
+  overlay.innerHTML =
+    '<div class="ntd-dialog" style="width:360px">' +
+      '<div class="ntd-header">' +
+        '<div class="ntd-sub">Named View</div>' +
+        '<div class="ntd-title">Rename View</div>' +
+      '</div>' +
+      '<div class="ntd-body">' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">View name</label>' +
+          '<input class="ntd-input" id="nrv-name" value="' + _esc(currentName) + '"/>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ntd-actions">' +
+        '<button class="ntd-btn ntd-btn-cancel" id="nrv-cancel">Cancel</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="nrv-save">Rename</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector('#nrv-name');
+  input.focus(); input.select();
+
+  const doRename = function() {
+    const newName = input.value.trim();
+    if (!newName || newName === currentName) { overlay.remove(); return; }
+    if (_workspace.views[newName]) {
+      input.style.borderColor = 'rgba(226,75,74,.6)';
+      input.title = 'A view named "' + newName + '" already exists';
+      input.focus(); return;
+    }
+    overlay.remove();
+    _notesRenameView(newName);
+  };
+
+  overlay.querySelector('#nrv-save').onclick   = doRename;
+  overlay.querySelector('#nrv-cancel').onclick  = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doRename();
+    if (e.key === 'Escape') overlay.remove();
+  });
 }
 
 function _notesRenameView(newName) {
@@ -1712,14 +1965,20 @@ async function _notesRenameBranch(el, topBranch, subBranch) {
   _notesRenderLeft();
 }
 
-function _notesDeleteBranch(topBranch, subBranch) {
+async function _notesDeleteBranch(topBranch, subBranch) {
   const path = subBranch ? topBranch + '/' + subBranch : topBranch;
   const notes = _notes.filter(n => n.hierarchy_path === path || n.hierarchy_path?.startsWith(path + '/'));
   if (notes.length > 0) {
     alert('Branch "' + path + '" is not empty. Move or delete its notes first.');
     return;
   }
-  if (!confirm('Delete branch "' + path + '"?')) return;
+  const branchConfirmed = await _notesConfirmDialog(
+    'Delete Branch',
+    '\u201c' + path.split('/').pop() + '\u201d',
+    'All notes in this branch will also be deleted.',
+    'Delete', 'rgba(226,75,74,.4)', '#E24B4A', 'rgba(226,75,74,.08)'
+  );
+  if (!branchConfirmed) return;
   _notesRenderLeft();
 }
 
@@ -2189,9 +2448,47 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Delete inbox note ────────────────────────────────────────────────────
+// ── Shared confirm dialog (replaces browser confirm()) ──────────────────
+function _notesConfirmDialog(title, subject, body, actionLabel, borderColor, color, bg) {
+  return new Promise(function(resolve) {
+    const overlay = document.createElement('div');
+    overlay.className = 'ntd-overlay';
+    overlay.innerHTML =
+      '<div class="ntd-dialog" style="width:380px">' +
+        '<div class="ntd-header">' +
+          '<div class="ntd-sub">' + _esc(title) + '</div>' +
+          '<div class="ntd-title">' + _esc(subject) + '</div>' +
+        '</div>' +
+        '<div class="ntd-body" style="padding:14px 24px">' +
+          '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text2);line-height:1.5">' +
+            _esc(body) +
+          '</div>' +
+        '</div>' +
+        '<div class="ntd-actions">' +
+          '<button class="ntd-btn ntd-btn-cancel" id="ncd-cancel">Cancel</button>' +
+          '<button class="ntd-btn" id="ncd-confirm" style="border-color:' + borderColor + ';color:' + color + ';background:' + bg + '">' +
+            _esc(actionLabel) +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#ncd-confirm').onclick = function() { overlay.remove(); resolve(true); };
+    overlay.querySelector('#ncd-cancel').onclick  = function() { overlay.remove(); resolve(false); };
+    overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    overlay.addEventListener('keydown',   function(e) { if (e.key === 'Escape') { overlay.remove(); resolve(false); } });
+  });
+}
+
 async function _notesDeleteTreeNote(noteId) {
   const note = _notes.find(n => n.id === noteId);
-  if (!confirm('Delete "' + (note?.title || 'this note') + '"? This cannot be undone.')) return;
+  const title = note?.title || 'this note';
+  const confirmed = await _notesConfirmDialog(
+    'Delete Note',
+    '\u201c' + title + '\u201d',
+    'This cannot be undone.',
+    'Delete', 'rgba(226,75,74,.4)', '#E24B4A', 'rgba(226,75,74,.08)'
+  );
+  if (!confirmed) return;
   try {
     await API.del('notes?id=eq.' + noteId);
     _notes = _notes.filter(n => n.id !== noteId);
@@ -2202,7 +2499,10 @@ async function _notesDeleteTreeNote(noteId) {
     _notesRenderGrid();
   } catch(e) { console.error('[Compass] Delete note error:', e); }
 }
-window._notesDeleteTreeNote = _notesDeleteTreeNote;
+window._notesDeleteTreeNote    = _notesDeleteTreeNote;
+window._notesSaveAsTemplate    = _notesSaveAsTemplate;
+window._notesDeleteTemplate    = _notesDeleteTemplate;
+window._notesLaunchTemplate    = _notesLaunchTemplate;
 
 async function _notesDeleteInboxNote(noteId) {
   const note = _notes.find(n => n.id === noteId);
