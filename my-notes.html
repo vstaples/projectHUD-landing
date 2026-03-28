@@ -6104,9 +6104,9 @@ window.WIDGET_REGISTRY.register({
       return;
     }
 
-    // Column widths — type badge · title · progress bar · due · status pill
-    // minmax on title prevents it from squeezing the fixed right columns
-    const COLS = '28px minmax(0,1fr) 100px 44px 76px';
+    // Columns: type badge · title (flex) · progress · due · status
+    // Progress is wide so the bar has room; due/status get generous fixed px
+    const COLS = '28px minmax(0,1fr) 180px 58px 90px';
     const mono = 'font-family:var(--font-mono,monospace)';
 
     function fmtDue(due, overdue) {
@@ -6115,17 +6115,16 @@ window.WIDGET_REGISTRY.register({
         const d = Math.round((new Date(today) - new Date(due)) / 86400000);
         return '<span style="'+mono+';font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>';
       }
-      const label = due === today
+      return due === today
         ? '<span style="'+mono+';font-size:11px;color:#EF9F27">Today</span>'
         : '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.4)">'+
             new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
-      return label;
     }
 
     function fmtProgress(t) {
       if (t.pct <= 0) return '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.25)">—</span>';
       const fc = t.pct>=80?'#1D9E75':t.pct>=40?'#00D2FF':'rgba(255,255,255,.35)';
-      return '<div style="display:flex;flex-direction:column;gap:2px;padding-right:8px;min-width:0">'+
+      return '<div style="display:flex;flex-direction:column;gap:3px;padding-right:12px;min-width:0">'+
         '<div style="'+mono+';font-size:10px;color:'+fc+'">'+t.pct+'%</div>'+
         '<div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">'+
           '<div style="height:100%;width:'+Math.min(t.pct,100)+'%;background:'+fc+';border-radius:2px"></div>'+
@@ -6135,20 +6134,19 @@ window.WIDGET_REGISTRY.register({
 
     function fmtStatus(t) {
       if (t.status==='blocked')
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLOCKED</div>';
+        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 8px;text-align:center;white-space:nowrap">BLOCKED</div>';
       if (t.status==='in_progress')
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:2px 6px;text-align:center;white-space:nowrap">In Progress</div>';
-      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 6px;text-align:center;white-space:nowrap">Start</div>';
+        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:2px 8px;text-align:center;white-space:nowrap">In Progress</div>';
+      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 8px;text-align:center;white-space:nowrap">Start</div>';
     }
 
-    // Column header row
     const headerHtml =
       '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
           'padding:4px 10px 4px 8px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">'+
         '<div></div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Task / Action</div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Progress</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right">Due</div>'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right;padding-right:4px">Due</div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:center">Status</div>'+
       '</div>';
 
@@ -6156,11 +6154,9 @@ window.WIDGET_REGISTRY.register({
       const leftBorder = t.overdue ? 'border-left:2px solid #E24B4A;' : '';
       return '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
           'padding:5px 10px 5px 8px;border-bottom:1px solid rgba(255,255,255,.05);'+leftBorder+'">'+
-        // TYPE badge
-        '<div style="display:flex;align-items:center;gap:0">'+
+        '<div style="display:flex;align-items:center">'+
           '<div style="width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,210,255,.4);flex-shrink:0"></div>'+
         '</div>'+
-        // TITLE + project subtitle
         '<div style="min-width:0;padding-right:8px">'+
           '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(t.title)+'">'+_esc(t.title)+'</div>'+
           (t.project
@@ -6168,16 +6164,12 @@ window.WIDGET_REGISTRY.register({
             : (t.due ? '<div style="'+mono+';font-size:10px;color:var(--text3)">Due '+new Date(t.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>' : '')
           )+
         '</div>'+
-        // PROGRESS bar
         '<div>'+fmtProgress(t)+'</div>'+
-        // DUE
-        '<div style="text-align:right">'+fmtDue(t.due, t.overdue)+'</div>'+
-        // STATUS pill
+        '<div style="text-align:right;padding-right:4px">'+fmtDue(t.due, t.overdue)+'</div>'+
         '<div style="display:flex;justify-content:center">'+fmtStatus(t)+'</div>'+
       '</div>';
     }).join('');
 
-    // Summary badge in top-right
     const summaryColor = overdueCnt>0 ? '#E24B4A' : 'rgba(255,255,255,.25)';
     const summaryText  = items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'');
 
@@ -6193,6 +6185,11 @@ window.WIDGET_REGISTRY.register({
 
 
 // ── 7. ACTION ITEM LIST ───────────────────────────────────────────────────
+// Cloned from task_list's proven dataFn pattern.
+// Key differences vs task_list:
+//   • Cache source: window._wiItems filtered to type==='action' (not type==='task')
+//   • Fetch: workflow_action_items by owner_resource_id (not tasks by assigned_to/user_id)
+//   • No pct_complete — progress column replaced by "From" (created_by_name)
 window.WIDGET_REGISTRY.register({
   id:              'action_item_list',
   label:           'Action item list',
@@ -6222,48 +6219,68 @@ window.WIDGET_REGISTRY.register({
 
     const res   = window._notesResource;
     const today = new Date().toISOString().slice(0,10);
+    const uid   = res.user_id;
     const rid   = res.id;
-    console.log(W, '_notesResource ok — rid:', rid);
+    console.log(W, '_notesResource ok — uid:', uid, ' rid:', rid);
 
-    if (!rid) { console.warn(W, 'no rid — cannot fetch action items'); return { items:[], today }; }
-
-    // ── 2. Check API
     const api = _resolveApi();
     console.log(W, 'API resolved?', api ? '✓' : '✗ MISSING');
+    if (!rid) { console.warn(W, 'no rid — cannot fetch action items'); return { items:[], today }; }
 
-    // ── 3. Try window.myActionItems cache
     const configRid = config && config.targetResourceId;
     const isSelf    = !configRid || configRid === rid;
     console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
 
+    // ── 2. Try _wiItems cache (my-work populates this with type:'action' entries)
+    if (isSelf && window._wiItems && window._wiItems.length) {
+      const cached = window._wiItems.filter(function(w){ return w.type === 'action'; });
+      console.log(W, 'cache hit — _wiItems action entries:', cached.length);
+      if (cached.length) {
+        const items = cached.map(function(a){
+          return { id:a.id, title:a.title, due:a.due, overdue:a.overdue,
+            createdBy: a.createdBy || null };
+        });
+        return { items, today, source:'cache' };
+      }
+      console.log(W, '_wiItems present but no action entries — falling through to fetch');
+    } else {
+      console.log(W, '_wiItems not available — will fetch directly');
+    }
+
+    // ── 3. Fallback: also try window.myActionItems (populated by my-work separately)
     if (isSelf && window.myActionItems && window.myActionItems.length) {
       const cached = window.myActionItems.filter(function(a){ return a.status === 'open'; });
-      console.log(W, 'cache hit — myActionItems open:', cached.length);
+      console.log(W, 'myActionItems cache hit — open:', cached.length);
       const items = cached.map(function(a){
         return { id:a.id, title:a.title, due:a.due_date,
           overdue: a.due_date && a.due_date < today,
           createdBy: a.created_by_name || null };
       });
-      return { items, today, source:'cache' };
+      return { items, today, source:'myActionItems-cache' };
     }
-    console.log(W, 'myActionItems not available — will fetch directly');
 
-    // ── 4. Fetch fresh
+    // ── 4. Fetch fresh directly from DB
     const targetRid = isSelf ? rid : configRid;
     if (!api) { console.error(W, 'API null at fetch step'); return { items:[], today }; }
 
     const aiQuery = 'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
       '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100';
-    console.log(W, 'fetching action items:', aiQuery);
+    console.log(W, 'fetching:', aiQuery);
     const rows = await api.get(aiQuery).catch(function(err){
-      console.error(W, 'action items fetch error:', err); return [];
+      console.error(W, 'fetch error:', err); return [];
     });
-    console.log(W, 'raw action items returned:', rows && rows.length, rows);
+    console.log(W, 'raw rows returned:', rows && rows.length, rows);
 
     const items = (rows||[]).map(function(a){
       return { id:a.id, title:a.title, due:a.due_date,
         overdue: a.due_date && a.due_date < today,
         createdBy: a.created_by_name || null };
+    });
+    items.sort(function(a,b){
+      const ua = a.overdue?0:(a.due?1:2), ub = b.overdue?0:(b.due?1:2);
+      if (ua!==ub) return ua-ub;
+      if (a.due&&b.due) return a.due.localeCompare(b.due);
+      return 0;
     });
     console.log(W, 'final items:', items.length);
     return { items, today };
@@ -6284,8 +6301,8 @@ window.WIDGET_REGISTRY.register({
       return;
     }
 
-    // Action items have no progress column — type badge · title · due · from
-    const COLS = '28px minmax(0,1fr) 48px 72px';
+    // Columns: type badge · title (flex) · due · from/created-by
+    const COLS = '28px minmax(0,1fr) 58px 120px';
     const mono = 'font-family:var(--font-mono,monospace)';
 
     function fmtDue(due, overdue) {
@@ -6300,38 +6317,30 @@ window.WIDGET_REGISTRY.register({
             new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
     }
 
-    // Column header row
     const headerHtml =
       '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
           'padding:4px 10px 4px 8px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">'+
         '<div></div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Action Item</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right">Due</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:center">From</div>'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right;padding-right:4px">Due</div>'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding-left:8px">From</div>'+
       '</div>';
 
     const rowsHtml = items.map(function(item){
       const leftBorder = item.overdue ? 'border-left:2px solid #E24B4A;' : '';
-      const fromHtml = item.createdBy
-        ? '<div style="'+mono+';font-size:10px;color:rgba(255,255,255,.5);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(item.createdBy)+'</div>'
-        : '<div style="'+mono+';font-size:10px;color:rgba(255,255,255,.2);text-align:center">—</div>';
       return '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
           'padding:5px 10px 5px 8px;border-bottom:1px solid rgba(255,255,255,.05);'+leftBorder+'">'+
-        // TYPE badge circle
         '<div style="display:flex;align-items:center">'+
           '<div style="width:14px;height:14px;border-radius:50%;border:1px solid rgba(74,158,255,.4);flex-shrink:0"></div>'+
         '</div>'+
-        // TITLE + optional due subtitle
         '<div style="min-width:0;padding-right:8px">'+
           '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title)+'">'+_esc(item.title)+'</div>'+
-          (item.due
-            ? '<div style="'+mono+';font-size:10px;color:var(--text3)">Due '+new Date(item.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>'
-            : '')+
+          (item.due ? '<div style="'+mono+';font-size:10px;color:var(--text3)">Due '+new Date(item.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>' : '')+
         '</div>'+
-        // DUE
-        '<div style="text-align:right">'+fmtDue(item.due, item.overdue)+'</div>'+
-        // FROM
-        '<div>'+fromHtml+'</div>'+
+        '<div style="text-align:right;padding-right:4px">'+fmtDue(item.due, item.overdue)+'</div>'+
+        '<div style="'+mono+';font-size:10px;color:rgba(255,255,255,.45);padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+          (item.createdBy ? _esc(item.createdBy) : '<span style="color:rgba(255,255,255,.2)">—</span>')+
+        '</div>'+
       '</div>';
     }).join('');
 
