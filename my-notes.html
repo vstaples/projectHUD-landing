@@ -3591,6 +3591,99 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
 
 window._notesRemoveParticipant        = _notesRemoveParticipant;
 window._notesLoadInviteResources      = _notesLoadInviteResources;
+
+// ── Shared resource picker — same popover, generic onSelect callback ──────
+window._notesShowResourcePicker = async function(anchorEl, onSelect) {
+  document.querySelectorAll('.notes-invite-pop').forEach(p => p.remove());
+
+  const pop = document.createElement('div');
+  pop.className = 'notes-invite-pop';
+  pop.innerHTML =
+    '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;' +
+      'color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Select person</div>' +
+    '<input id="notes-picker-input" placeholder="Search by name or department\u2026" autocomplete="off"/>' +
+    '<div class="notes-invite-result" id="notes-picker-results">' +
+      '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">Loading\u2026</div>' +
+    '</div>';
+
+  document.body.appendChild(pop);
+  const rect = anchorEl.getBoundingClientRect();
+  const popW = 280;
+  let left = rect.left;
+  let top  = rect.bottom + 4;
+  if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+  if (left < 8) left = 8;
+  if (top + 400 > window.innerHeight) top = rect.top - 420;
+  pop.style.left  = left + 'px';
+  pop.style.top   = top  + 'px';
+  pop.style.width = popW + 'px';
+
+  const input      = pop.querySelector('#notes-picker-input');
+  const resultsEl  = pop.querySelector('#notes-picker-results');
+  const allRes     = await _notesLoadInviteResources();
+
+  function render(q) {
+    const lower = (q||'').toLowerCase().trim();
+    const selfId = window._notesResource && window._notesResource.user_id;
+    const filtered = allRes.filter(function(r) {
+      if (!r.id) return false;
+      if (!lower) return true;
+      return (r.name||'').toLowerCase().includes(lower) ||
+             (r.department||'').toLowerCase().includes(lower) ||
+             (r.email||'').toLowerCase().includes(lower);
+    });
+
+    if (!filtered.length) {
+      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">No results</div>';
+      return;
+    }
+
+    const groups = {};
+    filtered.forEach(function(r) {
+      const grp = r.is_external ? 'External' : (r.department || 'Other');
+      (groups[grp] = groups[grp] || []).push(r);
+    });
+    const keys = Object.keys(groups).sort(function(a,b) {
+      if (a==='External') return 1; if (b==='External') return -1; return a.localeCompare(b);
+    });
+
+    let html = '';
+    keys.forEach(function(grp) {
+      html += '<div style="padding:4px 7px 2px;font-family:var(--font-mono,monospace);font-size:10px;' +
+        'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
+        'border-top:1px solid rgba(0,210,255,.08);margin-top:2px">' + _esc(grp) + '</div>';
+      groups[grp].forEach(function(r) {
+        const initials = r.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+        const color    = PARTICIPANT_COLORS[0];
+        html += '<div class="notes-invite-row" data-resid="' + _esc(r.id) + '" data-userid="' + _esc(r.user_id||'') + '" data-name="' + _esc(r.name) + '">' +
+          '<div class="notes-avatar" style="background:' + color + ';color:#000">' + _esc(initials) + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
+            (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      });
+    });
+
+    resultsEl.innerHTML = html;
+    resultsEl.querySelectorAll('.notes-invite-row').forEach(function(row) {
+      row.onclick = function() {
+        pop.remove();
+        onSelect({ id: row.dataset.resid, user_id: row.dataset.userid || null, name: row.dataset.name });
+      };
+    });
+  }
+
+  render('');
+  input.focus();
+  input.addEventListener('input', function() { render(input.value); });
+
+  setTimeout(function() {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('mousedown', _close); }
+    });
+  }, 50);
+};
 window._notesGetInviteResources       = function() { return _inviteResources; };
 window._notesStartPresence      = _notesStartPresence;
 window._notesStopPresence       = _notesStopPresence;
@@ -3912,24 +4005,14 @@ async function showWidgetConfig(widgetId, tileState, existingConfig) {
   const widget = WIDGET_REGISTRY.get(widgetId);
   if (!widget) return;
 
-  // Pre-load resources for any resource_picker fields
-  const hasResourcePicker = (widget.configSchema||[]).some(function(f) { return f.type === 'resource_picker'; });
-  if (hasResourcePicker && window._notesLoadInviteResources) {
-    await window._notesLoadInviteResources();
-  }
-
   // Pre-load projects for any project_picker fields
   let _wcfProjects = [];
   const hasProjectPicker = (widget.configSchema||[]).some(function(f) { return f.type === 'project_picker'; });
   if (hasProjectPicker) {
     try {
-      const api = window.API || window._notesAPI;
-      const rows = api ? await api.get('workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=100').catch(function(){return[];}) : [];
-      const seen = {};
-      _wcfProjects = (rows||[]).filter(function(r) {
-        if (!r.project_id || seen[r.project_id]) return false;
-        seen[r.project_id] = true; return true;
-      }).map(function(r) { return { id: r.project_id, name: r.title }; });
+      _wcfProjects = window._getProjectsForPicker
+        ? await window._getProjectsForPicker()
+        : [];
     } catch(e) {}
   }
 
@@ -3964,51 +4047,13 @@ async function showWidgetConfig(widgetId, tileState, existingConfig) {
       '</select>';
 
     } else if (field.type === 'resource_picker') {
-      const resources = (window._notesGetInviteResources && window._notesGetInviteResources()) || [];
-      const selfRes   = window._notesResource;
-      const selfName  = selfRes ? (selfRes.name || 'Me') : 'Me';
-      // Group by department — same as invite popover
-      const groups = {};
-      resources.forEach(function(r) {
-        if (!r.id) return;
-        const dept = r.department || 'Other';
-        (groups[dept] = groups[dept] || []).push(r);
-      });
-      const selfSelected = !val || val === '';
-
-      // Render as a styled searchable list embedded in the form
+      const selfName = window._notesResource ? (window._notesResource.name || 'Me') : 'Me';
+      const displayName = val ? '' : selfName; // will be updated when loaded
       input =
-        '<div class="wcf-resource-picker" data-key="' + _esc(field.key) + '" style="border:1px solid rgba(0,210,255,.15);background:rgba(0,0,0,.2)">' +
-          '<div style="padding:4px 8px;border-bottom:1px solid rgba(0,210,255,.1)">' +
-            '<input class="ntd-input wcf-res-search" placeholder="Search by name or department…" style="margin:0;border:none;background:transparent;padding:3px 0" autocomplete="off"/>' +
-          '</div>' +
-          '<div class="wcf-res-list" style="max-height:180px;overflow-y:auto">' +
-            // Me option
-            '<div class="wcf-res-row' + (selfSelected ? ' wcf-res-selected' : '') + '" data-resid="" data-resname="' + _esc(selfName) + '" ' +
-              'style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;' + (selfSelected ? 'background:rgba(0,210,255,.1)' : '') + '">' +
-              '<div style="width:24px;height:24px;border-radius:50%;background:rgba(0,210,255,.2);border:1px solid rgba(0,210,255,.4);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#00D2FF;flex-shrink:0">ME</div>' +
-              '<span style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text1)">Me (default)</span>' +
-            '</div>' +
-            // Resources grouped by department
-            Object.keys(groups).map(function(dept) {
-              return '<div style="padding:3px 10px 2px;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;background:rgba(0,0,0,.2)" data-dept-hdr>' +
-                _esc(dept) + '</div>' +
-                groups[dept].map(function(r) {
-                  const initials = (r.name||'').split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
-                  const isSelected = r.id === val;
-                  return '<div class="wcf-res-row' + (isSelected ? ' wcf-res-selected' : '') + '" data-resid="' + _esc(r.id) + '" data-resname="' + _esc(r.name) + '" ' +
-                    'style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;' + (isSelected ? 'background:rgba(0,210,255,.1)' : '') + '">' +
-                    '<div style="width:24px;height:24px;border-radius:50%;background:rgba(0,210,255,.15);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#00D2FF;flex-shrink:0">' + _esc(initials) + '</div>' +
-                    '<div style="min-width:0">' +
-                      '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(r.name) + '</div>' +
-                      '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(r.email||'') + '</div>' +
-                    '</div>' +
-                  '</div>';
-                }).join('');
-            }).join('') +
-          '</div>' +
-          // Hidden input that holds the actual value for Apply to read
+        '<div style="display:flex;align-items:center;gap:8px">' +
           '<input type="hidden" class="wcf-input wcf-res-val" data-key="' + _esc(field.key) + '" value="' + _esc(String(val)) + '"/>' +
+          '<div class="wcf-res-display" style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text1);flex:1;min-width:0">' + (val ? _esc(val) : _esc(selfName)) + '</div>' +
+          '<button class="ntd-btn ntd-btn-cancel wcf-res-pick-btn" type="button" style="padding:4px 10px;font-size:10px;flex-shrink:0">Choose…</button>' +
         '</div>';
 
     } else {
@@ -4032,42 +4077,28 @@ async function showWidgetConfig(widgetId, tileState, existingConfig) {
 
   document.body.appendChild(overlay);
 
-  // Wire resource picker rows — click to select
-  overlay.querySelectorAll('.wcf-resource-picker').forEach(function(picker) {
-    const hiddenInput = picker.querySelector('.wcf-res-val');
-    const searchInput = picker.querySelector('.wcf-res-search');
-    const list        = picker.querySelector('.wcf-res-list');
-
-    function selectRow(row) {
-      picker.querySelectorAll('.wcf-res-row').forEach(function(r) {
-        r.style.background = '';
-        r.classList.remove('wcf-res-selected');
+  // Wire resource picker "Choose…" buttons — open the shared invite popover
+  overlay.querySelectorAll('.wcf-res-pick-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!window._notesShowResourcePicker) return;
+      const hiddenInput  = btn.parentElement.querySelector('.wcf-res-val');
+      const displayEl    = btn.parentElement.querySelector('.wcf-res-display');
+      window._notesShowResourcePicker(btn, function(resource) {
+        hiddenInput.value  = resource.id || '';
+        displayEl.textContent = resource.name || 'Me (default)';
       });
-      row.style.background = 'rgba(0,210,255,.1)';
-      row.classList.add('wcf-res-selected');
-      hiddenInput.value = row.dataset.resid || '';
+    });
+  });
+
+  // Resolve saved resource IDs to names for display
+  overlay.querySelectorAll('.wcf-res-val').forEach(function(inp) {
+    const savedId  = inp.value;
+    const displayEl = inp.parentElement.querySelector('.wcf-res-display');
+    if (savedId && displayEl && window._notesGetInviteResources) {
+      const res = (window._notesGetInviteResources() || []).find(function(r) { return r.id === savedId; });
+      if (res) displayEl.textContent = res.name;
     }
-
-    list.querySelectorAll('.wcf-res-row').forEach(function(row) {
-      row.addEventListener('click', function() { selectRow(row); });
-      row.addEventListener('mouseover', function() { if (!row.classList.contains('wcf-res-selected')) row.style.background = 'rgba(0,210,255,.05)'; });
-      row.addEventListener('mouseout',  function() { if (!row.classList.contains('wcf-res-selected')) row.style.background = ''; });
-    });
-
-    // Search filter
-    searchInput.addEventListener('input', function() {
-      const q = searchInput.value.toLowerCase().trim();
-      list.querySelectorAll('.wcf-res-row').forEach(function(row) {
-        row.style.display = (!q || (row.dataset.resname||'').toLowerCase().includes(q)) ? '' : 'none';
-      });
-      list.querySelectorAll('[data-dept-hdr]').forEach(function(hdr) {
-        const next = hdr.nextElementSibling;
-        const anyVisible = Array.from(hdr.parentElement.querySelectorAll('.wcf-res-row')).some(function(r) {
-          return r.previousElementSibling === hdr || (r.style.display !== 'none');
-        });
-        hdr.style.display = q ? 'none' : '';
-      });
-    });
   });
 
   overlay.querySelector('#wcf-cancel').onclick = function() { overlay.remove(); };
@@ -4189,162 +4220,245 @@ function _selfUserId() {
   return window._notesResource && window._notesResource.user_id;
 }
 
-// ── 1. CAPACITY GAUGE ─────────────────────────────────────────────────────
-// Derives load from open action items + task assignments
-// Shows: arc dial (used/available), stat row (open / overdue / due today)
+// ── Context helpers ──────────────────────────────────────────────────────
+function _widgetCtx() {
+  const res = window._notesResource || {};
+  return {
+    firmId:     'aaaaaaaa-0001-0001-0001-000000000001',
+    userId:     res.user_id || null,
+    resourceId: res.id || null,
+    role:       res.role || res.title || '',
+    api:        window.API || window._notesAPI,
+  };
+}
+function _wApi(path) {
+  const api = window.API || window._notesAPI;
+  return api ? api.get(path).catch(function(){return[];}) : Promise.resolve([]);
+}
 
+// ── Project picker helper — role-aware ────────────────────────────────────
+async function _getProjectsForPicker() {
+  const ctx   = _widgetCtx();
+  const api   = ctx.api;
+  if (!api) return [];
+  const role  = (ctx.role || '').toLowerCase();
+  const isPM  = role.includes('pm') || role.includes('manager') || role.includes('director');
+
+  if (isPM) {
+    // PM: all active workflow instances (deduplicated by project_id)
+    const rows = await api.get(
+      'workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=200'
+    ).catch(function(){return[];});
+    const seen = {};
+    return (rows||[]).filter(function(r) {
+      if (!r.project_id || seen[r.project_id]) return false;
+      seen[r.project_id] = true; return true;
+    }).map(function(r) { return { id: r.project_id, name: r.title }; });
+  } else {
+    // User: only projects where they have assigned tasks or action items
+    const [taskRows, aiRows] = await Promise.all([
+      api.get('tasks?select=project_id,workflow_instances(title)&assigned_to=eq.' + ctx.userId +
+              '&status=neq.completed&not.project_id=is.null&limit=200').catch(function(){return[];}),
+      api.get('workflow_action_items?select=instance_id,workflow_instances(project_id,title)' +
+              '&owner_resource_id=eq.' + ctx.resourceId + '&status=eq.open&limit=200').catch(function(){return[];}),
+    ]);
+    const seen = {};
+    const projects = [];
+    (taskRows||[]).forEach(function(r) {
+      if (r.project_id && !seen[r.project_id]) {
+        seen[r.project_id] = true;
+        projects.push({ id: r.project_id, name: (r.workflow_instances&&r.workflow_instances.title) || r.project_id });
+      }
+    });
+    (aiRows||[]).forEach(function(r) {
+      const wi = r.workflow_instances;
+      if (wi && wi.project_id && !seen[wi.project_id]) {
+        seen[wi.project_id] = true;
+        projects.push({ id: wi.project_id, name: wi.title || wi.project_id });
+      }
+    });
+    return projects.sort(function(a,b){return a.name.localeCompare(b.name);});
+  }
+}
+window._getProjectsForPicker = _getProjectsForPicker;
+
+// ── 1. CAPACITY GAUGE ─────────────────────────────────────────────────────
+// Hours mode when budget_hours/loe_hours populated; count mode otherwise
 window.WIDGET_REGISTRY.register({
   id:              'capacity_gauge',
   label:           'Capacity gauge',
   category:        'personal',
-  description:     'Open items vs. capacity — arc dial with breakdown',
+  description:     'Load vs. capacity — hours when available, count when not',
   icon:            'gauge',
   configSchema: [
-    {
-      key:     'targetResourceId',
-      label:   'Person',
-      type:    'resource_picker',
-      default: ''
-    },
-    {
-      key:     'dailyCapacity',
-      label:   'Daily capacity (hours)',
-      type:    'number',
-      default: 8
-    }
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
+      templatePlaceholder:'Select person when launching' },
+    { key:'dailyCapacity',   label:'Daily capacity (hours)', type:'number', default:8 },
   ],
   refreshInterval: 120000,
   minTileHeight:   'medium',
 
-  dataFn: async function(config, context) {
-    const rid = config.targetResourceId || _selfResourceId();
-    if (!rid) return null;
+  dataFn: async function(config) {
+    const ctx = _widgetCtx();
+    const rid = config.targetResourceId || ctx.resourceId;
+    const uid = config.targetUserId     || ctx.userId;
+    if (!rid && !uid) return null;
+    const today = new Date().toISOString().slice(0,10);
+    const cap   = Math.max(1, parseFloat(config.dailyCapacity)||8);
 
-    const today = new Date().toISOString().slice(0, 10);
-
-    const [actionItems, taskRows] = await Promise.all([
-      _api('workflow_action_items?owner_resource_id=eq.' + rid +
-           '&status=eq.open&select=id,due_date&limit=200'),
-      _api('task_resource_assignments?resource_id=eq.' + rid +
-           '&select=id,tasks(status,due_date)&limit=200'),
+    const [aiRows, taskRows] = await Promise.all([
+      rid ? _wApi('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
+      uid ? _wApi('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500') : [],
     ]);
 
-    const items     = Array.isArray(actionItems) ? actionItems : [];
-    const tasks     = (Array.isArray(taskRows) ? taskRows : [])
-                        .filter(function(t) { return t.tasks && t.tasks.status !== 'completed'; });
+    const items = Array.isArray(aiRows) ? aiRows : [];
+    const tasks = Array.isArray(taskRows) ? taskRows : [];
+    const all   = items.concat(tasks);
 
-    const total     = items.length + tasks.length;
-    const overdue   = items.filter(function(i) { return i.due_date && i.due_date < today; }).length +
-                      tasks.filter(function(t) { return t.tasks.due_date && t.tasks.due_date < today; }).length;
-    const dueToday  = items.filter(function(i) { return i.due_date === today; }).length +
-                      tasks.filter(function(t) { return t.tasks.due_date === today; }).length;
+    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||t.loe_hours||0);},0);
+    const hasHours   = totalHours > 0;
+    const used       = hasHours ? Math.min(totalHours, cap*2) : Math.min(all.length, cap*2);
+    const pct        = Math.round((used/cap)*100);
 
-    const capacity  = Math.max(1, parseFloat(config.dailyCapacity) || 8);
-    // Rough load estimate: each item = 1hr, cap at 2x capacity
-    const used      = Math.min(total, capacity * 2);
-    const pct       = Math.round((used / capacity) * 100);
-
-    return { total, overdue, dueToday, upcoming: total - overdue - dueToday, used, capacity, pct };
+    return {
+      total:     all.length,
+      overdue:   all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
+      dueToday:  all.filter(function(i){return i.due_date===today;}).length,
+      upcoming:  all.filter(function(i){return i.due_date&&i.due_date>today;}).length,
+      used:Math.round(used*10)/10, cap, pct, hasHours,
+      totalHours:Math.round(totalHours*10)/10,
+    };
   },
 
   renderFn: function(data, container) {
-    if (!data) { container.innerHTML = '<div class="widget-error">No data</div>'; return; }
-
-    const pct   = Math.min(data.pct, 100);
-    const color = pct >= 100 ? '#E24B4A' : pct >= 75 ? '#EF9F27' : '#1D9E75';
-    const W     = 120, r = 44, cx = 60, cy = 62;
-    // Arc from 210deg to 330deg (240deg sweep)
-    const sweep = 240;
-    const startDeg = 210;
-    const endDeg   = startDeg + (sweep * pct / 100);
-
-    function polar(deg, radius) {
-      const rad = (deg - 90) * Math.PI / 180;
-      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
-    }
-    function arcPath(deg1, deg2, r2) {
-      const s = polar(deg1, r2), e = polar(deg2, r2);
-      const large = (deg2 - deg1) > 180 ? 1 : 0;
-      return 'M ' + s.x.toFixed(1) + ' ' + s.y.toFixed(1) +
-             ' A ' + r2 + ' ' + r2 + ' 0 ' + large + ' 1 ' + e.x.toFixed(1) + ' ' + e.y.toFixed(1);
-    }
-
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;align-items:center;padding:8px 4px 4px;height:100%;justify-content:space-between">' +
-        '<svg width="' + W + '" height="80" viewBox="0 0 ' + W + ' 80" style="overflow:visible">' +
-          // Track arc
-          '<path d="' + arcPath(startDeg, startDeg + sweep, r) + '" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8" stroke-linecap="round"/>' +
-          // Value arc
-          (pct > 0 ? '<path d="' + arcPath(startDeg, Math.min(endDeg, startDeg + sweep - 0.1), r) + '" fill="none" stroke="' + color + '" stroke-width="8" stroke-linecap="round"/>' : '') +
-          // Center text
-          '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="18" font-weight="700" fill="' + color + '">' + data.pct + '%</text>' +
-          '<text x="' + cx + '" y="' + (cy + 11) + '" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="8" fill="rgba(255,255,255,.3)" letter-spacing="0.06em">LOAD</text>' +
-        '</svg>' +
-        '<div class="widget-stat-row">' +
-          '<div class="wsr-item"><div class="wsr-val">' + data.total + '</div><div class="wsr-lbl">Open</div></div>' +
-          '<div class="wsr-item"><div class="wsr-val" style="color:#E24B4A">' + data.overdue + '</div><div class="wsr-lbl">Overdue</div></div>' +
-          '<div class="wsr-item"><div class="wsr-val" style="color:#EF9F27">' + data.dueToday + '</div><div class="wsr-lbl">Today</div></div>' +
-          '<div class="wsr-item"><div class="wsr-val" style="color:#4A9EFF">' + data.upcoming + '</div><div class="wsr-lbl">Upcoming</div></div>' +
-        '</div>' +
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const pct   = Math.min(data.pct,100);
+    const color = pct>=100?'#E24B4A':pct>=75?'#EF9F27':'#1D9E75';
+    const W=120,r=44,cx=60,cy=62,sweep=240,startDeg=210;
+    const endDeg = startDeg+(sweep*pct/100);
+    function polar(deg,rad){const a=(deg-90)*Math.PI/180;return{x:cx+rad*Math.cos(a),y:cy+rad*Math.sin(a)};}
+    function arc(d1,d2,rad){const s=polar(d1,rad),e=polar(d2,rad),large=d2-d1>180?1:0;
+      return'M '+s.x.toFixed(1)+' '+s.y.toFixed(1)+' A '+rad+' '+rad+' 0 '+large+' 1 '+e.x.toFixed(1)+' '+e.y.toFixed(1);}
+    const centerVal = data.hasHours ? data.totalHours+'h' : data.pct+'%';
+    const centerLbl = data.hasHours ? 'HOURS'            : 'LOAD';
+    const stat1Lbl  = data.hasHours ? data.cap+'h cap'   : 'Open';
+    const stat1Val  = data.hasHours ? data.totalHours    : data.total;
+    container.innerHTML=
+      '<div style="display:flex;flex-direction:column;align-items:center;padding:8px 4px 4px;height:100%;justify-content:space-between">'+
+        '<svg width="'+W+'" height="80" viewBox="0 0 '+W+' 80" style="overflow:visible">'+
+          '<path d="'+arc(startDeg,startDeg+sweep,r)+'" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8" stroke-linecap="round"/>'+
+          (pct>0?'<path d="'+arc(startDeg,Math.min(endDeg,startDeg+sweep-0.1),r)+'" fill="none" stroke="'+color+'" stroke-width="8" stroke-linecap="round"/>':'')+
+          '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="18" font-weight="700" fill="'+color+'">'+centerVal+'</text>'+
+          '<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="8" fill="rgba(255,255,255,.3)" letter-spacing="0.06em">'+centerLbl+'</text>'+
+        '</svg>'+
+        '<div class="widget-stat-row">'+
+          '<div class="wsr-item"><div class="wsr-val">'+stat1Val+'</div><div class="wsr-lbl">'+stat1Lbl+'</div></div>'+
+          '<div class="wsr-item"><div class="wsr-val" style="color:#E24B4A">'+data.overdue+'</div><div class="wsr-lbl">Overdue</div></div>'+
+          '<div class="wsr-item"><div class="wsr-val" style="color:#EF9F27">'+data.dueToday+'</div><div class="wsr-lbl">Today</div></div>'+
+          '<div class="wsr-item"><div class="wsr-val" style="color:#4A9EFF">'+data.upcoming+'</div><div class="wsr-lbl">Upcoming</div></div>'+
+        '</div>'+
       '</div>';
   }
 });
 
 // ── 2. ACTION ITEM COUNTER ────────────────────────────────────────────────
-// Large number + breakdown by status / due date
-
+// workflow_action_items only — owner_resource_id
 window.WIDGET_REGISTRY.register({
   id:              'action_item_counter',
   label:           'Action item counter',
   category:        'personal',
-  description:     'Open action items — large count with overdue breakdown',
+  description:     'Open action items — count with overdue breakdown',
   icon:            'counter',
   configSchema: [
-    {
-      key:     'targetResourceId',
-      label:   'Person',
-      type:    'resource_picker',
-      default: ''
-    }
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
+      templatePlaceholder:'Select person when launching' },
   ],
   refreshInterval: 60000,
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    const rid   = config.targetResourceId || _selfResourceId();
+    const ctx   = _widgetCtx();
+    const rid   = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
-    const today = new Date().toISOString().slice(0, 10);
-
-    const items = await _api(
-      'workflow_action_items?owner_resource_id=eq.' + rid +
-      '&status=eq.open&select=id,due_date&limit=500'
-    );
-    const all      = Array.isArray(items) ? items : [];
-    const overdue  = all.filter(function(i) { return i.due_date && i.due_date < today; }).length;
-    const dueToday = all.filter(function(i) { return i.due_date === today; }).length;
-    const upcoming = all.length - overdue - dueToday;
-    return { total: all.length, overdue, dueToday, upcoming };
+    const today = new Date().toISOString().slice(0,10);
+    const items = await _wApi('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500');
+    const all   = Array.isArray(items) ? items : [];
+    return {
+      total:    all.length,
+      overdue:  all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
+      dueToday: all.filter(function(i){return i.due_date===today;}).length,
+      upcoming: all.length - all.filter(function(i){return i.due_date&&i.due_date<=today;}).length,
+    };
   },
 
   renderFn: function(data, container) {
-    if (!data) { container.innerHTML = '<div class="widget-error">No data</div>'; return; }
-    const bigColor = data.overdue > 0 ? '#E24B4A' : data.dueToday > 0 ? '#EF9F27' : '#00D2FF';
-    container.innerHTML =
-      '<div class="widget-counter">' +
-        '<div class="wc-big" style="color:' + bigColor + '">' + data.total + '</div>' +
-        '<div class="wc-label">Open action items</div>' +
-        '<div class="wc-breakdown">' +
-          '<span style="color:#E24B4A">' + data.overdue + ' overdue</span>' +
-          '<span style="color:#EF9F27">' + data.dueToday + ' today</span>' +
-          '<span style="color:#4A9EFF">' + data.upcoming + ' upcoming</span>' +
-        '</div>' +
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const c = data.overdue>0?'#E24B4A':data.dueToday>0?'#EF9F27':'#00D2FF';
+    container.innerHTML=
+      '<div class="widget-counter">'+
+        '<div class="wc-big" style="color:'+c+'">'+data.total+'</div>'+
+        '<div class="wc-label">Open action items</div>'+
+        '<div class="wc-breakdown">'+
+          '<span style="color:#E24B4A">'+data.overdue+' overdue</span>'+
+          '<span style="color:#EF9F27">'+data.dueToday+' today</span>'+
+          '<span style="color:#4A9EFF">'+data.upcoming+' upcoming</span>'+
+        '</div>'+
       '</div>';
   }
 });
 
-// ── 3. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
-// Seven-bar sparkline of meeting ratings for a project
+// ── 3. TASK COUNTER ───────────────────────────────────────────────────────
+// tasks where user is assigned — separate from action items
+window.WIDGET_REGISTRY.register({
+  id:              'task_counter',
+  label:           'Task counter',
+  category:        'personal',
+  description:     'Open tasks assigned to you — hours when available',
+  icon:            'counter',
+  configSchema: [
+    { key:'targetUserId', label:'Person', type:'resource_picker', default:'', required:true,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 120000,
+  minTileHeight:   'small',
 
+  dataFn: async function(config) {
+    const ctx   = _widgetCtx();
+    const uid   = config.targetUserId || ctx.userId;
+    if (!uid) return null;
+    const today = new Date().toISOString().slice(0,10);
+    const tasks = await _wApi('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500');
+    const all   = Array.isArray(tasks) ? tasks : [];
+    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||t.loe_hours||0);},0);
+    return {
+      total:      all.length,
+      overdue:    all.filter(function(t){return t.due_date&&t.due_date<today;}).length,
+      dueToday:   all.filter(function(t){return t.due_date===today;}).length,
+      upcoming:   all.filter(function(t){return t.due_date&&t.due_date>today;}).length,
+      totalHours: Math.round(totalHours*10)/10,
+      hasHours:   totalHours>0,
+    };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const c    = data.overdue>0?'#E24B4A':data.dueToday>0?'#EF9F27':'#00D2FF';
+    const main = data.hasHours ? data.totalHours+'h' : String(data.total);
+    const lbl  = data.hasHours ? 'hours of open tasks' : 'open tasks';
+    container.innerHTML=
+      '<div class="widget-counter">'+
+        '<div class="wc-big" style="color:'+c+'">'+main+'</div>'+
+        '<div class="wc-label">'+lbl+'</div>'+
+        '<div class="wc-breakdown">'+
+          '<span style="color:#E24B4A">'+data.overdue+' overdue</span>'+
+          '<span style="color:#EF9F27">'+data.dueToday+' today</span>'+
+          '<span style="color:#4A9EFF">'+data.upcoming+' upcoming</span>'+
+        '</div>'+
+      '</div>';
+  }
+});
+
+// ── 4. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'meeting_health_sparkline',
   label:           'Meeting health',
@@ -4352,98 +4466,65 @@ window.WIDGET_REGISTRY.register({
   description:     'Last 7 meeting ratings — sparkline with trend',
   icon:            'sparkline',
   configSchema: [
-    {
-      key:     'projectId',
-      label:   'Project',
-      type:    'project_picker',
-      default: ''
-    }
+    { key:'projectId', label:'Project', type:'project_picker', default:'', required:false,
+      templatePlaceholder:'Select project when launching' },
   ],
   refreshInterval: 300000,
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    if (!config.projectId) return { ratings: [], avg: 0, trend: 'stable', noProject: true };
-
-    const meetings = await _api(
-      'v_meetings?select=id,meeting_date&firm_id=eq.' + FIRM_ID +
-      '&project_id=eq.' + config.projectId +
-      '&order=meeting_date.desc&limit=7'
+    if (!config.projectId) return { ratings:[], avg:0, trend:'stable', noProject:true };
+    const ctx = _widgetCtx();
+    const meetings = await _wApi(
+      'v_meetings?select=id,meeting_date&firm_id=eq.'+ctx.firmId+
+      '&project_id=eq.'+config.projectId+'&order=meeting_date.desc&limit=7'
     );
-    if (!meetings || !meetings.length) return { ratings: [], avg: 0, trend: 'stable' };
-
-    const ids = meetings.map(function(m) { return m.id; });
-    const ratings = await _api(
-      'meeting_ratings?meeting_id=in.(' + ids.join(',') + ')&select=meeting_id,rating'
-    );
-
-    const rMap = {};
-    (ratings || []).forEach(function(r) {
-      if (!rMap[r.meeting_id]) rMap[r.meeting_id] = [];
-      rMap[r.meeting_id].push(r.rating);
+    if (!meetings||!meetings.length) return { ratings:[], avg:0, trend:'stable' };
+    const ids = meetings.map(function(m){return m.id;});
+    const ratings = await _wApi('meeting_ratings?meeting_id=in.('+ids.join(',')+')'+'&select=meeting_id,rating');
+    const rMap={};
+    (ratings||[]).forEach(function(r){(rMap[r.meeting_id]=rMap[r.meeting_id]||[]).push(r.rating);});
+    const result = meetings.slice().reverse().map(function(m,i){
+      const mrs=rMap[m.id]||[];
+      const avg=mrs.length?Math.round((mrs.reduce(function(s,r){return s+r;},0)/mrs.length)*10)/10:0;
+      return {label:'M'+(i+1),value:avg};
     });
-
-    const result = meetings.slice().reverse().map(function(m, i) {
-      const mrs = rMap[m.id] || [];
-      const avg = mrs.length
-        ? Math.round((mrs.reduce(function(s, r) { return s + r; }, 0) / mrs.length) * 10) / 10
-        : 0;
-      return { label: 'M' + (i + 1), value: avg };
-    });
-
-    const vals    = result.map(function(r) { return r.value; }).filter(function(v) { return v > 0; });
-    const avg     = vals.length
-      ? Math.round((vals.reduce(function(s, v) { return s + v; }, 0) / vals.length) * 10) / 10 : 0;
-    const trend   = vals.length >= 2
-      ? (vals[vals.length - 1] > vals[0] ? 'up' : vals[vals.length - 1] < vals[0] ? 'down' : 'stable')
-      : 'stable';
-
-    return { ratings: result, avg, trend };
+    const vals=result.map(function(r){return r.value;}).filter(function(v){return v>0;});
+    const avg=vals.length?Math.round((vals.reduce(function(s,v){return s+v;},0)/vals.length)*10)/10:0;
+    const trend=vals.length>=2?(vals[vals.length-1]>vals[0]?'up':vals[vals.length-1]<vals[0]?'down':'stable'):'stable';
+    return {ratings:result,avg,trend};
   },
 
   renderFn: function(data, container) {
-    if (!data) { container.innerHTML = '<div class="widget-error">No data</div>'; return; }
-
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
     if (data.noProject) {
-      container.innerHTML = '<div class="widget-error" style="font-size:10px;flex-direction:column;gap:4px"><span style="font-size:16px">⚙</span>Configure project ID</div>';
+      container.innerHTML='<div class="widget-error" style="font-size:10px;flex-direction:column;gap:4px"><span style="font-size:16px">&#9881;</span>Configure project</div>';
       return;
     }
-    if (!data.ratings || !data.ratings.length) {
-      container.innerHTML = '<div class="widget-error" style="font-size:10px">No meeting data</div>';
-      return;
+    if (!data.ratings||!data.ratings.length) {
+      container.innerHTML='<div class="widget-error" style="font-size:10px">No meeting data</div>'; return;
     }
-
-    const W = 200, H = 56;
-    const n = data.ratings.length;
-    const barW  = Math.floor(W / n) - 3;
-    const maxVal = 5; // rating scale 1-5
-
-    const trendColor = data.trend === 'up' ? '#1D9E75' : data.trend === 'down' ? '#E24B4A' : '#EF9F27';
-    const trendArrow = data.trend === 'up' ? '↑' : data.trend === 'down' ? '↓' : '→';
-
-    const bars = data.ratings.map(function(r, i) {
-      const x     = i * (barW + 3) + 1;
-      const barH  = r.value > 0 ? Math.max(4, Math.round((r.value / maxVal) * H)) : 3;
-      const y     = H - barH;
-      const color = r.value >= 4 ? '#1D9E75' : r.value >= 2.5 ? '#EF9F27' : r.value > 0 ? '#E24B4A' : 'rgba(255,255,255,.1)';
-      return '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="' + color + '" rx="1"/>';
+    const W=200,H=56,n=data.ratings.length,barW=Math.floor(W/n)-3,maxVal=5;
+    const tc=data.trend==='up'?'#1D9E75':data.trend==='down'?'#E24B4A':'#EF9F27';
+    const ta=data.trend==='up'?'\u2191':data.trend==='down'?'\u2193':'\u2192';
+    const bars=data.ratings.map(function(r,i){
+      const x=i*(barW+3)+1,bh=r.value>0?Math.max(4,Math.round((r.value/maxVal)*H)):3,y=H-bh;
+      const c=r.value>=4?'#1D9E75':r.value>=2.5?'#EF9F27':r.value>0?'#E24B4A':'rgba(255,255,255,.1)';
+      return '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" fill="'+c+'" rx="1"/>';
     }).join('');
-
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:6px 8px;gap:4px">' +
-        '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' +
-          bars +
-        '</svg>' +
-        '<div class="widget-sparkline-footer">' +
-          '<span>Avg <strong style="color:' + trendColor + '">' + data.avg + '</strong>/5</span>' +
-          '<span style="color:' + trendColor + '">' + trendArrow + ' ' + data.trend + '</span>' +
-          '<span>' + n + ' meetings</span>' +
-        '</div>' +
+    container.innerHTML=
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:6px 8px;gap:4px">'+
+        '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+bars+'</svg>'+
+        '<div class="widget-sparkline-footer">'+
+          '<span>Avg <strong style="color:'+tc+'">'+data.avg+'</strong>/5</span>'+
+          '<span style="color:'+tc+'">'+ta+' '+data.trend+'</span>'+
+          '<span>'+n+' meetings</span>'+
+        '</div>'+
       '</div>';
   }
 });
 
-console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, meeting_health_sparkline');
+console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline');
 
 })();
 </script>
