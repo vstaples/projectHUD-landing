@@ -5548,10 +5548,11 @@ function _widgetCtx() {
   };
 }
 window._widgetContext = _widgetCtx; // export for cross-block access
-function _wApi(path) {
+function _api(path) {
   const api = window.API || window._notesAPI;
   return api ? api.get(path).catch(function(){return[];}) : Promise.resolve([]);
 }
+window._wApi = _wApi; // export for Phase 2 widgets
 
 // ── Project picker helper — role-aware ────────────────────────────────────
 async function _getProjectsForPicker() {
@@ -5624,8 +5625,8 @@ window.WIDGET_REGISTRY.register({
     const cap   = Math.max(1, parseFloat(config.dailyCapacity)||8);
 
     const [aiRows, taskRows] = await Promise.all([
-      rid ? _wApi('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
-      uid ? _wApi('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500') : [],
+      rid ? _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
+      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500') : [],
     ]);
 
     const items = Array.isArray(aiRows) ? aiRows : [];
@@ -5689,7 +5690,7 @@ window.WIDGET_REGISTRY.register({
     const rid   = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
     const today = new Date().toISOString().slice(0,10);
-    const items = await _wApi('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500');
+    const items = await _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500');
     const all   = Array.isArray(items) ? items : [];
     return {
       total:    all.length,
@@ -5735,7 +5736,7 @@ window.WIDGET_REGISTRY.register({
     const uid   = config.targetUserId || ctx.userId;
     if (!uid) return null;
     const today = new Date().toISOString().slice(0,10);
-    const tasks = await _wApi('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500');
+    const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500');
     const all   = Array.isArray(tasks) ? tasks : [];
     const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||t.loe_hours||0);},0);
     return {
@@ -5783,13 +5784,13 @@ window.WIDGET_REGISTRY.register({
   dataFn: async function(config) {
     if (!config.projectId) return { ratings:[], avg:0, trend:'stable', noProject:true };
     const ctx = _widgetCtx();
-    const meetings = await _wApi(
+    const meetings = await _api(
       'v_meetings?select=id,meeting_date&firm_id=eq.'+ctx.firmId+
       '&project_id=eq.'+config.projectId+'&order=meeting_date.desc&limit=7'
     );
     if (!meetings||!meetings.length) return { ratings:[], avg:0, trend:'stable' };
     const ids = meetings.map(function(m){return m.id;});
-    const ratings = await _wApi('meeting_ratings?meeting_id=in.('+ids.join(',')+')'+'&select=meeting_id,rating');
+    const ratings = await _api('meeting_ratings?meeting_id=in.('+ids.join(',')+')'+'&select=meeting_id,rating');
     const rMap={};
     (ratings||[]).forEach(function(r){(rMap[r.meeting_id]=rMap[r.meeting_id]||[]).push(r.rating);});
     const result = meetings.slice().reverse().map(function(m,i){
@@ -5873,7 +5874,7 @@ window.WIDGET_REGISTRY.register({
       if (_res && _res.user_id) {
         userId = _res.user_id;
       } else {
-        const rRows = await _wApi('resources?id=eq.'+rid+'&select=id,user_id&limit=1');
+        const rRows = await _api('resources?id=eq.'+rid+'&select=id,user_id&limit=1');
         if (Array.isArray(rRows) && rRows[0] && rRows[0].user_id) {
           userId = rRows[0].user_id;
         }
@@ -5882,7 +5883,7 @@ window.WIDGET_REGISTRY.register({
     if (!userId) return { tasks:[], today:new Date().toISOString().slice(0,10), noUser:true };
     const today = new Date().toISOString().slice(0,10);
     // Fetch all tasks — filter client-side for safety
-    const tasks = await _wApi(
+    const tasks = await _api(
       'tasks?assigned_to=eq.'+userId+
       '&select=id,name,project_id,status,due_date,pct_complete'+
       '&order=due_date.asc.nullslast&limit=500'
@@ -5893,7 +5894,7 @@ window.WIDGET_REGISTRY.register({
     taskArr.forEach(function(t){ if (t.project_id) projIdSet[t.project_id]=true; });
     const projIds = Object.keys(projIdSet);
     const projects = projIds.length
-      ? await _wApi('projects?id=in.('+projIds.join(',')+')'+'&select=id,name&limit=200')
+      ? await _api('projects?id=in.('+projIds.join(',')+')'+'&select=id,name&limit=200')
       : [];
     const projMap = {};
     (Array.isArray(projects)?projects:[]).forEach(function(p){projMap[p.id]=p.name;});
@@ -5992,7 +5993,7 @@ window.WIDGET_REGISTRY.register({
       ? config.targetResourceId : ctx.resourceId;
     if (!rid) return null;
     const today = new Date().toISOString().slice(0,10);
-    const items = await _wApi(
+    const items = await _api(
       'workflow_action_items?owner_resource_id=eq.'+rid+
       '&status=eq.open&select=id,title,due_date,owner_name,created_by_name'+
       '&order=due_date.asc.nullslast&limit=100'
@@ -6074,7 +6075,7 @@ window.WIDGET_REGISTRY.register({
     weekStart.setDate(now.getDate() + diff);
     const weekStartStr = weekStart.toISOString().slice(0, 10);
 
-    const entries = await _wApi(
+    const entries = await _api(
       'time_entries?resource_id=eq.' + rid +
       '&week_start_date=eq.' + weekStartStr +
       '&select=hours,is_billable&limit=500'
