@@ -5858,56 +5858,54 @@ window.WIDGET_REGISTRY.register({
   configSchema: [
     { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
       templatePlaceholder:'Select person when launching' },
-    { key:'dailyCapacity',   label:'Daily capacity (hours)', type:'number', default:8 },
+    { key:'dailyCapacity',   label:'Capacity (target open items)', type:'number', default:16 },
   ],
   refreshInterval: 120000,
   minTileHeight:   'medium',
 
   dataFn: async function(config) {
-    const ctx = _widgetCtx();
     const { rid, uid } = _resolveTarget(config);
     if (!rid && !uid) return null;
     const today = new Date().toISOString().slice(0,10);
-    const cap   = Math.max(1, parseFloat(config.dailyCapacity)||8);
+    // dailyCapacity is reused as "target open items" — a simple workload ceiling.
+    // Default 16 = a reasonable ceiling for open tasks+actions before overload.
+    const cap = Math.max(1, parseFloat(config.dailyCapacity) || 16);
 
     const [aiRows, taskRows] = await Promise.all([
       rid ? _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
-      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours&limit=500') : [],
+      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date&limit=500') : [],
     ]);
 
     const items = Array.isArray(aiRows)   ? aiRows   : [];
     const tasks = Array.isArray(taskRows) ? taskRows : [];
     const all   = items.concat(tasks);
 
-    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||0);},0);
-    const hasHours   = totalHours > 0;
-    const used       = hasHours ? Math.min(totalHours, cap*2) : Math.min(all.length, cap*2);
-    const pct        = Math.round((used/cap)*100);
+    // Load % = open item count vs capacity ceiling. Capped at 200% for display.
+    const count = all.length;
+    const pct   = Math.round((count / cap) * 100);
 
     return {
-      total:    all.length,
+      total:    count,
       overdue:  all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
       dueToday: all.filter(function(i){return i.due_date===today;}).length,
       upcoming: all.filter(function(i){return i.due_date&&i.due_date>today;}).length,
-      used:Math.round(used*10)/10, cap, pct, hasHours,
-      totalHours:Math.round(totalHours*10)/10,
+      cap, pct,
+      // hasHours always false now — count mode only, avoids misleading hour math
+      hasHours: false,
+      totalHours: 0,
     };
   },
 
   renderFn: function(data, container) {
     if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const pct   = Math.min(data.pct, 100);
+    const pct   = Math.min(data.pct, 200); // allow display up to 200%
     const color = pct>=100?'#E24B4A':pct>=75?'#EF9F27':'#1D9E75';
-    const centerVal = data.hasHours ? data.totalHours+'h' : data.pct+'%';
-    const centerLbl = data.hasHours ? 'HOURS LOAD' : '% LOAD';
-    const stat1Lbl  = data.hasHours ? data.cap+'h cap' : 'Open';
-    const stat1Val  = data.hasHours ? data.totalHours  : data.total;
     container.innerHTML=
       '<div class="widget-counter">'+
-        '<div class="wc-big" style="color:'+color+'">'+centerVal+'</div>'+
-        '<div class="wc-label">'+centerLbl+'</div>'+
+        '<div class="wc-big" style="color:'+color+'">'+data.pct+'%</div>'+
+        '<div class="wc-label">LOAD · '+data.total+' open / '+data.cap+' target</div>'+
         '<div class="widget-stat-row" style="margin-top:4px">'+
-          '<div class="wsr-item"><div class="wsr-val">'+stat1Val+'</div><div class="wsr-lbl">'+stat1Lbl+'</div></div>'+
+          '<div class="wsr-item"><div class="wsr-val">'+data.total+'</div><div class="wsr-lbl">Open</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#E24B4A">'+data.overdue+'</div><div class="wsr-lbl">Overdue</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#EF9F27">'+data.dueToday+'</div><div class="wsr-lbl">Today</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#4A9EFF">'+data.upcoming+'</div><div class="wsr-lbl">Upcoming</div></div>'+
