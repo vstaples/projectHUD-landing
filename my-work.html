@@ -571,6 +571,7 @@ window._mwLoadUserView = async function() {
       <button class="ust"    data-tab="timesheet"  onclick="uSwitchTab('timesheet',this)">My Time</button>
       <button class="ust"    data-tab="calendar"   onclick="uSwitchTab('calendar',this)">My Calendar</button>
       <button class="ust"    data-tab="meetings"   onclick="uSwitchTab('meetings',this)">My Meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="views"      onclick="uSwitchTab('views',this)">My Views</button>
       <button class="ust"    data-tab="concerns"   onclick="uSwitchTab('concerns',this)">My Notes <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
       <button class="ust"    data-tab="requests"   onclick="uSwitchTab('requests',this)">My Requests <span id="ust-requests-badge" class="ust-badge" style="display:none"></span></button>
     </div>
@@ -1025,6 +1026,11 @@ window._mwLoadUserView = async function() {
     <!-- Tab: MEETINGS -->
     <div class="utc" id="utc-meetings">
       <div id="user-meetings-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading meetings…</div></div>
+    </div>
+
+    <!-- Tab: MY VIEWS — my-views.html injected here on first activation -->
+    <div class="utc" id="utc-views">
+      <div id="views-root"></div>
     </div>
 
     <!-- Tab: CONCERNS -->
@@ -4918,6 +4924,9 @@ window.uSwitchTab = function(tab, btn) {
     window._notesStartInboxPoll();
     if (window._notesStartPingSystem) window._notesStartPingSystem();
   }
+  // MY VIEWS — flush save and manage polls same as MY NOTES
+  if (_uActiveTab === 'views' && tab !== 'views' && window._notesSaveNow) window._notesSaveNow();
+  if (tab === 'views' && window._notesStartInboxPoll) window._notesStartInboxPoll();
   _uActiveTab = tab;
   localStorage.setItem('compass-user-tab', tab);
   document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
@@ -4929,6 +4938,8 @@ window.uSwitchTab = function(tab, btn) {
   else if (tab === 'meetings' && window._mtgRefresh) window._mtgRefresh();
   if (tab === 'concerns' && !window._notesLoaded) loadMyNotesView();
   else if (tab === 'concerns' && window._notesRefresh) window._notesRefresh();
+  if (tab === 'views' && !window._myViewsLoaded) loadMyViewsView();
+  else if (tab === 'views' && window._viewsRefresh) window._viewsRefresh();
   if (tab === 'calendar' && !window._calLoaded) loadMyCalView();
   else if (tab === 'calendar' && window._calRefresh) window._calRefresh();
   if (tab === 'requests' && !window._requestsLoaded) loadUserRequests();
@@ -5201,6 +5212,44 @@ window.loadMyNotesView = async function() {
   } catch(err) {
     console.error('[Compass] Failed to load my-notes.html:', err);
     compassToast('Failed to load My Notes — check console', 4000);
+  }
+};
+
+window.loadMyViewsView = async function() {
+  if (window._myViewsLoaded) {
+    window._viewsRefresh && window._viewsRefresh();
+    return;
+  }
+  const container = document.getElementById('views-root');
+  if (!container) { console.error('[Compass] #views-root not found'); return; }
+  container.innerHTML = '';
+  try {
+    const resp = await fetch('/my-views.html');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(html, 'text/html');
+    for (const st of doc.querySelectorAll('style')) {
+      const el = document.createElement('style');
+      el.textContent = st.textContent;
+      document.head.appendChild(el);
+    }
+    Array.from(doc.body.childNodes).forEach(node => {
+      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
+    });
+    for (const s of doc.querySelectorAll('script')) {
+      const el = document.createElement('script');
+      el.textContent = s.textContent;
+      document.head.appendChild(el);
+    }
+    // Bridge resource — same pattern as MY NOTES
+    window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
+    window._myViewsLoaded = true;
+    if (window._viewsLoadView) await window._viewsLoadView();
+    else console.error('[Compass] _viewsLoadView not exported by my-views.html');
+  } catch(err) {
+    console.error('[Compass] Failed to load my-views.html:', err);
+    compassToast('Failed to load My Views — check console', 4000);
   }
 };
 
