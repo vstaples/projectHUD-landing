@@ -2158,32 +2158,48 @@ function _notesEditTemplate() {
 window._notesEditTemplate = _notesEditTemplate;
 
 function _notesRenderViewSwitcher() {
-  const sel  = document.getElementById('notes-view-switcher');
-  const name = document.getElementById('notes-view-name');
+  const sel = document.getElementById('notes-view-switcher');
   if (!sel) return;
   const views = Object.keys(_workspace.views);
-  sel.innerHTML = views.map(v =>
-    '<option value="' + _esc(v) + '"' + (v === _workspace.activeView ? ' selected' : '') + '>' +
-    _esc(v) + '</option>'
-  ).join('');
-  // Show/hide template description bar and Edit Template button
+  sel.innerHTML = views.map(function(v) {
+    const viewData = _workspace.views[v];
+    const label = (viewData && viewData._isSharedView)
+      ? '\u21aa ' + (viewData._sharedViewName || v)
+      : v;
+    return '<option value="' + _esc(v) + '"' + (v === _workspace.activeView ? ' selected' : '') + '>' + _esc(label) + '</option>';
+  }).join('');
   const cv = _cv();
   const srcName = cv.clonedFrom || null;
   const tpl = srcName ? (_workspace.library || {})[srcName] : null;
   const descBar = document.getElementById('notes-tpl-desc-bar');
   const editBtn = document.getElementById('notes-edit-tpl-btn');
   if (tpl && tpl.description && descBar) {
-    descBar.textContent = '▦ ' + srcName + ' — ' + tpl.description;
+    descBar.textContent = '\u25a6 ' + srcName + ' \u2014 ' + tpl.description;
     descBar.style.display = 'block';
   } else if (descBar) {
     descBar.style.display = 'none';
   }
-  if (editBtn) editBtn.style.display = tpl ? '' : 'none';
-  // Add rename on double-click
+  // Shared-view indicator bar
+  var sharedBar = document.getElementById('notes-shared-view-bar');
+  if (!sharedBar) {
+    sharedBar = document.createElement('div');
+    sharedBar.id = 'notes-shared-view-bar';
+    sharedBar.style.cssText = 'display:none;padding:3px 16px;font-family:var(--font-mono,monospace);font-size:10px;color:rgba(0,210,255,.6);background:rgba(0,210,255,.03);border-bottom:1px solid rgba(0,210,255,.06)';
+    var descBarEl = document.getElementById('notes-tpl-desc-bar');
+    if (descBarEl && descBarEl.parentNode) descBarEl.parentNode.insertBefore(sharedBar, descBarEl.nextSibling);
+  }
+  if (cv._isSharedView) {
+    sharedBar.textContent = '\u21aa Shared view \u00b7 Read-only';
+    sharedBar.style.display = 'block';
+  } else {
+    sharedBar.style.display = 'none';
+  }
+  if (editBtn) editBtn.style.display = (tpl && !cv._isSharedView) ? '' : 'none';
   const sel2 = document.getElementById('notes-view-switcher');
   if (sel2 && !sel2._renameWired) {
     sel2._renameWired = true;
-    sel2.addEventListener('dblclick', () => {
+    sel2.addEventListener('dblclick', function() {
+      if (_cv()._isSharedView) return;
       _notesShowRenameViewDialog(_workspace.activeView);
     });
   }
@@ -2328,16 +2344,21 @@ function _notesShowRenameViewDialog(currentName) {
 
 function _notesRenameView(newName) {
   if (!newName || newName === _workspace.activeView) return;
-  if (_workspace.views[newName]) {
-    // Name already taken — revert
-    return;
-  }
+  if (_workspace.views[newName]) { return; }
   const oldName = _workspace.activeView;
   _workspace.views[newName] = _workspace.views[oldName];
   delete _workspace.views[oldName];
   _workspace.activeView = newName;
   _notesSaveWorkspace(true);
   _notesRenderViewSwitcher();
+  // STEP 5: keep view_participants in sync so participant heartbeats stay aligned
+  if (_userId) {
+    API.patch(
+      'view_participants?workspace_owner_user_id=eq.' + _userId +
+      '&view_name=eq.' + encodeURIComponent(oldName),
+      { view_name: newName }
+    ).catch(function(e) { console.warn('[Compass] Rename view_participants failed:', e); });
+  }
 }
 
 function _notesClearWorkspace() {
@@ -4198,9 +4219,14 @@ window._notesShowShareViewDialog = async function() {
       return '<div style="margin-top:12px"><div class="ntd-label" style="margin-bottom:6px">Tile edit permissions <span style="text-transform:none;letter-spacing:0;color:var(--text3)">(viewers only)</span></div><div style="overflow-x:auto"><div style="min-width:max-content">' + hdr + body + '</div></div></div>';
     }
 
+    // Destroy and recreate overlay each render to avoid accumulated event listeners
     var overlay = document.getElementById('nvsd-overlay');
-    if (!overlay) { overlay = document.createElement('div'); overlay.id = 'nvsd-overlay'; document.body.appendChild(overlay); }
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'nvsd-overlay';
     overlay.className = 'ntd-overlay';
+    document.body.appendChild(overlay);
+
     overlay.innerHTML =
       '<div class="ntd-dialog" style="width:540px;max-height:86vh;display:flex;flex-direction:column">' +
         '<div class="ntd-header"><div class="ntd-sub">Share View</div><div class="ntd-title">' + _esc(viewName) + '</div></div>' +
@@ -4221,8 +4247,9 @@ window._notesShowShareViewDialog = async function() {
         '</div>' +
       '</div>';
 
+    // Wire once — fresh overlay element, no accumulated listeners
     overlay.querySelector('#nvsd-cancel').onclick = function() { overlay.remove(); };
-    overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
     overlay.querySelectorAll('.nvsd-role-sel').forEach(function(sel) {
       sel.onchange = function() {
@@ -4236,12 +4263,17 @@ window._notesShowShareViewDialog = async function() {
 
     overlay.querySelectorAll('.nvsd-remove').forEach(function(btn) {
       btn.onclick = async function() {
+        // Disable immediately to prevent double-fire
+        btn.disabled = true;
+        btn.style.opacity = '0.3';
         const pid  = btn.dataset.pid;
         const vkey = _vpViewKey(userId, viewName);
         const part = (_viewParticipants[vkey]||[]).find(function(p){ return p.id===pid; });
         if (!part) return;
         try {
           await API.del('view_participants?id=eq.' + pid);
+          // Remove from local cache immediately
+          _viewParticipants[vkey] = (_viewParticipants[vkey]||[]).filter(function(p){ return p.id !== pid; });
           if (part.user_id) {
             const myName = (window._notesResource && window._notesResource.name) || 'Someone';
             await API.post('notes', {
@@ -4253,6 +4285,7 @@ window._notesShowShareViewDialog = async function() {
             }).catch(function(){});
           }
         } catch(e) { console.warn('[Compass] Remove view participant error:', e); }
+        // Re-fetch to ensure cache is accurate, then re-render
         await _notesLoadViewParticipants(userId, viewName);
         renderDialog();
       };
