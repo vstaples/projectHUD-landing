@@ -6599,10 +6599,11 @@ window.WIDGET_REGISTRY.register({
 
     const tasks = await _api(
       'tasks?assigned_to=eq.'+uid+
-      '&status=neq.complete&status=neq.cancelled' +
+      '&status=neq.complete' +
       '&select=id,name,due_date,budget_hours,effort_days,status,pct_complete&limit=500'
     );
-    const all = Array.isArray(tasks) ? tasks : [];
+    // Filter cancelled client-side — 'cancelled' may not exist in the task_status enum
+    const all = (Array.isArray(tasks) ? tasks : []).filter(function(t){ return t.status !== 'cancelled'; });
 
     // Bucket: tasks that are overdue OR due on/before next Sunday.
     // Excludes tasks with no due date and tasks due beyond next Sunday.
