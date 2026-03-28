@@ -1301,6 +1301,13 @@ function _notesTileHTML(note, tileState, readOnly) {
   const titleEditable = readOnly ? 'false' : 'true';
   const canvasReadOnly = readOnly ? ' readonly' : '';
 
+  // Block canvas vs textarea — computed before return
+  const useBlocks = typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
+  const canvasHtml = useBlocks
+    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
+    : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
+        'placeholder="' + (readOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
+        (readOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
   return '<div class="notes-tile-header" style="position:relative">' +
     '<div class="notes-tile-title" contenteditable="' + titleEditable + '" spellcheck="false" ' +
       'data-noteid="' + _esc(note.id) + '" ' +
@@ -1322,13 +1329,6 @@ function _notesTileHTML(note, tileState, readOnly) {
     '</div>' +
     '<div class="notes-tile-body" id="notes-tbody-' + note.id + '" ' +
       'style="' + (tileState?.minimized ? 'display:none' : '') + '">' +
-  // Block canvas vs textarea
-  const useBlocks = typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
-  const canvasHtml = useBlocks
-    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
-    : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
-        'placeholder="' + (readOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
-        (readOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
     canvasHtml +
     '<div class="notes-chat' + (chatOpen ? '' : ' hidden') + '" id="notes-chat-' + note.id + '">' +
       '<div class="notes-chat-msgs" id="notes-chat-msgs-' + note.id + '">' +
