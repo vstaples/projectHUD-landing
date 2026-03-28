@@ -5825,12 +5825,12 @@ window.WIDGET_REGISTRY.register({
 
 console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline, billability_bars, task_list, action_item_list');
 // ── 6. TASK LIST ─────────────────────────────────────────────────────────────
-// Scrollable list of open tasks for a user with due date + status
+// Query matches my-work.html: tasks assigned_to=user_id, status neq complete/cancelled
 window.WIDGET_REGISTRY.register({
   id:              'task_list',
   label:           'Task list',
   category:        'personal',
-  description:     'Scrollable list of open tasks with due dates and status',
+  description:     'Scrollable list of open tasks with progress and due dates',
   icon:            'list',
   configSchema: [
     { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
@@ -5840,65 +5840,90 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    const ctx = _widgetCtx();
-    const rid = config.targetResourceId || ctx.resourceId;
+    const ctx  = _widgetCtx();
+    const rid  = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
+    // Resolve user_id from resource_id (tasks use assigned_to = user_id)
+    const resources = await _wApi('resources?id=eq.'+rid+'&select=id,user_id&limit=1');
+    const userId = (Array.isArray(resources) && resources[0]) ? resources[0].user_id : null;
+    if (!userId) return { tasks:[], today:new Date().toISOString().slice(0,10), noUser:true };
     const today = new Date().toISOString().slice(0,10);
-    // Get task assignments for this resource
-    const assignments = await _wApi(
-      'task_resource_assignments?resource_id=eq.'+rid+
-      '&select=task_id,tasks(id,name,status,due_date,priority)&limit=100'
+    const tasks = await _wApi(
+      'tasks?assigned_to=eq.'+userId+
+      '&status=neq.complete&select=id,name,project_id,status,due_date,pct_complete'+
+      '&order=due_date.asc.nullslast&limit=200'
     );
-    const rows = (Array.isArray(assignments) ? assignments : [])
-      .map(function(a) { return a.tasks; })
-      .filter(function(t) { return t && t.status !== 'completed' && t.status !== 'cancelled'; });
-    rows.sort(function(a, b) {
-      // Sort: overdue first, then due today, then by due date, then no date
-      const da = a.due_date || '9999';
-      const db = b.due_date || '9999';
-      return da < db ? -1 : da > db ? 1 : 0;
-    });
-    return { tasks: rows, today: today };
+    const projIds = [...new Set((Array.isArray(tasks)?tasks:[]).map(function(t){return t.project_id;}).filter(Boolean))];
+    const projects = projIds.length
+      ? await _wApi('projects?id=in.('+projIds.join(',')+')'+'&select=id,name&limit=200')
+      : [];
+    const projMap = {};
+    (Array.isArray(projects)?projects:[]).forEach(function(p){projMap[p.id]=p.name;});
+    const rows = (Array.isArray(tasks)?tasks:[])
+      .filter(function(t){return t.status!=='cancelled';})
+      .filter(function(t){const p=parseFloat(t.pct_complete)||0;const n=p<=1&&p>0?Math.round(p*100):Math.round(p);return n<100;})
+      .map(function(t){
+        const p=parseFloat(t.pct_complete)||0;
+        const pct=p<=1&&p>0?Math.round(p*100):Math.round(p);
+        const overdue=t.due_date&&t.due_date<today;
+        return {id:t.id,title:t.name,project:projMap[t.project_id]||'',status:t.status,due:t.due_date,overdue,pct};
+      });
+    return {tasks:rows,today};
   },
 
   renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const { tasks, today } = data;
+    if (!data) {container.innerHTML='<div class="widget-error">No data</div>';return;}
+    if (data.noUser) {container.innerHTML='<div class="widget-error" style="font-size:10px">Person has no user account</div>';return;}
+    const {tasks,today} = data;
     if (!tasks.length) {
-      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">0</div><div class="wc-label">open tasks</div></div>';
+      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">\u2713</div><div class="wc-label">No open tasks</div></div>';
       return;
     }
-    const statusColor = { 'in_progress':'#00D2FF','not_started':'rgba(255,255,255,.3)','on_hold':'#EF9F27','blocked':'#E24B4A' };
-    const statusLabel = { 'in_progress':'IN PROGRESS','not_started':'NOT STARTED','on_hold':'ON HOLD','blocked':'BLOCKED' };
-    const rows = tasks.map(function(t) {
-      const overdue = t.due_date && t.due_date < today;
-      const dueToday = t.due_date === today;
-      const dateColor = overdue ? '#E24B4A' : dueToday ? '#EF9F27' : 'rgba(255,255,255,.3)';
-      const dateText  = !t.due_date ? '' : overdue ? 'OVERDUE' : dueToday ? 'TODAY' :
-        new Date(t.due_date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      const sc = statusColor[t.status] || 'rgba(255,255,255,.3)';
-      const sl = statusLabel[t.status] || (t.status||'').toUpperCase();
-      return '<div style="display:flex;align-items:baseline;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);min-width:0">' +
-        '<div style="width:5px;height:5px;border-radius:50%;background:'+sc+';flex-shrink:0;margin-top:4px"></div>' +
-        '<div style="flex:1;min-width:0;font-family:var(--font-ui,\"Barlow Condensed\",sans-serif);font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title=\"'+ _esc(t.name||'')  +'\">'+ _esc(t.name||'Untitled') +'</div>' +
-        (dateText ? '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+dateColor+';flex-shrink:0;letter-spacing:.04em">'+dateText+'</div>' : '') +
+    function fmtDue(due,overdue) {
+      if (!due) return '<span style="color:rgba(255,255,255,.25);font-size:11px">\u2014</span>';
+      if (overdue) {
+        const days=Math.round((new Date(today)-new Date(due))/86400000);
+        return '<span style="font-size:11px;font-weight:700;color:#E24B4A">'+days+'d</span>';
+      }
+      const isToday=due===today;
+      return '<span style="font-size:11px;color:'+(isToday?'#EF9F27':'rgba(255,255,255,.4)')+'">'+
+        (isToday?'Today':new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}))+'</span>';
+    }
+    function fmtBtn(t) {
+      if (t.status==='blocked')      return '<span style="font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:1px 5px">BLOCKED</span>';
+      if (t.status==='in_progress')  return '<span style="font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:1px 5px">IN PROG</span>';
+      return '<span style="font-size:10px;font-weight:600;color:rgba(0,210,255,.7);border:1px solid rgba(0,210,255,.3);padding:1px 5px">START</span>';
+    }
+    const overdueCnt=tasks.filter(function(t){return t.overdue;}).length;
+    const rowsHtml=tasks.map(function(t){
+      const fc=t.pct>=80?'#1D9E75':t.pct>=40?'#00D2FF':'rgba(255,255,255,.2)';
+      const bar=t.pct>0
+        ?'<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:3px"><div style="height:100%;width:'+Math.min(t.pct,100)+'%;background:'+fc+';border-radius:2px"></div></div>'
+        :'';
+      return '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);'+(t.overdue?'border-left:2px solid #E24B4A;':'')+'">' +
+        '<div style="min-width:0">' +
+          '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(t.title)+'">'+_esc(t.title)+'</div>' +
+          (t.project?'<div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(t.project)+'</div>':'') +
+          bar +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">'+fmtDue(t.due,t.overdue)+'</div>' +
+        '<div style="flex-shrink:0">'+fmtBtn(t)+'</div>' +
       '</div>';
     }).join('');
-    const overdue = tasks.filter(function(t){return t.due_date&&t.due_date<today;}).length;
     container.innerHTML=
       '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 10px 4px;flex-shrink:0">' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Tasks</div>' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdue>0?'#E24B4A':'rgba(255,255,255,.3)')+'">' +
-            tasks.length+' open'+(overdue>0?' · '+overdue+' overdue':'')+'</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px 3px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Tasks</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdueCnt>0?'#E24B4A':'rgba(255,255,255,.3)')+'">'+
+            tasks.length+' open'+(overdueCnt>0?' \u00b7 '+overdueCnt+' overdue':'')+'</span>' +
         '</div>' +
-        '<div style="flex:1;overflow-y:auto;padding:0 10px 6px">' + rows + '</div>' +
+        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>' +
       '</div>';
   }
 });
 
 // ── 7. ACTION ITEM LIST ───────────────────────────────────────────────────────
-// Scrollable list of open action items for a user with due date + status
+// Query matches my-work.html: workflow_action_items owner_resource_id=resource_id, status=open
 window.WIDGET_REGISTRY.register({
   id:              'action_item_list',
   label:           'Action item list',
@@ -5919,45 +5944,55 @@ window.WIDGET_REGISTRY.register({
     const today = new Date().toISOString().slice(0,10);
     const items = await _wApi(
       'workflow_action_items?owner_resource_id=eq.'+rid+
-      '&status=eq.open&select=id,title,due_date,priority,source_type&order=due_date.asc.nullslast&limit=100'
+      '&status=eq.open&select=id,title,due_date,owner_name,created_by_name'+
+      '&order=due_date.asc.nullslast&limit=100'
     );
-    const rows = Array.isArray(items) ? items : [];
-    return { items: rows, today: today };
+    const rows = (Array.isArray(items)?items:[]).map(function(a){
+      const overdue=a.due_date&&a.due_date<today;
+      return {id:a.id,title:a.title,due:a.due_date,overdue,createdBy:a.created_by_name||null};
+    });
+    return {items:rows,today};
   },
 
   renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const { items, today } = data;
+    if (!data) {container.innerHTML='<div class="widget-error">No data</div>';return;}
+    const {items,today} = data;
     if (!items.length) {
-      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">0</div><div class="wc-label">open action items</div></div>';
+      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">\u2713</div><div class="wc-label">No open action items</div></div>';
       return;
     }
-    const rows = items.map(function(item) {
-      const overdue  = item.due_date && item.due_date < today;
-      const dueToday = item.due_date === today;
-      const dateColor = overdue ? '#E24B4A' : dueToday ? '#EF9F27' : 'rgba(255,255,255,.3)';
-      const dateText  = !item.due_date ? '' : overdue ? 'OVERDUE' : dueToday ? 'TODAY' :
-        new Date(item.due_date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      const dotColor = overdue ? '#E24B4A' : dueToday ? '#EF9F27' : '#00D2FF';
-      return '<div style="display:flex;align-items:baseline;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);min-width:0">' +
-        '<div style="width:5px;height:5px;border-radius:50%;background:'+dotColor+';flex-shrink:0;margin-top:4px"></div>' +
-        '<div style="flex:1;min-width:0;font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title||'')+'">'+_esc(item.title||'Untitled')+'</div>' +
-        (dateText ? '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+dateColor+';flex-shrink:0;letter-spacing:.04em">'+dateText+'</div>' : '') +
+    function fmtDue(due,overdue) {
+      if (!due) return '<span style="color:rgba(255,255,255,.25);font-size:11px">\u2014</span>';
+      if (overdue) {
+        const days=Math.round((new Date(today)-new Date(due))/86400000);
+        return '<span style="font-size:11px;font-weight:700;color:#E24B4A">'+days+'d</span>';
+      }
+      const isToday=due===today;
+      return '<span style="font-size:11px;color:'+(isToday?'#EF9F27':'rgba(255,255,255,.4)')+'">'+
+        (isToday?'Today':new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}))+'</span>';
+    }
+    const overdueCnt=items.filter(function(i){return i.overdue;}).length;
+    const rowsHtml=items.map(function(item){
+      return '<div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);'+(item.overdue?'border-left:2px solid #E24B4A;':'')+'">' +
+        '<div style="min-width:0">' +
+          '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title)+'">'+_esc(item.title)+'</div>' +
+          (item.createdBy?'<div style="font-size:10px;color:var(--text3)">from '+_esc(item.createdBy)+'</div>':'') +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">'+fmtDue(item.due,item.overdue)+'</div>' +
       '</div>';
     }).join('');
-    const overdue = items.filter(function(i){return i.due_date&&i.due_date<today;}).length;
-    const dueToday = items.filter(function(i){return i.due_date===today;}).length;
     container.innerHTML=
       '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 10px 4px;flex-shrink:0">' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Action Items</div>' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdue>0?'#E24B4A':dueToday>0?'#EF9F27':'rgba(255,255,255,.3)')+'">' +
-            items.length+' open'+(overdue>0?' · '+overdue+' overdue':dueToday>0?' · '+dueToday+' today':'')+'</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px 3px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Action Items</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdueCnt>0?'#E24B4A':'rgba(255,255,255,.3)')+'">'+
+            items.length+' open'+(overdueCnt>0?' \u00b7 '+overdueCnt+' overdue':'')+'</span>' +
         '</div>' +
-        '<div style="flex:1;overflow-y:auto;padding:0 10px 6px">' + rows + '</div>' +
+        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>' +
       '</div>';
   }
 });
+
 
 
 
