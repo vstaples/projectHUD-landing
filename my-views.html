@@ -471,7 +471,7 @@ window._viewsLoadView = async function() {
         if (cv && cv.tiles && window.WIDGET_REGISTRY) {
           cv.tiles.forEach(function(tile) {
             if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
-            var tileEl = document.querySelector('.views-tile[data-viewid="' + tile.noteId + '"]');
+            var tileEl = document.querySelector('.notes-tile[data-noteid="' + tile.noteId + '"]');
             if (!tileEl) return;
             var canvas = tileEl.querySelector('.tile-canvas');
             if (!canvas) return;
@@ -1166,8 +1166,8 @@ function _notesRenderGrid() {
   // dataset.widgetRendered guard, preventing dataFn from re-firing on every
   // _notesRenderGrid call (which would otherwise cause continuous API polls).
   const existingWidgetEls = {};
-  gridArea.querySelectorAll('.views-tile[data-viewid]').forEach(function(el) {
-    const nid = el.dataset.viewid;
+  gridArea.querySelectorAll('.notes-tile[data-noteid]').forEach(function(el) {
+    const nid = el.dataset.noteid;
     const canvas = el.querySelector('.tile-canvas');
     if (canvas && canvas.dataset.widgetRendered) {
       existingWidgetEls[nid] = el;
@@ -1572,7 +1572,7 @@ function _notesOpenNote(noteId) {
 
   // Already in grid with valid row — scroll to it
   if (cv.tiles.some(t => t.noteId === noteId && validIds.has(t.row))) {
-    const tileEl = document.querySelector('.views-tile[data-viewid="' + noteId + '"]');
+    const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
     if (tileEl) tileEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
@@ -1656,7 +1656,7 @@ function _notesToggleChat(noteId) {
     if (tile.chatOpen) _notesLoadAndRenderMsgs(noteId);
   }
   // Update SVG icon fill and opacity
-  const tileEl = document.querySelector('.views-tile[data-viewid="' + noteId + '"]');
+  const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
   if (tileEl) {
     const btn  = tileEl.querySelector('[title="Toggle chat"]');
     const path = btn?.querySelector('path');
@@ -1692,7 +1692,7 @@ async function _notesNew(rowId, slot) {
           window._viewsShowWidgetPicker(tileState);
         } else {
           // Fallback — try clicking the mode button if it was injected in time
-          const tileEl = document.querySelector('.views-tile[data-viewid="' + placeholderId + '"]');
+          const tileEl = document.querySelector('.notes-tile[data-noteid="' + placeholderId + '"]');
           const btn = tileEl && tileEl.querySelector('.tile-header-mode-btn');
           if (btn) btn.click();
         }
@@ -3176,7 +3176,7 @@ window._notesCloneView = async function() {
         if (cv && cv.tiles && window.WIDGET_REGISTRY && window._widgetContext) {
           cv.tiles.forEach(function(tile) {
             if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
-            var tileEl = document.querySelector('.views-tile[data-viewid="' + tile.noteId + '"]');
+            var tileEl = document.querySelector('.notes-tile[data-noteid="' + tile.noteId + '"]');
             if (!tileEl) return;
             var canvas = tileEl.querySelector('.tile-canvas');
             if (!canvas) return;
@@ -3232,7 +3232,7 @@ function _notesSwitchView(viewName) {
       if (cv && cv.tiles && window.WIDGET_REGISTRY && window._widgetContext) {
         cv.tiles.forEach(function(tile) {
           if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
-          var tileEl = document.querySelector('.views-tile[data-viewid="' + tile.noteId + '"]');
+          var tileEl = document.querySelector('.notes-tile[data-noteid="' + tile.noteId + '"]');
           if (!tileEl) return;
           var canvas = tileEl.querySelector('.tile-canvas');
           if (!canvas) return;
@@ -3864,10 +3864,10 @@ function _notesDndInit() {
   // ── Grid: standard HTML5 drag (no overflow:auto issue there) ─────────────
   shell.addEventListener('dragstart', e => {
     // Block tile/chip rearrangement when view is locked
-    if (_cv().locked && e.target.closest?.('.views-tile[data-viewid]')) {
+    if (_cv().locked && e.target.closest?.('.notes-tile[data-noteid]')) {
       e.preventDefault(); return;
     }
-    const tile = e.target.closest?.('.views-tile[data-viewid]');
+    const tile = e.target.closest?.('.notes-tile[data-noteid]');
     const chip = e.target.closest?.('.views-tray-chip[data-viewid]');
     const item = e.target.closest?.('.views-item[data-viewid]');
     if (tile && !e.target.closest?.('.views-tile-title[contenteditable]')) {
@@ -4108,7 +4108,7 @@ function _notesMaximizeTile(noteId) {
 
   if (!isMaximized) {
     // Maximize this tile
-    const tileEl = document.querySelector('.views-tile[data-viewid="' + noteId + '"]');
+    const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
     if (!tileEl) return;
     // Restore if minimized first
     if (tileEl.classList.contains('minimized')) _notesMinimizeTile(noteId);
@@ -4484,7 +4484,7 @@ window._viewsDiag = function() {
 
   // Check each widget tile
   widgetTiles.forEach(function(t) {
-    var tileEl = document.querySelector('.views-tile[data-viewid="' + t.noteId + '"]');
+    var tileEl = document.querySelector('.notes-tile[data-noteid="' + t.noteId + '"]');
     var canvas = tileEl ? tileEl.querySelector('.tile-canvas') : null;
     lines.push('Widget tile: ' + t.widgetId + ' | noteId: ' + t.noteId);
     lines.push('  tileEl found: ' + !!tileEl);
@@ -4497,14 +4497,14 @@ window._viewsDiag = function() {
   });
 
   lines.push('');
-  lines.push('DOM .views-tile[data-viewid] count: ' + document.querySelectorAll('.views-tile[data-viewid]').length);
+  lines.push('DOM .views-tile[data-viewid] count: ' + document.querySelectorAll('.notes-tile[data-noteid]').length);
   lines.push('DOM .notes-tile[data-noteid] count: ' + document.querySelectorAll('.notes-tile[data-noteid]').length);
   lines.push('DOM .tile-canvas count: ' + document.querySelectorAll('.tile-canvas').length);
 
   // Try a manual render of the first widget tile
   if (widgetTiles.length && window.WIDGET_REGISTRY && window._widgetContext) {
     var t = widgetTiles[0];
-    var tileEl = document.querySelector('.views-tile[data-viewid="' + t.noteId + '"]');
+    var tileEl = document.querySelector('.notes-tile[data-noteid="' + t.noteId + '"]');
     var canvas = tileEl ? tileEl.querySelector('.tile-canvas') : null;
     lines.push('');
     lines.push('Manual render attempt on: ' + t.widgetId);
@@ -6282,7 +6282,7 @@ function applyWidget(widgetId, config, tileState) {
     newNoteId = 'wt-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
     tileState.noteId = newNoteId;
     // Update the DOM element's data-viewid so refreshTileWidget can find it
-    const oldEl = document.querySelector('.views-tile[data-viewid="' + noteId + '"]');
+    const oldEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
     if (oldEl) oldEl.dataset.noteid = newNoteId;
   }
   tileState.isPlaceholder = false;
@@ -6297,7 +6297,7 @@ function applyWidget(widgetId, config, tileState) {
 
 // ── Refresh a specific tile's widget rendering ────────────────────────────
 function refreshTileWidget(noteId) {
-  const tileEl = document.querySelector('.views-tile[data-viewid="' + noteId + '"]');
+  const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
   if (!tileEl) return;
   const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
@@ -6321,7 +6321,7 @@ window._viewsPostWire = function() {
   if (!cv) return;
   const isLocked = !!cv.locked;
   cv.tiles.forEach(function(tileState) {
-    const tileEl = document.querySelector('.views-tile[data-viewid="' + tileState.noteId + '"]');
+    const tileEl = document.querySelector('.notes-tile[data-noteid="' + tileState.noteId + '"]');
     if (!tileEl) return;
     // Don't inject mode switcher on locked views — prevents widget/note switching
     if (!isLocked) injectModeSwitcher(tileEl, tileState);
