@@ -5512,11 +5512,16 @@ console.log('[Widgets] Phase 1 infrastructure loaded. Registry:', WIDGET_REGISTR
 </script>
 
 <script>
-// ── Widget Library — Phase 2: Three core widgets ──────────────────────────
+// ── Widget Library — Phase 2 ──────────────────────────────────────────────
+// Fixed: window.API → bare API global (compass declares it as const, not window.API)
+// Fixed: status=neq.completed → status=neq.complete (matches actual DB values)
+// Fixed: setTimeout re-fires moved to AFTER all widget registrations
+// Added: console diagnostics throughout dataFn pipeline
 (function() {
 'use strict';
 
 const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
+const P2 = '[W2]'; // log prefix — short, scannable in console
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function _esc(s) {
@@ -5524,43 +5529,75 @@ function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── API resolver ─────────────────────────────────────────────────────────
+// compass.html declares `const API = ...` at page scope — that is NOT a
+// property of window, so `window.API` is undefined inside an IIFE.
+// We must use `typeof API` to reach the bare global safely.
+function _resolveApi() {
+  if (typeof API !== 'undefined' && API && typeof API.get === 'function') return API;
+  if (window._notesAPI && typeof window._notesAPI.get === 'function') return window._notesAPI;
+  return null;
+}
+
 function _api(path) {
-  const api = window.API || window._notesAPI;
-  if (!api) return Promise.resolve([]);
-  return api.get(path).catch(function() { return []; });
+  const api = _resolveApi();
+  if (!api) {
+    console.warn(P2, '_api() — no API object available for path:', path);
+    return Promise.resolve([]);
+  }
+  return api.get(path).catch(function(err) {
+    console.error(P2, '_api() fetch error:', path, err);
+    return [];
+  });
 }
 
-function _selfResourceId() {
-  return window._notesResource && window._notesResource.id;
-}
-function _selfUserId() {
-  return window._notesResource && window._notesResource.user_id;
-}
+function _selfResourceId() { return window._notesResource && window._notesResource.id; }
+function _selfUserId()     { return window._notesResource && window._notesResource.user_id; }
 
-// ── Context helpers ──────────────────────────────────────────────────────
+// ── Context helper ────────────────────────────────────────────────────────
 function _widgetCtx() {
-  // Use Phase 1's exported _widgetContext (same object, avoids duplication)
   if (window._widgetContext) return window._widgetContext();
   const res = window._notesResource || {};
   return {
-    firmId:     'aaaaaaaa-0001-0001-0001-000000000001',
+    firmId:     FIRM_ID,
     userId:     res.user_id || null,
     resourceId: res.id || null,
     role:       res.role || res.title || '',
-    api:        window.API || window._notesAPI,
+    api:        _resolveApi(),
   };
+}
+
+// ── Startup diagnostics ──────────────────────────────────────────────────
+// Runs once when Phase 2 script is evaluated — catches most timing issues.
+(function _p2Diag() {
+  const api   = _resolveApi();
+  const res   = window._notesResource;
+  const reg   = window.WIDGET_REGISTRY;
+  const wiCtx = typeof window._widgetContext === 'function';
+  console.log(P2, '── Phase 2 startup diagnostics ──');
+  console.log(P2, 'API resolved?',        api   ? '✓ ' + (typeof API !== 'undefined' ? 'bare API' : 'window._notesAPI') : '✗ MISSING');
+  console.log(P2, '_notesResource?',      res   ? '✓  user_id=' + res.user_id + '  id=' + res.id : '✗ MISSING (will wait in dataFn)');
+  console.log(P2, 'WIDGET_REGISTRY?',     reg   ? '✓' : '✗ MISSING — widgets will NOT register');
+  console.log(P2, 'window._widgetContext?', wiCtx ? '✓' : '✗ missing (fallback active)');
+  console.log(P2, 'window._wiItems?',     window._wiItems ? '✓  len=' + window._wiItems.length : '— not loaded yet (ok)');
+  console.log(P2, 'window.myActionItems?',window.myActionItems ? '✓  len=' + window.myActionItems.length : '— not loaded yet (ok)');
+})();
+
+// ── Guard ─────────────────────────────────────────────────────────────────
+if (!window.WIDGET_REGISTRY) {
+  console.error(P2, 'WIDGET_REGISTRY not available — aborting Phase 2 registration');
+  return;
 }
 
 // ── Project picker helper — role-aware ────────────────────────────────────
 async function _getProjectsForPicker() {
-  const ctx   = _widgetCtx();
-  const api   = ctx.api;
-  if (!api) return [];
-  const role  = (ctx.role || '').toLowerCase();
-  const isPM  = role.includes('pm') || role.includes('manager') || role.includes('director');
+  const ctx  = _widgetCtx();
+  const api  = ctx.api;
+  if (!api) { console.warn(P2, '_getProjectsForPicker: no API'); return []; }
+  const role = (ctx.role || '').toLowerCase();
+  const isPM = role.includes('pm') || role.includes('manager') || role.includes('director');
 
   if (isPM) {
-    // PM: all active workflow instances (deduplicated by project_id)
     const rows = await api.get(
       'workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=200'
     ).catch(function(){return[];});
@@ -5570,10 +5607,9 @@ async function _getProjectsForPicker() {
       seen[r.project_id] = true; return true;
     }).map(function(r) { return { id: r.project_id, name: r.title }; });
   } else {
-    // User: only projects where they have assigned tasks or action items
     const [taskRows, aiRows] = await Promise.all([
       api.get('tasks?select=project_id,workflow_instances(title)&assigned_to=eq.' + ctx.userId +
-              '&status=neq.completed&not.project_id=is.null&limit=200').catch(function(){return[];}),
+              '&status=neq.complete&not.project_id=is.null&limit=200').catch(function(){return[];}),
       api.get('workflow_action_items?select=instance_id,workflow_instances(project_id,title)' +
               '&owner_resource_id=eq.' + ctx.resourceId + '&status=eq.open&limit=200').catch(function(){return[];}),
     ]);
@@ -5597,14 +5633,8 @@ async function _getProjectsForPicker() {
 }
 window._getProjectsForPicker = _getProjectsForPicker;
 
-// Guard: ensure WIDGET_REGISTRY exists before registering
-if (!window.WIDGET_REGISTRY) {
-  console.error('[Widgets] Phase 2: WIDGET_REGISTRY not available — widgets will not register');
-  return;
-}
 
 // ── 1. CAPACITY GAUGE ─────────────────────────────────────────────────────
-// Hours mode when budget_hours/loe_hours populated; count mode otherwise
 window.WIDGET_REGISTRY.register({
   id:              'capacity_gauge',
   label:           'Capacity gauge',
@@ -5629,10 +5659,10 @@ window.WIDGET_REGISTRY.register({
 
     const [aiRows, taskRows] = await Promise.all([
       rid ? _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
-      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500') : [],
+      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours,loe_hours&limit=500') : [],
     ]);
 
-    const items = Array.isArray(aiRows) ? aiRows : [];
+    const items = Array.isArray(aiRows)   ? aiRows   : [];
     const tasks = Array.isArray(taskRows) ? taskRows : [];
     const all   = items.concat(tasks);
 
@@ -5642,10 +5672,10 @@ window.WIDGET_REGISTRY.register({
     const pct        = Math.round((used/cap)*100);
 
     return {
-      total:     all.length,
-      overdue:   all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
-      dueToday:  all.filter(function(i){return i.due_date===today;}).length,
-      upcoming:  all.filter(function(i){return i.due_date&&i.due_date>today;}).length,
+      total:    all.length,
+      overdue:  all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
+      dueToday: all.filter(function(i){return i.due_date===today;}).length,
+      upcoming: all.filter(function(i){return i.due_date&&i.due_date>today;}).length,
       used:Math.round(used*10)/10, cap, pct, hasHours,
       totalHours:Math.round(totalHours*10)/10,
     };
@@ -5673,8 +5703,8 @@ window.WIDGET_REGISTRY.register({
   }
 });
 
+
 // ── 2. ACTION ITEM COUNTER ────────────────────────────────────────────────
-// workflow_action_items only — owner_resource_id
 window.WIDGET_REGISTRY.register({
   id:              'action_item_counter',
   label:           'Action item counter',
@@ -5719,8 +5749,8 @@ window.WIDGET_REGISTRY.register({
   }
 });
 
+
 // ── 3. TASK COUNTER ───────────────────────────────────────────────────────
-// tasks where user is assigned — separate from action items
 window.WIDGET_REGISTRY.register({
   id:              'task_counter',
   label:           'Task counter',
@@ -5739,7 +5769,7 @@ window.WIDGET_REGISTRY.register({
     const uid   = config.targetUserId || ctx.userId;
     if (!uid) return null;
     const today = new Date().toISOString().slice(0,10);
-    const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.completed&select=id,due_date,budget_hours,loe_hours&limit=500');
+    const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours,loe_hours&limit=500');
     const all   = Array.isArray(tasks) ? tasks : [];
     const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||t.loe_hours||0);},0);
     return {
@@ -5769,6 +5799,7 @@ window.WIDGET_REGISTRY.register({
       '</div>';
   }
 });
+
 
 // ── 4. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
@@ -5836,229 +5867,8 @@ window.WIDGET_REGISTRY.register({
   }
 });
 
-console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline, billability_bars, task_list, action_item_list');
-// Re-fire _notesPostWire now that all widgets are registered
-// The first call from _notesWireTiles ran before Phase 2 completed
-setTimeout(function() {
-  if (typeof window._notesPostWire === 'function') {
-    console.log('[Widgets] Phase 2 re-firing _notesPostWire');
-    window._notesPostWire();
-  }
-}, 100);
-// Re-run _notesPostWire now that all widgets are registered
-// (the first call from _notesWireTiles may have run before Phase 2 completed)
-setTimeout(function() {
-  if (typeof window._notesPostWire === 'function') window._notesPostWire();
-}, 50);
-// ── 6. TASK LIST ─────────────────────────────────────────────────────────────
-// Uses window._wiItems (already built by My Work) or fetches directly
-window.WIDGET_REGISTRY.register({
-  id:              'task_list',
-  label:           'Task list',
-  category:        'personal',
-  description:     'Open tasks with progress and due dates',
-  icon:            'list',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 60000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    // Wait for _notesResource — compass sets it after script injection
-    let _w = 0;
-    while (!window._notesResource && _w < 3000) {
-      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
-    }
-    const res   = window._notesResource || {};
-    const today = new Date().toISOString().slice(0,10);
-    const uid   = res.user_id;
-    const rid   = res.id;
-    if (!uid && !rid) return { items:[], today:today };
-
-    // Use My Work's already-loaded data if available and targeting self
-    const configRid = config && config.targetResourceId;
-    const isSelf = !configRid || configRid === rid;
-    if (isSelf && window._wiItems && window._wiItems.length) {
-      const tasks = window._wiItems.filter(function(w){ return w.type === 'task'; });
-      if (tasks.length) return { items: tasks, today: today, source: 'cache' };
-    }
-
-    // Fetch fresh using window.API directly
-    const fetchUid = isSelf ? uid : (function(){
-      const r = (window._resources||[]).find(function(r){ return r.id === configRid; });
-      return r ? r.user_id : null;
-    })();
-    if (!fetchUid) return { items:[], today:today };
-
-
-    // Use window.API directly — _api() may silently return [] if API not in closure scope
-    const _taskApi = window.API || window._notesAPI;
-    if (!_taskApi) return { items:[], today:today };
-    const tasks = await _taskApi.get(
-      'tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days' +
-      '&assigned_to=eq.'+fetchUid+'&order=created_at.desc&limit=200'
-    ).catch(function(){ return []; });
-    const projIds = {};
-    (tasks||[]).forEach(function(t){ if(t.project_id) projIds[t.project_id]=true; });
-    const pKeys = Object.keys(projIds);
-    const projs = pKeys.length ? await _api('projects?id=in.('+pKeys.join(',')+')'+'&select=id,name&limit=200') : [];
-    const pMap = {};
-    (projs||[]).forEach(function(p){ pMap[p.id]=p.name; });
-
-    const items = (tasks||[])
-      .filter(function(t){ return t.status !== 'cancelled'; })
-      .filter(function(t){ const p=parseFloat(t.pct_complete)||0; const n=p<=1&&p>0?Math.round(p*100):Math.round(p); return n<100; })
-      .map(function(t){
-        const p=parseFloat(t.pct_complete)||0;
-        const pct=p<=1&&p>0?Math.round(p*100):Math.round(p);
-        const overdue=t.due_date&&t.due_date<today;
-        return { type:'task', id:t.id, title:t.name, project:pMap[t.project_id]||'',
-          status:t.status, due:t.due_date, overdue, pct,
-          urgency: overdue?0:(t.due_date?1:2) };
-      });
-    items.sort(function(a,b){
-      if(a.urgency!==b.urgency) return a.urgency-b.urgency;
-      if(a.due&&b.due) return a.due.localeCompare(b.due);
-      return 0;
-    });
-    return { items:items, today:today };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const items = data.items || [];
-    const today = data.today;
-    if (!items.length) {
-      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">&#10003;</div><div class="wc-label">No open tasks</div></div>';
-      return;
-    }
-    const overdueCnt = items.filter(function(t){ return t.overdue; }).length;
-    function fmtDue(due, overdue) {
-      if (!due) return '<span style="color:rgba(255,255,255,.25);font-size:11px">—</span>';
-      if (overdue) { const d=Math.round((new Date(today)-new Date(due))/86400000); return '<span style="font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>'; }
-      return '<span style="font-size:11px;color:'+(due===today?'#EF9F27':'rgba(255,255,255,.4)')+'">'+new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
-    }
-    function fmtStatus(t) {
-      if (t.status==='blocked')     return '<span style="font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:1px 5px">BLOCKED</span>';
-      if (t.status==='in_progress') return '<span style="font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:1px 5px">IN PROG</span>';
-      return '<span style="font-size:10px;font-weight:600;color:rgba(0,210,255,.7);border:1px solid rgba(0,210,255,.3);padding:1px 5px">START</span>';
-    }
-    const rowsHtml = items.map(function(t){
-      const fc = t.pct>=80?'#1D9E75':t.pct>=40?'#00D2FF':'rgba(255,255,255,.2)';
-      const bar = t.pct>0 ? '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:3px"><div style="height:100%;width:'+Math.min(t.pct,100)+'%;background:'+fc+';border-radius:2px"></div></div>' : '';
-      return '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);'+(t.overdue?'border-left:2px solid #E24B4A;':'')+'">' +
-        '<div style="min-width:0"><div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(t.title)+'">'+_esc(t.title)+'</div>' +
-        (t.project ? '<div style="font-size:10px;color:var(--text3)">'+_esc(t.project)+'</div>' : '') + bar + '</div>' +
-        '<div>'+fmtDue(t.due,t.overdue)+'</div>' +
-        '<div>'+fmtStatus(t)+'</div></div>';
-    }).join('');
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px 3px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)">' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Tasks</span>' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdueCnt>0?'#E24B4A':'rgba(255,255,255,.3)')+'">'+items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'')+'</span>' +
-        '</div>' +
-        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>' +
-      '</div>';
-  }
-});
-
-// ── 7. ACTION ITEM LIST ───────────────────────────────────────────────────────
-// Uses window.myActionItems (already built by My Work) or fetches directly
-window.WIDGET_REGISTRY.register({
-  id:              'action_item_list',
-  label:           'Action item list',
-  category:        'personal',
-  description:     'Open action items with due dates',
-  icon:            'list',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 60000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    // Wait for _notesResource — compass sets it after script injection
-    let _w = 0;
-    while (!window._notesResource && _w < 3000) {
-      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
-    }
-    const res   = window._notesResource || {};
-    const today = new Date().toISOString().slice(0,10);
-    const rid   = res.id;
-    if (!rid) return { items:[], today:today };
-
-    const configRid = config && config.targetResourceId;
-    const isSelf = !configRid || configRid === rid;
-
-    // Use My Work's already-loaded data if available and targeting self
-    if (isSelf && window.myActionItems && window.myActionItems.length) {
-      const items = window.myActionItems
-        .filter(function(a){ return a.status === 'open'; })
-        .map(function(a){
-          return { id:a.id, title:a.title, due:a.due_date,
-            overdue: a.due_date && a.due_date < today,
-            createdBy: a.created_by_name || null };
-        });
-      return { items:items, today:today, source:'cache' };
-    }
-
-    // Fetch fresh — exact same query as My Work
-    const targetRid = isSelf ? rid : configRid;
-    const _aiApi = window.API || window._notesAPI;
-    if (!_aiApi) return { items:[], today:today };
-    const rows = await _aiApi.get(
-      'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
-      '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100'
-    ).catch(function(){ return []; });
-    const items = (rows||[]).map(function(a){
-      return { id:a.id, title:a.title, due:a.due_date,
-        overdue: a.due_date && a.due_date < today,
-        createdBy: a.created_by_name || null };
-    });
-    return { items:items, today:today };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const items = data.items || [];
-    const today = data.today;
-    if (!items.length) {
-      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">&#10003;</div><div class="wc-label">No open action items</div></div>';
-      return;
-    }
-    const overdueCnt = items.filter(function(i){ return i.overdue; }).length;
-    function fmtDue(due, overdue) {
-      if (!due) return '<span style="color:rgba(255,255,255,.25);font-size:11px">—</span>';
-      if (overdue) { const d=Math.round((new Date(today)-new Date(due))/86400000); return '<span style="font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>'; }
-      return '<span style="font-size:11px;color:'+(due===today?'#EF9F27':'rgba(255,255,255,.4)')+'">'+new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
-    }
-    const rowsHtml = items.map(function(item){
-      return '<div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);'+(item.overdue?'border-left:2px solid #E24B4A;':'')+'">' +
-        '<div style="min-width:0"><div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title)+'">'+_esc(item.title)+'</div>' +
-        (item.createdBy ? '<div style="font-size:10px;color:var(--text3)">from '+_esc(item.createdBy)+'</div>' : '') + '</div>' +
-        '<div>'+fmtDue(item.due,item.overdue)+'</div></div>';
-    }).join('');
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px 3px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)">' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Action Items</span>' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdueCnt>0?'#E24B4A':'rgba(255,255,255,.3)')+'">'+items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'')+'</span>' +
-        '</div>' +
-        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>' +
-      '</div>';
-  }
-});
-
-
-
-
 
 // ── 5. BILLABILITY BARS ───────────────────────────────────────────────────
-// Billable vs non-billable hours this week from time_entries
 window.WIDGET_REGISTRY.register({
   id:              'billability_bars',
   label:           'Billable vs Non-Bill',
@@ -6077,9 +5887,8 @@ window.WIDGET_REGISTRY.register({
     const rid = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
 
-    // Get current week start (Monday)
     const now       = new Date();
-    const day       = now.getDay(); // 0=Sun
+    const day       = now.getDay();
     const diff      = (day === 0 ? -6 : 1 - day);
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() + diff);
@@ -6092,10 +5901,10 @@ window.WIDGET_REGISTRY.register({
     );
 
     const all      = Array.isArray(entries) ? entries : [];
-    const billable = all.filter(function(e) { return e.is_billable; })
-                       .reduce(function(s,e) { return s + parseFloat(e.hours||0); }, 0);
-    const nonBill  = all.filter(function(e) { return !e.is_billable; })
-                       .reduce(function(s,e) { return s + parseFloat(e.hours||0); }, 0);
+    const billable = all.filter(function(e){return e.is_billable;})
+                       .reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+    const nonBill  = all.filter(function(e){return !e.is_billable;})
+                       .reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
     const total    = billable + nonBill;
     const billPct  = total > 0 ? Math.round((billable / total) * 100) : 0;
     const nonPct   = total > 0 ? (100 - billPct) : 0;
@@ -6104,62 +5913,374 @@ window.WIDGET_REGISTRY.register({
       billable:  Math.round(billable * 10) / 10,
       nonBill:   Math.round(nonBill  * 10) / 10,
       total:     Math.round(total    * 10) / 10,
-      billPct,
-      nonPct,
+      billPct, nonPct,
       weekStart: weekStartStr,
     };
   },
 
   renderFn: function(data, container) {
     if (!data) { container.innerHTML = '<div class="widget-error">No data</div>'; return; }
-
     const billColor = '#00D2FF';
-    const nonColor  = 'rgba(255,255,255,.25)';
-
-    // Scale only the big number font — clamp between 16px (small tile) and 26px (medium+)
-    // Use offsetHeight if available, otherwise fall back to parent tile height
-    const _tileEl  = container.closest('.notes-tile');
-    const _tileH   = (_tileEl && _tileEl.offsetHeight) || container.offsetHeight || 120;
-    const bigFont  = Math.min(26, Math.max(16, Math.round(_tileH * 0.18))) + 'px';
-
-    // Compress spacing for small tiles
-    const _isSmall = _tileH < 150;
-    const pad      = _isSmall ? '6px 12px' : '10px 12px';
-    const numMB    = _isSmall ? '4px' : '8px';
-    const barMB    = _isSmall ? '3px' : '5px';
-    const pctMB    = _isSmall ? '4px' : '8px';
+    const _tileEl   = container.closest('.notes-tile');
+    const _tileH    = (_tileEl && _tileEl.offsetHeight) || container.offsetHeight || 120;
+    const bigFont   = Math.min(26, Math.max(16, Math.round(_tileH * 0.18))) + 'px';
+    const _isSmall  = _tileH < 150;
+    const pad       = _isSmall ? '6px 12px' : '10px 12px';
+    const numMB     = _isSmall ? '4px' : '8px';
+    const barMB     = _isSmall ? '3px' : '5px';
+    const pctMB     = _isSmall ? '4px' : '8px';
 
     container.innerHTML =
       '<div style="display:flex;flex-direction:column;padding:'+pad+';height:100%;justify-content:center;gap:0;box-sizing:border-box">' +
-        // Header label row — title left, total right in yellow
         '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:'+numMB+'">' +
           '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Billable vs Non-Bill</div>' +
           '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:#EF9F27;letter-spacing:.04em">'+data.total+'h total</div>' +
         '</div>' +
-        // Two big numbers
         '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:'+numMB+'">' +
           '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:' + billColor + ';line-height:1">' + data.billable + 'h</div>' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:'+billColor+';line-height:1">'+data.billable+'h</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">billable</div>' +
           '</div>' +
           '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:var(--text2);line-height:1">' + data.nonBill + 'h</div>' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:var(--text2);line-height:1">'+data.nonBill+'h</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">non-bill</div>' +
           '</div>' +
         '</div>' +
-        // Horizontal bar
         '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:'+barMB+'">' +
-          '<div style="height:100%;width:' + data.billPct + '%;background:' + billColor + ';border-radius:3px;transition:width .4s"></div>' +
+          '<div style="height:100%;width:'+data.billPct+'%;background:'+billColor+';border-radius:3px;transition:width .4s"></div>' +
         '</div>' +
-        // Percentages
         '<div style="display:flex;justify-content:space-between;margin-bottom:'+pctMB+'">' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:' + billColor + '">' + data.billPct + '%</span>' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + data.nonPct + '%</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:'+billColor+'">'+data.billPct+'%</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">'+data.nonPct+'%</span>' +
         '</div>' +
-
       '</div>';
   }
 });
+
+
+// ── 6. TASK LIST ──────────────────────────────────────────────────────────
+window.WIDGET_REGISTRY.register({
+  id:              'task_list',
+  label:           'Task list',
+  category:        'personal',
+  description:     'Open tasks with progress and due dates',
+  icon:            'list',
+  configSchema: [
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 60000,
+  minTileHeight:   'small',
+
+  dataFn: async function(config) {
+    const W = '[W2:task_list]';
+    console.log(W, 'dataFn start — config:', config);
+
+    // ── 1. Wait for _notesResource (compass sets it after script injection)
+    let _w = 0;
+    while (!window._notesResource && _w < 3000) {
+      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
+    }
+    if (!window._notesResource) {
+      console.error(W, '_notesResource never appeared after 3s — aborting');
+      return { items:[], today:new Date().toISOString().slice(0,10) };
+    }
+
+    const res   = window._notesResource;
+    const today = new Date().toISOString().slice(0,10);
+    const uid   = res.user_id;
+    const rid   = res.id;
+    console.log(W, '_notesResource ok — uid:', uid, ' rid:', rid);
+
+    // ── 2. Check API
+    const api = _resolveApi();
+    console.log(W, 'API resolved?', api ? '✓' : '✗ MISSING');
+    if (!uid) { console.warn(W, 'no uid — cannot fetch tasks'); return { items:[], today }; }
+
+    // ── 3. Try window._wiItems cache (only when targeting self)
+    const configRid = config && config.targetResourceId;
+    const isSelf    = !configRid || configRid === rid;
+    console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
+
+    if (isSelf && window._wiItems && window._wiItems.length) {
+      const cached = window._wiItems.filter(function(w){ return w.type === 'task'; });
+      console.log(W, 'cache hit — _wiItems tasks:', cached.length);
+      if (cached.length) return { items: cached, today, source: 'cache' };
+      console.log(W, 'cache has _wiItems but no task entries — falling through to fetch');
+    } else {
+      console.log(W, '_wiItems not available or empty — will fetch directly');
+    }
+
+    // ── 4. Resolve fetch uid (self or target resource's user_id)
+    const fetchUid = isSelf ? uid : (function(){
+      const r = (window._resources||[]).find(function(r){ return r.id === configRid; });
+      return r ? r.user_id : null;
+    })();
+    console.log(W, 'fetchUid:', fetchUid);
+    if (!fetchUid) {
+      console.warn(W, 'fetchUid is null — cannot resolve user_id for resource', configRid);
+      return { items:[], today };
+    }
+
+    // ── 5. Fetch tasks
+    if (!api) { console.error(W, 'API still null at fetch step'); return { items:[], today }; }
+    const taskQuery = 'tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days' +
+      '&assigned_to=eq.'+fetchUid+'&status=neq.complete&order=created_at.desc&limit=200';
+    console.log(W, 'fetching tasks:', taskQuery);
+    const tasks = await api.get(taskQuery).catch(function(err){
+      console.error(W, 'tasks fetch error:', err); return [];
+    });
+    console.log(W, 'raw tasks returned:', tasks && tasks.length, tasks);
+
+    // ── 6. Fetch project names
+    const projIds = {};
+    (tasks||[]).forEach(function(t){ if(t.project_id) projIds[t.project_id]=true; });
+    const pKeys = Object.keys(projIds);
+    console.log(W, 'unique project_ids to resolve:', pKeys.length);
+    const projs = pKeys.length
+      ? await _api('projects?id=in.('+pKeys.join(',')+')'+'&select=id,name&limit=200')
+      : [];
+    const pMap = {};
+    (projs||[]).forEach(function(p){ pMap[p.id]=p.name; });
+
+    // ── 7. Build items — filter cancelled and 100% complete
+    const items = (tasks||[])
+      .filter(function(t){ return t.status !== 'cancelled'; })
+      .filter(function(t){
+        const p = parseFloat(t.pct_complete)||0;
+        const n = p<=1&&p>0 ? Math.round(p*100) : Math.round(p);
+        return n < 100;
+      })
+      .map(function(t){
+        const p   = parseFloat(t.pct_complete)||0;
+        const pct = p<=1&&p>0 ? Math.round(p*100) : Math.round(p);
+        const overdue = t.due_date && t.due_date < today;
+        return {
+          type: 'task', id: t.id, title: t.name,
+          project: pMap[t.project_id] || '',
+          status: t.status, due: t.due_date, overdue, pct,
+          urgency: overdue ? 0 : (t.due_date ? 1 : 2),
+        };
+      });
+
+    items.sort(function(a,b){
+      if (a.urgency !== b.urgency) return a.urgency - b.urgency;
+      if (a.due && b.due) return a.due.localeCompare(b.due);
+      return 0;
+    });
+
+    console.log(W, 'final items:', items.length);
+    return { items, today };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const items     = data.items || [];
+    const today     = data.today;
+    const overdueCnt = items.filter(function(t){ return t.overdue; }).length;
+
+    if (!items.length) {
+      container.innerHTML=
+        '<div class="widget-counter">'+
+          '<div class="wc-big" style="color:#1D9E75">&#10003;</div>'+
+          '<div class="wc-label">No open tasks</div>'+
+        '</div>';
+      return;
+    }
+
+    function fmtDue(due, overdue) {
+      if (!due) return '<span style="color:rgba(255,255,255,.25);font-size:11px">—</span>';
+      if (overdue) {
+        const d = Math.round((new Date(today) - new Date(due)) / 86400000);
+        return '<span style="font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>';
+      }
+      return '<span style="font-size:11px;color:'+(due===today?'#EF9F27':'rgba(255,255,255,.4)')+'">'+
+        new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
+    }
+    function fmtStatus(t) {
+      if (t.status==='blocked')
+        return '<span style="font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:1px 5px">BLOCKED</span>';
+      if (t.status==='in_progress')
+        return '<span style="font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:1px 5px">IN PROG</span>';
+      return '<span style="font-size:10px;font-weight:600;color:rgba(0,210,255,.7);border:1px solid rgba(0,210,255,.3);padding:1px 5px">START</span>';
+    }
+
+    const rowsHtml = items.map(function(t){
+      const fc  = t.pct>=80?'#1D9E75':t.pct>=40?'#00D2FF':'rgba(255,255,255,.2)';
+      const bar = t.pct>0
+        ? '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:3px">'+
+            '<div style="height:100%;width:'+Math.min(t.pct,100)+'%;background:'+fc+';border-radius:2px"></div></div>'
+        : '';
+      return '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:center;'+
+          'padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);'+
+          (t.overdue?'border-left:2px solid #E24B4A;':'')+'">' +
+        '<div style="min-width:0">'+
+          '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(t.title)+'">'+_esc(t.title)+'</div>'+
+          (t.project ? '<div style="font-size:10px;color:var(--text3)">'+_esc(t.project)+'</div>' : '') +
+          bar +
+        '</div>' +
+        '<div>'+fmtDue(t.due, t.overdue)+'</div>' +
+        '<div>'+fmtStatus(t)+'</div>'+
+        '</div>';
+    }).join('');
+
+    container.innerHTML =
+      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;'+
+            'padding:5px 10px 3px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Tasks</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdueCnt>0?'#E24B4A':'rgba(255,255,255,.3)')+'">'+
+            items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'')+'</span>' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>' +
+      '</div>';
+  }
+});
+
+
+// ── 7. ACTION ITEM LIST ───────────────────────────────────────────────────
+window.WIDGET_REGISTRY.register({
+  id:              'action_item_list',
+  label:           'Action item list',
+  category:        'personal',
+  description:     'Open action items with due dates',
+  icon:            'list',
+  configSchema: [
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 60000,
+  minTileHeight:   'small',
+
+  dataFn: async function(config) {
+    const W = '[W2:action_item_list]';
+    console.log(W, 'dataFn start — config:', config);
+
+    // ── 1. Wait for _notesResource
+    let _w = 0;
+    while (!window._notesResource && _w < 3000) {
+      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
+    }
+    if (!window._notesResource) {
+      console.error(W, '_notesResource never appeared after 3s — aborting');
+      return { items:[], today:new Date().toISOString().slice(0,10) };
+    }
+
+    const res   = window._notesResource;
+    const today = new Date().toISOString().slice(0,10);
+    const rid   = res.id;
+    console.log(W, '_notesResource ok — rid:', rid);
+
+    if (!rid) { console.warn(W, 'no rid — cannot fetch action items'); return { items:[], today }; }
+
+    // ── 2. Check API
+    const api = _resolveApi();
+    console.log(W, 'API resolved?', api ? '✓' : '✗ MISSING');
+
+    // ── 3. Try window.myActionItems cache
+    const configRid = config && config.targetResourceId;
+    const isSelf    = !configRid || configRid === rid;
+    console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
+
+    if (isSelf && window.myActionItems && window.myActionItems.length) {
+      const cached = window.myActionItems.filter(function(a){ return a.status === 'open'; });
+      console.log(W, 'cache hit — myActionItems open:', cached.length);
+      const items = cached.map(function(a){
+        return { id:a.id, title:a.title, due:a.due_date,
+          overdue: a.due_date && a.due_date < today,
+          createdBy: a.created_by_name || null };
+      });
+      return { items, today, source:'cache' };
+    }
+    console.log(W, 'myActionItems not available — will fetch directly');
+
+    // ── 4. Fetch fresh
+    const targetRid = isSelf ? rid : configRid;
+    if (!api) { console.error(W, 'API null at fetch step'); return { items:[], today }; }
+
+    const aiQuery = 'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
+      '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100';
+    console.log(W, 'fetching action items:', aiQuery);
+    const rows = await api.get(aiQuery).catch(function(err){
+      console.error(W, 'action items fetch error:', err); return [];
+    });
+    console.log(W, 'raw action items returned:', rows && rows.length, rows);
+
+    const items = (rows||[]).map(function(a){
+      return { id:a.id, title:a.title, due:a.due_date,
+        overdue: a.due_date && a.due_date < today,
+        createdBy: a.created_by_name || null };
+    });
+    console.log(W, 'final items:', items.length);
+    return { items, today };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const items      = data.items || [];
+    const today      = data.today;
+    const overdueCnt = items.filter(function(i){ return i.overdue; }).length;
+
+    if (!items.length) {
+      container.innerHTML=
+        '<div class="widget-counter">'+
+          '<div class="wc-big" style="color:#1D9E75">&#10003;</div>'+
+          '<div class="wc-label">No open action items</div>'+
+        '</div>';
+      return;
+    }
+
+    function fmtDue(due, overdue) {
+      if (!due) return '<span style="color:rgba(255,255,255,.25);font-size:11px">—</span>';
+      if (overdue) {
+        const d = Math.round((new Date(today) - new Date(due)) / 86400000);
+        return '<span style="font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>';
+      }
+      return '<span style="font-size:11px;color:'+(due===today?'#EF9F27':'rgba(255,255,255,.4)')+'">'+
+        new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
+    }
+
+    const rowsHtml = items.map(function(item){
+      return '<div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;'+
+          'padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);'+
+          (item.overdue?'border-left:2px solid #E24B4A;':'')+'">' +
+        '<div style="min-width:0">'+
+          '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title)+'">'+_esc(item.title)+'</div>'+
+          (item.createdBy ? '<div style="font-size:10px;color:var(--text3)">from '+_esc(item.createdBy)+'</div>' : '') +
+        '</div>' +
+        '<div>'+fmtDue(item.due, item.overdue)+'</div>'+
+        '</div>';
+    }).join('');
+
+    container.innerHTML =
+      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;'+
+            'padding:5px 10px 3px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Action Items</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdueCnt>0?'#E24B4A':'rgba(255,255,255,.3)')+'">'+
+            items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'')+'</span>' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>' +
+      '</div>';
+  }
+});
+
+
+// ── All widgets registered — now safe to re-fire _notesPostWire ───────────
+// (Moved here from mid-block so task_list and action_item_list are included)
+console.log(P2, 'All 7 widgets registered. Re-firing _notesPostWire…');
+setTimeout(function() {
+  if (typeof window._notesPostWire === 'function') {
+    console.log(P2, '_notesPostWire re-fire (50ms)');
+    window._notesPostWire();
+  }
+}, 50);
+setTimeout(function() {
+  if (typeof window._notesPostWire === 'function') {
+    console.log(P2, '_notesPostWire re-fire (200ms)');
+    window._notesPostWire();
+  }
+}, 200);
 
 })();
 </script>
