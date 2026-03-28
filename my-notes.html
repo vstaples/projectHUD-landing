@@ -421,6 +421,18 @@ async function _notesLoadWorkspace() {
       }
     }
   } catch(e) { console.error('[Compass] Workspace load error:', e); }
+  // Clean up any tiles with null/missing row references
+  _notesCleanTiles();
+}
+
+function _notesCleanTiles() {
+  Object.values(_workspace.views || {}).forEach(function(v) {
+    if (!v.tiles || !v.rows) return;
+    const validRowIds = new Set((v.rows || []).map(function(r) { return r.id; }));
+    const orphans = v.tiles.filter(function(t) { return !validRowIds.has(t.row); });
+    orphans.forEach(function(t) { if (!v.tray.includes(t.noteId)) v.tray.push(t.noteId); });
+    v.tiles = v.tiles.filter(function(t) { return validRowIds.has(t.row); });
+  });
 }
 
 function _notesDefaultView() {
@@ -778,6 +790,11 @@ function _notesRenderGrid() {
   if (!gridArea) return;
   const cv   = _cv();
   const rows = cv.rows || [];
+  // Clean orphaned tiles (row id doesn't exist in rows array)
+  const validIds = new Set(rows.map(function(r) { return r.id; }));
+  const orphaned = cv.tiles.filter(function(t) { return !validIds.has(t.row); });
+  orphaned.forEach(function(t) { if (!cv.tray.includes(t.noteId)) cv.tray.push(t.noteId); });
+  if (orphaned.length) cv.tiles = cv.tiles.filter(function(t) { return validIds.has(t.row); });
 
   gridArea.innerHTML = '';
   rows.forEach(function(row) {
@@ -1977,7 +1994,9 @@ function _notesDndInit() {
       if (eid !== _dragNoteId && !_notes.find(n => n.id === eid)) {
         try { const r = await API.get('notes?id=eq.' + eid + '&limit=1').catch(()=>[]); if (r?.[0]) _notes.push(r[0]); } catch(ex) {}
       }
-      _cv().tray = _cv().tray.filter(id => id !== eid && id !== _dragNoteId);
+      _cv().tray  = _cv().tray.filter(id => id !== eid && id !== _dragNoteId);
+      // Remove any orphaned tile entry so _notesOpenNote places it fresh
+      _cv().tiles = _cv().tiles.filter(function(t) { return t.noteId !== eid && t.noteId !== _dragNoteId; });
       _notesOpenNote(eid);
       _notesSaveWorkspace(true); _notesRenderLeft();
       _dragNoteId = null; _dragSlot = null; _dragRowId = null;
