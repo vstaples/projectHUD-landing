@@ -6162,16 +6162,17 @@ window.WIDGET_REGISTRY.register({
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">billable</div>' +
           '</div>' +
           '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:var(--text2);line-height:1">'+data.nonBill+'h</div>' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:#8B5CF6;line-height:1">'+data.nonBill+'h</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">non-bill</div>' +
           '</div>' +
         '</div>' +
         '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:'+barMB+'">' +
           '<div style="height:100%;width:'+data.billPct+'%;background:'+billColor+';border-radius:3px;transition:width .4s"></div>' +
+          '<div style="height:100%;width:'+data.nonPct+'%;background:#8B5CF6;border-radius:3px;transition:width .4s;float:right"></div>' +
         '</div>' +
         '<div style="display:flex;justify-content:space-between;margin-bottom:'+pctMB+'">' +
           '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:'+billColor+'">'+data.billPct+'%</span>' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">'+data.nonPct+'%</span>' +
+          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:#8B5CF6">'+data.nonPct+'%</span>' +
         '</div>' +
       '</div>';
   }
