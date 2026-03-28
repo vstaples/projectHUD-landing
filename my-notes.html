@@ -4173,7 +4173,9 @@ window._notesShowShareViewDialog = async function() {
     }
   });
 
-  function renderDialog() {
+  async function renderDialog() {
+    // Always reload fresh from DB — never trust cache for the dialog
+    await _notesLoadViewParticipants(userId, viewName);
     const existing = _viewParticipants[_vpViewKey(userId, viewName)] || [];
     const others   = existing.filter(function(p) { return p.user_id !== userId; });
 
@@ -4248,7 +4250,11 @@ window._notesShowShareViewDialog = async function() {
       '</div>';
 
     // Wire once — fresh overlay element, no accumulated listeners
-    overlay.querySelector('#nvsd-cancel').onclick = function() { overlay.remove(); };
+    overlay.querySelector('#nvsd-cancel').onclick = function() {
+      // Clear cache on close so next open always fetches fresh
+      delete _viewParticipants[_vpViewKey(userId, viewName)];
+      overlay.remove();
+    };
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
     overlay.querySelectorAll('.nvsd-role-sel').forEach(function(sel) {
@@ -4263,29 +4269,30 @@ window._notesShowShareViewDialog = async function() {
 
     overlay.querySelectorAll('.nvsd-remove').forEach(function(btn) {
       btn.onclick = async function() {
-        // Disable immediately to prevent double-fire
         btn.disabled = true;
         btn.style.opacity = '0.3';
         const pid  = btn.dataset.pid;
         const vkey = _vpViewKey(userId, viewName);
+        // Get part from cache — but proceed even if not found (cache may be stale)
         const part = (_viewParticipants[vkey]||[]).find(function(p){ return p.id===pid; });
-        if (!part) return;
+        // Remove from local cache immediately so re-render shows it gone
+        _viewParticipants[vkey] = (_viewParticipants[vkey]||[]).filter(function(p){ return p.id !== pid; });
+        // Delete by primary key (pid) — always reliable
         try {
           await API.del('view_participants?id=eq.' + pid);
-          // Remove from local cache immediately
-          _viewParticipants[vkey] = (_viewParticipants[vkey]||[]).filter(function(p){ return p.id !== pid; });
-          if (part.user_id) {
-            const myName = (window._notesResource && window._notesResource.name) || 'Someone';
-            await API.post('notes', {
-              firm_id: 'aaaaaaaa-0001-0001-0001-000000000001', owner_user_id: part.user_id,
-              title: myName + ' removed you from view: ' + viewName,
-              content: myName + ' has removed your access to the shared view "' + viewName + '".',
-              hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: 'view_removed',
-              created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            }).catch(function(){});
-          }
-        } catch(e) { console.warn('[Compass] Remove view participant error:', e); }
-        // Re-fetch to ensure cache is accurate, then re-render
+        } catch(e) { console.warn('[Compass] Remove view participant delete error:', e); }
+        // Send notification if we know who was removed
+        if (part && part.user_id) {
+          const myName = (window._notesResource && window._notesResource.name) || 'Someone';
+          API.post('notes', {
+            firm_id: 'aaaaaaaa-0001-0001-0001-000000000001', owner_user_id: part.user_id,
+            title: myName + ' removed you from view: ' + viewName,
+            content: myName + ' has removed your access to the shared view "' + viewName + '".',
+            hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: 'view_removed',
+            created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          }).catch(function(){});
+        }
+        // Re-fetch from DB then re-render to ensure accuracy
         await _notesLoadViewParticipants(userId, viewName);
         renderDialog();
       };
@@ -4295,6 +4302,8 @@ window._notesShowShareViewDialog = async function() {
       window._notesShowResourcePicker(e.currentTarget, async function(res) {
         if (!res.user_id) return;
         const vkey = _vpViewKey(userId, viewName);
+        // Always re-fetch before duplicate check — prevents stale cache blocking re-invites
+        await _notesLoadViewParticipants(userId, viewName);
         const existing2 = _viewParticipants[vkey] || [];
         if (existing2.some(function(p){ return p.user_id===res.user_id; })) return;
         try {
@@ -4316,7 +4325,7 @@ window._notesShowShareViewDialog = async function() {
           }).catch(function(){});
         } catch(e) { console.warn('[Compass] Add view participant error:', e); }
         await _notesLoadViewParticipants(userId, viewName);
-        renderDialog();
+        await renderDialog();
       });
     };
 
@@ -4352,7 +4361,7 @@ window._notesShowShareViewDialog = async function() {
       '.nvsd-slot-chk:disabled{opacity:.3;cursor:not-allowed}';
     document.head.appendChild(sty);
   }
-  renderDialog();
+  await renderDialog();
 };
 
 // ── STEP 5: View invite inbox dialog — accept / decline ───────────────────
