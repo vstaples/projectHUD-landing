@@ -1692,34 +1692,56 @@ function _notesDiffBlocks(noteId, container, incomingBlocks) {
   const focusedBlock = focusedEl && (focusedEl.closest ? focusedEl.closest('[data-blockid]') : null);
   const focusedBlockId = (focusedBlock && focusedBlock.dataset.blockid) || null;
 
-  incomingBlocks.forEach(function(incoming) {
-    const existing = container.querySelector('[data-blockid="' + incoming.id + '"]');
-    if (!existing) {
-      const el = _notesCreateBlockEl(noteId, incoming, false);
-      container.appendChild(el);
-      return;
-    }
-    if (selfTyping && focusedBlockId === incoming.id) return;
-    // Update content via inner text div
-    const existingTextDiv = existing.querySelector('.nbc-block-text') || existing;
-    if (existingTextDiv.textContent !== (incoming.content || '')) {
-      existingTextDiv.textContent = incoming.content || '';
-    }
-    // Update attribution if changed
-    const prevColor = existing.dataset.authorcolor || '';
-    const newColor  = incoming.authorColor || '';
-    if (prevColor !== newColor) {
-      existing.dataset.authorcolor = newColor;
-      existing.style.borderLeft = newColor ? '3px solid ' + newColor : 'none';
-      existing.style.paddingLeft = newColor ? '8px' : '0';
-      _notesUpdateBlockAvatar(existing, incoming);
-    }
-  });
-
-  // Remove deleted blocks
+  // Remove deleted blocks first
   const incomingIds = new Set(incomingBlocks.map(function(b) { return b.id; }));
   container.querySelectorAll('[data-blockid]').forEach(function(el) {
     if (!incomingIds.has(el.dataset.blockid)) el.remove();
+  });
+
+  // Update existing and insert new blocks in correct order
+  var prevEl = null; // track insertion position
+  incomingBlocks.forEach(function(incoming) {
+    var existing = container.querySelector('[data-blockid="' + incoming.id + '"]');
+    if (!existing) {
+      // New block — insert at correct position
+      existing = _notesCreateBlockEl(noteId, incoming, false);
+      if (prevEl && prevEl.nextSibling) {
+        container.insertBefore(existing, prevEl.nextSibling);
+      } else if (!prevEl) {
+        container.insertBefore(existing, container.firstChild);
+      } else {
+        container.appendChild(existing);
+      }
+    } else {
+      // Ensure existing block is in the right position
+      if (prevEl) {
+        if (existing !== prevEl.nextSibling) {
+          container.insertBefore(existing, prevEl.nextSibling || null);
+        }
+      } else {
+        if (existing !== container.firstChild) {
+          container.insertBefore(existing, container.firstChild);
+        }
+      }
+      // Update content if not actively typing in this block
+      if (!(selfTyping && focusedBlockId === incoming.id)) {
+        const existingTextDiv = existing.querySelector('.nbc-block-text');
+        if (existingTextDiv && existingTextDiv.textContent !== (incoming.content || '')) {
+          existingTextDiv.textContent = incoming.content || '';
+        }
+        // Update attribution if changed
+        const prevColor = existing.dataset.authorcolor || '';
+        const newColor  = incoming.authorColor || '';
+        if (prevColor !== newColor) {
+          existing.dataset.authorcolor = newColor;
+          existing.dataset.authorname  = incoming.authorName || '';
+          existing.style.borderLeft    = newColor ? '3px solid ' + newColor : 'none';
+          existing.style.paddingLeft   = newColor ? '6px' : '0';
+          _notesUpdateBlockAvatar(existing, incoming);
+        }
+      }
+    }
+    prevEl = existing;
   });
 }
 
@@ -3812,42 +3834,73 @@ async function _notesRenderPresence(noteId) {
   if (!el) return;
   const parts = _participants[noteId] || await _notesLoadParticipants(noteId);
   const now   = Date.now();
-  // Ensure resources are loaded
   if (!_inviteResources) await _notesLoadInviteResources();
   const resources = _inviteResources || [];
-  const filtered = parts.filter(p => {
-    const selfUserId = window._notesResource?.user_id;
-    if (p.user_id && p.user_id === selfUserId) return false;
-    return true;
+  const selfUserId = window._notesResource && window._notesResource.user_id;
+
+  // Build the set of people to show from note_participants
+  const filtered = parts.filter(function(p) {
+    return !(p.user_id && p.user_id === selfUserId);
   });
 
+  // ── Augment with view_participants for shared views ───────────────────────
+  // Covers: (a) owner showing in participant's tile, (b) view-level participants
+  // who never got note_participants rows
+  const activeView = window._workspace && window._workspace.views &&
+    window._workspace.views[window._workspace.activeView];
+  if (activeView) {
+    const ownerUserId = activeView._isSharedView
+      ? activeView._sharedOwner
+      : (window._notesResource && window._notesResource.user_id);
+    const viewName = activeView._isSharedView
+      ? activeView._sharedViewName
+      : (window._workspace && window._workspace.activeView);
+    if (ownerUserId && viewName && window._notesGetViewParticipants) {
+      const vpParts = window._notesGetViewParticipants(ownerUserId, viewName);
+      vpParts.forEach(function(vp) {
+        if (!vp.accepted_at) return; // skip pending
+        if (vp.user_id === selfUserId) return; // skip self
+        // Skip if already in note_participants list
+        if (filtered.some(function(p) { return p.user_id === vp.user_id; })) return;
+        // Add as a synthetic participant entry
+        filtered.push({
+          id:           vp.id,
+          user_id:      vp.user_id,
+          resource_id:  vp.resource_id,
+          color:        vp.color || '#00D2FF',
+          accepted_at:  vp.accepted_at,
+          last_seen_at: vp.last_seen_at,
+          _fromViewPart: true,
+        });
+      });
+    }
+  }
+
   el.innerHTML = '';
-  filtered.forEach(p => {
-    const res      = resources.find(r => r.id === p.resource_id) ||
-                     resources.find(r => r.user_id === p.user_id);
+  filtered.forEach(function(p) {
+    const res      = resources.find(function(r) { return r.id === p.resource_id; }) ||
+                     resources.find(function(r) { return r.user_id === p.user_id; });
     const name     = res ? ((res.first_name || '') + ' ' + (res.last_name || '')).trim() : (p.user_id ? 'User' : '?');
-    const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const initials = name.split(' ').map(function(w) { return w[0]; }).join('').slice(0,2).toUpperCase();
     const color    = p.color || '#00D2FF';
     const seenAgo  = p.last_seen_at ? now - new Date(p.last_seen_at).getTime() : Infinity;
     const active   = seenAgo < 15000;
+    const pending  = !p.accepted_at;
 
-    const pending = !p.accepted_at;
-    const avatar  = document.createElement('div');
+    const avatar = document.createElement('div');
     if (pending) {
-      // Pending — outline only, no fill
       avatar.className = 'notes-avatar notes-avatar-pending';
       avatar.style.cssText = 'background:transparent;color:' + color + ';border:1.5px solid ' + color + ';opacity:.6';
     } else {
-      // Accepted — filled, active dot if online
       avatar.className = 'notes-avatar' + (active ? ' active' : '');
       avatar.style.background = color;
     }
     avatar.textContent = initials;
+    avatar.title = name + (active ? ' (active)' : '');
     avatar.dataset.participantId = p.id;
     avatar.dataset.noteId        = noteId;
 
-    // Click to show profile card
-    avatar.addEventListener('click', e => {
+    avatar.addEventListener('click', function(e) {
       e.stopPropagation();
       _notesShowParticipantCard(avatar, p, res, name, color, active, noteId);
     });
