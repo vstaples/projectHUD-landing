@@ -596,7 +596,7 @@ async function _notesRestoreSharedViews() {
       var ownerUserId = p.workspace_owner_user_id;
       var viewName    = p.view_name;
       var sharedKey   = '__shared__' + ownerUserId + '__' + viewName;
-      if (_workspace.views[sharedKey]) continue; // already restored
+      // Always refresh layout from owner's current workspace (don't skip if already present)
       try {
         var wsRows = await API.get(
           'notes_workspace?user_id=eq.' + ownerUserId + '&limit=1'
@@ -1843,7 +1843,9 @@ function _notesGetBlocksFromContainer(container) {
   if (!container) return [];
   const blocks = [];
   container.querySelectorAll('[data-blockid]').forEach(function(el) {
-    const textEl = el.querySelector('.nbc-block-text') || el;
+    // Always use inner .nbc-block-text — never fall back to el which includes avatar text
+    const textEl = el.querySelector('.nbc-block-text');
+    if (!textEl) return;
     blocks.push({
       id:               el.dataset.blockid,
       type:             'text',
@@ -4604,7 +4606,29 @@ async function _notesViewHeartbeat(ownerUserId, viewName) {
           if (cv) {
             cv.rows  = JSON.parse(JSON.stringify(ownerView.rows  || []));
             cv.tiles = JSON.parse(JSON.stringify(ownerView.tiles || []));
-            if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+            // Fetch any new notes that aren't in memory yet
+            const newNoteIds = (ownerView.tiles || [])
+              .map(function(t) { return t.noteId; })
+              .filter(function(id) {
+                if (!id) return false;
+                const notesArr = typeof _notes !== 'undefined' ? _notes : [];
+                return !notesArr.find(function(n) { return n.id === id; });
+              });
+            if (newNoteIds.length) {
+              API.get('notes?id=in.(' + newNoteIds.join(',') + ')&limit=50')
+                .then(function(rows) {
+                  (rows || []).forEach(function(n) {
+                    const notesArr = typeof _notes !== 'undefined' ? _notes : [];
+                    if (!notesArr.find(function(x) { return x.id === n.id; })) notesArr.push(n);
+                  });
+                  if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+                })
+                .catch(function() {
+                  if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+                });
+            } else {
+              if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+            }
           }
         }
       }
