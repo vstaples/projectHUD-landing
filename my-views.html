@@ -307,7 +307,7 @@
   <!-- ── Left panel ──────────────────────────────────────────────────────── -->
   <div id="views-left" style="position:relative">
     <div id="views-left-header">
-      <div style="position:relative;display:flex;align-items:center;margin-bottom:7px">
+      <div style="position:relative;display:none;align-items:center;margin-bottom:7px">
         <input id="views-search" type="text" placeholder="Search notes…"
           oninput="_notesSearch(this.value);document.getElementById('views-search-clear').style.opacity=this.value?'1':'0'"
           style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);
@@ -319,7 +319,7 @@
             cursor:pointer;font-size:13px;padding:0;line-height:1;opacity:0;transition:opacity .15s"
           tabindex="-1">×</button>
       </div>
-      <button id="views-new-btn" onclick="_notesNew()">+ New note</button>
+      <button id="views-new-btn" onclick="_notesNew()" style="display:none">+ New note</button>
     </div>
 
     <!-- Library -->
@@ -342,7 +342,7 @@
     </div>
 
     <!-- Knowledge tree -->
-    <div id="views-tree-section">
+    <div id="views-tree-section" style="display:none">
       <div class="views-section-hdr" onclick="_notesToggleSection('tree')">
         <svg class="views-chevron open" id="views-chev-tree" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         Notes
