@@ -142,7 +142,7 @@
 .notes-tile.maximized .notes-tile-header{background:rgba(6,10,16,.98)}
 .notes-tile.empty{border:1px dashed rgba(0,210,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s}
 .notes-tile.empty:hover{background:rgba(0,210,255,.03);border-color:rgba(0,210,255,.25)}
-.notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}
+.notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}.notes-tile-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes-presence{display:flex;align-items:center;gap:3px;flex-shrink:0}
 .notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:pointer;position:relative}
 .notes-avatar.active::after{content:"";position:absolute;bottom:-1px;right:-1px;width:5px;height:5px;border-radius:50%;background:#1D9E75;border:1px solid #0c1628}
@@ -197,10 +197,9 @@
 /* ── Empty grid slot ─────────────────────────────────────────────────────── */
 .notes-slot-plus{font-size:18px;color:rgba(0,210,255,.2)}
 .notes-tile.empty{cursor:default}
-.notes-tile.empty .notes-tile-header{opacity:.55;transition:opacity .15s}
-.notes-tile.empty:hover .notes-tile-header{opacity:1}
+.notes-tile.empty .notes-tile-header{opacity:1}
 .notes-tile.empty .notes-tile-canvas-empty{flex:1;cursor:text;display:flex;align-items:center;justify-content:center}
-.notes-tile.empty .notes-slot-plus{font-size:22px;color:rgba(0,210,255,.12);user-select:none}
+.notes-tile.empty .notes-slot-plus{font-size:22px;color:rgba(0,210,255,.15);user-select:none}
 /* ── Library section ────────────────────────────────────────────────────── */
 #notes-library-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
 .notes-lib-entry{padding:5px 14px 5px 28px;display:flex;align-items:center;gap:6px;cursor:default}
@@ -887,17 +886,19 @@ function _notesRenderGrid() {
         div.dataset.rowid = row.id;
         div.dataset.slot  = s;
         div.innerHTML =
-          '<div class="notes-tile-header" style="position:relative">' +
-            '<div class="notes-tile-title" style="color:var(--text3);font-style:italic;cursor:text;flex:1" ' +
+          '<div class="notes-tile-header" style="position:relative;display:flex;align-items:center;gap:7px">' +
+            '<div class="notes-tile-title" style="color:var(--text2);font-style:italic;cursor:text;flex:1;min-width:0" ' +
               'data-rowid="' + row.id + '" data-slot="' + s + '" ' +
               'onclick="event.stopPropagation();_notesNew(this.dataset.rowid,parseInt(this.dataset.slot))">New note…</div>' +
-            '<button class="notes-invite-btn" style="opacity:.2;pointer-events:none">+</button>' +
-            '<button class="notes-tile-ctrl" style="width:20px;height:20px;opacity:.2;pointer-events:none">' +
-              '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14">' +
-              '<path d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10C14 10.5523 13.5523 11 13 11H9L6 14V11H3C2.44772 11 2 10.5523 2 10V3Z" stroke="#00D2FF" stroke-width="1.3" fill="none"/>' +
-              '</svg></button>' +
-            '<button class="notes-tile-ctrl" style="font-size:13px;opacity:.2;pointer-events:none">◻</button>' +
-            '<button class="notes-tile-ctrl" style="color:rgba(226,75,74,.4);opacity:.2;pointer-events:none">✕</button>' +
+            '<div style="display:flex;align-items:center;gap:7px;flex-shrink:0;margin-left:auto">' +
+              '<button class="notes-invite-btn" style="pointer-events:none;opacity:.5">+</button>' +
+              '<button class="notes-tile-ctrl" style="width:20px;height:20px;opacity:.5;pointer-events:none">' +
+                '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14">' +
+                '<path d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10C14 10.5523 13.5523 11 13 11H9L6 14V11H3C2.44772 11 2 10.5523 2 10V3Z" stroke="#00D2FF" stroke-width="1.3" fill="none"/>' +
+                '</svg></button>' +
+              '<button class="notes-tile-ctrl" style="font-size:13px;opacity:.5;pointer-events:none">◻</button>' +
+              '<button class="notes-tile-ctrl" style="color:rgba(226,75,74,.6);opacity:.5;pointer-events:none">✕</button>' +
+            '</div>' +
           '</div>' +
           '<div class="notes-tile-canvas-empty" style="flex:1;cursor:text;display:flex;align-items:center;justify-content:center" ' +
             'data-rowid="' + row.id + '" data-slot="' + s + '" ' +
