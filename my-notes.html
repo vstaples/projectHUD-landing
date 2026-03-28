@@ -6398,15 +6398,14 @@ function _resolveTarget(config) {
   }
   if (!resolvedUid && !effectiveRid) resolvedUid = configUid || null;
 
-  const result = {
+  // Only fall back to myUid when we're genuinely targeting self (no effectiveRid,
+  // or effectiveRid === myRid). When targeting another person whose user_id is null
+  // (no login yet), return uid:null so widgets show empty rather than self's data.
+  const targetingOther = effectiveRid && effectiveRid !== myRid;
+  return {
     rid: effectiveRid || myRid,
-    uid: resolvedUid  || myUid,
+    uid: resolvedUid || (targetingOther ? null : myUid),
   };
-  console.log('[resolveTarget] configRid='+configRid+' configUid='+configUid+
-    ' viewRid='+viewRid+' effectiveRid='+effectiveRid+
-    ' resolvedUid='+resolvedUid+' myRid='+myRid+' myUid='+myUid+
-    ' => rid='+result.rid+' uid='+result.uid);
-  return result;
 }
 
 // ── Guard ─────────────────────────────────────────────────────────────────
@@ -6591,9 +6590,7 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    console.log('[next_week_queue] config=', JSON.stringify(config));
     const { uid } = _resolveTarget(config);
-    console.log('[next_week_queue] resolved uid='+uid);
     if (!uid) return null;
 
     const now    = new Date();
@@ -7201,9 +7198,7 @@ window.WIDGET_REGISTRY.register({
     const W = '[W2:task_list]';
 
     // ── 1. Resolve target person via shared _resolveTarget (handles clone/shared-view/self)
-    console.log('[task_list] config=', JSON.stringify(config));
     const { rid, uid: fetchUid } = _resolveTarget(config);
-    console.log('[task_list] resolved rid='+rid+' fetchUid='+fetchUid);
     const today = new Date().toISOString().slice(0,10);
     if (!fetchUid && !rid) return { items:[], today };
 
