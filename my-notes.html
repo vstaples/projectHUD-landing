@@ -179,6 +179,17 @@
 .notes-tile-body{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
 .notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
 .notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
+/* ── Block collaborative canvas ── */
+.notes-block-canvas{display:flex;flex-direction:column;gap:0}
+.nbc-block{position:relative;outline:none;min-height:1.6em;line-height:1.75;caret-color:#00D2FF;
+  font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);
+  word-break:break-word;cursor:text;transition:background .1s}
+.nbc-block:focus{background:rgba(0,210,255,.02)}
+.nbc-block[contenteditable="false"]{cursor:default}
+.nbc-avatar{position:absolute;top:2px;right:4px;width:16px;height:16px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:8px;font-weight:700;
+  pointer-events:none;flex-shrink:0}
 
 /* ── Chat panel — bottom strip ───────────────────────────────────────────── */
 .notes-chat{border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;max-height:160px}
@@ -1311,9 +1322,14 @@ function _notesTileHTML(note, tileState, readOnly) {
     '</div>' +
     '<div class="notes-tile-body" id="notes-tbody-' + note.id + '" ' +
       'style="' + (tileState?.minimized ? 'display:none' : '') + '">' +
-    '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
-      'placeholder="' + (readOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
-      (readOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>' +
+  // Block canvas vs textarea
+  const useBlocks = typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
+  const canvasHtml = useBlocks
+    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
+    : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
+        'placeholder="' + (readOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
+        (readOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
+    canvasHtml +
     '<div class="notes-chat' + (chatOpen ? '' : ' hidden') + '" id="notes-chat-' + note.id + '">' +
       '<div class="notes-chat-msgs" id="notes-chat-msgs-' + note.id + '">' +
         '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;color:var(--text3);padding:8px">Loading…</div>' +
@@ -1332,6 +1348,21 @@ function _notesWireTiles() {
   // Load messages for tiles with chat open
   _cv().tiles.forEach(t => {
     if (t.chatOpen) _notesLoadAndRenderMsgs(t.noteId);
+  });
+  // Render block canvases for block-format notes
+  const _vCtx = typeof _notesGetViewerRole === 'function' ? _notesGetViewerRole() : { isViewer: false, overriddenSlots: new Set() };
+  document.querySelectorAll('.notes-block-canvas[data-noteblocks]').forEach(function(container) {
+    if (container._blocksWired) return;
+    container._blocksWired = true;
+    const noteId = container.dataset.noteblocks;
+    const note   = _notes.find(function(n) { return n.id === noteId; });
+    if (!note) return;
+    const tileEl  = container.closest('.notes-tile');
+    const rowId   = tileEl && tileEl.dataset.rowid;
+    const slot    = tileEl && tileEl.dataset.slot;
+    const slotKey = (rowId && slot !== undefined) ? rowId + ':' + slot : null;
+    const tileRO  = _vCtx.isViewer && (!slotKey || !_vCtx.overriddenSlots.has(slotKey));
+    if (typeof _notesRenderBlocks === 'function') _notesRenderBlocks(note, container, tileRO);
   });
   // Hook for widget system and other late-binding extensions
   setTimeout(function() {
@@ -1493,6 +1524,276 @@ async function _notesNew(rowId, slot) {
     }, 50);
   } catch(e) { console.error('[Compass] New note error:', e); }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOCK-LEVEL COLLABORATIVE CANVAS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Block utilities ───────────────────────────────────────────────────────
+
+function _notesNewBlock(authorResourceId, authorName, authorColor, content) {
+  return {
+    id:               'blk_' + Math.random().toString(36).slice(2, 8),
+    type:             'text',
+    content:          content || '',
+    authorResourceId: authorResourceId || null,
+    authorName:       authorName       || null,
+    authorColor:      authorColor      || null,
+    updatedAt:        new Date().toISOString(),
+  };
+}
+
+function _notesIsBlockFormat(note) {
+  if (!note) return false;
+  if (note.content_blocks && Array.isArray(note.content_blocks)) return true;
+  return false;
+}
+
+// Migrate plain text → blocks. Called once when first participant is added.
+function _notesMigrateToBlocks(plainText, ownerResourceId, ownerName) {
+  const lines = (plainText || '').split('\n').filter(function(l) { return l.trim().length > 0; });
+  if (!lines.length) lines.push('');
+  return lines.map(function(line) {
+    return _notesNewBlock(ownerResourceId, ownerName, null, line);
+  });
+}
+
+// Serialize blocks array to plain text for search / tree display
+function _notesBlocksToPlainText(blocks) {
+  return (blocks || []).map(function(b) { return b.content || ''; }).join('\n');
+}
+
+// ── Block save ────────────────────────────────────────────────────────────
+
+let _blockTimers = {};
+
+function _notesSaveBlocks(noteId, blocks) {
+  if (!noteId) return;
+  const note = _notes.find(function(n) { return n.id === noteId; });
+  if (note) note.content_blocks = blocks;
+  _lastTyped[noteId] = Date.now();
+  clearTimeout(_blockTimers[noteId]);
+  _blockTimers[noteId] = setTimeout(async function() {
+    try {
+      const plainText = _notesBlocksToPlainText(blocks);
+      await API.patch('notes?id=eq.' + noteId, {
+        content_blocks: blocks,
+        content:        plainText,   // keep plain text in sync for search
+        updated_at:     new Date().toISOString(),
+      });
+    } catch(e) { console.error('[Compass] Block save error:', e); }
+  }, 800);
+}
+
+// ── Block diff + sync ─────────────────────────────────────────────────────
+// Called by _notesSyncPoll for block-format notes.
+// Diffs incoming blocks by id — updates changed, adds new, removes deleted.
+// Skips any block the current user is actively typing in.
+
+function _notesDiffBlocks(noteId, container, incomingBlocks) {
+  if (!container || !Array.isArray(incomingBlocks)) return;
+  const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
+  const selfTyping = typedAgo < 3000;
+
+  // Get currently focused block id (if user is typing in this note)
+  const focusedEl = document.activeElement;
+  const focusedBlockId = (focusedEl && focusedEl.dataset && focusedEl.dataset.blockid) || null;
+
+  incomingBlocks.forEach(function(incoming) {
+    const existing = container.querySelector('[data-blockid="' + incoming.id + '"]');
+    if (!existing) {
+      // New block — append it
+      const el = _notesCreateBlockEl(noteId, incoming, false);
+      container.appendChild(el);
+      return;
+    }
+    // Skip if user is typing in this block
+    if (selfTyping && focusedBlockId === incoming.id) return;
+    // Update content if changed
+    if (existing.textContent !== (incoming.content || '')) {
+      existing.textContent = incoming.content || '';
+    }
+    // Update attribution if changed
+    const prevColor = existing.dataset.authorcolor || '';
+    const newColor  = incoming.authorColor || '';
+    if (prevColor !== newColor) {
+      existing.dataset.authorcolor = newColor;
+      existing.style.borderLeft = newColor ? '3px solid ' + newColor : 'none';
+      existing.style.paddingLeft = newColor ? '8px' : '0';
+      _notesUpdateBlockAvatar(existing, incoming);
+    }
+  });
+
+  // Remove deleted blocks
+  const incomingIds = new Set(incomingBlocks.map(function(b) { return b.id; }));
+  container.querySelectorAll('[data-blockid]').forEach(function(el) {
+    if (!incomingIds.has(el.dataset.blockid)) el.remove();
+  });
+}
+
+function _notesUpdateBlockAvatar(blockEl, block) {
+  const existing = blockEl.querySelector('.nbc-avatar');
+  if (existing) existing.remove();
+  if (!block.authorColor || !block.authorName) return;
+  const initials = (block.authorName || '').split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+  const av = document.createElement('span');
+  av.className = 'nbc-avatar';
+  av.textContent = initials;
+  av.style.cssText =
+    'position:absolute;top:2px;right:4px;width:16px;height:16px;border-radius:50%;' +
+    'background:' + block.authorColor + '22;color:' + block.authorColor + ';' +
+    'font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:8px;font-weight:700;' +
+    'display:flex;align-items:center;justify-content:center;pointer-events:none;flex-shrink:0;' +
+    'border:1px solid ' + block.authorColor + '44';
+  blockEl.appendChild(av);
+}
+
+// ── Create a single block element ─────────────────────────────────────────
+
+function _notesCreateBlockEl(noteId, block, readOnly) {
+  const selfResourceId = window._notesResource && window._notesResource.id;
+  const isOwnerBlock   = !block.authorColor; // null color = owner
+
+  const el = document.createElement('div');
+  el.className = 'nbc-block';
+  el.setAttribute('contenteditable', readOnly ? 'false' : 'true');
+  el.setAttribute('spellcheck', 'false');
+  el.dataset.blockid    = block.id;
+  el.dataset.noteid     = noteId;
+  el.dataset.authorcolor = block.authorColor || '';
+  el.textContent        = block.content || '';
+
+  el.style.cssText =
+    'position:relative;outline:none;min-height:1.6em;line-height:1.75;' +
+    'padding:1px ' + (block.authorColor ? '24px' : '0') + ' 1px ' + (block.authorColor ? '8px' : '0') + ';' +
+    'border-left:' + (block.authorColor ? '3px solid ' + block.authorColor : 'none') + ';' +
+    'font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;' +
+    'color:var(--text1,#C8DFF0);word-break:break-word;';
+
+  if (!isOwnerBlock) _notesUpdateBlockAvatar(el, block);
+  if (readOnly) return el;
+
+  // ── input — update local state + debounced save ─────────────────────────
+  el.addEventListener('input', function() {
+    block.content   = el.textContent;
+    block.updatedAt = new Date().toISOString();
+    // If user is editing a block attributed to someone else, take ownership
+    const curResId = window._notesResource && window._notesResource.id;
+    const curName  = window._notesResource && window._notesResource.name;
+    if (block.authorResourceId && block.authorResourceId !== curResId) {
+      // Find color for current user from note_participants
+      const parts = window._notesGetParticipants && window._notesGetParticipants(noteId);
+      const myPart = (parts || []).find(function(p) {
+        return p.resource_id === curResId || p.user_id === (_userId);
+      });
+      block.authorResourceId = curResId;
+      block.authorName       = curName;
+      block.authorColor      = myPart ? myPart.color : null;
+      el.dataset.authorcolor  = block.authorColor || '';
+      el.style.borderLeft     = block.authorColor ? '3px solid ' + block.authorColor : 'none';
+      el.style.paddingLeft    = block.authorColor ? '8px' : '0';
+      el.style.paddingRight   = block.authorColor ? '24px' : '0';
+      _notesUpdateBlockAvatar(el, block);
+    }
+    const noteLocal = _notes.find(function(n) { return n.id === noteId; });
+    if (noteLocal) noteLocal.content_blocks = _notesGetBlocksFromContainer(el.parentNode);
+    _notesSaveBlocks(noteId, _notesGetBlocksFromContainer(el.parentNode));
+  });
+
+  // ── keydown — Enter creates new block, Backspace at start merges ─────────
+  el.addEventListener('keydown', function(e) {
+    const blocks = _notesGetBlocksFromContainer(el.parentNode);
+    const idx    = blocks.findIndex(function(b) { return b.id === block.id; });
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const curResId = window._notesResource && window._notesResource.id;
+      const curName  = window._notesResource && window._notesResource.name;
+      const parts    = window._notesGetParticipants && window._notesGetParticipants(noteId);
+      const myPart   = (parts || []).find(function(p) {
+        return p.resource_id === curResId || p.user_id === _userId;
+      });
+      const myColor  = myPart ? myPart.color : null;
+      const newBlock = _notesNewBlock(curResId, curName, myColor, '');
+      // Insert new block after current
+      const newEl = _notesCreateBlockEl(noteId, newBlock, false);
+      el.parentNode.insertBefore(newEl, el.nextSibling);
+      newEl.focus();
+      const noteLocal = _notes.find(function(n) { return n.id === noteId; });
+      if (noteLocal) noteLocal.content_blocks = _notesGetBlocksFromContainer(el.parentNode);
+      _notesSaveBlocks(noteId, _notesGetBlocksFromContainer(el.parentNode));
+    }
+
+    if (e.key === 'Backspace') {
+      const sel = window.getSelection();
+      const atStart = sel && sel.focusOffset === 0 && sel.anchorOffset === 0;
+      if (atStart && el.textContent === '' && idx > 0) {
+        e.preventDefault();
+        // Remove empty block and focus previous
+        const prevEl = el.previousSibling;
+        el.remove();
+        if (prevEl) {
+          prevEl.focus();
+          // Place cursor at end
+          const range = document.createRange();
+          const selObj = window.getSelection();
+          range.selectNodeContents(prevEl);
+          range.collapse(false);
+          selObj.removeAllRanges();
+          selObj.addRange(range);
+        }
+        const noteLocal = _notes.find(function(n) { return n.id === noteId; });
+        if (noteLocal) noteLocal.content_blocks = _notesGetBlocksFromContainer(el.parentNode);
+        _notesSaveBlocks(noteId, _notesGetBlocksFromContainer(el.parentNode || document.querySelector('[data-noteblocks="' + noteId + '"]')));
+      }
+    }
+  });
+
+  return el;
+}
+
+// Collect current blocks array from DOM container
+function _notesGetBlocksFromContainer(container) {
+  if (!container) return [];
+  const blocks = [];
+  container.querySelectorAll('[data-blockid]').forEach(function(el) {
+    blocks.push({
+      id:               el.dataset.blockid,
+      type:             'text',
+      content:          el.textContent || '',
+      authorResourceId: el.dataset.authorresourceid || null,
+      authorName:       el.dataset.authorname       || null,
+      authorColor:      el.dataset.authorcolor      || null,
+      updatedAt:        new Date().toISOString(),
+    });
+  });
+  return blocks;
+}
+
+// ── Render block canvas into a container element ──────────────────────────
+
+function _notesRenderBlocks(note, container, readOnly) {
+  if (!container) return;
+  const blocks = note.content_blocks;
+  if (!Array.isArray(blocks) || !blocks.length) {
+    // Empty — create one starter block attributed to the owner
+    const ownerResId = window._notesResource && window._notesResource.id;
+    const ownerName  = window._notesResource && window._notesResource.name;
+    const starter    = _notesNewBlock(ownerResId, ownerName, null, '');
+    if (note) note.content_blocks = [starter];
+    container.appendChild(_notesCreateBlockEl(note.id, starter, readOnly));
+    return;
+  }
+  blocks.forEach(function(block) {
+    container.appendChild(_notesCreateBlockEl(note.id, block, readOnly));
+  });
+}
+window._notesRenderBlocks      = _notesRenderBlocks;
+window._notesDiffBlocks        = _notesDiffBlocks;
+window._notesIsBlockFormat     = _notesIsBlockFormat;
+window._notesMigrateToBlocks   = _notesMigrateToBlocks;
+window._notesBlocksToPlainText = _notesBlocksToPlainText;
 
 // ── Save handlers ─────────────────────────────────────────────────────────
 let _contentTimers = {};
@@ -3212,10 +3513,24 @@ async function _notesSyncPoll() {
   const tiles = _cv()?.tiles || [];
   for (const tile of tiles) {
     const noteId = tile.noteId;
-    const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
-    if (!ta) continue;
     const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
     if (typedAgo < 3000) continue;
+    // Block-format note: diff content_blocks
+    const blockContainer = document.querySelector('.notes-block-canvas[data-noteblocks="' + noteId + '"]');
+    if (blockContainer) {
+      try {
+        const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content_blocks,updated_at&limit=1').catch(()=>[]);
+        const remote = rows?.[0];
+        if (!remote || !Array.isArray(remote.content_blocks)) continue;
+        const local = _notes.find(function(n) { return n.id === noteId; });
+        if (local) { local.content_blocks = remote.content_blocks; local.updated_at = remote.updated_at; }
+        if (typeof _notesDiffBlocks === 'function') _notesDiffBlocks(noteId, blockContainer, remote.content_blocks);
+      } catch(e) {}
+      continue;
+    }
+    // Plain textarea note
+    const ta = document.querySelector('.notes-tile-canvas[data-noteid="' + noteId + '"]');
+    if (!ta) continue;
     try {
       const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,updated_at&limit=1').catch(()=>[]);
       const remote = rows?.[0];
@@ -3225,12 +3540,11 @@ async function _notesSyncPoll() {
       if (remoteContent !== displayedContent) {
         const selStart = ta.selectionStart;
         const selEnd   = ta.selectionEnd;
-        // Temporarily lift readonly so value assignment takes effect in all browsers
         const wasReadOnly = ta.readOnly;
         if (wasReadOnly) ta.readOnly = false;
         ta.value = remoteContent;
         if (wasReadOnly) ta.readOnly = true;
-        const local = _notes.find(n => n.id === noteId);
+        const local = _notes.find(function(n) { return n.id === noteId; });
         if (local) { local.content = remoteContent; local.updated_at = remote.updated_at; }
         try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
       }
@@ -3868,6 +4182,23 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
         console.warn('[Compass] Inbox notification failed:', e);
       }
     }
+
+    // Migrate note to block format if this is the first participant
+    try {
+      const noteForMigrate = typeof _notes !== 'undefined' ? _notes.find(function(n) { return n.id === noteId; }) : null;
+      if (noteForMigrate && !_notesIsBlockFormat(noteForMigrate)) {
+        const ownerResId = window._notesResource && window._notesResource.id;
+        const ownerName  = window._notesResource && window._notesResource.name;
+        const blocks     = _notesMigrateToBlocks(noteForMigrate.content || '', ownerResId, ownerName);
+        noteForMigrate.content_blocks = blocks;
+        await API.patch('notes?id=eq.' + noteId, {
+          content_blocks: blocks,
+          updated_at:     new Date().toISOString(),
+        });
+        // Re-render tiles showing this note
+        if (typeof _notesRenderGrid === 'function') _notesRenderGrid();
+      }
+    } catch(e) { console.warn('[Compass] Block migration error:', e); }
 
     await _notesLoadParticipants(noteId);
     _notesRenderPresence(noteId);
