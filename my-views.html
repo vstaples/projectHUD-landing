@@ -1166,7 +1166,7 @@ function _notesRenderGrid() {
   // _notesRenderGrid call (which would otherwise cause continuous API polls).
   const existingWidgetEls = {};
   gridArea.querySelectorAll('.views-tile[data-viewid]').forEach(function(el) {
-    const nid = el.dataset.noteid;
+    const nid = el.dataset.viewid;
     const canvas = el.querySelector('.tile-canvas');
     if (canvas && canvas.dataset.widgetRendered) {
       existingWidgetEls[nid] = el;
@@ -1223,6 +1223,7 @@ function _notesRenderGrid() {
         div.dataset.rowid  = row.id;
         div.dataset.slot   = s;
         div.dataset.noteid = noteObj.id;
+        div.dataset.viewid = noteObj.id;
         // ── STEP 5: lock read-only content areas ──────────────────────
         if (tileIsReadOnly) {
           const ta = div.querySelector('.views-tile-canvas');
