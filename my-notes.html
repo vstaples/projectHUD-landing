@@ -5899,8 +5899,11 @@ window.WIDGET_REGISTRY.register({
 
     container.innerHTML =
       '<div style="display:flex;flex-direction:column;padding:'+pad+';height:100%;justify-content:center;gap:0;box-sizing:border-box">' +
-        // Header label
-        '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:'+numMB+'">Billable vs Non-Bill</div>' +
+        // Header label row — title left, total right in yellow
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:'+numMB+'">' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Billable vs Non-Bill</div>' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:#EF9F27;letter-spacing:.04em">'+data.total+'h total</div>' +
+        '</div>' +
         // Two big numbers
         '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:'+numMB+'">' +
           '<div>' +
@@ -5921,8 +5924,7 @@ window.WIDGET_REGISTRY.register({
           '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:' + billColor + '">' + data.billPct + '%</span>' +
           '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + data.nonPct + '%</span>' +
         '</div>' +
-        // Total — hide on very small tiles
-        (_isSmall ? '' : '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text2)">'+data.total+'h total this week</div>') +
+
       '</div>';
   }
 });
