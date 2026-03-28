@@ -5547,12 +5547,7 @@ function _widgetCtx() {
     api:        window.API || window._notesAPI,
   };
 }
-window._widgetContext = _widgetCtx; // export for cross-block access
-function _api(path) {
-  const api = window.API || window._notesAPI;
-  return api ? api.get(path).catch(function(){return[];}) : Promise.resolve([]);
-}
-window._wApi = _wApi; // export for Phase 2 widgets
+// _widgetContext exported by Block 3 Phase 1 as window._widgetContext
 
 // ── Project picker helper — role-aware ────────────────────────────────────
 async function _getProjectsForPicker() {
