@@ -6008,7 +6008,7 @@ window.WIDGET_REGISTRY.register({
 
     const tasks = await _api(
       'tasks?assigned_to=eq.'+uid+
-      '&status=neq.complete&status=neq.cancelled' +
+      '&status=neq.complete' +
       '&select=id,name,due_date,budget_hours,effort_days,status&limit=500'
     );
     const all = Array.isArray(tasks) ? tasks : [];
