@@ -2370,9 +2370,15 @@ function _notesRenderLibrary() {
     const personName = v.forResourceName || myName;
     const personRid  = v.forResourceId   || myRid;
     const initials   = personName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-    // Pick a deterministic color from PARTICIPANT_COLORS palette by rid hash
-    const colorIdx   = personRid ? (parseInt(personRid.slice(-4), 16) || 0) : 0;
-    const color      = (typeof PARTICIPANT_COLORS !== 'undefined' && PARTICIPANT_COLORS.length)
+    // Derive color using the same sequential index as the invite picker.
+    // _inviteResources is sorted last_name.asc and grouped by department —
+    // find where this resource falls in that order to get a consistent index.
+    let colorIdx = 0;
+    if (window._inviteResources && window._inviteResources.length) {
+      const idx = window._inviteResources.findIndex(function(r){ return r.id === personRid; });
+      colorIdx  = idx >= 0 ? idx : 0;
+    }
+    const color = (typeof PARTICIPANT_COLORS !== 'undefined' && PARTICIPANT_COLORS.length)
       ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length]
       : '#00D2FF';
     entries.push({ vKey, label: vKey, personName, personRid, initials, color, isActive: vKey === _workspace.activeView });
@@ -2933,15 +2939,16 @@ window._notesCloneView = async function() {
     return a.localeCompare(b);
   });
   let personListHtml = '';
+  let _cloneColorIdx = 0; // sequential counter — matches invite picker colour assignment
   groupKeys.forEach(function(grp) {
     personListHtml += '<div style="padding:4px 10px 2px;font-family:var(--font-mono,monospace);font-size:9px;' +
       'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
       'border-top:1px solid rgba(0,210,255,.08);margin-top:2px">' + _esc(grp) + '</div>';
     groups[grp].forEach(function(r) {
       const initials = r.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const colorIdx = r.id ? (parseInt(r.id.slice(-4),16)||0) : 0;
       const color    = (typeof PARTICIPANT_COLORS!=='undefined'&&PARTICIPANT_COLORS.length)
-        ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+        ? PARTICIPANT_COLORS[_cloneColorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+      _cloneColorIdx++;
       const isMe = r.user_id === myUserId;
       personListHtml +=
         '<div class="clone-person-row" data-rid="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '" ' +
@@ -3218,15 +3225,16 @@ async function _notesShowRenameViewDialog(currentName) {
     return a.localeCompare(b);
   });
   let personListHtml = '';
+  let _rnvColorIdx = 0; // sequential — matches invite picker colour assignment
   groupKeys.forEach(function(grp) {
     personListHtml += '<div style="padding:3px 7px 1px;font-family:var(--font-mono,monospace);font-size:9px;' +
       'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
       'border-top:1px solid rgba(0,210,255,.06);margin-top:2px">' + _esc(grp) + '</div>';
     groups[grp].forEach(function(r) {
       const initials = r.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const colorIdx = r.id ? (parseInt(r.id.slice(-4),16)||0) : 0;
       const color = (typeof PARTICIPANT_COLORS!=='undefined'&&PARTICIPANT_COLORS.length)
-        ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+        ? PARTICIPANT_COLORS[_rnvColorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+      _rnvColorIdx++;
       const isCurrent = cv.forResourceId === r.id;
       personListHtml +=
         '<div class="rnv-person-row" data-rid="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '" ' +
