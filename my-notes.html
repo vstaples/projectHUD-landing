@@ -180,7 +180,7 @@
 .notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
 .notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
 /* ── Block collaborative canvas ── */
-.notes-block-canvas{display:flex;flex-direction:column;gap:0;overflow-y:auto;height:100%}
+.notes-block-canvas{display:flex;flex-direction:column;gap:0;flex:1;min-height:0;overflow-y:auto;padding:10px 12px;box-sizing:border-box}
 .nbc-block{position:relative;outline:none;min-height:1.6em;line-height:1.75;caret-color:#00D2FF;
   font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);
   word-break:break-word;cursor:text;transition:background .1s;
@@ -1356,7 +1356,7 @@ function _notesTileHTML(note, tileState, readOnly) {
   const canvasReadOnly = _effectiveReadOnly ? ' readonly' : '';
 
   const canvasHtml = useBlocks
-    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0;max-height:100%"></div>'
+    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '"></div>'
     : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
         'placeholder="' + (_effectiveReadOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
         (_effectiveReadOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
