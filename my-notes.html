@@ -3756,7 +3756,7 @@ function injectModeSwitcher(tileEl, tileState) {
   const label  = mode === 'widget' ? (WIDGET_REGISTRY.get(tileState.widgetId)?.label || 'Widget') : 'Note';
   const btn    = document.createElement('button');
   btn.className = 'tile-header-mode-btn' + (mode === 'widget' ? ' widget-active' : '');
-  btn.title     = 'Switch canvas mode';
+  btn.title     = mode === 'widget' ? 'Switch mode or reconfigure widget' : 'Switch canvas mode';
   btn.textContent = label;
 
   // Insert before the invite button
@@ -3768,6 +3768,21 @@ function injectModeSwitcher(tileEl, tileState) {
     e.stopPropagation();
     showModeSwitcher(btn, tileState);
   });
+
+  // If in widget mode, also add a ⚙ reconfigure button
+  if (mode === 'widget' && tileState.widgetId) {
+    const gearBtn = document.createElement('button');
+    gearBtn.className = 'tile-header-mode-btn';
+    gearBtn.title     = 'Reconfigure widget';
+    gearBtn.textContent = '⚙';
+    gearBtn.dataset.widgetGear = '1';
+    if (inviteBtn) header.insertBefore(gearBtn, inviteBtn);
+    else header.appendChild(gearBtn);
+    gearBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showWidgetConfig(tileState.widgetId, tileState, tileState.widgetConfig || {});
+    });
+  }
 }
 
 function showModeSwitcher(btn, tileState) {
@@ -3912,26 +3927,14 @@ function showWidgetConfig(widgetId, tileState, existingConfig) {
     } else if (field.type === 'boolean') {
       input = '<input type="checkbox" class="wcf-input" data-key="' + _esc(field.key) + '"' + (val ? ' checked' : '') + ' style="width:auto"/>';
     } else if (field.type === 'project_picker') {
-      const projects = (window._projects || []).filter(function(p) { return p.status === 'active' || p.status === 'in_progress'; });
-      if (!projects.length) {
-        input = '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:4px 0">No active projects found</div>' +
-                '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" value="' + _esc(String(val)) + '" placeholder="Paste project ID…"/>';
-      } else {
-        input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '" style="width:100%">' +
-          '<option value="">— Select project —</option>' +
-          projects.map(function(p) {
-            return '<option value="' + _esc(p.id) + '"' + (p.id === val ? ' selected' : '') + '>' + _esc(p.name) + '</option>';
-          }).join('') +
-        '</select>';
-      }
+      // Rendered async — placeholder replaced after fetch
+      input = '<select class="ntd-select wcf-input wcf-project-sel" data-key="' + _esc(field.key) + '" data-val="' + _esc(String(val)) + '" style="width:100%">' +
+        '<option value="">Loading projects…</option>' +
+      '</select>';
     } else if (field.type === 'resource_picker') {
-      const resources = (window._notesGetInviteResources && window._notesGetInviteResources()) || [];
-      const selfRes   = window._notesResource;
-      input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '" style="width:100%">' +
-        '<option value="">— Me —</option>' +
-        resources.filter(function(r) { return r.id && r.name; }).map(function(r) {
-          return '<option value="' + _esc(r.id) + '"' + (r.id === val ? ' selected' : '') + '>' + _esc(r.name) + '</option>';
-        }).join('') +
+      // Placeholder replaced after async load
+      input = '<select class="ntd-select wcf-input wcf-resource-sel" data-key="' + _esc(field.key) + '" data-val="' + _esc(String(val)) + '" style="width:100%">' +
+        '<option value="">Loading…</option>' +
       '</select>';
     } else {
       input = '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" type="' + (field.type === 'number' ? 'number' : 'text') + '" value="' + _esc(String(val)) + '" placeholder="' + _esc(field.label) + '"/>';
@@ -3953,6 +3956,45 @@ function showWidgetConfig(widgetId, tileState, existingConfig) {
     '</div>';
 
   document.body.appendChild(overlay);
+
+  // Populate project pickers async
+  overlay.querySelectorAll('.wcf-project-sel').forEach(function(sel) {
+    const savedVal = sel.dataset.val || '';
+    const api = window.API || window._notesAPI;
+    if (!api) { sel.innerHTML = '<option value="">No API available</option>'; return; }
+    api.get('workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=100').catch(function(){ return []; }).then(function(rows) {
+      // Deduplicate by project_id, use title as name
+      const seen = {};
+      const projects = (rows || []).filter(function(r) {
+        if (!r.project_id || seen[r.project_id]) return false;
+        seen[r.project_id] = true; return true;
+      }).map(function(r) { return { id: r.project_id, name: r.title }; });
+      if (!projects.length) {
+        sel.innerHTML = '<option value="">No active projects</option>';
+      } else {
+        sel.innerHTML = '<option value="">— Select project —</option>' +
+          projects.map(function(p) {
+            return '<option value="' + _esc(p.id) + '"' + (p.id === savedVal ? ' selected' : '') + '>' + _esc(p.name) + '</option>';
+          }).join('');
+      }
+    });
+  });
+
+  // Populate resource pickers async
+  overlay.querySelectorAll('.wcf-resource-sel').forEach(function(sel) {
+    const savedVal = sel.dataset.val || '';
+    var loadFn = window._notesLoadInviteResources;
+    var getFn  = window._notesGetInviteResources;
+    if (!loadFn) { sel.innerHTML = '<option value="">— Me (default) —</option>'; return; }
+    loadFn().then(function() {
+      const resources = (getFn && getFn()) || [];
+      sel.innerHTML = '<option value="">— Me (default) —</option>' +
+        resources.filter(function(r) { return r.id && r.name; }).map(function(r) {
+          return '<option value="' + _esc(r.id) + '"' + (r.id === savedVal ? ' selected' : '') + '>' + _esc(r.name) + '</option>';
+        }).join('');
+    });
+  });
+
   overlay.querySelector('#wcf-cancel').onclick = function() { overlay.remove(); };
   overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
   overlay.querySelector('#wcf-apply').onclick = function() {
@@ -3983,14 +4025,10 @@ function refreshTileWidget(noteId) {
   if (!cv) return;
   const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
   if (!tileState) return;
-  // Update mode button label
-  const modeBtn = tileEl.querySelector('.tile-header-mode-btn');
-  const mode    = tileState.canvasMode || 'note';
-  if (modeBtn) {
-    const widget = tileState.widgetId ? WIDGET_REGISTRY.get(tileState.widgetId) : null;
-    modeBtn.textContent = widget ? widget.label : 'Note';
-    modeBtn.classList.toggle('widget-active', mode === 'widget');
-  }
+  // Re-inject mode switcher (updates label, adds/removes gear button)
+  const existing = tileEl.querySelectorAll('.tile-header-mode-btn');
+  existing.forEach(function(el) { el.remove(); });
+  injectModeSwitcher(tileEl, tileState);
   renderTileCanvas(tileEl, tileState, null);
 }
 
