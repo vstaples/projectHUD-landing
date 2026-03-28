@@ -3640,6 +3640,10 @@ async function _notesSyncPoll() {
     const noteId = tile.noteId;
     const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
     if (typedAgo < 3000) continue;
+    // Widget tiles own their canvas — content_blocks sync is irrelevant and
+    // would incorrectly trigger _notesRenderGrid → _notesPostWire → dataFn
+    // on every poll cycle, causing continuous widget refreshes.
+    if (tile.canvasMode === 'widget') continue;
     // Fetch both content and content_blocks — decide which to use from remote data
     try {
       const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,content_blocks,updated_at&limit=1').catch(()=>[]);
@@ -5127,7 +5131,8 @@ function stopWidgetRefresh(tileEl) {
 }
 
 // ── Canvas mode rendering ─────────────────────────────────────────────────
-function renderTileCanvas(tileEl, tileState, note) {
+// forceRefresh=true bypasses the already-rendered guard (used by the periodic interval only)
+function renderTileCanvas(tileEl, tileState, note, forceRefresh) {
   const mode = tileState.canvasMode || 'note';
   let canvas = tileEl.querySelector('.tile-canvas');
   if (!canvas) {
@@ -5147,6 +5152,14 @@ function renderTileCanvas(tileEl, tileState, note) {
     canvas.style.display = '';
     const textarea = tileEl.querySelector('.notes-tile-canvas');
     if (textarea) textarea.style.display = 'none';
+    // Guard: skip dataFn if widget already rendered and this is just a re-wire call.
+    // forceRefresh=true is only set by the periodic startWidgetRefresh interval.
+    const alreadyRendered = canvas.dataset.widgetRendered === tileState.widgetId && !forceRefresh;
+    if (alreadyRendered) {
+      startWidgetRefresh(tileEl, tileState.noteId, tileState.widgetId, tileState.widgetConfig || {});
+      return;
+    }
+    canvas.dataset.widgetRendered = tileState.widgetId;
     WIDGET_REGISTRY.render(tileState.widgetId, tileState.widgetConfig || {}, canvas, _widgetContext());
     startWidgetRefresh(tileEl, tileState.noteId, tileState.widgetId, tileState.widgetConfig || {});
   } else {
@@ -5452,6 +5465,9 @@ function refreshTileWidget(noteId) {
   const existing = tileEl.querySelectorAll('.tile-header-mode-btn');
   existing.forEach(function(el) { el.remove(); });
   injectModeSwitcher(tileEl, tileState);
+  // Clear the rendered guard so the new config triggers a fresh dataFn call
+  const canvas = tileEl.querySelector('.tile-canvas');
+  if (canvas) delete canvas.dataset.widgetRendered;
   renderTileCanvas(tileEl, tileState, null);
 }
 
