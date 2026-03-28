@@ -1541,7 +1541,7 @@ function _notesWireTiles() {
   });
   // Hook for widget system and other late-binding extensions
   setTimeout(function() {
-    if (typeof window._notesPostWire === 'function') window._notesPostWire();
+    if (typeof window._viewsPostWire === 'function') window._viewsPostWire();
   }, 0);
 }
 
@@ -1687,8 +1687,8 @@ async function _notesNew(rowId, slot) {
       setTimeout(function() {
         const cv2 = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
         const tileState = cv2 && cv2.tiles.find(function(t){ return t.noteId === placeholderId; });
-        if (tileState && typeof window._notesShowWidgetPicker === 'function') {
-          window._notesShowWidgetPicker(tileState);
+        if (tileState && typeof window._viewsShowWidgetPicker === 'function') {
+          window._viewsShowWidgetPicker(tileState);
         } else {
           // Fallback — try clicking the mode button if it was injected in time
           const tileEl = document.querySelector('.views-tile[data-viewid="' + placeholderId + '"]');
@@ -4402,8 +4402,8 @@ window._notesNewView           = _notesNewView;
 window._viewsWorkspace         = _workspace; // safe alias for external inspection only
 window._notesRenameView    = _notesRenameView;
 window._notesClearWorkspace= _notesClearWorkspace;
-window._notesRenderLeft    = _notesRenderLeft;
-window._notesRenderGrid    = _notesRenderGrid;
+window._viewsRenderLeft    = _notesRenderLeft; // scoped — do NOT overwrite MY NOTES version
+window._viewsRenderGrid    = _notesRenderGrid; // scoped — do NOT overwrite MY NOTES version
 
 // ── STEP 5: Switch to a shared view (called after accept) ─────────────────
 // Loads the owner's workspace config for this view and renders it read-only.
@@ -5161,7 +5161,7 @@ window._notesWireTiles = function() {
   if (typeof _origFn === 'function') _origFn();
   _notesWireTilesCollab();
   // Widget mode buttons — injected after collab so avatars are in DOM first
-  if (typeof window._notesPostWire === 'function') window._notesPostWire();
+  if (typeof window._viewsPostWire === 'function') window._viewsPostWire();
 };
 
 // Also stop presence when tile is closed — only if user owns the note
@@ -5333,13 +5333,13 @@ async function _notesViewHeartbeat(ownerUserId, viewName) {
                     const notesArr = typeof _notes !== 'undefined' ? _notes : [];
                     if (!notesArr.find(function(x) { return x.id === n.id; })) notesArr.push(n);
                   });
-                  if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+                  if (typeof window._viewsRenderGrid === 'function') window._viewsRenderGrid();
                 })
                 .catch(function() {
-                  if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+                  if (typeof window._viewsRenderGrid === 'function') window._viewsRenderGrid();
                 });
             } else {
-              if (typeof window._notesRenderGrid === 'function') window._notesRenderGrid();
+              if (typeof window._viewsRenderGrid === 'function') window._viewsRenderGrid();
             }
           }
         }
@@ -6229,8 +6229,8 @@ function refreshTileWidget(noteId) {
 
 // ── Wire into tile rendering via _notesPostWire hook ─────────────────────
 // Export showWidgetPicker so _notesNew (Block 1) can open it directly
-window._notesShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
-window._notesPostWire = function() {
+window._viewsShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
+window._viewsPostWire = function() {
   const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
   const isLocked = !!cv.locked;
@@ -6247,7 +6247,7 @@ window._notesPostWire = function() {
 
 // ── Gear icon for reconfiguring existing widget ───────────────────────────
 // Exposed so tile HTML can call it
-window._notesWidgetReconfigure = function(noteId) {
+window._viewsWidgetReconfigure = function(noteId) {
   const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
   const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
@@ -7511,15 +7511,15 @@ window.WIDGET_REGISTRY.register({
 // (Moved here from mid-block so task_list and action_item_list are included)
 
 setTimeout(function() {
-  if (typeof window._notesPostWire === 'function') {
+  if (typeof window._viewsPostWire === 'function') {
     
-    window._notesPostWire();
+    window._viewsPostWire();
   }
 }, 50);
 setTimeout(function() {
-  if (typeof window._notesPostWire === 'function') {
+  if (typeof window._viewsPostWire === 'function') {
     
-    window._notesPostWire();
+    window._viewsPostWire();
   }
 }, 200);
 
