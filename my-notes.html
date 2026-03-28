@@ -366,7 +366,13 @@
             font-weight:600;-webkit-appearance:auto;max-width:300px;width:auto"
           onchange="_notesSwitchView(this.value)">
         </select>
+        <button id="notes-lock-btn"
+          onclick="window._notesToggleViewLock && window._notesToggleViewLock()"
+          title="Lock view — prevents edits to layout and tiles"
+          style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
+          onmouseover="this.style.color='#EF9F27'" onmouseout="this.style.color=this.dataset.locked==='1'?'#EF9F27':''">🔓</button>
         <button onclick="window._notesShowRenameViewDialog && window._notesShowRenameViewDialog(window._workspace && window._workspace.activeView)"
+          id="notes-rename-btn"
           title="Rename current view"
           style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
           onmouseover="this.style.color='#00D2FF'" onmouseout="this.style.color=''"
@@ -1162,7 +1168,9 @@ function _notesRenderGrid() {
       // ── STEP 5: per-slot viewer check ──────────────────────────────────
       const slotKey        = row.id + ':' + s;
       const tileIsWidget   = tile && tile.canvasMode === 'widget';
-      const tileIsReadOnly = !tileIsWidget && viewerCtx.isViewer && !viewerCtx.overriddenSlots.has(slotKey);
+      // Locked view: layout edits blocked (tile content still interactive for widgets)
+      const viewIsLocked   = !!cv.locked;
+      const tileIsReadOnly = !tileIsWidget && (viewIsLocked || (viewerCtx.isViewer && !viewerCtx.overriddenSlots.has(slotKey)));
 
       const isPlaceholderTile = tile && (tile.isPlaceholder ||
         (tile.noteId && (tile.noteId.startsWith('ph-') || tile.noteId.startsWith('wt-'))));
@@ -1636,6 +1644,7 @@ function _notesToggleChat(noteId) {
 
 async function _notesNew(rowId, slot) {
   if (!_userId) return;
+  if (_cv().locked) return; // view is locked
   try {
     if (rowId && typeof slot === 'number') {
       // Slot click — create a local placeholder tile immediately (no DB record yet).
@@ -2770,15 +2779,58 @@ function _notesRenderViewSwitcher() {
     sharedBar.style.display = 'none';
   }
   if (editBtn) editBtn.style.display = (tpl && !cv._isSharedView) ? '' : 'none';
+
+  // ── Lock button state ────────────────────────────────────────────────────
+  const isLocked   = !!cv.locked;
+  const lockBtn    = document.getElementById('notes-lock-btn');
+  const renameBtn  = document.getElementById('notes-rename-btn');
+  if (lockBtn) {
+    lockBtn.textContent     = isLocked ? '🔒' : '🔓';
+    lockBtn.dataset.locked  = isLocked ? '1' : '0';
+    lockBtn.style.color     = isLocked ? '#EF9F27' : '';
+    lockBtn.title           = isLocked ? 'View locked — click to unlock' : 'Lock view — prevents layout edits';
+    lockBtn.onmouseout      = function() { this.style.color = isLocked ? '#EF9F27' : ''; };
+  }
+  // Hide edit controls when locked (row editor, rename, delete, new view, clear, save template)
+  const editEls = [
+    document.getElementById('notes-row-editor'),
+    renameBtn,
+    document.getElementById('notes-edit-tpl-btn'),
+  ];
+  // Also hide the delete-view and Clear buttons (inside the grid header)
+  document.querySelectorAll('#notes-grid-header .notes-grid-btn').forEach(function(btn) {
+    const txt = btn.textContent.trim();
+    if (txt === 'Clear' || txt === '⊞ Save Template') {
+      btn.style.display = isLocked ? 'none' : '';
+    }
+  });
+  document.querySelectorAll('#notes-view-name-wrap button').forEach(function(btn) {
+    if (btn.id === 'notes-lock-btn') return; // keep lock button always visible
+    btn.style.display = isLocked ? 'none' : '';
+  });
+  const rowEditor = document.getElementById('notes-row-editor');
+  if (rowEditor) rowEditor.style.display = isLocked ? 'none' : '';
+
   const sel2 = document.getElementById('notes-view-switcher');
   if (sel2 && !sel2._renameWired) {
     sel2._renameWired = true;
     sel2.addEventListener('dblclick', function() {
-      if (_cv()._isSharedView) return;
+      if (_cv()._isSharedView || _cv().locked) return;
       _notesShowRenameViewDialog(_workspace.activeView);
     });
   }
 }
+
+// ── View lock toggle ──────────────────────────────────────────────────────
+window._notesToggleViewLock = function() {
+  const cv = _cv();
+  if (!cv) return;
+  cv.locked = !cv.locked;
+  _notesSaveWorkspace(true);
+  _notesRenderViewSwitcher();
+  // Re-render grid so empty-slot + controls respect the new lock state
+  _notesRenderGrid();
+};
 
 function _notesSwitchView(viewName) {
   if (!viewName || viewName === _workspace.activeView) return;
@@ -5676,10 +5728,12 @@ window._notesShowWidgetPicker = function(tileState) { showWidgetPicker(tileState
 window._notesPostWire = function() {
   const cv = window._notesCv && window._notesCv();
   if (!cv) return;
+  const isLocked = !!cv.locked;
   cv.tiles.forEach(function(tileState) {
     const tileEl = document.querySelector('.notes-tile[data-noteid="' + tileState.noteId + '"]');
     if (!tileEl) return;
-    injectModeSwitcher(tileEl, tileState);
+    // Don't inject mode switcher on locked views — prevents widget/note switching
+    if (!isLocked) injectModeSwitcher(tileEl, tileState);
     if (tileState.canvasMode === 'widget' && tileState.widgetId) {
       renderTileCanvas(tileEl, tileState, null);
     }
@@ -6196,25 +6250,57 @@ window.WIDGET_REGISTRY.register({
 
     const mono = 'font-family:var(--font-mono,monospace)';
     const billColor = '#00D2FF';
+    const nonBillColor = '#8B5CF6';
+    const billPct = data.billPct;
+    const nonPct  = 100 - billPct;
+
+    // Right-side summary panel — mirrors My Work's billable vs non-bill panel
+    const summaryPanel =
+      '<div style="display:flex;flex-direction:column;justify-content:center;padding:8px 14px;'+
+          'border-left:1px solid rgba(255,255,255,.07);flex-shrink:0;min-width:130px;gap:6px">'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Billable vs Non-Bill</div>'+
+        '<div style="display:flex;gap:16px;align-items:flex-end">'+
+          '<div>'+
+            '<div style="font-size:22px;font-weight:700;color:'+billColor+';line-height:1">'+data.weekBillable+'h</div>'+
+            '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:2px">billable</div>'+
+          '</div>'+
+          '<div>'+
+            '<div style="font-size:22px;font-weight:700;color:'+nonBillColor+';line-height:1">'+data.weekNonBill+'h</div>'+
+            '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:2px">non-bill</div>'+
+          '</div>'+
+        '</div>'+
+        // Split bar
+        '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;display:flex">'+
+          '<div style="height:100%;width:'+billPct+'%;background:'+billColor+';border-radius:3px 0 0 3px;transition:width .4s"></div>'+
+          '<div style="height:100%;width:'+nonPct+'%;background:'+nonBillColor+';transition:width .4s"></div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between">'+
+          '<span style="'+mono+';font-size:10px;color:'+billColor+'">'+billPct+'%</span>'+
+          '<span style="'+mono+';font-size:10px;color:'+nonBillColor+'">'+nonPct+'%</span>'+
+        '</div>'+
+        '<div style="'+mono+';font-size:10px;color:#EF9F27">'+data.weekTotal+'h total this week</div>'+
+      '</div>';
 
     container.innerHTML =
       '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">'+
         // Header
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;padding:5px 10px 3px;flex-shrink:0">'+
-          'This week — hours by day'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;padding:5px 10px 3px;flex-shrink:0;border-left:2px solid rgba(0,210,255,.5)">'+
+          '\u2003This week \u2014 hours by day'+
         '</div>'+
-        // Gauges
-        '<div style="display:flex;flex:1;align-items:flex-end;padding:0 4px;min-height:0;overflow:hidden">'+
-          gaugesHtml+
+        // Gauges + summary panel side by side
+        '<div style="display:flex;flex:1;min-height:0;overflow:hidden">'+
+          '<div style="display:flex;flex:1;align-items:flex-end;padding:0 4px;min-height:0;overflow:hidden">'+
+            gaugesHtml+
+          '</div>'+
+          summaryPanel+
         '</div>'+
         // Legend
         '<div style="display:flex;align-items:center;gap:12px;padding:4px 10px 5px;flex-shrink:0;border-top:1px solid rgba(255,255,255,.05)">'+
           '<div style="display:flex;align-items:center;gap:5px;'+mono+';font-size:10px;color:var(--text3)">'+
             '<div style="width:14px;height:4px;background:'+billColor+';border-radius:2px"></div>Billable</div>'+
           '<div style="display:flex;align-items:center;gap:5px;'+mono+';font-size:10px;color:var(--text3)">'+
-            '<div style="width:14px;height:4px;background:#8B5CF6;border-radius:2px"></div>Non-bill</div>'+
+            '<div style="width:14px;height:4px;background:'+nonBillColor+';border-radius:2px"></div>Non-billable</div>'+
           '<span style="'+mono+';font-size:10px;color:var(--text3)">Scale: 8h = full</span>'+
-          '<span style="margin-left:auto;'+mono+';font-size:10px;color:#EF9F27">'+data.weekTotal+'h total</span>'+
         '</div>'+
       '</div>';
   }
