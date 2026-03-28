@@ -1804,9 +1804,12 @@ function _notesDndInit() {
   let _mouseIsDown  = false;
   let _mouseDownPos = null;
 
+  let _html5DragActive = false; // set true when HTML5 dragstart fires
+
   document.addEventListener('mousedown', e => {
     const item = e.target?.closest?.('#notes-left .notes-item[data-noteid]');
     if (!item) return;
+    _html5DragActive = false; // reset — will be set true if dragstart fires
     _dragNoteId   = item.dataset.noteid;
     _dragSlot     = null;
     _mouseIsDown  = true;
@@ -1817,7 +1820,7 @@ function _notesDndInit() {
   let _dropInsert = null;
 
   document.addEventListener('mousemove', e => {
-    if (!_dragNoteId || !_mouseIsDown) return;
+    if (!_dragNoteId || !_mouseIsDown || _html5DragActive) return;
     // Require 5px movement before activating drag
     if (!_leftDragActive && _mouseDownPos) {
       const dx = Math.abs(e.clientX - _mouseDownPos.x);
@@ -1825,10 +1828,9 @@ function _notesDndInit() {
       if (dx < 5 && dy < 5) return;
     }
     // Only activate left-panel drag if cursor is still within #notes-left
-    // If cursor has moved to the grid, let HTML5 drag handle it
     const leftPanel = document.getElementById('notes-left');
     const leftRect  = leftPanel ? leftPanel.getBoundingClientRect() : null;
-    if (leftRect && (e.clientX > leftRect.right + 20)) return; // heading to grid
+    if (leftRect && (e.clientX > leftRect.right + 20)) return;
     if (!_leftDragActive) {
       _leftDragActive = true;
       document.getElementById('notes-left').style.userSelect = 'none';
@@ -1944,8 +1946,10 @@ function _notesDndInit() {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
     } else if (item) {
-      _dragNoteId = item.dataset.noteid;
-      _dragSlot   = null;
+      _dragNoteId      = item.dataset.noteid;
+      _dragSlot        = null;
+      _html5DragActive = true;  // signal mouse-event system to stay out
+      _leftDragActive  = false; // ensure left drag doesn't block grid drop
       item.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _dragNoteId);
@@ -1964,7 +1968,8 @@ function _notesDndInit() {
   shell.addEventListener('dragend', e => {
     shell.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    if (!_leftDragActive) { _dragNoteId = null; _dragSlot = null; }
+    _html5DragActive = false;
+    if (!_leftDragActive) { _dragNoteId = null; _dragSlot = null; _dragRowId = null; }
   });
 
   // Use document-level dragover to bypass Chrome overflow:auto dragover suppression
