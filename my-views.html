@@ -4460,6 +4460,88 @@ window._notesSwitchToSharedView = async function(ownerUserId, viewName) {
   }
 };
 
+
+// ── DIAGNOSTICS ──────────────────────────────────────────────────────────
+window._viewsDiag = function() {
+  const lines = [];
+  const cv = (typeof _cv === 'function') ? _cv() : null;
+  const tiles = cv ? cv.tiles : [];
+  const widgetTiles = tiles.filter(function(t) { return t.canvasMode === 'widget'; });
+
+  lines.push('=== MY VIEWS DIAGNOSTICS ===');
+  lines.push('_userId: ' + _userId);
+  lines.push('_workspace.activeView: ' + _workspace.activeView);
+  lines.push('_workspace.views keys: ' + Object.keys(_workspace.views || {}).join(', '));
+  lines.push('cv tiles total: ' + tiles.length);
+  lines.push('cv widget tiles: ' + widgetTiles.length);
+  lines.push('');
+  lines.push('window.WIDGET_REGISTRY: ' + (window.WIDGET_REGISTRY ? 'SET' : 'MISSING'));
+  lines.push('window._widgetContext: ' + (window._widgetContext ? 'SET' : 'MISSING'));
+  lines.push('window._viewsCv: ' + (window._viewsCv ? 'SET' : 'MISSING'));
+  lines.push('window._notesResource: ' + JSON.stringify(window._notesResource ? {id: window._notesResource.id, name: window._notesResource.name} : null));
+  lines.push('');
+
+  // Check each widget tile
+  widgetTiles.forEach(function(t) {
+    var tileEl = document.querySelector('.views-tile[data-viewid="' + t.noteId + '"]');
+    var canvas = tileEl ? tileEl.querySelector('.tile-canvas') : null;
+    lines.push('Widget tile: ' + t.widgetId + ' | noteId: ' + t.noteId);
+    lines.push('  tileEl found: ' + !!tileEl);
+    lines.push('  canvas found: ' + !!canvas);
+    lines.push('  widgetRendered: ' + (canvas ? canvas.dataset.widgetRendered : 'n/a'));
+    if (window.WIDGET_REGISTRY) {
+      var reg = window.WIDGET_REGISTRY.get(t.widgetId);
+      lines.push('  registry entry: ' + (reg ? 'FOUND' : 'MISSING'));
+    }
+  });
+
+  lines.push('');
+  lines.push('DOM .views-tile[data-viewid] count: ' + document.querySelectorAll('.views-tile[data-viewid]').length);
+  lines.push('DOM .notes-tile[data-noteid] count: ' + document.querySelectorAll('.notes-tile[data-noteid]').length);
+  lines.push('DOM .tile-canvas count: ' + document.querySelectorAll('.tile-canvas').length);
+
+  // Try a manual render of the first widget tile
+  if (widgetTiles.length && window.WIDGET_REGISTRY && window._widgetContext) {
+    var t = widgetTiles[0];
+    var tileEl = document.querySelector('.views-tile[data-viewid="' + t.noteId + '"]');
+    var canvas = tileEl ? tileEl.querySelector('.tile-canvas') : null;
+    lines.push('');
+    lines.push('Manual render attempt on: ' + t.widgetId);
+    if (canvas) {
+      try {
+        delete canvas.dataset.widgetRendered;
+        window.WIDGET_REGISTRY.render(t.widgetId, t.widgetConfig || {}, canvas, window._widgetContext());
+        lines.push('  render() called — check tile visually');
+      } catch(e) {
+        lines.push('  render() threw: ' + e.message);
+      }
+    } else {
+      lines.push('  canvas not found — cannot render');
+    }
+  }
+
+  var txt = lines.join('\n');
+  console.log(txt);
+
+  // Show overlay
+  var old = document.getElementById('views-diag-overlay');
+  if (old) old.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'views-diag-overlay';
+  overlay.style.cssText = 'position:fixed;top:60px;right:20px;z-index:99999;background:#0a0f18;border:1px solid #EF9F27;'
+    + 'border-radius:4px;padding:14px 16px;font-family:monospace;font-size:11px;color:#C8DFF0;'
+    + 'max-width:480px;max-height:70vh;overflow-y:auto;white-space:pre;line-height:1.6;'
+    + 'box-shadow:0 4px 24px rgba(0,0,0,.7)';
+  overlay.textContent = txt;
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ close';
+  closeBtn.style.cssText = 'display:block;margin-top:10px;background:none;border:1px solid rgba(255,255,255,.2);'
+    + 'color:#C8DFF0;cursor:pointer;font-size:11px;padding:3px 8px;border-radius:2px';
+  closeBtn.onclick = function() { overlay.remove(); };
+  overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+};
+
 })();
 </script>
 <script>
