@@ -90,7 +90,7 @@
 .nre-step-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF}
 .nre-step-btn:disabled{opacity:.25;cursor:not-allowed}
 .nre-col-val{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text0);min-width:14px;text-align:center}
-.nre-height-sel{background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.15);color:var(--text2);font-family:var(--font-mono,monospace);font-size:10px;padding:1px 3px;cursor:pointer;outline:none}
+.nre-height-sel{background:#0a1628;border:1px solid rgba(0,210,255,.15);color:#90B8D8;font-family:var(--font-mono,monospace);font-size:10px;padding:2px 4px;cursor:pointer;outline:none;-webkit-appearance:auto}.nre-height-sel option{background:#0d1e35 !important;color:#90B8D8 !important}
 .nre-height-sel:focus{border-color:rgba(0,210,255,.4)}
 .nre-del{background:none;border:none;color:rgba(226,75,74,.3);cursor:pointer;font-size:11px;padding:0 2px;line-height:1;transition:color .1s}
 .nre-del:hover{color:#E24B4A}
@@ -99,7 +99,7 @@
 .nre-add-row:hover{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.04)}
 .nre-add-row:disabled{opacity:.25;cursor:not-allowed}
 /* ── Grid area — row-based ── */
-#notes-grid-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
+#notes-grid-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 .nre-grid-row{display:grid;gap:8px;flex-shrink:0}
 .nre-grid-row[data-height="small"] .notes-tile{min-height:120px}
 .nre-grid-row[data-height="medium"] .notes-tile{min-height:180px}
@@ -910,25 +910,47 @@ function _notesRowDelete(rowId) {
 }
 
 function _notesWireRowDrag(bar) {
-  let dragging = null;
+  // Use data attribute to track drag state — avoids document listener pollution
+  bar._rowDragging  = null;
+  bar._rowDragEl    = null;
+
   bar.querySelectorAll('.nre-grip').forEach(function(grip) {
     grip.addEventListener('mousedown', function(e) {
       const seg = grip.closest('.nre-row');
-      dragging = seg ? seg.dataset.rowId : null;
+      if (!seg) return;
+      bar._rowDragging = seg.dataset.rowId;
+      bar._rowDragEl   = seg;
+      seg.style.opacity = '0.5';
       e.preventDefault();
+      e.stopPropagation(); // prevent left-panel D&D from capturing
     });
   });
-  document.addEventListener('mouseup', function() { dragging = null; });
-  bar.addEventListener('mouseover', function(e) {
-    if (!dragging) return;
+
+  bar.addEventListener('mouseup', function() {
+    if (bar._rowDragEl) bar._rowDragEl.style.opacity = '';
+    bar._rowDragging = null;
+    bar._rowDragEl   = null;
+  });
+
+  bar.addEventListener('mouseleave', function() {
+    if (bar._rowDragEl) bar._rowDragEl.style.opacity = '';
+    bar._rowDragging = null;
+    bar._rowDragEl   = null;
+  });
+
+  bar.addEventListener('mousemove', function(e) {
+    if (!bar._rowDragging) return;
     const targetSeg = e.target && e.target.closest && e.target.closest('.nre-row');
-    if (!targetSeg || targetSeg.dataset.rowId === dragging) return;
+    if (!targetSeg || targetSeg.dataset.rowId === bar._rowDragging) return;
     const cv      = _cv();
-    const fromIdx = cv.rows.findIndex(function(r) { return r.id === dragging; });
+    const fromIdx = cv.rows.findIndex(function(r) { return r.id === bar._rowDragging; });
     const toIdx   = cv.rows.findIndex(function(r) { return r.id === targetSeg.dataset.rowId; });
-    if (fromIdx < 0 || toIdx < 0) return;
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
     const moved = cv.rows.splice(fromIdx, 1)[0];
     cv.rows.splice(toIdx, 0, moved);
+    if (bar._rowDragEl) bar._rowDragEl.style.opacity = '';
+    bar._rowDragging = null;
+    bar._rowDragEl   = null;
     _notesSaveWorkspace(false);
     _notesRenderGrid();
   });
@@ -1740,6 +1762,11 @@ function _notesDndInit() {
       const dy = Math.abs(e.clientY - _mouseDownPos.y);
       if (dx < 5 && dy < 5) return;
     }
+    // Only activate left-panel drag if cursor is still within #notes-left
+    // If cursor has moved to the grid, let HTML5 drag handle it
+    const leftPanel = document.getElementById('notes-left');
+    const leftRect  = leftPanel ? leftPanel.getBoundingClientRect() : null;
+    if (leftRect && (e.clientX > leftRect.right + 20)) return; // heading to grid
     if (!_leftDragActive) {
       _leftDragActive = true;
       document.getElementById('notes-left').style.userSelect = 'none';
@@ -1878,7 +1905,8 @@ function _notesDndInit() {
     if (!_leftDragActive) { _dragNoteId = null; _dragSlot = null; }
   });
 
-  shell.addEventListener('dragover', e => {
+  // Use document-level dragover to bypass Chrome overflow:auto dragover suppression
+  document.addEventListener('dragover', e => {
     if (!_dragNoteId || _leftDragActive) return;
     const tile = e.target?.closest?.('.notes-tile');
     if (tile && !tile.closest('#notes-left')) {
@@ -1889,12 +1917,12 @@ function _notesDndInit() {
     }
   });
 
-  shell.addEventListener('dragleave', e => {
+  document.addEventListener('dragleave', e => {
     const tile = e.target?.closest?.('.notes-tile');
     if (tile) tile.classList.remove('drag-over');
   });
 
-  shell.addEventListener('drop', async e => {
+  document.addEventListener('drop', async e => {
     e.preventDefault();
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
