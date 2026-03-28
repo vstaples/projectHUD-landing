@@ -437,6 +437,8 @@ window._notesLoadView = async function() {
 
   await _notesFetchAll();
   await _notesLoadWorkspace();
+  // Re-fetch any shared view notes (_notesFetchAll only loads own notes)
+  await _notesFetchSharedViewNotes();
   // First launch seeding — new user with no notes and no workspace
   if (_notes.length === 0 && Object.keys(_workspace.views).length === 1 &&
       _cv().tiles.length === 0) {
@@ -467,9 +469,34 @@ window._notesLoadView = async function() {
 
 window._notesRefresh = async function() {
   await _notesFetchAll();
+  // Re-fetch shared view notes — _notesFetchAll only loads own notes
+  await _notesFetchSharedViewNotes();
   _notesRenderLeft();
   _notesRenderGrid();
 };
+
+// Fetch notes referenced by any shared view currently in workspace
+async function _notesFetchSharedViewNotes() {
+  const allTileNoteIds = new Set();
+  Object.values(_workspace.views || {}).forEach(function(v) {
+    if (!v._isSharedView) return;
+    (v.tiles || []).forEach(function(t) { if (t.noteId) allTileNoteIds.add(t.noteId); });
+  });
+  if (!allTileNoteIds.size) return;
+  // Only fetch ones not already in _notes
+  const missing = Array.from(allTileNoteIds).filter(function(id) {
+    return !_notes.find(function(n) { return n.id === id; });
+  });
+  if (!missing.length) return;
+  try {
+    const rows = await API.get(
+      'notes?id=in.(' + missing.join(',') + ')&limit=100'
+    ).catch(function() { return []; });
+    (rows || []).forEach(function(n) {
+      if (!_notes.find(function(x) { return x.id === n.id; })) _notes.push(n);
+    });
+  } catch(e) { console.warn('[Compass] _notesFetchSharedViewNotes error:', e); }
+}
 
 // ── Fetch ─────────────────────────────────────────────────────────────────
 async function _notesFetchAll() {
