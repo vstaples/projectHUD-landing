@@ -6591,7 +6591,10 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const { uid } = _resolveTarget(config);
-    if (!uid) return null;
+    // Return zero-state (not null) when uid unavailable — renderFn cleans up
+    // stale DOM and tooltip rather than leaving previous user's data visible.
+    if (!uid) return { count:0, hours:0, overdueN:0, thisWeekN:0,
+                       today:'', nextSunIso:'', rows:[], noLogin:true };
 
     const now    = new Date();
     const today  = now.toLocaleDateString('en-CA');
@@ -6646,7 +6649,19 @@ window.WIDGET_REGISTRY.register({
   },
 
   renderFn: function(data, container) {
+    // Always remove any stale tooltip from a previous render first
+    if (container._nwqTip) { container._nwqTip.remove(); delete container._nwqTip; }
     if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    // No login — show clean zero state, no tooltip
+    if (data.noLogin) {
+      container.innerHTML=
+        '<div class="widget-counter">'+
+          '<div class="wc-big" style="color:rgba(0,210,255,.3)">0h</div>'+
+          '<div class="wc-label">NEXT WEEK</div>'+
+          '<div class="wc-breakdown"><span style="color:var(--text3)">No tasks — login not configured</span></div>'+
+        '</div>';
+      return;
+    }
     const mono = 'font-family:var(--font-mono,monospace)';
 
     function fmtH(h) { return (Math.round(h*10)/10)+'h'; }
