@@ -5977,7 +5977,86 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 3. TASK COUNTER ───────────────────────────────────────────────────────
+// ── 3. NEXT WEEK QUEUE ───────────────────────────────────────────────────
+// Mirrors the "Next week" KPI from My Calendar:
+// Tasks with due_date beyond this Sunday, OR no due_date at all.
+// Hours = budget_hours || (effort_days * 8) || 2 per item (calendar default).
+window.WIDGET_REGISTRY.register({
+  id:              'next_week_queue',
+  label:           'Next week queue',
+  category:        'personal',
+  description:     'Tasks queued for next week — count and budgeted hours',
+  icon:            'counter',
+  configSchema: [
+    { key:'targetUserId', label:'Person', type:'resource_picker', default:'', required:false,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 120000,
+  minTileHeight:   'small',
+
+  dataFn: async function(config) {
+    const { uid } = _resolveTarget(config);
+    if (!uid) return null;
+
+    // Compute this Sunday in local time (same logic as My Calendar)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun..6=Sat
+    const daysToSun = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+    const thisSun = new Date(now);
+    thisSun.setDate(now.getDate() + daysToSun);
+    const sunIso = thisSun.toLocaleDateString('en-CA'); // YYYY-MM-DD local
+
+    const tasks = await _api(
+      'tasks?assigned_to=eq.'+uid+
+      '&status=neq.complete&status=neq.cancelled' +
+      '&select=id,name,due_date,budget_hours,effort_days,status&limit=500'
+    );
+    const all = Array.isArray(tasks) ? tasks : [];
+
+    // Next-week bucket: due after this Sunday, OR no due date (unscheduled)
+    const nextWeek = all.filter(function(t) {
+      if (!t.due_date) return true;              // no due date → queued
+      return t.due_date.slice(0,10) > sunIso;    // due beyond this Sunday
+    });
+
+    // Hours: budget_hours → effort_days×8 → default 2h (matches calendar)
+    const totalHrs = nextWeek.reduce(function(s, t) {
+      return s + parseFloat(t.budget_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
+    }, 0);
+
+    const noDue  = nextWeek.filter(function(t){ return !t.due_date; }).length;
+    const hasDue = nextWeek.length - noDue;
+
+    return {
+      count:    nextWeek.length,
+      hours:    Math.round(totalHrs * 10) / 10,
+      noDue:    noDue,
+      hasDue:   hasDue,
+      sunIso:   sunIso,
+    };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const mono = 'font-family:var(--font-mono,monospace)';
+    const hrsDisplay = Number.isInteger(data.hours) ? data.hours+'h' : data.hours+'h';
+    container.innerHTML=
+      '<div class="widget-counter">'+
+        '<div class="wc-big" style="color:#00D2FF">'+hrsDisplay+'</div>'+
+        '<div class="wc-label">NEXT WEEK</div>'+
+        '<div class="wc-breakdown">'+
+          '<span style="color:rgba(255,255,255,.5)">'+data.count+' item'+(data.count!==1?'s':'')+' queued</span>'+
+        '</div>'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:6px;display:flex;gap:10px;justify-content:center">'+
+          '<span>'+data.hasDue+' scheduled</span>'+
+          '<span style="color:rgba(239,159,39,.7)">'+data.noDue+' unscheduled</span>'+
+        '</div>'+
+      '</div>';
+  }
+});
+
+
+// ── 4. TASK COUNTER ───────────────────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'task_counter',
   label:           'Task counter',
@@ -6028,7 +6107,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 4. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
+// ── 5. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'meeting_health_sparkline',
   label:           'Meeting health',
@@ -6095,7 +6174,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 5. BILLABILITY BARS ───────────────────────────────────────────────────
+// ── 6. BILLABILITY BARS ───────────────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'billability_bars',
   label:           'Billable vs Non-Bill',
@@ -6193,7 +6272,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 6. TASK LIST ──────────────────────────────────────────────────────────
+// ── 7. TASK LIST ──────────────────────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'task_list',
   label:           'Task list',
@@ -6389,7 +6468,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 7. ACTION ITEM LIST ───────────────────────────────────────────────────
+// ── 8. ACTION ITEM LIST ───────────────────────────────────────────────────
 // Cloned from task_list's proven dataFn pattern.
 // Key differences vs task_list:
 //   • Cache source: window._wiItems filtered to type==='action' (not type==='task')
