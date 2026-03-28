@@ -5512,14 +5512,8 @@ console.log('[Widgets] Phase 1 infrastructure loaded. Registry:', WIDGET_REGISTR
 
 <script>
 // ── Widget Library — Phase 2: Three core widgets ──────────────────────────
-(async function() {
+(function() {
 'use strict';
-// Wait for Phase 1 to register WIDGET_REGISTRY (dynamic script injection may race)
-let _p2wait = 0;
-while (!window.WIDGET_REGISTRY && _p2wait < 5000) {
-  await new Promise(function(r){setTimeout(r,50);}); _p2wait+=50;
-}
-if (!window.WIDGET_REGISTRY) { console.error('[Widgets] Phase 2: WIDGET_REGISTRY not found after wait'); return; }
 
 const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
 
@@ -5600,6 +5594,12 @@ async function _getProjectsForPicker() {
   }
 }
 window._getProjectsForPicker = _getProjectsForPicker;
+
+// Guard: ensure WIDGET_REGISTRY exists before registering
+if (!window.WIDGET_REGISTRY) {
+  console.error('[Widgets] Phase 2: WIDGET_REGISTRY not available — widgets will not register');
+  return;
+}
 
 // ── 1. CAPACITY GAUGE ─────────────────────────────────────────────────────
 // Hours mode when budget_hours/loe_hours populated; count mode otherwise
@@ -5835,6 +5835,11 @@ window.WIDGET_REGISTRY.register({
 });
 
 console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline, billability_bars, task_list, action_item_list');
+// Re-run _notesPostWire now that all widgets are registered
+// (the first call from _notesWireTiles may have run before Phase 2 completed)
+setTimeout(function() {
+  if (typeof window._notesPostWire === 'function') window._notesPostWire();
+}, 50);
 // ── 6. TASK LIST ─────────────────────────────────────────────────────────────
 // Query matches my-work.html: tasks assigned_to=user_id, status neq complete/cancelled
 window.WIDGET_REGISTRY.register({
