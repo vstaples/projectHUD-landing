@@ -1073,17 +1073,25 @@ function _notesRenderTray() {
 function _notesSetGrid(size, btn) { /* no-op — replaced by row editor */ }
 
 function _notesOpenNote(noteId) {
-  // Already in grid — scroll to it visually
-  if (_cv().tiles.some(t => t.noteId === noteId)) {
+  const cv       = _cv();
+  const validIds = new Set((cv.rows || []).map(r => r.id));
+
+  // Clean any orphaned tiles for this note before checking
+  const orphaned = cv.tiles.filter(t => t.noteId === noteId && !validIds.has(t.row));
+  if (orphaned.length) {
+    cv.tiles = cv.tiles.filter(t => !(t.noteId === noteId && !validIds.has(t.row)));
+  }
+
+  // Already in grid with valid row — scroll to it
+  if (cv.tiles.some(t => t.noteId === noteId && validIds.has(t.row))) {
     const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
     if (tileEl) tileEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
   // Remove from tray if it was there
-  _cv().tray = _cv().tray.filter(id => id !== noteId);
+  cv.tray = cv.tray.filter(id => id !== noteId);
 
   // Find first empty {row, slot}
-  const cv    = _cv();
   const rows  = cv.rows || [];
   let placed  = false;
   for (const row of rows) {
