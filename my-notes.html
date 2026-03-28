@@ -7075,46 +7075,24 @@ window.WIDGET_REGISTRY.register({
   dataFn: async function(config) {
     const W = '[W2:task_list]';
 
-    // ── 1. Wait for _notesResource (compass sets it after script injection)
-    let _w = 0;
-    while (!window._notesResource && _w < 3000) {
-      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
-    }
-    if (!window._notesResource) {
-      return { items:[], today:new Date().toISOString().slice(0,10) };
-    }
-
-    const res   = window._notesResource;
+    // ── 1. Resolve target person via shared _resolveTarget (handles clone/shared-view/self)
+    const { rid, uid: fetchUid } = _resolveTarget(config);
     const today = new Date().toISOString().slice(0,10);
-    const uid   = res.user_id;
-    const rid   = res.id;
+    if (!fetchUid && !rid) return { items:[], today };
 
-    // ── 2. Check API
     const api = _resolveApi();
 
-    // ── 3. Try window._wiItems cache (only when targeting self)
-    const configRid = config && config.targetResourceId;
-    const ctx2      = _widgetCtx();
-    // In a shared view the config ID may be the owner's — treat as self
-    const isSelf = !configRid || configRid === rid ||
-                   (ctx2.isSharedView && configRid !== rid);
-
+    // ── 2. Use _wiItems cache only when targeting self (logged-in user)
+    const myRid  = window._notesResource && window._notesResource.id;
+    const isSelf = rid === myRid;
     if (isSelf && window._wiItems && window._wiItems.length) {
       const cached = window._wiItems.filter(function(w){ return w.type === 'task'; });
       if (cached.length) return { items: cached, today, source: 'cache' };
-    } else {
     }
 
-    // ── 4. Resolve fetch uid (self or target resource's user_id)
-    const fetchUid = isSelf ? uid : (function(){
-      const r = (window._resources||[]).find(function(r){ return r.id === configRid; });
-      return r ? r.user_id : null;
-    })();
-    if (!fetchUid) {
-      return { items:[], today };
-    }
+    if (!fetchUid) return { items:[], today };
 
-    // ── 5. Fetch tasks
+    // ── 3. Fetch tasks
     const taskQuery = 'tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days' +
       '&assigned_to=eq.'+fetchUid+'&status=neq.complete&order=created_at.desc&limit=200';
     const tasks = await api.get(taskQuery).catch(function(err){
@@ -7276,29 +7254,16 @@ window.WIDGET_REGISTRY.register({
   dataFn: async function(config) {
     const W = '[W2:action_item_list]';
 
-    // ── 1. Wait for _notesResource
-    let _w = 0;
-    while (!window._notesResource && _w < 3000) {
-      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
-    }
-    if (!window._notesResource) {
-      return { items:[], today:new Date().toISOString().slice(0,10) };
-    }
-
-    const res   = window._notesResource;
+    // ── 1. Resolve target person via shared _resolveTarget (handles clone/shared-view/self)
+    const { rid, uid } = _resolveTarget(config);
     const today = new Date().toISOString().slice(0,10);
-    const uid   = res.user_id;
-    const rid   = res.id;
+    if (!rid) return { items:[], today };
 
     const api = _resolveApi();
 
-    const configRid = config && config.targetResourceId;
-    const ctx2      = _widgetCtx();
-    // In a shared view the config ID may be the owner's — treat as self
-    const isSelf    = !configRid || configRid === rid ||
-                      (ctx2.isSharedView && configRid !== rid);
-
-    // ── 2. Try _wiItems cache (my-work populates this with type:'action' entries)
+    // ── 2. Use caches only when targeting self (logged-in user)
+    const myRid  = window._notesResource && window._notesResource.id;
+    const isSelf = rid === myRid;
     if (isSelf && window._wiItems && window._wiItems.length) {
       const cached = window._wiItems.filter(function(w){ return w.type === 'action'; });
       if (cached.length) {
@@ -7308,10 +7273,7 @@ window.WIDGET_REGISTRY.register({
         });
         return { items, today, source:'cache' };
       }
-    } else {
     }
-
-    // ── 3. Fallback: also try window.myActionItems (populated by my-work separately)
     if (isSelf && window.myActionItems && window.myActionItems.length) {
       const cached = window.myActionItems.filter(function(a){ return a.status === 'open'; });
       const items = cached.map(function(a){
@@ -7322,8 +7284,8 @@ window.WIDGET_REGISTRY.register({
       return { items, today, source:'myActionItems-cache' };
     }
 
-    // ── 4. Fetch fresh directly from DB
-    const targetRid = isSelf ? rid : configRid;
+    // ── 3. Fetch fresh directly from DB
+    const targetRid = rid;
 
     const aiQuery = 'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
       '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100';
