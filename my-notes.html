@@ -1181,6 +1181,10 @@ function _notesWireTiles() {
   _cv().tiles.forEach(t => {
     if (t.chatOpen) _notesLoadAndRenderMsgs(t.noteId);
   });
+  // Hook for widget system and other late-binding extensions
+  setTimeout(function() {
+    if (typeof window._notesPostWire === 'function') window._notesPostWire();
+  }, 0);
 }
 
 function _notesRenderTray() {
@@ -3963,11 +3967,8 @@ function refreshTileWidget(noteId) {
   renderTileCanvas(tileEl, tileState, null);
 }
 
-// ── Wire into tile rendering ──────────────────────────────────────────────
-// Hook into _notesWireTiles to inject mode switcher into each rendered tile
-const _origWireTiles = window._notesWireTiles;
-window._notesWireTiles = function() {
-  if (typeof _origWireTiles === 'function') _origWireTiles();
+// ── Wire into tile rendering via _notesPostWire hook ─────────────────────
+window._notesPostWire = function() {
   const cv = window._notesCv && window._notesCv();
   if (!cv) return;
   cv.tiles.forEach(function(tileState) {
