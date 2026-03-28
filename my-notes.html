@@ -5883,7 +5883,8 @@ window.WIDGET_REGISTRY.register({
     const today = new Date().toISOString().slice(0,10);
     const tasks = await _wApi(
       'tasks?assigned_to=eq.'+userId+
-      '&status=neq.complete&select=id,name,project_id,status,due_date,pct_complete'+
+      '&status=not.in.(complete,completed,cancelled)'+
+      '&select=id,name,project_id,status,due_date,pct_complete'+
       '&order=due_date.asc.nullslast&limit=200'
     );
     const projIds = [...new Set((Array.isArray(tasks)?tasks:[]).map(function(t){return t.project_id;}).filter(Boolean))];
@@ -5893,7 +5894,7 @@ window.WIDGET_REGISTRY.register({
     const projMap = {};
     (Array.isArray(projects)?projects:[]).forEach(function(p){projMap[p.id]=p.name;});
     const rows = (Array.isArray(tasks)?tasks:[])
-      .filter(function(t){return t.status!=='cancelled';})
+      .filter(function(t){return t.status!=='cancelled'&&t.status!=='complete'&&t.status!=='completed';})
       .filter(function(t){const p=parseFloat(t.pct_complete)||0;const n=p<=1&&p>0?Math.round(p*100):Math.round(p);return n<100;})
       .map(function(t){
         const p=parseFloat(t.pct_complete)||0;
