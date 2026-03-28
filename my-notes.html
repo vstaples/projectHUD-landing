@@ -19,7 +19,7 @@
 
 /* ── Inbox section ───────────────────────────────────────────────────────── */
 #notes-inbox-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
-.notes-section-hdr{padding:6px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.notes-section-hdr{padding:6px 14px;font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
 .notes-section-hdr:hover{color:var(--text2,#90B8D8)}
 .notes-inbox-count{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
 #notes-inbox-list{max-height:180px;overflow-y:auto}#notes-inbox-list .notes-item{padding-left:24px}
@@ -38,7 +38,7 @@
 .notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
 .notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
 .notes-item-body{flex:1;min-width:0}
-.notes-item-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:400;color:var(--text1,#C8DFF0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.notes-item-title{font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:400;color:var(--text1,#C8DFF0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .notes-item-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .notes-item-source{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);color:var(--text3);border-radius:2px;flex-shrink:0;margin-top:2px}
 
@@ -62,7 +62,7 @@
   background:#00D2FF;z-index:10;pointer-events:none;
   box-shadow:0 0 6px rgba(0,210,255,.6)}
 .notes-branch:hover{color:var(--text0,#F0F6FF)}
-.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
 .notes-subbranch:hover{color:var(--text2)}
 .notes-chevron{width:10px;height:10px;transition:transform .15s;flex-shrink:0;opacity:.7;color:var(--text2,#90B8D8)}
 .notes-chevron.open{transform:rotate(90deg)}
@@ -217,7 +217,7 @@
 #notes-library-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
 .notes-lib-entry{padding:5px 14px 5px 28px;display:flex;align-items:center;gap:6px;cursor:default}
 .notes-lib-entry:hover{background:rgba(0,210,255,.03)}
-.notes-lib-name{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notes-lib-name{font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes-lib-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;border:0.5px solid rgba(0,210,255,.2);color:var(--text3);background:rgba(0,210,255,.06);flex-shrink:0}
 .notes-lib-launch{font-family:var(--font-mono,monospace);font-size:9px;padding:2px 7px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF;cursor:pointer;opacity:0;transition:opacity .1s;flex-shrink:0}
 .notes-lib-entry:hover .notes-lib-launch{opacity:1}
@@ -274,7 +274,7 @@
 .tile-header-mode-btn.widget-active{background:rgba(0,210,255,.15);border-color:rgba(0,210,255,.4);color:#00D2FF}
 /* Mode switcher dropdown */
 .widget-mode-pop{position:fixed;z-index:800;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);min-width:160px;padding:4px 0}
-.widget-mode-item{padding:7px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.widget-mode-item{padding:7px 14px;font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
 .widget-mode-item:hover{background:rgba(0,210,255,.06);color:var(--text0)}
 .widget-mode-item.active{color:#00D2FF}
 /* Widget picker modal */
@@ -290,7 +290,7 @@
 .widget-card{background:rgba(255,255,255,.03);border:1px solid rgba(0,210,255,.1);padding:10px 12px;cursor:pointer;transition:all .12s}
 .widget-card:hover{background:rgba(0,210,255,.06);border-color:rgba(0,210,255,.3)}
 .widget-card-icon{font-size:18px;margin-bottom:5px}
-.widget-card-name{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:600;color:var(--text0);margin-bottom:2px}
+.widget-card-name{font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:600;color:var(--text0);margin-bottom:2px}
 .widget-card-desc{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);line-height:1.4}
 .widget-picker-close{background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0;line-height:1}
 .widget-picker-close:hover{color:var(--text0)}
@@ -5823,7 +5823,143 @@ window.WIDGET_REGISTRY.register({
   }
 });
 
-console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline, billability_bars');
+console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline, billability_bars, task_list, action_item_list');
+// ── 6. TASK LIST ─────────────────────────────────────────────────────────────
+// Scrollable list of open tasks for a user with due date + status
+window.WIDGET_REGISTRY.register({
+  id:              'task_list',
+  label:           'Task list',
+  category:        'personal',
+  description:     'Scrollable list of open tasks with due dates and status',
+  icon:            'list',
+  configSchema: [
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 60000,
+  minTileHeight:   'small',
+
+  dataFn: async function(config) {
+    const ctx = _widgetCtx();
+    const rid = config.targetResourceId || ctx.resourceId;
+    if (!rid) return null;
+    const today = new Date().toISOString().slice(0,10);
+    // Get task assignments for this resource
+    const assignments = await _wApi(
+      'task_resource_assignments?resource_id=eq.'+rid+
+      '&select=task_id,tasks(id,name,status,due_date,priority)&limit=100'
+    );
+    const rows = (Array.isArray(assignments) ? assignments : [])
+      .map(function(a) { return a.tasks; })
+      .filter(function(t) { return t && t.status !== 'completed' && t.status !== 'cancelled'; });
+    rows.sort(function(a, b) {
+      // Sort: overdue first, then due today, then by due date, then no date
+      const da = a.due_date || '9999';
+      const db = b.due_date || '9999';
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+    return { tasks: rows, today: today };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const { tasks, today } = data;
+    if (!tasks.length) {
+      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">0</div><div class="wc-label">open tasks</div></div>';
+      return;
+    }
+    const statusColor = { 'in_progress':'#00D2FF','not_started':'rgba(255,255,255,.3)','on_hold':'#EF9F27','blocked':'#E24B4A' };
+    const statusLabel = { 'in_progress':'IN PROGRESS','not_started':'NOT STARTED','on_hold':'ON HOLD','blocked':'BLOCKED' };
+    const rows = tasks.map(function(t) {
+      const overdue = t.due_date && t.due_date < today;
+      const dueToday = t.due_date === today;
+      const dateColor = overdue ? '#E24B4A' : dueToday ? '#EF9F27' : 'rgba(255,255,255,.3)';
+      const dateText  = !t.due_date ? '' : overdue ? 'OVERDUE' : dueToday ? 'TODAY' :
+        new Date(t.due_date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      const sc = statusColor[t.status] || 'rgba(255,255,255,.3)';
+      const sl = statusLabel[t.status] || (t.status||'').toUpperCase();
+      return '<div style="display:flex;align-items:baseline;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);min-width:0">' +
+        '<div style="width:5px;height:5px;border-radius:50%;background:'+sc+';flex-shrink:0;margin-top:4px"></div>' +
+        '<div style="flex:1;min-width:0;font-family:var(--font-ui,\"Barlow Condensed\",sans-serif);font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title=\"'+ _esc(t.name||'')  +'\">'+ _esc(t.name||'Untitled') +'</div>' +
+        (dateText ? '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+dateColor+';flex-shrink:0;letter-spacing:.04em">'+dateText+'</div>' : '') +
+      '</div>';
+    }).join('');
+    const overdue = tasks.filter(function(t){return t.due_date&&t.due_date<today;}).length;
+    container.innerHTML=
+      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 10px 4px;flex-shrink:0">' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Tasks</div>' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdue>0?'#E24B4A':'rgba(255,255,255,.3)')+'">' +
+            tasks.length+' open'+(overdue>0?' · '+overdue+' overdue':'')+'</div>' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto;padding:0 10px 6px">' + rows + '</div>' +
+      '</div>';
+  }
+});
+
+// ── 7. ACTION ITEM LIST ───────────────────────────────────────────────────────
+// Scrollable list of open action items for a user with due date + status
+window.WIDGET_REGISTRY.register({
+  id:              'action_item_list',
+  label:           'Action item list',
+  category:        'personal',
+  description:     'Scrollable list of open action items with due dates',
+  icon:            'list',
+  configSchema: [
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 60000,
+  minTileHeight:   'small',
+
+  dataFn: async function(config) {
+    const ctx = _widgetCtx();
+    const rid = config.targetResourceId || ctx.resourceId;
+    if (!rid) return null;
+    const today = new Date().toISOString().slice(0,10);
+    const items = await _wApi(
+      'workflow_action_items?owner_resource_id=eq.'+rid+
+      '&status=eq.open&select=id,title,due_date,priority,source_type&order=due_date.asc.nullslast&limit=100'
+    );
+    const rows = Array.isArray(items) ? items : [];
+    return { items: rows, today: today };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+    const { items, today } = data;
+    if (!items.length) {
+      container.innerHTML='<div class="widget-counter"><div class="wc-big" style="color:#1D9E75">0</div><div class="wc-label">open action items</div></div>';
+      return;
+    }
+    const rows = items.map(function(item) {
+      const overdue  = item.due_date && item.due_date < today;
+      const dueToday = item.due_date === today;
+      const dateColor = overdue ? '#E24B4A' : dueToday ? '#EF9F27' : 'rgba(255,255,255,.3)';
+      const dateText  = !item.due_date ? '' : overdue ? 'OVERDUE' : dueToday ? 'TODAY' :
+        new Date(item.due_date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      const dotColor = overdue ? '#E24B4A' : dueToday ? '#EF9F27' : '#00D2FF';
+      return '<div style="display:flex;align-items:baseline;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);min-width:0">' +
+        '<div style="width:5px;height:5px;border-radius:50%;background:'+dotColor+';flex-shrink:0;margin-top:4px"></div>' +
+        '<div style="flex:1;min-width:0;font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title||'')+'">'+_esc(item.title||'Untitled')+'</div>' +
+        (dateText ? '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+dateColor+';flex-shrink:0;letter-spacing:.04em">'+dateText+'</div>' : '') +
+      '</div>';
+    }).join('');
+    const overdue = items.filter(function(i){return i.due_date&&i.due_date<today;}).length;
+    const dueToday = items.filter(function(i){return i.due_date===today;}).length;
+    container.innerHTML=
+      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 10px 4px;flex-shrink:0">' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Action Items</div>' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:'+(overdue>0?'#E24B4A':dueToday>0?'#EF9F27':'rgba(255,255,255,.3)')+'">' +
+            items.length+' open'+(overdue>0?' · '+overdue+' overdue':dueToday>0?' · '+dueToday+' today':'')+'</div>' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto;padding:0 10px 6px">' + rows + '</div>' +
+      '</div>';
+  }
+});
+
+
 
 // ── 5. BILLABILITY BARS ───────────────────────────────────────────────────
 // Billable vs non-billable hours this week from time_entries
