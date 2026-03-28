@@ -910,49 +910,66 @@ function _notesRowDelete(rowId) {
 }
 
 function _notesWireRowDrag(bar) {
-  // Use data attribute to track drag state — avoids document listener pollution
-  bar._rowDragging  = null;
-  bar._rowDragEl    = null;
-
   bar.querySelectorAll('.nre-grip').forEach(function(grip) {
+    grip.style.cursor = 'grab';
     grip.addEventListener('mousedown', function(e) {
       const seg = grip.closest('.nre-row');
       if (!seg) return;
-      bar._rowDragging = seg.dataset.rowId;
-      bar._rowDragEl   = seg;
-      seg.style.opacity = '0.5';
       e.preventDefault();
-      e.stopPropagation(); // prevent left-panel D&D from capturing
+      e.stopPropagation();
+
+      let dragging   = seg.dataset.rowId;
+      let dragEl     = seg;
+      let lastTarget = null;
+      seg.style.opacity = '0.5';
+
+      function onMove(ev) {
+        const els = Array.from(bar.querySelectorAll('.nre-row'));
+        let closest = null, closestDist = Infinity;
+        els.forEach(function(el) {
+          if (el.dataset.rowId === dragging) return;
+          const r    = el.getBoundingClientRect();
+          const mid  = r.left + r.width / 2;
+          const dist = Math.abs(ev.clientX - mid);
+          if (dist < closestDist) { closestDist = dist; closest = el; }
+        });
+        // Visual reorder — move DOM element without saving
+        els.forEach(function(el) { el.style.outline = ''; });
+        if (closest && closestDist < 150) {
+          closest.style.outline = '1px solid rgba(0,210,255,.6)';
+          lastTarget = closest;
+          // Move dragEl before or after closest based on position
+          const r = closest.getBoundingClientRect();
+          if (ev.clientX < r.left + r.width / 2) {
+            bar.insertBefore(dragEl, closest);
+          } else {
+            closest.after ? closest.after(dragEl) : bar.insertBefore(dragEl, closest.nextSibling);
+          }
+        }
+      }
+
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        bar.querySelectorAll('.nre-row').forEach(function(el) { el.style.outline = ''; });
+        if (dragEl) dragEl.style.opacity = '';
+
+        // Read final order from DOM and save to state
+        const cv       = _cv();
+        const domOrder = Array.from(bar.querySelectorAll('.nre-row')).map(function(el) { return el.dataset.rowId; });
+        const rowMap   = {};
+        cv.rows.forEach(function(r) { rowMap[r.id] = r; });
+        const reordered = domOrder.map(function(id) { return rowMap[id]; }).filter(Boolean);
+        if (reordered.length === cv.rows.length) {
+          cv.rows = reordered;
+          _notesSaveWorkspace(true);
+          _notesRenderGrid(); // now safe to full re-render
+        }
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
-  });
-
-  bar.addEventListener('mouseup', function() {
-    if (bar._rowDragEl) bar._rowDragEl.style.opacity = '';
-    bar._rowDragging = null;
-    bar._rowDragEl   = null;
-  });
-
-  bar.addEventListener('mouseleave', function() {
-    if (bar._rowDragEl) bar._rowDragEl.style.opacity = '';
-    bar._rowDragging = null;
-    bar._rowDragEl   = null;
-  });
-
-  bar.addEventListener('mousemove', function(e) {
-    if (!bar._rowDragging) return;
-    const targetSeg = e.target && e.target.closest && e.target.closest('.nre-row');
-    if (!targetSeg || targetSeg.dataset.rowId === bar._rowDragging) return;
-    const cv      = _cv();
-    const fromIdx = cv.rows.findIndex(function(r) { return r.id === bar._rowDragging; });
-    const toIdx   = cv.rows.findIndex(function(r) { return r.id === targetSeg.dataset.rowId; });
-    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
-    const moved = cv.rows.splice(fromIdx, 1)[0];
-    cv.rows.splice(toIdx, 0, moved);
-    if (bar._rowDragEl) bar._rowDragEl.style.opacity = '';
-    bar._rowDragging = null;
-    bar._rowDragEl   = null;
-    _notesSaveWorkspace(false);
-    _notesRenderGrid();
   });
 }
 
@@ -1908,12 +1925,15 @@ function _notesDndInit() {
   // Use document-level dragover to bypass Chrome overflow:auto dragover suppression
   document.addEventListener('dragover', e => {
     if (!_dragNoteId || _leftDragActive) return;
-    const tile = e.target?.closest?.('.notes-tile');
-    if (tile && !tile.closest('#notes-left')) {
+    const tile     = e.target?.closest?.('.notes-tile');
+    const gridArea = e.target?.closest?.('#notes-grid-area');
+    if (gridArea && !e.target?.closest?.('#notes-left')) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-      tile.classList.add('drag-over');
+      if (tile) {
+        shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        tile.classList.add('drag-over');
+      }
     }
   });
 
