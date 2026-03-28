@@ -1684,7 +1684,7 @@ async function _notesNew(rowId, slot) {
       // injected yet (it arrives asynchronously via _notesPostWire).
       // Use a short delay so the tile DOM is in place from _notesRenderGrid.
       setTimeout(function() {
-        const cv2 = window._notesCv && window._notesCv();
+        const cv2 = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
         const tileState = cv2 && cv2.tiles.find(function(t){ return t.noteId === placeholderId; });
         if (tileState && typeof window._notesShowWidgetPicker === 'function') {
           window._notesShowWidgetPicker(tileState);
@@ -5007,8 +5007,8 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
     // Skip widget tiles — they don't use the text canvas
     try {
       const noteForMigrate = typeof _notes !== 'undefined' ? _notes.find(function(n) { return n.id === noteId; }) : null;
-      const _tileState = noteForMigrate && window._notesCv ? (function() {
-        const cv = window._notesCv(); return cv && cv.tiles && cv.tiles.find(function(t) { return t.noteId === noteId; });
+      const _tileState = noteForMigrate && (typeof _cv === 'function' ? _cv : window._viewsCv) ? (function() {
+        const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv())); return cv && cv.tiles && cv.tiles.find(function(t) { return t.noteId === noteId; });
       })() : null;
       const _isWidget = _tileState && _tileState.canvasMode === 'widget';
       if (noteForMigrate && !_notesIsBlockFormat(noteForMigrate) && !_isWidget) {
@@ -5137,7 +5137,7 @@ window._notesGetPresenceKeys    = () => Object.keys(_presenceIntervals);
 // ── Wire presence on tile open ────────────────────────────────────────────
 const _origWireTiles = window._notesWireTiles || null;
 async function _notesWireTilesCollab() {
-  const cvFn = typeof _cv === 'function' ? _cv : window._notesCv;
+  const cvFn = typeof _cv === 'function' ? _cv : window._viewsCv;
   const cv   = typeof cvFn === 'function' ? cvFn() : null;
   if (!cv) { console.warn('[Compass] _notesWireTilesCollab: _cv not available'); return; }
   // Pre-load resources so avatars have names immediately
@@ -5311,7 +5311,7 @@ async function _notesViewHeartbeat(ownerUserId, viewName) {
       if (_viewConfigHash[key] !== hash) {
         _viewConfigHash[key] = hash;
         // Update local workspace state with owner's current layout
-        const cvFn = window._notesCv;
+        const cvFn = (typeof _cv === 'function' ? _cv : window._viewsCv);
         if (typeof cvFn === 'function') {
           const cv = cvFn();
           if (cv) {
@@ -5386,7 +5386,7 @@ window._notesShowShareViewDialog = async function() {
   if (myRow && myRow.view_role === 'viewer') return;
 
   const allResources = await _notesLoadInviteResources();
-  const cvFn = window._notesCv;
+  const cvFn = (typeof _cv === 'function' ? _cv : window._viewsCv);
   const cv   = typeof cvFn === 'function' ? cvFn() : null;
   const tiles = (cv && cv.tiles) || [];
   const rows  = (cv && cv.rows)  || [];
@@ -5783,13 +5783,10 @@ window.WIDGET_REGISTRY = WIDGET_REGISTRY;
 // ── Widget context ────────────────────────────────────────────────────────
 function _widgetContext() {
   const _res = window._notesResource || {};
-  // Detect shared-view: the active view's _sharedOwner tells us whose workspace
-  // the tile config was saved in (the owner). If the viewer is a participant,
-  // widgetConfigs with a hardcoded targetResourceId belong to the owner — the
-  // viewer should always see their OWN data instead.
-  const _cv  = window._notesCv && window._notesCv();
-  const _isShared   = !!(_cv && _cv._isSharedView);
-  const _ownerUserId = (_cv && _cv._sharedOwner) || null;
+  // MY VIEWS: use local _cv() directly — window._notesCv is MY NOTES' accessor
+  const cv   = (typeof _cv === 'function') ? _cv() : (window._viewsCv && window._viewsCv());
+  const _isShared    = !!(cv && cv._isSharedView);
+  const _ownerUserId = (cv && cv._sharedOwner) || null;
   return {
     firmId:      FIRM_ID,
     userId:      _res.user_id || null,
@@ -6215,7 +6212,7 @@ function applyWidget(widgetId, config, tileState) {
 function refreshTileWidget(noteId) {
   const tileEl = document.querySelector('.views-tile[data-viewid="' + noteId + '"]');
   if (!tileEl) return;
-  const cv = window._notesCv && window._notesCv();
+  const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
   const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
   if (!tileState) return;
@@ -6233,7 +6230,7 @@ function refreshTileWidget(noteId) {
 // Export showWidgetPicker so _notesNew (Block 1) can open it directly
 window._notesShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
 window._notesPostWire = function() {
-  const cv = window._notesCv && window._notesCv();
+  const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
   const isLocked = !!cv.locked;
   cv.tiles.forEach(function(tileState) {
@@ -6250,7 +6247,7 @@ window._notesPostWire = function() {
 // ── Gear icon for reconfiguring existing widget ───────────────────────────
 // Exposed so tile HTML can call it
 window._notesWidgetReconfigure = function(noteId) {
-  const cv = window._notesCv && window._notesCv();
+  const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
   const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
   if (!tileState || !tileState.widgetId) return;
@@ -6371,7 +6368,7 @@ function _resolveTarget(config) {
   // When a widget config's targetResourceId is empty (owner didn't explicitly pick
   // themselves), fall back to the view's associated person rather than the logged-in
   // user. This is the key fix for cloned dashboards showing identical data.
-  const cv = window._notesCv && window._notesCv();
+  const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   const viewRid = cv && cv.forResourceId  ? cv.forResourceId  : null;
 
   // Prefer rid-derived uid over any raw configUid — a stale cloned config may have
