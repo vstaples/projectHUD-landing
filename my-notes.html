@@ -5884,18 +5884,21 @@ window.WIDGET_REGISTRY.register({
     const billColor = '#00D2FF';
     const nonColor  = 'rgba(255,255,255,.25)';
 
+    // Scale only the big number font — clamp between 16px (small tile) and 26px (medium+)
+    const bigFont = Math.min(26, Math.max(16, Math.round((container.offsetHeight || 120) * 0.22))) + 'px';
+
     container.innerHTML =
       '<div style="display:flex;flex-direction:column;padding:10px 12px;height:100%;justify-content:space-between;box-sizing:border-box">' +
-        // Header label
+        // Header label — fixed small size
         '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Billable vs Non-Bill</div>' +
-        // Two big numbers
+        // Two big numbers — font scales with tile height
         '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:8px">' +
           '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:26px;font-weight:700;color:' + billColor + ';line-height:1">' + data.billable + 'h</div>' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:' + billColor + ';line-height:1">' + data.billable + 'h</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">billable</div>' +
           '</div>' +
           '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:26px;font-weight:700;color:var(--text2);line-height:1">' + data.nonBill + 'h</div>' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:var(--text2);line-height:1">' + data.nonBill + 'h</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">non-bill</div>' +
           '</div>' +
         '</div>' +
