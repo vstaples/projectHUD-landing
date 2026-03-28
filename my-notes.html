@@ -2803,8 +2803,17 @@ function _notesRenderViewSwitcher() {
   // Also hide the delete-view and Clear buttons (inside the grid header)
   document.querySelectorAll('#notes-grid-header .notes-grid-btn').forEach(function(btn) {
     const txt = btn.textContent.trim();
-    if (txt === 'Clear' || txt === '⊞ Save Template' || btn.id === 'notes-clone-btn') {
+    if (txt === 'Clear' || txt === '⊞ Save Template') {
       btn.style.display = isLocked ? 'none' : '';
+    }
+    if (btn.id === 'notes-clone-btn') {
+      // Clone is meaningful when the dashboard is locked (finalised).
+      // Gray it out in edit mode so intent is clear.
+      btn.style.opacity      = isLocked ? '1'    : '0.35';
+      btn.style.pointerEvents = isLocked ? 'auto' : 'none';
+      btn.title              = isLocked
+        ? 'Clone this view — copy layout and widgets to a new named view'
+        : 'Lock the view first to enable cloning';
     }
   });
   document.querySelectorAll('#notes-view-name-wrap button').forEach(function(btn) {
