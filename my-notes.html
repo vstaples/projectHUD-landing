@@ -324,7 +324,7 @@
     <div id="notes-library-section">
       <div class="notes-section-hdr" onclick="_notesToggleSection('library')">
         <svg class="notes-chevron open" id="notes-chev-library" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        Library
+        Workflows
       </div>
       <div id="notes-library-list"></div>
     </div>
@@ -2353,28 +2353,91 @@ window._notesDeleteInboxNote   = _notesDeleteInboxNote;
 function _notesRenderLibrary() {
   const list = document.getElementById('notes-library-list');
   if (!list) return;
-  const lib  = _workspace.library || {};
-  const keys = Object.keys(lib);
-  if (!keys.length) {
-    list.innerHTML = '<div style="padding:5px 14px 8px 28px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">No templates saved</div>';
+
+  // Build workflow entries from all non-shared, non-default views.
+  // Each view that has a person associated (stored as view.forResourceId /
+  // view.forResourceName, stamped by Clone) gets grouped under that person.
+  // Views without a person association appear under the owner's own name.
+  const views     = _workspace.views || {};
+  const myName    = (window._notesResource && window._notesResource.name) || 'Me';
+  const myRid     = (window._notesResource && window._notesResource.id)   || '';
+
+  // Collect entries — skip shared views (they're not ours to manage)
+  const entries = [];
+  Object.keys(views).forEach(function(vKey) {
+    const v = views[vKey];
+    if (v._isSharedView) return;
+    const personName = v.forResourceName || myName;
+    const personRid  = v.forResourceId   || myRid;
+    const initials   = personName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    // Pick a deterministic color from PARTICIPANT_COLORS palette by rid hash
+    const colorIdx   = personRid ? (parseInt(personRid.slice(-4), 16) || 0) : 0;
+    const color      = (typeof PARTICIPANT_COLORS !== 'undefined' && PARTICIPANT_COLORS.length)
+      ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length]
+      : '#00D2FF';
+    entries.push({ vKey, label: vKey, personName, personRid, initials, color, isActive: vKey === _workspace.activeView });
+  });
+
+  if (!entries.length) {
+    list.innerHTML = '<div style="padding:5px 14px 8px 28px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">No dashboards saved</div>';
     return;
   }
-  list.innerHTML = keys.map(function(name) {
-    const t   = lib[name];
-    const cat = t.category || 'Custom';
-    return '<div class="notes-lib-entry" data-tplname="' + _esc(name) + '">' +
-      '<span class="notes-lib-name" title="' + _esc(name) + '">' + _esc(name) + '</span>' +
-      '<span class="notes-lib-badge">' + _esc(cat) + '</span>' +
-      '<button class="notes-lib-launch" data-action="launch">Launch</button>' +
-      '<button class="notes-lib-del" data-action="del" title="Delete template">\u00d7</button>' +
-    '</div>';
-  }).join('');
-  // Wire buttons via event delegation
-  list.querySelectorAll('[data-action]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      const name = btn.closest('[data-tplname]').dataset.tplname;
-      if (btn.dataset.action === 'launch') _notesLaunchTemplate(name);
-      if (btn.dataset.action === 'del')    _notesDeleteTemplate(name);
+
+  // Group by person name, owner first
+  const groups = {};
+  entries.forEach(function(e) {
+    if (!groups[e.personName]) groups[e.personName] = { color: e.color, initials: e.initials, items: [] };
+    groups[e.personName].items.push(e);
+  });
+
+  // Sort: owner first, then alphabetical
+  const sortedGroups = Object.keys(groups).sort(function(a, b) {
+    if (a === myName) return -1;
+    if (b === myName) return  1;
+    return a.localeCompare(b);
+  });
+
+  let html = '';
+  sortedGroups.forEach(function(personName) {
+    const grp      = groups[personName];
+    const color    = grp.color;
+    const initials = grp.initials;
+    // Department header with avatar — matches invite picker style
+    html +=
+      '<div style="display:flex;align-items:center;gap:7px;padding:5px 10px 4px 10px;' +
+          'border-top:1px solid rgba(0,210,255,.06);margin-top:2px">' +
+        '<div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
+            'justify-content:center;font-family:var(--font-ui,sans-serif);font-size:9px;font-weight:700;' +
+            'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
+          initials +
+        '</div>' +
+        '<span style="font-family:var(--font-ui,sans-serif);font-size:11px;font-weight:700;color:var(--text1)">' +
+          _esc(personName) +
+        '</span>' +
+      '</div>';
+    grp.items.forEach(function(e) {
+      html +=
+        '<div class="notes-lib-entry" data-vkey="' + _esc(e.vKey) + '" ' +
+            'style="padding:3px 10px 3px 28px;cursor:pointer;' +
+            (e.isActive ? 'background:rgba(0,210,255,.06);border-left:2px solid rgba(0,210,255,.4);' : '') + '">' +
+          '<span class="notes-lib-name" style="font-size:12px;color:' + (e.isActive ? '#00D2FF' : 'var(--text1)') + '">' +
+            _esc(e.label) +
+          '</span>' +
+          (e.isActive ? '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:rgba(0,210,255,.6)">active</span>' : '') +
+        '</div>';
+    });
+  });
+
+  list.innerHTML = html;
+
+  // Wire clicks — switch to that view
+  list.querySelectorAll('[data-vkey]').forEach(function(row) {
+    row.addEventListener('click', function() {
+      const vKey = row.dataset.vkey;
+      if (vKey && vKey !== _workspace.activeView) {
+        _notesSwitchView(vKey);
+        _notesRenderLibrary(); // refresh active state
+      }
     });
   });
 }
@@ -2845,54 +2908,92 @@ window._notesToggleViewLock = function() {
 };
 
 // ── Clone view ────────────────────────────────────────────────────────────
-// Deep-copies the active view's layout and widget configs into a new named view.
-// Prompts for a new name and optionally a target resource whose metrics to show.
 window._notesCloneView = async function() {
   const srcCv   = _cv();
   if (!srcCv)   return;
   const srcName = _workspace.activeView;
 
-  // Load all firm resources for the person picker
-  let resources = [];
-  try {
-    resources = await API.get(
-      'resources?firm_id=eq.' + FIRM_ID + '&select=id,name,user_id&order=name.asc&limit=200'
-    ).catch(function(){ return []; });
-  } catch(e) {}
+  // Reuse the already-loaded invite resources (same data, same format)
+  const allResources = await _notesLoadInviteResources();
 
   const overlay = document.createElement('div');
   overlay.className = 'ntd-overlay';
 
-  const resOptions = (resources||[]).map(function(r) {
-    return '<option value="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '">' + _esc(r.name) + '</option>';
-  }).join('');
+  // Build grouped person list matching the invite picker exactly
+  const groups = {};
+  const myUserId = window._notesResource && window._notesResource.user_id;
+  (allResources||[]).forEach(function(r) {
+    const grp = r.is_external ? 'External' : (r.department || 'Other');
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(r);
+  });
+  const groupKeys = Object.keys(groups).sort(function(a,b) {
+    if (a === 'External') return 1;
+    if (b === 'External') return -1;
+    return a.localeCompare(b);
+  });
+  let personListHtml = '';
+  groupKeys.forEach(function(grp) {
+    personListHtml += '<div style="padding:4px 10px 2px;font-family:var(--font-mono,monospace);font-size:9px;' +
+      'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
+      'border-top:1px solid rgba(0,210,255,.08);margin-top:2px">' + _esc(grp) + '</div>';
+    groups[grp].forEach(function(r) {
+      const initials = r.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      const colorIdx = r.id ? (parseInt(r.id.slice(-4),16)||0) : 0;
+      const color    = (typeof PARTICIPANT_COLORS!=='undefined'&&PARTICIPANT_COLORS.length)
+        ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+      const isMe = r.user_id === myUserId;
+      personListHtml +=
+        '<div class="clone-person-row" data-rid="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '" ' +
+            'data-name="' + _esc(r.name) + '" ' +
+            'style="display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;' +
+              'transition:background .1s" ' +
+            'onmouseover="this.style.background=\'rgba(0,210,255,.04)\'" ' +
+            'onmouseout="this.style.background=this.classList.contains(\'selected\')?\'rgba(0,210,255,.09)\':\'\'">'+
+          '<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
+              'justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-ui,sans-serif);' +
+              'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
+            initials +
+          '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;color:var(--text0)">' +
+              _esc(r.name) + (isMe ? ' <span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)">(you)</span>' : '') +
+            '</div>' +
+            (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
+          '</div>' +
+        '</div>';
+    });
+  });
 
   overlay.innerHTML =
-    '<div class="ntd-dialog" style="width:420px">' +
+    '<div class="ntd-dialog" style="width:440px;max-height:80vh;display:flex;flex-direction:column">' +
       '<div class="ntd-header">' +
-        '<div class="ntd-sub">Clone view</div>' +
+        '<div class="ntd-sub">Clone dashboard</div>' +
         '<div class="ntd-title">' + _esc(srcName) + '</div>' +
       '</div>' +
-      '<div class="ntd-body" style="padding:16px 24px;display:flex;flex-direction:column;gap:14px">' +
+      '<div class="ntd-body" style="padding:16px 24px 0;display:flex;flex-direction:column;gap:12px;overflow:hidden">' +
         '<div class="ntd-field">' +
-          '<label class="ntd-label">New view name</label>' +
+          '<label class="ntd-label">New dashboard name</label>' +
           '<input class="ntd-input" id="clone-name-inp" type="text" value="' + _esc(srcName) + ' (copy)"' +
-            ' placeholder="Name for the cloned view" style="width:100%"/>' +
+            ' placeholder="Name for the cloned dashboard" style="width:100%"/>' +
         '</div>' +
-        (resources.length ? (
-          '<div class="ntd-field">' +
-            '<label class="ntd-label">Show metrics for (optional)</label>' +
-            '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:4px">' +
-              'Widget configs will be updated to target this person\'s data' +
-            '</div>' +
-            '<select class="ntd-select" id="clone-resource-sel" style="width:100%">' +
-              '<option value="">— Keep original settings —</option>' +
-              resOptions +
-            '</select>' +
-          '</div>'
-        ) : '') +
+        '<div class="ntd-field" style="flex:1;min-height:0;display:flex;flex-direction:column">' +
+          '<label class="ntd-label">Show metrics for</label>' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:6px">' +
+            'Widget data will be targeted to this person. Leave unselected to keep original.' +
+          '</div>' +
+          '<input id="clone-person-search" placeholder="Search by name or department…" autocomplete="off" ' +
+            'style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.15);color:var(--text0);' +
+              'font-family:var(--font-ui,sans-serif);font-size:12px;padding:5px 8px;margin-bottom:4px;outline:none;width:100%;box-sizing:border-box"/>' +
+          '<div id="clone-person-list" style="flex:1;max-height:280px;overflow-y:auto;' +
+              'border:1px solid rgba(0,210,255,.1);background:rgba(0,0,0,.2)">' +
+            personListHtml +
+          '</div>' +
+          '<div id="clone-person-selected" style="margin-top:6px;font-family:var(--font-mono,monospace);' +
+              'font-size:10px;color:rgba(0,210,255,.7);min-height:16px"></div>' +
+        '</div>' +
       '</div>' +
-      '<div class="ntd-actions">' +
+      '<div class="ntd-actions" style="flex-shrink:0">' +
         '<button class="ntd-btn ntd-btn-cancel" id="clone-cancel">Cancel</button>' +
         '<button class="ntd-btn ntd-btn-save" id="clone-apply">Clone</button>' +
       '</div>' +
@@ -2900,45 +3001,83 @@ window._notesCloneView = async function() {
 
   document.body.appendChild(overlay);
 
-  const nameInp = overlay.querySelector('#clone-name-inp');
+  const nameInp   = overlay.querySelector('#clone-name-inp');
+  const searchInp = overlay.querySelector('#clone-person-search');
+  const personList = overlay.querySelector('#clone-person-list');
+  const selectedLbl = overlay.querySelector('#clone-person-selected');
   if (nameInp) { nameInp.focus(); nameInp.select(); }
+
+  // Selection state
+  let selectedRid = null, selectedUid = null, selectedName = null;
+
+  // Wire row selection
+  function wireRows() {
+    personList.querySelectorAll('.clone-person-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        personList.querySelectorAll('.clone-person-row').forEach(function(r) {
+          r.classList.remove('selected');
+          r.style.background = '';
+        });
+        row.classList.add('selected');
+        row.style.background = 'rgba(0,210,255,.09)';
+        selectedRid  = row.dataset.rid  || null;
+        selectedUid  = row.dataset.uid  || null;
+        selectedName = row.dataset.name || null;
+        selectedLbl.textContent = selectedName ? ('→ ' + selectedName) : '';
+      });
+    });
+  }
+  wireRows();
+
+  // Live search filter
+  searchInp.addEventListener('input', function() {
+    const q = searchInp.value.toLowerCase().trim();
+    personList.querySelectorAll('.clone-person-row').forEach(function(row) {
+      const name = (row.dataset.name || '').toLowerCase();
+      const dept = (row.parentElement && row.parentElement.textContent || '').toLowerCase();
+      row.style.display = (!q || name.includes(q) || dept.includes(q)) ? '' : 'none';
+    });
+    // Show/hide dept headers
+    personList.querySelectorAll('[style*="text-transform:uppercase"]').forEach(function(hdr) {
+      const sibs = [];
+      let el = hdr.nextElementSibling;
+      while (el && el.classList.contains('clone-person-row')) { sibs.push(el); el = el.nextElementSibling; }
+      hdr.style.display = sibs.some(function(s){ return s.style.display !== 'none'; }) ? '' : 'none';
+    });
+  });
 
   overlay.querySelector('#clone-cancel').onclick = function() { overlay.remove(); };
   overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
 
   overlay.querySelector('#clone-apply').onclick = function() {
-    const newName = (nameInp ? nameInp.value.trim() : '') || (srcName + ' (copy)');
-    const resSel  = overlay.querySelector('#clone-resource-sel');
-    const selOpt  = resSel && resSel.options[resSel.selectedIndex];
-    const targetRid = selOpt && selOpt.value ? selOpt.value : null;
-    const targetUid = selOpt && selOpt.dataset.uid ? selOpt.dataset.uid : null;
+    const newName   = (nameInp ? nameInp.value.trim() : '') || (srcName + ' (copy)');
+    const targetRid = selectedRid;
+    const targetUid = selectedUid;
+    const targetName = selectedName;
     overlay.remove();
 
-    // Deep-clone the view — copy rows and tiles, but strip lock state
     const cloned = JSON.parse(JSON.stringify(srcCv));
-    cloned.locked      = false;      // always start unlocked
-    cloned.clonedFrom  = undefined;  // not a template clone
+    cloned.locked         = false;
+    cloned.clonedFrom     = undefined;
     cloned._isSharedView  = undefined;
     cloned._sharedOwner   = undefined;
     cloned._sharedViewName = undefined;
+    // Stamp the person this dashboard is for (used by WORKFLOWS panel)
+    if (targetName) { cloned.forResourceName = targetName; cloned.forResourceId = targetRid; }
 
-    // If a target resource was chosen, rewrite all widget configs
+    // Rewrite widget configs to target selected person
     if (targetRid || targetUid) {
       (cloned.tiles || []).forEach(function(t) {
         if (t.canvasMode !== 'widget' || !t.widgetConfig) return;
         const cfg = t.widgetConfig;
-        // Remap resource-based config keys
         if ('targetResourceId' in cfg && targetRid) cfg.targetResourceId = targetRid;
         if ('targetUserId'     in cfg && targetUid) cfg.targetUserId     = targetUid;
       });
     }
 
-    // Pick a unique name if it collides
     let finalName = newName;
     let suffix = 2;
-    while (_workspace.views[finalName]) {
-      finalName = newName + ' ' + suffix++;
-    }
+    while (_workspace.views[finalName]) { finalName = newName + ' ' + suffix++; }
 
     _workspace.views[finalName] = cloned;
     _workspace.activeView       = finalName;
@@ -2946,6 +3085,7 @@ window._notesCloneView = async function() {
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
+    _notesRenderLibrary();
   };
 };
 
@@ -2977,6 +3117,7 @@ function _notesSwitchView(viewName) {
   _notesRenderGrid();
   _notesRenderLeft();
   _notesRenderViewSwitcher();
+  _notesRenderLibrary();
   // ── STEP 5: start presence on new view ───────────────────────────────
   setTimeout(function() {
     if (window._notesStartViewPresence && _userId) {
