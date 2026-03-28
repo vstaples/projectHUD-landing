@@ -6301,8 +6301,8 @@ window.WIDGET_REGISTRY.register({
       return;
     }
 
-    // Columns: type badge · title (flex) · due · from/created-by
-    const COLS = '28px minmax(0,1fr) 58px 120px';
+    // Columns: type badge · title (flex) · due · status — mirrors task_list layout
+    const COLS = '28px minmax(0,1fr) 58px 90px';
     const mono = 'font-family:var(--font-mono,monospace)';
 
     function fmtDue(due, overdue) {
@@ -6317,13 +6317,21 @@ window.WIDGET_REGISTRY.register({
             new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
     }
 
+    // Action items carry status: 'open' always (we filter to open), but surface it
+    // the same way task_list surfaces Start/In Progress/Blocked
+    function fmtStatus(item) {
+      if (item.overdue)
+        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 8px;text-align:center;white-space:nowrap">Overdue</div>';
+      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 8px;text-align:center;white-space:nowrap">Open</div>';
+    }
+
     const headerHtml =
       '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
           'padding:4px 10px 4px 8px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">'+
         '<div></div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Action Item</div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right;padding-right:4px">Due</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding-left:8px">From</div>'+
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:center">Status</div>'+
       '</div>';
 
     const rowsHtml = items.map(function(item){
@@ -6338,9 +6346,7 @@ window.WIDGET_REGISTRY.register({
           (item.due ? '<div style="'+mono+';font-size:10px;color:var(--text3)">Due '+new Date(item.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>' : '')+
         '</div>'+
         '<div style="text-align:right;padding-right:4px">'+fmtDue(item.due, item.overdue)+'</div>'+
-        '<div style="'+mono+';font-size:10px;color:rgba(255,255,255,.45);padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
-          (item.createdBy ? _esc(item.createdBy) : '<span style="color:rgba(255,255,255,.2)">—</span>')+
-        '</div>'+
+        '<div style="display:flex;justify-content:center">'+fmtStatus(item)+'</div>'+
       '</div>';
     }).join('');
 
