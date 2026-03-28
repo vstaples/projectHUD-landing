@@ -100,11 +100,11 @@
 .nre-add-row:disabled{opacity:.25;cursor:not-allowed}
 /* ── Grid area — row-based ── */
 #notes-grid-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
-.nre-grid-row{display:grid;gap:8px;flex-shrink:0}
-.nre-grid-row[data-height="small"] .notes-tile{min-height:120px}
-.nre-grid-row[data-height="medium"] .notes-tile{min-height:180px}
-.nre-grid-row[data-height="large"] .notes-tile{min-height:260px}
-.nre-grid-row[data-height="auto"] .notes-tile{min-height:120px}
+.nre-grid-row{display:grid;gap:8px;flex-shrink:0;align-items:stretch}
+.nre-grid-row[data-height="small"] .notes-tile{min-height:120px;max-height:120px;overflow:hidden}
+.nre-grid-row[data-height="medium"] .notes-tile{min-height:180px;max-height:180px;overflow:hidden}
+.nre-grid-row[data-height="large"] .notes-tile{min-height:260px;max-height:260px;overflow:hidden}
+.nre-grid-row[data-height="auto"] .notes-tile{min-height:120px;overflow:hidden}
 #notes-grid{display:contents}/* legacy compat — children render into #notes-grid-area */
 #notes-tray{border-top:1px solid rgba(0,210,255,.08);padding:8px 12px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;min-height:0}
 #notes-tray:empty{display:none}
