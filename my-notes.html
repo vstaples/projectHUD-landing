@@ -464,9 +464,17 @@ window._notesLoadView = async function() {
   }
   _notesRenderLeft();
   _notesRenderGrid();
-  // Pre-load invite resources so the header user name fallback resolves on first render
-  // (fires async, then re-renders the view switcher with the correct name populated)
-  _notesLoadInviteResources().then(function() { _notesRenderViewSwitcher(); });
+  // Pre-load invite resources so the header user name resolves on first render.
+  // _notesLoadInviteResources is defined in Block 2 — use window reference
+  // and defer until after all scripts have injected.
+  setTimeout(function() {
+    if (typeof window._notesLoadInviteResources === 'function') {
+      window._notesLoadInviteResources().then(function() {
+        _notesRenderViewSwitcher();
+        _notesRenderLibrary();
+      });
+    }
+  }, 200);
   // Restore saved panel width and init splitter
   const savedW = _cv().leftPanelWidth;
   if (savedW) {
@@ -2367,42 +2375,63 @@ function _notesRenderLibrary() {
   const myName    = (window._notesResource && window._notesResource.name) || 'Me';
   const myRid     = (window._notesResource && window._notesResource.id)   || '';
 
-  // Collect entries — only views with an explicitly associated person.
-  // Owner's own workspace views (no forResourceName) are not "workflows" 
-  // and should not appear here.
-  const entries = [];
+  // Collect entries — show all non-shared views.
+  // Views with forResourceName are associated with that person.
+  // Views without forResourceName are the owner's own workspace views —
+  // show them under the owner but only if there are ANY to show.
+  const ownViews   = [];
+  const otherViews = [];
+
   Object.keys(views).forEach(function(vKey) {
     const v = views[vKey];
     if (v._isSharedView) return;
-    if (!v.forResourceName) return; // skip views with no associated person
-    const personName = v.forResourceName;
-    const personRid  = v.forResourceId || '';
-    const initials   = personName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-    let colorIdx = 0;
-    if (window._inviteResources && window._inviteResources.length) {
-      const idx = window._inviteResources.findIndex(function(r){ return r.id === personRid; });
-      colorIdx  = idx >= 0 ? idx : 0;
+    if (v.forResourceName) {
+      const personName = v.forResourceName;
+      const personRid  = v.forResourceId || '';
+      const initials   = personName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      let colorIdx = 0;
+      if (window._inviteResources && window._inviteResources.length) {
+        const idx = window._inviteResources.findIndex(function(r){ return r.id === personRid; });
+        colorIdx = idx >= 0 ? idx : 0;
+      }
+      const color = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+        ? window.PARTICIPANT_COLORS[colorIdx % window.PARTICIPANT_COLORS.length] : '#00D2FF';
+      otherViews.push({ vKey, label: vKey, personName, personRid, initials, color, isActive: vKey === _workspace.activeView });
+    } else {
+      ownViews.push({ vKey, label: vKey, isActive: vKey === _workspace.activeView });
     }
-    const color = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
-      ? window.PARTICIPANT_COLORS[colorIdx % window.PARTICIPANT_COLORS.length]
-      : '#00D2FF';
-    entries.push({ vKey, label: vKey, personName, personRid, initials, color, isActive: vKey === _workspace.activeView });
   });
+
+  const entries = otherViews.concat(ownViews);
 
   if (!entries.length) {
     list.innerHTML = '<div style="padding:5px 14px 8px 28px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">No dashboards saved</div>';
     return;
   }
 
-  // Group by person name, owner first
+  // Group: associated-person views first (sorted alpha by person name),
+  // then owner's own views under their own name
   const groups = {};
-  entries.forEach(function(e) {
-    if (!groups[e.personName]) groups[e.personName] = { color: e.color, initials: e.initials, items: [] };
+  otherViews.forEach(function(e) {
+    if (!groups[e.personName]) groups[e.personName] = { color: e.color, initials: e.initials, isOwner: false, items: [] };
     groups[e.personName].items.push(e);
   });
+  if (ownViews.length) {
+    // Owner's own views — use their name and avatar
+    const ownerColorIdx = (window._inviteResources && window._inviteResources.length)
+      ? Math.max(0, window._inviteResources.findIndex(function(r){ return r.id === myRid; }))
+      : 0;
+    const ownerColor = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+      ? window.PARTICIPANT_COLORS[ownerColorIdx % window.PARTICIPANT_COLORS.length] : '#00D2FF';
+    const ownerInitials = myName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    if (!groups[myName]) groups[myName] = { color: ownerColor, initials: ownerInitials, isOwner: true, items: [] };
+    ownViews.forEach(function(e){ groups[myName].items.push(e); });
+  }
 
-  // Sort alphabetically by person name
   const sortedGroups = Object.keys(groups).sort(function(a, b) {
+    // Other-person groups first (alpha), owner last
+    if (groups[a].isOwner) return 1;
+    if (groups[b].isOwner) return -1;
     return a.localeCompare(b);
   });
 
