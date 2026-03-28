@@ -3745,10 +3745,9 @@ async function _notesSyncPoll() {
     const noteId = tile.noteId;
     const typedAgo = Date.now() - (_lastTyped[noteId] || 0);
     if (typedAgo < 3000) continue;
-    // Widget tiles own their canvas — content_blocks sync is irrelevant and
-    // would incorrectly trigger _notesRenderGrid → _notesPostWire → dataFn
-    // on every poll cycle, causing continuous widget refreshes.
+    // Skip widget tiles and placeholder/synthetic IDs — these have no DB record
     if (tile.canvasMode === 'widget') continue;
+    if (!noteId || noteId.startsWith('ph-') || noteId.startsWith('wt-')) continue;
     // Fetch both content and content_blocks — decide which to use from remote data
     try {
       const rows = await API.get('notes?id=eq.' + noteId + '&select=id,content,content_blocks,updated_at&limit=1').catch(()=>[]);
@@ -3927,6 +3926,11 @@ const _presenceIntervals = {};
 
 // ── Load participants for a note ──────────────────────────────────────────
 async function _notesLoadParticipants(noteId) {
+  // Placeholder and widget-tile IDs have no DB record — skip silently
+  if (!noteId || noteId.startsWith('ph-') || noteId.startsWith('wt-')) {
+    _participants[noteId] = [];
+    return [];
+  }
   try {
     const rows = await API.get(
       'note_participants?note_id=eq.' + noteId +
@@ -3991,6 +3995,8 @@ async function _notesRenderPresence(noteId) {
 
 // ── Heartbeat — update own last_seen_at every 5s ──────────────────────────
 async function _notesHeartbeat(noteId) {
+  // No DB record exists for placeholder or widget-tile IDs
+  if (!noteId || noteId.startsWith('ph-') || noteId.startsWith('wt-')) return;
   const userId = window._notesResource?.user_id;
   if (!userId) return;
   try {
@@ -4569,9 +4575,12 @@ async function _notesWireTilesCollab() {
   // Pre-load resources so avatars have names immediately
   await _notesLoadInviteResources();
   cv.tiles.forEach(t => {
-    _notesLoadParticipants(t.noteId).then(() => {
-      _notesRenderPresence(t.noteId);
-      _notesStartPresence(t.noteId);
+    const nid = t.noteId;
+    // Skip placeholder and widget-tile IDs — no DB record, no participants
+    if (!nid || nid.startsWith('ph-') || nid.startsWith('wt-') || t.canvasMode === 'widget') return;
+    _notesLoadParticipants(nid).then(() => {
+      _notesRenderPresence(nid);
+      _notesStartPresence(nid);
     });
   });
 }
