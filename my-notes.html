@@ -2378,8 +2378,8 @@ function _notesRenderLibrary() {
       const idx = window._inviteResources.findIndex(function(r){ return r.id === personRid; });
       colorIdx  = idx >= 0 ? idx : 0;
     }
-    const color = (typeof PARTICIPANT_COLORS !== 'undefined' && PARTICIPANT_COLORS.length)
-      ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length]
+    const color = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+      ? window.PARTICIPANT_COLORS[colorIdx % window.PARTICIPANT_COLORS.length]
       : '#00D2FF';
     entries.push({ vKey, label: vKey, personName, personRid, initials, color, isActive: vKey === _workspace.activeView });
   });
@@ -2946,8 +2946,8 @@ window._notesCloneView = async function() {
       'border-top:1px solid rgba(0,210,255,.08);margin-top:2px">' + _esc(grp) + '</div>';
     groups[grp].forEach(function(r) {
       const initials = r.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const color    = (typeof PARTICIPANT_COLORS!=='undefined'&&PARTICIPANT_COLORS.length)
-        ? PARTICIPANT_COLORS[_cloneColorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+      const color    = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+        ? window.PARTICIPANT_COLORS[_cloneColorIdx % window.PARTICIPANT_COLORS.length] : '#00D2FF';
       _cloneColorIdx++;
       const isMe = r.user_id === myUserId;
       personListHtml +=
@@ -3232,8 +3232,8 @@ async function _notesShowRenameViewDialog(currentName) {
       'border-top:1px solid rgba(0,210,255,.06);margin-top:2px">' + _esc(grp) + '</div>';
     groups[grp].forEach(function(r) {
       const initials = r.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const color = (typeof PARTICIPANT_COLORS!=='undefined'&&PARTICIPANT_COLORS.length)
-        ? PARTICIPANT_COLORS[_rnvColorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+      const color = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+        ? window.PARTICIPANT_COLORS[_rnvColorIdx % window.PARTICIPANT_COLORS.length] : '#00D2FF';
       _rnvColorIdx++;
       const isCurrent = cv.forResourceId === r.id;
       personListHtml +=
@@ -4364,6 +4364,7 @@ function _notesRelTime(iso) {
 const PARTICIPANT_COLORS = [
   '#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'
 ];
+window.PARTICIPANT_COLORS = PARTICIPANT_COLORS;
 
 // Cache: noteId → [{user_id, name, color, last_seen_at}]
 const _participants = {};
