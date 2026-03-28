@@ -5885,7 +5885,10 @@ window.WIDGET_REGISTRY.register({
     const nonColor  = 'rgba(255,255,255,.25)';
 
     // Scale only the big number font — clamp between 16px (small tile) and 26px (medium+)
-    const bigFont = Math.min(26, Math.max(16, Math.round((container.offsetHeight || 120) * 0.22))) + 'px';
+    // Use offsetHeight if available, otherwise fall back to parent tile height
+    const _tileEl  = container.closest('.notes-tile');
+    const _tileH   = (_tileEl && _tileEl.offsetHeight) || container.offsetHeight || 120;
+    const bigFont  = Math.min(26, Math.max(16, Math.round(_tileH * 0.18))) + 'px';
 
     container.innerHTML =
       '<div style="display:flex;flex-direction:column;padding:10px 12px;height:100%;justify-content:space-between;box-sizing:border-box">' +
