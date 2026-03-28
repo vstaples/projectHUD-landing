@@ -4362,7 +4362,12 @@ async function _notesShowViewInviteDialog(inviteNote) {
   overlay.querySelector('#nvid-decline').onclick = async function() {
     overlay.remove();
     const selfUserId = window._notesResource && window._notesResource.user_id;
-    try { await API.del('notes?id=eq.' + inviteNote.id); } catch(e) {}
+    // Remove from local array immediately before DB delete
+    if (typeof _notes !== 'undefined') {
+      const didx = _notes.findIndex(function(n) { return n.id === inviteNote.id; });
+      if (didx >= 0) _notes.splice(didx, 1);
+    }
+    API.del('notes?id=eq.' + inviteNote.id).catch(function(){});
     if (selfUserId && ownerUserId) {
       try {
         await API.del(
@@ -4425,14 +4430,14 @@ async function _notesShowViewInviteDialog(inviteNote) {
       }
     } catch(e) { console.warn('[Compass] Accept view invite workspace write error:', e); }
 
-    // 3. Delete inbox note and remove from local array — always runs regardless of above
-    try { await API.del('notes?id=eq.' + inviteNote.id); } catch(e) { console.warn('[Compass] Inbox delete error:', e); }
+    // 3. Remove from local array first, then fire async DB delete
     if (typeof _notes !== 'undefined') {
       const idx = _notes.findIndex(function(n) { return n.id === inviteNote.id; });
       if (idx >= 0) _notes.splice(idx, 1);
     }
+    API.del('notes?id=eq.' + inviteNote.id).catch(function(e) { console.warn('[Compass] Inbox delete error:', e); });
 
-    // 4. Re-render inbox and switch to shared view
+    // 4. Re-render inbox (note already gone from array) then switch to shared view
     if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
     else if (window._notesRenderLeft) window._notesRenderLeft();
     if (window._notesSwitchToSharedView) window._notesSwitchToSharedView(ownerUserId, viewName);
