@@ -3911,6 +3911,28 @@ function showWidgetConfig(widgetId, tileState, existingConfig) {
       '</select>';
     } else if (field.type === 'boolean') {
       input = '<input type="checkbox" class="wcf-input" data-key="' + _esc(field.key) + '"' + (val ? ' checked' : '') + ' style="width:auto"/>';
+    } else if (field.type === 'project_picker') {
+      const projects = (window._projects || []).filter(function(p) { return p.status === 'active' || p.status === 'in_progress'; });
+      if (!projects.length) {
+        input = '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:4px 0">No active projects found</div>' +
+                '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" value="' + _esc(String(val)) + '" placeholder="Paste project ID…"/>';
+      } else {
+        input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '" style="width:100%">' +
+          '<option value="">— Select project —</option>' +
+          projects.map(function(p) {
+            return '<option value="' + _esc(p.id) + '"' + (p.id === val ? ' selected' : '') + '>' + _esc(p.name) + '</option>';
+          }).join('') +
+        '</select>';
+      }
+    } else if (field.type === 'resource_picker') {
+      const resources = (window._notesGetInviteResources && window._notesGetInviteResources()) || [];
+      const selfRes   = window._notesResource;
+      input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '" style="width:100%">' +
+        '<option value="">— Me —</option>' +
+        resources.filter(function(r) { return r.id && r.name; }).map(function(r) {
+          return '<option value="' + _esc(r.id) + '"' + (r.id === val ? ' selected' : '') + '>' + _esc(r.name) + '</option>';
+        }).join('') +
+      '</select>';
     } else {
       input = '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" type="' + (field.type === 'number' ? 'number' : 'text') + '" value="' + _esc(String(val)) + '" placeholder="' + _esc(field.label) + '"/>';
     }
@@ -4067,8 +4089,8 @@ window.WIDGET_REGISTRY.register({
   configSchema: [
     {
       key:     'targetResourceId',
-      label:   'Person (blank = me)',
-      type:    'text',
+      label:   'Person',
+      type:    'resource_picker',
       default: ''
     },
     {
@@ -4167,8 +4189,8 @@ window.WIDGET_REGISTRY.register({
   configSchema: [
     {
       key:     'targetResourceId',
-      label:   'Person (blank = me)',
-      type:    'text',
+      label:   'Person',
+      type:    'resource_picker',
       default: ''
     }
   ],
@@ -4219,8 +4241,8 @@ window.WIDGET_REGISTRY.register({
   configSchema: [
     {
       key:     'projectId',
-      label:   'Project ID',
-      type:    'text',
+      label:   'Project',
+      type:    'project_picker',
       default: ''
     }
   ],
