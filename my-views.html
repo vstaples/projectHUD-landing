@@ -453,18 +453,8 @@ window._viewsLoadView = async function() {
 
   await _notesFetchAll();
   await _notesLoadWorkspace();
-  // Re-fetch any shared view notes (_notesFetchAll only loads own notes)
-  await _notesFetchSharedViewNotes();
-  // ── One-time cleanup: delete note records that back widget tiles ──────────
-  // These were created before the widget-tile / note-tile separation was
-  // enforced. We identify them by matching workspace tileState.canvasMode
-  // against the notes table and deleting any note that is now a widget slot.
-  await _notesCleanWidgetNotes();
-  // First launch seeding — new user with no notes and no workspace
-  if (_notes.length === 0 && Object.keys(_workspace.views).length === 1 &&
-      _cv().tiles.length === 0) {
-    await _notesFirstLaunchSeed();
-  }
+  // MY VIEWS: skip _notesFetchSharedViewNotes, _notesCleanWidgetNotes, _notesFirstLaunchSeed
+  // — these operate on MY NOTES data and must not run in the views module.
   _notesRenderLeft();
   _notesRenderGrid();
   // Wait for Block 2 to export _notesLoadInviteResources (it runs async after script injection),
@@ -647,7 +637,7 @@ async function _notesLoadWorkspace() {
           const v = _workspace.views[vn];
           if (v.gridSize && !v.rows) { _notesMigrateView(v); migrated = true; }
         });
-        if (migrated) _notesSaveWorkspace(true);
+        if (migrated) _viewsSaveWorkspace(true);
       }
       // No legacy migration for MY VIEWS — starts fresh if sub-key absent
     }
@@ -742,7 +732,7 @@ function _notesDefaultView() {
   };
 }
 
-async function _notesSaveNow() {
+async function _viewsSaveNow() {
   if (!_userId) return;
   // MY VIEWS isolation: read existing full state, merge viewsWorkspace sub-key, write back
   const viewsSnapshot = JSON.parse(JSON.stringify(_workspace));
@@ -763,11 +753,11 @@ async function _notesSaveNow() {
   } catch(e) { console.error('[Compass] Views workspace save error:', e); }
 }
 
-async function _notesSaveWorkspace(immediate) {
+async function _viewsSaveWorkspace(immediate) {
   if (!_userId) return;
-  if (immediate) { clearTimeout(_saveTimer); return _notesSaveNow(); }
+  if (immediate) { clearTimeout(_saveTimer); return _viewsSaveNow(); }
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(_notesSaveNow, 800);
+  _saveTimer = setTimeout(_viewsSaveNow, 800);
 }
 
 // ── Left panel ────────────────────────────────────────────────────────────
@@ -1353,20 +1343,20 @@ function _notesRowSetCols(rowId, delta) {
     cv.tiles = cv.tiles.filter(function(t) { return !(t.row === rowId && t.slot >= newCols); });
   }
   row.columns = newCols;
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
 }
 
 function _notesRowSetHeight(rowId, height) {
   const row = _cv().rows.find(function(r) { return r.id === rowId; });
-  if (row) { row.height = height; _notesSaveWorkspace(false); _notesRenderGrid(); }
+  if (row) { row.height = height; _viewsSaveWorkspace(false); _notesRenderGrid(); }
 }
 
 function _notesAddRow() {
   const cv = _cv();
   if ((cv.rows || []).length >= 8) return;
   cv.rows.push({ id: 'row' + Date.now(), columns: 2, height: 'medium' });
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
 }
 
@@ -1375,7 +1365,7 @@ function _notesRowDelete(rowId) {
   if ((cv.tiles || []).some(function(t) { return t.row === rowId; })) return;
   cv.rows = cv.rows.filter(function(r) { return r.id !== rowId; });
   if (cv.rows.length === 0) cv.rows.push({ id: 'row0', columns: 2, height: 'medium' });
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
 }
 
@@ -1452,7 +1442,7 @@ function _notesWireRowDrag(bar) {
 
         if (newOrder.length === cv.rows.length) {
           cv.rows = newOrder;
-          _notesSaveWorkspace(true);
+          _viewsSaveWorkspace(true);
           _notesRenderGrid();
         }
       }
@@ -1609,7 +1599,7 @@ function _notesOpenNote(noteId) {
     }
   }
 
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
 }
@@ -1617,7 +1607,7 @@ function _notesOpenNote(noteId) {
 async function _notesCloseTile(noteId) {
   _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
   _cv().tray  = _cv().tray.filter(id => id !== noteId);
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
 
@@ -1669,7 +1659,7 @@ function _notesToggleChat(noteId) {
     if (btn)  btn.style.opacity = tile.chatOpen ? '1' : '.4';
     if (path) path.setAttribute('fill', tile.chatOpen ? 'rgba(0,210,255,.2)' : 'none');
   }
-  _notesSaveWorkspace();
+  _viewsSaveWorkspace();
 }
 
 async function _notesNew(rowId, slot) {
@@ -1686,7 +1676,7 @@ async function _notesNew(rowId, slot) {
       if (existing) { cv.tray.push(existing.noteId); cv.tiles = cv.tiles.filter(t => !(t.row === rowId && t.slot === slot)); }
       const placeholderId = 'ph-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
       cv.tiles.push({ row: rowId, slot, noteId: placeholderId, chatOpen: false, isPlaceholder: true });
-      _notesSaveWorkspace();
+      _viewsSaveWorkspace();
       _notesRenderGrid();
       // Directly open the widget picker — don't rely on the mode button being
       // injected yet (it arrives asynchronously via _notesPostWire).
@@ -1719,7 +1709,7 @@ async function _notesNew(rowId, slot) {
       if (!newNote?.id) return;
       _notes.unshift(newNote);
       _notesOpenNote(newNote.id);
-      _notesSaveWorkspace();
+      _viewsSaveWorkspace();
       _notesRenderLeft();
       _notesRenderGrid();
       setTimeout(() => {
@@ -2339,7 +2329,7 @@ function _notesFloatClose(noteId, btn) {
   if (noteId && !_cv().tiles.some(t => t.noteId === noteId)) {
     if (!_cv().tray.includes(noteId)) {
       _cv().tray.push(noteId);
-      _notesSaveWorkspace(true);
+      _viewsSaveWorkspace(true);
       _notesRenderTray();
     }
   }
@@ -2548,7 +2538,7 @@ function _notesSaveAsTemplate() {
       parameters: params, createdAt: new Date().toISOString(),
       rows: tplView.rows, tiles: tplView.tiles,
     };
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderLibrary();
     overlay.remove();
   };
@@ -2563,7 +2553,7 @@ function _notesDeleteTemplate(name) {
   ).then(function(confirmed) {
     if (!confirmed) return;
     delete _workspace.library[name];
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderLibrary();
   });
 }
@@ -2722,7 +2712,7 @@ async function _notesLaunchTemplateNow(templateName, paramVals, requestedViewNam
     createdAt:  new Date().toISOString(),
   };
   _workspace.activeView = viewName;
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid(); _notesRenderLeft(); _notesRenderViewSwitcher();
 
   // STEP 5: insert owner row then invite each person via view_participants + inbox
@@ -2788,7 +2778,7 @@ function _notesDeleteView() {
     delete _workspace.views[cur];
     // Switch to first remaining view
     _workspace.activeView = Object.keys(_workspace.views)[0];
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderGrid(); _notesRenderLeft(); _notesRenderViewSwitcher();
   });
 }
@@ -2844,7 +2834,7 @@ function _notesEditTemplate() {
     tpl.category    = overlay.querySelector('#net-category').value;
     tpl.parameters  = overlay.querySelector('#net-params').value.split(',').map(function(p){ return p.trim(); }).filter(Boolean);
     tpl.description = desc;
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderLibrary();
     _notesRenderViewSwitcher();
     overlay.remove();
@@ -2986,7 +2976,7 @@ window._notesToggleViewLock = function() {
   const cv = _cv();
   if (!cv) return;
   cv.locked = !cv.locked;
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderViewSwitcher();
   // Re-render grid so empty-slot + controls respect the new lock state
   _notesRenderGrid();
@@ -3167,7 +3157,7 @@ window._notesCloneView = async function() {
 
     _workspace.views[finalName] = cloned;
     _workspace.activeView       = finalName;
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
@@ -3221,7 +3211,7 @@ function _notesSwitchView(viewName) {
       if (_workspace.sharedViews[k]) _workspace.sharedViews[k].wasActive = false;
     });
   }
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
   _notesRenderViewSwitcher();
@@ -3294,7 +3284,7 @@ function _notesNewView() {
     overlay.remove();
     _workspace.views[trimmed] = _notesDefaultView();
     _workspace.activeView = trimmed;
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
@@ -3478,7 +3468,7 @@ async function _notesShowRenameViewDialog(currentName) {
       }
     }
     if (newName !== currentName) _notesRenameView(newName);
-    else { _notesSaveWorkspace(true); _notesRenderViewSwitcher(); _notesRenderLibrary(); }
+    else { _viewsSaveWorkspace(true); _notesRenderViewSwitcher(); _notesRenderLibrary(); }
     _notesRenderGrid(); // re-render widgets with new configs
   };
 
@@ -3495,7 +3485,7 @@ function _notesRenameView(newName) {
   _workspace.views[newName] = _workspace.views[oldName];
   delete _workspace.views[oldName];
   _workspace.activeView = newName;
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderViewSwitcher();
   _notesRenderLibrary(); // keep WORKFLOWS left panel in sync with rename
   // STEP 5: keep view_participants in sync so participant heartbeats stay aligned
@@ -3511,7 +3501,7 @@ function _notesRenameView(newName) {
 function _notesClearWorkspace() {
   _cv().tiles = [];
   _cv().tray  = [];
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
 }
@@ -3563,7 +3553,7 @@ async function _notesFirstLaunchSeed() {
         tray:     [],
       }
     };
-    await _notesSaveNow();
+    await _viewsSaveNow();
     // ── STEP 5: seed owner row for Default view ───────────────────────────
     try {
       await API.post('view_participants', {
@@ -3965,7 +3955,7 @@ function _notesDndInit() {
       // Remove any orphaned tile entry so _notesOpenNote places it fresh
       _cv().tiles = _cv().tiles.filter(function(t) { return t.noteId !== eid && t.noteId !== _dragNoteId; });
       _notesOpenNote(eid);
-      _notesSaveWorkspace(true); _notesRenderLeft();
+      _viewsSaveWorkspace(true); _notesRenderLeft();
       _dragNoteId = null; _dragSlot = null; _dragRowId = null;
       return;
     }
@@ -4018,7 +4008,7 @@ function _notesDndInit() {
         cv.tiles.push({ row: targetRowId, slot: targetSlot, noteId: effectiveNoteId, chatOpen: false });
       }
     }
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderGrid();
     _notesRenderLeft();
   });
@@ -4069,7 +4059,7 @@ function _notesDndInit() {
       if (shell && _workspace) {
         const w = parseInt(shell.style.getPropertyValue('--notes-left-w')) || 260;
         _cv().leftPanelWidth = w;
-        _notesSaveWorkspace();
+        _viewsSaveWorkspace();
       }
     });
   }
@@ -4094,7 +4084,7 @@ function _notesMinimizeTile(noteId) {
   if (btn)    btn.title = tile.minimized ? 'Restore tile' : 'Minimize tile';
   if (btn)    btn.textContent = tile.minimized ? '▢' : '—';
 
-  _notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
 }
 
 // ── Maximize tile ─────────────────────────────────────────────────────────
@@ -4179,7 +4169,7 @@ async function _notesDeleteTreeNote(noteId) {
     _notes = _notes.filter(n => n.id !== noteId);
     _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
     _cv().tray  = _cv().tray.filter(id => id !== noteId);
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderLeft();
     _notesRenderGrid();
   } catch(e) { console.error('[Compass] Delete note error:', e); }
@@ -4274,7 +4264,7 @@ async function _notesDeleteInboxNote(noteId) {
     _notes = _notes.filter(n => n.id !== noteId);
     _cv().tiles = _cv().tiles.filter(t => t.noteId !== noteId);
     _cv().tray  = _cv().tray.filter(id => id !== noteId);
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderLeft();
     _notesRenderGrid();
   } catch(e) { console.error('[Compass] Delete inbox note error:', e); }
@@ -4371,12 +4361,13 @@ function _notesStopSyncPoll() {
 }
 
 // ── Expose to window for onclick handlers ────────────────────────────────
-window._notesSaveNow         = _notesSaveNow;
-window._notesCv              = _cv;
-window._notesStartInboxPoll  = _notesStartInboxPoll;
-window._notesStopInboxPoll   = _notesStopInboxPoll;
-window._notesStartSyncPoll   = _notesStartSyncPoll;
-window._notesStopSyncPoll    = _notesStopSyncPoll;
+window._viewsSaveNow         = _viewsSaveNow; // MY VIEWS save — does NOT overwrite window._notesSaveNow
+window._viewsCv              = _cv; // MY VIEWS: do NOT overwrite window._notesCv
+// MY VIEWS: poll functions scoped — do NOT overwrite MY NOTES poll functions
+window._viewsStartInboxPoll  = _notesStartInboxPoll;
+window._viewsStopInboxPoll   = _notesStopInboxPoll;
+window._viewsStartSyncPoll   = _notesStartSyncPoll;
+window._viewsStopSyncPoll    = _notesStopSyncPoll;
 window._notesStartPingSystem = function(){};
 window._notesStopPingSystem  = function(){};
 window._notesAddRow          = _notesAddRow;
@@ -4404,7 +4395,8 @@ window._notesBranchDragOver  = _notesBranchDragOver;
 window._notesBranchDragLeave = _notesBranchDragLeave;
 window._notesBranchDrop      = _notesBranchDrop;
 window._notesNewView           = _notesNewView;
-window._workspace              = _workspace;
+// MY VIEWS: _workspace intentionally NOT exported to window — would clobber MY NOTES workspace
+window._viewsWorkspace         = _workspace; // safe alias for external inspection only
 window._notesRenameView    = _notesRenameView;
 window._notesClearWorkspace= _notesClearWorkspace;
 window._notesRenderLeft    = _notesRenderLeft;
@@ -4450,7 +4442,7 @@ window._notesSwitchToSharedView = async function(ownerUserId, viewName) {
     const _svKey = ownerUserId + '::' + viewName;
     if (!_workspace.sharedViews[_svKey]) _workspace.sharedViews[_svKey] = { ownerUserId: ownerUserId, viewName: viewName };
     _workspace.sharedViews[_svKey].wasActive = true;
-    _notesSaveWorkspace(true);
+    _viewsSaveWorkspace(true);
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
@@ -5964,7 +5956,7 @@ function showModeSwitcher(btn, tileState) {
               tileState.canvasMode  = 'note';
               delete tileState.widgetId;
               delete tileState.widgetConfig;
-              if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
+              _viewsSaveWorkspace(true);
               _notesRenderLeft();
               _notesRenderGrid();
               setTimeout(function() {
@@ -5977,7 +5969,7 @@ function showModeSwitcher(btn, tileState) {
           tileState.canvasMode = 'note';
           delete tileState.widgetId;
           delete tileState.widgetConfig;
-          if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
+          _viewsSaveWorkspace(true);
           refreshTileWidget(tileState.noteId);
         }
       }
@@ -6211,7 +6203,7 @@ function applyWidget(widgetId, config, tileState) {
   tileState.canvasMode    = 'widget';
   tileState.widgetId      = widgetId;
   tileState.widgetConfig  = config;
-  if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
+  _viewsSaveWorkspace(true);
   // Refresh left panel so deleted note disappears from knowledge tree
   if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
   refreshTileWidget(tileState.noteId);

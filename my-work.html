@@ -4924,9 +4924,9 @@ window.uSwitchTab = function(tab, btn) {
     window._notesStartInboxPoll();
     if (window._notesStartPingSystem) window._notesStartPingSystem();
   }
-  // MY VIEWS — flush save and manage polls same as MY NOTES
-  if (_uActiveTab === 'views' && tab !== 'views' && window._notesSaveNow) window._notesSaveNow();
-  if (tab === 'views' && window._notesStartInboxPoll) window._notesStartInboxPoll();
+  // MY VIEWS — flush save and manage polls using views-scoped functions
+  if (_uActiveTab === 'views' && tab !== 'views' && window._viewsSaveNow) window._viewsSaveNow();
+  if (tab === 'views' && window._viewsStartInboxPoll) window._viewsStartInboxPoll();
   _uActiveTab = tab;
   localStorage.setItem('compass-user-tab', tab);
   document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
