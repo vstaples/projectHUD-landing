@@ -3159,8 +3159,6 @@ function _notesStopInboxPoll() {
 let _syncPollInterval = null;
 
 async function _notesSyncPoll() {
-  const now = new Date();
-  const ts  = now.toISOString().replace('T',' ').slice(0,19);
   const tiles = _cv()?.tiles || [];
   for (const tile of tiles) {
     const noteId = tile.noteId;
@@ -3175,15 +3173,16 @@ async function _notesSyncPoll() {
       const remoteContent    = remote.content || '';
       const displayedContent = ta.value;
       if (remoteContent !== displayedContent) {
-
         const selStart = ta.selectionStart;
         const selEnd   = ta.selectionEnd;
+        // Temporarily lift readonly so value assignment takes effect in all browsers
+        const wasReadOnly = ta.readOnly;
+        if (wasReadOnly) ta.readOnly = false;
         ta.value = remoteContent;
+        if (wasReadOnly) ta.readOnly = true;
         const local = _notes.find(n => n.id === noteId);
         if (local) { local.content = remoteContent; local.updated_at = remote.updated_at; }
         try { ta.setSelectionRange(selStart, selEnd); } catch(e) {}
-      } else {
-
       }
     } catch(e) {}
   }
@@ -4477,6 +4476,8 @@ async function _notesShowViewInviteDialog(inviteNote) {
       const idx = _notes.findIndex(function(n) { return n.id === inviteNote.id; });
       if (idx >= 0) _notes.splice(idx, 1);
     }
+    // Advance lastChecked so inbox poller never re-fetches this deleted note
+    try { window._inboxLastChecked = new Date().toISOString(); } catch(e) {}
     API.del('notes?id=eq.' + inviteNote.id).catch(function(e) { console.warn('[Compass] Inbox delete error:', e); });
 
     // 4. Re-render inbox (note already gone from array) then switch to shared view
