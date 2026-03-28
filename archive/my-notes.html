@@ -441,11 +441,6 @@ window._notesLoadView = async function() {
   await _notesLoadWorkspace();
   // Re-fetch any shared view notes (_notesFetchAll only loads own notes)
   await _notesFetchSharedViewNotes();
-  // ── One-time cleanup: delete note records that back widget tiles ──────────
-  // These were created before the widget-tile / note-tile separation was
-  // enforced. We identify them by matching workspace tileState.canvasMode
-  // against the notes table and deleting any note that is now a widget slot.
-  await _notesCleanWidgetNotes();
   // First launch seeding — new user with no notes and no workspace
   if (_notes.length === 0 && Object.keys(_workspace.views).length === 1 &&
       _cv().tiles.length === 0) {
@@ -481,45 +476,6 @@ window._notesRefresh = async function() {
   _notesRenderLeft();
   _notesRenderGrid();
 };
-
-// ── One-time cleanup: remove note records that back widget tiles ───────────
-// Runs silently on startup. Any note whose ID appears in a workspace tile with
-// canvasMode='widget' (or a synthetic wt-/ph- ID) is an operational placeholder,
-// not institutional knowledge. Delete the DB record and remove from local array.
-async function _notesCleanWidgetNotes() {
-  try {
-    const toDelete = [];
-    Object.values(_workspace.views || {}).forEach(function(v) {
-      (v.tiles || []).forEach(function(t) {
-        const nid = t.noteId;
-        if (!nid) return;
-        // Synthetic IDs — never in DB, just remove from local notes array
-        if (nid.startsWith('ph-') || nid.startsWith('wt-')) {
-          _notes = _notes.filter(function(n){ return n.id !== nid; });
-          return;
-        }
-        // Real UUID that backs a widget tile — queue for DB deletion
-        if (t.canvasMode === 'widget') {
-          const exists = _notes.find(function(n){ return n.id === nid; });
-          if (exists) toDelete.push(nid);
-        }
-      });
-    });
-    if (!toDelete.length) return;
-    console.log('[Compass] Cleaning', toDelete.length, 'orphaned widget-tile note(s):', toDelete);
-    // Delete from DB in batches of 10
-    for (let i = 0; i < toDelete.length; i += 10) {
-      const batch = toDelete.slice(i, i + 10);
-      await API.del('notes?id=in.(' + batch.join(',') + ')').catch(function(){});
-    }
-    // Remove from local array
-    const deleteSet = new Set(toDelete);
-    _notes = _notes.filter(function(n){ return !deleteSet.has(n.id); });
-    console.log('[Compass] Cleanup complete.');
-  } catch(e) {
-    console.warn('[Compass] _notesCleanWidgetNotes error:', e);
-  }
-}
 
 // Fetch notes referenced by any shared view currently in workspace
 async function _notesFetchSharedViewNotes() {
@@ -757,22 +713,7 @@ function _notesRenderTree() {
   const body = document.getElementById('notes-tree-body');
   if (!body) return;
 
-  // Collect all noteIds that back widget tiles or are placeholders — these are
-  // operational tile slots, not knowledge records, and must not appear in the tree.
-  const widgetNoteIds = new Set();
-  Object.values((_workspace && _workspace.views) || {}).forEach(function(v) {
-    (v.tiles || []).forEach(function(t) {
-      if (t.canvasMode === 'widget' || t.isPlaceholder ||
-          (t.noteId && t.noteId.startsWith('ph-')) ||
-          (t.noteId && t.noteId.startsWith('wt-'))) {
-        widgetNoteIds.add(t.noteId);
-      }
-    });
-  });
-
-  const organized = _notes.filter(function(n) {
-    return !n.is_inbox && !widgetNoteIds.has(n.id);
-  });
+  const organized = _notes.filter(n => !n.is_inbox);
   const branches  = {};
   organized.forEach(n => {
     const parts  = (n.hierarchy_path || 'Work').split('/');
@@ -1153,22 +1094,13 @@ function _notesRenderGrid() {
       const tileIsWidget   = tile && tile.canvasMode === 'widget';
       const tileIsReadOnly = !tileIsWidget && viewerCtx.isViewer && !viewerCtx.overriddenSlots.has(slotKey);
 
-      // A tile may be a placeholder (ph-/wt- ID, no DB note yet) or a widget tile
-      // (real UUID but canvasMode='widget'). Both render as tiles without needing
-      // a note object. Only genuine note tiles require note to be non-null.
-      const isPlaceholderTile = tile && (tile.isPlaceholder ||
-        (tile.noteId && (tile.noteId.startsWith('ph-') || tile.noteId.startsWith('wt-'))));
-      const isWidgetTile = tile && tile.canvasMode === 'widget';
-
-      if (note || isPlaceholderTile || isWidgetTile) {
-        // For placeholder/widget tiles without a note, synthesise a minimal note-like object
-        const noteObj = note || { id: tile.noteId, title: isWidgetTile ? (tile.widgetId || 'Widget') : 'New tile', content: '' };
+      if (note) {
         div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
         div.setAttribute('draggable', !tileIsReadOnly ? 'true' : 'false');
-        div.innerHTML = _notesTileHTML(noteObj, tile, tileIsReadOnly);
+        div.innerHTML = _notesTileHTML(note, tile, tileIsReadOnly);
         div.dataset.rowid  = row.id;
         div.dataset.slot   = s;
-        div.dataset.noteid = noteObj.id;
+        div.dataset.noteid = note.id;
         // ── STEP 5: lock read-only content areas ──────────────────────
         if (tileIsReadOnly) {
           const ta = div.querySelector('.notes-tile-canvas');
@@ -1613,48 +1545,35 @@ function _notesToggleChat(noteId) {
 async function _notesNew(rowId, slot) {
   if (!_userId) return;
   try {
+    const res = await API.post('notes', {
+      firm_id:       FIRM_ID,
+      owner_user_id: _userId,
+      title:         'New note',
+      content:       '',
+      hierarchy_path:'Work',
+      is_inbox:      false,
+      created_at:    new Date().toISOString(),
+      updated_at:    new Date().toISOString(),
+    });
+    const newNote = res?.[0];
+    if (!newNote?.id) return;
+    _notes.unshift(newNote);
     if (rowId && typeof slot === 'number') {
-      // Slot click — create a local placeholder tile immediately (no DB record yet).
-      // A real note record is only written when the user switches to note mode
-      // and starts typing, or explicitly keeps it as a note. Widget tiles that
-      // come from this path will never pollute the notes table.
+      // Place in specific row+slot, displacing any existing tile to tray
       const cv = _cv();
       const existing = cv.tiles.find(t => t.row === rowId && t.slot === slot);
       if (existing) { cv.tray.push(existing.noteId); cv.tiles = cv.tiles.filter(t => !(t.row === rowId && t.slot === slot)); }
-      const placeholderId = 'ph-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
-      cv.tiles.push({ row: rowId, slot, noteId: placeholderId, chatOpen: false, isPlaceholder: true });
-      _notesSaveWorkspace();
-      _notesRenderGrid();
-      // After render, open the mode switcher immediately so user picks widget vs note
-      setTimeout(function() {
-        const tileEl = document.querySelector('.notes-tile[data-noteid="' + placeholderId + '"]');
-        const btn = tileEl && tileEl.querySelector('.tile-header-mode-btn');
-        if (btn) btn.click();
-      }, 80);
+      cv.tiles.push({ row: rowId, slot, noteId: newNote.id, chatOpen: false });
     } else {
-      // New note from left panel "+ New note" button — always creates a DB record
-      const res = await API.post('notes', {
-        firm_id:       FIRM_ID,
-        owner_user_id: _userId,
-        title:         'New note',
-        content:       '',
-        hierarchy_path:'Work',
-        is_inbox:      false,
-        created_at:    new Date().toISOString(),
-        updated_at:    new Date().toISOString(),
-      });
-      const newNote = res?.[0];
-      if (!newNote?.id) return;
-      _notes.unshift(newNote);
       _notesOpenNote(newNote.id);
-      _notesSaveWorkspace();
-      _notesRenderLeft();
-      _notesRenderGrid();
-      setTimeout(() => {
-        const titleEl = document.querySelector('[data-noteid="' + newNote.id + '"].notes-tile-title');
-        if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
-      }, 50);
     }
+    _notesSaveWorkspace();
+    _notesRenderLeft();
+    _notesRenderGrid();
+    setTimeout(() => {
+      const titleEl = document.querySelector('[data-noteid="' + newNote.id + '"].notes-tile-title');
+      if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
+    }, 50);
   } catch(e) { console.error('[Compass] New note error:', e); }
 }
 
@@ -5182,21 +5101,12 @@ window.WIDGET_REGISTRY = WIDGET_REGISTRY;
 // ── Widget context ────────────────────────────────────────────────────────
 function _widgetContext() {
   const _res = window._notesResource || {};
-  // Detect shared-view: the active view's _sharedOwner tells us whose workspace
-  // the tile config was saved in (the owner). If the viewer is a participant,
-  // widgetConfigs with a hardcoded targetResourceId belong to the owner — the
-  // viewer should always see their OWN data instead.
-  const _cv  = window._notesCv && window._notesCv();
-  const _isShared   = !!(_cv && _cv._isSharedView);
-  const _ownerUserId = (_cv && _cv._sharedOwner) || null;
   return {
-    firmId:      FIRM_ID,
-    userId:      _res.user_id || null,
-    resourceId:  _res.id     || null,
-    resource:    _res,
-    api:         (typeof API !== 'undefined' && API) || window._notesAPI || null,
-    isSharedView: _isShared,
-    ownerUserId:  _ownerUserId,
+    firmId:     FIRM_ID,
+    userId:     _res.user_id   || null,
+    resourceId: _res.id        || null,
+    resource:   _res,
+    api:        window.API || window._notesAPI,
   };
 }
 window._widgetContext = _widgetContext; // export so Phase 2 widgets can call it
@@ -5326,53 +5236,11 @@ function showModeSwitcher(btn, tileState) {
       if (newMode === 'widget') {
         showWidgetPicker(tileState);
       } else {
-        // Switching to Note mode — if this is a placeholder tile (no DB record
-        // yet), materialise a real note record now before rendering.
-        const isPlaceholder = tileState.isPlaceholder ||
-          (tileState.noteId && (tileState.noteId.startsWith('ph-') || tileState.noteId.startsWith('wt-')));
-        if (isPlaceholder) {
-          (async function() {
-            try {
-              const res = await API.post('notes', {
-                firm_id:        FIRM_ID,
-                owner_user_id:  _userId,
-                title:          'New note',
-                content:        '',
-                hierarchy_path: 'Work',
-                is_inbox:       false,
-                created_at:     new Date().toISOString(),
-                updated_at:     new Date().toISOString(),
-              });
-              const newNote = res?.[0];
-              if (!newNote?.id) return;
-              _notes.unshift(newNote);
-              // Remap tileState to real note ID across ALL views (it may appear in tray too)
-              const oldId = tileState.noteId;
-              Object.values(_workspace.views || {}).forEach(function(v) {
-                (v.tiles || []).forEach(function(t) { if (t.noteId === oldId) t.noteId = newNote.id; });
-                v.tray = (v.tray || []).map(function(id) { return id === oldId ? newNote.id : id; });
-              });
-              tileState.noteId      = newNote.id;
-              tileState.isPlaceholder = false;
-              tileState.canvasMode  = 'note';
-              delete tileState.widgetId;
-              delete tileState.widgetConfig;
-              if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
-              _notesRenderLeft();
-              _notesRenderGrid();
-              setTimeout(function() {
-                const titleEl = document.querySelector('[data-noteid="' + newNote.id + '"].notes-tile-title');
-                if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
-              }, 50);
-            } catch(e) { console.error('[Compass] Failed to materialise note for placeholder tile:', e); }
-          })();
-        } else {
-          tileState.canvasMode = 'note';
-          delete tileState.widgetId;
-          delete tileState.widgetConfig;
-          if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
-          refreshTileWidget(tileState.noteId);
-        }
+        tileState.canvasMode = 'note';
+        delete tileState.widgetId;
+        delete tileState.widgetConfig;
+        if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
+        refreshTileWidget(tileState.noteId);
       }
     });
   });
@@ -5578,30 +5446,10 @@ async function showWidgetConfig(widgetId, tileState, existingConfig) {
 
 // ── Apply widget to tile ──────────────────────────────────────────────────
 function applyWidget(widgetId, config, tileState) {
-  // If a real note record backs this tile, delete it — widget tiles have no
-  // institutional knowledge worth preserving in the notes table.
-  const noteId = tileState.noteId;
-  const isPlaceholder = tileState.isPlaceholder || (noteId && noteId.startsWith('ph-'));
-  if (!isPlaceholder && noteId) {
-    // Delete the backing note record silently
-    API.del('notes?id=eq.' + noteId).catch(function(){});
-    // Remove from local _notes array
-    if (typeof _notes !== 'undefined') {
-      _notes = _notes.filter(function(n){ return n.id !== noteId; });
-    }
-    console.log('[Widgets] Deleted backing note for widget tile:', noteId, widgetId);
-  }
-  // Assign a stable synthetic ID for placeholder tiles (never hits the DB)
-  if (isPlaceholder && (!noteId || noteId.startsWith('ph-'))) {
-    tileState.noteId = 'wt-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
-  }
-  tileState.isPlaceholder = false;
-  tileState.canvasMode    = 'widget';
-  tileState.widgetId      = widgetId;
-  tileState.widgetConfig  = config;
+  tileState.canvasMode   = 'widget';
+  tileState.widgetId     = widgetId;
+  tileState.widgetConfig = config;
   if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
-  // Refresh left panel so deleted note disappears from knowledge tree
-  if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
   refreshTileWidget(tileState.noteId);
 }
 
@@ -5735,35 +5583,6 @@ function _widgetCtx() {
   };
 }
 
-// ── Target resolver — shared-view aware ──────────────────────────────────
-// When a viewer opens a shared workspace, widgetConfig.targetResourceId may
-// contain the *owner's* resource ID (saved when the owner configured the tile).
-// The viewer should always see their own data. This helper resolves the correct
-// rid/uid to query, substituting the viewer's own IDs whenever the config ID
-// does not belong to the current user.
-function _resolveTarget(config) {
-  const ctx        = _widgetCtx();
-  const myRid      = ctx.resourceId;
-  const myUid      = ctx.userId;
-  const configRid  = (config && config.targetResourceId) || '';
-  const configUid  = (config && config.targetUserId)     || '';
-
-  // In a shared view, if the saved ID is not ours → use our own IDs
-  if (ctx.isSharedView && configRid && configRid !== myRid) {
-    console.log(P2, '_resolveTarget: shared view — substituting viewer IDs for owner config',
-      { configRid, myRid });
-    return { rid: myRid, uid: myUid };
-  }
-  if (ctx.isSharedView && configUid && configUid !== myUid) {
-    return { rid: myRid, uid: myUid };
-  }
-  // Normal: use config if set, fall back to self
-  return {
-    rid: configRid || myRid,
-    uid: configUid || myUid,
-  };
-}
-
 // ── Startup diagnostics ──────────────────────────────────────────────────
 // Runs once when Phase 2 script is evaluated — catches most timing issues.
 (function _p2Diag() {
@@ -5848,7 +5667,8 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const ctx = _widgetCtx();
-    const { rid, uid } = _resolveTarget(config);
+    const rid = config.targetResourceId || ctx.resourceId;
+    const uid = config.targetUserId     || ctx.userId;
     if (!rid && !uid) return null;
     const today = new Date().toISOString().slice(0,10);
     const cap   = Math.max(1, parseFloat(config.dailyCapacity)||8);
@@ -5916,7 +5736,7 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const ctx   = _widgetCtx();
-    const { rid } = _resolveTarget(config);
+    const rid   = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
     const today = new Date().toISOString().slice(0,10);
     const items = await _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500');
@@ -5962,7 +5782,7 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const ctx   = _widgetCtx();
-    const { uid } = _resolveTarget(config);
+    const uid   = config.targetUserId || ctx.userId;
     if (!uid) return null;
     const today = new Date().toISOString().slice(0,10);
     const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours,loe_hours&limit=500');
@@ -6080,7 +5900,7 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const ctx = _widgetCtx();
-    const { rid } = _resolveTarget(config);
+    const rid = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
 
     const now       = new Date();
@@ -6195,10 +6015,7 @@ window.WIDGET_REGISTRY.register({
 
     // ── 3. Try window._wiItems cache (only when targeting self)
     const configRid = config && config.targetResourceId;
-    const ctx2      = _widgetCtx();
-    // In a shared view the config ID may be the owner's — treat as self
-    const isSelf = !configRid || configRid === rid ||
-                   (ctx2.isSharedView && configRid !== rid);
+    const isSelf    = !configRid || configRid === rid;
     console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
 
     if (isSelf && window._wiItems && window._wiItems.length) {
@@ -6411,10 +6228,7 @@ window.WIDGET_REGISTRY.register({
     if (!rid) { console.warn(W, 'no rid — cannot fetch action items'); return { items:[], today }; }
 
     const configRid = config && config.targetResourceId;
-    const ctx2      = _widgetCtx();
-    // In a shared view the config ID may be the owner's — treat as self
-    const isSelf    = !configRid || configRid === rid ||
-                      (ctx2.isSharedView && configRid !== rid);
+    const isSelf    = !configRid || configRid === rid;
     console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
 
     // ── 2. Try _wiItems cache (my-work populates this with type:'action' entries)
