@@ -886,8 +886,24 @@ function _notesRenderGrid() {
         div.className = 'notes-tile empty';
         div.dataset.rowid = row.id;
         div.dataset.slot  = s;
-        div.innerHTML = '<span class="notes-slot-plus">+</span>';
-        (function(rid, sl) { div.onclick = function() { _notesNew(rid, sl); }; })(row.id, s);
+        div.innerHTML =
+          '<div class="notes-tile-header" style="position:relative">' +
+            '<div class="notes-tile-title" style="color:var(--text3);font-style:italic;cursor:text;flex:1" ' +
+              'data-rowid="' + row.id + '" data-slot="' + s + '" ' +
+              'onclick="event.stopPropagation();_notesNew(this.dataset.rowid,parseInt(this.dataset.slot))">New note…</div>' +
+            '<button class="notes-invite-btn" style="opacity:.2;pointer-events:none">+</button>' +
+            '<button class="notes-tile-ctrl" style="width:20px;height:20px;opacity:.2;pointer-events:none">' +
+              '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14">' +
+              '<path d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V10C14 10.5523 13.5523 11 13 11H9L6 14V11H3C2.44772 11 2 10.5523 2 10V3Z" stroke="#00D2FF" stroke-width="1.3" fill="none"/>' +
+              '</svg></button>' +
+            '<button class="notes-tile-ctrl" style="font-size:13px;opacity:.2;pointer-events:none">◻</button>' +
+            '<button class="notes-tile-ctrl" style="color:rgba(226,75,74,.4);opacity:.2;pointer-events:none">✕</button>' +
+          '</div>' +
+          '<div class="notes-tile-canvas-empty" style="flex:1;cursor:text;display:flex;align-items:center;justify-content:center" ' +
+            'data-rowid="' + row.id + '" data-slot="' + s + '" ' +
+            'onclick="_notesNew(this.dataset.rowid,parseInt(this.dataset.slot))">' +
+            '<span class="notes-slot-plus">+</span>' +
+          '</div>';
       }
       rowDiv.appendChild(div);
     }
