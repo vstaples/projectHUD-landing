@@ -928,11 +928,16 @@ function _notesRenderGrid() {
         div.className = 'notes-tile empty';
         div.dataset.rowid = row.id;
         div.dataset.slot  = s;
+        div.style.cssText = 'display:flex;flex-direction:column;cursor:pointer';
+        (function(rid, sl) {
+          div.onclick = function(e) {
+            if (e.target.closest && e.target.closest('button')) return;
+            if (window._notesNew) window._notesNew(rid, sl);
+          };
+        })(row.id, s);
         div.innerHTML =
           '<div style="padding:6px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15);width:100%;box-sizing:border-box">' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;font-weight:600;color:var(--text2);font-style:italic;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin-right:8px" ' +
-              'data-rowid="' + row.id + '" data-slot="' + s + '" ' +
-              'onclick="event.stopPropagation();_notesNew(this.dataset.rowid,parseInt(this.dataset.slot))">New note…</div>' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;font-weight:600;color:var(--text2);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin-right:8px">New note…</div>' +
             '<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">' +
               '<button class="notes-invite-btn" style="pointer-events:none;opacity:.5">+</button>' +
               '<button class="notes-tile-ctrl" style="width:20px;height:20px;opacity:.5;pointer-events:none">' +
@@ -943,9 +948,7 @@ function _notesRenderGrid() {
               '<button class="notes-tile-ctrl" style="color:rgba(226,75,74,.6);opacity:.5;pointer-events:none">✕</button>' +
             '</div>' +
           '</div>' +
-          '<div class="notes-tile-canvas-empty" ' +
-            'data-rowid="' + row.id + '" data-slot="' + s + '" ' +
-            'onclick="_notesNew(this.dataset.rowid,parseInt(this.dataset.slot))">' +
+          '<div style="flex:1;display:flex;align-items:center;justify-content:center">' +
             '<span class="notes-slot-plus">+</span>' +
           '</div>';
       }
@@ -3616,6 +3619,8 @@ const _origFn = window._notesWireTiles;
 window._notesWireTiles = function() {
   if (typeof _origFn === 'function') _origFn();
   _notesWireTilesCollab();
+  // Widget mode buttons — injected after collab so avatars are in DOM first
+  if (typeof window._notesPostWire === 'function') window._notesPostWire();
 };
 
 // Also stop presence when tile is closed — only if user owns the note
