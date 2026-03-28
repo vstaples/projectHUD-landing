@@ -1688,7 +1688,9 @@ function _notesDiffBlocks(noteId, container, incomingBlocks) {
 
   // Get currently focused block id (if user is typing in this note)
   const focusedEl = document.activeElement;
-  const focusedBlockId = (focusedEl && focusedEl.dataset && focusedEl.dataset.blockid) || null;
+  // activeElement may be the inner textDiv — walk up to find the block element with data-blockid
+  const focusedBlock = focusedEl && (focusedEl.closest ? focusedEl.closest('[data-blockid]') : null);
+  const focusedBlockId = (focusedBlock && focusedBlock.dataset.blockid) || null;
 
   incomingBlocks.forEach(function(incoming) {
     const existing = container.querySelector('[data-blockid="' + incoming.id + '"]');
@@ -1744,21 +1746,19 @@ function _notesCreateBlockEl(noteId, block, readOnly) {
 
   const el = document.createElement('div');
   el.className = 'nbc-block';
-  el.setAttribute('contenteditable', readOnly ? 'false' : 'true');
-  el.setAttribute('spellcheck', 'false');
+  // el is the flex container — not contenteditable itself
   el.dataset.blockid          = block.id;
   el.dataset.noteid           = noteId;
   el.dataset.authorcolor      = block.authorColor      || '';
   el.dataset.authorresourceid = block.authorResourceId || '';
   el.dataset.authorname       = block.authorName       || '';
-  el.textContent        = block.content || '';
 
   el.style.cssText =
     'padding:1px 0;' +
     'border-left:' + (block.authorColor ? '3px solid ' + block.authorColor : 'none') + ';' +
     'padding-left:' + (block.authorColor ? '6px' : '0') + ';';
 
-  // Inner text div — this is what gets contenteditable and receives focus/input
+  // Inner text div — the only contenteditable element
   const textDiv = document.createElement('div');
   textDiv.className = 'nbc-block-text';
   textDiv.setAttribute('contenteditable', readOnly ? 'false' : 'true');
