@@ -1302,7 +1302,9 @@ function _notesTileHTML(note, tileState, readOnly) {
   const canvasReadOnly = readOnly ? ' readonly' : '';
 
   // Block canvas vs textarea — computed before return
-  const useBlocks = typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
+  // Never use block canvas for widget tiles — the widget renderer owns the canvas
+  const _tileIsWidget = tileState && tileState.canvasMode === 'widget';
+  const useBlocks = !_tileIsWidget && typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
   const canvasHtml = useBlocks
     ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
     : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
@@ -4184,9 +4186,14 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
     }
 
     // Migrate note to block format if this is the first participant
+    // Skip widget tiles — they don't use the text canvas
     try {
       const noteForMigrate = typeof _notes !== 'undefined' ? _notes.find(function(n) { return n.id === noteId; }) : null;
-      if (noteForMigrate && !_notesIsBlockFormat(noteForMigrate)) {
+      const _tileState = noteForMigrate && window._notesCv ? (function() {
+        const cv = window._notesCv(); return cv && cv.tiles && cv.tiles.find(function(t) { return t.noteId === noteId; });
+      })() : null;
+      const _isWidget = _tileState && _tileState.canvasMode === 'widget';
+      if (noteForMigrate && !_notesIsBlockFormat(noteForMigrate) && !_isWidget) {
         const ownerResId = window._notesResource && window._notesResource.id;
         const ownerName  = window._notesResource && window._notesResource.name;
         const blocks     = _notesMigrateToBlocks(noteForMigrate.content || '', ownerResId, ownerName);
@@ -4195,7 +4202,6 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
           content_blocks: blocks,
           updated_at:     new Date().toISOString(),
         });
-        // Re-render tiles showing this note
         if (typeof _notesRenderGrid === 'function') _notesRenderGrid();
       }
     } catch(e) { console.warn('[Compass] Block migration error:', e); }
