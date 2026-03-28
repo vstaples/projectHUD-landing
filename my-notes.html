@@ -5890,12 +5890,19 @@ window.WIDGET_REGISTRY.register({
     const _tileH   = (_tileEl && _tileEl.offsetHeight) || container.offsetHeight || 120;
     const bigFont  = Math.min(26, Math.max(16, Math.round(_tileH * 0.18))) + 'px';
 
+    // Compress spacing for small tiles
+    const _isSmall = _tileH < 150;
+    const pad      = _isSmall ? '6px 12px' : '10px 12px';
+    const numMB    = _isSmall ? '4px' : '8px';
+    const barMB    = _isSmall ? '3px' : '5px';
+    const pctMB    = _isSmall ? '4px' : '8px';
+
     container.innerHTML =
-      '<div style="display:flex;flex-direction:column;padding:10px 12px;height:100%;justify-content:space-between;box-sizing:border-box">' +
-        // Header label — fixed small size
-        '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Billable vs Non-Bill</div>' +
-        // Two big numbers — font scales with tile height
-        '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:8px">' +
+      '<div style="display:flex;flex-direction:column;padding:'+pad+';height:100%;justify-content:center;gap:0;box-sizing:border-box">' +
+        // Header label
+        '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:'+numMB+'">Billable vs Non-Bill</div>' +
+        // Two big numbers
+        '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:'+numMB+'">' +
           '<div>' +
             '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:' + billColor + ';line-height:1">' + data.billable + 'h</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">billable</div>' +
@@ -5906,18 +5913,16 @@ window.WIDGET_REGISTRY.register({
           '</div>' +
         '</div>' +
         // Horizontal bar
-        '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:5px">' +
+        '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:'+barMB+'">' +
           '<div style="height:100%;width:' + data.billPct + '%;background:' + billColor + ';border-radius:3px;transition:width .4s"></div>' +
         '</div>' +
         // Percentages
-        '<div style="display:flex;justify-content:space-between;margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:'+pctMB+'">' +
           '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:' + billColor + '">' + data.billPct + '%</span>' +
           '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + data.nonPct + '%</span>' +
         '</div>' +
-        // Total
-        '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text2)">' +
-          data.total + 'h total this week' +
-        '</div>' +
+        // Total — hide on very small tiles
+        (_isSmall ? '' : '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text2)">'+data.total+'h total this week</div>') +
       '</div>';
   }
 });
