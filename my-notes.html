@@ -2367,17 +2367,17 @@ function _notesRenderLibrary() {
   const myName    = (window._notesResource && window._notesResource.name) || 'Me';
   const myRid     = (window._notesResource && window._notesResource.id)   || '';
 
-  // Collect entries — skip shared views (they're not ours to manage)
+  // Collect entries — only views with an explicitly associated person.
+  // Owner's own workspace views (no forResourceName) are not "workflows" 
+  // and should not appear here.
   const entries = [];
   Object.keys(views).forEach(function(vKey) {
     const v = views[vKey];
     if (v._isSharedView) return;
-    const personName = v.forResourceName || myName;
-    const personRid  = v.forResourceId   || myRid;
+    if (!v.forResourceName) return; // skip views with no associated person
+    const personName = v.forResourceName;
+    const personRid  = v.forResourceId || '';
     const initials   = personName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-    // Derive color using the same sequential index as the invite picker.
-    // _inviteResources is sorted last_name.asc and grouped by department —
-    // find where this resource falls in that order to get a consistent index.
     let colorIdx = 0;
     if (window._inviteResources && window._inviteResources.length) {
       const idx = window._inviteResources.findIndex(function(r){ return r.id === personRid; });
@@ -2401,10 +2401,8 @@ function _notesRenderLibrary() {
     groups[e.personName].items.push(e);
   });
 
-  // Sort: owner first, then alphabetical
+  // Sort alphabetically by person name
   const sortedGroups = Object.keys(groups).sort(function(a, b) {
-    if (a === myName) return -1;
-    if (b === myName) return  1;
     return a.localeCompare(b);
   });
 
@@ -2862,8 +2860,16 @@ function _notesRenderViewSwitcher() {
   if (headerUser) {
     let userName = cv.forResourceName || null;
 
-    // Fallback: derive from widget tile configs (for dashboards cloned before
-    // forResourceName stamping was added, or configured via the gear dialog)
+    // Fallback 1: resolve from forResourceId if name not yet stamped
+    if (!userName && cv.forResourceId && window._inviteResources && window._inviteResources.length) {
+      const res = window._inviteResources.find(function(r){ return r.id === cv.forResourceId; });
+      if (res) {
+        userName = res.name;
+        cv.forResourceName = res.name; // back-fill
+      }
+    }
+
+    // Fallback 2: scan widget tile configs for a non-empty targetResourceId
     if (!userName && window._inviteResources && window._inviteResources.length) {
       const widgetTile = (cv.tiles || []).find(function(t) {
         return t.canvasMode === 'widget' && t.widgetConfig &&
@@ -2871,13 +2877,10 @@ function _notesRenderViewSwitcher() {
       });
       if (widgetTile) {
         const rid = widgetTile.widgetConfig.targetResourceId;
-        const myRid = window._notesResource && window._notesResource.id;
-        // Only show if it's targeting someone other than the logged-in user
-        if (rid && rid !== myRid) {
+        if (rid) {
           const res = window._inviteResources.find(function(r){ return r.id === rid; });
           if (res) {
             userName = res.name;
-            // Back-fill so future renders skip the lookup
             cv.forResourceName = res.name;
             cv.forResourceId   = res.id;
           }
