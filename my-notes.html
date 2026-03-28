@@ -910,6 +910,11 @@ function _notesRowDelete(rowId) {
 }
 
 function _notesWireRowDrag(bar) {
+  // Create insertion indicator bar
+  const indicator = document.createElement('div');
+  indicator.style.cssText = 'width:2px;background:#00D2FF;height:28px;border-radius:1px;flex-shrink:0;display:none;box-shadow:0 0 6px rgba(0,210,255,.6)';
+  indicator.id = 'nre-indicator';
+
   bar.querySelectorAll('.nre-grip').forEach(function(grip) {
     grip.style.cursor = 'grab';
     grip.addEventListener('mousedown', function(e) {
@@ -918,52 +923,67 @@ function _notesWireRowDrag(bar) {
       e.preventDefault();
       e.stopPropagation();
 
-      let dragging   = seg.dataset.rowId;
-      let dragEl     = seg;
-      let lastTarget = null;
+      const dragging = seg.dataset.rowId;
       seg.style.opacity = '0.5';
+      indicator.style.display = 'block';
+      bar.appendChild(indicator); // start at end
+
+      function getSorted() {
+        return Array.from(bar.querySelectorAll('.nre-row'));
+      }
 
       function onMove(ev) {
-        const els = Array.from(bar.querySelectorAll('.nre-row'));
-        let closest = null, closestDist = Infinity;
-        els.forEach(function(el) {
-          if (el.dataset.rowId === dragging) return;
-          const r    = el.getBoundingClientRect();
-          const mid  = r.left + r.width / 2;
-          const dist = Math.abs(ev.clientX - mid);
-          if (dist < closestDist) { closestDist = dist; closest = el; }
-        });
-        // Visual reorder — move DOM element without saving
-        els.forEach(function(el) { el.style.outline = ''; });
-        if (closest && closestDist < 150) {
-          closest.style.outline = '1px solid rgba(0,210,255,.6)';
-          lastTarget = closest;
-          // Move dragEl before or after closest based on position
-          const r = closest.getBoundingClientRect();
+        const els = getSorted();
+        // Find insertion point based on mouse X
+        let insertBefore = null;
+        for (const el of els) {
+          if (el.dataset.rowId === dragging) continue;
+          const r = el.getBoundingClientRect();
           if (ev.clientX < r.left + r.width / 2) {
-            bar.insertBefore(dragEl, closest);
-          } else {
-            closest.after ? closest.after(dragEl) : bar.insertBefore(dragEl, closest.nextSibling);
+            insertBefore = el;
+            break;
           }
+        }
+        // Position indicator
+        if (insertBefore) {
+          bar.insertBefore(indicator, insertBefore);
+        } else {
+          // After last non-dragging element
+          const last = els.filter(el => el.dataset.rowId !== dragging).pop();
+          if (last) last.after ? last.after(indicator) : bar.appendChild(indicator);
+          else bar.appendChild(indicator);
         }
       }
 
-      function onUp() {
+      function onUp(ev) {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        bar.querySelectorAll('.nre-row').forEach(function(el) { el.style.outline = ''; });
-        if (dragEl) dragEl.style.opacity = '';
+        seg.style.opacity = '';
+        indicator.style.display = 'none';
 
-        // Read final order from DOM and save to state
-        const cv       = _cv();
-        const domOrder = Array.from(bar.querySelectorAll('.nre-row')).map(function(el) { return el.dataset.rowId; });
-        const rowMap   = {};
+        // Read insertion point from indicator position
+        const cv      = _cv();
+        const rowMap  = {};
         cv.rows.forEach(function(r) { rowMap[r.id] = r; });
-        const reordered = domOrder.map(function(id) { return rowMap[id]; }).filter(Boolean);
-        if (reordered.length === cv.rows.length) {
-          cv.rows = reordered;
+
+        // Build new order: all rows in DOM order, indicator marks where dragged row goes
+        const allSegs = Array.from(bar.children); // includes indicator
+        const newOrder = [];
+        let draggedRow = rowMap[dragging];
+        for (const el of allSegs) {
+          if (el === indicator) { if (draggedRow) newOrder.push(draggedRow); }
+          else if (el.dataset && el.dataset.rowId && el.dataset.rowId !== dragging) {
+            const r = rowMap[el.dataset.rowId];
+            if (r) newOrder.push(r);
+          }
+        }
+        // Remove indicator from bar
+        if (indicator.parentNode === bar) bar.removeChild(indicator);
+
+        if (newOrder.length === cv.rows.length) {
+          cv.rows = newOrder;
           _notesSaveWorkspace(true);
-          _notesRenderGrid(); // now safe to full re-render
+          _notesRenderGrid();
         }
       }
 
@@ -1946,8 +1966,23 @@ function _notesDndInit() {
     e.preventDefault();
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    const dropTile = e.target?.closest?.('.notes-tile');
-    if (!dropTile || dropTile.closest('#notes-left')) return;
+    // Must be dropping into the grid area (not left panel)
+    if (!e.target?.closest?.('#notes-grid-area') || e.target?.closest?.('#notes-left')) return;
+    let dropTile = e.target?.closest?.('.notes-tile');
+
+    // If dropped on grid area background (not a tile), use _notesOpenNote to find first empty slot
+    if (!dropTile) {
+      const draggedNote2 = _notes.find(n => n.id === _dragNoteId);
+      const eid = (draggedNote2?.is_inbox && draggedNote2?.entity_id) ? draggedNote2.entity_id : _dragNoteId;
+      if (eid !== _dragNoteId && !_notes.find(n => n.id === eid)) {
+        try { const r = await API.get('notes?id=eq.' + eid + '&limit=1').catch(()=>[]); if (r?.[0]) _notes.push(r[0]); } catch(ex) {}
+      }
+      _cv().tray = _cv().tray.filter(id => id !== eid && id !== _dragNoteId);
+      _notesOpenNote(eid);
+      _notesSaveWorkspace(true); _notesRenderLeft();
+      _dragNoteId = null; _dragSlot = null; _dragRowId = null;
+      return;
+    }
 
     const targetRowId  = dropTile.dataset.rowid || null;
     const targetSlot   = dropTile.dataset.slot !== undefined ? parseInt(dropTile.dataset.slot) : 0;
