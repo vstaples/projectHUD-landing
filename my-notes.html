@@ -5075,8 +5075,14 @@ const WIDGET_REGISTRY = (function() {
       const widget = _widgets[widgetId];
       if (!widget) { container.innerHTML = '<div class="widget-error">Unknown widget: ' + _esc(widgetId) + '</div>'; return; }
       try {
+        const prevHTML = container.innerHTML;
         container.innerHTML = '<div class="widget-loading">Loading\u2026</div>';
         const data = await widget.dataFn(config, context);
+        // If dataFn returns null (e.g. missing context), restore previous content and abort
+        if (data === null || data === undefined) {
+          container.innerHTML = prevHTML;
+          return;
+        }
         container.innerHTML = '';
         widget.renderFn(data, container, config);
       } catch(err) {
@@ -5090,11 +5096,13 @@ window.WIDGET_REGISTRY = WIDGET_REGISTRY;
 
 // ── Widget context ────────────────────────────────────────────────────────
 function _widgetContext() {
+  const _res = window._notesResource || {};
   return {
-    firmId:   FIRM_ID,
-    userId:   window._notesResource && window._notesResource.user_id,
-    resource: window._notesResource,
-    api:      window.API || window._notesAPI,
+    firmId:     FIRM_ID,
+    userId:     _res.user_id   || null,
+    resourceId: _res.id        || null,
+    resource:   _res,
+    api:        window.API || window._notesAPI,
   };
 }
 
@@ -5841,6 +5849,11 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
+    // Wait for _notesResource to be available (it may not be on very first load)
+    let _waitMs = 0;
+    while (!window._notesResource && _waitMs < 3000) {
+      await new Promise(function(res){setTimeout(res,100);}); _waitMs+=100;
+    }
     const ctx  = (typeof _widgetCtx==='function' ? _widgetCtx() : null) ||
                  (window._widgetContext && window._widgetContext()) ||
                  { firmId:'aaaaaaaa-0001-0001-0001-000000000001',
@@ -5958,6 +5971,10 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
+    let _waitMs = 0;
+    while (!window._notesResource && _waitMs < 3000) {
+      await new Promise(function(res){setTimeout(res,100);}); _waitMs+=100;
+    }
     const ctx = (typeof _widgetCtx==='function' ? _widgetCtx() : null) ||
                 (window._widgetContext && window._widgetContext()) ||
                 { firmId:'aaaaaaaa-0001-0001-0001-000000000001',
