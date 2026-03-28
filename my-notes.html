@@ -3908,34 +3908,109 @@ function showWidgetPicker(tileState) {
 }
 
 // ── Widget config form ────────────────────────────────────────────────────
-function showWidgetConfig(widgetId, tileState, existingConfig) {
+async function showWidgetConfig(widgetId, tileState, existingConfig) {
   const widget = WIDGET_REGISTRY.get(widgetId);
   if (!widget) return;
+
+  // Pre-load resources for any resource_picker fields
+  const hasResourcePicker = (widget.configSchema||[]).some(function(f) { return f.type === 'resource_picker'; });
+  if (hasResourcePicker && window._notesLoadInviteResources) {
+    await window._notesLoadInviteResources();
+  }
+
+  // Pre-load projects for any project_picker fields
+  let _wcfProjects = [];
+  const hasProjectPicker = (widget.configSchema||[]).some(function(f) { return f.type === 'project_picker'; });
+  if (hasProjectPicker) {
+    try {
+      const api = window.API || window._notesAPI;
+      const rows = api ? await api.get('workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=100').catch(function(){return[];}) : [];
+      const seen = {};
+      _wcfProjects = (rows||[]).filter(function(r) {
+        if (!r.project_id || seen[r.project_id]) return false;
+        seen[r.project_id] = true; return true;
+      }).map(function(r) { return { id: r.project_id, name: r.title }; });
+    } catch(e) {}
+  }
+
+  // Per-field config values — resource_picker uses resource_id, display separately
+  const configValues = {};
+  (widget.configSchema||[]).forEach(function(f) {
+    configValues[f.key] = existingConfig[f.key] !== undefined ? existingConfig[f.key] : (f.default || '');
+  });
 
   const overlay = document.createElement('div');
   overlay.className = 'widget-config-overlay';
 
   const fields = (widget.configSchema || []).map(function(field) {
-    const val = existingConfig[field.key] !== undefined ? existingConfig[field.key] : (field.default || '');
+    const val = configValues[field.key];
     let input = '';
+
     if (field.type === 'select') {
       input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '">' +
         (field.options||[]).map(function(o) {
           return '<option value="' + _esc(o.value) + '"' + (o.value == val ? ' selected' : '') + '>' + _esc(o.label) + '</option>';
-        }).join('') +
-      '</select>';
+        }).join('') + '</select>';
+
     } else if (field.type === 'boolean') {
       input = '<input type="checkbox" class="wcf-input" data-key="' + _esc(field.key) + '"' + (val ? ' checked' : '') + ' style="width:auto"/>';
+
     } else if (field.type === 'project_picker') {
-      // Rendered async — placeholder replaced after fetch
-      input = '<select class="ntd-select wcf-input wcf-project-sel" data-key="' + _esc(field.key) + '" data-val="' + _esc(String(val)) + '" style="width:100%">' +
-        '<option value="">Loading projects…</option>' +
+      input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '" style="width:100%">' +
+        '<option value="">— Select project —</option>' +
+        _wcfProjects.map(function(p) {
+          return '<option value="' + _esc(p.id) + '"' + (p.id === val ? ' selected' : '') + '>' + _esc(p.name) + '</option>';
+        }).join('') +
       '</select>';
+
     } else if (field.type === 'resource_picker') {
-      // Placeholder replaced after async load
-      input = '<select class="ntd-select wcf-input wcf-resource-sel" data-key="' + _esc(field.key) + '" data-val="' + _esc(String(val)) + '" style="width:100%">' +
-        '<option value="">Loading…</option>' +
-      '</select>';
+      const resources = (window._notesGetInviteResources && window._notesGetInviteResources()) || [];
+      const selfRes   = window._notesResource;
+      const selfName  = selfRes ? (selfRes.name || 'Me') : 'Me';
+      // Group by department — same as invite popover
+      const groups = {};
+      resources.forEach(function(r) {
+        if (!r.id) return;
+        const dept = r.department || 'Other';
+        (groups[dept] = groups[dept] || []).push(r);
+      });
+      const selfSelected = !val || val === '';
+
+      // Render as a styled searchable list embedded in the form
+      input =
+        '<div class="wcf-resource-picker" data-key="' + _esc(field.key) + '" style="border:1px solid rgba(0,210,255,.15);background:rgba(0,0,0,.2)">' +
+          '<div style="padding:4px 8px;border-bottom:1px solid rgba(0,210,255,.1)">' +
+            '<input class="ntd-input wcf-res-search" placeholder="Search by name or department…" style="margin:0;border:none;background:transparent;padding:3px 0" autocomplete="off"/>' +
+          '</div>' +
+          '<div class="wcf-res-list" style="max-height:180px;overflow-y:auto">' +
+            // Me option
+            '<div class="wcf-res-row' + (selfSelected ? ' wcf-res-selected' : '') + '" data-resid="" data-resname="' + _esc(selfName) + '" ' +
+              'style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;' + (selfSelected ? 'background:rgba(0,210,255,.1)' : '') + '">' +
+              '<div style="width:24px;height:24px;border-radius:50%;background:rgba(0,210,255,.2);border:1px solid rgba(0,210,255,.4);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#00D2FF;flex-shrink:0">ME</div>' +
+              '<span style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text1)">Me (default)</span>' +
+            '</div>' +
+            // Resources grouped by department
+            Object.keys(groups).map(function(dept) {
+              return '<div style="padding:3px 10px 2px;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;background:rgba(0,0,0,.2)" data-dept-hdr>' +
+                _esc(dept) + '</div>' +
+                groups[dept].map(function(r) {
+                  const initials = (r.name||'').split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
+                  const isSelected = r.id === val;
+                  return '<div class="wcf-res-row' + (isSelected ? ' wcf-res-selected' : '') + '" data-resid="' + _esc(r.id) + '" data-resname="' + _esc(r.name) + '" ' +
+                    'style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;' + (isSelected ? 'background:rgba(0,210,255,.1)' : '') + '">' +
+                    '<div style="width:24px;height:24px;border-radius:50%;background:rgba(0,210,255,.15);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#00D2FF;flex-shrink:0">' + _esc(initials) + '</div>' +
+                    '<div style="min-width:0">' +
+                      '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(r.name) + '</div>' +
+                      '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(r.email||'') + '</div>' +
+                    '</div>' +
+                  '</div>';
+                }).join('');
+            }).join('') +
+          '</div>' +
+          // Hidden input that holds the actual value for Apply to read
+          '<input type="hidden" class="wcf-input wcf-res-val" data-key="' + _esc(field.key) + '" value="' + _esc(String(val)) + '"/>' +
+        '</div>';
+
     } else {
       input = '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" type="' + (field.type === 'number' ? 'number' : 'text') + '" value="' + _esc(String(val)) + '" placeholder="' + _esc(field.label) + '"/>';
     }
@@ -3957,41 +4032,41 @@ function showWidgetConfig(widgetId, tileState, existingConfig) {
 
   document.body.appendChild(overlay);
 
-  // Populate project pickers async
-  overlay.querySelectorAll('.wcf-project-sel').forEach(function(sel) {
-    const savedVal = sel.dataset.val || '';
-    const api = window.API || window._notesAPI;
-    if (!api) { sel.innerHTML = '<option value="">No API available</option>'; return; }
-    api.get('workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=100').catch(function(){ return []; }).then(function(rows) {
-      // Deduplicate by project_id, use title as name
-      const seen = {};
-      const projects = (rows || []).filter(function(r) {
-        if (!r.project_id || seen[r.project_id]) return false;
-        seen[r.project_id] = true; return true;
-      }).map(function(r) { return { id: r.project_id, name: r.title }; });
-      if (!projects.length) {
-        sel.innerHTML = '<option value="">No active projects</option>';
-      } else {
-        sel.innerHTML = '<option value="">— Select project —</option>' +
-          projects.map(function(p) {
-            return '<option value="' + _esc(p.id) + '"' + (p.id === savedVal ? ' selected' : '') + '>' + _esc(p.name) + '</option>';
-          }).join('');
-      }
-    });
-  });
+  // Wire resource picker rows — click to select
+  overlay.querySelectorAll('.wcf-resource-picker').forEach(function(picker) {
+    const hiddenInput = picker.querySelector('.wcf-res-val');
+    const searchInput = picker.querySelector('.wcf-res-search');
+    const list        = picker.querySelector('.wcf-res-list');
 
-  // Populate resource pickers async
-  overlay.querySelectorAll('.wcf-resource-sel').forEach(function(sel) {
-    const savedVal = sel.dataset.val || '';
-    var loadFn = window._notesLoadInviteResources;
-    var getFn  = window._notesGetInviteResources;
-    if (!loadFn) { sel.innerHTML = '<option value="">— Me (default) —</option>'; return; }
-    loadFn().then(function() {
-      const resources = (getFn && getFn()) || [];
-      sel.innerHTML = '<option value="">— Me (default) —</option>' +
-        resources.filter(function(r) { return r.id && r.name; }).map(function(r) {
-          return '<option value="' + _esc(r.id) + '"' + (r.id === savedVal ? ' selected' : '') + '>' + _esc(r.name) + '</option>';
-        }).join('');
+    function selectRow(row) {
+      picker.querySelectorAll('.wcf-res-row').forEach(function(r) {
+        r.style.background = '';
+        r.classList.remove('wcf-res-selected');
+      });
+      row.style.background = 'rgba(0,210,255,.1)';
+      row.classList.add('wcf-res-selected');
+      hiddenInput.value = row.dataset.resid || '';
+    }
+
+    list.querySelectorAll('.wcf-res-row').forEach(function(row) {
+      row.addEventListener('click', function() { selectRow(row); });
+      row.addEventListener('mouseover', function() { if (!row.classList.contains('wcf-res-selected')) row.style.background = 'rgba(0,210,255,.05)'; });
+      row.addEventListener('mouseout',  function() { if (!row.classList.contains('wcf-res-selected')) row.style.background = ''; });
+    });
+
+    // Search filter
+    searchInput.addEventListener('input', function() {
+      const q = searchInput.value.toLowerCase().trim();
+      list.querySelectorAll('.wcf-res-row').forEach(function(row) {
+        row.style.display = (!q || (row.dataset.resname||'').toLowerCase().includes(q)) ? '' : 'none';
+      });
+      list.querySelectorAll('[data-dept-hdr]').forEach(function(hdr) {
+        const next = hdr.nextElementSibling;
+        const anyVisible = Array.from(hdr.parentElement.querySelectorAll('.wcf-res-row')).some(function(r) {
+          return r.previousElementSibling === hdr || (r.style.display !== 'none');
+        });
+        hdr.style.display = q ? 'none' : '';
+      });
     });
   });
 
@@ -4001,7 +4076,7 @@ function showWidgetConfig(widgetId, tileState, existingConfig) {
     const config = {};
     overlay.querySelectorAll('.wcf-input').forEach(function(inp) {
       if (inp.type === 'checkbox') config[inp.dataset.key] = inp.checked;
-      else config[inp.dataset.key] = inp.value;
+      else if (inp.dataset.key) config[inp.dataset.key] = inp.value;
     });
     overlay.remove();
     applyWidget(widgetId, config, tileState);
