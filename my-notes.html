@@ -5843,9 +5843,10 @@ window.WIDGET_REGISTRY.register({
     const ctx  = _widgetCtx();
     const rid  = config.targetResourceId || ctx.resourceId;
     if (!rid) return null;
-    // Resolve user_id from resource_id (tasks use assigned_to = user_id)
-    const resources = await _wApi('resources?id=eq.'+rid+'&select=id,user_id&limit=1');
-    const userId = (Array.isArray(resources) && resources[0]) ? resources[0].user_id : null;
+    // Resolve user_id from resource_id using shared _resources global (tasks use assigned_to = user_id)
+    const _resList = window._resources || [];
+    const _res = _resList.find(function(r){ return r.id === rid; });
+    const userId = (_res && _res.user_id) ? _res.user_id : null;
     if (!userId) return { tasks:[], today:new Date().toISOString().slice(0,10), noUser:true };
     const today = new Date().toISOString().slice(0,10);
     const tasks = await _wApi(
