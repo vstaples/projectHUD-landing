@@ -311,6 +311,11 @@
           style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
           onmouseover="this.style.color='#00D2FF'" onmouseout="this.style.color=''"
           >✎</button>
+        <button onclick="window._notesDeleteView && window._notesDeleteView()"
+          title="Delete current view"
+          style="background:none;border:none;color:rgba(226,75,74,.3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
+          onmouseover="this.style.color='#E24B4A'" onmouseout="this.style.color='rgba(226,75,74,.3)'"
+          >✕</button>
       </div>
       <button class="notes-grid-btn" onclick="_notesNewView()" title="New view"
         >+ View</button>
@@ -1689,23 +1694,210 @@ function _notesDeleteTemplate(name) {
   });
 }
 
-function _notesLaunchTemplate(name) {
+async function _notesLaunchTemplate(name) {
   const tpl = (_workspace.library || {})[name];
   if (!tpl) return;
-  const base = name + ' \u2014 ' + new Date().toLocaleDateString();
+  const params = tpl.parameters || [];
+
+  await _notesLoadInviteResources();
+  const allResources = _inviteResources || [];
+  const selectedInvitees = [];
+  let colorIdx = 0;
+  const COLORS = ['#4A9EFF','#FF6B6B','#4ECDC4','#FFE66D','#A8E6CF','#FF8B94','#C3A6FF','#FFB347'];
+
+  const overlay = document.createElement('div');
+  overlay.className = 'ntd-overlay';
+
+  function renderOverlay() {
+    const selfId = window._notesResource && window._notesResource.user_id;
+    const chipsHtml = selectedInvitees.length
+      ? selectedInvitees.map(function(inv) {
+          const key = inv.user_id || inv.resource_id;
+          return '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);padding:2px 6px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text1)">' +
+            '<span style="width:7px;height:7px;border-radius:50%;background:' + inv.color + ';flex-shrink:0"></span>' +
+            _esc(inv.name) +
+            '<button data-remove="' + _esc(key) + '" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:0 0 0 3px;font-size:11px;line-height:1">×</button>' +
+          '</span>';
+        }).join('')
+      : '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">No invitees — will be your view only</span>';
+
+    overlay.innerHTML =
+      '<div class="ntd-dialog" style="width:460px;max-height:86vh;display:flex;flex-direction:column">' +
+        '<div class="ntd-header">' +
+          '<div class="ntd-sub">Launch Template</div>' +
+          '<div class="ntd-title">' + _esc(name) + '</div>' +
+        '</div>' +
+        '<div class="ntd-body" style="overflow-y:auto;flex:1;gap:10px;display:flex;flex-direction:column">' +
+          (tpl.description ? '<div style="font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text3)">' + _esc(tpl.description) + '</div>' : '') +
+          '<div class="ntd-field"><label class="ntd-label">View name</label>' +
+            '<input class="ntd-input" id="ntd-launch-viewname" value="' + _esc(name) + '"/>' +
+          '</div>' +
+          params.map(function(p) {
+            const label = p.replace(/([A-Z])/g,' $1').replace(/^./,function(s){return s.toUpperCase();});
+            return '<div class="ntd-field"><label class="ntd-label">' + _esc(label) + '</label>' +
+              '<input class="ntd-input ntd-param-input" data-param="' + _esc(p) + '" placeholder="' + _esc(label) + '…"/></div>';
+          }).join('') +
+          '<div class="ntd-field">' +
+            '<label class="ntd-label" style="margin-bottom:6px">Invite to this view</label>' +
+            '<div id="ntd-chips" style="display:flex;flex-wrap:wrap;gap:5px;min-height:20px;margin-bottom:7px">' + chipsHtml + '</div>' +
+            '<input class="ntd-input" id="ntd-inv-search" placeholder="Search by name or department…" autocomplete="off"/>' +
+            '<div id="ntd-inv-results" style="display:none;max-height:150px;overflow-y:auto;border:1px solid rgba(0,210,255,.12);margin-top:3px"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ntd-actions">' +
+          '<button class="ntd-btn ntd-btn-cancel" id="ntd-lcancel">Cancel</button>' +
+          '<button class="ntd-btn ntd-btn-save" id="ntd-llaunch">Launch</button>' +
+        '</div>' +
+      '</div>';
+
+    // Wire remove chips
+    overlay.querySelectorAll('[data-remove]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const key = btn.dataset.remove;
+        const i = selectedInvitees.findIndex(function(x) { return (x.user_id||x.resource_id) === key; });
+        if (i >= 0) { selectedInvitees.splice(i,1); renderOverlay(); }
+      });
+    });
+
+    // Wire search
+    const searchEl  = overlay.querySelector('#ntd-inv-search');
+    const resultsEl = overlay.querySelector('#ntd-inv-results');
+    const selectedIds = new Set(selectedInvitees.map(function(x){ return x.user_id||x.resource_id; }));
+
+    function renderResults(q) {
+      const lower = (q||'').toLowerCase().trim();
+      const filtered = allResources.filter(function(r) {
+        if (!r.id || r.user_id === selfId) return false;
+        if (selectedIds.has(r.user_id) || selectedIds.has(r.id)) return false;
+        if (!lower) return true;
+        return (r.name||'').toLowerCase().includes(lower) ||
+               (r.department||'').toLowerCase().includes(lower) ||
+               (r.email||'').toLowerCase().includes(lower);
+      }).slice(0,10);
+
+      if (!filtered.length) {
+        resultsEl.innerHTML = '<div style="padding:7px 10px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + (lower ? 'No results' : 'Type to search') + '</div>';
+        resultsEl.style.display = 'block'; return;
+      }
+      const groups = {};
+      filtered.forEach(function(r){ const d=r.department||'Other'; (groups[d]=groups[d]||[]).push(r); });
+      let html = '';
+      Object.keys(groups).forEach(function(dept) {
+        html += '<div style="padding:3px 10px 2px;font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;background:rgba(0,0,0,.25)">' + _esc(dept) + '</div>';
+        groups[dept].forEach(function(r) {
+          html += '<div class="ntd-inv-row" data-rid="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '" data-name="' + _esc(r.name) + '"' +
+            ' style="padding:5px 10px;cursor:pointer;transition:background .1s">' +
+            '<div style="font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text1)">' + _esc(r.name) + '</div>' +
+            '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + _esc(r.email||'') + '</div>' +
+          '</div>';
+        });
+      });
+      resultsEl.innerHTML = html;
+      resultsEl.style.display = 'block';
+
+      resultsEl.querySelectorAll('.ntd-inv-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+          const color = COLORS[colorIdx++ % COLORS.length];
+          selectedInvitees.push({ resource_id:row.dataset.rid, user_id:row.dataset.uid||null, name:row.dataset.name, color:color });
+          selectedIds.add(row.dataset.uid||row.dataset.rid);
+          searchEl.value = '';
+          resultsEl.style.display = 'none';
+          renderOverlay();
+        });
+      });
+    }
+
+    searchEl.addEventListener('input',  function(){ renderResults(searchEl.value); });
+    searchEl.addEventListener('focus',  function(){ renderResults(searchEl.value); });
+    document.addEventListener('mousedown', function _hide(e){
+      if (!overlay.contains(e.target)) return;
+      if (!resultsEl.contains(e.target) && e.target !== searchEl) { resultsEl.style.display='none'; document.removeEventListener('mousedown',_hide); }
+    });
+
+    overlay.querySelector('#ntd-lcancel').onclick = function(){ overlay.remove(); };
+    overlay.querySelector('#ntd-llaunch').onclick = function(){
+      const paramVals = {};
+      overlay.querySelectorAll('.ntd-param-input').forEach(function(inp){ paramVals[inp.dataset.param]=inp.value.trim(); });
+      const viewName = overlay.querySelector('#ntd-launch-viewname').value.trim() || name;
+      overlay.remove();
+      _notesLaunchTemplateNow(name, paramVals, viewName, selectedInvitees);
+    };
+    overlay.addEventListener('keydown', function(e){ if(e.key==='Escape') overlay.remove(); });
+  }
+
+  renderOverlay();
+  document.body.appendChild(overlay);
+  setTimeout(function(){ const vn=overlay.querySelector('#ntd-launch-viewname'); if(vn) vn.focus(); }, 50);
+}
+
+async function _notesLaunchTemplateNow(templateName, paramVals, requestedViewName, invitees) {
+  const tpl = (_workspace.library || {})[templateName];
+  if (!tpl) return;
+  invitees = invitees || [];
+
+  const base = requestedViewName || templateName;
   let viewName = base; let idx = 2;
   while (_workspace.views[viewName]) { viewName = base + ' (' + idx++ + ')'; }
+
   _workspace.views[viewName] = {
-    rows: JSON.parse(JSON.stringify(tpl.rows || [])),
-    tiles: JSON.parse(JSON.stringify(tpl.tiles || [])),
-    tray: [], clonedFrom: name, createdAt: new Date().toISOString(),
+    rows:       JSON.parse(JSON.stringify(tpl.rows  || [])),
+    tiles:      JSON.parse(JSON.stringify(tpl.tiles || [])),
+    tray:       [],
+    clonedFrom: templateName,
+    parameters: paramVals,
+    createdAt:  new Date().toISOString(),
   };
   _workspace.activeView = viewName;
   _notesSaveWorkspace(true);
   _notesRenderGrid(); _notesRenderLeft(); _notesRenderViewSwitcher();
+
+  // Notify each invitee via inbox
+  if (invitees.length) {
+    const myName = (window._notesResource && window._notesResource.name) || 'Someone';
+    for (var i = 0; i < invitees.length; i++) {
+      var inv = invitees[i];
+      if (!inv.user_id) continue;
+      try {
+        await API.post('notes', {
+          firm_id: FIRM_ID, owner_user_id: inv.user_id,
+          title:   myName + ' invited you to view: ' + viewName,
+          content: myName + ' shared the view “' + viewName + '” with you (from template “' + templateName + '”).',
+          hierarchy_path: 'Inbox', is_inbox: true,
+          entity_id: null, entity_type: null,
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        });
+      } catch(e) { console.warn('[Compass] View invite failed:', e); }
+    }
+  }
 }
 
 // ── View management ──────────────────────────────────────────────────────
+function _notesDeleteView() {
+  const cur   = _workspace.activeView;
+  const views = Object.keys(_workspace.views);
+  if (views.length <= 1) {
+    // Can't delete last view — show styled info dialog
+    _notesConfirmDialog(
+      'Cannot Delete', '"' + cur + '"',
+      'You must have at least one view. Create another view before deleting this one.',
+      'OK', 'rgba(0,210,255,.4)', '#00D2FF', 'rgba(0,210,255,.08)'
+    );
+    return;
+  }
+  _notesConfirmDialog(
+    'Delete View', '“' + cur + '”',
+    'All tiles will be removed from this view. Notes in your Knowledge Tree are not affected.',
+    'Delete', 'rgba(226,75,74,.4)', '#E24B4A', 'rgba(226,75,74,.08)'
+  ).then(function(confirmed) {
+    if (!confirmed) return;
+    delete _workspace.views[cur];
+    // Switch to first remaining view
+    _workspace.activeView = Object.keys(_workspace.views)[0];
+    _notesSaveWorkspace(true);
+    _notesRenderGrid(); _notesRenderLeft(); _notesRenderViewSwitcher();
+  });
+}
+
 function _notesRenderViewSwitcher() {
   const sel  = document.getElementById('notes-view-switcher');
   const name = document.getElementById('notes-view-name');
@@ -2502,6 +2694,8 @@ async function _notesDeleteTreeNote(noteId) {
 window._notesDeleteTreeNote    = _notesDeleteTreeNote;
 window._notesSaveAsTemplate        = _notesSaveAsTemplate;
 window._notesShowRenameViewDialog  = _notesShowRenameViewDialog;
+window._notesDeleteView            = _notesDeleteView;
+window._notesLaunchTemplate        = _notesLaunchTemplate;
 window._notesDeleteTemplate    = _notesDeleteTemplate;
 window._notesLaunchTemplate    = _notesLaunchTemplate;
 
