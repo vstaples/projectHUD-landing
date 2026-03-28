@@ -2004,8 +2004,9 @@ function _notesDndInit() {
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     // Must be dropping into the grid area (not left panel)
-    if (!e.target?.closest?.('#notes-grid-area') || e.target?.closest?.('#notes-left')) return;
+    if (!e.target?.closest?.('#notes-grid-area') || e.target?.closest?.('#notes-left')) { console.log('[DROP] bailed — not in grid area'); return; }
     let dropTile = e.target?.closest?.('.notes-tile');
+    console.log('[DROP] dropTile:', dropTile?.className, 'empty:', dropTile?.classList.contains('empty'));
 
     // If dropped on grid area background (not a tile), use _notesOpenNote to find first empty slot
     if (!dropTile) {
