@@ -2000,6 +2000,7 @@ function _notesDndInit() {
     // Recover noteId from dataTransfer in case _dragNoteId was cleared by mouseup
     const transferredId = e.dataTransfer.getData('application/noteid') || e.dataTransfer.getData('text/plain');
     if (!_dragNoteId && transferredId) _dragNoteId = transferredId;
+    console.log('[DROP] _dragNoteId:', _dragNoteId, '_leftDragActive:', _leftDragActive, 'inGrid:', !!e.target?.closest?.('#notes-grid-area'));
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     // Must be dropping into the grid area (not left panel)
