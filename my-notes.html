@@ -1582,6 +1582,44 @@ async function _notesNew(rowId, slot) {
 
 // ── Block utilities ───────────────────────────────────────────────────────
 
+// Returns the current user's attribution color for a given note.
+// Checks note_participants first (note-level collab), then view_participants
+// (view-level sharing) as fallback. Returns null for the note owner (no color).
+function _notesGetMyColor(noteId) {
+  const curResId = window._notesResource && window._notesResource.id;
+  const curUserId = window._notesResource && window._notesResource.user_id;
+
+  // 1. Check note_participants cache (Block 2 export)
+  const noteParts = window._notesGetParticipants && window._notesGetParticipants(noteId);
+  if (noteParts && noteParts.length) {
+    const myNotePart = noteParts.find(function(p) {
+      return p.resource_id === curResId || p.user_id === curUserId;
+    });
+    if (myNotePart) return myNotePart.color || null;
+  }
+
+  // 2. Fall back to view_participants for the active shared view
+  const activeView = window._workspace && window._workspace.views && window._workspace.views[window._workspace.activeView];
+  if (activeView && activeView._isSharedView && activeView._sharedOwner) {
+    const vpParts = window._notesGetViewParticipants
+      ? window._notesGetViewParticipants(activeView._sharedOwner, activeView._sharedViewName)
+      : [];
+    const myVpPart = vpParts.find(function(p) {
+      return p.user_id === curUserId;
+    });
+    if (myVpPart && myVpPart.color) return myVpPart.color;
+    // Assign a consistent color from PARTICIPANT_COLORS based on user position
+    // Use a deterministic index based on user_id to keep color stable
+    const COLORS = ['#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'];
+    if (curUserId) {
+      const idx = parseInt(curUserId.replace(/-/g,'').slice(-4), 16) % COLORS.length;
+      return COLORS[idx];
+    }
+  }
+  return null;
+}
+window._notesGetMyColor = _notesGetMyColor;
+
 function _notesNewBlock(authorResourceId, authorName, authorColor, content) {
   return {
     id:               'blk_' + Math.random().toString(36).slice(2, 8),
@@ -1732,14 +1770,9 @@ function _notesCreateBlockEl(noteId, block, readOnly) {
     const curResId = window._notesResource && window._notesResource.id;
     const curName  = window._notesResource && window._notesResource.name;
     if (block.authorResourceId && block.authorResourceId !== curResId) {
-      // Find color for current user from note_participants
-      const parts = window._notesGetParticipants && window._notesGetParticipants(noteId);
-      const myPart = (parts || []).find(function(p) {
-        return p.resource_id === curResId || p.user_id === (_userId);
-      });
       block.authorResourceId = curResId;
       block.authorName       = curName;
-      block.authorColor      = myPart ? myPart.color : null;
+      block.authorColor      = _notesGetMyColor(noteId);
       el.dataset.authorcolor  = block.authorColor || '';
       el.style.borderLeft     = block.authorColor ? '3px solid ' + block.authorColor : 'none';
       el.style.paddingLeft    = block.authorColor ? '8px' : '0';
@@ -1760,11 +1793,7 @@ function _notesCreateBlockEl(noteId, block, readOnly) {
       e.preventDefault();
       const curResId = window._notesResource && window._notesResource.id;
       const curName  = window._notesResource && window._notesResource.name;
-      const parts    = window._notesGetParticipants && window._notesGetParticipants(noteId);
-      const myPart   = (parts || []).find(function(p) {
-        return p.resource_id === curResId || p.user_id === _userId;
-      });
-      const myColor  = myPart ? myPart.color : null;
+      const myColor  = _notesGetMyColor(noteId);
       const newBlock = _notesNewBlock(curResId, curName, myColor, '');
       // Insert new block after current
       const newEl = _notesCreateBlockEl(noteId, newBlock, false);
@@ -4443,7 +4472,7 @@ async function _notesLoadViewParticipants(ownerUserId, viewName) {
     const rows = await API.get(
       'view_participants?workspace_owner_user_id=eq.' + ownerUserId +
       '&view_name=eq.' + encodeURIComponent(viewName) +
-      '&select=id,user_id,resource_id,view_role,tile_edit_overrides,invited_at,accepted_at,last_seen_at' +
+      '&select=id,user_id,resource_id,view_role,tile_edit_overrides,color,invited_at,accepted_at,last_seen_at' +
       '&order=invited_at.asc'
     ).catch(() => []);
     const resources = _inviteResources || await _notesLoadInviteResources();
@@ -4762,11 +4791,15 @@ window._notesShowShareViewDialog = async function() {
         const existing2 = _viewParticipants[vkey] || [];
         if (existing2.some(function(p){ return p.user_id===res.user_id; })) return;
         try {
+          // Assign a color from palette based on participant count
+          const _vpColors = ['#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'];
+          const _existingVp = _viewParticipants[_vpViewKey(userId, viewName)] || [];
+          const _vpColor = _vpColors[(_existingVp.length) % _vpColors.length];
           await API.post('view_participants', {
             firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
             workspace_owner_user_id: userId, view_name: viewName,
             user_id: res.user_id, resource_id: res.id||null,
-            view_role: 'viewer', tile_edit_overrides: [],
+            view_role: 'viewer', tile_edit_overrides: [], color: _vpColor,
             invited_at: new Date().toISOString(), accepted_at: null, last_seen_at: null,
           });
           const myName = (window._notesResource && window._notesResource.name) || 'Someone';
