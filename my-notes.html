@@ -74,7 +74,7 @@
 /* ── Grid workspace ──────────────────────────────────────────────────────── */
 #notes-right{display:flex;flex-direction:column;overflow:hidden}
 #notes-grid-header{padding:6px 16px;border-bottom:1px solid rgba(0,210,255,.08);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;flex-shrink:0}
-#notes-header-user{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#F0F6FF;white-space:nowrap;pointer-events:none;text-align:center;justify-self:center;min-width:1px;visibility:hidden}
+#notes-header-user{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:20px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#EF9F27;white-space:nowrap;pointer-events:none;text-align:center;justify-self:center;min-width:1px;visibility:hidden}
 #notes-header-user.has-name{visibility:visible}
 #notes-grid-label{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);flex:1}
 .notes-grid-btn{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
@@ -475,6 +475,21 @@ window._notesLoadView = async function() {
         _notesRenderViewSwitcher();
         _notesRenderLibrary();
         _notesUpdateHeaderUser(); // explicit call after resources guaranteed loaded
+        // Re-render widget tiles so cloned dashboards query the correct person's data
+        var cv = _cv();
+        if (cv && cv.tiles && window.WIDGET_REGISTRY) {
+          cv.tiles.forEach(function(tile) {
+            if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
+            var tileEl = document.querySelector('[data-tile-id="' + tile.id + '"]');
+            if (!tileEl) return;
+            var canvas = tileEl.querySelector('.notes-widget-canvas');
+            if (!canvas) return;
+            delete canvas.dataset.widgetRendered;
+            if (window._widgetContext) {
+              window.WIDGET_REGISTRY.render(tile.widgetId, tile.widgetConfig || {}, canvas, window._widgetContext());
+            }
+          });
+        }
       });
     } else if (attempts > 0) {
       setTimeout(function() { _waitForInviteResources(attempts - 1); }, 150);
@@ -4595,6 +4610,7 @@ async function _notesLoadInviteResources() {
       ...r,
       name: ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || r.email || r.id,
     }));
+    window._inviteResources = _inviteResources;
   } catch(e) { _inviteResources = []; }
   return _inviteResources;
 }
