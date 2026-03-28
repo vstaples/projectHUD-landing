@@ -385,6 +385,9 @@
       </div>
       <button class="notes-grid-btn" onclick="_notesNewView()" title="New view"
         >+ View</button>
+      <button class="notes-grid-btn" id="notes-clone-btn" onclick="window._notesCloneView && window._notesCloneView()"
+        title="Clone this view — copy layout and widgets to a new named view"
+        style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⧉ Clone</button>
       <button class="notes-grid-btn" id="notes-share-view-btn"
         onclick="window._notesShowShareViewDialog && window._notesShowShareViewDialog()"
         title="Share this view with others"
@@ -2800,7 +2803,7 @@ function _notesRenderViewSwitcher() {
   // Also hide the delete-view and Clear buttons (inside the grid header)
   document.querySelectorAll('#notes-grid-header .notes-grid-btn').forEach(function(btn) {
     const txt = btn.textContent.trim();
-    if (txt === 'Clear' || txt === '⊞ Save Template') {
+    if (txt === 'Clear' || txt === '⊞ Save Template' || btn.id === 'notes-clone-btn') {
       btn.style.display = isLocked ? 'none' : '';
     }
   });
@@ -2831,6 +2834,112 @@ window._notesToggleViewLock = function() {
   // Re-render grid so empty-slot + controls respect the new lock state
   _notesRenderGrid();
 };
+
+// ── Clone view ────────────────────────────────────────────────────────────
+// Deep-copies the active view's layout and widget configs into a new named view.
+// Prompts for a new name and optionally a target resource whose metrics to show.
+window._notesCloneView = async function() {
+  const srcCv   = _cv();
+  if (!srcCv)   return;
+  const srcName = _workspace.activeView;
+
+  // Load all firm resources for the person picker
+  let resources = [];
+  try {
+    resources = await API.get(
+      'resources?firm_id=eq.' + FIRM_ID + '&select=id,name,user_id&order=name.asc&limit=200'
+    ).catch(function(){ return []; });
+  } catch(e) {}
+
+  const overlay = document.createElement('div');
+  overlay.className = 'ntd-overlay';
+
+  const resOptions = (resources||[]).map(function(r) {
+    return '<option value="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '">' + _esc(r.name) + '</option>';
+  }).join('');
+
+  overlay.innerHTML =
+    '<div class="ntd-dialog" style="width:420px">' +
+      '<div class="ntd-header">' +
+        '<div class="ntd-sub">Clone view</div>' +
+        '<div class="ntd-title">' + _esc(srcName) + '</div>' +
+      '</div>' +
+      '<div class="ntd-body" style="padding:16px 24px;display:flex;flex-direction:column;gap:14px">' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">New view name</label>' +
+          '<input class="ntd-input" id="clone-name-inp" type="text" value="' + _esc(srcName) + ' (copy)"' +
+            ' placeholder="Name for the cloned view" style="width:100%"/>' +
+        '</div>' +
+        (resources.length ? (
+          '<div class="ntd-field">' +
+            '<label class="ntd-label">Show metrics for (optional)</label>' +
+            '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);margin-bottom:4px">' +
+              'Widget configs will be updated to target this person\'s data' +
+            '</div>' +
+            '<select class="ntd-select" id="clone-resource-sel" style="width:100%">' +
+              '<option value="">— Keep original settings —</option>' +
+              resOptions +
+            '</select>' +
+          '</div>'
+        ) : '') +
+      '</div>' +
+      '<div class="ntd-actions">' +
+        '<button class="ntd-btn ntd-btn-cancel" id="clone-cancel">Cancel</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="clone-apply">Clone</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  const nameInp = overlay.querySelector('#clone-name-inp');
+  if (nameInp) { nameInp.focus(); nameInp.select(); }
+
+  overlay.querySelector('#clone-cancel').onclick = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#clone-apply').onclick = function() {
+    const newName = (nameInp ? nameInp.value.trim() : '') || (srcName + ' (copy)');
+    const resSel  = overlay.querySelector('#clone-resource-sel');
+    const selOpt  = resSel && resSel.options[resSel.selectedIndex];
+    const targetRid = selOpt && selOpt.value ? selOpt.value : null;
+    const targetUid = selOpt && selOpt.dataset.uid ? selOpt.dataset.uid : null;
+    overlay.remove();
+
+    // Deep-clone the view — copy rows and tiles, but strip lock state
+    const cloned = JSON.parse(JSON.stringify(srcCv));
+    cloned.locked      = false;      // always start unlocked
+    cloned.clonedFrom  = undefined;  // not a template clone
+    cloned._isSharedView  = undefined;
+    cloned._sharedOwner   = undefined;
+    cloned._sharedViewName = undefined;
+
+    // If a target resource was chosen, rewrite all widget configs
+    if (targetRid || targetUid) {
+      (cloned.tiles || []).forEach(function(t) {
+        if (t.canvasMode !== 'widget' || !t.widgetConfig) return;
+        const cfg = t.widgetConfig;
+        // Remap resource-based config keys
+        if ('targetResourceId' in cfg && targetRid) cfg.targetResourceId = targetRid;
+        if ('targetUserId'     in cfg && targetUid) cfg.targetUserId     = targetUid;
+      });
+    }
+
+    // Pick a unique name if it collides
+    let finalName = newName;
+    let suffix = 2;
+    while (_workspace.views[finalName]) {
+      finalName = newName + ' ' + suffix++;
+    }
+
+    _workspace.views[finalName] = cloned;
+    _workspace.activeView       = finalName;
+    _notesSaveWorkspace(true);
+    _notesRenderGrid();
+    _notesRenderLeft();
+    _notesRenderViewSwitcher();
+  };
+};
+
 
 function _notesSwitchView(viewName) {
   if (!viewName || viewName === _workspace.activeView) return;
@@ -3364,6 +3473,10 @@ function _notesDndInit() {
 
   // ── Grid: standard HTML5 drag (no overflow:auto issue there) ─────────────
   shell.addEventListener('dragstart', e => {
+    // Block tile/chip rearrangement when view is locked
+    if (_cv().locked && e.target.closest?.('.notes-tile[data-noteid]')) {
+      e.preventDefault(); return;
+    }
     const tile = e.target.closest?.('.notes-tile[data-noteid]');
     const chip = e.target.closest?.('.notes-tray-chip[data-noteid]');
     const item = e.target.closest?.('.notes-item[data-noteid]');
@@ -3433,14 +3546,17 @@ function _notesDndInit() {
     // Recover noteId from dataTransfer in case _dragNoteId was cleared by mouseup
     const transferredId = e.dataTransfer.getData('application/noteid') || e.dataTransfer.getData('text/plain');
     if (!_dragNoteId && transferredId) _dragNoteId = transferredId;
-    console.log('[DROP] _dragNoteId:', _dragNoteId, '_leftDragActive:', _leftDragActive, 'inGrid:', !!e.target?.closest?.('#notes-grid-area'));
     if (!_dragNoteId || _leftDragActive) return;
-    shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    // Block grid rearrangement when view is locked
+    if (_cv().locked && e.target?.closest?.('#notes-grid-area')) {
+      _dragNoteId = null; _dragSlot = null; _dragRowId = null;
+      shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      return;
+    }
     // Must be dropping into the grid area (not left panel)
     if (!e.target?.closest?.('#notes-grid-area') || e.target?.closest?.('#notes-left')) {
  return; }
     let dropTile = e.target?.closest?.('.notes-tile');
-    console.log('[DROP] dropTile:', dropTile?.className, 'empty:', dropTile?.classList.contains('empty'));
 
     // If dropped on grid area background (not a tile), use _notesOpenNote to find first empty slot
     if (!dropTile) {
@@ -3478,7 +3594,6 @@ function _notesDndInit() {
 
     if (dropTile.classList.contains('empty')) {
       // Move to empty slot
-      console.log('[DROP] empty slot — targetRowId:', targetRowId, 'targetSlot:', targetSlot, 'effectiveNoteId:', effectiveNoteId?.slice(0,8));
       cv.tray = cv.tray.filter(id => id !== effectiveNoteId && id !== _dragNoteId);
       const existing = cv.tiles.find(t => t.noteId === effectiveNoteId);
       if (existing) {
