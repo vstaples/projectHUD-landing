@@ -196,6 +196,11 @@
 
 /* ── Empty grid slot ─────────────────────────────────────────────────────── */
 .notes-slot-plus{font-size:18px;color:rgba(0,210,255,.2)}
+.notes-tile.empty{cursor:default}
+.notes-tile.empty .notes-tile-header{opacity:.55;transition:opacity .15s}
+.notes-tile.empty:hover .notes-tile-header{opacity:1}
+.notes-tile.empty .notes-tile-canvas-empty{flex:1;cursor:text;display:flex;align-items:center;justify-content:center}
+.notes-tile.empty .notes-slot-plus{font-size:22px;color:rgba(0,210,255,.12);user-select:none}
 /* ── Library section ────────────────────────────────────────────────────── */
 #notes-library-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
 .notes-lib-entry{padding:5px 14px 5px 28px;display:flex;align-items:center;gap:6px;cursor:default}
@@ -303,7 +308,7 @@
         <select id="notes-view-switcher"
           style="background:#0a1628;border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
             font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
-            max-width:180px;font-weight:600;-webkit-appearance:auto"
+            font-weight:600;-webkit-appearance:auto;max-width:300px;width:auto"
           onchange="_notesSwitchView(this.value)">
         </select>
         <button onclick="window._notesShowRenameViewDialog && window._notesShowRenameViewDialog(window._workspace && window._workspace.activeView)"
@@ -320,10 +325,12 @@
       <button class="notes-grid-btn" onclick="_notesNewView()" title="New view"
         >+ View</button>
       <button class="notes-grid-btn" onclick="_notesSaveAsTemplate()" title="Save current view as a reusable template"
-        style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⊞ Template</button>
+        style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⊞ Save Template</button>
+      <button class="notes-grid-btn" id="notes-edit-tpl-btn" onclick="window._notesEditTemplate && window._notesEditTemplate()" title="Edit this template" style="display:none;color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">✎ Edit Template</button>
       <button class="notes-grid-btn" onclick="_notesClearWorkspace()" title="Clear all tiles from this view"
         style="color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
     </div>
+    <div id="notes-tpl-desc-bar" style="display:none;padding:4px 16px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);background:rgba(0,210,255,.03);border-bottom:1px solid rgba(0,210,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
     <div id="notes-row-editor"></div>
     <div id="notes-grid-area">
       <div id="notes-grid"></div>
@@ -1647,8 +1654,8 @@ function _notesSaveAsTemplate() {
           '<div class="ntd-hint">These become fill-in fields when launching an instance</div>' +
         '</div>' +
         '<div class="ntd-field">' +
-          '<label class="ntd-label">Description</label>' +
-          '<textarea class="ntd-textarea" id="ntd-desc" placeholder="Optional description\u2026"></textarea>' +
+          '<label class="ntd-label">Description <span style="color:#E24B4A">*</span></label>' +
+          '<textarea class="ntd-textarea" id="ntd-desc" placeholder="Describe when to use this template\u2026" style="min-height:72px"></textarea>' +
         '</div>' +
       '</div>' +
       '<div class="ntd-actions">' +
@@ -1664,9 +1671,15 @@ function _notesSaveAsTemplate() {
   overlay.querySelector('#ntd-save').onclick = function() {
     const tplName  = overlay.querySelector('#ntd-name').value.trim();
     if (!tplName) { overlay.querySelector('#ntd-name').focus(); return; }
+    const desc = overlay.querySelector('#ntd-desc').value.trim();
+    if (!desc) {
+      const ta = overlay.querySelector('#ntd-desc');
+      ta.style.borderColor = 'rgba(226,75,74,.6)';
+      ta.placeholder = 'Description is required…';
+      ta.focus(); return;
+    }
     const params   = overlay.querySelector('#ntd-params').value.split(',').map(function(p) { return p.trim(); }).filter(Boolean);
     const category = overlay.querySelector('#ntd-category').value;
-    const desc     = overlay.querySelector('#ntd-desc').value.trim();
     const tplView  = JSON.parse(JSON.stringify({ rows: cv.rows || [], tiles: cv.tiles || [] }));
     if (!_workspace.library) _workspace.library = {};
     _workspace.library[tplName] = {
@@ -1699,8 +1712,8 @@ async function _notesLaunchTemplate(name) {
   if (!tpl) return;
   const params = tpl.parameters || [];
 
-  await _notesLoadInviteResources();
-  const allResources = _inviteResources || [];
+  if (window._notesLoadInviteResources) await window._notesLoadInviteResources();
+  const allResources = (window._notesGetInviteResources && window._notesGetInviteResources()) || [];
   const selectedInvitees = [];
   let colorIdx = 0;
   const COLORS = ['#4A9EFF','#FF6B6B','#4ECDC4','#FFE66D','#A8E6CF','#FF8B94','#C3A6FF','#FFB347'];
@@ -1898,6 +1911,65 @@ function _notesDeleteView() {
   });
 }
 
+function _notesEditTemplate() {
+  const cv      = _cv();
+  const tplName = cv.clonedFrom;
+  if (!tplName) return;
+  const tpl = (_workspace.library || {})[tplName];
+  if (!tpl) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'ntd-overlay';
+  overlay.innerHTML =
+    '<div class="ntd-dialog" style="width:460px">' +
+      '<div class="ntd-header">' +
+        '<div class="ntd-sub">Edit Template</div>' +
+        '<div class="ntd-title">' + _esc(tplName) + '</div>' +
+      '</div>' +
+      '<div class="ntd-body">' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Category</label>' +
+          '<select class="ntd-select" id="net-category">' +
+            ['Project','Onboarding','QMS','Custom'].map(function(c) {
+              return '<option value="' + c + '"' + (c === tpl.category ? ' selected' : '') + '>' + c + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Parameters <span style="text-transform:none;letter-spacing:0">(comma-separated)</span></label>' +
+          '<input class="ntd-input" id="net-params" value="' + _esc((tpl.parameters||[]).join(', ')) + '" placeholder="e.g. projectName, clientName"/>' +
+        '</div>' +
+        '<div class="ntd-field">' +
+          '<label class="ntd-label">Description <span style="color:#E24B4A">*</span></label>' +
+          '<textarea class="ntd-textarea" id="net-desc" style="min-height:72px">' + _esc(tpl.description||'') + '</textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ntd-actions">' +
+        '<button class="ntd-btn ntd-btn-cancel" id="net-cancel">Cancel</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="net-save">Save Changes</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('#net-desc').focus();
+  overlay.querySelector('#net-cancel').onclick = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#net-save').onclick = function() {
+    const desc = overlay.querySelector('#net-desc').value.trim();
+    if (!desc) {
+      const ta = overlay.querySelector('#net-desc');
+      ta.style.borderColor = 'rgba(226,75,74,.6)'; ta.focus(); return;
+    }
+    tpl.category    = overlay.querySelector('#net-category').value;
+    tpl.parameters  = overlay.querySelector('#net-params').value.split(',').map(function(p){ return p.trim(); }).filter(Boolean);
+    tpl.description = desc;
+    _notesSaveWorkspace(true);
+    _notesRenderLibrary();
+    _notesRenderViewSwitcher();
+    overlay.remove();
+  };
+}
+window._notesEditTemplate = _notesEditTemplate;
+
 function _notesRenderViewSwitcher() {
   const sel  = document.getElementById('notes-view-switcher');
   const name = document.getElementById('notes-view-name');
@@ -1907,6 +1979,19 @@ function _notesRenderViewSwitcher() {
     '<option value="' + _esc(v) + '"' + (v === _workspace.activeView ? ' selected' : '') + '>' +
     _esc(v) + '</option>'
   ).join('');
+  // Show/hide template description bar and Edit Template button
+  const cv = _cv();
+  const srcName = cv.clonedFrom || null;
+  const tpl = srcName ? (_workspace.library || {})[srcName] : null;
+  const descBar = document.getElementById('notes-tpl-desc-bar');
+  const editBtn = document.getElementById('notes-edit-tpl-btn');
+  if (tpl && tpl.description && descBar) {
+    descBar.textContent = '▦ ' + srcName + ' — ' + tpl.description;
+    descBar.style.display = 'block';
+  } else if (descBar) {
+    descBar.style.display = 'none';
+  }
+  if (editBtn) editBtn.style.display = tpl ? '' : 'none';
   // Add rename on double-click
   const sel2 = document.getElementById('notes-view-switcher');
   if (sel2 && !sel2._renameWired) {
@@ -3437,7 +3522,9 @@ async function _notesInvite(noteId, resourceId, userId, color, pop) {
   }
 }
 
-window._notesRemoveParticipant  = _notesRemoveParticipant;
+window._notesRemoveParticipant        = _notesRemoveParticipant;
+window._notesLoadInviteResources      = _notesLoadInviteResources;
+window._notesGetInviteResources       = function() { return _inviteResources; };
 window._notesStartPresence      = _notesStartPresence;
 window._notesStopPresence       = _notesStopPresence;
 window._notesGetParticipants    = (noteId) => _participants[noteId];
