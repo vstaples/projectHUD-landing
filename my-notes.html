@@ -464,6 +464,9 @@ window._notesLoadView = async function() {
   }
   _notesRenderLeft();
   _notesRenderGrid();
+  // Pre-load invite resources so the header user name fallback resolves on first render
+  // (fires async, then re-renders the view switcher with the correct name populated)
+  _notesLoadInviteResources().then(function() { _notesRenderViewSwitcher(); });
   // Restore saved panel width and init splitter
   const savedW = _cv().leftPanelWidth;
   if (savedW) {
@@ -2857,7 +2860,31 @@ function _notesRenderViewSwitcher() {
   // ── Centered associated user name ───────────────────────────────────────
   const headerUser = document.getElementById('notes-header-user');
   if (headerUser) {
-    const userName = cv.forResourceName || null;
+    let userName = cv.forResourceName || null;
+
+    // Fallback: derive from widget tile configs (for dashboards cloned before
+    // forResourceName stamping was added, or configured via the gear dialog)
+    if (!userName && window._inviteResources && window._inviteResources.length) {
+      const widgetTile = (cv.tiles || []).find(function(t) {
+        return t.canvasMode === 'widget' && t.widgetConfig &&
+               t.widgetConfig.targetResourceId;
+      });
+      if (widgetTile) {
+        const rid = widgetTile.widgetConfig.targetResourceId;
+        const myRid = window._notesResource && window._notesResource.id;
+        // Only show if it's targeting someone other than the logged-in user
+        if (rid && rid !== myRid) {
+          const res = window._inviteResources.find(function(r){ return r.id === rid; });
+          if (res) {
+            userName = res.name;
+            // Back-fill so future renders skip the lookup
+            cv.forResourceName = res.name;
+            cv.forResourceId   = res.id;
+          }
+        }
+      }
+    }
+
     if (userName && !cv._isSharedView) {
       headerUser.textContent = userName;
       headerUser.style.display = '';
