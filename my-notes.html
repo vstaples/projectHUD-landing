@@ -5512,8 +5512,14 @@ console.log('[Widgets] Phase 1 infrastructure loaded. Registry:', WIDGET_REGISTR
 
 <script>
 // ── Widget Library — Phase 2: Three core widgets ──────────────────────────
-(function() {
+(async function() {
 'use strict';
+// Wait for Phase 1 to register WIDGET_REGISTRY (dynamic script injection may race)
+let _p2wait = 0;
+while (!window.WIDGET_REGISTRY && _p2wait < 5000) {
+  await new Promise(function(r){setTimeout(r,50);}); _p2wait+=50;
+}
+if (!window.WIDGET_REGISTRY) { console.error('[Widgets] Phase 2: WIDGET_REGISTRY not found after wait'); return; }
 
 const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
 
