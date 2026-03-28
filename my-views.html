@@ -5913,12 +5913,13 @@ function renderTileCanvas(tileEl, tileState, note, forceRefresh) {
   if (!canvas) {
     canvas = document.createElement('div');
     canvas.className = 'tile-canvas';
-    // Insert before chat panel
-    const chat = tileEl.querySelector('[id^="notes-chat-"]');
-    const body = tileEl.querySelector('[id^="notes-tbody-"]');
+    // Insert before chat panel — MY VIEWS uses views-tbody-* and views-chat-*
+    const chat = tileEl.querySelector('[id^="views-chat-"]');
+    const body = tileEl.querySelector('[id^="views-tbody-"]');
     const textarea = tileEl.querySelector('.views-tile-canvas');
     if (textarea) textarea.style.display = mode === 'note' ? '' : 'none';
     if (body) body.insertBefore(canvas, chat || null);
+    else tileEl.appendChild(canvas); // fallback: append directly to tile
   }
 
   stopWidgetRefresh(tileEl);
