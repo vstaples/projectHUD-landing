@@ -1088,7 +1088,9 @@ function _notesRenderGrid() {
 
       // ── STEP 5: per-slot viewer check ──────────────────────────────────
       const slotKey        = row.id + ':' + s;
-      const tileIsReadOnly = viewerCtx.isViewer && !viewerCtx.overriddenSlots.has(slotKey);
+      // Widget tiles are never read-only — viewers can always see widget data
+      const tileIsWidget   = tile && tile.canvasMode === 'widget';
+      const tileIsReadOnly = !tileIsWidget && viewerCtx.isViewer && !viewerCtx.overriddenSlots.has(slotKey);
 
       if (note) {
         div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
@@ -1333,31 +1335,33 @@ function _notesTileHTML(note, tileState, readOnly) {
   const chatOpen = tileState?.chatOpen || false;
   const _presDiv = '<div class="notes-presence" id="notes-presence-' + note.id + '"></div>';
   // ── STEP 5: read-only (viewer role) controls ──────────────────────────
-  const lockIcon = readOnly
+  const lockIcon = _effectiveReadOnly
     ? '<span title="View only" style="font-size:11px;color:var(--text3);opacity:.7;flex-shrink:0;cursor:default">🔒</span>'
     : '';
-  const inviteBtn = readOnly ? '' :
+  const inviteBtn = _effectiveReadOnly ? '' :
     '<button class="notes-invite-btn" title="Invite to note" onclick="_notesShowInvite(\'' + note.id + '\',this)">+</button>';
-  const modeBtn = readOnly ? '' :
+  const modeBtn = _effectiveReadOnly ? '' :
     (window._notesModeBtn ? window._notesModeBtn(note.id, tileState) : '');
-  const closeBtn = readOnly ? '' :
+  const closeBtn = _effectiveReadOnly ? '' :
     '<button class="notes-tile-ctrl" title="Close" onclick="_notesCloseTile(\'' + note.id + '\')" style="color:rgba(226,75,74,.6)">✕</button>';
-  const titleEditable = readOnly ? 'false' : 'true';
-  const canvasReadOnly = readOnly ? ' readonly' : '';
+  const titleEditable = _effectiveReadOnly ? 'false' : 'true';
+  const canvasReadOnly = _effectiveReadOnly ? ' readonly' : '';
 
   // Block canvas vs textarea — computed before return
   // Never use block canvas for widget tiles — the widget renderer owns the canvas
   const _tileIsWidget = tileState && tileState.canvasMode === 'widget';
+  // Widget tiles are never read-only regardless of viewer role — viewers can see widget data
+  const _effectiveReadOnly = _tileIsWidget ? false : readOnly;
   const useBlocks = !_tileIsWidget && typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
   const canvasHtml = useBlocks
     ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
     : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
-        'placeholder="' + (readOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
-        (readOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
+        'placeholder="' + (_effectiveReadOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
+        (_effectiveReadOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
   return '<div class="notes-tile-header" style="position:relative">' +
     '<div class="notes-tile-title" contenteditable="' + titleEditable + '" spellcheck="false" ' +
       'data-noteid="' + _esc(note.id) + '" ' +
-      (readOnly ? '' : 'onblur="_notesSaveTitle(this)"') + '>' + _esc(note.title || 'Untitled') + '</div>' +
+      (_effectiveReadOnly ? '' : 'onblur="_notesSaveTitle(this)"') + '>' + _esc(note.title || 'Untitled') + '</div>' +
     (note.entity_type && note.entity_type !== 'note' ? '<span class="notes-tile-source">' + _esc(note.entity_type) + '</span>' : '') +
     _presDiv +
     lockIcon +
