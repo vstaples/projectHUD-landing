@@ -1649,11 +1649,20 @@ async function _notesNew(rowId, slot) {
       cv.tiles.push({ row: rowId, slot, noteId: placeholderId, chatOpen: false, isPlaceholder: true });
       _notesSaveWorkspace();
       _notesRenderGrid();
-      // After render, open the mode switcher immediately so user picks widget vs note
+      // Directly open the widget picker — don't rely on the mode button being
+      // injected yet (it arrives asynchronously via _notesPostWire).
+      // Use a short delay so the tile DOM is in place from _notesRenderGrid.
       setTimeout(function() {
-        const tileEl = document.querySelector('.notes-tile[data-noteid="' + placeholderId + '"]');
-        const btn = tileEl && tileEl.querySelector('.tile-header-mode-btn');
-        if (btn) btn.click();
+        const cv2 = window._notesCv && window._notesCv();
+        const tileState = cv2 && cv2.tiles.find(function(t){ return t.noteId === placeholderId; });
+        if (tileState && typeof window._notesShowWidgetPicker === 'function') {
+          window._notesShowWidgetPicker(tileState);
+        } else {
+          // Fallback — try clicking the mode button if it was injected in time
+          const tileEl = document.querySelector('.notes-tile[data-noteid="' + placeholderId + '"]');
+          const btn = tileEl && tileEl.querySelector('.tile-header-mode-btn');
+          if (btn) btn.click();
+        }
       }, 80);
     } else {
       // New note from left panel "+ New note" button — always creates a DB record
@@ -5625,8 +5634,13 @@ function applyWidget(widgetId, config, tileState) {
     console.log('[Widgets] Deleted backing note for widget tile:', noteId, widgetId);
   }
   // Assign a stable synthetic ID for placeholder tiles (never hits the DB)
+  let newNoteId = noteId;
   if (isPlaceholder && (!noteId || noteId.startsWith('ph-'))) {
-    tileState.noteId = 'wt-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
+    newNoteId = 'wt-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
+    tileState.noteId = newNoteId;
+    // Update the DOM element's data-noteid so refreshTileWidget can find it
+    const oldEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
+    if (oldEl) oldEl.dataset.noteid = newNoteId;
   }
   tileState.isPlaceholder = false;
   tileState.canvasMode    = 'widget';
@@ -5657,6 +5671,8 @@ function refreshTileWidget(noteId) {
 }
 
 // ── Wire into tile rendering via _notesPostWire hook ─────────────────────
+// Export showWidgetPicker so _notesNew (Block 1) can open it directly
+window._notesShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
 window._notesPostWire = function() {
   const cv = window._notesCv && window._notesCv();
   if (!cv) return;
