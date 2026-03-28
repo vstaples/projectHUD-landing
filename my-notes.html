@@ -802,7 +802,7 @@ function _notesRenderGrid() {
     const height = row.height || 'medium';
     const rowDiv = document.createElement('div');
     rowDiv.className = 'nre-grid-row';
-    rowDiv.dataset.rowId  = row.id;
+    rowDiv.dataset.rowid  = row.id;
     rowDiv.dataset.height = height;
     rowDiv.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
 
@@ -814,12 +814,12 @@ function _notesRenderGrid() {
         div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
         div.setAttribute('draggable', 'true');
         div.innerHTML = _notesTileHTML(note, tile);
-        div.dataset.rowId  = row.id;
+        div.dataset.rowid  = row.id;
         div.dataset.slot   = s;
         div.dataset.noteid = note.id;
       } else {
         div.className = 'notes-tile empty';
-        div.dataset.rowId = row.id;
+        div.dataset.rowid = row.id;
         div.dataset.slot  = s;
         div.innerHTML = '<span class="notes-slot-plus">+</span>';
         (function(rid, sl) { div.onclick = function() { _notesNew(rid, sl); }; })(row.id, s);
@@ -849,7 +849,7 @@ function _notesRenderRowEditor() {
     const occupied = (cv.tiles || []).some(function(t) { return t.row === row.id; });
     const seg      = document.createElement('div');
     seg.className    = 'nre-row';
-    seg.dataset.rowId = row.id;
+    seg.dataset.rowid = row.id;
     seg.innerHTML =
       '<span class="nre-grip" title="Drag to reorder rows">⠿</span>' +
       '<span class="nre-label">R' + (idx + 1) + '</span>' +
@@ -940,7 +940,7 @@ function _notesWireRowDrag(bar) {
       e.preventDefault();
       e.stopPropagation();
 
-      const dragging = seg.dataset.rowId;
+      const dragging = seg.dataset.rowid;
       seg.style.opacity = '0.5';
       indicator.style.display = 'block';
       bar.appendChild(indicator); // start at end
@@ -954,7 +954,7 @@ function _notesWireRowDrag(bar) {
         // Find insertion point based on mouse X
         let insertBefore = null;
         for (const el of els) {
-          if (el.dataset.rowId === dragging) continue;
+          if (el.dataset.rowid === dragging) continue;
           const r = el.getBoundingClientRect();
           if (ev.clientX < r.left + r.width / 2) {
             insertBefore = el;
@@ -966,7 +966,7 @@ function _notesWireRowDrag(bar) {
           bar.insertBefore(indicator, insertBefore);
         } else {
           // After last non-dragging element
-          const last = els.filter(el => el.dataset.rowId !== dragging).pop();
+          const last = els.filter(el => el.dataset.rowid !== dragging).pop();
           if (last) last.after ? last.after(indicator) : bar.appendChild(indicator);
           else bar.appendChild(indicator);
         }
@@ -989,8 +989,8 @@ function _notesWireRowDrag(bar) {
         let draggedRow = rowMap[dragging];
         for (const el of allSegs) {
           if (el === indicator) { if (draggedRow) newOrder.push(draggedRow); }
-          else if (el.dataset && el.dataset.rowId && el.dataset.rowId !== dragging) {
-            const r = rowMap[el.dataset.rowId];
+          else if (el.dataset && el.dataset.rowid && el.dataset.rowid !== dragging) {
+            const r = rowMap[el.dataset.rowid];
             if (r) newOrder.push(r);
           }
         }
@@ -1936,7 +1936,7 @@ function _notesDndInit() {
     const item = e.target.closest?.('.notes-item[data-noteid]');
     if (tile && !e.target.closest?.('.notes-tile-title[contenteditable]')) {
       _dragNoteId  = tile.dataset.noteid;
-      _dragRowId   = tile.dataset.rowid || null;
+        _dragRowId   = tile.dataset.rowid || null;
       _dragSlot    = tile.dataset.slot !== undefined ? parseInt(tile.dataset.slot) : null;
       tile.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -2004,7 +2004,8 @@ function _notesDndInit() {
     if (!_dragNoteId || _leftDragActive) return;
     shell.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     // Must be dropping into the grid area (not left panel)
-    if (!e.target?.closest?.('#notes-grid-area') || e.target?.closest?.('#notes-left')) { console.log('[DROP] bailed — not in grid area'); return; }
+    if (!e.target?.closest?.('#notes-grid-area') || e.target?.closest?.('#notes-left')) {
+ return; }
     let dropTile = e.target?.closest?.('.notes-tile');
     console.log('[DROP] dropTile:', dropTile?.className, 'empty:', dropTile?.classList.contains('empty'));
 
