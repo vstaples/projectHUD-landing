@@ -180,7 +180,7 @@
 .notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
 .notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
 /* ── Block collaborative canvas ── */
-.notes-block-canvas{display:flex;flex-direction:column;gap:0}
+.notes-block-canvas{display:flex;flex-direction:column;gap:0;overflow-y:auto;height:100%}
 .nbc-block{position:relative;outline:none;min-height:1.6em;line-height:1.75;caret-color:#00D2FF;
   font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);
   word-break:break-word;cursor:text;transition:background .1s;
@@ -1356,7 +1356,7 @@ function _notesTileHTML(note, tileState, readOnly) {
   const canvasReadOnly = _effectiveReadOnly ? ' readonly' : '';
 
   const canvasHtml = useBlocks
-    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
+    ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0;max-height:100%"></div>'
     : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
         'placeholder="' + (_effectiveReadOnly ? 'Read only' : 'Start writing\u2026') + '"' + canvasReadOnly + ' ' +
         (_effectiveReadOnly ? '' : 'oninput="_notesSaveContent(this)"') + '>' + _esc(note.content || '') + '</textarea>';
@@ -3843,38 +3843,9 @@ async function _notesRenderPresence(noteId) {
     return !(p.user_id && p.user_id === selfUserId);
   });
 
-  // ── Augment with view_participants for shared views ───────────────────────
-  // Covers: (a) owner showing in participant's tile, (b) view-level participants
-  // who never got note_participants rows
-  const activeView = window._workspace && window._workspace.views &&
-    window._workspace.views[window._workspace.activeView];
-  if (activeView) {
-    const ownerUserId = activeView._isSharedView
-      ? activeView._sharedOwner
-      : (window._notesResource && window._notesResource.user_id);
-    const viewName = activeView._isSharedView
-      ? activeView._sharedViewName
-      : (window._workspace && window._workspace.activeView);
-    if (ownerUserId && viewName && window._notesGetViewParticipants) {
-      const vpParts = window._notesGetViewParticipants(ownerUserId, viewName);
-      vpParts.forEach(function(vp) {
-        if (!vp.accepted_at) return; // skip pending
-        if (vp.user_id === selfUserId) return; // skip self
-        // Skip if already in note_participants list
-        if (filtered.some(function(p) { return p.user_id === vp.user_id; })) return;
-        // Add as a synthetic participant entry
-        filtered.push({
-          id:           vp.id,
-          user_id:      vp.user_id,
-          resource_id:  vp.resource_id,
-          color:        vp.color || '#00D2FF',
-          accepted_at:  vp.accepted_at,
-          last_seen_at: vp.last_seen_at,
-          _fromViewPart: true,
-        });
-      });
-    }
-  }
+  // Tile header presence = note_participants only (direct note collaborators)
+  // View-level participants (view_participants) appear in the presence strip above
+  // the grid, not in individual tile headers.
 
   el.innerHTML = '';
   filtered.forEach(function(p) {
@@ -4552,7 +4523,8 @@ async function _notesLoadViewParticipants(ownerUserId, viewName) {
       return Object.assign({}, p, {
         name:     name,
         initials: name.split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase(),
-        color:    PARTICIPANT_COLORS[
+        // Use DB color if set, otherwise assign from palette by position
+        color:    p.color || PARTICIPANT_COLORS[
           (Array.isArray(rows) ? rows : []).indexOf(p) % PARTICIPANT_COLORS.length
         ],
       });
