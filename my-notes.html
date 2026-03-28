@@ -6056,7 +6056,172 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 4. TASK COUNTER ───────────────────────────────────────────────────────
+// ── 4. HOURS BY DAY ──────────────────────────────────────────────────────
+// Speedometer gauge per day — exact port of My Work's "This week — hours by day"
+// Cyan = billable arc, purple = non-billable arc, needle = total. Scale: 8h = full.
+window.WIDGET_REGISTRY.register({
+  id:              'hours_by_day',
+  label:           'Hours by day',
+  category:        'personal',
+  description:     'This week\'s time entries as daily speedometer gauges',
+  icon:            'bars',
+  configSchema: [
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
+      templatePlaceholder:'Select person when launching' },
+  ],
+  refreshInterval: 300000,
+  minTileHeight:   'medium',
+
+  dataFn: async function(config) {
+    const { rid } = _resolveTarget(config);
+    if (!rid) return null;
+
+    // Build Mon–Sun array in local time
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const isoOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const mon = new Date(now); mon.setDate(now.getDate() - isoOffset);
+    const weekDays = Array.from({length:7}, function(_,i) {
+      const d = new Date(mon); d.setDate(mon.getDate() + i);
+      return d.toLocaleDateString('en-CA');
+    });
+    const today    = now.toLocaleDateString('en-CA');
+    const monIso   = weekDays[0];
+    const sunIso   = weekDays[6];
+
+    const entries = await _api(
+      'time_entries?resource_id=eq.'+rid+
+      '&date=gte.'+monIso+'&date=lte.'+sunIso+
+      '&select=date,hours,is_billable&limit=500'
+    );
+    const all = Array.isArray(entries) ? entries : [];
+
+    const hoursByDay = {}, billByDay = {};
+    weekDays.forEach(function(d){ hoursByDay[d]=0; billByDay[d]=0; });
+    all.forEach(function(e) {
+      if (Object.prototype.hasOwnProperty.call(hoursByDay, e.date)) {
+        const h = parseFloat(e.hours||0);
+        hoursByDay[e.date] += h;
+        if (e.is_billable) billByDay[e.date] += h;
+      }
+    });
+
+    const weekTotal    = Object.values(hoursByDay).reduce(function(s,h){return s+h;},0);
+    const weekBillable = Object.values(billByDay).reduce(function(s,h){return s+h;},0);
+    const billPct = weekTotal > 0 ? Math.round((weekBillable/weekTotal)*100) : 0;
+
+    return {
+      weekDays, today, hoursByDay, billByDay,
+      weekTotal:    Math.round(weekTotal*10)/10,
+      weekBillable: Math.round(weekBillable*10)/10,
+      weekNonBill:  Math.round((weekTotal-weekBillable)*10)/10,
+      billPct,
+    };
+  },
+
+  renderFn: function(data, container) {
+    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
+
+    const { weekDays, today, hoursByDay, billByDay } = data;
+    const DAY_LABELS = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+    const gaugeMax = 8;
+
+    // SVG gauge geometry — exact match to My Work
+    const GW=74, GH=70, GCX=37, GCY=48, GR=30;
+
+    function gPt(deg) {
+      const a = (deg - 180) * Math.PI / 180;
+      return [(GCX + GR * Math.cos(a)).toFixed(1), (GCY + GR * Math.sin(a)).toFixed(1)];
+    }
+    function gArc(d1, d2) {
+      if (d2 <= d1) return '';
+      const p1 = gPt(d1), p2 = gPt(Math.min(d2, 179.9));
+      return 'M'+p1[0]+','+p1[1]+' A'+GR+','+GR+' 0 '+(d2-d1>180?1:0)+' 1 '+p2[0]+','+p2[1];
+    }
+
+    // Tick marks + % labels
+    const gTicks = Array.from({length:11}, function(_,i) {
+      const deg = i * 18;
+      const isMaj = i % 2 === 0;
+      const a = (deg - 180) * Math.PI / 180;
+      const r0 = GR + 2, r1 = isMaj ? GR + 7 : GR + 4;
+      const x0=(GCX+r0*Math.cos(a)).toFixed(1), y0=(GCY+r0*Math.sin(a)).toFixed(1);
+      const x1=(GCX+r1*Math.cos(a)).toFixed(1), y1=(GCY+r1*Math.sin(a)).toFixed(1);
+      const tick = '<line x1="'+x0+'" y1="'+y0+'" x2="'+x1+'" y2="'+y1+'" stroke="rgba(255,255,255,.28)" stroke-width="'+(isMaj?1:.6)+'"/>';
+      if (!isMaj) return tick;
+      const rl=GR+16, lx=(GCX+rl*Math.cos(a)).toFixed(1), ly=(GCY+rl*Math.sin(a)).toFixed(1);
+      return tick+'<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="central" font-size="7.5" font-family="monospace" font-weight="700" fill="rgba(255,255,255,.75)">'+(i*10)+'%</text>';
+    }).join('');
+
+    const gaugesHtml = weekDays.map(function(d, i) {
+      const hrs  = hoursByDay[d]||0;
+      const bill = billByDay[d]||0;
+      const nonBill = hrs - bill;
+      const isToday = d === today;
+      const pct     = Math.min(hrs/gaugeMax, 1);
+      const billPct = Math.min(bill/gaugeMax, 1);
+      const nbPct   = Math.min(nonBill/gaugeMax, 1);
+      const billEnd = billPct * 180;
+      const nbEnd   = (billPct + nbPct) * 180;
+      const needleRad = (pct * 180 - 180) * Math.PI / 180;
+      const nx = (GCX + (GR-6) * Math.cos(needleRad)).toFixed(1);
+      const ny = (GCY + (GR-6) * Math.sin(needleRad)).toFixed(1);
+      const arcColor  = isToday ? '#00D2FF' : hrs>0 ? '#1D9E75' : 'rgba(255,255,255,.08)';
+      const pillColor = isToday ? '#00D2FF' : hrs>0 ? '#1D9E75' : 'rgba(255,255,255,.2)';
+      const dayColor  = isToday ? '#00D2FF' : '#6A94B8';
+      const fw        = isToday ? '600' : '400';
+
+      return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0">'+
+        '<svg viewBox="0 0 '+GW+' '+GH+'" width="'+GW+'" height="'+GH+'" style="overflow:visible">'+
+          gTicks+
+          '<path d="'+gArc(0,179.9)+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="4" stroke-linecap="round"/>'+
+          (hrs>0
+            ? (bill>0 ? '<path d="'+gArc(0,billEnd)+'" fill="none" stroke="'+arcColor+'" stroke-width="4" stroke-linecap="round"/>' : '')+
+              (nonBill>0 ? '<path d="'+gArc(billEnd,nbEnd)+'" fill="none" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>' : '')+
+              '<line x1="'+GCX+'" y1="'+GCY+'" x2="'+nx+'" y2="'+ny+'" stroke="'+arcColor+'" stroke-width="1.5" stroke-linecap="round"/>'+
+              '<circle cx="'+GCX+'" cy="'+GCY+'" r="3" fill="'+arcColor+'"/>'
+            : '<circle cx="'+GCX+'" cy="'+GCY+'" r="2" fill="rgba(255,255,255,.12)"/>'
+          )+
+          '<rect x="'+(GCX-17)+'" y="'+(GCY+5)+'" width="34" height="14" rx="7" fill="rgba(6,10,16,.7)" stroke="'+pillColor+'" stroke-width="1.2"/>'+
+          '<text x="'+GCX+'" y="'+(GCY+12)+'" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="monospace" font-weight="700" fill="'+pillColor+'">'+
+            (hrs>0 ? hrs.toFixed(1)+'h' : '—')+
+          '</text>'+
+        '</svg>'+
+        '<div style="font-family:var(--font-head,sans-serif);font-size:11px;font-weight:700;color:'+(isToday?dayColor:'#F0F6FF')+';text-align:center;line-height:1.4;letter-spacing:.04em">'+
+          DAY_LABELS[i]+'<br>'+
+          '<span style="font-weight:'+fw+';color:'+dayColor+';font-size:11px">'+new Date(d+'T00:00:00').getDate()+'</span>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+
+    const mono = 'font-family:var(--font-mono,monospace)';
+    const billColor = '#00D2FF';
+
+    container.innerHTML =
+      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">'+
+        // Header
+        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;padding:5px 10px 3px;flex-shrink:0">'+
+          'This week — hours by day'+
+        '</div>'+
+        // Gauges
+        '<div style="display:flex;flex:1;align-items:flex-end;padding:0 4px;min-height:0;overflow:hidden">'+
+          gaugesHtml+
+        '</div>'+
+        // Legend
+        '<div style="display:flex;align-items:center;gap:12px;padding:4px 10px 5px;flex-shrink:0;border-top:1px solid rgba(255,255,255,.05)">'+
+          '<div style="display:flex;align-items:center;gap:5px;'+mono+';font-size:10px;color:var(--text3)">'+
+            '<div style="width:14px;height:4px;background:'+billColor+';border-radius:2px"></div>Billable</div>'+
+          '<div style="display:flex;align-items:center;gap:5px;'+mono+';font-size:10px;color:var(--text3)">'+
+            '<div style="width:14px;height:4px;background:#8B5CF6;border-radius:2px"></div>Non-bill</div>'+
+          '<span style="'+mono+';font-size:10px;color:var(--text3)">Scale: 8h = full</span>'+
+          '<span style="margin-left:auto;'+mono+';font-size:10px;color:#EF9F27">'+data.weekTotal+'h total</span>'+
+        '</div>'+
+      '</div>';
+  }
+});
+
+
+// ── 5. TASK COUNTER ───────────────────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'task_counter',
   label:           'Task counter',
@@ -6107,7 +6272,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 5. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
+// ── 6. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'meeting_health_sparkline',
   label:           'Meeting health',
@@ -6174,7 +6339,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 6. BILLABILITY BARS ───────────────────────────────────────────────────
+// ── 7. BILLABILITY BARS ───────────────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'billability_bars',
   label:           'Billable vs Non-Bill',
@@ -6272,7 +6437,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 7. TASK LIST ──────────────────────────────────────────────────────────
+// ── 8. TASK LIST ──────────────────────────────────────────────────────────
 window.WIDGET_REGISTRY.register({
   id:              'task_list',
   label:           'Task list',
@@ -6468,7 +6633,7 @@ window.WIDGET_REGISTRY.register({
 });
 
 
-// ── 8. ACTION ITEM LIST ───────────────────────────────────────────────────
+// ── 9. ACTION ITEM LIST ───────────────────────────────────────────────────
 // Cloned from task_list's proven dataFn pattern.
 // Key differences vs task_list:
 //   • Cache source: window._wiItems filtered to type==='action' (not type==='task')
