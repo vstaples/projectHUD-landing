@@ -17,6 +17,11 @@
 
   <!-- ── View: PM Portfolio ──────────────────────────────── -->
 <script>
+// ── HTML escape helper (used throughout this module) ──────────────────────
+function _esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 // My Work filter state
 let _wfStatus    = 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
 let _wfProject   = '';     // project id | '' = all
@@ -5540,6 +5545,7 @@ const _WF_ICONS = {
 };
 
 function renderMyRequestsCatalog() {
+  const _esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const el = document.getElementById('myr-catalog-content');
   if (!el) return;
   let html = '';
