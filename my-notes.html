@@ -6368,7 +6368,8 @@ function _resolveTarget(config) {
   const myRid     = ctx.resourceId;
   const myUid     = ctx.userId;
   const configRid = (config && config.targetResourceId) || '';
-  const configUid = (config && config.targetUserId)     || '';
+  // Also accept legacy targetUserId key (next_week_queue/task_counter used this before the rename)
+  const configUid = (config && config.targetUserId) || '';
 
   // In a shared view, if the saved ID is not ours → use our own IDs
   if (ctx.isSharedView && configRid && configRid !== myRid) {
@@ -6385,16 +6386,17 @@ function _resolveTarget(config) {
   const cv = window._notesCv && window._notesCv();
   const viewRid = cv && cv.forResourceId  ? cv.forResourceId  : null;
 
-  // Resolve uid from configRid first — widgets stamp targetResourceId (rid) at clone
-  // time but never stamp targetUserId, so uid must be looked up from _inviteResources.
-  // Without this, tasks (queried by uid) always fall back to the logged-in user's uid
-  // even when rid correctly points to a different person.
-  let resolvedUid = configUid || null;
+  // Prefer rid-derived uid over any raw configUid — a stale cloned config may have
+  // the previous owner's targetUserId baked in. When configRid (or viewRid) is
+  // available, always look up the uid fresh from _inviteResources instead.
+  // configUid is only used as a last resort when there is no rid at all.
   const effectiveRid = configRid || viewRid || null;
-  if (!resolvedUid && effectiveRid && window._inviteResources) {
+  let resolvedUid = null;
+  if (effectiveRid && window._inviteResources) {
     const res = window._inviteResources.find(function(r) { return r.id === effectiveRid; });
     if (res) resolvedUid = res.user_id || null;
   }
+  if (!resolvedUid && !effectiveRid) resolvedUid = configUid || null;
 
   return {
     rid: effectiveRid || myRid,
@@ -6577,7 +6579,7 @@ window.WIDGET_REGISTRY.register({
   description:     'Tasks queued for next week — count and budgeted hours',
   icon:            'counter',
   configSchema: [
-    { key:'targetUserId', label:'Person', type:'resource_picker', default:'', required:false,
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
       templatePlaceholder:'Select person when launching' },
   ],
   refreshInterval: 120000,
@@ -6966,7 +6968,7 @@ window.WIDGET_REGISTRY.register({
   description:     'Open tasks assigned to you — hours when available',
   icon:            'counter',
   configSchema: [
-    { key:'targetUserId', label:'Person', type:'resource_picker', default:'', required:true,
+    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
       templatePlaceholder:'Select person when launching' },
   ],
   refreshInterval: 120000,
