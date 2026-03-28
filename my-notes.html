@@ -326,7 +326,7 @@
     <div id="notes-library-section">
       <div class="notes-section-hdr" onclick="_notesToggleSection('library')">
         <svg class="notes-chevron open" id="notes-chev-library" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        Workflows
+        Dashboards
       </div>
       <div id="notes-library-list"></div>
     </div>
@@ -2460,28 +2460,21 @@ function _notesRenderLibrary() {
     const grp      = groups[personName];
     const color    = grp.color;
     const initials = grp.initials;
-    // Department header with avatar — matches invite picker style
-    html +=
-      '<div style="display:flex;align-items:center;gap:7px;padding:5px 10px 4px 10px;' +
-          'border-top:1px solid rgba(0,210,255,.06);margin-top:2px">' +
-        '<div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
-            'justify-content:center;font-family:var(--font-ui,sans-serif);font-size:9px;font-weight:700;' +
-            'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
-          initials +
-        '</div>' +
-        '<span style="font-family:var(--font-ui,sans-serif);font-size:11px;font-weight:700;color:var(--text1)">' +
-          _esc(personName) +
-        '</span>' +
-      '</div>';
+    // One row per dashboard — name on left, avatar on right. No separate person header row.
     grp.items.forEach(function(e) {
       html +=
         '<div class="notes-lib-entry" data-vkey="' + _esc(e.vKey) + '" ' +
-            'style="padding:3px 10px 3px 28px;cursor:pointer;' +
-            (e.isActive ? 'background:rgba(0,210,255,.06);border-left:2px solid rgba(0,210,255,.4);' : '') + '">' +
-          '<span class="notes-lib-name" style="font-size:12px;color:' + (e.isActive ? '#00D2FF' : 'var(--text1)') + '">' +
+            'style="padding:3px 10px 3px 12px;cursor:pointer;display:flex;align-items:center;gap:0;' +
+            (e.isActive ? 'background:rgba(0,210,255,.06);border-left:2px solid rgba(0,210,255,.4);padding-left:10px;' : '') + '">' +
+          '<span class="notes-lib-name" style="font-size:12px;flex:1;color:' + (e.isActive ? '#00D2FF' : 'var(--text1)') + '">' +
             _esc(e.label) +
           '</span>' +
-          (e.isActive ? '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:rgba(0,210,255,.6)">active</span>' : '') +
+          (e.isActive ? '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:rgba(0,210,255,.6);margin-right:6px">active</span>' : '') +
+          '<div title="' + _esc(personName) + '" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
+              'justify-content:center;font-family:var(--font-ui,sans-serif);font-size:8px;font-weight:700;' +
+              'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
+            initials +
+          '</div>' +
         '</div>';
     });
   });
@@ -3185,6 +3178,28 @@ window._notesCloneView = async function() {
     _notesRenderLeft();
     _notesRenderViewSwitcher();
     _notesRenderLibrary();
+    _notesUpdateHeaderUser();
+    // Re-render widget tiles with the correct target person's data.
+    // _inviteResources is already loaded at clone time (fetched at dialog open),
+    // so this should resolve immediately on the first attempt.
+    (function _cloneWidgetRefresh(attempts) {
+      if (window._inviteResources && window._inviteResources.length) {
+        var cv = _cv();
+        if (cv && cv.tiles && window.WIDGET_REGISTRY && window._widgetContext) {
+          cv.tiles.forEach(function(tile) {
+            if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
+            var tileEl = document.querySelector('.notes-tile[data-noteid="' + tile.noteId + '"]');
+            if (!tileEl) return;
+            var canvas = tileEl.querySelector('.tile-canvas');
+            if (!canvas) return;
+            delete canvas.dataset.widgetRendered;
+            window.WIDGET_REGISTRY.render(tile.widgetId, tile.widgetConfig || {}, canvas, window._widgetContext());
+          });
+        }
+      } else if (attempts > 0) {
+        setTimeout(function() { _cloneWidgetRefresh(attempts - 1); }, 100);
+      }
+    })(30);
   };
 };
 
