@@ -5866,32 +5866,32 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
+    // Wait for _notesResource — compass sets it after script injection
+    let _w = 0;
+    while (!window._notesResource && _w < 3000) {
+      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
+    }
     const res   = window._notesResource || {};
     const today = new Date().toISOString().slice(0,10);
     const uid   = res.user_id;
     const rid   = res.id;
-    if (!uid && !rid) return null;
+    if (!uid && !rid) return { items:[], today:today };
 
     // Use My Work's already-loaded data if available and targeting self
     const configRid = config && config.targetResourceId;
     const isSelf = !configRid || configRid === rid;
-    // My Work exports work items as window._calItems (set at line 5118 of my-work.html)
-    const _cachedItems = window._calItems || window._wiItems || [];
-    if (isSelf && _cachedItems.length) {
-      const tasks = _cachedItems.filter(function(w){ return w.type === 'task'; });
+    if (isSelf && window._wiItems && window._wiItems.length) {
+      const tasks = window._wiItems.filter(function(w){ return w.type === 'task'; });
       if (tasks.length) return { items: tasks, today: today, source: 'cache' };
     }
 
-    // Fetch fresh — exact same query as My Work
-    const targetUid = isSelf ? uid : null;
-    const targetRid = isSelf ? rid : configRid;
-    if (!targetUid && !targetRid) return null;
-
-    const fetchUid = targetUid || (function(){
-      const r = (window._resources||[]).find(function(r){ return r.id === targetRid; });
-      return r && r.user_id;
+    // Fetch fresh using window.API directly
+    const fetchUid = isSelf ? uid : (function(){
+      const r = (window._resources||[]).find(function(r){ return r.id === configRid; });
+      return r ? r.user_id : null;
     })();
     if (!fetchUid) return { items:[], today:today };
+
 
     // Use window.API directly — _api() may silently return [] if API not in closure scope
     const _taskApi = window.API || window._notesAPI;
@@ -5981,10 +5981,15 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
+    // Wait for _notesResource — compass sets it after script injection
+    let _w = 0;
+    while (!window._notesResource && _w < 3000) {
+      await new Promise(function(r){setTimeout(r,100);}); _w+=100;
+    }
     const res   = window._notesResource || {};
     const today = new Date().toISOString().slice(0,10);
     const rid   = res.id;
-    if (!rid) return null;
+    if (!rid) return { items:[], today:today };
 
     const configRid = config && config.targetResourceId;
     const isSelf = !configRid || configRid === rid;
