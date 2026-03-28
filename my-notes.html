@@ -591,8 +591,25 @@ async function _notesRestoreSharedViews() {
           _sharedOwner:    ownerUserId,
           _sharedViewName: viewName,
         });
+        // If the user's last active view was this shared view, restore it as active
+        if (_workspace.activeView === sharedKey) {
+          // Already set — nothing to do
+        } else if (_workspace.sharedViews && _workspace.sharedViews[ownerUserId + '::' + viewName]) {
+          // User had this shared view active — restore it
+          const svMeta = _workspace.sharedViews[ownerUserId + '::' + viewName];
+          if (svMeta && svMeta.wasActive) {
+            _workspace.activeView = sharedKey;
+          }
+        }
       } catch(e) {
         console.warn('[Compass] Could not restore shared view:', viewName, e);
+      }
+    }
+    // If activeView points to a sharedKey that now exists, keep it; 
+    // if it points to a stale key, fall back to Default
+    if (_workspace.activeView && _workspace.activeView.startsWith('__shared__')) {
+      if (!_workspace.views[_workspace.activeView]) {
+        _workspace.activeView = Object.keys(_workspace.views).find(function(k) { return !k.startsWith('__shared__'); }) || 'Default';
       }
     }
   } catch(e) {
@@ -2566,6 +2583,21 @@ function _notesSwitchView(viewName) {
     window._notesStopViewPresence(_userId, _workspace.activeView);
   }
   _workspace.activeView = viewName;
+  // STEP 5: persist wasActive flag for shared views so refresh restores them
+  const switchedView = _workspace.views[viewName];
+  if (switchedView && switchedView._isSharedView && _workspace.sharedViews) {
+    const svKey = switchedView._sharedOwner + '::' + switchedView._sharedViewName;
+    if (_workspace.sharedViews[svKey]) _workspace.sharedViews[svKey].wasActive = true;
+    // Clear wasActive on all other shared views
+    Object.keys(_workspace.sharedViews).forEach(function(k) {
+      if (k !== svKey && _workspace.sharedViews[k]) _workspace.sharedViews[k].wasActive = false;
+    });
+  } else if (_workspace.sharedViews) {
+    // Switched to own view — clear all wasActive flags
+    Object.keys(_workspace.sharedViews).forEach(function(k) {
+      if (_workspace.sharedViews[k]) _workspace.sharedViews[k].wasActive = false;
+    });
+  }
   _notesSaveWorkspace(true);
   _notesRenderGrid();
   _notesRenderLeft();
@@ -3638,6 +3670,12 @@ window._notesSwitchToSharedView = async function(ownerUserId, viewName) {
       _sharedViewName: viewName,
     });
     _workspace.activeView = sharedKey;
+    // Persist wasActive so page refresh restores this shared view
+    if (!_workspace.sharedViews) _workspace.sharedViews = {};
+    const _svKey = ownerUserId + '::' + viewName;
+    if (!_workspace.sharedViews[_svKey]) _workspace.sharedViews[_svKey] = { ownerUserId: ownerUserId, viewName: viewName };
+    _workspace.sharedViews[_svKey].wasActive = true;
+    _notesSaveWorkspace(true);
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
