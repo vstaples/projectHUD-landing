@@ -1333,6 +1333,12 @@ function _notesWireRowDrag(bar) {
 
 function _notesTileHTML(note, tileState, readOnly) {
   const chatOpen = tileState?.chatOpen || false;
+  // Block canvas vs textarea — computed before return
+  // Never use block canvas for widget tiles — the widget renderer owns the canvas
+  const _tileIsWidget = tileState && tileState.canvasMode === 'widget';
+  // Widget tiles are never read-only regardless of viewer role — viewers can see widget data
+  const _effectiveReadOnly = _tileIsWidget ? false : readOnly;
+  const useBlocks = !_tileIsWidget && typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
   const _presDiv = '<div class="notes-presence" id="notes-presence-' + note.id + '"></div>';
   // ── STEP 5: read-only (viewer role) controls ──────────────────────────
   const lockIcon = _effectiveReadOnly
@@ -1347,12 +1353,6 @@ function _notesTileHTML(note, tileState, readOnly) {
   const titleEditable = _effectiveReadOnly ? 'false' : 'true';
   const canvasReadOnly = _effectiveReadOnly ? ' readonly' : '';
 
-  // Block canvas vs textarea — computed before return
-  // Never use block canvas for widget tiles — the widget renderer owns the canvas
-  const _tileIsWidget = tileState && tileState.canvasMode === 'widget';
-  // Widget tiles are never read-only regardless of viewer role — viewers can see widget data
-  const _effectiveReadOnly = _tileIsWidget ? false : readOnly;
-  const useBlocks = !_tileIsWidget && typeof _notesIsBlockFormat === 'function' && _notesIsBlockFormat(note);
   const canvasHtml = useBlocks
     ? '<div class="notes-block-canvas" data-noteblocks="' + _esc(note.id) + '" style="flex:1;overflow-y:auto;padding:8px 12px;min-height:0"></div>'
     : '<textarea class="notes-tile-canvas" data-noteid="' + _esc(note.id) + '" ' +
