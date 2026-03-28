@@ -3648,13 +3648,14 @@ window._notesShowResourcePicker = async function(anchorEl, onSelect) {
     });
 
     let html = '';
+    let colorIdx = 0;
     keys.forEach(function(grp) {
       html += '<div style="padding:4px 7px 2px;font-family:var(--font-mono,monospace);font-size:10px;' +
         'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
         'border-top:1px solid rgba(0,210,255,.08);margin-top:2px">' + _esc(grp) + '</div>';
       groups[grp].forEach(function(r) {
         const initials = r.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-        const color    = PARTICIPANT_COLORS[0];
+        const color    = PARTICIPANT_COLORS[colorIdx++ % PARTICIPANT_COLORS.length];
         html += '<div class="notes-invite-row" data-resid="' + _esc(r.id) + '" data-userid="' + _esc(r.user_id||'') + '" data-name="' + _esc(r.name) + '">' +
           '<div class="notes-avatar" style="background:' + color + ';color:#000">' + _esc(initials) + '</div>' +
           '<div style="flex:1;min-width:0">' +
