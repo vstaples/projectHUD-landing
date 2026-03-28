@@ -242,6 +242,49 @@
 .notes-tile.drag-over{border-color:#00D2FF;background:rgba(0,210,255,.06)}
 .notes-tile.empty.drag-over{border-color:#00D2FF;background:rgba(0,210,255,.06)}
 .notes-tray-chip[draggable]{cursor:grab}
+
+/* ── Widget system ───────────────────────────────────────────────────────── */
+.widget-error{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--font-mono,monospace);font-size:11px;color:#E24B4A;padding:8px;text-align:center}
+.widget-loading{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);letter-spacing:.06em}
+.widget-stat-row{display:flex;gap:8px;justify-content:center;padding:4px 8px;font-family:var(--font-ui,'Barlow Condensed',sans-serif)}
+.wsr-item{display:flex;flex-direction:column;align-items:center;gap:1px}
+.wsr-val{font-size:13px;font-weight:500;line-height:1;color:var(--text0)}
+.wsr-lbl{font-size:9px;color:var(--text3);letter-spacing:.04em;text-transform:uppercase}
+.widget-counter{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);padding:8px}
+.wc-big{font-size:32px;font-weight:600;line-height:1;color:var(--text0)}
+.wc-label{font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase}
+.wc-breakdown{display:flex;gap:10px;font-size:10px;margin-top:2px}
+.widget-sparkline-footer{display:flex;justify-content:center;gap:8px;font-size:10px;color:var(--text3);font-family:var(--font-mono,monospace);padding:2px 0}
+.tile-canvas{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.tile-header-mode-btn{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 6px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);color:var(--text3);cursor:pointer;letter-spacing:.04em;transition:all .12s;flex-shrink:0}
+.tile-header-mode-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF}
+.tile-header-mode-btn.widget-active{background:rgba(0,210,255,.15);border-color:rgba(0,210,255,.4);color:#00D2FF}
+/* Mode switcher dropdown */
+.widget-mode-pop{position:fixed;z-index:800;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);min-width:160px;padding:4px 0}
+.widget-mode-item{padding:7px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.widget-mode-item:hover{background:rgba(0,210,255,.06);color:var(--text0)}
+.widget-mode-item.active{color:#00D2FF}
+/* Widget picker modal */
+.widget-picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.widget-picker-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:560px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column}
+.widget-picker-header{padding:14px 20px;border-bottom:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:10px}
+.widget-picker-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:16px;font-weight:700;color:var(--text0);flex:1}
+.widget-picker-search{background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 10px;outline:none;width:180px}
+.widget-picker-search:focus{border-color:rgba(0,210,255,.4)}
+.widget-picker-body{overflow-y:auto;padding:12px 16px;flex:1}
+.widget-cat-label{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;padding:8px 2px 5px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:8px}
+.widget-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.widget-card{background:rgba(255,255,255,.03);border:1px solid rgba(0,210,255,.1);padding:10px 12px;cursor:pointer;transition:all .12s}
+.widget-card:hover{background:rgba(0,210,255,.06);border-color:rgba(0,210,255,.3)}
+.widget-card-icon{font-size:18px;margin-bottom:5px}
+.widget-card-name{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;font-weight:600;color:var(--text0);margin-bottom:2px}
+.widget-card-desc{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);line-height:1.4}
+.widget-picker-close{background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0;line-height:1}
+.widget-picker-close:hover{color:var(--text0)}
+/* Widget config form */
+.widget-config-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:750;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.widget-config-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:380px;max-width:95vw}
+
 </style>
 
 <div id="notes-shell">
@@ -3583,6 +3626,398 @@ window._notesCloseTile = function(noteId) {
   if (isOwner) _notesStopPresence(noteId);
   if (typeof _origClose === 'function') _origClose(noteId);
 };
+
+})();
+</script>
+
+<script>
+// ── Widget System — Phase 1 Infrastructure ────────────────────────────────
+(function() {
+'use strict';
+
+const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
+
+function _esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Widget Registry ───────────────────────────────────────────────────────
+const WIDGET_REGISTRY = (function() {
+  const _widgets = {};
+  return {
+    register: function(def) {
+      if (!def.id || !def.renderFn || !def.dataFn) {
+        console.error('[Widgets] Invalid registration:', def.id); return;
+      }
+      _widgets[def.id] = def;
+      console.log('[Widgets] Registered:', def.id);
+    },
+    get: function(id) { return _widgets[id] || null; },
+    getAll: function() { return Object.values(_widgets); },
+    getByCategory: function(cat) { return Object.values(_widgets).filter(function(w) { return w.category === cat; }); },
+    categories: function() {
+      const cats = [];
+      Object.values(_widgets).forEach(function(w) { if (!cats.includes(w.category)) cats.push(w.category); });
+      return cats;
+    },
+    render: async function(widgetId, config, container, context) {
+      const widget = _widgets[widgetId];
+      if (!widget) { container.innerHTML = '<div class="widget-error">Unknown widget: ' + _esc(widgetId) + '</div>'; return; }
+      try {
+        container.innerHTML = '<div class="widget-loading">Loading\u2026</div>';
+        const data = await widget.dataFn(config, context);
+        container.innerHTML = '';
+        widget.renderFn(data, container, config);
+      } catch(err) {
+        console.error('[Widgets] Render error:', widgetId, err);
+        container.innerHTML = '<div class="widget-error">Failed to load</div>';
+      }
+    }
+  };
+})();
+window.WIDGET_REGISTRY = WIDGET_REGISTRY;
+
+// ── Widget context ────────────────────────────────────────────────────────
+function _widgetContext() {
+  return {
+    firmId:   FIRM_ID,
+    userId:   window._notesResource && window._notesResource.user_id,
+    resource: window._notesResource,
+    api:      window.API || window._notesAPI,
+  };
+}
+
+// ── Refresh management ────────────────────────────────────────────────────
+function startWidgetRefresh(tileEl, noteId, widgetId, config) {
+  stopWidgetRefresh(tileEl);
+  const widget = WIDGET_REGISTRY.get(widgetId);
+  if (!widget || !widget.refreshInterval) return;
+  tileEl._widgetInterval = setInterval(function() {
+    const canvas = tileEl.querySelector('.tile-canvas');
+    if (!canvas || tileEl.classList.contains('minimized')) return;
+    WIDGET_REGISTRY.render(widgetId, config, canvas, _widgetContext());
+  }, widget.refreshInterval);
+}
+
+function stopWidgetRefresh(tileEl) {
+  if (tileEl && tileEl._widgetInterval) {
+    clearInterval(tileEl._widgetInterval);
+    delete tileEl._widgetInterval;
+  }
+}
+
+// ── Canvas mode rendering ─────────────────────────────────────────────────
+function renderTileCanvas(tileEl, tileState, note) {
+  const mode = tileState.canvasMode || 'note';
+  let canvas = tileEl.querySelector('.tile-canvas');
+  if (!canvas) {
+    canvas = document.createElement('div');
+    canvas.className = 'tile-canvas';
+    // Insert before chat panel
+    const chat = tileEl.querySelector('[id^="notes-chat-"]');
+    const body = tileEl.querySelector('[id^="notes-tbody-"]');
+    const textarea = tileEl.querySelector('.notes-tile-canvas');
+    if (textarea) textarea.style.display = mode === 'note' ? '' : 'none';
+    if (body) body.insertBefore(canvas, chat || null);
+  }
+
+  stopWidgetRefresh(tileEl);
+
+  if (mode === 'widget' && tileState.widgetId) {
+    canvas.style.display = '';
+    const textarea = tileEl.querySelector('.notes-tile-canvas');
+    if (textarea) textarea.style.display = 'none';
+    WIDGET_REGISTRY.render(tileState.widgetId, tileState.widgetConfig || {}, canvas, _widgetContext());
+    startWidgetRefresh(tileEl, tileState.noteId, tileState.widgetId, tileState.widgetConfig || {});
+  } else {
+    // Note mode — hide canvas div, show textarea
+    canvas.style.display = 'none';
+    const textarea = tileEl.querySelector('.notes-tile-canvas');
+    if (textarea) textarea.style.display = '';
+  }
+}
+
+// ── Mode switcher button (injected into tile header) ──────────────────────
+function injectModeSwitcher(tileEl, tileState) {
+  const header = tileEl.querySelector('.notes-tile-header');
+  if (!header || header.querySelector('.tile-header-mode-btn')) return;
+
+  const mode   = tileState.canvasMode || 'note';
+  const label  = mode === 'widget' ? (WIDGET_REGISTRY.get(tileState.widgetId)?.label || 'Widget') : 'Note';
+  const btn    = document.createElement('button');
+  btn.className = 'tile-header-mode-btn' + (mode === 'widget' ? ' widget-active' : '');
+  btn.title     = 'Switch canvas mode';
+  btn.textContent = label;
+
+  // Insert before the invite button
+  const inviteBtn = header.querySelector('.notes-invite-btn');
+  if (inviteBtn) header.insertBefore(btn, inviteBtn);
+  else header.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    showModeSwitcher(btn, tileState);
+  });
+}
+
+function showModeSwitcher(btn, tileState) {
+  document.querySelectorAll('.widget-mode-pop').forEach(function(el) { el.remove(); });
+  const pop = document.createElement('div');
+  pop.className = 'widget-mode-pop';
+  const mode = tileState.canvasMode || 'note';
+
+  pop.innerHTML =
+    '<div class="widget-mode-item' + (mode === 'note' ? ' active' : '') + '" data-mode="note">' +
+      '<span style="font-size:13px">✎</span> Note canvas' +
+    '</div>' +
+    '<div class="widget-mode-item' + (mode === 'widget' ? ' active' : '') + '" data-mode="widget">' +
+      '<span style="font-size:13px">▦</span> Add widget' +
+    '</div>';
+
+  document.body.appendChild(pop);
+
+  // Position below button
+  const r = btn.getBoundingClientRect();
+  pop.style.left = r.left + 'px';
+  pop.style.top  = (r.bottom + 3) + 'px';
+
+  pop.querySelectorAll('.widget-mode-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      pop.remove();
+      const newMode = item.dataset.mode;
+      if (newMode === 'widget') {
+        showWidgetPicker(tileState);
+      } else {
+        tileState.canvasMode = 'note';
+        delete tileState.widgetId;
+        delete tileState.widgetConfig;
+        if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
+        refreshTileWidget(tileState.noteId);
+      }
+    });
+  });
+
+  setTimeout(function() {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('mousedown', _close); }
+    });
+  }, 0);
+}
+
+// ── Widget picker ─────────────────────────────────────────────────────────
+function showWidgetPicker(tileState) {
+  document.querySelectorAll('.widget-picker-overlay').forEach(function(el) { el.remove(); });
+
+  const overlay = document.createElement('div');
+  overlay.className = 'widget-picker-overlay';
+
+  function renderPicker(q) {
+    const all  = WIDGET_REGISTRY.getAll();
+    const cats = WIDGET_REGISTRY.categories();
+    const lower = (q || '').toLowerCase().trim();
+    const filtered = lower
+      ? all.filter(function(w) { return w.label.toLowerCase().includes(lower) || (w.description||'').toLowerCase().includes(lower); })
+      : all;
+
+    const ICONS = { gauge:'⏱', counter:'🔢', sparkline:'📈', bars:'▬', feed:'📋', dial:'◉', heatmap:'▦', strip:'▬', default:'◈' };
+
+    let bodyHtml = '';
+    if (!filtered.length) {
+      bodyHtml = '<div style="padding:20px;text-align:center;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3)">No widgets match</div>';
+    } else if (lower) {
+      bodyHtml = '<div class="widget-card-grid">' +
+        filtered.map(function(w) { return widgetCardHTML(w, ICONS); }).join('') +
+      '</div>';
+    } else {
+      cats.forEach(function(cat) {
+        const items = filtered.filter(function(w) { return w.category === cat; });
+        if (!items.length) return;
+        bodyHtml +=
+          '<div class="widget-cat-label">' + _esc(cat.charAt(0).toUpperCase() + cat.slice(1)) + '</div>' +
+          '<div class="widget-card-grid">' + items.map(function(w) { return widgetCardHTML(w, ICONS); }).join('') + '</div>';
+      });
+    }
+
+    overlay.innerHTML =
+      '<div class="widget-picker-dialog">' +
+        '<div class="widget-picker-header">' +
+          '<div class="widget-picker-title">Add Widget</div>' +
+          '<input class="widget-picker-search" id="wps-search" placeholder="Search widgets\u2026" value="' + _esc(q||'') + '" autocomplete="off"/>' +
+          '<button class="widget-picker-close" id="wps-close">\u00d7</button>' +
+        '</div>' +
+        '<div class="widget-picker-body">' + bodyHtml + '</div>' +
+      '</div>';
+
+    overlay.querySelector('#wps-close').onclick = function() { overlay.remove(); };
+    overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+
+    const searchEl = overlay.querySelector('#wps-search');
+    searchEl.addEventListener('input', function() { renderPicker(searchEl.value); });
+    searchEl.focus();
+
+    overlay.querySelectorAll('.widget-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        const widgetId = card.dataset.widgetId;
+        overlay.remove();
+        const widget = WIDGET_REGISTRY.get(widgetId);
+        if (widget && widget.configSchema && widget.configSchema.length) {
+          showWidgetConfig(widgetId, tileState, {});
+        } else {
+          applyWidget(widgetId, {}, tileState);
+        }
+      });
+    });
+  }
+
+  function widgetCardHTML(w, icons) {
+    const icon = icons[w.icon] || icons.default;
+    return '<div class="widget-card" data-widget-id="' + _esc(w.id) + '">' +
+      '<div class="widget-card-icon">' + icon + '</div>' +
+      '<div class="widget-card-name">' + _esc(w.label) + '</div>' +
+      '<div class="widget-card-desc">' + _esc(w.description || '') + '</div>' +
+    '</div>';
+  }
+
+  renderPicker('');
+  document.body.appendChild(overlay);
+}
+
+// ── Widget config form ────────────────────────────────────────────────────
+function showWidgetConfig(widgetId, tileState, existingConfig) {
+  const widget = WIDGET_REGISTRY.get(widgetId);
+  if (!widget) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'widget-config-overlay';
+
+  const fields = (widget.configSchema || []).map(function(field) {
+    const val = existingConfig[field.key] !== undefined ? existingConfig[field.key] : (field.default || '');
+    let input = '';
+    if (field.type === 'select') {
+      input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '">' +
+        (field.options||[]).map(function(o) {
+          return '<option value="' + _esc(o.value) + '"' + (o.value == val ? ' selected' : '') + '>' + _esc(o.label) + '</option>';
+        }).join('') +
+      '</select>';
+    } else if (field.type === 'boolean') {
+      input = '<input type="checkbox" class="wcf-input" data-key="' + _esc(field.key) + '"' + (val ? ' checked' : '') + ' style="width:auto"/>';
+    } else {
+      input = '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" type="' + (field.type === 'number' ? 'number' : 'text') + '" value="' + _esc(String(val)) + '" placeholder="' + _esc(field.label) + '"/>';
+    }
+    return '<div class="ntd-field"><label class="ntd-label">' + _esc(field.label) + '</label>' + input + '</div>';
+  }).join('');
+
+  overlay.innerHTML =
+    '<div class="widget-config-dialog">' +
+      '<div class="ntd-header">' +
+        '<div class="ntd-sub">Configure Widget</div>' +
+        '<div class="ntd-title">' + _esc(widget.label) + '</div>' +
+      '</div>' +
+      '<div class="ntd-body">' + fields + '</div>' +
+      '<div class="ntd-actions">' +
+        '<button class="ntd-btn ntd-btn-cancel" id="wcf-cancel">Cancel</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="wcf-apply">Apply</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('#wcf-cancel').onclick = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#wcf-apply').onclick = function() {
+    const config = {};
+    overlay.querySelectorAll('.wcf-input').forEach(function(inp) {
+      if (inp.type === 'checkbox') config[inp.dataset.key] = inp.checked;
+      else config[inp.dataset.key] = inp.value;
+    });
+    overlay.remove();
+    applyWidget(widgetId, config, tileState);
+  };
+}
+
+// ── Apply widget to tile ──────────────────────────────────────────────────
+function applyWidget(widgetId, config, tileState) {
+  tileState.canvasMode   = 'widget';
+  tileState.widgetId     = widgetId;
+  tileState.widgetConfig = config;
+  if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
+  refreshTileWidget(tileState.noteId);
+}
+
+// ── Refresh a specific tile's widget rendering ────────────────────────────
+function refreshTileWidget(noteId) {
+  const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
+  if (!tileEl) return;
+  const cv = window._notesCv && window._notesCv();
+  if (!cv) return;
+  const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
+  if (!tileState) return;
+  // Update mode button label
+  const modeBtn = tileEl.querySelector('.tile-header-mode-btn');
+  const mode    = tileState.canvasMode || 'note';
+  if (modeBtn) {
+    const widget = tileState.widgetId ? WIDGET_REGISTRY.get(tileState.widgetId) : null;
+    modeBtn.textContent = widget ? widget.label : 'Note';
+    modeBtn.classList.toggle('widget-active', mode === 'widget');
+  }
+  renderTileCanvas(tileEl, tileState, null);
+}
+
+// ── Wire into tile rendering ──────────────────────────────────────────────
+// Hook into _notesWireTiles to inject mode switcher into each rendered tile
+const _origWireTiles = window._notesWireTiles;
+window._notesWireTiles = function() {
+  if (typeof _origWireTiles === 'function') _origWireTiles();
+  const cv = window._notesCv && window._notesCv();
+  if (!cv) return;
+  cv.tiles.forEach(function(tileState) {
+    const tileEl = document.querySelector('.notes-tile[data-noteid="' + tileState.noteId + '"]');
+    if (!tileEl) return;
+    injectModeSwitcher(tileEl, tileState);
+    if (tileState.canvasMode === 'widget' && tileState.widgetId) {
+      renderTileCanvas(tileEl, tileState, null);
+    }
+  });
+};
+
+// ── Gear icon for reconfiguring existing widget ───────────────────────────
+// Exposed so tile HTML can call it
+window._notesWidgetReconfigure = function(noteId) {
+  const cv = window._notesCv && window._notesCv();
+  if (!cv) return;
+  const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
+  if (!tileState || !tileState.widgetId) return;
+  showWidgetConfig(tileState.widgetId, tileState, tileState.widgetConfig || {});
+};
+
+// ── Stub widget — validates full pipeline ────────────────────────────────
+WIDGET_REGISTRY.register({
+  id:          'stub_hello',
+  label:       'Hello Widget',
+  category:    'personal',
+  description: 'Stub widget — validates the full pipeline',
+  icon:        'gauge',
+  configSchema: [
+    { key: 'message', label: 'Message', type: 'text', default: 'Hello from the widget system!' }
+  ],
+  refreshInterval: 0,
+  minTileHeight:   'small',
+  dataFn: async function(config) {
+    return { message: config.message || 'Hello from the widget system!' };
+  },
+  renderFn: function(data, container) {
+    container.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;padding:16px">' +
+        '<div style="font-size:28px">▦</div>' +
+        '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:14px;font-weight:600;color:#00D2FF;text-align:center">' +
+          _esc((data && data.message) || 'Hello!') +
+        '</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.08em">WIDGET SYSTEM ACTIVE</div>' +
+      '</div>';
+  }
+});
+
+console.log('[Widgets] Phase 1 infrastructure loaded. Registry:', WIDGET_REGISTRY.getAll().length, 'widget(s).');
 
 })();
 </script>
