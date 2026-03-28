@@ -5640,44 +5640,17 @@ window.WIDGET_REGISTRY.register({
 
   renderFn: function(data, container) {
     if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const pct   = Math.min(data.pct,100);
+    const pct   = Math.min(data.pct, 100);
     const color = pct>=100?'#E24B4A':pct>=75?'#EF9F27':'#1D9E75';
-    // Fixed viewBox coordinates — SVG scales via width:100%
-    const W=120,r=44,cx=60,cy=64,sweep=240,startDeg=210;
-    const endDeg = startDeg+(sweep*pct/100);
-    function polar(deg,rad){const a=(deg-90)*Math.PI/180;return{x:cx+rad*Math.cos(a),y:cy+rad*Math.sin(a)};}
-    function arc(d1,d2,rad){const s=polar(d1,rad),e=polar(d2,rad),large=d2-d1>180?1:0;
-      return'M '+s.x.toFixed(1)+' '+s.y.toFixed(1)+' A '+rad+' '+rad+' 0 '+large+' 1 '+e.x.toFixed(1)+' '+e.y.toFixed(1);}
     const centerVal = data.hasHours ? data.totalHours+'h' : data.pct+'%';
-    const centerLbl = data.hasHours ? 'HOURS'            : 'LOAD';
-    const stat1Lbl  = data.hasHours ? data.cap+'h cap'   : 'Open';
-    const stat1Val  = data.hasHours ? data.totalHours    : data.total;
-    // Measure available height — boost by 1.4x to compensate for late render
-    const availH = Math.max(70, (container.offsetHeight || 120) - 34);
-    const svgH   = availH;
-    const scale  = (svgH / 80) * 1.05;
-    const sW     = Math.round(120 * scale);
-    const sr     = Math.round(44 * scale);
-    const scx    = Math.round(60 * scale);
-    // Shift arc north: cy at 58% of height instead of 80%
-    const scy    = Math.round(svgH * 0.58);
-    const sFontL = Math.max(13, Math.round(18 * scale));
-    const sFontS = Math.max(8,  Math.round(8  * scale));
-    const sSW    = Math.max(6,  Math.round(8  * scale));
-
-    function polar2(deg,rad){const a=(deg-90)*Math.PI/180;return{x:scx+rad*Math.cos(a),y:scy+rad*Math.sin(a)};}
-    function arc2(d1,d2,rad){const s=polar2(d1,rad),e=polar2(d2,rad),large=d2-d1>180?1:0;
-      return'M '+s.x.toFixed(1)+' '+s.y.toFixed(1)+' A '+rad+' '+rad+' 0 '+large+' 1 '+e.x.toFixed(1)+' '+e.y.toFixed(1);}
-
+    const centerLbl = data.hasHours ? 'HOURS LOAD' : '% LOAD';
+    const stat1Lbl  = data.hasHours ? data.cap+'h cap' : 'Open';
+    const stat1Val  = data.hasHours ? data.totalHours  : data.total;
     container.innerHTML=
-      '<div style="display:flex;flex-direction:column;align-items:center;padding:4px 4px 4px;height:100%;box-sizing:border-box;justify-content:space-between;overflow:hidden">'+
-        '<svg width="'+sW+'" height="'+svgH+'" viewBox="0 0 '+sW+' '+svgH+'" style="flex-shrink:1;min-height:0;overflow:visible">'+
-          '<path d="'+arc2(startDeg,startDeg+sweep,sr)+'" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="'+sSW+'" stroke-linecap="round"/>'+
-          (pct>0?'<path d="'+arc2(startDeg,Math.min(endDeg,startDeg+sweep-0.1),sr)+'" fill="none" stroke="'+color+'" stroke-width="'+sSW+'" stroke-linecap="round"/>':'')+
-          '<text x="'+scx+'" y="'+(scy-4)+'" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="'+sFontL+'" font-weight="700" fill="'+color+'">'+centerVal+'</text>'+
-          '<text x="'+scx+'" y="'+(scy+sFontS+3)+'" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="'+sFontS+'" fill="rgba(255,255,255,.3)" letter-spacing="0.06em">'+centerLbl+'</text>'+
-        '</svg>'+
-        '<div class="widget-stat-row" style="flex-shrink:0;width:100%">'+
+      '<div class="widget-counter">'+
+        '<div class="wc-big" style="color:'+color+'">'+centerVal+'</div>'+
+        '<div class="wc-label">'+centerLbl+'</div>'+
+        '<div class="widget-stat-row" style="margin-top:4px">'+
           '<div class="wsr-item"><div class="wsr-val">'+stat1Val+'</div><div class="wsr-lbl">'+stat1Lbl+'</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#E24B4A">'+data.overdue+'</div><div class="wsr-lbl">Overdue</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#EF9F27">'+data.dueToday+'</div><div class="wsr-lbl">Today</div></div>'+
