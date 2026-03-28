@@ -5642,7 +5642,8 @@ window.WIDGET_REGISTRY.register({
     if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
     const pct   = Math.min(data.pct,100);
     const color = pct>=100?'#E24B4A':pct>=75?'#EF9F27':'#1D9E75';
-    const W=120,r=44,cx=60,cy=62,sweep=240,startDeg=210;
+    // Fixed viewBox coordinates — SVG scales via width:100%
+    const W=120,r=44,cx=60,cy=64,sweep=240,startDeg=210;
     const endDeg = startDeg+(sweep*pct/100);
     function polar(deg,rad){const a=(deg-90)*Math.PI/180;return{x:cx+rad*Math.cos(a),y:cy+rad*Math.sin(a)};}
     function arc(d1,d2,rad){const s=polar(d1,rad),e=polar(d2,rad),large=d2-d1>180?1:0;
@@ -5652,14 +5653,15 @@ window.WIDGET_REGISTRY.register({
     const stat1Lbl  = data.hasHours ? data.cap+'h cap'   : 'Open';
     const stat1Val  = data.hasHours ? data.totalHours    : data.total;
     container.innerHTML=
-      '<div style="display:flex;flex-direction:column;align-items:center;padding:8px 4px 4px;height:100%;justify-content:space-between">'+
-        '<svg width="'+W+'" height="80" viewBox="0 0 '+W+' 80" style="overflow:visible">'+
+      '<div style="display:flex;flex-direction:column;align-items:center;padding:6px 4px 4px;height:100%;box-sizing:border-box;justify-content:space-between;overflow:hidden">'+
+        // SVG uses width:100% max-width so it scales down in small tiles
+        '<svg width="100%" viewBox="0 0 '+W+' 82" style="max-width:'+W+'px;flex-shrink:1;min-height:0">'+
           '<path d="'+arc(startDeg,startDeg+sweep,r)+'" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8" stroke-linecap="round"/>'+
           (pct>0?'<path d="'+arc(startDeg,Math.min(endDeg,startDeg+sweep-0.1),r)+'" fill="none" stroke="'+color+'" stroke-width="8" stroke-linecap="round"/>':'')+
           '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="18" font-weight="700" fill="'+color+'">'+centerVal+'</text>'+
           '<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" font-family="var(--font-mono,monospace)" font-size="8" fill="rgba(255,255,255,.3)" letter-spacing="0.06em">'+centerLbl+'</text>'+
         '</svg>'+
-        '<div class="widget-stat-row">'+
+        '<div class="widget-stat-row" style="flex-shrink:0;width:100%">'+
           '<div class="wsr-item"><div class="wsr-val">'+stat1Val+'</div><div class="wsr-lbl">'+stat1Lbl+'</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#E24B4A">'+data.overdue+'</div><div class="wsr-lbl">Overdue</div></div>'+
           '<div class="wsr-item"><div class="wsr-val" style="color:#EF9F27">'+data.dueToday+'</div><div class="wsr-lbl">Today</div></div>'+
