@@ -3465,6 +3465,7 @@ function _notesRenameView(newName) {
   _workspace.activeView = newName;
   _notesSaveWorkspace(true);
   _notesRenderViewSwitcher();
+  _notesRenderLibrary(); // keep WORKFLOWS left panel in sync with rename
   // STEP 5: keep view_participants in sync so participant heartbeats stay aligned
   if (_userId) {
     API.patch(
@@ -6346,17 +6347,20 @@ function _resolveTarget(config) {
   const cv = window._notesCv && window._notesCv();
   const viewRid = cv && cv.forResourceId  ? cv.forResourceId  : null;
 
-  // Resolve user_id for the view's associated resource if we have it
-  // (needed by widgets that query by user_id rather than resource_id)
-  let viewUid = null;
-  if (viewRid && window._inviteResources) {
-    const res = window._inviteResources.find(function(r) { return r.id === viewRid; });
-    if (res) viewUid = res.user_id || null;
+  // Resolve uid from configRid first — widgets stamp targetResourceId (rid) at clone
+  // time but never stamp targetUserId, so uid must be looked up from _inviteResources.
+  // Without this, tasks (queried by uid) always fall back to the logged-in user's uid
+  // even when rid correctly points to a different person.
+  let resolvedUid = configUid || null;
+  const effectiveRid = configRid || viewRid || null;
+  if (!resolvedUid && effectiveRid && window._inviteResources) {
+    const res = window._inviteResources.find(function(r) { return r.id === effectiveRid; });
+    if (res) resolvedUid = res.user_id || null;
   }
 
   return {
-    rid: configRid || viewRid || myRid,
-    uid: configUid || viewUid || myUid,
+    rid: effectiveRid || myRid,
+    uid: resolvedUid  || myUid,
   };
 }
 
