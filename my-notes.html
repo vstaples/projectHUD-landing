@@ -374,8 +374,8 @@
         <button onclick="window._notesShowRenameViewDialog && window._notesShowRenameViewDialog(window._workspace && window._workspace.activeView)"
           id="notes-rename-btn"
           title="Rename current view"
-          style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
-          onmouseover="this.style.color='#00D2FF'" onmouseout="this.style.color=''"
+          style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:color .12s"
+          onmouseover="this.style.color='#00D2FF'" onmouseout="this.style.color='rgba(255,255,255,.25)'"
           >✎</button>
         <button onclick="window._notesDeleteView && window._notesDeleteView()"
           title="Delete current view"
@@ -3197,50 +3197,162 @@ function _notesNewView() {
   });
 }
 
-function _notesShowRenameViewDialog(currentName) {
+async function _notesShowRenameViewDialog(currentName) {
+  const cv = _cv();
   const overlay = document.createElement('div');
   overlay.className = 'ntd-overlay';
+
+  // Load resources for the person picker (reuse invite cache)
+  const allResources = await _notesLoadInviteResources();
+  const myUserId = window._notesResource && window._notesResource.user_id;
+
+  // Build grouped list matching the invite picker style
+  const groups = {};
+  (allResources||[]).forEach(function(r) {
+    const grp = r.is_external ? 'External' : (r.department || 'Other');
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(r);
+  });
+  const groupKeys = Object.keys(groups).sort(function(a,b) {
+    if (a==='External') return 1; if (b==='External') return -1;
+    return a.localeCompare(b);
+  });
+  let personListHtml = '';
+  groupKeys.forEach(function(grp) {
+    personListHtml += '<div style="padding:3px 7px 1px;font-family:var(--font-mono,monospace);font-size:9px;' +
+      'color:var(--text3);letter-spacing:.08em;text-transform:uppercase;' +
+      'border-top:1px solid rgba(0,210,255,.06);margin-top:2px">' + _esc(grp) + '</div>';
+    groups[grp].forEach(function(r) {
+      const initials = r.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      const colorIdx = r.id ? (parseInt(r.id.slice(-4),16)||0) : 0;
+      const color = (typeof PARTICIPANT_COLORS!=='undefined'&&PARTICIPANT_COLORS.length)
+        ? PARTICIPANT_COLORS[colorIdx % PARTICIPANT_COLORS.length] : '#00D2FF';
+      const isCurrent = cv.forResourceId === r.id;
+      personListHtml +=
+        '<div class="rnv-person-row" data-rid="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '" ' +
+            'data-name="' + _esc(r.name) + '" ' +
+            'style="display:flex;align-items:center;gap:8px;padding:4px 8px;cursor:pointer;' +
+              (isCurrent ? 'background:rgba(0,210,255,.09);' : '') + '">' +
+          '<div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
+              'justify-content:center;font-size:9px;font-weight:700;font-family:var(--font-ui,sans-serif);' +
+              'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
+            initials +
+          '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
+            (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
+          '</div>' +
+          (isCurrent ? '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:rgba(0,210,255,.6)">✓</span>' : '') +
+        '</div>';
+    });
+  });
+
   overlay.innerHTML =
-    '<div class="ntd-dialog" style="width:360px">' +
+    '<div class="ntd-dialog" style="width:400px;max-height:80vh;display:flex;flex-direction:column">' +
       '<div class="ntd-header">' +
-        '<div class="ntd-sub">Named View</div>' +
-        '<div class="ntd-title">Rename View</div>' +
+        '<div class="ntd-sub">Edit Dashboard</div>' +
+        '<div class="ntd-title">' + _esc(currentName) + '</div>' +
       '</div>' +
-      '<div class="ntd-body">' +
+      '<div class="ntd-body" style="padding:14px 20px 0;display:flex;flex-direction:column;gap:12px;overflow:hidden">' +
         '<div class="ntd-field">' +
-          '<label class="ntd-label">View name</label>' +
-          '<input class="ntd-input" id="nrv-name" value="' + _esc(currentName) + '"/>' +
+          '<label class="ntd-label">Dashboard name</label>' +
+          '<input class="ntd-input" id="nrv-name" value="' + _esc(currentName) + '" style="width:100%"/>' +
+        '</div>' +
+        '<div class="ntd-field" style="flex:1;min-height:0;display:flex;flex-direction:column">' +
+          '<label class="ntd-label">Associated user</label>' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);margin-bottom:5px">' +
+            'Widgets will pull data for this person' +
+          '</div>' +
+          '<input id="nrv-search" placeholder="Search…" autocomplete="off" ' +
+            'style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.15);color:var(--text0);' +
+              'font-family:var(--font-ui,sans-serif);font-size:12px;padding:4px 7px;margin-bottom:3px;outline:none;width:100%;box-sizing:border-box"/>' +
+          '<div id="nrv-person-list" style="max-height:220px;overflow-y:auto;' +
+              'border:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.2)">' +
+            personListHtml +
+          '</div>' +
+          '<div id="nrv-selected-lbl" style="margin-top:5px;font-family:var(--font-mono,monospace);' +
+              'font-size:10px;color:rgba(0,210,255,.7);min-height:14px">' +
+            (cv.forResourceName ? '→ ' + _esc(cv.forResourceName) : '') +
+          '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="ntd-actions">' +
+      '<div class="ntd-actions" style="flex-shrink:0">' +
         '<button class="ntd-btn ntd-btn-cancel" id="nrv-cancel">Cancel</button>' +
-        '<button class="ntd-btn ntd-btn-save" id="nrv-save">Rename</button>' +
+        '<button class="ntd-btn ntd-btn-save" id="nrv-save">Save</button>' +
       '</div>' +
     '</div>';
+
   document.body.appendChild(overlay);
 
-  const input = overlay.querySelector('#nrv-name');
-  input.focus(); input.select();
+  const nameInp    = overlay.querySelector('#nrv-name');
+  const searchInp  = overlay.querySelector('#nrv-search');
+  const personList = overlay.querySelector('#nrv-person-list');
+  const selectedLbl = overlay.querySelector('#nrv-selected-lbl');
+  nameInp.focus(); nameInp.select();
 
-  const doRename = function() {
-    const newName = input.value.trim();
-    if (!newName || newName === currentName) { overlay.remove(); return; }
-    if (_workspace.views[newName]) {
-      input.style.borderColor = 'rgba(226,75,74,.6)';
-      input.title = 'A view named "' + newName + '" already exists';
-      input.focus(); return;
+  // Selection state — pre-seed from current view
+  let selectedRid  = cv.forResourceId   || null;
+  let selectedUid  = cv.forResourceId   ? (allResources.find(function(r){return r.id===cv.forResourceId;})||{}).user_id || null : null;
+  let selectedName = cv.forResourceName || null;
+
+  // Wire row selection
+  personList.querySelectorAll('.rnv-person-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      personList.querySelectorAll('.rnv-person-row').forEach(function(r) {
+        r.style.background = ''; r.querySelector('span') && (r.querySelector('span[style*="✓"]') ? r.querySelector('span').remove() : null);
+      });
+      row.style.background = 'rgba(0,210,255,.09)';
+      selectedRid  = row.dataset.rid  || null;
+      selectedUid  = row.dataset.uid  || null;
+      selectedName = row.dataset.name || null;
+      selectedLbl.textContent = selectedName ? ('→ ' + selectedName) : '';
+    });
+  });
+
+  // Live search
+  searchInp.addEventListener('input', function() {
+    const q = searchInp.value.toLowerCase().trim();
+    personList.querySelectorAll('.rnv-person-row').forEach(function(row) {
+      row.style.display = (!q || (row.dataset.name||'').toLowerCase().includes(q)) ? '' : 'none';
+    });
+    personList.querySelectorAll('[style*="text-transform:uppercase"]').forEach(function(hdr) {
+      let el = hdr.nextElementSibling, hasVis = false;
+      while (el && el.classList.contains('rnv-person-row')) { if (el.style.display!=='none') hasVis=true; el=el.nextElementSibling; }
+      hdr.style.display = hasVis ? '' : 'none';
+    });
+  });
+
+  const doSave = function() {
+    const newName = nameInp.value.trim();
+    if (!newName) { nameInp.focus(); return; }
+    if (newName !== currentName && _workspace.views[newName]) {
+      nameInp.style.borderColor = 'rgba(226,75,74,.6)';
+      nameInp.title = 'A view with this name already exists'; nameInp.focus(); return;
     }
     overlay.remove();
-    _notesRenameView(newName);
+    // Update person association on the view
+    const targetView = _workspace.views[currentName];
+    if (targetView) {
+      if (selectedName) { targetView.forResourceName = selectedName; targetView.forResourceId = selectedRid || null; }
+      // Also update all widget configs to match the newly selected person
+      if ((selectedRid || selectedUid) && (selectedRid !== cv.forResourceId || !cv.forResourceId)) {
+        (targetView.tiles || []).forEach(function(t) {
+          if (t.canvasMode !== 'widget' || !t.widgetConfig) return;
+          const cfg = t.widgetConfig;
+          if ('targetResourceId' in cfg && selectedRid) cfg.targetResourceId = selectedRid;
+          if ('targetUserId'     in cfg && selectedUid) cfg.targetUserId     = selectedUid;
+        });
+      }
+    }
+    if (newName !== currentName) _notesRenameView(newName);
+    else { _notesSaveWorkspace(true); _notesRenderViewSwitcher(); _notesRenderLibrary(); }
+    _notesRenderGrid(); // re-render widgets with new configs
   };
 
-  overlay.querySelector('#nrv-save').onclick   = doRename;
-  overlay.querySelector('#nrv-cancel').onclick  = function() { overlay.remove(); };
-  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doRename();
-    if (e.key === 'Escape') overlay.remove();
-  });
+  overlay.querySelector('#nrv-save').onclick  = doSave;
+  overlay.querySelector('#nrv-cancel').onclick = function() { overlay.remove(); };
+  overlay.addEventListener('mousedown', function(e) { if (e.target===overlay) overlay.remove(); });
+  nameInp.addEventListener('keydown', function(e) { if (e.key==='Enter') doSave(); if (e.key==='Escape') overlay.remove(); });
 }
 
 function _notesRenameView(newName) {
@@ -6110,25 +6222,38 @@ function _widgetCtx() {
 // rid/uid to query, substituting the viewer's own IDs whenever the config ID
 // does not belong to the current user.
 function _resolveTarget(config) {
-  const ctx        = _widgetCtx();
-  const myRid      = ctx.resourceId;
-  const myUid      = ctx.userId;
-  const configRid  = (config && config.targetResourceId) || '';
-  const configUid  = (config && config.targetUserId)     || '';
+  const ctx       = _widgetCtx();
+  const myRid     = ctx.resourceId;
+  const myUid     = ctx.userId;
+  const configRid = (config && config.targetResourceId) || '';
+  const configUid = (config && config.targetUserId)     || '';
 
   // In a shared view, if the saved ID is not ours → use our own IDs
   if (ctx.isSharedView && configRid && configRid !== myRid) {
-    console.log(P2, '_resolveTarget: shared view — substituting viewer IDs for owner config',
-      { configRid, myRid });
     return { rid: myRid, uid: myUid };
   }
   if (ctx.isSharedView && configUid && configUid !== myUid) {
     return { rid: myRid, uid: myUid };
   }
-  // Normal: use config if set, fall back to self
+
+  // For cloned dashboards: the active view may have forResourceId stamped on it.
+  // When a widget config's targetResourceId is empty (owner didn't explicitly pick
+  // themselves), fall back to the view's associated person rather than the logged-in
+  // user. This is the key fix for cloned dashboards showing identical data.
+  const cv = window._notesCv && window._notesCv();
+  const viewRid = cv && cv.forResourceId  ? cv.forResourceId  : null;
+
+  // Resolve user_id for the view's associated resource if we have it
+  // (needed by widgets that query by user_id rather than resource_id)
+  let viewUid = null;
+  if (viewRid && window._inviteResources) {
+    const res = window._inviteResources.find(function(r) { return r.id === viewRid; });
+    if (res) viewUid = res.user_id || null;
+  }
+
   return {
-    rid: configRid || myRid,
-    uid: configUid || myUid,
+    rid: configRid || viewRid || myRid,
+    uid: configUid || viewUid || myUid,
   };
 }
 
