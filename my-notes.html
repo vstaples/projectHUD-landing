@@ -1132,6 +1132,19 @@ function _notesRenderGrid() {
   // ── STEP 5: determine viewer status once per render ───────────────────
   const viewerCtx = _notesGetViewerRole();
 
+  // Snapshot existing widget tile elements BEFORE wiping the grid so we can
+  // transplant them back in. This preserves the .tile-canvas and its
+  // dataset.widgetRendered guard, preventing dataFn from re-firing on every
+  // _notesRenderGrid call (which would otherwise cause continuous API polls).
+  const existingWidgetEls = {};
+  gridArea.querySelectorAll('.notes-tile[data-noteid]').forEach(function(el) {
+    const nid = el.dataset.noteid;
+    const canvas = el.querySelector('.tile-canvas');
+    if (canvas && canvas.dataset.widgetRendered) {
+      existingWidgetEls[nid] = el;
+    }
+  });
+
   gridArea.innerHTML = '';
   rows.forEach(function(row) {
     const cols   = Math.max(1, Math.min(8, row.columns || 2));
@@ -1145,24 +1158,35 @@ function _notesRenderGrid() {
     for (let s = 0; s < cols; s++) {
       const tile = cv.tiles.find(function(t) { return t.row === row.id && t.slot === s; });
       const note = tile ? _notes.find(function(n) { return n.id === tile.noteId; }) : null;
-      const div  = document.createElement('div');
 
       // ── STEP 5: per-slot viewer check ──────────────────────────────────
       const slotKey        = row.id + ':' + s;
-      // Widget tiles are never read-only — viewers can always see widget data
       const tileIsWidget   = tile && tile.canvasMode === 'widget';
       const tileIsReadOnly = !tileIsWidget && viewerCtx.isViewer && !viewerCtx.overriddenSlots.has(slotKey);
 
-      // A tile may be a placeholder (ph-/wt- ID, no DB note yet) or a widget tile
-      // (real UUID but canvasMode='widget'). Both render as tiles without needing
-      // a note object. Only genuine note tiles require note to be non-null.
       const isPlaceholderTile = tile && (tile.isPlaceholder ||
         (tile.noteId && (tile.noteId.startsWith('ph-') || tile.noteId.startsWith('wt-'))));
-      const isWidgetTile = tile && tile.canvasMode === 'widget';
 
-      if (note || isPlaceholderTile || isWidgetTile) {
+      // ── Widget tile DOM reuse ─────────────────────────────────────────
+      // If we already have a rendered widget element for this noteId, transplant
+      // it directly. This preserves the canvas and its widgetRendered guard so
+      // dataFn is NOT re-invoked — eliminating the continuous refresh loop.
+      if (tileIsWidget && tile.noteId && existingWidgetEls[tile.noteId]) {
+        const existing = existingWidgetEls[tile.noteId];
+        // Update minimized state in case it changed
+        existing.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
+        existing.dataset.rowid = row.id;
+        existing.dataset.slot  = s;
+        rowDiv.appendChild(existing);
+        delete existingWidgetEls[tile.noteId]; // consumed
+        continue;
+      }
+
+      const div = document.createElement('div');
+
+      if (note || isPlaceholderTile || tileIsWidget) {
         // For placeholder/widget tiles without a note, synthesise a minimal note-like object
-        const noteObj = note || { id: tile.noteId, title: isWidgetTile ? (tile.widgetId || 'Widget') : 'New tile', content: '' };
+        const noteObj = note || { id: tile.noteId, title: tileIsWidget ? (tile.widgetId || 'Widget') : 'New tile', content: '' };
         div.className = 'notes-tile' + (tile.minimized ? ' minimized' : '');
         div.setAttribute('draggable', !tileIsReadOnly ? 'true' : 'false');
         div.innerHTML = _notesTileHTML(noteObj, tile, tileIsReadOnly);
@@ -5764,22 +5788,6 @@ function _resolveTarget(config) {
   };
 }
 
-// ── Startup diagnostics ──────────────────────────────────────────────────
-// Runs once when Phase 2 script is evaluated — catches most timing issues.
-(function _p2Diag() {
-  const api   = _resolveApi();
-  const res   = window._notesResource;
-  const reg   = window.WIDGET_REGISTRY;
-  const wiCtx = typeof window._widgetContext === 'function';
-  console.log(P2, '── Phase 2 startup diagnostics ──');
-  console.log(P2, 'API resolved?',        api   ? '✓ ' + (typeof API !== 'undefined' ? 'bare API' : 'window._notesAPI') : '✗ MISSING');
-  console.log(P2, '_notesResource?',      res   ? '✓  user_id=' + res.user_id + '  id=' + res.id : '✗ MISSING (will wait in dataFn)');
-  console.log(P2, 'WIDGET_REGISTRY?',     reg   ? '✓' : '✗ MISSING — widgets will NOT register');
-  console.log(P2, 'window._widgetContext?', wiCtx ? '✓' : '✗ missing (fallback active)');
-  console.log(P2, 'window._wiItems?',     window._wiItems ? '✓  len=' + window._wiItems.length : '— not loaded yet (ok)');
-  console.log(P2, 'window.myActionItems?',window.myActionItems ? '✓  len=' + window.myActionItems.length : '— not loaded yet (ok)');
-})();
-
 // ── Guard ─────────────────────────────────────────────────────────────────
 if (!window.WIDGET_REGISTRY) {
   console.error(P2, 'WIDGET_REGISTRY not available — aborting Phase 2 registration');
@@ -5855,14 +5863,14 @@ window.WIDGET_REGISTRY.register({
 
     const [aiRows, taskRows] = await Promise.all([
       rid ? _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
-      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours,loe_hours&limit=500') : [],
+      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours&limit=500') : [],
     ]);
 
     const items = Array.isArray(aiRows)   ? aiRows   : [];
     const tasks = Array.isArray(taskRows) ? taskRows : [];
     const all   = items.concat(tasks);
 
-    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||t.loe_hours||0);},0);
+    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||0);},0);
     const hasHours   = totalHours > 0;
     const used       = hasHours ? Math.min(totalHours, cap*2) : Math.min(all.length, cap*2);
     const pct        = Math.round((used/cap)*100);
@@ -5965,9 +5973,9 @@ window.WIDGET_REGISTRY.register({
     const { uid } = _resolveTarget(config);
     if (!uid) return null;
     const today = new Date().toISOString().slice(0,10);
-    const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours,loe_hours&limit=500');
+    const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours&limit=500');
     const all   = Array.isArray(tasks) ? tasks : [];
-    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||t.loe_hours||0);},0);
+    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||0);},0);
     return {
       total:      all.length,
       overdue:    all.filter(function(t){return t.due_date&&t.due_date<today;}).length,
@@ -6170,7 +6178,6 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const W = '[W2:task_list]';
-    console.log(W, 'dataFn start — config:', config);
 
     // ── 1. Wait for _notesResource (compass sets it after script injection)
     let _w = 0;
@@ -6178,7 +6185,6 @@ window.WIDGET_REGISTRY.register({
       await new Promise(function(r){setTimeout(r,100);}); _w+=100;
     }
     if (!window._notesResource) {
-      console.error(W, '_notesResource never appeared after 3s — aborting');
       return { items:[], today:new Date().toISOString().slice(0,10) };
     }
 
@@ -6186,12 +6192,9 @@ window.WIDGET_REGISTRY.register({
     const today = new Date().toISOString().slice(0,10);
     const uid   = res.user_id;
     const rid   = res.id;
-    console.log(W, '_notesResource ok — uid:', uid, ' rid:', rid);
 
     // ── 2. Check API
     const api = _resolveApi();
-    console.log(W, 'API resolved?', api ? '✓' : '✗ MISSING');
-    if (!uid) { console.warn(W, 'no uid — cannot fetch tasks'); return { items:[], today }; }
 
     // ── 3. Try window._wiItems cache (only when targeting self)
     const configRid = config && config.targetResourceId;
@@ -6199,15 +6202,11 @@ window.WIDGET_REGISTRY.register({
     // In a shared view the config ID may be the owner's — treat as self
     const isSelf = !configRid || configRid === rid ||
                    (ctx2.isSharedView && configRid !== rid);
-    console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
 
     if (isSelf && window._wiItems && window._wiItems.length) {
       const cached = window._wiItems.filter(function(w){ return w.type === 'task'; });
-      console.log(W, 'cache hit — _wiItems tasks:', cached.length);
       if (cached.length) return { items: cached, today, source: 'cache' };
-      console.log(W, 'cache has _wiItems but no task entries — falling through to fetch');
     } else {
-      console.log(W, '_wiItems not available or empty — will fetch directly');
     }
 
     // ── 4. Resolve fetch uid (self or target resource's user_id)
@@ -6215,27 +6214,20 @@ window.WIDGET_REGISTRY.register({
       const r = (window._resources||[]).find(function(r){ return r.id === configRid; });
       return r ? r.user_id : null;
     })();
-    console.log(W, 'fetchUid:', fetchUid);
     if (!fetchUid) {
-      console.warn(W, 'fetchUid is null — cannot resolve user_id for resource', configRid);
       return { items:[], today };
     }
 
     // ── 5. Fetch tasks
-    if (!api) { console.error(W, 'API still null at fetch step'); return { items:[], today }; }
     const taskQuery = 'tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days' +
       '&assigned_to=eq.'+fetchUid+'&status=neq.complete&order=created_at.desc&limit=200';
-    console.log(W, 'fetching tasks:', taskQuery);
     const tasks = await api.get(taskQuery).catch(function(err){
-      console.error(W, 'tasks fetch error:', err); return [];
     });
-    console.log(W, 'raw tasks returned:', tasks && tasks.length, tasks);
 
     // ── 6. Fetch project names
     const projIds = {};
     (tasks||[]).forEach(function(t){ if(t.project_id) projIds[t.project_id]=true; });
     const pKeys = Object.keys(projIds);
-    console.log(W, 'unique project_ids to resolve:', pKeys.length);
     const projs = pKeys.length
       ? await _api('projects?id=in.('+pKeys.join(',')+')'+'&select=id,name&limit=200')
       : [];
@@ -6268,7 +6260,6 @@ window.WIDGET_REGISTRY.register({
       return 0;
     });
 
-    console.log(W, 'final items:', items.length);
     return { items, today };
   },
 
@@ -6388,7 +6379,6 @@ window.WIDGET_REGISTRY.register({
 
   dataFn: async function(config) {
     const W = '[W2:action_item_list]';
-    console.log(W, 'dataFn start — config:', config);
 
     // ── 1. Wait for _notesResource
     let _w = 0;
@@ -6396,7 +6386,6 @@ window.WIDGET_REGISTRY.register({
       await new Promise(function(r){setTimeout(r,100);}); _w+=100;
     }
     if (!window._notesResource) {
-      console.error(W, '_notesResource never appeared after 3s — aborting');
       return { items:[], today:new Date().toISOString().slice(0,10) };
     }
 
@@ -6404,23 +6393,18 @@ window.WIDGET_REGISTRY.register({
     const today = new Date().toISOString().slice(0,10);
     const uid   = res.user_id;
     const rid   = res.id;
-    console.log(W, '_notesResource ok — uid:', uid, ' rid:', rid);
 
     const api = _resolveApi();
-    console.log(W, 'API resolved?', api ? '✓' : '✗ MISSING');
-    if (!rid) { console.warn(W, 'no rid — cannot fetch action items'); return { items:[], today }; }
 
     const configRid = config && config.targetResourceId;
     const ctx2      = _widgetCtx();
     // In a shared view the config ID may be the owner's — treat as self
     const isSelf    = !configRid || configRid === rid ||
                       (ctx2.isSharedView && configRid !== rid);
-    console.log(W, 'isSelf:', isSelf, ' configRid:', configRid);
 
     // ── 2. Try _wiItems cache (my-work populates this with type:'action' entries)
     if (isSelf && window._wiItems && window._wiItems.length) {
       const cached = window._wiItems.filter(function(w){ return w.type === 'action'; });
-      console.log(W, 'cache hit — _wiItems action entries:', cached.length);
       if (cached.length) {
         const items = cached.map(function(a){
           return { id:a.id, title:a.title, due:a.due, overdue:a.overdue,
@@ -6428,15 +6412,12 @@ window.WIDGET_REGISTRY.register({
         });
         return { items, today, source:'cache' };
       }
-      console.log(W, '_wiItems present but no action entries — falling through to fetch');
     } else {
-      console.log(W, '_wiItems not available — will fetch directly');
     }
 
     // ── 3. Fallback: also try window.myActionItems (populated by my-work separately)
     if (isSelf && window.myActionItems && window.myActionItems.length) {
       const cached = window.myActionItems.filter(function(a){ return a.status === 'open'; });
-      console.log(W, 'myActionItems cache hit — open:', cached.length);
       const items = cached.map(function(a){
         return { id:a.id, title:a.title, due:a.due_date,
           overdue: a.due_date && a.due_date < today,
@@ -6447,15 +6428,11 @@ window.WIDGET_REGISTRY.register({
 
     // ── 4. Fetch fresh directly from DB
     const targetRid = isSelf ? rid : configRid;
-    if (!api) { console.error(W, 'API null at fetch step'); return { items:[], today }; }
 
     const aiQuery = 'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
       '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100';
-    console.log(W, 'fetching:', aiQuery);
     const rows = await api.get(aiQuery).catch(function(err){
-      console.error(W, 'fetch error:', err); return [];
     });
-    console.log(W, 'raw rows returned:', rows && rows.length, rows);
 
     const items = (rows||[]).map(function(a){
       return { id:a.id, title:a.title, due:a.due_date,
@@ -6468,7 +6445,6 @@ window.WIDGET_REGISTRY.register({
       if (a.due&&b.due) return a.due.localeCompare(b.due);
       return 0;
     });
-    console.log(W, 'final items:', items.length);
     return { items, today };
   },
 
@@ -6552,16 +6528,16 @@ window.WIDGET_REGISTRY.register({
 
 // ── All widgets registered — now safe to re-fire _notesPostWire ───────────
 // (Moved here from mid-block so task_list and action_item_list are included)
-console.log(P2, 'All 7 widgets registered. Re-firing _notesPostWire…');
+
 setTimeout(function() {
   if (typeof window._notesPostWire === 'function') {
-    console.log(P2, '_notesPostWire re-fire (50ms)');
+    
     window._notesPostWire();
   }
 }, 50);
 setTimeout(function() {
   if (typeof window._notesPostWire === 'function') {
-    console.log(P2, '_notesPostWire re-fire (200ms)');
+    
     window._notesPostWire();
   }
 }, 200);
