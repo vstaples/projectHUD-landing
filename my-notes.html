@@ -5875,9 +5875,11 @@ window.WIDGET_REGISTRY.register({
     // Use My Work's already-loaded data if available and targeting self
     const configRid = config && config.targetResourceId;
     const isSelf = !configRid || configRid === rid;
-    if (isSelf && window._wiItems && window._wiItems.length) {
-      const tasks = window._wiItems.filter(function(w){ return w.type === 'task'; });
-      return { items: tasks, today: today, source: 'cache' };
+    // My Work exports work items as window._calItems (set at line 5118 of my-work.html)
+    const _cachedItems = window._calItems || window._wiItems || [];
+    if (isSelf && _cachedItems.length) {
+      const tasks = _cachedItems.filter(function(w){ return w.type === 'task'; });
+      if (tasks.length) return { items: tasks, today: today, source: 'cache' };
     }
 
     // Fetch fresh — exact same query as My Work
@@ -5891,10 +5893,13 @@ window.WIDGET_REGISTRY.register({
     })();
     if (!fetchUid) return { items:[], today:today };
 
-    const tasks = await _api(
+    // Use window.API directly — _api() may silently return [] if API not in closure scope
+    const _taskApi = window.API || window._notesAPI;
+    if (!_taskApi) return { items:[], today:today };
+    const tasks = await _taskApi.get(
       'tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days' +
-      '&assigned_to=eq.'+fetchUid+'&status=neq.complete&order=created_at.desc&limit=200'
-    );
+      '&assigned_to=eq.'+fetchUid+'&order=created_at.desc&limit=200'
+    ).catch(function(){ return []; });
     const projIds = {};
     (tasks||[]).forEach(function(t){ if(t.project_id) projIds[t.project_id]=true; });
     const pKeys = Object.keys(projIds);
@@ -5998,10 +6003,12 @@ window.WIDGET_REGISTRY.register({
 
     // Fetch fresh — exact same query as My Work
     const targetRid = isSelf ? rid : configRid;
-    const rows = await _api(
+    const _aiApi = window.API || window._notesAPI;
+    if (!_aiApi) return { items:[], today:today };
+    const rows = await _aiApi.get(
       'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
       '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100'
-    );
+    ).catch(function(){ return []; });
     const items = (rows||[]).map(function(a){
       return { id:a.id, title:a.title, due:a.due_date,
         overdue: a.due_date && a.due_date < today,
