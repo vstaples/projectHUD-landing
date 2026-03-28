@@ -480,9 +480,9 @@ window._notesLoadView = async function() {
         if (cv && cv.tiles && window.WIDGET_REGISTRY) {
           cv.tiles.forEach(function(tile) {
             if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
-            var tileEl = document.querySelector('[data-tile-id="' + tile.id + '"]');
+            var tileEl = document.querySelector('.notes-tile[data-noteid="' + tile.noteId + '"]');
             if (!tileEl) return;
-            var canvas = tileEl.querySelector('.notes-widget-canvas');
+            var canvas = tileEl.querySelector('.tile-canvas');
             if (!canvas) return;
             delete canvas.dataset.widgetRendered;
             if (window._widgetContext) {
@@ -3218,6 +3218,29 @@ function _notesSwitchView(viewName) {
   _notesRenderViewSwitcher();
   _notesRenderLibrary();
   _notesUpdateHeaderUser();
+  // ── Re-render widget tiles with correct person data after view switch ─────────
+  // _inviteResources must be loaded for _resolveTarget to map rid→uid.
+  // If already loaded (normal case after first load), re-render immediately
+  // by clearing the widgetRendered guard. If not yet loaded, the
+  // _waitForInviteResources callback on initial load will handle it.
+  (function _switchViewWidgetRefresh(attempts) {
+    if (window._inviteResources && window._inviteResources.length) {
+      var cv = _cv();
+      if (cv && cv.tiles && window.WIDGET_REGISTRY && window._widgetContext) {
+        cv.tiles.forEach(function(tile) {
+          if (tile.canvasMode !== 'widget' || !tile.widgetId) return;
+          var tileEl = document.querySelector('.notes-tile[data-noteid="' + tile.noteId + '"]');
+          if (!tileEl) return;
+          var canvas = tileEl.querySelector('.tile-canvas');
+          if (!canvas) return;
+          delete canvas.dataset.widgetRendered;
+          window.WIDGET_REGISTRY.render(tile.widgetId, tile.widgetConfig || {}, canvas, window._widgetContext());
+        });
+      }
+    } else if (attempts > 0) {
+      setTimeout(function() { _switchViewWidgetRefresh(attempts - 1); }, 100);
+    }
+  })(30); // up to 3s; initial-load fallback: _waitForInviteResources handles it
   // ── STEP 5: start presence on new view ───────────────────────────────
   setTimeout(function() {
     if (window._notesStartViewPresence && _userId) {
