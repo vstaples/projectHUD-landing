@@ -464,17 +464,19 @@ window._notesLoadView = async function() {
   }
   _notesRenderLeft();
   _notesRenderGrid();
-  // Pre-load invite resources so the header user name resolves on first render.
-  // _notesLoadInviteResources is defined in Block 2 — use window reference
-  // and defer until after all scripts have injected.
-  setTimeout(function() {
+  // Wait for Block 2 to export _notesLoadInviteResources (it runs async after script injection),
+  // then load resources and re-render the header user name and workflows panel.
+  (function _waitForInviteResources(attempts) {
     if (typeof window._notesLoadInviteResources === 'function') {
       window._notesLoadInviteResources().then(function() {
         _notesRenderViewSwitcher();
         _notesRenderLibrary();
+        _notesUpdateHeaderUser(); // explicit call after resources guaranteed loaded
       });
+    } else if (attempts > 0) {
+      setTimeout(function() { _waitForInviteResources(attempts - 1); }, 150);
     }
-  }, 200);
+  })(20); // up to 3 seconds total
   // Restore saved panel width and init splitter
   const savedW = _cv().leftPanelWidth;
   if (savedW) {
@@ -2885,45 +2887,7 @@ function _notesRenderViewSwitcher() {
   if (editBtn) editBtn.style.display = (tpl && !cv._isSharedView) ? '' : 'none';
 
   // ── Centered associated user name ───────────────────────────────────────
-  const headerUser = document.getElementById('notes-header-user');
-  if (headerUser) {
-    let userName = cv.forResourceName || null;
-
-    // Fallback 1: resolve from forResourceId if name not yet stamped
-    if (!userName && cv.forResourceId && window._inviteResources && window._inviteResources.length) {
-      const res = window._inviteResources.find(function(r){ return r.id === cv.forResourceId; });
-      if (res) {
-        userName = res.name;
-        cv.forResourceName = res.name; // back-fill
-      }
-    }
-
-    // Fallback 2: scan widget tile configs for a non-empty targetResourceId
-    if (!userName && window._inviteResources && window._inviteResources.length) {
-      const widgetTile = (cv.tiles || []).find(function(t) {
-        return t.canvasMode === 'widget' && t.widgetConfig &&
-               t.widgetConfig.targetResourceId;
-      });
-      if (widgetTile) {
-        const rid = widgetTile.widgetConfig.targetResourceId;
-        if (rid) {
-          const res = window._inviteResources.find(function(r){ return r.id === rid; });
-          if (res) {
-            userName = res.name;
-            cv.forResourceName = res.name;
-            cv.forResourceId   = res.id;
-          }
-        }
-      }
-    }
-
-    if (userName && !cv._isSharedView) {
-      headerUser.textContent = userName;
-      headerUser.style.display = '';
-    } else {
-      headerUser.style.display = 'none';
-    }
-  }
+  _notesUpdateHeaderUser();
 
   // ── Lock button state ────────────────────────────────────────────────────
   const isLocked   = !!cv.locked;
@@ -2974,6 +2938,42 @@ function _notesRenderViewSwitcher() {
     });
   }
 }
+
+// ── Header user name update ───────────────────────────────────────────────
+// Standalone so it can be called after _inviteResources loads asynchronously.
+function _notesUpdateHeaderUser() {
+  const headerUser = document.getElementById('notes-header-user');
+  if (!headerUser) return;
+  const cv = _cv();
+  if (!cv || cv._isSharedView) { headerUser.style.display = 'none'; return; }
+
+  let userName = cv.forResourceName || null;
+
+  // Fallback 1: resolve from forResourceId
+  if (!userName && cv.forResourceId && window._inviteResources && window._inviteResources.length) {
+    const res = window._inviteResources.find(function(r){ return r.id === cv.forResourceId; });
+    if (res) { userName = res.name; cv.forResourceName = res.name; }
+  }
+
+  // Fallback 2: scan widget tile targetResourceId
+  if (!userName && window._inviteResources && window._inviteResources.length) {
+    const tile = (cv.tiles || []).find(function(t) {
+      return t.canvasMode === 'widget' && t.widgetConfig && t.widgetConfig.targetResourceId;
+    });
+    if (tile) {
+      const res = window._inviteResources.find(function(r){ return r.id === tile.widgetConfig.targetResourceId; });
+      if (res) { userName = res.name; cv.forResourceName = res.name; cv.forResourceId = res.id; }
+    }
+  }
+
+  if (userName) {
+    headerUser.textContent = userName;
+    headerUser.style.display = '';
+  } else {
+    headerUser.style.display = 'none';
+  }
+}
+window._notesUpdateHeaderUser = _notesUpdateHeaderUser;
 
 // ── View lock toggle ──────────────────────────────────────────────────────
 window._notesToggleViewLock = function() {
@@ -3198,6 +3198,7 @@ function _notesSwitchView(viewName) {
   _notesRenderLeft();
   _notesRenderViewSwitcher();
   _notesRenderLibrary();
+  _notesUpdateHeaderUser();
   // ── STEP 5: start presence on new view ───────────────────────────────
   setTimeout(function() {
     if (window._notesStartViewPresence && _userId) {
