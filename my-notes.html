@@ -5105,6 +5105,7 @@ function _widgetContext() {
     api:        window.API || window._notesAPI,
   };
 }
+window._widgetContext = _widgetContext; // export so Phase 2 widgets can call it
 
 // ── Refresh management ────────────────────────────────────────────────────
 function startWidgetRefresh(tileEl, noteId, widgetId, config) {
@@ -5538,6 +5539,8 @@ function _selfUserId() {
 
 // ── Context helpers ──────────────────────────────────────────────────────
 function _widgetCtx() {
+  // Use Phase 1's exported _widgetContext (same object, avoids duplication)
+  if (window._widgetContext) return window._widgetContext();
   const res = window._notesResource || {};
   return {
     firmId:     'aaaaaaaa-0001-0001-0001-000000000001',
@@ -5547,7 +5550,6 @@ function _widgetCtx() {
     api:        window.API || window._notesAPI,
   };
 }
-// _widgetContext exported by Block 3 Phase 1 as window._widgetContext
 
 // ── Project picker helper — role-aware ────────────────────────────────────
 async function _getProjectsForPicker() {
@@ -5835,6 +5837,14 @@ window.WIDGET_REGISTRY.register({
 });
 
 console.log('[Widgets] Phase 2 loaded — capacity_gauge, action_item_counter, task_counter, meeting_health_sparkline, billability_bars, task_list, action_item_list');
+// Re-fire _notesPostWire now that all widgets are registered
+// The first call from _notesWireTiles ran before Phase 2 completed
+setTimeout(function() {
+  if (typeof window._notesPostWire === 'function') {
+    console.log('[Widgets] Phase 2 re-firing _notesPostWire');
+    window._notesPostWire();
+  }
+}, 100);
 // Re-run _notesPostWire now that all widgets are registered
 // (the first call from _notesWireTiles may have run before Phase 2 completed)
 setTimeout(function() {
