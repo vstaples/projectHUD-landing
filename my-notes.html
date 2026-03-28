@@ -2037,7 +2037,7 @@ async function _notesLaunchTemplateNow(templateName, paramVals, requestedViewNam
         content: myName + ' shared the view "' + viewName + '" with you (from template "' + templateName + '"). Accept in your inbox to access it.',
         hierarchy_path: 'Inbox', is_inbox: true,
         entity_id: null, entity_type: 'view_invite',
-        entity_meta: JSON.stringify({ ownerUserId: myUserId, viewName: viewName }),
+        entity_meta: { ownerUserId: myUserId, viewName: viewName },
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       });
     } catch(e) { console.warn('[Compass] Template launch view invite notification failed:', e); }
@@ -4238,7 +4238,7 @@ window._notesShowShareViewDialog = async function() {
             title: myName + ' invited you to view: ' + viewName,
             content: myName + ' has shared the view "' + viewName + '" with you. Accept in your inbox to access it.',
             hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: 'view_invite',
-            entity_meta: JSON.stringify({ ownerUserId: userId, viewName: viewName }),
+            entity_meta: { ownerUserId: userId, viewName: viewName },
             created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }).catch(function(){});
         } catch(e) { console.warn('[Compass] Add view participant error:', e); }
@@ -4289,7 +4289,10 @@ async function _notesShowViewInviteDialog(inviteNote) {
   const viewName    = titleMatch ? titleMatch[2] : 'a view';
   let ownerUserId   = null;
   try {
-    const meta = inviteNote.entity_meta ? JSON.parse(inviteNote.entity_meta) : null;
+    // entity_meta may arrive as object (jsonb) or string depending on API layer — handle both
+    const meta = inviteNote.entity_meta
+      ? (typeof inviteNote.entity_meta === 'string' ? JSON.parse(inviteNote.entity_meta) : inviteNote.entity_meta)
+      : null;
     ownerUserId = meta && meta.ownerUserId;
   } catch(e) {}
   if (!ownerUserId) return;
