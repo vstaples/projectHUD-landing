@@ -5539,6 +5539,7 @@ function _widgetCtx() {
     api:        window.API || window._notesAPI,
   };
 }
+window._widgetContext = _widgetCtx; // export for cross-block access
 function _wApi(path) {
   const api = window.API || window._notesAPI;
   return api ? api.get(path).catch(function(){return[];}) : Promise.resolve([]);
@@ -5840,24 +5841,29 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    const ctx  = _widgetCtx();
+    const ctx  = (typeof _widgetCtx==='function' ? _widgetCtx() : null) ||
+                 (window._widgetContext && window._widgetContext()) ||
+                 { firmId:'aaaaaaaa-0001-0001-0001-000000000001',
+                   userId: window._notesResource && window._notesResource.user_id,
+                   resourceId: window._notesResource && window._notesResource.id };
     const rid  = (config.targetResourceId && config.targetResourceId !== '')
       ? config.targetResourceId : ctx.resourceId;
     if (!rid) return null;
-    // Resolve user_id: check window._resources first, fall back to API, then ctx.userId
+    // Resolve user_id — tasks use assigned_to = user_id, not resource_id
+    // If rid === ctx.resourceId (self), use ctx.userId directly
     let userId = null;
-    const _resList = window._resources || [];
-    const _res = _resList.find(function(r){ return r.id === rid; });
-    if (_res && _res.user_id) {
-      userId = _res.user_id;
+    if (rid === ctx.resourceId && ctx.userId) {
+      userId = ctx.userId;
     } else {
-      // Try API lookup
-      const rRows = await _wApi('resources?id=eq.'+rid+'&select=id,user_id&limit=1').catch(function(){return [];});
-      if (Array.isArray(rRows) && rRows[0] && rRows[0].user_id) {
-        userId = rRows[0].user_id;
+      const _resList = window._resources || [];
+      const _res = _resList.find(function(r){ return r.id === rid; });
+      if (_res && _res.user_id) {
+        userId = _res.user_id;
       } else {
-        // Last resort: use ctx.userId directly (widget configured for self)
-        userId = ctx.userId || null;
+        const rRows = await _wApi('resources?id=eq.'+rid+'&select=id,user_id&limit=1');
+        if (Array.isArray(rRows) && rRows[0] && rRows[0].user_id) {
+          userId = rRows[0].user_id;
+        }
       }
     }
     if (!userId) return { tasks:[], today:new Date().toISOString().slice(0,10), noUser:true };
@@ -5952,7 +5958,11 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    const ctx = _widgetCtx();
+    const ctx = (typeof _widgetCtx==='function' ? _widgetCtx() : null) ||
+                (window._widgetContext && window._widgetContext()) ||
+                { firmId:'aaaaaaaa-0001-0001-0001-000000000001',
+                  userId: window._notesResource && window._notesResource.user_id,
+                  resourceId: window._notesResource && window._notesResource.id };
     const rid = (config.targetResourceId && config.targetResourceId !== '')
       ? config.targetResourceId : ctx.resourceId;
     if (!rid) return null;
