@@ -2044,6 +2044,7 @@ function _notesDndInit() {
 
     if (dropTile.classList.contains('empty')) {
       // Move to empty slot
+      console.log('[DROP] empty slot — targetRowId:', targetRowId, 'targetSlot:', targetSlot, 'effectiveNoteId:', effectiveNoteId?.slice(0,8));
       cv.tray = cv.tray.filter(id => id !== effectiveNoteId && id !== _dragNoteId);
       const existing = cv.tiles.find(t => t.noteId === effectiveNoteId);
       if (existing) {
