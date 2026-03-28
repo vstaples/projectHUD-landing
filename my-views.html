@@ -5779,7 +5779,8 @@ const WIDGET_REGISTRY = (function() {
     }
   };
 })();
-window.WIDGET_REGISTRY = WIDGET_REGISTRY;
+// MY VIEWS: reuse shared WIDGET_REGISTRY if already set by MY NOTES
+if (!window.WIDGET_REGISTRY) window.WIDGET_REGISTRY = WIDGET_REGISTRY;
 
 // ── Widget context ────────────────────────────────────────────────────────
 function _widgetContext() {
@@ -5798,7 +5799,9 @@ function _widgetContext() {
     ownerUserId:  _ownerUserId,
   };
 }
-window._widgetContext = _widgetContext; // export so Phase 2 widgets can call it
+// MY VIEWS: store views-scoped context; only set shared _widgetContext if not already claimed
+window._viewsWidgetContext = _widgetContext;
+if (!window._widgetContext) window._widgetContext = _widgetContext;
 
 // ── Refresh management ────────────────────────────────────────────────────
 function startWidgetRefresh(tileEl, noteId, widgetId, config) {
