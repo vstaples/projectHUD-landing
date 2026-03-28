@@ -6587,60 +6587,167 @@ window.WIDGET_REGISTRY.register({
     const { uid } = _resolveTarget(config);
     if (!uid) return null;
 
-    // Compute this Sunday in local time (same logic as My Calendar)
-    const now = new Date();
-    const dayOfWeek = now.getDay(); // 0=Sun..6=Sat
-    const daysToSun = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const thisSun = new Date(now);
-    thisSun.setDate(now.getDate() + daysToSun);
-    const sunIso = thisSun.toLocaleDateString('en-CA'); // YYYY-MM-DD local
+    const now    = new Date();
+    const today  = now.toLocaleDateString('en-CA');
+
+    // Next Sunday — always advance (even if today is Sunday, target next one)
+    const dayOfWeek  = now.getDay();
+    const daysToSun  = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+    const nextSun    = new Date(now);
+    nextSun.setDate(now.getDate() + daysToSun);
+    const nextSunIso = nextSun.toLocaleDateString('en-CA');
 
     const tasks = await _api(
       'tasks?assigned_to=eq.'+uid+
-      '&status=neq.complete' +
-      '&select=id,name,due_date,budget_hours,effort_days,status&limit=500'
+      '&status=neq.complete&status=neq.cancelled' +
+      '&select=id,name,due_date,budget_hours,effort_days,status,pct_complete&limit=500'
     );
     const all = Array.isArray(tasks) ? tasks : [];
 
-    // Next-week bucket: due after this Sunday, OR no due date (unscheduled)
-    const nextWeek = all.filter(function(t) {
-      if (!t.due_date) return true;              // no due date → queued
-      return t.due_date.slice(0,10) > sunIso;    // due beyond this Sunday
+    // Bucket: tasks that are overdue OR due on/before next Sunday.
+    // Excludes tasks with no due date and tasks due beyond next Sunday.
+    const bucket = all.filter(function(t) {
+      if (!t.due_date) return false;
+      return t.due_date.slice(0,10) <= nextSunIso;
     });
 
-    // Hours: budget_hours → effort_days×8 → default 2h (matches calendar)
-    const totalHrs = nextWeek.reduce(function(s, t) {
-      return s + parseFloat(t.budget_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
-    }, 0);
+    function taskHrs(t) {
+      return parseFloat(t.budget_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
+    }
 
-    const noDue  = nextWeek.filter(function(t){ return !t.due_date; }).length;
-    const hasDue = nextWeek.length - noDue;
+    const totalHrs  = bucket.reduce(function(s,t){ return s + taskHrs(t); }, 0);
+    const overdueN  = bucket.filter(function(t){ return t.due_date.slice(0,10) < today; }).length;
+    const thisWeekN = bucket.length - overdueN;
+
+    // Detail rows for tooltip — sorted by due date (overdue first naturally)
+    const rows = bucket.slice().sort(function(a,b){
+      const da = a.due_date.slice(0,10), db = b.due_date.slice(0,10);
+      return da < db ? -1 : da > db ? 1 : 0;
+    }).map(function(t) {
+      const hrs  = taskHrs(t);
+      const p    = parseFloat(t.pct_complete)||0;
+      const pct  = p<=1&&p>0 ? Math.round(p*100) : Math.round(p);
+      const due  = t.due_date.slice(0,10);
+      return { name: t.name, hrs, pct, due, overdue: due < today, status: t.status||'' };
+    });
 
     return {
-      count:    nextWeek.length,
-      hours:    Math.round(totalHrs * 10) / 10,
-      noDue:    noDue,
-      hasDue:   hasDue,
-      sunIso:   sunIso,
+      count: bucket.length,
+      hours: Math.round(totalHrs * 10) / 10,
+      overdueN, thisWeekN, today, nextSunIso, rows,
     };
   },
 
   renderFn: function(data, container) {
     if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
     const mono = 'font-family:var(--font-mono,monospace)';
-    const hrsDisplay = Number.isInteger(data.hours) ? data.hours+'h' : data.hours+'h';
-    container.innerHTML=
-      '<div class="widget-counter">'+
-        '<div class="wc-big" style="color:#00D2FF">'+hrsDisplay+'</div>'+
+
+    function fmtH(h) { return (Math.round(h*10)/10)+'h'; }
+    function fmtD(iso) {
+      if (!iso) return '\u2013';
+      const d = new Date(iso+'T00:00:00');
+      return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    }
+    function _esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    container.innerHTML =
+      '<div class="widget-counter" style="position:relative">'+
+        '<div class="wc-big" style="color:#00D2FF">'+fmtH(data.hours)+'</div>'+
         '<div class="wc-label">NEXT WEEK</div>'+
         '<div class="wc-breakdown">'+
           '<span style="color:rgba(255,255,255,.5)">'+data.count+' item'+(data.count!==1?'s':'')+' queued</span>'+
         '</div>'+
         '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:6px;display:flex;gap:10px;justify-content:center">'+
-          '<span>'+data.hasDue+' scheduled</span>'+
-          '<span style="color:rgba(239,159,39,.7)">'+data.noDue+' unscheduled</span>'+
+          '<span style="color:rgba(226,75,74,.8)">'+data.overdueN+' overdue</span>'+
+          '<span>'+data.thisWeekN+' this/next week</span>'+
         '</div>'+
+        (data.rows.length ? '<div style="'+mono+';font-size:8px;color:rgba(0,210,255,.3);margin-top:8px;letter-spacing:.04em">HOVER FOR DETAIL \u25b2</div>' : '')+
       '</div>';
+
+    if (!data.rows.length) return;
+
+    // ── Tooltip ──────────────────────────────────────────────────────────
+    var tip = document.createElement('div');
+    tip.style.cssText =
+      'position:fixed;z-index:9999;display:none;'+
+      'background:#0A1628;border:1px solid rgba(0,210,255,.25);'+
+      'box-shadow:0 8px 32px rgba(0,0,0,.75);'+
+      'font-family:var(--font-ui,"Barlow Condensed",sans-serif);'+
+      'font-size:11px;color:var(--text1,#C8DFF0);'+
+      'min-width:520px;max-width:700px;pointer-events:none';
+
+    var COL = { name:'flex:1;padding-right:10px', hrs:'width:52px;text-align:right',
+                pct:'width:46px;text-align:right', due:'width:66px;text-align:right',
+                status:'width:80px;text-align:right' };
+
+    var html =
+      '<div style="padding:7px 12px 5px;border-bottom:1px solid rgba(0,210,255,.15);'+
+          'display:flex;gap:0;'+mono+';font-size:9px;color:rgba(0,210,255,.55);letter-spacing:.07em;text-transform:uppercase">'+
+        '<span style="'+COL.name+'">Task</span>'+
+        '<span style="'+COL.hrs+'">Effort</span>'+
+        '<span style="'+COL.pct+'">Done</span>'+
+        '<span style="'+COL.due+'">Due</span>'+
+        '<span style="'+COL.status+'">Status</span>'+
+      '</div>'+
+      '<div style="max-height:340px;overflow-y:auto">';
+
+    data.rows.forEach(function(r) {
+      var bg  = r.overdue ? 'rgba(226,75,74,.10)' : 'transparent';
+      var dc  = r.overdue ? '#E24B4A' : 'rgba(255,255,255,.4)';
+      var pc  = r.pct>=100 ? '#1D9E75' : r.pct>0 ? '#EF9F27' : 'rgba(255,255,255,.25)';
+      var sl  = r.status ? r.status.charAt(0).toUpperCase()+r.status.slice(1).replace(/_/g,' ') : '\u2013';
+      html +=
+        '<div style="display:flex;gap:0;align-items:center;padding:5px 12px;'+
+            'border-bottom:1px solid rgba(255,255,255,.04);background:'+bg+'">'+
+          '<span style="'+COL.name+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(r.overdue?'color:#E24B4A;':'')+'">'+_esc(r.name)+'</span>'+
+          '<span style="'+COL.hrs+';'+mono+';font-size:10px;color:#00D2FF">'+fmtH(r.hrs)+'</span>'+
+          '<span style="'+COL.pct+';'+mono+';font-size:10px;color:'+pc+'">'+r.pct+'%</span>'+
+          '<span style="'+COL.due+';'+mono+';font-size:10px;color:'+dc+'">'+fmtD(r.due)+'</span>'+
+          '<span style="'+COL.status+';font-size:10px;color:rgba(255,255,255,.4)">'+_esc(sl)+'</span>'+
+        '</div>';
+    });
+
+    // Footer — total must match KPI exactly
+    html +=
+      '</div>'+
+      '<div style="display:flex;gap:0;align-items:center;padding:6px 12px;'+
+          'border-top:1px solid rgba(0,210,255,.2);background:rgba(0,210,255,.05)">'+
+        '<span style="'+COL.name+';'+mono+';font-size:9px;color:rgba(0,210,255,.5);letter-spacing:.05em;text-transform:uppercase">'+
+          'Total \u2014 '+data.count+' task'+(data.count!==1?'s':'')+
+        '</span>'+
+        '<span style="'+COL.hrs+';'+mono+';font-size:12px;font-weight:700;color:#00D2FF">'+fmtH(data.hours)+'</span>'+
+        '<span style="'+COL.pct+'"></span>'+
+        '<span style="'+COL.due+'"></span>'+
+        '<span style="'+COL.status+'"></span>'+
+      '</div>';
+
+    tip.innerHTML = html;
+    document.body.appendChild(tip);
+
+    var wrapEl = container.querySelector('.widget-counter') || container;
+    function showTip(e) { tip.style.display='block'; moveTip(e); }
+    function moveTip(e) {
+      var tw=tip.offsetWidth, th=tip.offsetHeight;
+      var vw=window.innerWidth, vh=window.innerHeight;
+      var x=e.clientX+16, y=e.clientY-24;
+      if (x+tw>vw-8) x=e.clientX-tw-16;
+      if (y+th>vh-8) y=vh-th-8;
+      if (y<8) y=8;
+      tip.style.left=x+'px'; tip.style.top=y+'px';
+    }
+    function hideTip() { tip.style.display='none'; }
+    wrapEl.addEventListener('mouseenter', showTip);
+    wrapEl.addEventListener('mousemove',  moveTip);
+    wrapEl.addEventListener('mouseleave', hideTip);
+    wrapEl.style.cursor = 'default';
+
+    // Cleanup when container is removed from DOM
+    var obs = new MutationObserver(function() {
+      if (!document.body.contains(container)) { tip.remove(); obs.disconnect(); }
+    });
+    obs.observe(document.body, { childList:true, subtree:true });
   }
 });
 
