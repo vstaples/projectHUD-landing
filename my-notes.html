@@ -6096,28 +6096,35 @@ window.WIDGET_REGISTRY.register({
   minTileHeight:   'small',
 
   dataFn: async function(config) {
-    const ctx = _widgetCtx();
     const { rid } = _resolveTarget(config);
     if (!rid) return null;
 
-    const now       = new Date();
-    const day       = now.getDay();
-    const diff      = (day === 0 ? -6 : 1 - day);
+    // Use local date (not UTC) to match My Work's en-CA locale string
+    const now     = new Date();
+    const todayLocal = now.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
+    // ISO week: Monday = day 1. getDay() returns 0=Sun..6=Sat
+    const dayOfWeek = now.getDay();
+    const isoOffset = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // days since Monday
     const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() + diff);
-    const weekStartStr = weekStart.toISOString().slice(0, 10);
+    weekStart.setDate(now.getDate() - isoOffset);
+    const weekEnd   = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekStartStr = weekStart.toLocaleDateString('en-CA');
+    const weekEndStr   = weekEnd.toLocaleDateString('en-CA');
 
+    // Query by date range — matches how My Work loads time_entries
     const entries = await _api(
       'time_entries?resource_id=eq.' + rid +
-      '&week_start_date=eq.' + weekStartStr +
+      '&date=gte.' + weekStartStr +
+      '&date=lte.' + weekEndStr +
       '&select=hours,is_billable&limit=500'
     );
 
     const all      = Array.isArray(entries) ? entries : [];
-    const billable = all.filter(function(e){return e.is_billable;})
-                       .reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
-    const nonBill  = all.filter(function(e){return !e.is_billable;})
-                       .reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+    const billable = all.filter(function(e){ return e.is_billable; })
+                       .reduce(function(s,e){ return s + parseFloat(e.hours||0); }, 0);
+    const nonBill  = all.filter(function(e){ return !e.is_billable; })
+                       .reduce(function(s,e){ return s + parseFloat(e.hours||0); }, 0);
     const total    = billable + nonBill;
     const billPct  = total > 0 ? Math.round((billable / total) * 100) : 0;
     const nonPct   = total > 0 ? (100 - billPct) : 0;
@@ -6147,7 +6154,7 @@ window.WIDGET_REGISTRY.register({
       '<div style="display:flex;flex-direction:column;padding:'+pad+';height:100%;justify-content:center;gap:0;box-sizing:border-box">' +
         '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:'+numMB+'">' +
           '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Billable vs Non-Bill</div>' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:#EF9F27;letter-spacing:.04em">'+data.total+'h total</div>' +
+          '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:#EF9F27;letter-spacing:.04em">'+data.total+'h total this week</div>' +
         '</div>' +
         '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:'+numMB+'">' +
           '<div>' +
