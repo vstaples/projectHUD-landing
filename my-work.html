@@ -7075,7 +7075,7 @@ window._recSeqGenerated = false;
     // Build factor-matching: map each item's _reasons back to known factors
     var factorColor = function(reason) {
       if (reason.includes('Blocking'))         return '#E24B4A';
-      if (reason.includes('overdue'))          return '#E24B4A';
+      if (/^\d+d overdue$/.test(reason.trim())) return '#E24B4A';
       if (reason.includes('Blocked'))          return '#E24B4A';
       if (reason.includes('Due today'))        return 'var(--compass-amber)';
       if (reason.includes('Due in'))           return 'var(--compass-amber)';
@@ -7094,7 +7094,7 @@ window._recSeqGenerated = false;
         var parts = [];
         var today2 = new Date().toLocaleDateString('en-CA');
         (w._reasons || []).forEach(function(r) {
-          if (r.includes('overdue')) {
+          if (/^\d+d overdue$/.test(r.trim())) {
             var d = parseInt(r);
             parts.push(isNaN(d) ? '500' : '500+(' + d + '×10)');
           } else if (r.includes('Blocking'))         { parts.push('1000'); }
@@ -7132,7 +7132,7 @@ window._recSeqGenerated = false;
     }).join('');
 
     // Factor legend
-    var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)">' +
+    var legend = '<div style="margin-top:4px;padding-top:6px">' +
       '<div style="font-family:inherit;font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring Factors</div>' +
       '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px 24px">' +
       SCORE_FACTORS.map(function(f) {
@@ -7228,7 +7228,7 @@ function buildRecommendedSequence(workItems) {
 
     // 6. Project health proxy — if project has multiple overdue items, this project is at risk
     const projOverdue = open.filter(x => x.projectId && x.projectId === w.projectId && x.overdue).length;
-    if (projOverdue >= 2) { score += 100; reasons.push('Project at risk · ' + projOverdue + ' overdue'); }
+    if (projOverdue >= 2) { score += 100; reasons.push('Project at risk'); }
 
     // 7. Due soon (within 2 days)
     if (w.due && !w.overdue && w.due !== today) {
@@ -7274,7 +7274,7 @@ function renderRecSeq(items) {
     // Factor badges — full set, colour-coded
     const factorColor = r => {
       if (r.includes('Blocking'))        return '#E24B4A';
-      if (r.includes('overdue'))         return '#E24B4A';
+      if (/^\d+d overdue$/.test(r.trim())) return '#E24B4A';
       if (r.includes('Blocked'))         return '#E24B4A';
       if (r.includes('Due today'))       return '#EF9F27';
       if (r.includes('Due in'))          return '#EF9F27';
@@ -7291,7 +7291,7 @@ function renderRecSeq(items) {
     const scoreBreakdown = (() => {
       const parts = [];
       (w._reasons || []).forEach(r => {
-        if (r.includes('overdue')) { const d=parseInt(r); parts.push(isNaN(d)?'500':'500+('+ d +'×10)'); }
+        if (/^\d+d overdue$/.test(r.trim())) { const d=parseInt(r); parts.push(isNaN(d)?'500':'500+('+ d +'×10)'); }
         else if (r.includes('Blocking'))        parts.push('1000');
         else if (r.includes('Blocked'))         parts.push('400');
         else if (r.includes('Due today'))        parts.push('300');
