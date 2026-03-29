@@ -7050,11 +7050,11 @@ window._recSeqGenerated = false;
 
   var SCORE_FACTORS = [
     { key: 'blocking',    label: 'Blocking someone',     pts: 1000, color: 'var(--compass-red)' },
-    { key: 'overdue',     label: 'Overdue',              pts: 500,  color: 'var(--compass-red)' },
+    { key: 'overdue',     label: 'Overdue (+10/day)',    pts: 500,  color: 'var(--compass-red)' },
     { key: 'blocked',     label: 'Blocked status',       pts: 400,  color: 'var(--compass-red)' },
     { key: 'due_today',   label: 'Due today',            pts: 300,  color: 'var(--compass-amber)' },
-    { key: 'due_soon',    label: 'Due within 2 days',    pts: 150,  color: 'var(--compass-amber)' },
     { key: 'unrated',     label: 'Unrated action item',  pts: 200,  color: 'var(--compass-amber)' },
+    { key: 'due_soon',    label: 'Due within 2 days',    pts: 150,  color: 'var(--compass-amber)' },
     { key: 'proj_risk',   label: 'Project at risk',      pts: 100,  color: 'var(--compass-amber)' },
     { key: 'in_progress', label: 'Already in progress',  pts: 50,   color: 'var(--compass-cyan)' },
   ];
@@ -7105,7 +7105,7 @@ window._recSeqGenerated = false;
           '<div style="display:flex;gap:4px;flex-wrap:wrap;max-width:280px">' + (factors || '<span style="color:var(--text3);font-size:13px">no factors</span>') + '</div>' +
         '</td>' +
         '<td style="padding:3px 0;vertical-align:top;text-align:right;white-space:nowrap">' +
-          '<div style="font-family:inherit;font-size:13px;font-weight:700;color:var(--compass-cyan)">' + w._score + ' pts</div>' +
+          '<div style="font-family:inherit;font-size:13px;font-weight:700;color:var(--compass-cyan)" title="' + (w._reasons||[]).join(' · ') + '">' + w._score + ' pts</div>' +
           '<div style="width:60px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;margin-left:auto">' +
             '<div style="height:3px;background:var(--compass-cyan);width:' + barW + '%;border-radius:2px"></div>' +
           '</div>' +
@@ -7133,7 +7133,11 @@ window._recSeqGenerated = false;
           '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 0 4px 0;text-align:right">Score</th>' +
         '</thead>' +
         '<tbody>' + rows + '</tbody>' +
-      '</table>' + legend;
+      '</table>' +
+      '<div style="font-size:11px;color:#6A94B8;margin-top:4px;font-style:italic">' +
+        '* Overdue score = 500 base + 10 per day late&nbsp;&nbsp;' +
+        '(e.g. 5d overdue = 550 pts)' +
+      '</div>' + legend;
 
     _rTip = document.createElement('div');
     _rTip.id = 'mw-recseq-tip';
