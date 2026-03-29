@@ -1111,24 +1111,24 @@ window._mwLoadUserView = async function() {
     var title = headerTitles[type] || 'Summary';
 
     var taskRow = function(w, color) {
-      var overdueBadge = w.overdue ? '<span style="font-size:9px;padding:1px 5px;background:rgba(226,75,74,.15);color:var(--compass-red);border:1px solid rgba(226,75,74,.25);border-radius:2px;margin-left:6px;flex-shrink:0">overdue</span>' : '';
+      var overdueBadge = w.overdue ? '<span style="font-size:13px;padding:1px 5px;background:rgba(226,75,74,.15);color:var(--compass-red);border:1px solid rgba(226,75,74,.25);border-radius:2px;margin-left:6px;flex-shrink:0">overdue</span>' : '';
       var pct = w.progress != null ? w.progress : null;
       var prog = pct != null ? '<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin-top:3px"><div style="height:2px;background:'+color+';width:'+Math.min(100,pct)+'%;border-radius:1px"></div></div>' : '';
       return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
         '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">' +
-          '<span style="color:var(--text0);font-size:12px;flex:1;min-width:0">' + esc(w.title) + '</span>' +
+          '<span style="color:var(--text0);font-size:13px;flex:1;min-width:0">' + esc(w.title) + '</span>' +
           overdueBadge +
-          '<span style="color:'+(w.overdue?'var(--compass-red)':'var(--text3)')+';font-size:11px;flex-shrink:0">'+fmtDate(w.due)+'</span>' +
+          '<span style="color:'+(w.overdue?'var(--compass-red)':'var(--text3)')+';font-size:13px;flex-shrink:0">'+fmtDate(w.due)+'</span>' +
         '</div>' +
-        '<div style="color:var(--text3);font-size:11px;margin-top:1px">'+esc(w.project||'—')+'</div>' +
+        '<div style="color:var(--text3);font-size:13px;margin-top:1px">'+esc(w.project||'—')+'</div>' +
         prog + '</div>';
     };
     var teRow = function(e) {
       var proj = (window._projects||[]).find(function(p){return p.id===e.project_id;});
-      var bill = e.is_billable ? '<span style="color:var(--compass-cyan);font-size:9px;margin-left:4px">● bill</span>' : '<span style="color:var(--compass-purple);font-size:9px;margin-left:4px">● non-bill</span>';
+      var bill = e.is_billable ? '<span style="color:var(--compass-cyan);font-size:13px;margin-left:4px">● bill</span>' : '<span style="color:var(--compass-purple);font-size:13px;margin-left:4px">● non-bill</span>';
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
-        '<div style="flex:1;min-width:0"><div style="color:var(--text0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.description||e.activity||'Time entry')+'</div>' +
-        '<div style="color:var(--text3);font-size:11px">'+esc(proj?proj.name:'—')+bill+'</div></div>' +
+        '<div style="flex:1;min-width:0"><div style="color:var(--text0);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.description||e.activity||'Time entry')+'</div>' +
+        '<div style="color:var(--text3);font-size:13px">'+esc(proj?proj.name:'—')+bill+'</div></div>' +
         '<div style="color:var(--compass-amber);font-weight:700;font-size:13px;margin-left:12px;flex-shrink:0">'+fmtHrs(e.hours)+'</div></div>';
     };
 
@@ -1152,8 +1152,8 @@ window._mwLoadUserView = async function() {
     } else if (type === 'done') {
       html = done.length ? done.map(function(w){
         return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
-          '<div style="color:var(--text0);font-size:12px">'+esc(w.title)+'</div>' +
-          '<div style="color:var(--text3);font-size:11px;margin-top:1px">'+esc(w.project||'—')+'</div></div>';
+          '<div style="color:var(--text0);font-size:13px">'+esc(w.title)+'</div>' +
+          '<div style="color:var(--text3);font-size:13px;margin-top:1px">'+esc(w.project||'—')+'</div></div>';
       }).join('') : '<div style="color:var(--text3);padding:12px 0">Nothing completed yet today.</div>';
 
     } else if (type === 'hrs_week') {
@@ -1162,9 +1162,9 @@ window._mwLoadUserView = async function() {
       var bill = weekTe.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
       var pct  = tot>0?Math.round(bill/tot*100):0;
       html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
-        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
-        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
-        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Bill %</div><div style="color:'+(pct>=80?'var(--compass-green)':pct>=50?'var(--compass-amber)':'var(--compass-red)')+';font-size:18px;font-weight:700">'+pct+'%</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Total</div><div style="color:var(--compass-amber);font-size:13px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Bill %</div><div style="color:'+(pct>=80?'var(--compass-green)':pct>=50?'var(--compass-amber)':'var(--compass-red)')+';font-size:13px;font-weight:700">'+pct+'%</div></div>' +
         '</div>' + (weekTe.length ? weekTe.slice(0,20).map(teRow).join('') : '<div style="color:var(--text3);padding:8px 0">No time entries this week.</div>');
 
     } else if (type === 'hrs_today') {
@@ -1173,20 +1173,20 @@ window._mwLoadUserView = async function() {
       var tot  = todayTe.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
       var bill = todayTe.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
       html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
-        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total today</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
-        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Total today</div><div style="color:var(--compass-amber);font-size:13px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
         '</div>' + (todayTe.length ? todayTe.map(teRow).join('') : '<div style="color:var(--text3);padding:8px 0">No time entries logged today.</div>');
 
     } else if (type === 'open') {
       var overdue = wi.filter(function(w){return w.overdue;});
       var current = wi.filter(function(w){return !w.overdue;});
       if (overdue.length) {
-        html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-red);margin-bottom:4px">Overdue — '+overdue.length+'</div>';
+        html += '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-red);margin-bottom:4px">Overdue — '+overdue.length+'</div>';
         html += overdue.map(function(w){return taskRow(w,'var(--compass-red)');}).join('');
         html += '<div style="margin-top:10px"></div>';
       }
       if (current.length) {
-        html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-amber);margin-bottom:4px">Current — '+current.length+'</div>';
+        html += '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-amber);margin-bottom:4px">Current — '+current.length+'</div>';
         html += current.map(function(w){return taskRow(w,'var(--compass-amber)');}).join('');
       }
       if (!wi.length) html = '<div style="color:var(--compass-green);padding:12px 0">✓ No open items.</div>';
@@ -1203,24 +1203,24 @@ window._mwLoadUserView = async function() {
         });
         var wfRow = function(w, sc) {
           var proj = (window._projects||[]).find(function(p){return p.id===w.project_id;});
-          var step = w.current_step_name ? '<span style="color:var(--compass-cyan);margin-left:6px;font-size:10px">→ '+esc(w.current_step_name)+'</span>' : '';
+          var step = w.current_step_name ? '<span style="color:var(--compass-cyan);margin-left:6px;font-size:13px">→ '+esc(w.current_step_name)+'</span>' : '';
           return '<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
             '<div style="flex:1;min-width:0">' +
-              '<span style="color:var(--text0);font-size:12px">'+esc(w.title||w.template_name||'Workflow')+'</span>' + step +
-              '<div style="color:var(--text3);font-size:11px;margin-top:1px">'+esc(proj?proj.name:'—')+'</div>' +
+              '<span style="color:var(--text0);font-size:13px">'+esc(w.title||w.template_name||'Workflow')+'</span>' + step +
+              '<div style="color:var(--text3);font-size:13px;margin-top:1px">'+esc(proj?proj.name:'—')+'</div>' +
             '</div>' +
           '</div>';
         };
         var wfSection = function(label, items, sc) {
           if (!items.length) return '';
-          return '<div style="font-family:var(--font-mono,monospace);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+sc+';margin:8px 0 4px">'+label+' — '+items.length+'</div>' +
+          return '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+sc+';margin:8px 0 4px">'+label+' — '+items.length+'</div>' +
             items.map(function(w){ return wfRow(w, sc); }).join('');
         };
         // Summary counts bar
         var statBar = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:center">' +
-          '<div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">'+wfGroups.in_progress.length+'</div></div>' +
-          '<div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(wfGroups.blocked.length?'var(--compass-red)':'var(--text2)')+';font-size:18px;font-weight:700">'+wfGroups.blocked.length+'</div></div>' +
-          '<div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Not Started</div><div style="color:var(--text2);font-size:18px;font-weight:700">'+wfGroups.not_started.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+wfGroups.in_progress.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(wfGroups.blocked.length?'var(--compass-red)':'var(--text2)')+';font-size:13px;font-weight:700">'+wfGroups.blocked.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Not Started</div><div style="color:var(--text2);font-size:13px;font-weight:700">'+wfGroups.not_started.length+'</div></div>' +
         '</div>';
         html = statBar +
           wfSection('Blocked', wfGroups.blocked, 'var(--compass-red)') +
@@ -1240,12 +1240,12 @@ window._mwLoadUserView = async function() {
       var pct      = tot>0?Math.round(bill/tot*100):0;
       html =
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:center">' +
-          '<div><div style="color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:.08em">Waiting</div><div style="color:var(--text2);font-size:16px;font-weight:700">'+waiting.length+'</div></div>' +
-          '<div><div style="color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:16px;font-weight:700">'+inp.length+'</div></div>' +
-          '<div><div style="color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(blk.length?'var(--compass-red)':'var(--text2)')+';font-size:16px;font-weight:700">'+blk.length+'</div></div>' +
-          '<div><div style="color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:.08em">Overdue</div><div style="color:'+(overdue.length?'var(--compass-red)':'var(--text2)')+';font-size:16px;font-weight:700">'+overdue.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Waiting</div><div style="color:var(--text2);font-size:13px;font-weight:700">'+waiting.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+inp.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(blk.length?'var(--compass-red)':'var(--text2)')+';font-size:13px;font-weight:700">'+blk.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Overdue</div><div style="color:'+(overdue.length?'var(--compass-red)':'var(--text2)')+';font-size:13px;font-weight:700">'+overdue.length+'</div></div>' +
         '</div>' +
-        '<div style="font-size:11px;color:var(--text3)">Week: <span style="color:var(--compass-amber);font-weight:700">'+fmtHrs(tot)+'</span> &nbsp; Billable: <span style="color:var(--compass-cyan);font-weight:700">'+fmtHrs(bill)+' ('+pct+'%)</span></div>';
+        '<div style="font-size:13px;color:var(--text3)">Week: <span style="color:var(--compass-amber);font-weight:700">'+fmtHrs(tot)+'</span> &nbsp; Billable: <span style="color:var(--compass-cyan);font-weight:700">'+fmtHrs(bill)+' ('+pct+'%)</span></div>';
     }
 
     if (!html.trim()) return;
@@ -1255,13 +1255,13 @@ window._mwLoadUserView = async function() {
     _tip.style.cssText = [
       'position:fixed', 'z-index:9999', 'background:#0a1628',
       'border:1px solid rgba(0,210,255,.25)', 'border-radius:3px',
-      'padding:14px 16px', 'font-family:var(--font-mono,monospace)',
-      'font-size:11px', 'color:var(--text1,#C8DFF0)', 'width:600px',
+      'padding:14px 16px', 'font-family:inherit;',
+      'font-size:13px', 'color:var(--text1,#C8DFF0)', 'width:600px',
       'max-height:70vh', 'overflow-y:auto',
       'box-shadow:0 8px 32px rgba(0,0,0,.75)', 'pointer-events:auto', 'line-height:1.55'
     ].join(';');
     _tip.innerHTML =
-      '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:700;letter-spacing:.1em;' +
+      '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;' +
       'text-transform:uppercase;color:' + accentColor + ';margin-bottom:10px;' +
       'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:8px">' + title + '</div>' + html;
     document.body.appendChild(_tip);
@@ -7091,21 +7091,21 @@ window._recSeqGenerated = false;
       var barW = Math.round((w._score / maxScore) * 100);
       var factors = (w._reasons || []).map(function(r) {
         var c = factorColor(r);
-        return '<span style="font-size:10px;padding:1px 6px;border-radius:2px;background:' + c + '18;color:' + c + ';border:1px solid ' + c + '40;white-space:nowrap">' + esc(r) + '</span>';
+        return '<span style="font-size:13px;padding:1px 6px;border-radius:2px;background:' + c + '18;color:' + c + ';border:1px solid ' + c + '40;white-space:nowrap">' + esc(r) + '</span>';
       }).join(' ');
       return '<tr style="border-bottom:1px solid rgba(255,255,255,.05)">' +
         '<td style="padding:7px 10px 7px 0;text-align:center;vertical-align:top">' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:16px;font-weight:700;color:' + rankColor + '">' + (i+1) + '</span>' +
+          '<span style="font-family:inherit;font-size:13px;font-weight:700;color:' + rankColor + '">' + (i+1) + '</span>' +
         '</td>' +
         '<td style="padding:7px 12px 7px 0;vertical-align:top;min-width:200px">' +
-          '<div style="color:var(--text0);font-size:12px;font-weight:500">' + esc(w.title) + '</div>' +
-          '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(w.project || '—') + ' · ' + esc(w.type || 'task') + '</div>' +
+          '<div style="color:var(--text0);font-size:13px;font-weight:500">' + esc(w.title) + '</div>' +
+          '<div style="color:var(--text3);font-size:13px;margin-top:1px">' + esc(w.project || '—') + ' · ' + esc(w.type || 'task') + '</div>' +
         '</td>' +
         '<td style="padding:7px 12px 7px 0;vertical-align:top;white-space:nowrap">' +
-          '<div style="display:flex;gap:4px;flex-wrap:wrap;max-width:280px">' + (factors || '<span style="color:var(--text3);font-size:11px">no factors</span>') + '</div>' +
+          '<div style="display:flex;gap:4px;flex-wrap:wrap;max-width:280px">' + (factors || '<span style="color:var(--text3);font-size:13px">no factors</span>') + '</div>' +
         '</td>' +
         '<td style="padding:7px 0;vertical-align:top;text-align:right;white-space:nowrap">' +
-          '<div style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--compass-cyan)">' + w._score + ' pts</div>' +
+          '<div style="font-family:inherit;font-size:13px;font-weight:700;color:var(--compass-cyan)">' + w._score + ' pts</div>' +
           '<div style="width:60px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;margin-left:auto">' +
             '<div style="height:3px;background:var(--compass-cyan);width:' + barW + '%;border-radius:2px"></div>' +
           '</div>' +
@@ -7115,10 +7115,10 @@ window._recSeqGenerated = false;
 
     // Factor legend
     var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)">' +
-      '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring factors</div>' +
+      '<div style="font-family:inherit;font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring factors</div>' +
       '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px 24px">' +
       SCORE_FACTORS.map(function(f) {
-        return '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);white-space:nowrap;display:flex;gap:10px;align-items:center">' +
+        return '<div style="font-family:inherit;font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);white-space:nowrap;display:flex;gap:10px;align-items:center">' +
           '<span style="color:' + f.color + ';font-weight:700;min-width:42px;text-align:right">+' + f.pts + '</span>' +
           '<span style="color:var(--text0,#F0F6FF)">' + f.label + '</span></div>';
       }).join('') +
@@ -7127,10 +7127,10 @@ window._recSeqGenerated = false;
     var html =
       '<table style="border-collapse:collapse;width:100%">' +
         '<thead><tr>' +
-          '<th style="font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 10px 8px 0;text-align:left">#</th>' +
-          '<th style="font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 12px 8px 0;text-align:left">Item</th>' +
-          '<th style="font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 12px 8px 0;text-align:left">Decision factors</th>' +
-          '<th style="font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 0 8px 0;text-align:right">Score</th>' +
+          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 10px 8px 0;text-align:left">#</th>' +
+          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 12px 8px 0;text-align:left">Item</th>' +
+          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 12px 8px 0;text-align:left">Decision factors</th>' +
+          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 0 8px 0;text-align:right">Score</th>' +
         '</thead>' +
         '<tbody>' + rows + '</tbody>' +
       '</table>' + legend;
@@ -7141,14 +7141,14 @@ window._recSeqGenerated = false;
       'position:fixed', 'z-index:9999', 'background:#0a1628',
       'border:1px solid rgba(0,210,255,.25)', 'border-left:3px solid var(--compass-cyan)',
       'border-radius:3px', 'padding:14px 16px',
-      'font-family:var(--font-mono,monospace)', 'font-size:12px', 'font-weight:400',
+      'font-family:inherit;', 'font-size:13px', 'font-weight:400',
       'color:var(--text0,#F0F6FF)', 'max-width:720px', 'min-width:520px',
       'overflow-y:auto',
       'box-shadow:0 12px 40px rgba(0,0,0,.8)', 'pointer-events:auto', 'line-height:1.7'
     ].join(';');
 
     _rTip.innerHTML =
-      '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:700;letter-spacing:.1em;' +
+      '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;' +
       'text-transform:uppercase;color:var(--compass-cyan);margin-bottom:12px;' +
       'border-bottom:1px solid rgba(0,210,255,.15);padding-bottom:8px">Recommended Sequence — Decision Rationale</div>' +
       html;
