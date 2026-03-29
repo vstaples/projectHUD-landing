@@ -7114,13 +7114,13 @@ window._recSeqGenerated = false;
     }).join('');
 
     // Factor legend
-    var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1)">' +
-      '<div style="font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:.04em;color:#C8DFF0;margin-bottom:8px">Scoring factors</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px">' +
+    var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)">' +
+      '<div style="font-family:var(--font-mono);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring factors</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px 24px">' +
       SCORE_FACTORS.map(function(f) {
-        return '<div style="font-family:var(--font-mono);font-size:11px;font-weight:400;color:#C8DFF0;white-space:nowrap;display:flex;gap:8px;align-items:center">' +
-          '<span style="color:' + f.color + ';font-weight:700;min-width:36px;text-align:right">+' + f.pts + '</span>' +
-          '<span style="color:#C8DFF0">' + f.label + '</span></div>';
+        return '<div style="font-family:var(--font-mono);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);white-space:nowrap;display:flex;gap:10px;align-items:center">' +
+          '<span style="color:' + f.color + ';font-weight:700;min-width:42px;text-align:right">+' + f.pts + '</span>' +
+          '<span style="color:var(--text0,#F0F6FF)">' + f.label + '</span></div>';
       }).join('') +
       '</div></div>';
 
