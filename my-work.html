@@ -1192,15 +1192,42 @@ window._mwLoadUserView = async function() {
       if (!wi.length) html = '<div style="color:var(--compass-green);padding:12px 0">✓ No open items.</div>';
 
     } else if (type === 'workflows') {
-      html = wf.length ? wf.map(function(w){
-        var proj = (window._projects||[]).find(function(p){return p.id===w.project_id;});
-        var sc = w.status==='in_progress'?'var(--compass-cyan)':w.status==='blocked'?'var(--compass-red)':'var(--text3)';
-        return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<span style="color:var(--text0);font-size:12px;flex:1">'+esc(w.template_name||w.name||'Workflow')+'</span>' +
-            '<span style="font-size:10px;color:'+sc+';font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;margin-left:8px">'+esc(w.status||'')+'</span>' +
-          '</div><div style="color:var(--text3);font-size:11px;margin-top:1px">'+esc(proj?proj.name:'—')+'</div></div>';
-      }).join('') : '<div style="color:var(--text3);padding:12px 0">No active workflows.</div>';
+      if (!wf.length) {
+        html = '<div style="color:var(--text3);padding:12px 0">No active workflows.</div>';
+      } else {
+        // Group by status
+        var wfGroups = { blocked:[], in_progress:[], not_started:[], other:[] };
+        wf.forEach(function(w) {
+          var s = w.status || 'other';
+          if (wfGroups[s]) wfGroups[s].push(w); else wfGroups.other.push(w);
+        });
+        var wfRow = function(w, sc) {
+          var proj = (window._projects||[]).find(function(p){return p.id===w.project_id;});
+          var step = w.current_step_name ? '<span style="color:var(--compass-cyan);margin-left:6px;font-size:10px">→ '+esc(w.current_step_name)+'</span>' : '';
+          return '<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+            '<div style="flex:1;min-width:0">' +
+              '<span style="color:var(--text0);font-size:12px">'+esc(w.title||w.template_name||'Workflow')+'</span>' + step +
+              '<div style="color:var(--text3);font-size:11px;margin-top:1px">'+esc(proj?proj.name:'—')+'</div>' +
+            '</div>' +
+          '</div>';
+        };
+        var wfSection = function(label, items, sc) {
+          if (!items.length) return '';
+          return '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+sc+';margin:8px 0 4px">'+label+' — '+items.length+'</div>' +
+            items.map(function(w){ return wfRow(w, sc); }).join('');
+        };
+        // Summary counts bar
+        var statBar = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:center">' +
+          '<div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">'+wfGroups.in_progress.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(wfGroups.blocked.length?'var(--compass-red)':'var(--text2)')+';font-size:18px;font-weight:700">'+wfGroups.blocked.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Not Started</div><div style="color:var(--text2);font-size:18px;font-weight:700">'+wfGroups.not_started.length+'</div></div>' +
+        '</div>';
+        html = statBar +
+          wfSection('Blocked', wfGroups.blocked, 'var(--compass-red)') +
+          wfSection('In Progress', wfGroups.in_progress, 'var(--compass-cyan)') +
+          wfSection('Not Started', wfGroups.not_started, 'var(--text3)') +
+          wfSection('Other', wfGroups.other, 'var(--text3)');
+      }
 
     } else {
       // Summary view
@@ -7015,6 +7042,135 @@ document.addEventListener('compass-identity-ready', () => {
 // Shows 3-5 items. Immutable for the session once generated.
 window._recSeqGenerated = false;
 
+
+// ── Recommended Sequence tooltip ───────────────────────────────────
+(function() {
+  var _rTip = null;
+  var _rTimer = null;
+
+  var SCORE_FACTORS = [
+    { key: 'blocking',    label: 'Blocking someone',     pts: 1000, color: 'var(--compass-red)' },
+    { key: 'overdue',     label: 'Overdue',              pts: 500,  color: 'var(--compass-red)' },
+    { key: 'blocked',     label: 'Blocked status',       pts: 400,  color: 'var(--compass-red)' },
+    { key: 'due_today',   label: 'Due today',            pts: 300,  color: 'var(--compass-amber)' },
+    { key: 'due_soon',    label: 'Due within 2 days',    pts: 150,  color: 'var(--compass-amber)' },
+    { key: 'unrated',     label: 'Unrated action item',  pts: 200,  color: 'var(--compass-amber)' },
+    { key: 'proj_risk',   label: 'Project at risk',      pts: 100,  color: 'var(--compass-amber)' },
+    { key: 'in_progress', label: 'Already in progress',  pts: 50,   color: 'var(--compass-cyan)' },
+  ];
+
+  window.showRecSeqTooltip = function(e) {
+    clearTimeout(_rTimer);
+    if (_rTip) return;
+
+    var items = window._recSeqItems;
+    if (!items || !items.length) return;
+
+    var esc = function(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+
+    // Build factor-matching: map each item's _reasons back to known factors
+    var factorColor = function(reason) {
+      if (reason.includes('Blocking'))         return 'var(--compass-red)';
+      if (reason.includes('overdue'))          return 'var(--compass-red)';
+      if (reason.includes('Blocked'))          return 'var(--compass-red)';
+      if (reason.includes('Due today'))        return 'var(--compass-amber)';
+      if (reason.includes('Due in'))           return 'var(--compass-amber)';
+      if (reason.includes('Unrated'))          return 'var(--compass-amber)';
+      if (reason.includes('Project at risk'))  return 'var(--compass-amber)';
+      return 'var(--compass-cyan)';
+    };
+
+    // Rows: rank | title | project | score | factors
+    var maxScore = items[0]._score || 1;
+    var rows = items.map(function(w, i) {
+      var rankColor = i === 0 ? 'var(--compass-cyan)' : i === 1 ? 'rgba(0,210,255,.7)' : i === 2 ? 'rgba(0,210,255,.5)' : 'var(--text3)';
+      var barW = Math.round((w._score / maxScore) * 100);
+      var factors = (w._reasons || []).map(function(r) {
+        var c = factorColor(r);
+        return '<span style="font-size:10px;padding:1px 6px;border-radius:2px;background:' + c + '18;color:' + c + ';border:1px solid ' + c + '40;white-space:nowrap">' + esc(r) + '</span>';
+      }).join(' ');
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<td style="padding:7px 10px 7px 0;text-align:center;vertical-align:top">' +
+          '<span style="font-family:var(--font-display);font-size:16px;font-weight:700;color:' + rankColor + '">' + (i+1) + '</span>' +
+        '</td>' +
+        '<td style="padding:7px 12px 7px 0;vertical-align:top;min-width:200px">' +
+          '<div style="color:var(--text0);font-size:12px;font-weight:500">' + esc(w.title) + '</div>' +
+          '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(w.project || '—') + ' · ' + esc(w.type || 'task') + '</div>' +
+        '</td>' +
+        '<td style="padding:7px 12px 7px 0;vertical-align:top;white-space:nowrap">' +
+          '<div style="display:flex;gap:4px;flex-wrap:wrap;max-width:280px">' + (factors || '<span style="color:var(--text3);font-size:11px">no factors</span>') + '</div>' +
+        '</td>' +
+        '<td style="padding:7px 0;vertical-align:top;text-align:right;white-space:nowrap">' +
+          '<div style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--compass-cyan)">' + w._score + ' pts</div>' +
+          '<div style="width:60px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;margin-left:auto">' +
+            '<div style="height:3px;background:var(--compass-cyan);width:' + barW + '%;border-radius:2px"></div>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    // Factor legend
+    var legend = '<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)">' +
+      '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">Scoring factors</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+      SCORE_FACTORS.map(function(f) {
+        return '<div style="font-size:10px;color:' + f.color + ';white-space:nowrap">' +
+          '<span style="opacity:.5">+' + f.pts + '</span> ' + f.label + '</div>';
+      }).join('') +
+      '</div></div>';
+
+    var html =
+      '<table style="border-collapse:collapse;width:100%">' +
+        '<thead><tr>' +
+          '<th style="font-family:var(--font-head);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 10px 8px 0;text-align:left">#</th>' +
+          '<th style="font-family:var(--font-head);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 12px 8px 0;text-align:left">Item</th>' +
+          '<th style="font-family:var(--font-head);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 12px 8px 0;text-align:left">Decision factors</th>' +
+          '<th style="font-family:var(--font-head);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 0 8px 0;text-align:right">Score</th>' +
+        '</thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' + legend;
+
+    _rTip = document.createElement('div');
+    _rTip.id = 'mw-recseq-tip';
+    _rTip.style.cssText = [
+      'position:fixed', 'z-index:9999', 'background:#0a1628',
+      'border:1px solid rgba(0,210,255,.25)', 'border-left:3px solid var(--compass-cyan)',
+      'border-radius:3px', 'padding:14px 16px',
+      'font-family:var(--font-mono,monospace)', 'font-size:11px',
+      'color:var(--text1,#C8DFF0)', 'max-width:700px', 'min-width:500px',
+      'max-height:70vh', 'overflow-y:auto',
+      'box-shadow:0 12px 40px rgba(0,0,0,.8)', 'pointer-events:auto', 'line-height:1.55'
+    ].join(';');
+
+    _rTip.innerHTML =
+      '<div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.1em;' +
+      'text-transform:uppercase;color:var(--compass-cyan);margin-bottom:10px;' +
+      'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:8px">Recommended Sequence — Decision Rationale</div>' +
+      html;
+
+    document.body.appendChild(_rTip);
+
+    // Position below the hovered element
+    var r = e.currentTarget.getBoundingClientRect();
+    var top = r.bottom + 6;
+    var left = r.left;
+    if (left + 700 > window.innerWidth - 10) left = window.innerWidth - 710;
+    if (left < 8) left = 8;
+    _rTip.style.top  = top + 'px';
+    _rTip.style.left = left + 'px';
+
+    // Keep alive when mouse enters tip
+    _rTip.addEventListener('mouseenter', function() { clearTimeout(_rTimer); });
+    _rTip.addEventListener('mouseleave', function() { window.hideRecSeqTooltip(); });
+  };
+
+  window.hideRecSeqTooltip = function() {
+    _rTimer = setTimeout(function() {
+      if (_rTip) { _rTip.remove(); _rTip = null; }
+    }, 200);
+  };
+})();
+
 function buildRecommendedSequence(workItems) {
   const el = document.getElementById('mw-rec-seq');
   if (!el) return;
@@ -7110,7 +7266,7 @@ function renderRecSeq(items) {
   el.innerHTML = `
     <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan)">Recommended sequence for today</div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan);cursor:help" onmouseenter="showRecSeqTooltip(event)" onmouseleave="hideRecSeqTooltip()">Recommended sequence for today</div>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
         <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
       </div>
