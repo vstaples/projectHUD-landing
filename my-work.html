@@ -800,7 +800,7 @@ window._mwLoadUserView = async function() {
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
             <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">My Work Queue</div>
-            <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)';showRecSeqTooltip(event)" onmouseleave="this.style.background='rgba(0,210,255,.06)';hideRecSeqTooltip()">⚡ Seq</button>
+            <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
               <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
               <button data-action="diagram-diag" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'rgba(239,159,39,.2)':'none'};color:${_diagramMode?'#EF9F27':'rgba(255,255,255,.3)'};border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .12s">DIAGRAM</button>
@@ -7152,17 +7152,31 @@ window._recSeqGenerated = false;
       'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:8px">Recommended Sequence — Decision Rationale</div>' +
       html;
 
-    document.body.appendChild(_rTip);
-
-    // Position below the hovered element
+    // Smart position: prefer above the pane, fall back to below, never clip
     var r = e.currentTarget.getBoundingClientRect();
-    var top = r.bottom + 6;
+    var tipW = 700;
     var left = r.left;
-    if (left + 700 > window.innerWidth - 10) left = window.innerWidth - 710;
+    if (left + tipW > window.innerWidth - 10) left = window.innerWidth - tipW - 10;
     if (left < 8) left = 8;
-    _rTip.style.top  = top + 'px';
     _rTip.style.left = left + 'px';
-
+    _rTip.style.top  = '-9999px'; // off-screen to measure height
+    document.body.appendChild(_rTip);
+    var tipH = _rTip.offsetHeight;
+    var spaceBelow = window.innerHeight - r.bottom - 10;
+    var spaceAbove = r.top - 10;
+    if (spaceBelow >= tipH) {
+      _rTip.style.top = (r.bottom + 6) + 'px';
+    } else if (spaceAbove >= tipH) {
+      _rTip.style.top = (r.top - tipH - 6) + 'px';
+    } else if (spaceAbove > spaceBelow) {
+      // Fits better above — scroll to top of viewport
+      _rTip.style.top = '8px';
+      _rTip.style.maxHeight = (r.top - 18) + 'px';
+    } else {
+      // Below but constrain height
+      _rTip.style.top = (r.bottom + 6) + 'px';
+      _rTip.style.maxHeight = (window.innerHeight - r.bottom - 16) + 'px';
+    }
     // Keep alive when mouse enters tip
     _rTip.addEventListener('mouseenter', function() { clearTimeout(_rTimer); });
     _rTip.addEventListener('mouseleave', function() { window.hideRecSeqTooltip(); });
@@ -7270,7 +7284,7 @@ function renderRecSeq(items) {
   el.innerHTML = `
     <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan);cursor:default">Recommended sequence for today</div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan);cursor:help" id="mw-recseq-hdr" onmouseenter="showRecSeqTooltip(event)" onmouseleave="hideRecSeqTooltip()">Recommended sequence for today</div>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
         <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
       </div>
