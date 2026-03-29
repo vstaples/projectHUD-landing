@@ -232,6 +232,8 @@ window._mwLoadUserView = async function() {
     });
     _teEntries = myTimeEntries;
     window._myTimeEntries = myTimeEntries;
+    window._weekEntries = myTimeEntries.filter(function(e){ return weekDays.includes(e.date); });
+    window._today = today;
 
     // ── Fetch CoC events for all instances backing the user's work ────
     // ── Fetch CoC events from coc_events (entity-based, no FK constraints) ──
@@ -1155,17 +1157,19 @@ window._mwLoadUserView = async function() {
       }).join('') : '<div style="color:var(--text3);padding:12px 0">Nothing completed yet today.</div>';
 
     } else if (type === 'hrs_week') {
-      var tot  = te.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
-      var bill = te.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var weekTe = window._weekEntries || te;
+      var tot  = weekTe.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var bill = weekTe.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
       var pct  = tot>0?Math.round(bill/tot*100):0;
       html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
         '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
         '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
         '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Bill %</div><div style="color:'+(pct>=80?'var(--compass-green)':pct>=50?'var(--compass-amber)':'var(--compass-red)')+';font-size:18px;font-weight:700">'+pct+'%</div></div>' +
-        '</div>' + (te.length ? te.slice(0,12).map(teRow).join('') : '<div style="color:var(--text3);padding:8px 0">No time entries this week.</div>');
+        '</div>' + (weekTe.length ? weekTe.slice(0,20).map(teRow).join('') : '<div style="color:var(--text3);padding:8px 0">No time entries this week.</div>');
 
     } else if (type === 'hrs_today') {
-      var todayTe = te.filter(function(e){return e.date===today;});
+      var todayStr = window._today || today;
+      var todayTe = te.filter(function(e){return e.date===todayStr;});
       var tot  = todayTe.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
       var bill = todayTe.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
       html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
@@ -1225,20 +1229,20 @@ window._mwLoadUserView = async function() {
       'position:fixed', 'z-index:9999', 'background:#0a1628',
       'border:1px solid rgba(0,210,255,.25)', 'border-radius:3px',
       'padding:14px 16px', 'font-family:var(--font-mono,monospace)',
-      'font-size:11px', 'color:var(--text1,#C8DFF0)', 'width:380px',
+      'font-size:11px', 'color:var(--text1,#C8DFF0)', 'width:600px',
       'max-height:70vh', 'overflow-y:auto',
-      'box-shadow:0 8px 32px rgba(0,0,0,.75)', 'pointer-events:none', 'line-height:1.55'
+      'box-shadow:0 8px 32px rgba(0,0,0,.75)', 'pointer-events:auto', 'line-height:1.55'
     ].join(';');
     _tip.innerHTML =
-      '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.12em;' +
+      '<div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.1em;' +
       'text-transform:uppercase;color:' + accentColor + ';margin-bottom:10px;' +
-      'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:6px">' + title + '</div>' + html;
+      'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:8px">' + title + '</div>' + html;
     document.body.appendChild(_tip);
 
     // Position below the hovered card
     var cardEl = e.currentTarget;
     var r = cardEl.getBoundingClientRect();
-    var tipW = 380;
+    var tipW = 600;
     var top  = r.bottom + 6;
     var left = r.left;
     if (left + tipW > window.innerWidth - 10) left = window.innerWidth - tipW - 10;
@@ -1250,8 +1254,17 @@ window._mwLoadUserView = async function() {
   window.hideStatTooltip = function() {
     _tipTimer = setTimeout(function() {
       if (_tip) { _tip.remove(); _tip = null; }
-    }, 150);
+    }, 200);
   };
+  // Keep tip alive when mouse enters it
+  document.addEventListener('mouseover', function(ev) {
+    if (_tip && _tip.contains(ev.target)) { clearTimeout(_tipTimer); }
+  });
+  document.addEventListener('mouseout', function(ev) {
+    if (_tip && _tip.contains(ev.target) && !_tip.contains(ev.relatedTarget)) {
+      window.hideStatTooltip();
+    }
+  });
 })();
 
 
