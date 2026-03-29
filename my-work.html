@@ -678,42 +678,42 @@ window._mwLoadUserView = async function() {
     <div id="mw-stat-strip" style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px;position:relative"
       onmouseenter="showStatTooltip(event)"
       onmouseleave="hideStatTooltip()">
-      <div class="stat-card" style="border-top:2px solid var(--text3)">
+      <div class="stat-card" style="border-top:2px solid var(--text3);cursor:pointer" onclick="showCardPopup('waiting',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks Waiting</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--text3)">${waiting}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">assigned</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan);cursor:pointer" onclick="showCardPopup('inprogress',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks In Progress</div>
         <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${inProgress}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">active now</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-red)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-red);cursor:pointer" onclick="showCardPopup('blocked',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks Blocked</div>
         <div class="stat-value" style="font-family:var(--font-display);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">needs attention</div>
       </div>
-      <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green)">
+      <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green);cursor:pointer" onclick="showCardPopup('done',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Done Today</div>
         <div class="stat-value" id="done-today-count" style="font-family:var(--font-display);color:var(--compass-green)">${_doneToday.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">completed</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-amber)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-amber);cursor:pointer" onclick="showCardPopup('hrs_week',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Hrs — Week</div>
         <div class="stat-value sv-amber" style="font-family:var(--font-display)">${weekTotal.toFixed(1)}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">${weekBillable.toFixed(1)}h billable</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan);cursor:pointer" onclick="showCardPopup('hrs_today',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Hrs — Today</div>
         <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${todayTotal.toFixed(1)}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">of ~8h expected</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'}">
+      <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'};cursor:pointer" onclick="showCardPopup('open',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Open Items</div>
         <div class="stat-value" style="font-family:var(--font-display);color:${overdueCount>0?'var(--compass-amber)':'var(--text1)'}">${workItems.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head);color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-purple)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-purple);cursor:pointer" onclick="showCardPopup('workflows',this)">
         <div class="stat-label" style="font-family:var(--font-head)">Active Workflows</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--compass-purple)">${wfInstances.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">firm-wide</div>
@@ -1193,6 +1193,200 @@ window._mwLoadUserView = async function() {
     }, 150);
   };
 })();
+
+
+// ── Stat card click popup ────────────────────────────────────────────
+window.showCardPopup = function(type, cardEl) {
+  // Remove any existing popup
+  var existing = document.getElementById('mw-card-popup');
+  if (existing) { existing.remove(); return; }
+
+  var wi       = window._wiItems || [];
+  var te       = window._myTimeEntries || [];
+  var done     = window._doneToday || [];
+  var wf       = window._wfInstances || [];
+  var today    = new Date().toLocaleDateString('en-CA');
+
+  var esc = function(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var fmtDate = function(d) {
+    if (!d) return '—';
+    var dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  };
+  var fmtHrs = function(h) { return parseFloat(h||0).toFixed(1) + 'h'; };
+
+  var headerColor = {
+    waiting:'var(--text3)', inprogress:'var(--compass-cyan)', blocked:'var(--compass-red)',
+    done:'var(--compass-green)', hrs_week:'var(--compass-amber)', hrs_today:'var(--compass-cyan)',
+    open:'var(--compass-amber)', workflows:'var(--compass-purple)'
+  }[type] || 'var(--compass-cyan)';
+
+  var titles = {
+    waiting:'Tasks Waiting', inprogress:'Tasks In Progress', blocked:'Tasks Blocked',
+    done:'Completed Today', hrs_week:'Hours — This Week', hrs_today:'Hours — Today',
+    open:'All Open Items', workflows:'Active Workflows'
+  };
+
+  // Row builder for task lists
+  var taskRow = function(w, accentColor) {
+    var overdueBadge = w.overdue
+      ? '<span style="font-size:9px;padding:1px 5px;background:rgba(226,75,74,.15);color:var(--compass-red);border:1px solid rgba(226,75,74,.25);border-radius:2px;margin-left:6px;flex-shrink:0">overdue</span>'
+      : '';
+    var pct = w.progress != null ? w.progress : null;
+    var progBar = pct != null
+      ? '<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin-top:3px"><div style="height:2px;background:' + accentColor + ';width:' + Math.min(100,pct) + '%;border-radius:1px"></div></div>'
+      : '';
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">' +
+        '<span style="color:var(--text0);font-size:12px;flex:1;min-width:0">' + esc(w.title) + '</span>' +
+        overdueBadge +
+        '<span style="color:' + (w.overdue?'var(--compass-red)':'var(--text3)') + ';font-size:11px;flex-shrink:0">' + fmtDate(w.due) + '</span>' +
+      '</div>' +
+      '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(w.project||'—') + '</div>' +
+      progBar +
+    '</div>';
+  };
+
+  // Time entry row
+  var teRow = function(e) {
+    var proj = (window._projects||[]).find(function(p){ return p.id===e.project_id; });
+    var billDot = e.is_billable
+      ? '<span style="color:var(--compass-cyan);font-size:9px;margin-left:4px">● bill</span>'
+      : '<span style="color:var(--compass-purple);font-size:9px;margin-left:4px">● non-bill</span>';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="color:var(--text0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(e.description||e.activity||'Time entry') + '</div>' +
+        '<div style="color:var(--text3);font-size:11px">' + esc(proj?proj.name:'—') + billDot + '</div>' +
+      '</div>' +
+      '<div style="color:var(--compass-amber);font-weight:700;font-size:13px;margin-left:12px;flex-shrink:0">' + fmtHrs(e.hours) + '</div>' +
+    '</div>';
+  };
+
+  // Workflow row
+  var wfRow = function(w) {
+    var proj = (window._projects||[]).find(function(p){ return p.id===w.project_id; });
+    var statusColor = w.status==='in_progress'?'var(--compass-cyan)':w.status==='blocked'?'var(--compass-red)':'var(--text3)';
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="color:var(--text0);font-size:12px;flex:1">' + esc(w.template_name||w.name||'Workflow') + '</span>' +
+        '<span style="font-size:10px;color:' + statusColor + ';font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;margin-left:8px">' + esc(w.status||'') + '</span>' +
+      '</div>' +
+      '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(proj?proj.name:'—') + '</div>' +
+    '</div>';
+  };
+
+  var bodyHtml = '';
+
+  if (type === 'waiting') {
+    var items = wi.filter(function(w){ return w.status==='not_started'; });
+    if (!items.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">No tasks waiting.</div>'; }
+    else bodyHtml = items.map(function(w){ return taskRow(w,'var(--text3)'); }).join('');
+
+  } else if (type === 'inprogress') {
+    var items = wi.filter(function(w){ return w.status==='in_progress'; });
+    if (!items.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">No tasks in progress.</div>'; }
+    else bodyHtml = items.map(function(w){ return taskRow(w,'var(--compass-cyan)'); }).join('');
+
+  } else if (type === 'blocked') {
+    var items = wi.filter(function(w){ return w.status==='blocked'; });
+    if (!items.length) { bodyHtml = '<div style="color:var(--compass-green);padding:12px 0">✓ Nothing blocked.</div>'; }
+    else bodyHtml = items.map(function(w){ return taskRow(w,'var(--compass-red)'); }).join('');
+
+  } else if (type === 'done') {
+    if (!done.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">Nothing completed yet today.</div>'; }
+    else bodyHtml = done.map(function(w){
+      return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<div style="color:var(--text0);font-size:12px">' + esc(w.title) + '</div>' +
+        '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(w.project||'—') + '</div>' +
+      '</div>';
+    }).join('');
+
+  } else if (type === 'hrs_week') {
+    var entries = te;
+    var total   = entries.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var bill    = entries.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var nonBill = total - bill;
+    var pct     = total>0 ? Math.round(bill/total*100) : 0;
+    // Summary bar
+    bodyHtml =
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">' + fmtHrs(total) + '</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">' + fmtHrs(bill) + '</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Bill %</div><div style="color:' + (pct>=80?'var(--compass-green)':pct>=50?'var(--compass-amber)':'var(--compass-red)') + ';font-size:18px;font-weight:700">' + pct + '%</div></div>' +
+      '</div>';
+    if (!entries.length) bodyHtml += '<div style="color:var(--text3);padding:8px 0">No time entries this week.</div>';
+    else bodyHtml += entries.slice(0,15).map(teRow).join('');
+
+  } else if (type === 'hrs_today') {
+    var entries = te.filter(function(e){ return e.date===today; });
+    var total   = entries.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var bill    = entries.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    bodyHtml =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total today</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">' + fmtHrs(total) + '</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">' + fmtHrs(bill) + '</div></div>' +
+      '</div>';
+    if (!entries.length) bodyHtml += '<div style="color:var(--text3);padding:8px 0">No time entries logged today.</div>';
+    else bodyHtml += entries.map(teRow).join('');
+
+  } else if (type === 'open') {
+    var overdue = wi.filter(function(w){ return w.overdue; });
+    var current = wi.filter(function(w){ return !w.overdue; });
+    if (overdue.length) {
+      bodyHtml += '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-red);margin-bottom:4px">Overdue — ' + overdue.length + '</div>';
+      bodyHtml += overdue.map(function(w){ return taskRow(w,'var(--compass-red)'); }).join('');
+      bodyHtml += '<div style="margin-top:10px"></div>';
+    }
+    if (current.length) {
+      bodyHtml += '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-amber);margin-bottom:4px">Current — ' + current.length + '</div>';
+      bodyHtml += current.map(function(w){ return taskRow(w,'var(--compass-amber)'); }).join('');
+    }
+    if (!wi.length) bodyHtml = '<div style="color:var(--compass-green);padding:12px 0">✓ No open items.</div>';
+
+  } else if (type === 'workflows') {
+    if (!wf.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">No active workflows.</div>'; }
+    else bodyHtml = wf.map(wfRow).join('');
+  }
+
+  // Build popup
+  var popup = document.createElement('div');
+  popup.id = 'mw-card-popup';
+  popup.style.cssText = [
+    'position:fixed','z-index:9998','background:#0a1628',
+    'border:1px solid rgba(0,210,255,.2)','border-radius:3px',
+    'padding:0','width:420px','max-height:72vh',
+    'box-shadow:0 12px 40px rgba(0,0,0,.8)',
+    'display:flex','flex-direction:column','overflow:hidden'
+  ].join(';');
+
+  popup.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0">' +
+      '<div style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:' + headerColor + ';flex:1">' + (titles[type]||type) + '</div>' +
+      '<button onclick="document.getElementById('mw-card-popup').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;line-height:1">×</button>' +
+    '</div>' +
+    '<div style="padding:10px 14px;overflow-y:auto;flex:1">' + bodyHtml + '</div>';
+
+  document.body.appendChild(popup);
+
+  // Position below the clicked card
+  var r = cardEl.getBoundingClientRect();
+  var top = r.bottom + 6;
+  var left = r.left;
+  if (left + 420 > window.innerWidth - 10) left = window.innerWidth - 430;
+  if (top + 500 > window.innerHeight - 10) top = r.top - Math.min(500, top + 500 - window.innerHeight + 20);
+  popup.style.top  = top + 'px';
+  popup.style.left = left + 'px';
+
+  // Close on outside click
+  setTimeout(function() {
+    document.addEventListener('click', function _closePopup(ev) {
+      if (!popup.contains(ev.target) && ev.target !== cardEl) {
+        popup.remove();
+        document.removeEventListener('click', _closePopup);
+      }
+    });
+  }, 0);
+};
 
 // ── Recommended daily sequence panel ─────────────────
     setTimeout(() => buildRecommendedSequence(_wiItems), 100);
