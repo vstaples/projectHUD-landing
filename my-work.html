@@ -7142,22 +7142,9 @@ window._recSeqGenerated = false;
       }).join('') +
       '</div></div>';
 
-    var html =
-      '<table style="border-collapse:collapse;width:100%">' +
-        '<thead><tr>' +
-          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 8px 4px 0;text-align:left">#</th>' +
-          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 10px 4px 0;text-align:left">Item</th>' +
-          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 10px 4px 0;text-align:left">Decision factors</th>' +
-          '<th style="font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:0 0 4px 0;text-align:right">Score</th>' +
-        '</thead>' +
-        '<tbody>' + rows + '</tbody>' +
-      '</table>' +
-      '<div style="font-size:11px;color:#6A94B8;margin-top:4px;font-style:italic">' +
-        '* Overdue score = 500 base + 10 per day late&nbsp;&nbsp;' +
-        '(e.g. 5d overdue = 550 pts)' +
-      '</div>' + legend;
+    // Tooltip shows Scoring Factors only — table is now in the pane itself
 
-    _rTip = document.createElement('div');
+        _rTip = document.createElement('div');
     _rTip.id = 'mw-recseq-tip';
     _rTip.style.cssText = [
       'position:fixed', 'z-index:9999', 'background:#0a1628',
@@ -7169,11 +7156,10 @@ window._recSeqGenerated = false;
     ].join(';');
 
     _rTip.innerHTML =
-      '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;' +
-      'text-transform:uppercase;color:var(--compass-cyan);margin-bottom:12px;' +
-      'border-bottom:1px solid rgba(0,210,255,.15);padding-bottom:8px">Recommended Sequence — Decision Rationale</div>' +
-      html;
-
+      '<div style="font-size:13px;font-weight:700;letter-spacing:.08em;' +
+      'text-transform:uppercase;color:#00D2FF;margin-bottom:10px;' +
+      'border-bottom:1px solid rgba(0,210,255,.15);padding-bottom:6px">Scoring Factors</div>' +
+      legend;
     // Smart position: prefer above the pane, fall back to below, never clip
     var r = e.currentTarget.getBoundingClientRect();
     var tipW = 860;
@@ -7270,32 +7256,75 @@ function buildRecommendedSequence(workItems) {
 function renderRecSeq(items) {
   const el = document.getElementById('mw-rec-seq');
   if (!el) return;
+  const today = new Date().toLocaleDateString('en-CA');
+
+  // Column header row
+  const hdr = `<div style="display:grid;grid-template-columns:24px 1fr 280px 200px;gap:0;padding:5px 12px 5px 12px;border-bottom:1px solid rgba(0,210,255,.12)">
+    <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6A94B8">#</div>
+    <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6A94B8">Item</div>
+    <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6A94B8">Decision Factors</div>
+    <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6A94B8;text-align:right">Score</div>
+  </div>`;
 
   const rows = items.map((w, i) => {
-    const rankColor = i === 0 ? 'var(--compass-cyan)' : i === 1 ? 'rgba(0,210,255,.6)' : 'rgba(0,210,255,.35)';
-    const reasonHtml = w._reasons.slice(0, 2).map(r =>
-      `<span style="font-family:var(--font-mono,monospace);font-size:11px;padding:1px 6px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:rgba(0,210,255,.7);border-radius:2px">${r}</span>`
-    ).join('');
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer"
+    const rankColor = i === 0 ? '#00D2FF' : i === 1 ? 'rgba(0,210,255,.7)' : 'rgba(0,210,255,.45)';
+    const typeLabel = (w.type === 'action' ? 'Action item' : 'Task');
+    const subLabel  = [w.project, typeLabel].filter(Boolean).join(' · ');
+
+    // Factor badges — full set, colour-coded
+    const factorColor = r => {
+      if (r.includes('Blocking'))        return '#E24B4A';
+      if (r.includes('overdue'))         return '#E24B4A';
+      if (r.includes('Blocked'))         return '#E24B4A';
+      if (r.includes('Due today'))       return '#EF9F27';
+      if (r.includes('Due in'))          return '#EF9F27';
+      if (r.includes('Unrated'))         return '#EF9F27';
+      if (r.includes('Project at risk')) return '#EF9F27';
+      return '#00D2FF';
+    };
+    const factorHtml = (w._reasons || []).map(r => {
+      const c = factorColor(r);
+      return `<span style="font-size:11px;padding:1px 6px;border-radius:2px;background:${c}18;color:${c};border:1px solid ${c}40;white-space:nowrap">${esc(r)}</span>`;
+    }).join(' ');
+
+    // Score breakdown
+    const scoreBreakdown = (() => {
+      const parts = [];
+      (w._reasons || []).forEach(r => {
+        if (r.includes('overdue')) { const d=parseInt(r); parts.push(isNaN(d)?'500':'500+('+ d +'×10)'); }
+        else if (r.includes('Blocking'))        parts.push('1000');
+        else if (r.includes('Blocked'))         parts.push('400');
+        else if (r.includes('Due today'))        parts.push('300');
+        else if (r.includes('Unrated'))          parts.push('200');
+        else if (r.includes('Due in'))           parts.push('150');
+        else if (r.includes('Project at risk'))  parts.push('100');
+        else if (r.includes('In progress'))      parts.push('50');
+      });
+      return parts.length ? parts.join(' + ') + ' = ' + w._score : String(w._score);
+    })();
+
+    return `<div style="display:grid;grid-template-columns:24px 1fr 280px 200px;gap:0;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;align-items:start"
       data-wi-id="${w.id}" data-wi-type="${w.type}" data-action="diag-open-task"
       onmouseenter="this.style.background='rgba(0,210,255,.03)'" onmouseleave="this.style.background=''">
-      <div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:${rankColor};width:18px;flex-shrink:0;text-align:center">${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${reasonHtml}</div>
+      <div style="font-size:15px;font-weight:700;color:${rankColor};padding-top:1px">${i+1}</div>
+      <div style="min-width:0;padding-right:8px">
+        <div style="font-size:12px;font-weight:600;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
+        <div style="font-size:11px;color:#6A94B8;margin-top:2px">${esc(subLabel)}</div>
       </div>
-      <div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);flex-shrink:0">${esc(w.project||'')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:flex-start">${factorHtml}</div>
+      <div style="text-align:right;font-size:12px;font-weight:700;color:#00D2FF;white-space:nowrap">${scoreBreakdown} pts</div>
     </div>`;
   }).join('');
 
   el.style.display = 'block';
   el.innerHTML = `
-    <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)" onmouseenter="showRecSeqTooltip(event)" onmouseleave="if(!this.contains(event.relatedTarget))hideRecSeqTooltip()">
+    <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid #00D2FF" onmouseenter="showRecSeqTooltip(event)" onmouseleave="if(!this.contains(event.relatedTarget))hideRecSeqTooltip()">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
-        <div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan);cursor:help" id="mw-recseq-hdr">Recommended sequence for today</div>
-        <div style="font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#00D2FF;cursor:help" id="mw-recseq-hdr">Recommended sequence for today</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
         <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
       </div>
+      ${hdr}
       ${rows}
     </div>`;
 }
