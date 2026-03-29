@@ -5862,8 +5862,17 @@ const WIDGET_REGISTRY = (function() {
     }
   };
 })();
-// MY VIEWS: reuse shared WIDGET_REGISTRY if already set by MY NOTES
-if (!window.WIDGET_REGISTRY) window.WIDGET_REGISTRY = WIDGET_REGISTRY;
+// MY VIEWS: sync with shared WIDGET_REGISTRY
+// If MY NOTES already created one, copy all our local registrations into it
+// so capacity_gauge, task_list etc. (registered above) are visible globally.
+if (window.WIDGET_REGISTRY && window.WIDGET_REGISTRY !== WIDGET_REGISTRY) {
+  // Adopt shared registry — re-register everything from our local instance
+  WIDGET_REGISTRY.getAll().forEach(function(def) {
+    if (!window.WIDGET_REGISTRY.get(def.id)) window.WIDGET_REGISTRY.register(def);
+  });
+} else {
+  window.WIDGET_REGISTRY = WIDGET_REGISTRY;
+}
 
 // ── Widget context ────────────────────────────────────────────────────────
 function _widgetContext() {
