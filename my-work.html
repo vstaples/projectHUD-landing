@@ -723,7 +723,7 @@ window._mwLoadUserView = async function() {
         <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
-            <div class="panel-title" style="color:var(--compass-cyan)">${_weekOffset===0?'This week':_weekOffset===1?'Last week':`${_weekOffset} weeks ago`} — hours by day</div>
+            <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">${_weekOffset===0?'This week':_weekOffset===1?'Last week':`${_weekOffset} weeks ago`} — hours by day</div>
             <div style="display:flex;align-items:center;gap:6px">
               <!-- Back a week -->
               <button id="week-step-back"
@@ -797,7 +797,7 @@ window._mwLoadUserView = async function() {
         <!-- 1.C Work List -->
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
-            <div class="panel-title" style="color:var(--compass-cyan)">My Work Queue</div>
+            <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">My Work Queue</div>
             <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
               <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
@@ -6843,7 +6843,7 @@ function renderRecSeq(items) {
   el.innerHTML = `
     <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan)">Recommended sequence for today</div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan)">Recommended sequence for today</div>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
         <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
       </div>
