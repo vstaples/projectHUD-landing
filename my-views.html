@@ -767,8 +767,8 @@ async function _viewsSaveWorkspace(immediate) {
 function _notesRenderLeft() {
   _notesRenderLibrary();
   _notesRenderInbox();
-  _notesRenderTree();
-  _notesWireLeft(); // wire after both inbox and tree are in DOM
+  // MY VIEWS: _notesRenderTree() omitted — NOTES section not shown
+  _notesWireLeft();
 }
 
 function _notesRenderInbox() {
