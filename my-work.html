@@ -675,45 +675,43 @@ window._mwLoadUserView = async function() {
     </div>
 
     <!-- 1.A 8-Card Strip -->
-    <div id="mw-stat-strip" style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px;position:relative"
-      onmouseenter="showStatTooltip(event)"
-      onmouseleave="hideStatTooltip()">
-      <div class="stat-card" style="border-top:2px solid var(--text3);cursor:pointer" onclick="showCardPopup('waiting',this)">
+    <div id="mw-stat-strip" style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px">
+      <div class="stat-card" style="border-top:2px solid var(--text3);cursor:pointer" onclick="showCardPopup(&apos;waiting&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks Waiting</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--text3)">${waiting}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">assigned</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-cyan);cursor:pointer" onclick="showCardPopup('inprogress',this)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan);cursor:pointer" onclick="showCardPopup(&apos;inprogress&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks In Progress</div>
         <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${inProgress}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">active now</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-red);cursor:pointer" onclick="showCardPopup('blocked',this)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-red);cursor:pointer" onclick="showCardPopup(&apos;blocked&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks Blocked</div>
         <div class="stat-value" style="font-family:var(--font-display);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">needs attention</div>
       </div>
-      <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green);cursor:pointer" onclick="showCardPopup('done',this)">
+      <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green);cursor:pointer" onclick="showCardPopup(&apos;done&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Done Today</div>
         <div class="stat-value" id="done-today-count" style="font-family:var(--font-display);color:var(--compass-green)">${_doneToday.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">completed</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-amber);cursor:pointer" onclick="showCardPopup('hrs_week',this)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-amber);cursor:pointer" onclick="showCardPopup(&apos;hrs_week&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Hrs — Week</div>
         <div class="stat-value sv-amber" style="font-family:var(--font-display)">${weekTotal.toFixed(1)}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">${weekBillable.toFixed(1)}h billable</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-cyan);cursor:pointer" onclick="showCardPopup('hrs_today',this)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan);cursor:pointer" onclick="showCardPopup(&apos;hrs_today&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Hrs — Today</div>
         <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${todayTotal.toFixed(1)}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">of ~8h expected</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'};cursor:pointer" onclick="showCardPopup('open',this)">
+      <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'};cursor:pointer" onclick="showCardPopup(&apos;open&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Open Items</div>
         <div class="stat-value" style="font-family:var(--font-display);color:${overdueCount>0?'var(--compass-amber)':'var(--text1)'}">${workItems.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head);color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid var(--compass-purple);cursor:pointer" onclick="showCardPopup('workflows',this)">
+      <div class="stat-card" style="border-top:2px solid var(--compass-purple);cursor:pointer" onclick="showCardPopup(&apos;workflows&apos;,this)">
         <div class="stat-label" style="font-family:var(--font-head)">Active Workflows</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--compass-purple)">${wfInstances.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">firm-wide</div>
@@ -1362,7 +1360,7 @@ window.showCardPopup = function(type, cardEl) {
   popup.innerHTML =
     '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0">' +
       '<div style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:' + headerColor + ';flex:1">' + (titles[type]||type) + '</div>' +
-      '<button onclick="document.getElementById('mw-card-popup').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;line-height:1">×</button>' +
+      '<button onclick="document.getElementById(&apos;mw-card-popup&apos;).remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;line-height:1">×</button>' +
     '</div>' +
     '<div style="padding:10px 14px;overflow-y:auto;flex:1">' + bodyHtml + '</div>';
 
