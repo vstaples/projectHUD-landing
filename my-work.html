@@ -7049,11 +7049,11 @@ window._recSeqGenerated = false;
   var _rTimer = null;
 
   var SCORE_FACTORS = [
-    { key: 'blocking',    label: 'Blocking someone',     pts: 1000, color: 'var(--compass-red)' },
+    { key: 'blocking',    label: 'Blocking someone',     pts: 1000, color: '#E24B4A' },
     { key: 'unrated',     label: 'Unrated action item',  pts: 200,  color: 'var(--compass-amber)' },
-    { key: 'overdue',     label: 'Overdue (+10/day)',    pts: 500,  color: 'var(--compass-red)' },
+    { key: 'overdue',     label: 'Overdue (+10/day)',    pts: 500,  color: '#E24B4A' },
     { key: 'due_soon',    label: 'Due within 2 days',    pts: 150,  color: 'var(--compass-amber)' },
-    { key: 'blocked',     label: 'Blocked status',       pts: 400,  color: 'var(--compass-red)' },
+    { key: 'blocked',     label: 'Blocked status',       pts: 400,  color: '#E24B4A' },
     { key: 'proj_risk',   label: 'Project at risk',      pts: 100,  color: 'var(--compass-amber)' },
     { key: 'due_today',   label: 'Due today',            pts: 300,  color: 'var(--compass-amber)' },
     { key: 'in_progress', label: 'Already in progress',  pts: 50,   color: 'var(--compass-cyan)' },
@@ -7074,9 +7074,9 @@ window._recSeqGenerated = false;
 
     // Build factor-matching: map each item's _reasons back to known factors
     var factorColor = function(reason) {
-      if (reason.includes('Blocking'))         return 'var(--compass-red)';
-      if (reason.includes('overdue'))          return 'var(--compass-red)';
-      if (reason.includes('Blocked'))          return 'var(--compass-red)';
+      if (reason.includes('Blocking'))         return '#E24B4A';
+      if (reason.includes('overdue'))          return '#E24B4A';
+      if (reason.includes('Blocked'))          return '#E24B4A';
       if (reason.includes('Due today'))        return 'var(--compass-amber)';
       if (reason.includes('Due in'))           return 'var(--compass-amber)';
       if (reason.includes('Unrated'))          return 'var(--compass-amber)';
@@ -7089,6 +7089,24 @@ window._recSeqGenerated = false;
     var rows = items.map(function(w, i) {
       var rankColor = i === 0 ? 'var(--compass-cyan)' : i === 1 ? 'rgba(0,210,255,.7)' : i === 2 ? 'rgba(0,210,255,.5)' : 'var(--text3)';
       var barW = Math.round((w._score / maxScore) * 100);
+      // Build score breakdown: e.g. '500 + (5×10) + 200 = 750'
+      var scoreBreakdown = (function() {
+        var parts = [];
+        var today2 = new Date().toLocaleDateString('en-CA');
+        (w._reasons || []).forEach(function(r) {
+          if (r.includes('overdue')) {
+            var d = parseInt(r);
+            parts.push(isNaN(d) ? '500' : '500+(' + d + '×10)');
+          } else if (r.includes('Blocking'))         { parts.push('1000'); }
+          else if (r.includes('Blocked'))            { parts.push('400'); }
+          else if (r.includes('Due today'))          { parts.push('300'); }
+          else if (r.includes('Unrated'))            { parts.push('200'); }
+          else if (r.includes('Due in'))             { parts.push('150'); }
+          else if (r.includes('Project at risk'))    { parts.push('100'); }
+          else if (r.includes('In progress'))        { parts.push('50'); }
+        });
+        return parts.length ? parts.join(' + ') + ' = ' + w._score : w._score + '';
+      })();
       var factors = (w._reasons || []).map(function(r) {
         var c = factorColor(r);
         return '<span style="font-size:13px;padding:1px 6px;border-radius:2px;background:' + c + '18;color:' + c + ';border:1px solid ' + c + '40;white-space:nowrap">' + esc(r) + '</span>';
@@ -7105,7 +7123,7 @@ window._recSeqGenerated = false;
           '<div style="display:flex;gap:4px;flex-wrap:wrap;max-width:280px">' + (factors || '<span style="color:var(--text3);font-size:13px">no factors</span>') + '</div>' +
         '</td>' +
         '<td style="padding:3px 0;vertical-align:top;text-align:right;white-space:nowrap">' +
-          '<div style="font-family:inherit;font-size:13px;font-weight:700;color:var(--compass-cyan)" title="' + (w._reasons||[]).join(' · ') + '">' + w._score + ' pts</div>' +
+          '<div style="font-family:inherit;font-size:13px;font-weight:700;color:#00D2FF">' + scoreBreakdown + ' pts</div>' +
           '<div style="width:60px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;margin-left:auto">' +
             '<div style="height:3px;background:var(--compass-cyan);width:' + barW + '%;border-radius:2px"></div>' +
           '</div>' +
@@ -7146,7 +7164,7 @@ window._recSeqGenerated = false;
       'border:1px solid rgba(0,210,255,.25)', 'border-left:3px solid var(--compass-cyan)',
       'border-radius:3px', 'padding:10px 14px',
       'font-family:inherit;', 'font-size:13px', 'font-weight:400',
-      'color:var(--text0,#F0F6FF)', 'max-width:720px', 'min-width:520px',
+      'color:var(--text0,#F0F6FF)', 'max-width:900px', 'min-width:680px',
       'overflow-y:auto',
       'box-shadow:0 12px 40px rgba(0,0,0,.8)', 'pointer-events:auto', 'line-height:1.3'
     ].join(';');
@@ -7159,7 +7177,7 @@ window._recSeqGenerated = false;
 
     // Smart position: prefer above the pane, fall back to below, never clip
     var r = e.currentTarget.getBoundingClientRect();
-    var tipW = 700;
+    var tipW = 860;
     var left = r.left;
     if (left + tipW > window.innerWidth - 10) left = window.innerWidth - tipW - 10;
     if (left < 8) left = 8;
@@ -7167,20 +7185,23 @@ window._recSeqGenerated = false;
     _rTip.style.top  = '-9999px'; // off-screen to measure height
     document.body.appendChild(_rTip);
     var tipH = _rTip.offsetHeight;
-    var spaceBelow = window.innerHeight - r.bottom - 10;
+    var vh = window.innerHeight;
+    var spaceBelow = vh - r.bottom - 10;
     var spaceAbove = r.top - 10;
-    // Position to show full content — above if pane in lower half, else below
     var PAD = 8;
-    if (tipH <= spaceAbove || spaceAbove >= spaceBelow) {
-      // Go above
-      var top = r.top - tipH - 6;
-      if (top < PAD) top = PAD;
-      _rTip.style.top = top + 'px';
+    // Always prefer above when content fits; pane is typically near bottom
+    if (tipH <= spaceAbove) {
+      // Fits above perfectly
+      _rTip.style.top = (r.top - tipH - 6) + 'px';
+      _rTip.style.maxHeight = tipH + 'px';
+    } else if (spaceAbove >= spaceBelow) {
+      // More space above — pin to top of viewport
+      _rTip.style.top = PAD + 'px';
       _rTip.style.maxHeight = (r.top - PAD - 6) + 'px';
     } else {
-      // Go below
+      // More space below
       _rTip.style.top = (r.bottom + 6) + 'px';
-      _rTip.style.maxHeight = (window.innerHeight - r.bottom - PAD - 6) + 'px';
+      _rTip.style.maxHeight = (vh - r.bottom - PAD - 6) + 'px';
     }
     // Keep alive when mouse enters tip
     _rTip.addEventListener('mouseenter', function() { clearTimeout(_rTimer); });
