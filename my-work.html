@@ -7114,12 +7114,13 @@ window._recSeqGenerated = false;
     }).join('');
 
     // Factor legend
-    var legend = '<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)">' +
-      '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">Scoring factors</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1)">' +
+      '<div style="font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:.04em;color:#C8DFF0;margin-bottom:8px">Scoring factors</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px">' +
       SCORE_FACTORS.map(function(f) {
-        return '<div style="font-size:10px;color:' + f.color + ';white-space:nowrap">' +
-          '<span style="opacity:.5">+' + f.pts + '</span> ' + f.label + '</div>';
+        return '<div style="font-family:var(--font-mono);font-size:11px;font-weight:400;color:#C8DFF0;white-space:nowrap;display:flex;gap:8px;align-items:center">' +
+          '<span style="color:' + f.color + ';font-weight:700;min-width:36px;text-align:right">+' + f.pts + '</span>' +
+          '<span style="color:#C8DFF0">' + f.label + '</span></div>';
       }).join('') +
       '</div></div>';
 
@@ -7282,9 +7283,9 @@ function renderRecSeq(items) {
 
   el.style.display = 'block';
   el.innerHTML = `
-    <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)">
+    <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid var(--compass-cyan)" onmouseenter="showRecSeqTooltip(event)" onmouseleave="if(!this.contains(event.relatedTarget))hideRecSeqTooltip()">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan);cursor:help" id="mw-recseq-hdr" onmouseenter="showRecSeqTooltip(event)" onmouseleave="hideRecSeqTooltip()">Recommended sequence for today</div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--compass-cyan);cursor:help" id="mw-recseq-hdr">Recommended sequence for today</div>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
         <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
       </div>
