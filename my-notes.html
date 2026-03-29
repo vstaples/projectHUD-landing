@@ -360,7 +360,7 @@
   <div id="notes-right">
     <div id="notes-grid-header">
       <!-- LEFT: view switcher + lock + rename + delete -->
-      <div id="notes-view-name-wrap" style="display:none;align-items:center;gap:6px;min-width:0">
+      <div id="notes-view-name-wrap" style="display:flex;align-items:center;gap:6px;min-width:0">
         <select id="notes-view-switcher"
           style="background:#0a1628;border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
             font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
@@ -388,16 +388,16 @@
       <div id="notes-header-user"></div>
       <!-- RIGHT: action buttons -->
       <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
-        <button class="notes-grid-btn" onclick="_notesNewView()" title="New view" style="display:none">+ View</button>
+        <button class="notes-grid-btn" onclick="_notesNewView()" title="New view">+ View</button>
         <button class="notes-grid-btn" id="notes-clone-btn" onclick="window._notesCloneView && window._notesCloneView()"
           title="Clone this view — copy layout and widgets to a new named view"
-          style="display:none">⧉ Clone</button>
+          style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⧉ Clone</button>
         <button class="notes-grid-btn" id="notes-share-view-btn"
           onclick="window._notesShowShareViewDialog && window._notesShowShareViewDialog()"
           title="Share this view with others"
-          style="display:none">⊕ Share</button>
+          style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⊕ Share</button>
         <button class="notes-grid-btn" onclick="_notesSaveAsTemplate()" title="Save current view as a reusable template"
-          style="display:none">⊞ Save Template</button>
+          style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⊞ Save Template</button>
         <button class="notes-grid-btn" id="notes-edit-tpl-btn" onclick="window._notesEditTemplate && window._notesEditTemplate()" title="Edit this template" style="display:none;color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">✎ Edit Template</button>
         <button class="notes-grid-btn" onclick="_notesClearWorkspace()" title="Clear all tiles from this view"
           style="color:rgba(226,75,74,.7);border-color:rgba(226,75,74,.2)">Clear</button>
