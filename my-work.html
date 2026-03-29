@@ -7115,10 +7115,10 @@ window._recSeqGenerated = false;
 
     // Factor legend
     var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)">' +
-      '<div style="font-family:var(--font-mono);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring factors</div>' +
+      '<div style="font-family:var(--font-display,\"Barlow Condensed\",sans-serif);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring factors</div>' +
       '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px 24px">' +
       SCORE_FACTORS.map(function(f) {
-        return '<div style="font-family:var(--font-mono);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);white-space:nowrap;display:flex;gap:10px;align-items:center">' +
+        return '<div style="font-family:var(--font-display,\"Barlow Condensed\",sans-serif);font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);white-space:nowrap;display:flex;gap:10px;align-items:center">' +
           '<span style="color:' + f.color + ';font-weight:700;min-width:42px;text-align:right">+' + f.pts + '</span>' +
           '<span style="color:var(--text0,#F0F6FF)">' + f.label + '</span></div>';
       }).join('') +
@@ -7141,16 +7141,16 @@ window._recSeqGenerated = false;
       'position:fixed', 'z-index:9999', 'background:#0a1628',
       'border:1px solid rgba(0,210,255,.25)', 'border-left:3px solid var(--compass-cyan)',
       'border-radius:3px', 'padding:14px 16px',
-      'font-family:var(--font-mono,monospace)', 'font-size:11px',
-      'color:var(--text1,#C8DFF0)', 'max-width:700px', 'min-width:500px',
-      'max-height:70vh', 'overflow-y:auto',
-      'box-shadow:0 12px 40px rgba(0,0,0,.8)', 'pointer-events:auto', 'line-height:1.55'
+      'font-family:var(--font-display,"Barlow Condensed",sans-serif)', 'font-size:13px', 'font-weight:400',
+      'color:var(--text0,#F0F6FF)', 'max-width:700px', 'min-width:500px',
+      'overflow-y:auto',
+      'box-shadow:0 12px 40px rgba(0,0,0,.8)', 'pointer-events:auto', 'line-height:1.6'
     ].join(';');
 
     _rTip.innerHTML =
-      '<div style="font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.1em;' +
-      'text-transform:uppercase;color:var(--compass-cyan);margin-bottom:10px;' +
-      'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:8px">Recommended Sequence — Decision Rationale</div>' +
+      '<div style="font-family:var(--font-display,\"Barlow Condensed\",sans-serif);font-size:15px;font-weight:700;letter-spacing:.06em;' +
+      'text-transform:uppercase;color:var(--compass-cyan);margin-bottom:12px;' +
+      'border-bottom:1px solid rgba(0,210,255,.15);padding-bottom:8px">Recommended Sequence — Decision Rationale</div>' +
       html;
 
     // Smart position: prefer above the pane, fall back to below, never clip
@@ -7165,18 +7165,17 @@ window._recSeqGenerated = false;
     var tipH = _rTip.offsetHeight;
     var spaceBelow = window.innerHeight - r.bottom - 10;
     var spaceAbove = r.top - 10;
-    if (spaceBelow >= tipH) {
-      _rTip.style.top = (r.bottom + 6) + 'px';
-    } else if (spaceAbove >= tipH) {
-      _rTip.style.top = (r.top - tipH - 6) + 'px';
-    } else if (spaceAbove > spaceBelow) {
-      // Fits better above — scroll to top of viewport
-      _rTip.style.top = '8px';
-      _rTip.style.maxHeight = (r.top - 18) + 'px';
+    var PAD = 12;
+    if (spaceAbove >= spaceBelow) {
+      // Position above the pane — more space there
+      var availH = r.top - PAD;
+      _rTip.style.maxHeight = Math.min(tipH, availH) + 'px';
+      _rTip.style.top = (r.top - Math.min(tipH, availH) - 6) + 'px';
     } else {
-      // Below but constrain height
+      // Position below the pane
+      var availH = window.innerHeight - r.bottom - PAD;
+      _rTip.style.maxHeight = Math.min(tipH, availH) + 'px';
       _rTip.style.top = (r.bottom + 6) + 'px';
-      _rTip.style.maxHeight = (window.innerHeight - r.bottom - 16) + 'px';
     }
     // Keep alive when mouse enters tip
     _rTip.addEventListener('mouseenter', function() { clearTimeout(_rTimer); });
