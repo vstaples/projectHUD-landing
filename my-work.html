@@ -677,17 +677,17 @@ window._mwLoadUserView = async function() {
     <!-- 1.A 8-Card Strip -->
     <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px">
       <div class="stat-card" style="border-top:2px solid var(--text3)">
-        <div class="stat-label" style="font-family:var(--font-head)">Waiting</div>
+        <div class="stat-label" style="font-family:var(--font-head)">Tasks Waiting</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--text3)">${waiting}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">assigned</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-cyan)">
-        <div class="stat-label" style="font-family:var(--font-head)">In Progress</div>
+        <div class="stat-label" style="font-family:var(--font-head)">Tasks In Progress</div>
         <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${inProgress}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">active now</div>
       </div>
       <div class="stat-card" style="border-top:2px solid ${blocked>0?'var(--compass-red)':'var(--border)'}">
-        <div class="stat-label" style="font-family:var(--font-head)">Blocked</div>
+        <div class="stat-label" style="font-family:var(--font-head)">Tasks Blocked</div>
         <div class="stat-value" style="font-family:var(--font-display);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">needs attention</div>
       </div>
@@ -712,7 +712,7 @@ window._mwLoadUserView = async function() {
         <div class="stat-sub" style="font-family:var(--font-head);color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-purple)">
-        <div class="stat-label" style="font-family:var(--font-head)">Active WF</div>
+        <div class="stat-label" style="font-family:var(--font-head)">Active Workflows</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--compass-purple)">${wfInstances.length}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">firm-wide</div>
       </div>
@@ -795,7 +795,7 @@ window._mwLoadUserView = async function() {
         <!-- 1.C Work List -->
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
-            <div class="panel-title">My work</div>
+            <div class="panel-title">My Work Queue</div>
             <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
               <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
@@ -4924,9 +4924,9 @@ window.uSwitchTab = function(tab, btn) {
     window._notesStartInboxPoll();
     if (window._notesStartPingSystem) window._notesStartPingSystem();
   }
-  // MY VIEWS — flush save and manage polls using views-scoped functions
-  if (_uActiveTab === 'views' && tab !== 'views' && window._viewsSaveNow) window._viewsSaveNow();
-  if (tab === 'views' && window._viewsStartInboxPoll) window._viewsStartInboxPoll();
+  // MY VIEWS — flush save and manage polls same as MY NOTES
+  if (_uActiveTab === 'views' && tab !== 'views' && window._notesSaveNow) window._notesSaveNow();
+  if (tab === 'views' && window._notesStartInboxPoll) window._notesStartInboxPoll();
   _uActiveTab = tab;
   localStorage.setItem('compass-user-tab', tab);
   document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
@@ -8018,9 +8018,9 @@ function openInProgressPanel(item) {
         <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Status</div>
         <select id="ip-status" style="font-family:var(--font-head);font-size:12px;font-weight:600;padding:6px 8px;
           background:var(--bg2);color:var(--text1);border:1px solid var(--border);width:100%;cursor:pointer">
-          <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In Progress</option>
+          <option value="in_progress" ${item.status==='in_progress'?'selected':''}>Tasks In Progress</option>
           <option value="not_started" ${item.status==='not_started'?'selected':''}>Not Started</option>
-          <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
+          <option value="blocked" ${item.status==='blocked'?'selected':''}>Tasks Blocked</option>
         </select>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:1px">
@@ -9002,7 +9002,7 @@ function openWorkItemExpanded(item) {
             : item.status==='blocked'
               ? `<span style="font-family:var(--font-head);font-size:11px;font-weight:700;
                   color:var(--compass-amber);border:1px solid rgba(239,159,39,.4);
-                  background:rgba(239,159,39,.08);padding:1px 7px">Blocked</span>`
+                  background:rgba(239,159,39,.08);padding:1px 7px">Tasks Blocked</span>`
               : ''}
         </div>
         <div style="font-family:var(--font-body);font-size:14px;font-weight:600;
@@ -9081,7 +9081,7 @@ function openWorkItemExpanded(item) {
               style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 6px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer;flex-shrink:0">
               <option value="not_started" ${item.status==='not_started'?'selected':''}>Not started</option>
               <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
-              <option value="blocked" ${item.status==='blocked'?'selected':''}>Blocked</option>
+              <option value="blocked" ${item.status==='blocked'?'selected':''}>Tasks Blocked</option>
             </select>`
             :`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Action item</div>
