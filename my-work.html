@@ -7050,14 +7050,14 @@ window._recSeqGenerated = false;
 
   var SCORE_FACTORS = [
     { key: 'blocking',    label: 'Blocking someone',     pts: 1000, color: 'var(--compass-red)' },
-    { key: 'overdue',     label: 'Overdue (+10/day)',    pts: 500,  color: 'var(--compass-red)' },
-    { key: 'blocked',     label: 'Blocked status',       pts: 400,  color: 'var(--compass-red)' },
-    { key: 'due_today',   label: 'Due today',            pts: 300,  color: 'var(--compass-amber)' },
     { key: 'unrated',     label: 'Unrated action item',  pts: 200,  color: 'var(--compass-amber)' },
+    { key: 'overdue',     label: 'Overdue (+10/day)',    pts: 500,  color: 'var(--compass-red)' },
     { key: 'due_soon',    label: 'Due within 2 days',    pts: 150,  color: 'var(--compass-amber)' },
+    { key: 'blocked',     label: 'Blocked status',       pts: 400,  color: 'var(--compass-red)' },
     { key: 'proj_risk',   label: 'Project at risk',      pts: 100,  color: 'var(--compass-amber)' },
+    { key: 'due_today',   label: 'Due today',            pts: 300,  color: 'var(--compass-amber)' },
     { key: 'in_progress', label: 'Already in progress',  pts: 50,   color: 'var(--compass-cyan)' },
-  ];
+  ]; // grid reads L-R: col1=1000,500,400,300 | col2=200,150,100,50
 
   window.showRecSeqTooltip = function(e) {
     clearTimeout(_rTimer);
@@ -7115,7 +7115,7 @@ window._recSeqGenerated = false;
 
     // Factor legend
     var legend = '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)">' +
-      '<div style="font-family:inherit;font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring factors</div>' +
+      '<div style="font-family:inherit;font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);margin-bottom:8px">Scoring Factors</div>' +
       '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px 24px">' +
       SCORE_FACTORS.map(function(f) {
         return '<div style="font-family:inherit;font-size:13px;font-weight:400;color:var(--text0,#F0F6FF);white-space:nowrap;display:flex;gap:10px;align-items:center">' +
@@ -7239,7 +7239,7 @@ function buildRecommendedSequence(workItems) {
 
     // 6. Project health proxy — if project has multiple overdue items, this project is at risk
     const projOverdue = open.filter(x => x.projectId && x.projectId === w.projectId && x.overdue).length;
-    if (projOverdue >= 2) { score += 100; if (!reasons.some(r=>r.includes('overdue'))) reasons.push('Project at risk · ' + projOverdue + ' overdue'); }
+    if (projOverdue >= 2) { score += 100; reasons.push('Project at risk · ' + projOverdue + ' overdue'); }
 
     // 7. Due soon (within 2 days)
     if (w.due && !w.overdue && w.due !== today) {
@@ -7248,7 +7248,7 @@ function buildRecommendedSequence(workItems) {
     }
 
     // 8. In progress — finish what you started
-    if (w.status === 'in_progress') score += 50;
+    if (w.status === 'in_progress') { score += 50; reasons.push('In progress'); }
 
     return { ...w, _score: score, _reasons: reasons };
   });
