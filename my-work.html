@@ -675,7 +675,9 @@ window._mwLoadUserView = async function() {
     </div>
 
     <!-- 1.A 8-Card Strip -->
-    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px">
+    <div id="mw-stat-strip" style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px;position:relative"
+      onmouseenter="showStatTooltip(event)"
+      onmouseleave="hideStatTooltip()">
       <div class="stat-card" style="border-top:2px solid var(--text3)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks Waiting</div>
         <div class="stat-value" style="font-family:var(--font-display);color:var(--text3)">${waiting}</div>
@@ -686,7 +688,7 @@ window._mwLoadUserView = async function() {
         <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${inProgress}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">active now</div>
       </div>
-      <div class="stat-card" style="border-top:2px solid ${blocked>0?'var(--compass-red)':'var(--border)'}">
+      <div class="stat-card" style="border-top:2px solid var(--compass-red)">
         <div class="stat-label" style="font-family:var(--font-head)">Tasks Blocked</div>
         <div class="stat-value" style="font-family:var(--font-display);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
         <div class="stat-sub" style="font-family:var(--font-head)">needs attention</div>
@@ -721,7 +723,7 @@ window._mwLoadUserView = async function() {
         <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
         <div class="cmp-panel" style="margin-bottom:14px">
           <div class="panel-hdr">
-            <div class="panel-title">${_weekOffset===0?'This week':_weekOffset===1?'Last week':`${_weekOffset} weeks ago`} — hours by day</div>
+            <div class="panel-title" style="color:var(--compass-cyan)">${_weekOffset===0?'This week':_weekOffset===1?'Last week':`${_weekOffset} weeks ago`} — hours by day</div>
             <div style="display:flex;align-items:center;gap:6px">
               <!-- Back a week -->
               <button id="week-step-back"
@@ -795,7 +797,7 @@ window._mwLoadUserView = async function() {
         <!-- 1.C Work List -->
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
-            <div class="panel-title">My Work Queue</div>
+            <div class="panel-title" style="color:var(--compass-cyan)">My Work Queue</div>
             <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
               <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
@@ -1070,7 +1072,129 @@ window._mwLoadUserView = async function() {
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
 
-    // ── Recommended daily sequence panel ─────────────────
+    
+// ── Stat strip summary tooltip ──────────────────────────────────────────
+(function() {
+  var _tip = null;
+  var _tipTimer = null;
+
+  window.showStatTooltip = function(e) {
+    clearTimeout(_tipTimer);
+    if (_tip) return;
+    var wi = window._wiItems || [];
+    if (!wi.length) return;
+
+    var today = new Date().toLocaleDateString('en-CA');
+    var esc = function(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var fmtDate = function(d) {
+      if (!d) return '';
+      var dt = new Date(d + 'T00:00:00');
+      return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    };
+
+    var waiting    = wi.filter(function(w){ return w.status==='not_started'; });
+    var inProgress = wi.filter(function(w){ return w.status==='in_progress'; });
+    var blocked    = wi.filter(function(w){ return w.status==='blocked'; });
+    var overdue    = wi.filter(function(w){ return w.overdue; });
+    var doneToday  = window._doneToday || [];
+
+    var byProject = function(items) {
+      var map = {};
+      items.forEach(function(w) { var p = w.project||'—'; map[p] = (map[p]||0)+1; });
+      return Object.entries(map).sort(function(a,b){ return b[1]-a[1]; }).slice(0,4);
+    };
+
+    var section = function(color, title, items) {
+      if (!items.length) return '';
+      var projRows = byProject(items).map(function(e) {
+        return '<div style="display:flex;justify-content:space-between;gap:12px;padding:1px 0">' +
+          '<span style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e[0]) + '</span>' +
+          '<span style="color:' + color + ';font-weight:700;flex-shrink:0">' + e[1] + '</span>' +
+          '</div>';
+      }).join('');
+      var topItems = items.slice(0,3).map(function(w) {
+        var due = w.due ? ' <span style="color:' + (w.overdue?'var(--compass-red)':'var(--text3)') + ';margin-left:6px">' + fmtDate(w.due) + '</span>' : '';
+        return '<div style="padding:1px 0 1px 8px;border-left:2px solid ' + color + '55;color:var(--text2);' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(w.title) + due + '</div>';
+      }).join('');
+      var more = items.length > 3 ? '<div style="color:var(--text3);padding:1px 0 1px 8px;font-size:10px">+' + (items.length-3) + ' more…</div>' : '';
+      return '<div style="margin-bottom:11px">' +
+        '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:' + color + ';margin-bottom:4px">' +
+          title + ' — ' + items.length +
+        '</div>' +
+        '<div style="font-size:11px;margin-bottom:3px">' + projRows + '</div>' +
+        '<div style="font-size:11px">' + topItems + more + '</div>' +
+        '</div>';
+    };
+
+    var te = window._myTimeEntries || [];
+    var todayHrs = te.filter(function(e){ return e.date===today; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var weekHrs  = te.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var billHrs  = te.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var billPct  = weekHrs > 0 ? Math.round(billHrs/weekHrs*100) : 0;
+    var hoursHtml =
+      '<div style="margin-bottom:11px">' +
+        '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-amber);margin-bottom:6px">Hours</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:11px">' +
+          '<div><div style="color:var(--text3)">Today</div><div style="color:var(--compass-amber);font-weight:700;font-size:14px">' + todayHrs.toFixed(1) + 'h</div></div>' +
+          '<div><div style="color:var(--text3)">This week</div><div style="color:var(--compass-amber);font-weight:700;font-size:14px">' + weekHrs.toFixed(1) + 'h</div></div>' +
+          '<div><div style="color:var(--text3)">Billable</div><div style="color:var(--compass-cyan);font-weight:700;font-size:14px">' + billPct + '%</div></div>' +
+        '</div>' +
+      '</div>';
+
+    var doneHtml = doneToday.length ?
+      '<div>' +
+        '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-green);margin-bottom:4px">Completed today — ' + doneToday.length + '</div>' +
+        doneToday.slice(0,3).map(function(w) {
+          return '<div style="font-size:11px;padding:1px 0 1px 8px;border-left:2px solid rgba(29,158,117,.45);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(w.title||'') + '</div>';
+        }).join('') +
+        (doneToday.length>3?'<div style="color:var(--text3);font-size:10px;padding:1px 0 1px 8px">+' + (doneToday.length-3) + ' more</div>':'') +
+      '</div>' : '';
+
+    var html =
+      section('var(--text3)',         'Tasks Waiting',    waiting) +
+      section('var(--compass-cyan)',  'In Progress',      inProgress) +
+      section('var(--compass-red)',   'Tasks Blocked',    blocked) +
+      (overdue.length ? section('var(--compass-red)', 'Overdue', overdue) : '') +
+      hoursHtml + doneHtml;
+
+    if (!html.trim()) return;
+
+    _tip = document.createElement('div');
+    _tip.id = 'mw-stat-tip';
+    _tip.style.cssText = [
+      'position:fixed', 'z-index:9999', 'background:#0a1628',
+      'border:1px solid rgba(0,210,255,.25)', 'border-radius:3px',
+      'padding:14px 16px', 'font-family:var(--font-mono,monospace)',
+      'font-size:11px', 'color:var(--text1,#C8DFF0)', 'width:340px',
+      'box-shadow:0 8px 32px rgba(0,0,0,.75)', 'pointer-events:none', 'line-height:1.55'
+    ].join(';');
+    _tip.innerHTML =
+      '<div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.12em;' +
+      'text-transform:uppercase;color:rgba(0,210,255,.5);margin-bottom:10px;' +
+      'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:6px">Status Summary</div>' + html;
+    document.body.appendChild(_tip);
+
+    // Position below strip
+    var strip = document.getElementById('mw-stat-strip');
+    if (strip) {
+      var r = strip.getBoundingClientRect();
+      var top = r.bottom + 6;
+      var left = r.left;
+      if (left + 340 > window.innerWidth - 10) left = window.innerWidth - 350;
+      _tip.style.top  = top + 'px';
+      _tip.style.left = left + 'px';
+    }
+  };
+
+  window.hideStatTooltip = function() {
+    _tipTimer = setTimeout(function() {
+      if (_tip) { _tip.remove(); _tip = null; }
+    }, 150);
+  };
+})();
+
+// ── Recommended daily sequence panel ─────────────────
     setTimeout(() => buildRecommendedSequence(_wiItems), 100);
 
     // ── Build diagram if in diagram mode ────────────────
