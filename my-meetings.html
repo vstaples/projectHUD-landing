@@ -1,4 +1,26 @@
-<!-- my-meetings.html — Compass My Meetings module -->
+<!-- my-meetings.html — Compass My Meetings module
+     Loaded dynamically by compass.html via loadMyMeetingsView() in mw-tabs.js.
+
+     EXPORTS
+       window._mtgLoadView()     — first-load init: fetches data + builds tree
+       window._mtgRefresh()      — re-fetch and re-render on tab revisit
+       window._mtgMinutesClosed  — callback from meeting-minutes.html iframe on close
+       window._mtgNewMeeting     — stub (coming soon)
+       window._mtgOpenMinutes    — opens minutes iframe for active meeting
+       window._mtgScheduleFollowup / _mtgViewInWork — stubs
+
+     SHARED GLOBALS (set by mw-tabs.js loadMyMeetingsView before calling _mtgLoadView)
+       window._mtgResource       — {id, user_id, name} for the logged-in user
+       window._users             — users array from compass.html scope
+
+     DEPENDENCIES
+       API                       — Supabase wrapper from api.js
+       compassToast              — toast helper from ui.js
+       uSwitchTab                — tab switcher from mw-tabs.js (used by _mtgViewInWork)
+
+     FONT POLICY: var(--font-mono) used throughout. --font-ui/--font-head/--font-display banned.
+     MODULARIZATION: 364 lines JS — below threshold; single file is appropriate.
+-->
 <!-- Exports: window._mtgLoadView, window._mtgRefresh -->
 <!-- Loaded dynamically by my-work.html when My Meetings tab clicked -->
 <!-- Depends on: window._mtgResource (bridged by loadMyMeetingsView) -->
@@ -14,14 +36,14 @@
 #mtg-search{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0,#F0F6FF);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 9px;outline:none;transition:border-color .12s}
 #mtg-search:focus{border-color:rgba(0,210,255,.35)}
 #mtg-search::placeholder{color:var(--text3,#6A94B8)}
-#mtg-new-btn{margin-top:7px;width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
+#mtg-new-btn{margin-top:7px;width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-mono);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
 #mtg-new-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.04)}
 #mtg-tree-scroll{flex:1;overflow-y:auto;padding:8px 0}
 
 /* ── Tree nodes ──────────────────────────────────────────────────────── */
-.mtg-client{padding:6px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.mtg-client{padding:6px 14px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
 .mtg-client:hover{color:var(--text0,#F0F6FF)}
-.mtg-project{padding:5px 14px 5px 24px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.mtg-project{padding:5px 14px 5px 24px;font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
 .mtg-project:hover{color:var(--text0,#F0F6FF)}
 .mtg-stream{padding:4px 14px 4px 34px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3,#6A94B8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.04em}
 .mtg-stream:hover{color:var(--text2,#90B8D8)}
@@ -58,7 +80,7 @@
 .mtg-status-draft{background:rgba(255,255,255,.06);color:var(--text3);border:0.5px solid rgba(255,255,255,.12)}
 .mtg-attempt-badge{font-family:var(--font-mono,monospace);font-size:11px;padding:2px 8px;background:rgba(239,159,39,.1);color:#EF9F27;border:0.5px solid rgba(239,159,39,.25)}
 .mtg-closure-rate{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);padding:2px 0}
-.mtg-rec-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:22px;font-weight:700;color:var(--text0,#F0F6FF);letter-spacing:.02em;line-height:1.2;margin-bottom:5px}
+.mtg-rec-title{font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text0,#F0F6FF);letter-spacing:.02em;line-height:1.2;margin-bottom:5px}
 .mtg-rec-meta{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);display:flex;gap:14px;flex-wrap:wrap}
 
 /* ── Sections ────────────────────────────────────────────────────────── */
@@ -80,7 +102,7 @@
 .mtg-thread-item.current{background:rgba(0,210,255,.03);margin:0 -14px;padding:7px 14px}
 .mtg-thread-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:2px}
 .mtg-thread-date{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);min-width:70px}
-.mtg-thread-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text1,#C8DFF0);flex:1}
+.mtg-thread-title{font-family:var(--font-mono);font-size:12px;color:var(--text1,#C8DFF0);flex:1}
 .mtg-thread-status{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
 
 /* ── Action items ────────────────────────────────────────────────────── */
@@ -90,7 +112,7 @@
 .mtg-action-icon-done{background:rgba(29,158,117,.2);border:1px solid rgba(29,158,117,.5)}
 .mtg-action-icon-open{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15)}
 .mtg-action-icon-overdue{background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.4)}
-.mtg-action-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:12px;color:var(--text0);flex:1;line-height:1.3}
+.mtg-action-title{font-family:var(--font-mono);font-size:12px;color:var(--text0);flex:1;line-height:1.3}
 .mtg-action-title.done{color:var(--text3);text-decoration:line-through}
 .mtg-action-title.overdue{color:#E24B4A}
 .mtg-action-owner{font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);min-width:100px}
@@ -105,7 +127,7 @@
 
 /* ── Footer actions ──────────────────────────────────────────────────── */
 #mtg-record-footer{padding:10px 20px;border-top:1px solid rgba(0,210,255,.08);display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
-.mtg-foot-btn{font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;text-transform:uppercase;padding:5px 14px;cursor:pointer;transition:all .12s;border:1px solid}
+.mtg-foot-btn{font-family:var(--font-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;padding:5px 14px;cursor:pointer;transition:all .12s;border:1px solid}
 .mtg-foot-btn-primary{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.35);color:#00D2FF}
 .mtg-foot-btn-primary:hover{background:rgba(0,210,255,.18)}
 .mtg-foot-btn-secondary{background:none;border-color:rgba(255,255,255,.15);color:var(--text2)}
@@ -174,7 +196,7 @@
 (function() {
 'use strict';
 
-// ── State ─────────────────────────────────────────────────────────────────
+// ── STATE ──────────────────────────────────────────────────────────────────
 let _meetings    = [];
 let _attendees   = {};  // meeting_id → [attendee rows]
 let _minutes     = {};  // meeting_id → minutes row
@@ -185,7 +207,7 @@ let _projects    = [];
 let _activeMtgId = null;
 const FIRM_ID    = 'aaaaaaaa-0001-0001-0001-000000000001';
 
-// ── Entry point ───────────────────────────────────────────────────────────
+// ── MODULE ENTRY POINTS ────────────────────────────────────────────────────
 window._mtgLoadView = async function() {
   if (window._mtgLoaded) { window._mtgRefresh && window._mtgRefresh(); return; }
   window._mtgLoaded = true;
@@ -201,7 +223,9 @@ window._mtgRefresh = async function() {
   if (_activeMtgId) _mtgSelectMeeting(_activeMtgId);
 };
 
-// ── Fetch all meeting data ────────────────────────────────────────────────
+// ── DATA FETCH ─────────────────────────────────────────────────────────────
+// _mtgFetchAll: loads meetings, attendees, minutes, action items, ratings,
+// CoC events, and projects for the current resource in a single parallel fetch.
 async function _mtgFetchAll() {
   const resource = window._mtgResource || window._myResource || null;
   if (!resource) return;
@@ -261,7 +285,9 @@ async function _mtgFetchAll() {
   }
 }
 
-// ── Build knowledge tree ─────────────────────────────────────────────────
+// ── KNOWLEDGE TREE ─────────────────────────────────────────────────────────
+// Builds the left-panel tree grouped by client → project → stream.
+// _mtgWireTree wires click handlers after render.
 function _mtgBuildTree() {
   const body = document.getElementById('mtg-tree-body');
   if (!body) return;
@@ -412,7 +438,7 @@ function _mtgWireTree() {
   });
 }
 
-// ── Select meeting — load meeting-minutes.html in iframe ─────────────────
+// ── MEETING SELECTION + SEARCH ─────────────────────────────────────────────
 function _mtgSelectMeeting(id) {
   _activeMtgId = id;
 
@@ -448,46 +474,13 @@ window._mtgMinutesClosed = function(meetingId) {
   _mtgFetchAll().then(() => _mtgBuildTree());
 };
 
-// ── Footer / stub actions (kept for compatibility) ────────────────────────
+// ── STUB ACTIONS ───────────────────────────────────────────────────────────
+// Kept for window.* compatibility. Full implementations in a future session.
 window._mtgOpenMinutes = function() {
   // No-op — clicking a tree node now loads minutes directly in the iframe
 };
 
-// ── Dead code start (remove) ─────────────────────────────────────────────
 // old overlay code removed — replaced by inline iframe in _mtgSelectMeeting
-if (false) { const id = _activeMtgId; if (!id) return;
-  document.getElementById('mtg-minutes-overlay')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'mtg-minutes-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;background:rgba(6,10,16,.96)';
-
-  // Overlay toolbar
-  const toolbar = document.createElement('div');
-  toolbar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 16px;background:#0c1628;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0';
-  toolbar.innerHTML =
-    '<span style="font-family:var(--font-mono,monospace);font-size:11px;color:rgba(0,210,255,.7);letter-spacing:.08em">MEETING MINUTES</span>' +
-    '<span style="flex:1"></span>' +
-    '<button id="mtg-minutes-close" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-family:var(--font-head,\'Barlow Condensed\',sans-serif);font-size:11px;letter-spacing:.07em;padding:4px 12px;cursor:pointer;text-transform:uppercase">✕ Close</button>';
-
-  // iframe
-  const frame = document.createElement('iframe');
-  frame.src = '/meeting-minutes.html?id=' + encodeURIComponent(id);
-  frame.style.cssText = 'flex:1;border:none;width:100%;background:#0f1117';
-  frame.allow = 'same-origin';
-
-  overlay.appendChild(toolbar);
-  overlay.appendChild(frame);
-  document.body.appendChild(overlay);
-
-  document.getElementById('mtg-minutes-close').addEventListener('click', () => {
-    overlay.remove();
-    // Refresh the record panel in case minutes were saved
-    if (_activeMtgId) {
-      _mtgFetchAll().then(() => _mtgSelectMeeting(_activeMtgId));
-    }
-  });
-};
 window._mtgScheduleFollowup = function() {
   compassToast && compassToast('Follow-up scheduling — coming in next session.', 2500);
 };
@@ -500,7 +493,7 @@ window._mtgNewMeeting = function() {
   if (frame) { frame.style.display = 'flex'; frame.style.flex = '1'; frame.src = '/meeting-minutes.html'; }
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── HELPERS ────────────────────────────────────────────────────────────────
 function _mtgAttemptNumber(m) {
   // Walk back through prior_meeting_id chain
   let count = 1, current = m;
@@ -532,6 +525,6 @@ function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Module exports ────────────────────────────────────────────────────────
+// ── MODULE EXPORTS ──────────────────────────────────────────────────────────
 })();
 </script>
