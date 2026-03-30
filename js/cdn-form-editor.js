@@ -1509,12 +1509,11 @@ For each field identify:
 Do NOT include document control metadata (Type, Document Number, Revision, etc. in the header block).
 Return ONLY a JSON array of field objects, no explanation or markdown.`;
 
-    // Route through /api/ai-form-vision — a Vercel rewrite that proxies to the
-    // Supabase edge function. Direct api.anthropic.com calls are blocked by CORS.
-    // The /api/ path avoids sending Supabase credentials from the browser.
-    // Pass SUPA_KEY as bearer token so Supabase edge function auth passes.
-    // SUPA_KEY is the anon key — intentionally public, safe in client code.
-    const response = await fetch('/api/ai-form-vision', {
+    // Call the edge function directly — it has Access-Control-Allow-Origin: *
+    // so CORS is fine. Vercel rewrites strip custom headers before forwarding,
+    // which caused the 401. Calling directly with the anon key works correctly.
+    // SUPA_KEY is the anon key — intentionally public, safe in client JS.
+    const response = await fetch(`${SUPA_URL}/functions/v1/ai-form-vision`, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
@@ -1525,11 +1524,16 @@ Return ONLY a JSON array of field objects, no explanation or markdown.`;
     });
 
     if (!response.ok) {
-      if (response.status === 404) {
-        console.warn('[FormEditor] ai-form-vision endpoint not available — skipping vision pass. Deploy the edge function and add the Vercel rewrite.');
+      const errBody = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        console.warn('[FormEditor] ai-form-vision 401 — redeploy with --no-verify-jwt or check SUPA_KEY');
         return [];
       }
-      throw new Error(`Vision API error ${response.status}`);
+      if (response.status === 404) {
+        console.warn('[FormEditor] ai-form-vision not deployed — skipping vision pass');
+        return [];
+      }
+      throw new Error(`Vision API ${response.status}: ${errBody.error || 'unknown'}`);
     }
     const data = await response.json();
     const raw  = data.text || data.content?.map(c => c.text || '').join('') || '[]';
