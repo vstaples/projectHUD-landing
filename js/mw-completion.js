@@ -1,6 +1,14 @@
 // ══════════════════════════════════════════════════════════
 // INLINE COMPLETION PANEL (1.C) — renders below work row
 // ══════════════════════════════════════════════════════════
+
+// ── CoC write guard — safe no-op if stale coc.js is deployed ─────────────
+if (typeof window.CoC?.write !== 'function') {
+  console.warn('[CoC] write() not available — stale coc.js. Events will not be recorded until updated.');
+  window.CoC = window.CoC || {};
+  window.CoC.write = async () => null;
+}
+
 let _cmpSignal = null;
 let _cmpItem   = null;
 
@@ -14,22 +22,22 @@ function openCompletionPanel(item) {
   panel.style.cssText = 'grid-column:1/-1;border-bottom:2px solid var(--compass-cyan);background:rgba(0,210,255,.03);padding:12px 16px 14px;animation:micro-open 180ms ease';
 
   panel.innerHTML = `
-    <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;
+    <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
       text-transform:uppercase;color:var(--compass-cyan);margin-bottom:8px;font-weight:700">
       ${item.type==='task'?'Complete task':'Resolve action'} —
       <span style="font-weight:400;color:var(--text2)">${esc(item.title.slice(0,60))}</span>
     </div>
     <div style="display:grid;grid-template-columns:105px 155px 1fr;gap:12px;align-items:start">
       <div>
-        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
           letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Hours</div>
         <input id="cmp-hours" type="number" min="0" max="24" step="0.25" placeholder="0.0"
-          style="width:80px;font-family:var(--font-display);font-size:22px;font-weight:700;
+          style="width:80px;font-family:var(--font-mono);font-size:22px;font-weight:700;
             padding:7px 10px;background:var(--bg2);border:1px solid var(--compass-cyan);
             color:var(--compass-cyan);outline:none;text-align:center"/>
       </div>
       <div>
-        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
           letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px">Signal</div>
         <div style="display:flex;gap:10px">
           <button id="cmp-sig-green" onclick="setCmpSignal('green')" title="On track"
@@ -47,7 +55,7 @@ function openCompletionPanel(item) {
         </div>
       </div>
       <div>
-        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
           letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">Note <span style="color:var(--muted)">(optional)</span></div>
         <textarea id="cmp-note" rows="3" placeholder="What did you complete?"
           style="width:100%;font-family:var(--font-body);font-size:12px;padding:7px 10px;
@@ -58,20 +66,20 @@ function openCompletionPanel(item) {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
       <div style="display:flex;align-items:center;gap:12px">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;
-          font-family:var(--font-head);font-size:11px;color:var(--text3)">
+          font-family:var(--font-mono);font-size:11px;color:var(--text3)">
           <input id="cmp-billable" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable</label>
-        <span id="cmp-status" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);min-height:14px"></span>
+        <span id="cmp-status" style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber);min-height:14px"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button onclick="skipCompletion()"
-          style="font-family:var(--font-head);font-size:11px;font-weight:600;letter-spacing:.07em;
+          style="font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.07em;
             text-transform:uppercase;padding:6px 14px;background:none;
             border:1px solid var(--border);color:var(--text3);cursor:pointer"
           onmouseenter="this.style.borderColor='var(--text2)';this.style.color='var(--text1)'"
           onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
           Skip <span style="font-weight:400;color:var(--muted)">— no time</span></button>
         <button id="cmp-submit" onclick="submitCompletion()"
-          style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;
+          style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;
             text-transform:uppercase;padding:6px 18px;background:var(--compass-cyan);
             color:#060a10;border:none;cursor:pointer;transition:opacity .12s"
           onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Complete →</button>
@@ -136,9 +144,9 @@ async function skipCompletion() {
     const r=document.createElement('div'); r.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);animation:micro-open 200ms ease';
     r.innerHTML=`<span style="color:var(--compass-green);font-size:13px">✓</span>
       <div style="flex:1;min-width:0"><div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
-      <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${esc(proj?.name||'—')} · ${timeStr} · no time logged</div></div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${esc(proj?.name||'—')} · ${timeStr} · no time logged</div></div>
       <div style="width:8px;height:8px;border-radius:50%;background:var(--muted)"></div>
-      <div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text3)">—</div>`;
+      <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text3)">—</div>`;
     dtList.insertBefore(r, dtList.firstChild);
   }
   const ctr=document.getElementById('done-today-count');
@@ -180,7 +188,7 @@ async function submitCompletion() {
   if (hoursRaw > 0) {
     promises.push(
       API.post('time_entries', {
-        firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
+        firm_id:     window.FIRM_ID,
         resource_id: _myResource?.id  || null,
         user_id:     _myResource?.user_id || null,
         project_id:  item.projectId   || null,
@@ -241,9 +249,9 @@ async function submitCompletion() {
       const r=document.createElement('div'); r.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);animation:micro-open 200ms ease';
       r.innerHTML=`<span style="color:var(--compass-green);font-size:13px">✓</span>
         <div style="flex:1;min-width:0"><div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
-        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${esc(proj?.name||'—')} · ${timeStr}${hoursRaw===0?' · no time logged':''}</div></div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${esc(proj?.name||'—')} · ${timeStr}${hoursRaw===0?' · no time logged':''}</div></div>
         ${_cmpSignal?`<div style="width:8px;height:8px;border-radius:50%;background:${sc};flex-shrink:0"></div>`:'<div style="width:8px;height:8px"></div>'}
-        <div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:${hoursRaw===0?'var(--text3)':'var(--compass-cyan)'}">${hoursRaw===0?'—':hoursRaw.toFixed(1)+'h'}</div>`;
+        <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:${hoursRaw===0?'var(--text3)':'var(--compass-cyan)'}">${hoursRaw===0?'—':hoursRaw.toFixed(1)+'h'}</div>`;
       dtList.insertBefore(r, dtList.firstChild);
     }
     // ── Pulse Done Today counter ───────────────────────────

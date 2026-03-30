@@ -4,6 +4,14 @@
 // State: _kbDrag, _kbNeg, _kbDel, _kbColDates, _kbWeekOffset are IIFE-scoped lets.
 // Calls buildCalendarTab (from mc-grid.js) — requires mc-grid.js to load first.
 
+
+// ── CoC write guard — safe no-op if stale coc.js is deployed ─────────────
+if (typeof window.CoC?.write !== 'function') {
+  console.warn('[CoC] write() not available — stale coc.js. Events will not be recorded until updated.');
+  window.CoC = window.CoC || {};
+  window.CoC.write = async () => null;
+}
+
 (function() {
 'use strict';
 

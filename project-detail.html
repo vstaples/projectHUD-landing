@@ -1858,8 +1858,12 @@ async function renderJournalTab() {
 // ── AUDIT LOG ─────────────────────────────────────────────────
 async function _writeAudit(action, table, recordId, before, after) {
   // Routes through CoC platform service — writes to coc_events
-  await window.CoC.legacy.auditLog(table, recordId || PROJECT_ID, action, before, after)
-    .catch(e => console.warn('Audit write failed:', e.message));
+  if (typeof window.CoC?.legacy?.auditLog === 'function') {
+    await window.CoC.legacy.auditLog(table, recordId || PROJECT_ID, action, before, after)
+      .catch(e => console.warn('Audit write failed:', e.message));
+  } else {
+    console.warn('[CoC] auditLog not available — stale coc.js deployed');
+  }
 }
 
 // Diff two objects — returns only changed fields with before/after
@@ -1887,7 +1891,10 @@ async function loadProjectDetail() {
       API.getFirms(),
       API.getRisksByProject(PROJECT_ID),
       API.getDocumentsByProject(PROJECT_ID),
-      window.CoC.readByProject(PROJECT_ID, { limit: 200 }),
+      (typeof window.CoC?.readByProject === 'function'
+        ? window.CoC.readByProject(PROJECT_ID, { limit: 200 })
+        : API.get(`coc_events?project_id=eq.${PROJECT_ID}&order=occurred_at.desc&limit=200&select=*`).catch(()=>[])
+      ),
       API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`),
     ]);
     if (!project) { window.location.href = '/projects.html'; return; }
@@ -3774,7 +3781,9 @@ async function _renderJournalBody(taskId) {
   const body = document.getElementById('jp-body');
   try {
     // Read progress entries from unified coc_events (event_class = 'progress')
-    const allEntries = await window.CoC.read('task', taskId);
+    const allEntries = typeof window.CoC?.read === 'function'
+      ? await window.CoC.read('task', taskId)
+      : await API.get(`coc_events?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&limit=200&select=*`).catch(()=>[]);
     const entries = allEntries.filter(e => e.event_class === 'progress');
     // Reconstruct legacy-shaped objects from metadata for the existing renderer
     const reshapedEntries = entries.map(e => ({
@@ -3854,12 +3863,31 @@ async function submitJournalEntry(taskId) {
 
   try {
     // Write progress entry via CoC platform service
-    await window.CoC.legacy.taskJournal(taskId, PROJECT_ID, {
-      accomplishment,
-      hours: hours,
-      pct:   pct,
-      blockers: blockers,
-    });
+    if (typeof window.CoC?.legacy?.taskJournal === 'function') {
+      await window.CoC.legacy.taskJournal(taskId, PROJECT_ID, {
+        accomplishment,
+        hours: hours,
+        pct:   pct,
+        blockers: blockers,
+      });
+    } else {
+      // Fallback: direct write until new coc.js is deployed
+      await API.post('coc_events', {
+        id: crypto.randomUUID(),
+        firm_id: window.FIRM_ID || STATE.project?.firm_id || null,
+        event_class: 'progress', event_type: 'update',
+        step_name: 'Progress Update',
+        entity_type: 'task', entity_id: taskId,
+        project_id: PROJECT_ID,
+        actor_resource_id: STATE.currentUserId || null,
+        event_notes: accomplishment,
+        outcome: blockers ? 'at_risk' : 'on_track',
+        metadata: { hours_spent: hours, pct_complete: pct, accomplishment, blockers },
+        occurred_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
     // Also update task pct_complete and actual_hours
     const task = STATE.tasks.find(t => t.id === taskId);
     if (task) {

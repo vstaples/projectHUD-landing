@@ -3372,6 +3372,18 @@ function showToast(msg, type='info') {
 const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
 const CURRENT_USER_RESOURCE_ID = window.CURRENT_USER?.id || window._myResource?.id || null;
 
+// ── CoC service availability shim ────────────────────────────────────────────
+// If the deployed coc.js is an older version without the legacy adapters,
+// patch a no-op shim so call sites don't crash. Remove once coc.js is confirmed live.
+if (!window.CoC?.legacy) {
+  console.warn('[projects.html] CoC.legacy not available — stale coc.js deployed. Writes will be no-ops until updated.');
+  window.CoC = window.CoC || {};
+  window.CoC.legacy = {
+    exceptionAnnotation: async () => null,
+    resourceRequestEvent: async () => null,
+  };
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadAll();
 </script>

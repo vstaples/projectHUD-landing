@@ -1,4 +1,12 @@
 // ── Work Item Detail Drawer ───────────────────────────────
+
+// ── CoC write guard — safe no-op if stale coc.js is deployed ─────────────
+if (typeof window.CoC?.write !== 'function') {
+  console.warn('[CoC] write() not available — stale coc.js. Events will not be recorded until updated.');
+  window.CoC = window.CoC || {};
+  window.CoC.write = async () => null;
+}
+
 function openWorkItemDrawer(item) {
   openWorkItemExpanded(item);
 }
