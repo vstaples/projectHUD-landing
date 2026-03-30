@@ -2013,11 +2013,18 @@ function _highlightAndScrollToField(fieldId, field) {
 }
 
 // Marquee + outer SVG overrides
+// NOTE: _orig* must be captured BEFORE the overrides are defined.
+// We use const arrow functions (not `function` declarations) for the overrides
+// because `function` declarations are hoisted — meaning by the time the `const`
+// capture lines execute, a hoisted `function _formSvgMouseMove` would already
+// have replaced the original, making _origSvgMouseMove === the new override and
+// causing infinite recursion (RangeError: Maximum call stack size exceeded).
 const _origSvgMouseDown = _formSvgMouseDown;
 const _origSvgMouseMove = _formSvgMouseMove;
 const _origSvgMouseUp   = _formSvgMouseUp;
 
-function _formSvgMouseDown(event) {
+// Override: adds marquee-select on empty-canvas mousedown (select mode only)
+const _formSvgMouseDownOverride = (event) => {
   if (_formMode === 'select') {
     const group = event.target.closest('.field-rect-group');
     if (!group) {
@@ -2037,9 +2044,10 @@ function _formSvgMouseDown(event) {
     }
   }
   _origSvgMouseDown(event);
-}
+};
 
-function _formSvgMouseMove(event) {
+// Override: rubber-band marquee rect update during drag
+const _formSvgMouseMoveOverride = (event) => {
   if (_marqueeDrag?.active) {
     const svg = document.getElementById('form-field-overlay');
     const svgRect = svg?.getBoundingClientRect(); if (!svgRect) return;
@@ -2054,9 +2062,10 @@ function _formSvgMouseMove(event) {
     return;
   }
   _origSvgMouseMove(event);
-}
+};
 
-function _formSvgMouseUp(event) {
+// Override: commit marquee selection on mouseup
+const _formSvgMouseUpOverride = (event) => {
   if (_marqueeDrag?.active) {
     const svg = document.getElementById('form-field-overlay');
     const svgRect = svg?.getBoundingClientRect();
@@ -2076,7 +2085,14 @@ function _formSvgMouseUp(event) {
     _marqueeDrag = null; return;
   }
   _origSvgMouseUp(event);
-}
+};
+
+// Patch the SVG element's inline handlers to use the override functions.
+// The SVG uses onmousedown/move/up="..." string attributes, so we need to
+// expose the overrides on window and update the attributes after render.
+window._formSvgMouseDown = _formSvgMouseDownOverride;
+window._formSvgMouseMove = _formSvgMouseMoveOverride;
+window._formSvgMouseUp   = _formSvgMouseUpOverride;
 
 function _formArrange(op) {
   const fields = [..._selectedFieldIds].map(id=>_formFields.find(f=>f.id===id)).filter(Boolean);
