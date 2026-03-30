@@ -3830,6 +3830,22 @@ function refreshTileWidget(noteId) {
 // ── Wire into tile rendering via _notesPostWire hook ─────────────────────
 // Export showWidgetPicker so _notesNew (Block 1) can open it directly
 window._viewsShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
+
+// ── Mode button factory — called by _notesTileHTML for newly created tiles ──
+// Returns HTML string for the Note/Widget toggle button inserted into tile headers.
+// For tiles rendered BEFORE Block 2 loads, _viewsPostWire calls injectModeSwitcher instead.
+window._notesModeBtn = function(noteId, tileState) {
+  var mode  = (tileState && tileState.canvasMode) || 'note';
+  var label = mode === 'widget'
+    ? (WIDGET_REGISTRY.get(tileState.widgetId) ? WIDGET_REGISTRY.get(tileState.widgetId).label : 'Widget')
+    : 'Note';
+  return '<button class="tile-header-mode-btn' + (mode === 'widget' ? ' widget-active' : '') + '" ' +
+    'title="' + (mode === 'widget' ? 'Switch mode or reconfigure widget' : 'Switch canvas mode') + '" ' +
+    'onclick="event.stopPropagation();' +
+      'var ts=window._viewsCv&&window._viewsCv()&&window._viewsCv().tiles.find(function(t){return t.noteId===\'' + noteId + '\';});' +
+      'if(ts&&window._viewsShowWidgetPicker)window._viewsShowWidgetPicker(ts);">' +
+    label + '</button>';
+};
 window._viewsPostWire = function() {
   const cv = (typeof _cv === 'function' ? _cv() : (window._viewsCv && window._viewsCv()));
   if (!cv) return;
