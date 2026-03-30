@@ -187,7 +187,8 @@ function _renderFormEditor() {
         <!-- Column 1: Document canvas -->
         <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0"
           id="form-canvas-wrap">
-          <div style="display:inline-block;position:relative;margin:20px">
+          <div style="display:flex;justify-content:center;padding:24px 20px;min-height:100%">
+          <div style="display:inline-block;position:relative;flex-shrink:0">
             <canvas id="form-pdf-canvas" style="display:block;box-shadow:0 4px 24px rgba(0,0,0,.5)"></canvas>
             <!-- SVG overlay for field rectangles -->
             <svg id="form-field-overlay" style="position:absolute;top:0;left:0;
@@ -201,6 +202,7 @@ function _renderFormEditor() {
               onmousemove="_formDrawMove(event)"
               onmouseup="_formDrawEnd(event)">
             </div>
+          </div>
           </div>
           <div style="padding:6px 20px 4px;font-size:10px;color:var(--muted);
                       display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -834,21 +836,32 @@ async function _ensurePdfJs() {
 async function _renderPdfPage(pageNum) {
   if (!_pdfDoc) return;
   try {
-    const page    = await _pdfDoc.getPage(pageNum);
-    const vp      = page.getViewport({ scale: _pdfScale });
+    const page = await _pdfDoc.getPage(pageNum);
+
+    // PDF pages can carry a rotation flag (0/90/180/270).
+    // Scanned documents often come in at 180° — correct to 0 for display.
+    // We read the page's natural rotation and override it to 0 so it
+    // always renders right-way-up. Field rect coordinates are stored in
+    // PDF space (unrotated) so this keeps overlays aligned correctly.
+    const naturalRotation = page.rotate || 0;
+    const vp = page.getViewport({ scale: _pdfScale, rotation: 0 });
+
     const canvas  = document.getElementById('form-pdf-canvas');
     const overlay = document.getElementById('form-field-overlay');
     if (!canvas) return;
+
     canvas.width  = vp.width;
     canvas.height = vp.height;
     canvas.style.width  = vp.width  + 'px';
     canvas.style.height = vp.height + 'px';
+
     if (overlay) {
       overlay.setAttribute('width',  vp.width  + 'px');
       overlay.setAttribute('height', vp.height + 'px');
       overlay.style.width  = vp.width  + 'px';
       overlay.style.height = vp.height + 'px';
     }
+
     await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
     _renderFieldOverlays();
   } catch(e) {
