@@ -479,7 +479,21 @@ window._mwLoadUserView = async function() {
           :w.due?`<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${fmtDate(w.due)}</span>`
           :`<span style="color:var(--text3);font-size:11px">—</span>`;
         let btnLabel,btnStyle;
-        if (w.type==='action')            {btnLabel='Resolve';    btnStyle=`color:var(--compass-green);border:1px solid var(--compass-green);background:none`;}
+        if (w.type==='action') {
+          const _ns = negGetState(w.id).state;
+          if (_ns==='unrated') {
+            // Must be rated before it can be resolved
+            btnLabel='Rate';      btnStyle=`color:var(--compass-amber);border:1px solid rgba(239,159,39,.5);background:none`;
+          } else if (_ns==='pending' || _ns==='negotiating') {
+            // Awaiting assigner response
+            btnLabel='Pending';   btnStyle=`color:#8B5CF6;border:1px solid rgba(139,92,246,.4);background:none`;
+          } else if (_ns==='escalated') {
+            btnLabel='Escalated'; btnStyle=`color:var(--compass-red);border:1px solid rgba(226,75,74,.4);background:none`;
+          } else {
+            // agreed or any other state — ready to resolve
+            btnLabel='Resolve';   btnStyle=`color:var(--compass-green);border:1px solid var(--compass-green);background:none`;
+          }
+        }
         else if (w.status==='blocked')    {btnLabel='Unblock';    btnStyle=`color:var(--compass-amber);border:1px solid var(--compass-amber);background:none`;}
         else if (w.pct>=100)               {btnLabel='Mark Done';  btnStyle=`color:#060a10;border:none;background:var(--compass-cyan)`;}
         else if (w.status==='in_progress'){btnLabel='In Progress';btnStyle=`color:var(--compass-amber);border:1px solid rgba(239,159,39,.5);background:none`;}
@@ -8541,7 +8555,16 @@ document.addEventListener('click', function(ev) {
     const item = _wiItems.find(w => w.id === actionBtn.dataset.wiId);
     if (!item) return;
     const status = actionBtn.dataset.wiStatus;
-    if (item.type==='action' || parseInt(actionBtn.dataset.wiPct)>=100) {
+    if (item.type==='action') {
+      const _ns = negGetState(item.id).state;
+      if (_ns==='unrated' || _ns==='pending' || _ns==='negotiating' || _ns==='escalated') {
+        // Not yet agreed — open drawer to LOE negotiation panel
+        openWorkItemExpanded(item);
+      } else {
+        // Agreed or locked — ready to resolve
+        openCompletionPanel({ id:item.id, type:item.type, title:item.title, projectId:item.projectId||null });
+      }
+    } else if (parseInt(actionBtn.dataset.wiPct)>=100) {
       openCompletionPanel({ id:item.id, type:item.type, title:item.title, projectId:item.projectId||null });
     } else {
       openInProgressPanel(item);
