@@ -1310,12 +1310,25 @@ async function loadUserView() {
         if (el.tagName !== 'SCRIPT') viewUser.appendChild(el.cloneNode(true));
       });
     }
-    // Execute scripts
+    // Execute scripts — handle both external (src=) and inline scripts,
+    // loading each one serially so later modules see earlier ones' globals.
     const scripts = doc.querySelectorAll('script');
     for (const s of scripts) {
-      const newScript = document.createElement('script');
-      newScript.textContent = s.textContent;
-      document.head.appendChild(newScript);
+      await new Promise((resolve, reject) => {
+        const newScript = document.createElement('script');
+        if (s.src) {
+          // External script: must use src= and wait for load event
+          newScript.src = s.src;
+          newScript.onload  = resolve;
+          newScript.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          // Inline script: textContent executes synchronously on appendChild
+          newScript.textContent = s.textContent;
+        }
+        document.head.appendChild(newScript);
+        // Inline scripts resolve immediately (no load event fired)
+        if (!s.src) resolve();
+      });
     }
     window._myWorkLoaded = true;
     // Now call the real loadUserView that was just loaded
@@ -1369,11 +1382,20 @@ async function loadMyTimeView() {
       }
     });
 
-    // Execute scripts in declaration order
+    // Execute scripts in declaration order — handle src= and inline
     for (const s of doc.querySelectorAll('script')) {
-      const el = document.createElement('script');
-      el.textContent = s.textContent;
-      document.head.appendChild(el);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
 
     window._myTimeLoaded = true;
