@@ -330,8 +330,9 @@ window.HUDNotif = (() => {
     notify,
     markAllRead,
     markRead,
-    getUnread:  () => _notifs.filter(n => !n.read).length,
-    getAll:     () => [..._notifs],
+    getUnread:   () => _notifs.filter(n => !n.read).length,
+    getAll:      () => [..._notifs],
+    _openPanel:  _buildPanel,
   };
 
 })();

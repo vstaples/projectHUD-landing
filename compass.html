@@ -38,6 +38,42 @@
   background: var(--bg0, #060a10);
 }
 
+/* ── Hover-reveal sidebar ─────────────────────────────────── */
+#hud-sidebar-trigger {
+  position:fixed; left:0; top:0; bottom:0; width:6px; z-index:399; cursor:pointer;
+}
+#hud-sidebar-panel {
+  position:fixed; left:0; top:0; bottom:0; width:200px;
+  background:var(--bg1,#0c1628);
+  border-right:1px solid rgba(0,210,255,.15);
+  box-shadow:4px 0 24px rgba(0,0,0,.6);
+  z-index:400;
+  transform:translateX(-200px);
+  transition:transform 220ms cubic-bezier(.4,0,.2,1);
+  overflow:hidden; display:flex; flex-direction:column;
+}
+#hud-sidebar-panel.open { transform:translateX(0); }
+#hud-sidebar-inner { flex:1; overflow-y:auto; overflow-x:hidden; }
+#hud-notif-btn {
+  position:fixed; left:10px; bottom:14px; z-index:401;
+  background:rgba(6,10,16,.85);
+  border:1px solid rgba(0,210,255,.2); border-radius:4px;
+  color:rgba(160,200,235,.5); font-size:15px;
+  width:34px; height:34px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:color .15s,border-color .15s,background .15s; padding:0;
+}
+#hud-notif-btn:hover { color:#00D2FF; border-color:rgba(0,210,255,.45); background:rgba(0,210,255,.08); }
+#hud-notif-btn.has-unread { color:#00D2FF; border-color:rgba(0,210,255,.4); }
+#hud-notif-badge {
+  position:absolute; top:-5px; right:-5px;
+  background:#E24B4A; color:#fff;
+  font-family:var(--font-mono,monospace); font-size:9px; font-weight:700;
+  min-width:16px; height:16px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 3px; pointer-events:none;
+}
+
 /* ── Top nav bar ─────────────────────────────────────────── */
 #compass-nav {
   display: flex;
@@ -836,6 +872,21 @@
 </head>
 <body>
 
+<!-- ── Hover-reveal sidebar ─────────────────────────────────────────────── -->
+<!-- Trigger zone: invisible 6px strip on left edge -->
+<div id="hud-sidebar-trigger"></div>
+
+<!-- Sidebar panel: slides in from left on hover -->
+<div id="hud-sidebar-panel">
+  <div id="hud-sidebar-inner"></div>
+</div>
+
+<!-- Notification bell: always-visible fixed button, top-left -->
+<button id="hud-notif-btn" title="Notifications" onclick="window.HUDNotif?._openPanel?.(this)">
+  <span id="hud-notif-glyph">◉</span>
+  <span id="hud-notif-badge" style="display:none">0</span>
+</button>
+
 <div id="compass-app">
 
   <!-- ── Top navigation bar ──────────────────────────────── -->
@@ -1346,5 +1397,83 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 </script>
+
+<script>
+// ── Compass hover-reveal sidebar ──────────────────────────────────────────
+(function() {
+  const trigger = document.getElementById('hud-sidebar-trigger');
+  const panel   = document.getElementById('hud-sidebar-panel');
+  const inner   = document.getElementById('hud-sidebar-inner');
+  const notifBtn = document.getElementById('hud-notif-btn');
+  const badge    = document.getElementById('hud-notif-badge');
+  if (!trigger || !panel) return;
+
+  let hideTimer = null;
+
+  function openPanel() {
+    clearTimeout(hideTimer);
+    panel.classList.add('open');
+  }
+  function closePanel() {
+    hideTimer = setTimeout(() => panel.classList.remove('open'), 300);
+  }
+
+  // Hover trigger zone → open
+  trigger.addEventListener('mouseenter', openPanel);
+  // Keep open while inside panel
+  panel.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+  panel.addEventListener('mouseleave', closePanel);
+  trigger.addEventListener('mouseleave', closePanel);
+
+  // Populate sidebar inner with Sidebar.render output once Sidebar is ready
+  function populateSidebar() {
+    if (typeof Sidebar === 'undefined' || !inner) return;
+    // Sidebar.init() will target #sidebar — we redirect it to our inner div
+    const phantom = document.createElement('div');
+    phantom.id = 'sidebar';
+    phantom.style.display = 'none';
+    document.body.appendChild(phantom);
+
+    // After Sidebar.init populates #sidebar, move its content to our inner div
+    const origInit = Sidebar.init.bind(Sidebar);
+    const wrappedInit = async function(page) {
+      await origInit(page);
+      inner.innerHTML = phantom.innerHTML;
+      phantom.innerHTML = '';
+      // Re-wire HUDNotif badge updates to our visible badge elements
+      _syncNotifBadge();
+    };
+    // Call it once now
+    wrappedInit('compass');
+  }
+
+  // Sync unread count to the fixed bell button badge
+  function _syncNotifBadge() {
+    const count = window.HUDNotif ? window.HUDNotif.getUnread() : 0;
+    if (badge) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+    if (notifBtn) notifBtn.classList.toggle('has-unread', count > 0);
+  }
+
+  // Poll badge sync every 2s (HUDNotif polls every 10s, this just keeps the button in sync)
+  setInterval(_syncNotifBadge, 2000);
+
+  // Bell button opens notification panel
+  if (notifBtn) {
+    notifBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.HUDNotif) window.HUDNotif._openPanel(notifBtn);
+    });
+  }
+
+  // Wait for DOM + scripts to be ready, then populate
+  if (document.readyState === 'complete') {
+    populateSidebar();
+  } else {
+    window.addEventListener('load', populateSidebar);
+  }
+})();
+</script>
 </body>
-</html>
