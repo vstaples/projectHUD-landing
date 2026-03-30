@@ -1509,25 +1509,27 @@ For each field identify:
 Do NOT include document control metadata (Type, Document Number, Revision, etc. in the header block).
 Return ONLY a JSON array of field objects, no explanation or markdown.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-            { type: 'text',  text: prompt }
-          ]
-        }]
-      })
+    // Route through Supabase edge function — direct api.anthropic.com calls
+    // are blocked by CORS from browser. Edge function: ai-form-vision
+    const response = await fetch(`${SUPA_URL}/functions/v1/ai-form-vision`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'apikey':        SUPA_KEY,
+      },
+      body: JSON.stringify({ base64, prompt, media_type: 'image/jpeg' }),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn('[FormEditor] ai-form-vision edge function not deployed yet — skipping vision pass');
+        return [];
+      }
+      throw new Error(`Edge function error ${response.status}`);
+    }
     const data = await response.json();
-    const raw  = data.content?.map(c => c.text || '').join('') || '[]';
+    const raw  = data.text || data.content?.map(c => c.text || '').join('') || '[]';
     const clean = raw.replace(/```json|```/g, '').trim();
     const aiFields = JSON.parse(clean);
 
