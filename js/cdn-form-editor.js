@@ -2049,26 +2049,151 @@ async function _formFileChosen(event) {
   }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORT PROGRESS UI
+// Renders a progress overlay in the Form Library main area (#form-editor-main).
+// Shows stage name, animated bar, and per-page status during import.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _importProgressShow(filename, totalPages) {
+  const main = document.getElementById('form-editor-main');
+  if (!main) return;
+
+  main.innerHTML = `
+    <div id="import-progress-wrap"
+      style="flex:1;display:flex;flex-direction:column;align-items:center;
+             justify-content:center;gap:20px;padding:48px;background:var(--bg1)">
+
+      <!-- File icon + name -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <div style="font-size:36px;opacity:.5">📄</div>
+        <div style="font-size:13px;font-weight:500;color:var(--text);
+                    max-width:360px;text-align:center;overflow:hidden;
+                    text-overflow:ellipsis;white-space:nowrap">
+          ${escHtml(filename)}
+        </div>
+        <div style="font-size:11px;color:var(--muted)">${totalPages} page${totalPages !== 1 ? 's' : ''}</div>
+      </div>
+
+      <!-- Progress bar track -->
+      <div style="width:min(420px,80%);display:flex;flex-direction:column;gap:8px">
+        <div style="height:4px;background:var(--surf3);border-radius:2px;overflow:hidden">
+          <div id="import-progress-bar"
+            style="height:100%;width:0%;background:var(--cad);border-radius:2px;
+                   transition:width .35s cubic-bezier(.4,0,.2,1)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div id="import-progress-stage"
+            style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">
+            Initialising…
+          </div>
+          <div id="import-progress-pct"
+            style="font-size:11px;color:var(--cad);font-family:var(--font-mono);font-weight:600">
+            0%
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-page dot grid (shown once we know page count) -->
+      <div id="import-page-dots"
+        style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+               max-width:360px;min-height:20px">
+        ${Array.from({length: totalPages}, (_, i) => `
+          <div id="import-dot-${i+1}"
+            style="width:10px;height:10px;border-radius:50%;
+                   background:var(--surf3);transition:background .2s"
+            title="Page ${i+1}"></div>
+        `).join('')}
+      </div>
+
+      <!-- Detail line -->
+      <div id="import-progress-detail"
+        style="font-size:10px;color:var(--muted);text-align:center;min-height:16px;
+               font-family:var(--font-mono)"></div>
+
+    </div>`;
+}
+
+function _importProgressUpdate(pct, stage, detail) {
+  const bar   = document.getElementById('import-progress-bar');
+  const stEl  = document.getElementById('import-progress-stage');
+  const pctEl = document.getElementById('import-progress-pct');
+  const detEl = document.getElementById('import-progress-detail');
+  if (bar)   bar.style.width  = Math.round(pct) + '%';
+  if (stEl)  stEl.textContent = stage  || '';
+  if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+  if (detEl) detEl.textContent = detail || '';
+}
+
+function _importProgressDot(pageNum, state) {
+  // state: 'pending' | 'active' | 'done' | 'ai'
+  const dot = document.getElementById(`import-dot-${pageNum}`);
+  if (!dot) return;
+  const colors = {
+    pending: 'var(--surf3)',
+    active:  'var(--cad)',
+    done:    'var(--green)',
+    ai:      'var(--amber)',
+  };
+  dot.style.background = colors[state] || colors.pending;
+  if (state === 'active') {
+    dot.style.boxShadow = '0 0 0 2px var(--cad-dim)';
+  } else {
+    dot.style.boxShadow = '';
+  }
+}
+
 async function _proceedWithImport(startPage = 1, endPage = null) {
   // _pdfDoc MUST already be loaded by _formFileChosen before this is called.
-  // Never reload from a File object here — ArrayBuffer is already transferred.
   if (!_pdfDoc) {
     cadToast('Import error: PDF not loaded. Please try again.', 'error');
     return;
   }
 
-  const pageLimit = endPage || _pdfDoc.numPages;
-  cadToast(`Detecting fields on ${pageLimit - startPage + 1} page(s)…`, 'info');
+  const pageLimit  = endPage || _pdfDoc.numPages;
+  const totalPages = pageLimit - startPage + 1;
+  const sourceName = window._pendingImportName || 'Imported form';
 
-  // ── Classify archetype ────────────────────────────────────────────────
+  // ── Show progress UI in the main area ────────────────────────────────
+  // Render the tab shell first so #form-editor-main exists
+  const tabEl = document.getElementById('cad-content');
+  if (tabEl) renderFormsTab(tabEl);
+  _importProgressShow(sourceName, totalPages);
+
+  // Progress budget (percentages):
+  //   5%  — archetype classification
+  //   60% — AcroForm + heuristics (split evenly across pages)
+  //   25% — Claude vision pass (only if triggered; else skipped quickly)
+  //   10% — final assembly + render
+
+  const PAGE_BUDGET  = 60 / totalPages; // pct per page in main loop
+  let   pct          = 0;
+
+  // ── Stage 1: Classify archetype (5%) ─────────────────────────────────
+  _importProgressUpdate(pct, 'Classifying document type…', '');
+  await new Promise(r => setTimeout(r, 0)); // yield to browser to paint
+
   const firstPage = await _pdfDoc.getPage(startPage);
   const firstText = await firstPage.getTextContent();
   const archetype = _classifyFormArchetype(firstText.items);
+  pct = 5;
+  _importProgressUpdate(pct, `Detected: ${archetype === 'checklist' ? 'Checklist' : 'Data entry'} form`, '');
+  await new Promise(r => setTimeout(r, 0));
 
-  // ── AcroForm pass + text heuristics ──────────────────────────────────
+  // ── Stage 2: AcroForm + heuristics (5% → 65%, per page) ──────────────
   const detectedFields = [];
 
   for (let p = startPage; p <= pageLimit; p++) {
+    const editorPage = p - startPage + 1;
+    _importProgressDot(editorPage, 'active');
+    _importProgressUpdate(
+      pct,
+      `Scanning page ${editorPage} of ${totalPages}…`,
+      `AcroForm fields + text heuristics`
+    );
+    await new Promise(r => setTimeout(r, 0));
+
     const page        = await _pdfDoc.getPage(p);
     const annotations = await page.getAnnotations();
     const vp          = page.getViewport({ scale: 1 });
@@ -2086,7 +2211,7 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
                     : /pm|manager/.test(nameL) ? 'pm' : 'assignee';
       detectedFields.push({
         id:        `acro_${p}_${detectedFields.length}`,
-        page:      p - startPage + 1,
+        page:      editorPage,
         rect:      { x, y, w, h },
         label:     ann.fieldName || ann.alternativeText || `Field ${detectedFields.length + 1}`,
         type:      typeMap[ann.fieldType] || 'text',
@@ -2096,33 +2221,67 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
       });
     }
 
-    // Text heuristics
     const textContent = await page.getTextContent();
     const heuristic   = _detectTextHeuristicsV2(
-      textContent, page, p - startPage + 1, detectedFields.length, archetype
+      textContent, page, editorPage, detectedFields.length, archetype
     );
     detectedFields.push(...heuristic);
+
+    pct += PAGE_BUDGET;
+    _importProgressDot(editorPage, 'done');
+    _importProgressUpdate(
+      pct,
+      `Page ${editorPage} complete — ${detectedFields.length} fields so far`,
+      ''
+    );
+    await new Promise(r => setTimeout(r, 0));
   }
 
-  // ── Claude vision pass if sparse ─────────────────────────────────────
+  // ── Stage 3: Claude vision pass (65% → 90%, only if sparse) ──────────
   let visionFields = [];
   const autoCount  = detectedFields.filter(f => f.detection !== 'manual').length;
+
   if (autoCount < 3) {
-    cadToast('Sparse detection — running AI vision pass…', 'info');
+    const visionPages = Math.min(2, totalPages);
+    const visionBudget = 25 / visionPages;
+    _importProgressUpdate(pct, 'Sparse detection — running AI vision pass…', '');
+    await new Promise(r => setTimeout(r, 0));
+
     for (let p = startPage; p <= Math.min(startPage + 1, pageLimit); p++) {
+      const editorPage = p - startPage + 1;
+      _importProgressDot(editorPage, 'ai');
+      _importProgressUpdate(
+        pct,
+        `AI vision: analysing page ${editorPage}…`,
+        'Sending to Claude — this takes a moment'
+      );
+      await new Promise(r => setTimeout(r, 0));
+
       const vf = await _detectFieldsViaClaudeVision(_pdfDoc, p);
-      visionFields.push(...vf.map(f => ({ ...f, page: p - startPage + 1 })));
+      visionFields.push(...vf.map(f => ({ ...f, page: editorPage })));
+
+      pct += visionBudget;
+      _importProgressDot(editorPage, 'done');
+      _importProgressUpdate(pct, `AI vision complete — ${vf.length} fields found`, '');
+      await new Promise(r => setTimeout(r, 0));
     }
+  } else {
+    // No vision pass needed — jump to 90%
+    pct = 90;
+    _importProgressUpdate(pct, 'Field detection complete', '');
+    await new Promise(r => setTimeout(r, 0));
   }
 
   const allFields = [...detectedFields, ...visionFields];
 
-  // ── Create form definition ────────────────────────────────────────────
-  const sourceName = window._pendingImportName || 'Imported form';
+  // ── Stage 4: Assembly + render (90% → 100%) ───────────────────────────
+  _importProgressUpdate(92, 'Assembling form definition…', '');
+  await new Promise(r => setTimeout(r, 0));
+
   const newForm = {
     id:          'local_' + Date.now(),
     source_name: sourceName,
-    page_count:  pageLimit - startPage + 1,
+    page_count:  totalPages,
     archetype,
     fields:      allFields,
     routing: {
@@ -2138,23 +2297,24 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
   _formRouting  = newForm.routing;
   _selectedForm = newForm;
 
-  // Set page state — _pdfDoc still has ALL pages loaded;
-  // _pdfTotalPages is the editor's view (may be a subset for template-only import)
-  _pdfTotalPages = pageLimit - startPage + 1;
-  _pdfStartPage  = startPage;  // store so nav buttons use absolute PDF page numbers
+  _pdfTotalPages = totalPages;
+  _pdfStartPage  = startPage;
   _pdfPage       = 1;
 
-  // Re-render tab then draw first page
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
-  await _renderPdfPage(startPage); // use absolute page number in full _pdfDoc
+  _importProgressUpdate(96, 'Rendering document…', '');
+  await new Promise(r => setTimeout(r, 0));
+
+  // Re-render tab (replaces progress UI with the editor)
+  if (tabEl) renderFormsTab(tabEl);
+  await _renderPdfPage(startPage);
+
+  _importProgressUpdate(100, 'Done', '');
 
   const nExact    = allFields.filter(f => f.detection === 'acroform').length;
   const nInferred = allFields.filter(f => (f.detection||'').startsWith('heuristic')).length;
   const nAI       = allFields.filter(f => f.detection === 'claude_vision').length;
   cadToast(
-    `${allFields.length} fields · ${nExact} exact · ${nInferred} inferred · ${nAI} AI` +
-    ` · ${pageLimit - startPage + 1} pages`,
+    `${allFields.length} fields · ${nExact} exact · ${nInferred} inferred · ${nAI} AI · ${totalPages} pages`,
     'success'
   );
 
