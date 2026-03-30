@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Proposal — ProjectHUD</title>
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -615,6 +615,19 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 <script>
 const params = new URLSearchParams(location.search);
 let PROPOSAL_ID  = params.get('id');
+
+  // ── CoC write guard — safe no-op if stale coc.js is deployed ─────────────
+  if (typeof window.CoC?.write !== 'function') {
+    console.warn('[CoC] write() not available — stale coc.js deployed.');
+    window.CoC = window.CoC || {};
+    window.CoC.write = async () => null;
+    if (window.CoC.legacy === undefined) window.CoC.legacy = {
+      exceptionAnnotation: async () => null,
+      resourceRequestEvent: async () => null,
+      auditLog: async () => null,
+      taskJournal: async () => null,
+    };
+  }
 const PROSPECT_ID = params.get('prospect_id');
 
 // ── rate table ─────────────────────────────────────────

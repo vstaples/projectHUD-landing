@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SOW Builder — ProjectHUD</title>
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
@@ -492,6 +492,19 @@ body {
 <script>
 const params      = new URLSearchParams(location.search);
 const PROPOSAL_ID = params.get('proposal_id');
+
+  // ── CoC write guard — safe no-op if stale coc.js is deployed ─────────────
+  if (typeof window.CoC?.write !== 'function') {
+    console.warn('[CoC] write() not available — stale coc.js deployed.');
+    window.CoC = window.CoC || {};
+    window.CoC.write = async () => null;
+    if (window.CoC.legacy === undefined) window.CoC.legacy = {
+      exceptionAnnotation: async () => null,
+      resourceRequestEvent: async () => null,
+      auditLog: async () => null,
+      taskJournal: async () => null,
+    };
+  }
 
 let proposal      = null;
 let prospect      = null;
