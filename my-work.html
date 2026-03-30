@@ -9603,8 +9603,7 @@ function openWorkItemExpanded(item) {
         <div style="font-family:var(--font-body);font-size:14px;font-weight:600;
           color:var(--text0);line-height:1.3">${esc(item.title)}</div>
         <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:3px">
-          ${item.project && item.project.toLowerCase()!=='action item' ? esc(item.project) + ' · ' : ''}${item.due ? 'Due ' + fmtDate(item.due) + ' · ' : ''}<span style="text-transform:capitalize">${statusLabel}</span>
-          ${item.type==='action'?\` · ${getNegotiationBadgeHtml(negGetState(item.id).state)}\`:''}
+          ${item.project && item.project.toLowerCase()!=='action item' ? esc(item.project) + ' · ' : ''}${item.due ? 'Due ' + fmtDate(item.due) + ' · ' : ''}<span style="text-transform:capitalize">${statusLabel}</span>${item.type==='action' ? ' · ' + getNegotiationBadgeHtml(negGetState(item.id).state) : ''}
         </div>
       </div>
       <button data-action="close-wi-modal"
