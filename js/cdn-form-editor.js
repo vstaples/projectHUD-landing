@@ -30,6 +30,7 @@ let _pdfTotalPages   = 1;
 let _pdfScale        = 1.5;
 let _pdfStartPage    = 1;  // absolute page in _pdfDoc that editor page 1 maps to
 let _drawingRect     = null;
+let _formMode        = 'select'; // 'select' | 'draw' — controls cursor and interaction
 
 // ── Role vocabulary ──────────────────────────────────────────────────────────
 // Maps field.role values to display labels and colours
@@ -175,6 +176,18 @@ function _renderFormEditor() {
         <button onclick="_formZoomIn()"  class="btn btn-ghost btn-sm"
           style="padding:3px 8px">+</button>
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
+        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
+        <!-- Mode toggle: Select vs Draw -->
+        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
+          <button id="form-mode-select" onclick="_formSetMode('select')"
+            title="Select & move fields (S)"
+            style="padding:3px 10px;font-size:10px;border:none;cursor:pointer;
+                   background:var(--cad);color:var(--bg0);transition:all .12s">⊹ Select</button>
+          <button id="form-mode-draw" onclick="_formSetMode('draw')"
+            title="Draw new field (D)"
+            style="padding:3px 10px;font-size:10px;border:none;border-left:1px solid var(--border);
+                   cursor:pointer;background:transparent;color:var(--muted);transition:all .12s">✎ Draw</button>
+        </div>
         <button class="btn btn-ghost btn-sm" onclick="_formDelete('${f.id}')"
           style="color:var(--red);font-size:10px">🗑 Remove</button>
         <button class="btn btn-solid btn-sm" onclick="_formSave()"
@@ -192,15 +205,15 @@ function _renderFormEditor() {
             <canvas id="form-pdf-canvas" style="display:block;box-shadow:0 4px 24px rgba(0,0,0,.5)"></canvas>
             <!-- SVG overlay for field rectangles -->
             <svg id="form-field-overlay" style="position:absolute;top:0;left:0;
-              pointer-events:none;overflow:visible"
-              width="100%" height="100%">
+              pointer-events:all;overflow:visible;cursor:crosshair"
+              width="100%" height="100%"
+              onmousedown="_formSvgMouseDown(event)"
+              onmousemove="_formSvgMouseMove(event)"
+              onmouseup="_formSvgMouseUp(event)">
             </svg>
-            <!-- Draw interaction layer -->
+            <!-- Interaction layer: transparent rect over SVG handles both select + draw -->
             <div id="form-draw-layer" style="position:absolute;top:0;left:0;
-              width:100%;height:100%;cursor:crosshair"
-              onmousedown="_formDrawStart(event)"
-              onmousemove="_formDrawMove(event)"
-              onmouseup="_formDrawEnd(event)">
+              width:100%;height:100%;cursor:crosshair;display:none">
             </div>
           </div>
           </div>
@@ -341,7 +354,7 @@ function _renderRoutingPanel(roles) {
                     transition:all .15s">
         <input type="radio" name="form-routing-mode" value="serial"
           ${isSerial ? 'checked' : ''}
-          onchange="_formSetMode('serial')"
+          onchange="_formSetRoutingMode('serial')"
           style="margin-top:2px;accent-color:var(--cad);flex-shrink:0"/>
         <div>
           <div style="font-size:11px;font-weight:600;color:${isSerial ? 'var(--text)' : 'var(--text2)'}">
@@ -361,7 +374,7 @@ function _renderRoutingPanel(roles) {
                     transition:all .15s">
         <input type="radio" name="form-routing-mode" value="parallel"
           ${!isSerial ? 'checked' : ''}
-          onchange="_formSetMode('parallel')"
+          onchange="_formSetRoutingMode('parallel')"
           style="margin-top:2px;accent-color:var(--accent);flex-shrink:0"/>
         <div>
           <div style="font-size:11px;font-weight:600;color:${!isSerial ? 'var(--text)' : 'var(--text2)'}">
@@ -488,7 +501,7 @@ function _formRoutingRolesOrdered(roles) {
   return ordered;
 }
 
-function _formSetMode(mode) {
+function _formSetRoutingMode(mode) {
   _formRouting = { ..._formRouting, mode };
   _reRenderRoutingPanel();
 }
@@ -708,7 +721,7 @@ function _renderFieldOverlays() {
         <rect x="${x}" y="${y - 16}" width="${Math.min(w, 90)}" height="14"
           fill="${roleConf.color}" rx="2" opacity="0.9"/>
         <text x="${x + 4}" y="${y - 5}"
-          fill="white" font-size="8" font-family="monospace"
+          fill="white" font-size="10" font-family="monospace"
           style="pointer-events:none">
           ${escHtml((field.label || 'field').slice(0, 14))}
         </text>
@@ -735,83 +748,162 @@ function _highlightFieldRect(fieldId) {
 // MANUAL DRAW — click-drag to add field rectangle
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _formDrawStart(event) {
-  const layer = document.getElementById('form-draw-layer');
-  if (!layer) return;
-  const layerRect = layer.getBoundingClientRect();
-  _drawingRect = {
-    active: true,
-    startX: event.clientX - layerRect.left,
-    startY: event.clientY - layerRect.top,
-  };
-  // Create preview rect
-  const preview = document.getElementById('form-draw-preview');
-  if (preview) preview.remove();
-  const p = document.createElement('div');
-  p.id = 'form-draw-preview';
-  p.style.cssText = `
-    position:absolute;border:2px dashed var(--cad);background:var(--cad-dim);
-    pointer-events:none;border-radius:2px;
-    left:${_drawingRect.startX}px;top:${_drawingRect.startY}px;width:0;height:0
-  `;
-  layer.appendChild(p);
+// ─────────────────────────────────────────────────────────────────────────────
+// MODE TOGGLE
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _formSetMode(mode) {
+  _formMode = mode;
+  const svg = document.getElementById('form-field-overlay');
+  const selBtn = document.getElementById('form-mode-select');
+  const drwBtn = document.getElementById('form-mode-draw');
+
+  if (mode === 'draw') {
+    if (svg) svg.style.cursor = 'crosshair';
+    if (selBtn) { selBtn.style.background = 'transparent'; selBtn.style.color = 'var(--muted)'; }
+    if (drwBtn) { drwBtn.style.background = 'var(--cad)';  drwBtn.style.color  = 'var(--bg0)'; }
+  } else {
+    if (svg) svg.style.cursor = 'default';
+    if (selBtn) { selBtn.style.background = 'var(--cad)';  selBtn.style.color  = 'var(--bg0)'; }
+    if (drwBtn) { drwBtn.style.background = 'transparent'; drwBtn.style.color = 'var(--muted)'; }
+  }
 }
 
-function _formDrawMove(event) {
-  if (!_drawingRect?.active) return;
-  const layer = document.getElementById('form-draw-layer');
-  const preview = document.getElementById('form-draw-preview');
-  if (!layer || !preview) return;
-  const layerRect = layer.getBoundingClientRect();
-  const curX = event.clientX - layerRect.left;
-  const curY = event.clientY - layerRect.top;
-  const x = Math.min(curX, _drawingRect.startX);
-  const y = Math.min(curY, _drawingRect.startY);
-  const w = Math.abs(curX - _drawingRect.startX);
-  const h = Math.abs(curY - _drawingRect.startY);
-  preview.style.left   = x + 'px';
-  preview.style.top    = y + 'px';
-  preview.style.width  = w + 'px';
-  preview.style.height = h + 'px';
-}
+// Keyboard shortcut: S = select, D = draw
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (!document.getElementById('form-field-overlay')) return; // Forms tab not active
+  if (e.key === 's' || e.key === 'S') _formSetMode('select');
+  if (e.key === 'd' || e.key === 'D') _formSetMode('draw');
+});
 
-function _formDrawEnd(event) {
-  if (!_drawingRect?.active) return;
-  const layer = document.getElementById('form-draw-layer');
-  const preview = document.getElementById('form-draw-preview');
-  if (preview) preview.remove();
-  if (!layer) { _drawingRect = null; return; }
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED SVG INTERACTION — select / drag-to-move / draw
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const layerRect = layer.getBoundingClientRect();
-  const curX = event.clientX - layerRect.left;
-  const curY = event.clientY - layerRect.top;
-  const w = Math.abs(curX - _drawingRect.startX);
-  const h = Math.abs(curY - _drawingRect.startY);
+let _svgDragField  = null; // field being moved
+let _svgDragStartX = 0;
+let _svgDragStartY = 0;
+let _svgDragOrigX  = 0;
+let _svgDragOrigY  = 0;
 
-  if (w > 12 && h > 8) {
-    // Convert canvas coords back to PDF points
-    const x = Math.min(curX, _drawingRect.startX) / _pdfScale;
-    const y = Math.min(curY, _drawingRect.startY) / _pdfScale;
-    const fieldId = 'manual_' + Date.now();
-    _formFields.push({
-      id: fieldId,
-      page: _pdfPage,
-      rect: { x, y, w: w / _pdfScale, h: h / _pdfScale },
-      label: '',
-      type: 'text',
-      role: 'assignee',
-      required: false,
-      detection: 'manual',
-    });
-    _renderFieldOverlays();
-    const listEl = document.getElementById('form-field-list');
-    if (listEl) listEl.innerHTML = _renderFieldList();
-    _reRenderRoutingPanel();
-    // Open the edit popover immediately for the new field
-    setTimeout(() => _formSelectField(fieldId), 50);
+function _formSvgMouseDown(event) {
+  const svg     = document.getElementById('form-field-overlay');
+  if (!svg) return;
+  const svgRect = svg.getBoundingClientRect();
+  const mx = event.clientX - svgRect.left;
+  const my = event.clientY - svgRect.top;
+
+  if (_formMode === 'draw') {
+    // Start drawing a new rectangle
+    _drawingRect = { active: true, startX: mx, startY: my };
+    // Draw preview rect inside SVG
+    const preview = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    preview.id = 'form-draw-preview-rect';
+    preview.setAttribute('x', mx); preview.setAttribute('y', my);
+    preview.setAttribute('width', 0); preview.setAttribute('height', 0);
+    preview.setAttribute('fill', 'var(--cad-dim)');
+    preview.setAttribute('stroke', 'var(--cad)');
+    preview.setAttribute('stroke-width', '1.5');
+    preview.setAttribute('stroke-dasharray', '4 2');
+    preview.setAttribute('rx', '2');
+    preview.style.pointerEvents = 'none';
+    svg.appendChild(preview);
+    event.preventDefault();
+    return;
   }
 
-  _drawingRect = null;
+  // Select mode: check if click is on a field rect
+  const group = event.target.closest('.field-rect-group');
+  if (group) {
+    const fieldId = group.dataset.fieldId;
+    const field   = _formFields.find(f => f.id === fieldId);
+    if (field) {
+      _svgDragField  = field;
+      _svgDragStartX = mx;
+      _svgDragStartY = my;
+      _svgDragOrigX  = field.rect.x * _pdfScale;
+      _svgDragOrigY  = field.rect.y * _pdfScale;
+      svg.style.cursor = 'grabbing';
+      event.preventDefault();
+    }
+  }
+}
+
+function _formSvgMouseMove(event) {
+  const svg = document.getElementById('form-field-overlay');
+  if (!svg) return;
+  const svgRect = svg.getBoundingClientRect();
+  const mx = event.clientX - svgRect.left;
+  const my = event.clientY - svgRect.top;
+
+  if (_formMode === 'draw' && _drawingRect?.active) {
+    const preview = document.getElementById('form-draw-preview-rect');
+    if (!preview) return;
+    const x = Math.min(mx, _drawingRect.startX);
+    const y = Math.min(my, _drawingRect.startY);
+    const w = Math.abs(mx - _drawingRect.startX);
+    const h = Math.abs(my - _drawingRect.startY);
+    preview.setAttribute('x', x); preview.setAttribute('y', y);
+    preview.setAttribute('width', w); preview.setAttribute('height', h);
+    return;
+  }
+
+  if (_svgDragField) {
+    const dx = mx - _svgDragStartX;
+    const dy = my - _svgDragStartY;
+    _svgDragField.rect.x = (_svgDragOrigX + dx) / _pdfScale;
+    _svgDragField.rect.y = (_svgDragOrigY + dy) / _pdfScale;
+    _renderFieldOverlays();
+  }
+}
+
+function _formSvgMouseUp(event) {
+  const svg = document.getElementById('form-field-overlay');
+  if (!svg) return;
+  const svgRect = svg.getBoundingClientRect();
+  const mx = event.clientX - svgRect.left;
+  const my = event.clientY - svgRect.top;
+
+  if (_formMode === 'draw' && _drawingRect?.active) {
+    document.getElementById('form-draw-preview-rect')?.remove();
+    const w = Math.abs(mx - _drawingRect.startX);
+    const h = Math.abs(my - _drawingRect.startY);
+
+    if (w > 12 && h > 8) {
+      const x       = Math.min(mx, _drawingRect.startX) / _pdfScale;
+      const y       = Math.min(my, _drawingRect.startY) / _pdfScale;
+      const fieldId = 'manual_' + Date.now();
+      _formFields.push({
+        id: fieldId, page: _pdfPage,
+        rect: { x, y, w: w / _pdfScale, h: h / _pdfScale },
+        label: '', type: 'text', role: 'assignee',
+        required: false, detection: 'manual',
+      });
+      _renderFieldOverlays();
+      const listEl = document.getElementById('form-field-list');
+      if (listEl) listEl.innerHTML = _renderFieldList();
+      _reRenderRoutingPanel();
+      setTimeout(() => _formSelectField(fieldId), 50);
+    }
+    _drawingRect = null;
+    return;
+  }
+
+  if (_svgDragField) {
+    // Dragged — update field list to reflect new position
+    const listEl = document.getElementById('form-field-list');
+    if (listEl) listEl.innerHTML = _renderFieldList();
+    svg.style.cursor = 'default';
+    _svgDragField = null;
+
+    // If it was just a click (no movement), open the edit popover
+    const moved = Math.abs(mx - _svgDragStartX) > 4 || Math.abs(my - _svgDragStartY) > 4;
+    if (!moved) {
+      const group = event.target.closest('.field-rect-group');
+      if (group) _formSelectField(group.dataset.fieldId);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2021,11 +2113,11 @@ function _renderFieldOverlays() {
         <rect x="${x}" y="${y}" width="${w}" height="${h}"
           fill="${roleConf.dim}" stroke="${confColor}" stroke-width="1.5"
           rx="2" opacity="0.85"/>
-        <!-- Label pill -->
-        <rect x="${x}" y="${y - 17}" width="${Math.min(w, 110)}" height="15"
-          fill="${confColor}" rx="3" opacity="0.92"/>
-        <text x="${x + 4}" y="${y - 6}"
-          fill="white" font-size="8" font-family="monospace"
+        <!-- Label pill — inside rect so it's always visible -->
+        <rect x="${x}" y="${y}" width="${Math.min(w, 110)}" height="16"
+          fill="${confColor}" rx="2" opacity="0.88"/>
+        <text x="${x + 4}" y="${y + 11}"
+          fill="white" font-size="10" font-family="monospace"
           style="pointer-events:none">
           ${typeIcon} ${escHtml(labelText)}
         </text>
