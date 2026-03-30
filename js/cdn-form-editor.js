@@ -28,6 +28,7 @@ let _pdfDoc          = null;
 let _pdfPage         = 1;
 let _pdfTotalPages   = 1;
 let _pdfScale        = 1.5;
+let _pdfStartPage    = 1;  // absolute page in _pdfDoc that editor page 1 maps to
 let _drawingRect     = null;
 
 // ── Role vocabulary ──────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ function renderFormsTab(el) {
     </div>`;
 
   if (_selectedForm && _pdfDoc) {
-    requestAnimationFrame(() => _renderPdfPage(_pdfPage));
+    requestAnimationFrame(() => _renderPdfPage(_pdfStartPage + _pdfPage - 1));
   }
 }
 
@@ -844,14 +845,14 @@ function _formPrevPage() {
   if (_pdfPage <= 1) return;
   _pdfPage--;
   _updatePageIndicator();
-  _renderPdfPage(_pdfPage);
+  _renderPdfPage(_pdfStartPage + _pdfPage - 1);
 }
 
 function _formNextPage() {
   if (_pdfPage >= _pdfTotalPages) return;
   _pdfPage++;
   _updatePageIndicator();
-  _renderPdfPage(_pdfPage);
+  _renderPdfPage(_pdfStartPage + _pdfPage - 1);
 }
 
 function _updatePageIndicator() {
@@ -859,8 +860,8 @@ function _updatePageIndicator() {
   if (el) el.textContent = `${_pdfPage} / ${_pdfTotalPages}`;
 }
 
-function _formZoomIn()  { _pdfScale = Math.min(3, _pdfScale * 1.25); _renderPdfPage(_pdfPage); }
-function _formZoomOut() { _pdfScale = Math.max(0.5, _pdfScale * 0.8); _renderPdfPage(_pdfPage); }
+function _formZoomIn()  { _pdfScale = Math.min(3, _pdfScale * 1.25); _renderPdfPage(_pdfStartPage + _pdfPage - 1); }
+function _formZoomOut() { _pdfScale = Math.max(0.5, _pdfScale * 0.8); _renderPdfPage(_pdfStartPage + _pdfPage - 1); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FILE IMPORT — upload, detect fields, open editor
@@ -870,53 +871,7 @@ function _formUploadClick() {
   document.getElementById('form-file-input')?.click();
 }
 
-async function _formFileChosen(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-
-  cadToast(`Loading ${file.name}…`, 'info');
-
-  try {
-    await _ensurePdfJs();
-    const arrayBuffer = await file.arrayBuffer();
-    _pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    _pdfTotalPages = _pdfDoc.numPages;
-    _pdfPage = 1;
-    _pdfScale = 1.5;
-
-    // Run AcroForm field detection on all pages
-    const detectedFields = await _detectAcroFormFields(_pdfDoc);
-
-    // Create a new form definition (not yet saved to DB)
-    const newForm = {
-      id: 'local_' + Date.now(),
-      source_name: file.name,
-      page_count: _pdfTotalPages,
-      fields: detectedFields,
-      routing: { mode: 'serial', roles: [] },
-      _unsaved: true,
-      _file: file,
-    };
-
-    _formDefs.push(newForm);
-    _formFields = detectedFields;
-    _formRouting = { mode: 'serial', roles: _deriveRoles(detectedFields).map((r, i) => ({ role: r.role, order: i + 1 })) };
-    _selectedForm = newForm;
-
-    // Re-render the full tab
-    const el = document.getElementById('cad-content');
-    if (el) renderFormsTab(el);
-
-    // Render first page
-    await _renderPdfPage(1);
-
-    cadToast(`${detectedFields.length} field${detectedFields.length !== 1 ? 's' : ''} detected in ${file.name}`, 'success');
-  } catch(e) {
-    cadToast('Import failed: ' + e.message, 'error');
-  }
-
-  event.target.value = '';
-}
+// _formFileChosen (original stub removed — definitive version below)
 
 async function _detectAcroFormFields(pdfDoc) {
   const fields = [];
@@ -1426,7 +1381,7 @@ async function _detectMultiInstance(pdfDoc) {
 }
 
 // Show the multi-instance prompt dialog
-function _showMultiInstancePrompt(info, file) {
+function _showMultiInstancePrompt(info) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.style.zIndex = '500';
@@ -1436,22 +1391,27 @@ function _showMultiInstancePrompt(info, file) {
         <div class="modal-title">📄 Multiple instances detected</div>
       </div>
       <div class="modal-body" style="font-size:13px;line-height:1.7;color:var(--text2)">
-        This PDF appears to contain the same <strong style="color:var(--text)">${info.templatePageCount}-page form</strong>
+        This PDF appears to contain the same
+        <strong style="color:var(--text)">${info.templatePageCount}-page form</strong>
         completed <strong style="color:var(--text)">${info.instanceCount} times</strong>.
-        <div style="margin-top:14px;font-size:12px;color:var(--muted)">How would you like to import it?</div>
+        <div style="margin-top:14px;font-size:12px;color:var(--muted)">
+          How would you like to import it?
+        </div>
       </div>
       <div class="modal-footer" style="flex-direction:column;gap:8px;align-items:stretch">
-        <button class="btn btn-solid" onclick="_multiInstanceImport('template',${JSON.stringify(info).replace(/"/g,'&quot;')})"
+        <button class="btn btn-solid"
+          onclick="_multiInstanceImport('template',${JSON.stringify(info).replace(/"/g,'&quot;')})"
           style="justify-content:center">
-          Import blank template only
+          Import blank template only (${info.templatePageCount} pages)
         </button>
-        <button class="btn btn-ghost" onclick="_multiInstanceImport('template_and_history',${JSON.stringify(info).replace(/"/g,'&quot;')})"
+        <button class="btn btn-ghost"
+          onclick="_multiInstanceImport('template_and_history',${JSON.stringify(info).replace(/"/g,'&quot;')})"
           style="justify-content:center">
-          Import template + ${info.instanceCount} historical completed instances
+          Import template + ${info.instanceCount} historical instances
         </button>
         <button class="btn btn-ghost" style="color:var(--muted);justify-content:center"
-          onclick="this.closest('.modal-overlay').remove();_proceedWithImport(window._pendingImportFile)">
-          Import all ${info.instanceCount * info.templatePageCount} pages as single document
+          onclick="document.querySelector('.modal-overlay').remove();_proceedWithImport(1,_pdfTotalPages)">
+          Import all ${info.instanceCount * info.templatePageCount} pages as one document
         </button>
       </div>
     </div>`;
@@ -1460,19 +1420,17 @@ function _showMultiInstancePrompt(info, file) {
 
 async function _multiInstanceImport(mode, info) {
   document.querySelector('.modal-overlay')?.remove();
-  const file = window._pendingImportFile;
-  if (!file) return;
 
-  // Always extract template from first N pages
-  await _proceedWithImport(file, 1, info.templatePageCount);
+  // _pdfDoc is already loaded — call _proceedWithImport directly,
+  // no File object needed, no second arrayBuffer() call.
+  await _proceedWithImport(1, info.templatePageCount);
 
   if (mode === 'template_and_history') {
-    cadToast(`Template imported. Extracting ${info.instanceCount - 1} historical instances…`, 'info');
-    // Future: OCR fill values from remaining page groups and create form_response records
-    // For now, toast a message — historical import is Phase 2
-    setTimeout(() => {
-      cadToast('Historical instance import coming in next release', 'info');
-    }, 1500);
+    cadToast(
+      `Template imported (${info.templatePageCount} pages). ` +
+      `Historical instance import coming in next release.`,
+      'info'
+    );
   }
 }
 
@@ -2053,12 +2011,10 @@ function _renderFieldOverlays() {
 async function _formFileChosen(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  window._pendingImportFile = file;
+  event.target.value = ''; // reset immediately so same file can be re-selected
 
-  // PDF only for now (Word support coming)
   if (!file.name.toLowerCase().endsWith('.pdf')) {
     cadToast('PDF import supported — Word documents coming soon', 'info');
-    event.target.value = '';
     return;
   }
 
@@ -2066,47 +2022,50 @@ async function _formFileChosen(event) {
 
   try {
     await _ensurePdfJs();
-    const arrayBuffer = await file.arrayBuffer();
-    _pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    _pdfTotalPages = _pdfDoc.numPages;
-    _pdfPage = 1;
-    _pdfScale = 1.5;
 
-    // ── Step 1: Multi-instance detection ─────────────────────────────────
+    // Read the buffer ONCE and pass it directly to PDF.js.
+    // PDF.js transfers (neuters) ArrayBuffers — storing the File object
+    // and calling .arrayBuffer() a second time returns a zeroed buffer.
+    // Keeping _pdfDoc as the single source of truth avoids this entirely.
+    const arrayBuffer = await file.arrayBuffer();
+    _pdfDoc        = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    _pdfTotalPages = _pdfDoc.numPages;
+    _pdfPage       = 1;
+    _pdfScale      = 1.5;
+    window._pendingImportName = file.name;
+
+    // Multi-instance detection
     if (_pdfTotalPages > 1) {
       const multiInfo = await _detectMultiInstance(_pdfDoc);
       if (multiInfo?.detected) {
-        event.target.value = '';
-        _showMultiInstancePrompt(multiInfo, file);
+        _showMultiInstancePrompt(multiInfo); // no file arg — uses _pdfDoc
         return;
       }
     }
 
-    await _proceedWithImport(file, 1, _pdfTotalPages);
+    await _proceedWithImport(1, _pdfTotalPages);
   } catch(e) {
     cadToast('Import failed: ' + e.message, 'error');
   }
-
-  event.target.value = '';
 }
 
-async function _proceedWithImport(file, startPage = 1, endPage = null) {
+async function _proceedWithImport(startPage = 1, endPage = null) {
+  // _pdfDoc MUST already be loaded by _formFileChosen before this is called.
+  // Never reload from a File object here — ArrayBuffer is already transferred.
   if (!_pdfDoc) {
-    await _ensurePdfJs();
-    const arrayBuffer = await file.arrayBuffer();
-    _pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    _pdfTotalPages = _pdfDoc.numPages;
+    cadToast('Import error: PDF not loaded. Please try again.', 'error');
+    return;
   }
 
-  const pageLimit = endPage || _pdfTotalPages;
-  cadToast('Detecting fields…', 'info');
+  const pageLimit = endPage || _pdfDoc.numPages;
+  cadToast(`Detecting fields on ${pageLimit - startPage + 1} page(s)…`, 'info');
 
-  // ── Step 2: Classify archetype ────────────────────────────────────────
+  // ── Classify archetype ────────────────────────────────────────────────
   const firstPage = await _pdfDoc.getPage(startPage);
   const firstText = await firstPage.getTextContent();
   const archetype = _classifyFormArchetype(firstText.items);
 
-  // ── Step 3: AcroForm pass ─────────────────────────────────────────────
+  // ── AcroForm pass + text heuristics ──────────────────────────────────
   const detectedFields = [];
 
   for (let p = startPage; p <= pageLimit; p++) {
@@ -2122,32 +2081,33 @@ async function _proceedWithImport(file, startPage = 1, endPage = null) {
       const w = Math.abs(x2 - x1);
       const h = Math.abs(y2 - y1);
       const typeMap = { Tx: 'text', Btn: 'checkbox', Ch: 'text', Sig: 'signature' };
-      const nameL = (ann.fieldName || '').toLowerCase();
-      const role  = nameL.includes('sign') || nameL.includes('approv') || nameL.includes('review')
-        ? 'reviewer'
-        : nameL.includes('pm') || nameL.includes('manager') ? 'pm' : 'assignee';
+      const nameL   = (ann.fieldName || '').toLowerCase();
+      const role    = /sign|approv|review/.test(nameL) ? 'reviewer'
+                    : /pm|manager/.test(nameL) ? 'pm' : 'assignee';
       detectedFields.push({
-        id: `acro_${p}_${detectedFields.length}`,
-        page: p - startPage + 1,
-        rect: { x, y, w, h },
-        label: ann.fieldName || ann.alternativeText || 'Field ' + (detectedFields.length + 1),
-        type: typeMap[ann.fieldType] || 'text',
-        role, required: !!(ann.fieldFlags & 2),
+        id:        `acro_${p}_${detectedFields.length}`,
+        page:      p - startPage + 1,
+        rect:      { x, y, w, h },
+        label:     ann.fieldName || ann.alternativeText || `Field ${detectedFields.length + 1}`,
+        type:      typeMap[ann.fieldType] || 'text',
+        role,
+        required:  !!(ann.fieldFlags & 2),
         detection: 'acroform',
       });
     }
 
-    // ── Step 4: Text heuristics ─────────────────────────────────────────
-    const textContent     = await page.getTextContent();
-    const heuristicFields = _detectTextHeuristicsV2(
+    // Text heuristics
+    const textContent = await page.getTextContent();
+    const heuristic   = _detectTextHeuristicsV2(
       textContent, page, p - startPage + 1, detectedFields.length, archetype
     );
-    detectedFields.push(...heuristicFields);
+    detectedFields.push(...heuristic);
   }
 
-  // ── Step 5: Claude vision pass if sparse ─────────────────────────────
+  // ── Claude vision pass if sparse ─────────────────────────────────────
   let visionFields = [];
-  if (detectedFields.filter(f => f.detection !== 'manual').length < 3) {
+  const autoCount  = detectedFields.filter(f => f.detection !== 'manual').length;
+  if (autoCount < 3) {
     cadToast('Sparse detection — running AI vision pass…', 'info');
     for (let p = startPage; p <= Math.min(startPage + 1, pageLimit); p++) {
       const vf = await _detectFieldsViaClaudeVision(_pdfDoc, p);
@@ -2158,9 +2118,10 @@ async function _proceedWithImport(file, startPage = 1, endPage = null) {
   const allFields = [...detectedFields, ...visionFields];
 
   // ── Create form definition ────────────────────────────────────────────
+  const sourceName = window._pendingImportName || 'Imported form';
   const newForm = {
     id:          'local_' + Date.now(),
-    source_name: file.name,
+    source_name: sourceName,
     page_count:  pageLimit - startPage + 1,
     archetype,
     fields:      allFields,
@@ -2170,31 +2131,33 @@ async function _proceedWithImport(file, startPage = 1, endPage = null) {
       ]
     },
     _unsaved: true,
-    _file:    file,
   };
 
   _formDefs.push(newForm);
-  _formFields  = allFields;
-  _formRouting = newForm.routing;
+  _formFields   = allFields;
+  _formRouting  = newForm.routing;
   _selectedForm = newForm;
-  _pdfTotalPages = pageLimit - startPage + 1;
-  _pdfPage = 1;
 
-  // Re-render
+  // Set page state — _pdfDoc still has ALL pages loaded;
+  // _pdfTotalPages is the editor's view (may be a subset for template-only import)
+  _pdfTotalPages = pageLimit - startPage + 1;
+  _pdfStartPage  = startPage;  // store so nav buttons use absolute PDF page numbers
+  _pdfPage       = 1;
+
+  // Re-render tab then draw first page
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
-  await _renderPdfPage(1);
+  await _renderPdfPage(startPage); // use absolute page number in full _pdfDoc
 
-  const confidence = allFields.filter(f => f.detection === 'acroform').length;
-  const ai         = allFields.filter(f => f.detection === 'claude_vision').length;
-  const heuristic  = allFields.filter(f => f.detection?.startsWith('heuristic')).length;
-
+  const nExact    = allFields.filter(f => f.detection === 'acroform').length;
+  const nInferred = allFields.filter(f => (f.detection||'').startsWith('heuristic')).length;
+  const nAI       = allFields.filter(f => f.detection === 'claude_vision').length;
   cadToast(
-    `${allFields.length} fields detected  ·  ${confidence} exact  ·  ${heuristic} inferred  ·  ${ai} AI`,
+    `${allFields.length} fields · ${nExact} exact · ${nInferred} inferred · ${nAI} AI` +
+    ` · ${pageLimit - startPage + 1} pages`,
     'success'
   );
 
-  // Check for missing signature
   setTimeout(() => _checkAndPromptSignature(allFields), 1200);
 }
 
