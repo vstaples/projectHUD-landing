@@ -1344,7 +1344,7 @@ window._mwLoadUserView = async function() {
     document.body.appendChild(_tip);
 
     // Position below the hovered card
-    var cardEl = e.currentTarget;
+    var cardEl = eTarget;
     var r = cardEl.getBoundingClientRect();
     var tipW = 600;
     var top  = r.bottom + 6;
@@ -1366,6 +1366,37 @@ window._mwLoadUserView = async function() {
     if (e.key === 'Control') {
       clearTimeout(_tipTimer);
       if (_tip) { _tip.remove(); _tip = null; }
+    }
+  });
+  // Ctrl pressed while already hovering — start dwell for any tooltip target
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key !== 'Control' || ev.repeat) return;
+    // Stat card
+    var statCard = document.querySelector('.stat-card:hover');
+    if (statCard) {
+      var attr = statCard.getAttribute('onmouseenter') || '';
+      var m = attr.match(/showStatTooltip[^'"]*['"](\w+)['"]/); 
+      if (m) {
+        clearTimeout(_tipTimer);
+        if (_tip) { _tip.remove(); _tip = null; }
+        var _cap = statCard, _capType = m[1];
+        _tipTimer = setTimeout(function() { window._showStatTooltipNow(_cap, _capType); }, 1500);
+      }
+    }
+    // Rec seq pane
+    var recPane = document.getElementById('mw-rec-seq');
+    if (recPane && recPane.matches(':hover')) {
+      clearTimeout(window._rTimer);
+      var _capPane = recPane;
+      window._rTimer = setTimeout(function() {
+        if (!window._rTip) window.showRecSeqTooltip({ ctrlKey: true, currentTarget: _capPane });
+      }, 1500);
+    }
+    // Gauge
+    var gaugeRow = document.getElementById('mw-gauge-row');
+    if (gaugeRow) {
+      var gaugeHov = gaugeRow.querySelector('.gauge-col:hover');
+      if (gaugeHov) gaugeHov.dispatchEvent(new MouseEvent('mouseover', { ctrlKey: true, bubbles: true }));
     }
   });
   // Keep tip alive when mouse enters it
@@ -7185,6 +7216,7 @@ window._recSeqGenerated = false;
     if (!e.ctrlKey) return;  // Ctrl required
     clearTimeout(_rTimer);
     if (_rTip) return;
+    var eTarget = e.currentTarget;
 
     // Build on demand if not yet generated
     if (!window._recSeqItems && window._wiItems && window._wiItems.length) {
