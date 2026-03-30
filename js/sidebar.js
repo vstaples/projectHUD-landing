@@ -242,7 +242,13 @@ const Sidebar = (() => {
       const currentUser = users?.find(u => u.id === userId);
       const internalFirm = firms?.find(f => f.is_internal);
       let notifCount = 0;
-      try { const notifs = await API.getNotifications?.(); notifCount = notifs?.filter(n=>!n.read_at)?.length||0; } catch(e) {}
+      // HUDNotif manages badge, polling, toasts, and panel — init after we have the userId
+      if (typeof window.HUDNotif !== 'undefined' && userId) {
+        window.HUDNotif.init(userId);
+        notifCount = window.HUDNotif.getUnread();
+      } else {
+        try { const notifs = await API.getNotifications?.(); notifCount = notifs?.filter(n=>!n.read)?.length||0; } catch(e) {}
+      }
       injectStyles();
       sidebar.innerHTML = render(activePage, internalFirm?.name||'', currentUser, notifCount, showToolbar);
       if (showToolbar) {
