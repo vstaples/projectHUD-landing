@@ -13,8 +13,6 @@
 // LOAD ORDER: 1st — before all other cdn-*.js files
 // ─────────────────────────────────────────────────────────────────────────────
 'use strict';
-
-'use strict';
 // ── State ────────────────────────────────────────────────────────────────────
 const FIRM_ID_CAD = 'aaaaaaaa-0001-0001-0001-000000000001';
 const SUPA_URL  = 'https://dvbetgdzksatcgdfftbs.supabase.co';
@@ -163,6 +161,72 @@ function _diffSteps(prevSnap, currentSteps) {
 
   return diffs;
 }
+
+// ── Step type metadata ────────────────────────────────────────────────────────
+// Icon, label, and visual style for each workflow step type.
+// Used by: cdn-template-editor.js, cdn-dag-viewer.js, cdn-instance-dag.js,
+//          cdn-instances.js, cdn-intel.js
+const STEP_META = {
+  trigger:      { icon:'⚡', label:'Trigger',            nodeClass:'sn-trigger',  badgeColor:'rgba(192,64,74,.2)',    badgeText:'#c0404a' },
+  approval:     { icon:'✓',  label:'Approval',           nodeClass:'sn-approval', badgeColor:'rgba(61,153,112,.15)',  badgeText:'#3d9970' },
+  review:       { icon:'R',  label:'Review',             nodeClass:'sn-review',   badgeColor:'rgba(79,142,247,.15)',  badgeText:'#4f8ef7' },
+  signoff:      { icon:'✍',  label:'Sign-off',           nodeClass:'sn-signoff',  badgeColor:'rgba(196,125,24,.15)',  badgeText:'#c47d18' },
+  action:       { icon:'→',  label:'Action',             nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.5)' },
+  external:     { icon:'E',  label:'External',           nodeClass:'sn-external', badgeColor:'rgba(201,168,76,.15)',  badgeText:'#c9a84c' },
+  form:         { icon:'F',  label:'Collaborative Form', nodeClass:'sn-form',     badgeColor:'rgba(160,80,200,.15)',  badgeText:'#b070e0' },
+  branch:       { icon:'⋔',  label:'Branch',             nodeClass:'sn-branch',   badgeColor:'rgba(255,255,255,.05)', badgeText:'rgba(255,255,255,.4)' },
+  wait:         { icon:'⏱',  label:'Wait',               nodeClass:'sn-action',   badgeColor:'rgba(255,255,255,.06)', badgeText:'rgba(255,255,255,.4)' },
+  confirmation: { icon:'✓✓', label:'Confirmation',       nodeClass:'sn-confirm',  badgeColor:'rgba(0,185,195,.15)',   badgeText:'#00b9c3' },
+  meeting:      { icon:'◉',  label:'Meeting',            nodeClass:'sn-meeting',  badgeColor:'rgba(79,200,140,.15)',  badgeText:'#4fc88c' },
+};
+
+// ── Default outcomes per step type ────────────────────────────────────────────
+// Each outcome: { id, label, color, isDefault, isReject, requiresReset, ... }
+// Used by: _getOutcomes() below, cdn-template-editor.js, cdn-instances.js
+const DEFAULT_OUTCOMES = {
+  approval:     [
+    { id:'approved',          label:'Approved',           color:'#1D9E75', isDefault:true  },
+    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false, requiresReset:true },
+    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true },
+  ],
+  review:       [
+    { id:'accepted',          label:'Accepted',           color:'#1D9E75', isDefault:true  },
+    { id:'changes_requested', label:'Changes requested',  color:'#BA7517', isDefault:false, requiresReset:true },
+    { id:'rejected',          label:'Rejected',           color:'#E24B4A', isDefault:false, requiresReset:true },
+  ],
+  signoff:      [
+    { id:'signed',            label:'Signed',             color:'#1D9E75', isDefault:true  },
+    { id:'declined',          label:'Declined',           color:'#E24B4A', isDefault:false, requiresReset:true },
+  ],
+  form:         [
+    { id:'submitted',         label:'Submitted',          color:'#1D9E75', isDefault:true  },
+    { id:'saved_incomplete',  label:'Saved (incomplete)', color:'#BA7517', isDefault:false, isPartial:true },
+  ],
+  action:       [
+    { id:'done',              label:'Done',               color:'#1D9E75', isDefault:true  },
+    { id:'blocked',           label:'Blocked',            color:'#E24B4A', isDefault:false, requiresReset:true },
+    { id:'escalated',         label:'Escalated',          color:'#BA7517', isDefault:false },
+  ],
+  external:     [
+    { id:'responded',         label:'Responded',          color:'#1D9E75', isDefault:true  },
+    { id:'no_response',       label:'No response',        color:'#BA7517', isDefault:false },
+  ],
+  meeting:      [
+    { id:'concluded',            label:'Concluded — no actions',      color:'#1D9E75', isDefault:true  },
+    { id:'concluded_actions',    label:'Concluded — actions pending', color:'#BA7517', isDefault:false, holdsForActions:true },
+    { id:'design_change',        label:'Design change required',      color:'#E24B4A', isDefault:false, requiresReset:true },
+    { id:'full_reset',           label:'Full reset — awaiting input', color:'#E24B4A', isDefault:false, requiresReset:true, requiresSuspend:true },
+    { id:'cancelled',            label:'Cancelled',                   color:'#888',    isDefault:false },
+  ],
+  confirmation: [
+    { id:'confirmed',         label:'Confirmed',          color:'#1D9E75', isDefault:true  },
+    { id:'incomplete',        label:'Incomplete',         color:'#BA7517', isDefault:false },
+  ],
+  wait:         [
+    { id:'condition_met',     label:'Condition met',      color:'#1D9E75', isDefault:true  },
+    { id:'timed_out',         label:'Timed out',          color:'#BA7517', isDefault:false },
+  ],
+};
 
 function _getOutcomes(step) {
   // Use saved custom outcomes if present, else defaults for the step type
