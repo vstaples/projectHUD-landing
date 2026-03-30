@@ -45,6 +45,24 @@ const FORM_ROLES = {
 
 const FIELD_TYPES = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea'];
 
+// Extended type list including review (4-state) and doc_ref (paired number+rev)
+const FIELD_TYPES_FULL = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea', 'review', 'doc_ref'];
+
+const FIELD_TYPE_META = {
+  text:      { icon: 'T',  label: 'Text',      color: 'var(--text2)' },
+  date:      { icon: '📅', label: 'Date',      color: 'var(--accent)' },
+  number:    { icon: '#',  label: 'Number',    color: 'var(--text2)' },
+  checkbox:  { icon: '☑', label: 'Checkbox',  color: 'var(--cad)' },
+  signature: { icon: '✍', label: 'Signature', color: 'var(--amber)' },
+  textarea:  { icon: '¶', label: 'Textarea',  color: 'var(--text2)' },
+  review:    { icon: '◑', label: 'Review',    color: '#00b9c3' },
+  doc_ref:   { icon: '⎘', label: 'Doc Ref',   color: 'var(--accent)' },
+};
+
+const REVIEW_VALUES  = ['', 'pass', 'fail', 'na'];
+const REVIEW_DISPLAY = { '': '—', pass: '✓', fail: '✗', na: 'N/A' };
+const REVIEW_COLORS  = { '': 'var(--muted)', pass: 'var(--green)', fail: 'var(--red)', na: 'var(--amber)' };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB ENTRY POINT
 // ─────────────────────────────────────────────────────────────────────────────
