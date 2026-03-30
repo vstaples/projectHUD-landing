@@ -1113,8 +1113,10 @@ async function _renderPdfPage(pageNum) {
   if (!_pdfDoc) return;
   try {
     const page = await _pdfDoc.getPage(pageNum);
-    // Force rotation:0 — scanned docs often carry 180° flag
-    const vp      = page.getViewport({ scale: _pdfScale, rotation: 0 });
+    // Normalise rotation: 180° scans render right-way-up at 0°; honour 90/270 as-is
+    const naturalRotation = page.rotate || 0;
+    const rotation = (naturalRotation === 180) ? 0 : naturalRotation;
+    const vp      = page.getViewport({ scale: _pdfScale, rotation });
     const canvas  = document.getElementById('form-pdf-canvas');
     const overlay = document.getElementById('form-field-overlay');
     if (!canvas) return;
