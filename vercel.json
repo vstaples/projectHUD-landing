@@ -1,0 +1,61 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
+    {
+      "source": "/js/(.*)\\.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/favicon.ico",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        },
+        {
+          "key": "Content-Type",
+          "value": "image/x-icon"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/ai-form-vision",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/ai-form-vision"
+    },
+    {
+      "source": "/api/ai-briefing",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/ai-briefing"
+    },
+    {
+      "source": "/api/ai-draft",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/ai-draft"
+    },
+    {
+      "source": "/api/notify-step-activated",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/notify-step-activated"
+    }
+  ]
+}

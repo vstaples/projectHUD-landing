@@ -1509,24 +1509,21 @@ For each field identify:
 Do NOT include document control metadata (Type, Document Number, Revision, etc. in the header block).
 Return ONLY a JSON array of field objects, no explanation or markdown.`;
 
-    // Route through Supabase edge function — direct api.anthropic.com calls
-    // are blocked by CORS from browser. Edge function: ai-form-vision
-    const response = await fetch(`${SUPA_URL}/functions/v1/ai-form-vision`, {
+    // Route through /api/ai-form-vision — a Vercel rewrite that proxies to the
+    // Supabase edge function. Direct api.anthropic.com calls are blocked by CORS.
+    // The /api/ path avoids sending Supabase credentials from the browser.
+    const response = await fetch('/api/ai-form-vision', {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'apikey':        SUPA_KEY,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64, prompt, media_type: 'image/jpeg' }),
     });
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.warn('[FormEditor] ai-form-vision edge function not deployed yet — skipping vision pass');
+        console.warn('[FormEditor] ai-form-vision endpoint not available — skipping vision pass. Deploy the edge function and add the Vercel rewrite.');
         return [];
       }
-      throw new Error(`Edge function error ${response.status}`);
+      throw new Error(`Vision API error ${response.status}`);
     }
     const data = await response.json();
     const raw  = data.text || data.content?.map(c => c.text || '').join('') || '[]';

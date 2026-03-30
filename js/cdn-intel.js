@@ -778,13 +778,9 @@ async function _generateAIBriefing(instId) {
   let full = '';
 
   try {
-    const response = await fetch(`${SUPA_URL}/functions/v1/ai-briefing`, {
+    const response = await fetch('/api/ai-briefing', {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'apikey':        SUPA_KEY,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt }),
     });
 
