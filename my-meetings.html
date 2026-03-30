@@ -184,9 +184,9 @@
       <div style="font-size:11px;opacity:.6">Client → Project → Work stream → Session</div>
     </div>
     <!-- iframe — loads meeting-minutes.html inline for the selected meeting -->
+    <!-- No allow/sandbox needed: same-origin iframes share parent context by default -->
     <iframe id="mtg-minutes-frame"
-      style="display:none;width:100%;height:100%;border:none;flex:1"
-      allow="same-origin">
+      style="display:none;width:100%;height:100%;border:none;flex:1">
     </iframe>
   </div>
 
