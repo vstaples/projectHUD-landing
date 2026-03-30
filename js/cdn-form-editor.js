@@ -48,7 +48,7 @@ const FIELD_TYPES = ['text', 'date', 'number', 'checkbox', 'signature', 'textare
 
 function renderFormsTab(el) {
   el.innerHTML = `
-    <div style="display:flex;height:100%;overflow:hidden">
+    <div style="display:flex;width:100%;height:100%;overflow:hidden">
 
       <!-- ── Left column: form list ───────────────────────────────── -->
       <div style="width:220px;min-width:220px;border-right:1px solid var(--border);
@@ -69,7 +69,7 @@ function renderFormsTab(el) {
       </div>
 
       <!-- ── Main area: editor or empty state ─────────────────────── -->
-      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0;width:100%;height:100%">
+      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
         ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
       </div>
 
@@ -124,7 +124,7 @@ function _routingBadge(form) {
 
 function _renderFormEmpty() {
   return `
-    <div style="width:100%;height:100%;display:flex;flex-direction:column;
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;
                 align-items:center;justify-content:center;gap:14px;
                 background:var(--bg);color:var(--muted)">
       <div style="font-size:48px;opacity:.12">📄</div>
@@ -209,8 +209,15 @@ function _renderFormEditor() {
         </div>
 
         <!-- Column 2: Field list -->
-        <div style="width:240px;min-width:240px;border-left:1px solid var(--border);
-                    display:flex;flex-direction:column;background:var(--bg1)">
+        <div id="form-col-fields" style="width:240px;min-width:160px;max-width:480px;
+                    border-left:1px solid var(--border);display:flex;flex-direction:column;
+                    background:var(--bg1);position:relative;flex-shrink:0">
+          <!-- Drag handle -->
+          <div style="position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;
+                      z-index:10;background:transparent;transition:background .15s"
+            onmouseover="this.style.background='rgba(196,125,24,.3)'"
+            onmouseout="if(!window._formDragCol)this.style.background='transparent'"
+            onmousedown="_formColDragStart(event,'form-col-fields','left')"></div>
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);
                       display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
             <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
@@ -224,8 +231,15 @@ function _renderFormEditor() {
         </div>
 
         <!-- Column 3: Routing panel -->
-        <div style="width:220px;min-width:220px;border-left:1px solid var(--border);
-                    display:flex;flex-direction:column;background:var(--bg1)">
+        <div id="form-col-routing" style="width:220px;min-width:140px;max-width:400px;
+                    border-left:1px solid var(--border);display:flex;flex-direction:column;
+                    background:var(--bg1);position:relative;flex-shrink:0">
+          <!-- Drag handle -->
+          <div style="position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;
+                      z-index:10;background:transparent;transition:background .15s"
+            onmouseover="this.style.background='rgba(196,125,24,.3)'"
+            onmouseout="if(!window._formDragCol)this.style.background='transparent'"
+            onmousedown="_formColDragStart(event,'form-col-routing','left')"></div>
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
             <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
                          text-transform:uppercase;color:var(--muted)">Fill Routing</span>
@@ -2328,6 +2342,52 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
 
   setTimeout(() => _checkAndPromptSignature(allFields), 1200);
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COLUMN DRAG-TO-RESIZE — shared handler for field list and routing panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+window._formDragCol     = null;  // id of column being dragged
+window._formDragStartX  = 0;
+window._formDragStartW  = 0;
+
+function _formColDragStart(event, colId, side) {
+  const col = document.getElementById(colId);
+  if (!col) return;
+  window._formDragCol    = colId;
+  window._formDragStartX = event.clientX;
+  window._formDragStartW = col.offsetWidth;
+  document.body.style.cursor     = 'col-resize';
+  document.body.style.userSelect = 'none';
+  event.preventDefault();
+}
+
+document.addEventListener('mousemove', e => {
+  if (!window._formDragCol) return;
+  const col = document.getElementById(window._formDragCol);
+  if (!col) return;
+  // Dragging left edge: move left = wider, move right = narrower
+  const delta  = window._formDragStartX - e.clientX;
+  const minW   = parseInt(col.style.minWidth) || 140;
+  const maxW   = parseInt(col.style.maxWidth) || 480;
+  const newW   = Math.max(minW, Math.min(maxW, window._formDragStartW + delta));
+  col.style.width      = newW + 'px';
+  col.style.transition = 'none';
+});
+
+document.addEventListener('mouseup', () => {
+  if (!window._formDragCol) return;
+  const col = document.getElementById(window._formDragCol);
+  if (col) col.style.transition = '';
+  document.body.style.cursor     = '';
+  document.body.style.userSelect = '';
+  // Re-colour any handle that was stuck highlighted
+  document.querySelectorAll('#form-col-fields > div, #form-col-routing > div').forEach(h => {
+    if (h.style.cursor === 'col-resize') h.style.background = 'transparent';
+  });
+  window._formDragCol = null;
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DB MIGRATION HELPER — outputs the SQL needed for the new tables
