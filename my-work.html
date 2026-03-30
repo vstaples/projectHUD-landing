@@ -401,6 +401,58 @@ window._mwLoadUserView = async function() {
       </div>`;
     }).join('');
 
+    // Wire gauge hover tooltips after render (1.5s dwell)
+    (function _wireGaugeHover() {
+      var _gt = null, _gTimer = null;
+      var container = document.getElementById('mw-gauge-row');
+      if (!container) return;
+      container.addEventListener('mouseover', function(ev) {
+        var col = ev.target.closest('.gauge-col');
+        if (!col) return;
+        if (!ev.ctrlKey) return;  // Ctrl required
+        clearTimeout(_gTimer);
+        _gTimer = setTimeout(function() {
+          if (_gt) { _gt.remove(); _gt = null; }
+          var d    = col.dataset.gaugeDate;
+          var te   = (window._myTimeEntries||[]).filter(function(e){ return e.date===d; });
+          var hrs  = te.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+          var bill = te.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+          var label= new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+          var html = '<div style="font-size:13px;font-weight:700;color:#F0F6FF;margin-bottom:6px">' + label + '</div>';
+          if (!te.length) {
+            html += '<div style="font-size:12px;color:#6A94B8">No time entries</div>';
+          } else {
+            html += '<div style="font-size:12px;color:#C8DFF0;margin-bottom:4px">' + hrs.toFixed(1) + 'h total &nbsp;·&nbsp; ' + bill.toFixed(1) + 'h billable</div>';
+            html += '<div style="border-top:1px solid rgba(255,255,255,.08);margin:6px 0;padding-top:6px">';
+            te.forEach(function(e) {
+              var proj = (_projects||[]).find(function(p){ return p.id===e.project_id; });
+              html += '<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#90B8D8;margin-bottom:3px">';
+              html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (proj?proj.name:e.step_name||'—') + '</span>';
+              html += '<span style="flex-shrink:0;color:' + (e.is_billable?'#00D2FF':'#8B5CF6') + '">' + parseFloat(e.hours||0).toFixed(1) + 'h</span></div>';
+            });
+            html += '</div>';
+          }
+          _gt = document.createElement('div');
+          _gt.style.cssText = 'position:fixed;z-index:9999;background:#0a1628;border:1px solid rgba(0,210,255,.25);border-left:3px solid #00D2FF;border-radius:3px;padding:10px 14px;font-family:inherit;min-width:180px;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.7);pointer-events:none';
+          _gt.innerHTML = html;
+          document.body.appendChild(_gt);
+          var r = col.getBoundingClientRect();
+          var top = r.bottom + 6;
+          var left = r.left + r.width/2 - 140;
+          if (left < 8) left = 8;
+          if (left + 280 > window.innerWidth - 8) left = window.innerWidth - 288;
+          _gt.style.top  = top + 'px';
+          _gt.style.left = left + 'px';
+        }, 1500);
+      });
+      container.addEventListener('mouseout', function(ev) {
+        var col = ev.target.closest('.gauge-col');
+        if (!col) return;
+        clearTimeout(_gTimer);
+        if (_gt) { _gt.remove(); _gt = null; }
+      });
+    })();
+
     const barLegend = `
       <div style="display:flex;align-items:center;gap:12px;padding:0 13px 8px;
         font-family:var(--font-mono);font-size:11px;color:var(--text3)">
@@ -771,7 +823,7 @@ window._mwLoadUserView = async function() {
           <div style="display:grid;grid-template-columns:auto 200px;gap:0;align-items:start">
             <!-- Gauges column -->
             <div>
-              <div style="display:flex;justify-content:flex-start;padding:8px 4px 0;gap:0">
+              <div id="mw-gauge-row" style="display:flex;justify-content:flex-start;padding:8px 4px 0;gap:0">
                 ${gaugesHtml}
               </div>
               ${barLegend}
@@ -1099,6 +1151,15 @@ window._mwLoadUserView = async function() {
   window.showStatTooltip = function(e, type) {
     clearTimeout(_tipTimer);
     if (_tip) { _tip.remove(); _tip = null; }
+    if (!e.ctrlKey) return;  // Ctrl required
+    var _eTarget = e.currentTarget;
+    var _eType   = type;
+    _tipTimer = setTimeout(function() {
+      window._showStatTooltipNow(_eTarget, _eType);
+    }, 1500);
+  };
+  window._showStatTooltipNow = function(eTarget, type) {
+    if (_tip) { _tip.remove(); _tip = null; }
     var wi = window._wiItems || [];
     var type = type || 'summary';
 
@@ -1295,10 +1356,18 @@ window._mwLoadUserView = async function() {
   };
 
   window.hideStatTooltip = function() {
+    clearTimeout(_tipTimer);
     _tipTimer = setTimeout(function() {
       if (_tip) { _tip.remove(); _tip = null; }
-    }, 200);
+    }, 150);
   };
+  // Cancel all tooltip timers if Ctrl is released mid-dwell
+  document.addEventListener('keyup', function(e) {
+    if (e.key === 'Control') {
+      clearTimeout(_tipTimer);
+      if (_tip) { _tip.remove(); _tip = null; }
+    }
+  });
   // Keep tip alive when mouse enters it
   document.addEventListener('mouseover', function(ev) {
     if (_tip && _tip.contains(ev.target)) { clearTimeout(_tipTimer); }
@@ -2380,6 +2449,7 @@ async function loadPMView() {
         const t = getTip(); t.classList.remove('show'); t.innerHTML = '';
       };
       window.pmShowDayTip = function(ev, el) {
+        if (!ev.ctrlKey) return;  // Ctrl required
         try {
           const d = JSON.parse(el.dataset.tt.replace(/&#39;/g,"'"));
           const t = getTip();
@@ -2413,6 +2483,7 @@ async function loadPMView() {
         } catch(e) {}
       };
       window.pmShowOverdueTip = function(ev, el) {
+        if (!ev.ctrlKey) return;  // Ctrl required
         try {
           const d = JSON.parse(el.dataset.tt.replace(/&#39;/g,"'"));
           const t = getTip();
@@ -2428,6 +2499,7 @@ async function loadPMView() {
         } catch(e) {}
       };
       window.pmShowReqsTip = function(ev, el) {
+        if (!ev.ctrlKey) return;  // Ctrl required
         try {
           const d = JSON.parse(el.dataset.tt.replace(/&#39;/g,"'"));
           const t = getTip();
@@ -3439,7 +3511,7 @@ async function loadManagementView() {
           <div class="mg-sc-sub">green signals today</div>
         </div>
         <div class="mg-sc" style="cursor:default" data-tip="${escTipHtml}"
-          onmouseenter="mgStatHover(this,this.dataset.tip)" onmouseleave="mgStatLeave()">
+          onmouseenter="if(event.ctrlKey)mgStatHover(this,this.dataset.tip)" onmouseleave="mgStatLeave()">
           <div class="mg-sc-lbl">Active escalations</div>
           <div class="mg-sc-val" style="color:${escalations>0?'#E24B4A':'#3A5C80'}">${escalations}</div>
           <div class="mg-sc-sub">${escalations>0?'hover for detail':'none pending'}</div>
@@ -3450,7 +3522,7 @@ async function loadManagementView() {
           <div class="mg-sc-sub">redesign recommended</div>
         </div>
         <div class="mg-sc" style="cursor:default" data-tip="${rwTipFull}"
-          onmouseenter="mgStatHover(this,this.dataset.tip)" onmouseleave="mgStatLeave()">
+          onmouseenter="if(event.ctrlKey)mgStatHover(this,this.dataset.tip)" onmouseleave="mgStatLeave()">
           <div class="mg-sc-lbl">Rework cost — week</div>
           <div class="mg-sc-val" style="color:${reworkCost>500000?'#E24B4A':reworkCost>100000?'#EF9F27':'#3A5C80'}">${formatYen(reworkCost)}</div>
           <div class="mg-sc-sub">hover for breakdown</div>
@@ -7110,6 +7182,7 @@ window._recSeqGenerated = false;
   ]; // grid reads L-R: col1=1000,500,400,300 | col2=200,150,100,50
 
   window.showRecSeqTooltip = function(e) {
+    if (!e.ctrlKey) return;  // Ctrl required
     clearTimeout(_rTimer);
     if (_rTip) return;
 
@@ -7211,7 +7284,7 @@ window._recSeqGenerated = false;
       'border-bottom:1px solid rgba(0,210,255,.15);padding-bottom:6px">Scoring Factors</div>' +
       legend;
     // Smart position: prefer above the pane, fall back to below, never clip
-    var r = e.currentTarget.getBoundingClientRect();
+    var r = eTarget.getBoundingClientRect();
     var tipW = 860;
     var left = r.left;
     if (left + tipW > window.innerWidth - 10) left = window.innerWidth - tipW - 10;
