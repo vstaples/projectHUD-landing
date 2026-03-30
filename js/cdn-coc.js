@@ -2,6 +2,21 @@
 // fmtTs / fmtTsShort are shared formatters — import from here, don't duplicate
 // LOAD ORDER: 9th
 
+// ── Shared timestamp formatters (module-scope globals) ───────────────────────
+function fmtTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+    + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+}
+
+function fmtTsShort(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' })
+    + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+}
+
 function toggleTmplCoC() {
   const panel  = document.getElementById('tmpl-coc-panel');
   const cocBtn = document.getElementById('coc-btn');
@@ -65,13 +80,6 @@ function renderTmplCoC(rows) {
     instance_suspended:  'Instance Suspended',
   };
 
-  function fmtTs(ts) {
-    if (!ts) return '';
-    const d = new Date(ts);
-    return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
-      + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-  }
-
   // ── Pending (uncommitted) bin at top ────────────────────────────────────────
   let pendingHtml = '';
   if (pending.length) {
@@ -89,13 +97,6 @@ function renderTmplCoC(rows) {
     const allPending = [...liveDiffs, ...binLines];
 
     // Build bullet list with per-entry author + timestamp from bin where available
-    function fmtTsShort(ts) {
-      if (!ts) return '';
-      const d = new Date(ts);
-      return d.toLocaleDateString('en-US', { month:'short', day:'numeric' })
-        + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    }
-
     // Map diff strings back to bin entries for attribution
     const bulletHtml = allPending.length
       ? allPending.map(diffLine => {
