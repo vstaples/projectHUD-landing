@@ -678,19 +678,33 @@ async function _formPersistResponses(stepId) {
       filled_by:    _myResourceId || null,
     }));
 
-    // Upsert — one row per field per instance+step+stage
-    for (const row of rows) {
-      await API.post('workflow_form_responses', row).catch(async () => {
-        // Try patch on conflict
-        await API.patch(
-          `workflow_form_responses?instance_id=eq.${row.instance_id}&step_id=eq.${row.step_id}&field_id=eq.${row.field_id}`,
-          { value: row.value, note: row.note, filled_by: row.filled_by }
-        ).catch(() => {});
-      });
-    }
+    if (!rows.length) return;
 
-    if (statusEl) { statusEl.textContent = 'Saved'; statusEl.style.color = 'var(--green)';
-      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000); }
+    // Bulk upsert — single request, PostgREST merge-duplicates on the
+    // UNIQUE INDEX (instance_id, step_id, stage, field_id).
+    // Replaces the previous serial POST-per-field loop that generated
+    // one 409 console error per field on every auto-save after first write.
+    const token = await Auth.getToken();
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/workflow_form_responses`,
+      {
+        method:  'POST',
+        headers: {
+          'apikey':        SUPA_KEY,
+          'Authorization': 'Bearer ' + token,
+          'Content-Type':  'application/json',
+          'Prefer':        'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(rows),
+      }
+    );
+    if (!res.ok) throw new Error(`Upsert failed: ${res.status}`);
+
+    if (statusEl) {
+      statusEl.textContent = 'Saved';
+      statusEl.style.color = 'var(--green)';
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+    }
   } catch(e) {
     if (statusEl) { statusEl.textContent = 'Save failed'; statusEl.style.color = 'var(--red)'; }
   }

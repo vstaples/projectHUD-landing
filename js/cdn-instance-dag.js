@@ -30,12 +30,14 @@ function toggleInstDagCoC(btn) {
       step_completed:'var(--green)', step_reset:'var(--muted)',
       instance_completed:'var(--green)', instance_cancelled:'var(--red)',
       override:'#e8a838', step_reassigned:'var(--accent)',
+      'form.stage_submitted':'var(--accent)',
     };
     const evtLabel = {
       instance_launched:'Launched', step_activated:'Activated',
       step_completed:'Completed', step_reset:'Reset',
       instance_completed:'Completed', instance_cancelled:'Cancelled',
       override:'PM Override', step_reassigned:'Reassigned',
+      'form.stage_submitted':'Form Stage Submitted',
     };
     // Build step name lookup from template steps
     const stepNameById = {};
