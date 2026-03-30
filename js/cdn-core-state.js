@@ -379,6 +379,9 @@ let _selectedInstance  = null;  // full instance object currently open in detail
 let _instFilter        = 'all';  // 'all' | 'mine' | 'active' | 'done'
 let _instSearch        = '';     // current search query string
 
+// ── Comment / action-item panel state ────────────────────────────────────────
+let _commentConf       = {};     // { [stepId]: conf } — confidence toggle per step thread
+
 // ── Instance DAG (pan/zoom canvas) state ─────────────────────────────────────
 let _instDagScale      = 1;
 let _instDagPanX       = 0;
