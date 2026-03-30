@@ -6438,24 +6438,17 @@ window.renderNegPanel = function(itemId, assignerName) {
 
   if (s === 'unrated') {
     actionZone = `
-      <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin-bottom:7px">Rate this action item</div>
+      <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;margin-bottom:7px">Rate this action item</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:7px">
-        <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">My LOE estimate:</span>
-        <select id="neg-loe-${itemId}" style="padding:4px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:11px;outline:none;cursor:pointer">
-          <option value="">Select...</option>
-          <option value="2 hours">2 hours</option>
-          <option value="4 hours">4 hours</option>
-          <option value="1 day">1 day</option>
-          <option value="2 days">2 days</option>
-          <option value="3 days">3 days</option>
-          <option value="4 days">4 days</option>
-          <option value="1 week">1 week</option>
-        </select>
-        <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Proposed due:</span>
+        <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.6)">Effort Estimate (hrs):</span>
+        <input id="neg-loe-${itemId}" type="number" min="0.25" max="999" step="0.25" placeholder="0.0"
+          style="width:60px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 4px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"
+          oninput="negCheckSubmitGate('${itemId}')" />
+        <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.6)">Proposed Due Date:</span>
         <input id="neg-due-${itemId}" type="date" style="padding:4px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:11px;outline:none"/>
       </div>
       <textarea id="neg-comment-${itemId}" rows="3" placeholder="Required: explain your LOE — what does this involve, why will it take this long, what constraints apply? (min 20 chars)"
-        style="width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(239,159,39,.4);color:#C8DFF0;font-family:var(--font-body);font-size:11px;outline:none;resize:none;margin-bottom:4px;box-sizing:border-box"
+        style="width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.3);color:#F0F6FF;font-family:var(--font-body);font-size:11px;outline:none;resize:none;margin-bottom:4px;box-sizing:border-box"
         oninput="negCheckSubmitGate('${itemId}')"></textarea>
       <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-bottom:7px">Comment is required and becomes a permanent CoC record.</div>
       <div style="display:flex;gap:6px;align-items:center">
@@ -9686,20 +9679,20 @@ function openWorkItemExpanded(item) {
               <option value="blocked" ${item.status==='blocked'?'selected':''}>Tasks Blocked</option>
             </select>`
             :`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--compass-amber)">Action item</div>
+              
               ${item.createdBy?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Assigned by <span style="color:var(--compass-cyan)">${esc(item.createdBy)}</span></div>`:''}
-              ${item.ownerName?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Owner: <span style="color:rgba(255,255,255,.6)">${esc(item.ownerName)}</span></div>`:''}
+              ${item.ownerName?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><span style="color:rgba(255,255,255,.6)">${esc(item.ownerName)}</span></div>`:''}
             </div>`}
             ${[
               ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
               ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
-              ['Exp. Hrs',   bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
-              ['Logged',     ah.toFixed(1)+'h'+(bh?' / '+bh+'h':''), usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
+              ['Effort Hrs',   bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
+              ['Act. Hrs',     ah.toFixed(1)+'h'+(bh?' / '+bh+'h':''), usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
               ['Budget',     bh?usedPct+'% used':'—', effortColor],
             ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 6px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:11px;color:var(--text3);letter-spacing:.04em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'};">${v}</div></div>`).join('')}
             <div style="width:1px;height:22px;background:rgba(255,255,255,.08);flex-shrink:0"></div>
             <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log time</span>
+              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log Time (hrs)</span>
               <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
                 style="width:52px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 4px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
               <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">
