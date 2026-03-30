@@ -914,7 +914,12 @@ window._mwLoadUserView = async function() {
             <div></div><div style="padding-left:2px">TYPE</div>
             <div style="padding-left:4px">TASK / ACTION</div>
             <div style="padding:0 8px">PROGRESS</div>
-            <div style="text-align:center">DUE</div><div></div>
+            <div style="text-align:center">DUE</div>
+            <div style="text-align:center;position:relative">
+              <span id="wq-legend-btn"
+                style="font-family:var(--font-mono);font-size:10px;color:rgba(0,210,255,.4);cursor:help;border:1px solid rgba(0,210,255,.2);border-radius:2px;padding:0 4px;line-height:1.6"
+                title="Ctrl + hover for legend">?</span>
+            </div>
           </div>
           <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
           <!-- Diagram view -->
@@ -1397,6 +1402,54 @@ window._mwLoadUserView = async function() {
     if (gaugeRow) {
       var gaugeHov = gaugeRow.querySelector('.gauge-col:hover');
       if (gaugeHov) gaugeHov.dispatchEvent(new MouseEvent('mouseover', { ctrlKey: true, bubbles: true }));
+    }
+    // Work queue legend button
+    var legendBtn = document.getElementById('wq-legend-btn');
+    if (legendBtn && legendBtn.matches(':hover')) {
+      clearTimeout(window._wqLegendTimer);
+      window._wqLegendTimer = setTimeout(function() { window._showWQLegend(legendBtn); }, 1500);
+    }
+  });
+
+  // Work Queue legend tooltip
+  window._showWQLegend = function(btn) {
+    var existing = document.getElementById('wq-legend-tip');
+    if (existing) { existing.remove(); return; }
+    var tip = document.createElement('div');
+    tip.id = 'wq-legend-tip';
+    tip.style.cssText = 'position:fixed;z-index:9999;background:#0a1628;'
+      + 'border:1px solid rgba(0,210,255,.25);border-left:3px solid #00D2FF;'
+      + 'border-radius:3px;padding:12px 14px;font-family:inherit;'
+      + 'min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.7);pointer-events:auto';
+    tip.innerHTML =
+      '<div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;'
+      + 'color:#00D2FF;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(0,210,255,.15)">'
+      + 'Button Legend</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #00D2FF;color:#00D2FF;text-align:center;border-radius:2px">Start</div><div style="font-size:11px;color:#90B8D8">Task not yet begun</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-amber);color:var(--compass-amber);text-align:center;border-radius:2px">Rate</div><div style="font-size:11px;color:#90B8D8">Action item needs LOE rating</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-amber);color:var(--compass-amber);text-align:center;border-radius:2px">In Progress</div><div style="font-size:11px;color:#90B8D8">Task underway</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #8B5CF6;color:#8B5CF6;text-align:center;border-radius:2px">Pending</div><div style="font-size:11px;color:#90B8D8">LOE submitted, awaiting assignor</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-red);color:var(--compass-red);text-align:center;border-radius:2px">Escalated</div><div style="font-size:11px;color:#90B8D8">Escalated to PM</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #00D2FF;color:#060a10;background:#00D2FF;text-align:center;border-radius:2px">Mark Done</div><div style="font-size:11px;color:#90B8D8">Task ≥100% complete</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-green);color:var(--compass-green);text-align:center;border-radius:2px">Resolve</div><div style="font-size:11px;color:#90B8D8">LOE agreed, ready to close</div></div>';
+    var r = btn.getBoundingClientRect();
+    tip.style.top  = (r.bottom + 6) + 'px';
+    tip.style.right = (window.innerWidth - r.right - 4) + 'px';
+    document.body.appendChild(tip);
+    // Dismiss on outside click or Ctrl release
+    setTimeout(function() {
+      document.addEventListener('click', function _dismiss(e) {
+        if (!tip.contains(e.target)) { tip.remove(); document.removeEventListener('click', _dismiss); }
+      });
+      document.addEventListener('keyup', function _kup(e) {
+        if (e.key === 'Control') { tip.remove(); document.removeEventListener('keyup', _kup); }
+      });
+    }, 50);
+  };
+  // Also wire mouseout on the ? button to cancel pending timer
+  document.addEventListener('mouseout', function(ev) {
+    if (ev.target && ev.target.id === 'wq-legend-btn') {
+      clearTimeout(window._wqLegendTimer);
     }
   });
   // Keep tip alive when mouse enters it
