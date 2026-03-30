@@ -9680,8 +9680,8 @@ function openWorkItemExpanded(item) {
             ${[
               ['Effort Hrs', bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
               ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
-              ['Budget',     bh?'$'+(bh*8000).toLocaleString():'—', ''],
-            ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
+              ['Budget',     bh?'…':'—', '', 'budget'],
+            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
           </div>
           <!-- Row 2b: Actuals tiles + Log Time -->
           <div style="display:flex;align-items:center;gap:5px;padding:5px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
@@ -9689,9 +9689,9 @@ function openWorkItemExpanded(item) {
             ${[
               ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
               ['Act. Hrs',   ah.toFixed(1)+'h', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
-              ['Spend',      bh?'$'+(ah*8000).toLocaleString():'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
+              ['Spend',      bh?'…':'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'', 'spend'],
               ['Spend %',    bh?usedPct+'%':'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'var(--compass-green)'],
-            ].map(([l,v,c])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
+            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
             <div style="width:1px;height:22px;background:rgba(255,255,255,.08);flex-shrink:0;margin-left:4px"></div>
             <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
               <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log Time (hrs)</span>
@@ -9757,9 +9757,49 @@ function openWorkItemExpanded(item) {
 
       </div>
 
+    <div data-rate-caution style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);padding:4px 14px;border-top:1px solid rgba(239,159,39,.15);flex-shrink:0"></div>
     </div>`;
   panel.innerHTML = headerHtml + detailHtml;
   document.body.appendChild(panel);
+
+  // ── Fetch assignee labor rate from hud_role_levels ───────────────
+  (async function() {
+    try {
+      // Find the assignee resource — for tasks use assigned_to user_id, for actions use owner
+      const assigneeUserId = item.assignedTo || item.ownerUserId || null;
+      const assigneeRes = assigneeUserId
+        ? await API.get('resources?select=id,hud_role_id,level&user_id=eq.' + assigneeUserId + '&limit=1').catch(()=>[])
+        : [];
+      const aRes = assigneeRes && assigneeRes[0];
+      const roleId = aRes?.hud_role_id || null;
+      const level  = aRes?.level || null;
+      let rate = null;
+      if (roleId && level) {
+        const rlRows = await API.get('hud_role_levels?select=overhead_rate_per_hour&role_id=eq.' + roleId + '&level=eq.' + level + '&limit=1').catch(()=>[]);
+        rate = rlRows && rlRows[0] ? parseFloat(rlRows[0].overhead_rate_per_hour) : null;
+      }
+      // Update Budget and Spend tiles with real rate
+      const bh = item.budgetHours || (item.effortDays ? item.effortDays * 8 : null);
+      const loggedHrs2 = (_teEntries||[]).filter(e=>e.task_id===item.id).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+      const ah2 = item.actualHours || loggedHrs2;
+      const budgetTile = panel.querySelector('[data-tile="budget"]');
+      const spendTile  = panel.querySelector('[data-tile="spend"]');
+      const cautionEl  = panel.querySelector('[data-rate-caution]');
+      if (rate && bh && budgetTile) budgetTile.textContent = '$' + Math.round(bh * rate).toLocaleString();
+      if (rate && spendTile) spendTile.textContent = '$' + Math.round(ah2 * rate).toLocaleString();
+      // Show caution if rate cannot be determined
+      if (cautionEl) {
+        if (!aRes) cautionEl.textContent = '* Caution: assignee resource record not found — budget cost cannot be calculated.';
+        else if (!roleId) cautionEl.textContent = '* Caution: assignee has no role assigned — budget cost cannot be calculated.';
+        else if (!level) cautionEl.textContent = '* Caution: assignee has no seniority level assigned — budget cost cannot be calculated.';
+        else if (!rate) cautionEl.textContent = '* Caution: no labor rate defined for this role/level — budget cost cannot be calculated.';
+        else cautionEl.style.display = 'none';
+      }
+    } catch(e) {
+      console.warn('[Compass] Rate lookup error:', e);
+    }
+  })();
+
   // Wire negotiation panel for action items
   if (item.type === 'action') {
     const neg = negGetState(item.id);
