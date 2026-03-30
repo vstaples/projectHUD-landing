@@ -1311,12 +1311,21 @@ async function loadUserView() {
         if (el.tagName !== 'SCRIPT') viewUser.appendChild(el.cloneNode(true));
       });
     }
-    // Execute scripts
+    // Execute scripts — src-aware loader handles both inline and external <script src> tags
     const scripts = doc.querySelectorAll('script');
     for (const s of scripts) {
-      const newScript = document.createElement('script');
-      newScript.textContent = s.textContent;
-      document.head.appendChild(newScript);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
     window._myWorkLoaded = true;
     // Now call the real loadUserView that was just loaded
