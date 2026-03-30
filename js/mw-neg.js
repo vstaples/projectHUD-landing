@@ -57,34 +57,15 @@ window.negRowBorderStyle = function(itemId) {
 // Write a CoC event for negotiation milestone
 window.negWriteCoCEvent = async function(itemId, eventNotes, actorName) {
   const now   = new Date().toISOString();
-  const actor = actorName || _myResource?.name || null;
-  const evtId = crypto.randomUUID();
-  const evt = {
-    id:          evtId,
-    firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
-    entity_id:   itemId,
-    entity_type: 'action_item',
-    event_type:  'loe_negotiation',
-    step_name:   'LOE negotiation',
-    event_notes: eventNotes,
-    actor_name:  actor,
-    actor_resource_id: _myResource?.id || null,
-    outcome:     'on_track',
-    created_at:  now,
-    updated_at:  now,
-  };
-  // Optimistically update local cache so CoC panel refreshes immediately
-  if (!window._myCocEvents) window._myCocEvents = [];
-  window._myCocEvents.unshift(evt);
-  _negRefreshModalCoC(itemId);
-  // Persist to Supabase
-  try {
-    await API.post('coc_events', evt);
-  } catch(e) {
-    console.error('[Compass] negWriteCoC FAILED:', e);
-    window._myCocEvents = (window._myCocEvents||[]).filter(ev=>ev.id!==evtId);
-    _negRefreshModalCoC(itemId);
-  }
+  // CoC.write() handles identity, optimistic cache, and persist
+  const written = await window.CoC.write('negotiation.loe_proposed', itemId, {
+    entityType: 'action_item',
+    stepName:   'LOE negotiation',
+    notes:      eventNotes,
+    outcome:    'on_track',
+    actorName:  actorName || null,
+  });
+  if (written) _negRefreshModalCoC(itemId);
 };
 
 // Refresh the CoC column in the open work item modal for a given item

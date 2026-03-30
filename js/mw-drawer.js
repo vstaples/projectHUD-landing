@@ -507,23 +507,14 @@ async function wiSaveProgress(itemId, projectId) {
         notes: comment
       }).catch(()=>{}));
     }
-    // Write CoC event to coc_events (primary — no FK constraints)
-    const cocEvtId = crypto.randomUUID();
-    const cocEvt = {
-      id:          cocEvtId,
-      firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
-      entity_id:   itemId,
-      entity_type: 'task',
-      event_type:  'progress_update',
-      step_name:   pct !== null ? `Progress: ${pct}%` : 'Progress update',
-      event_notes: comment,
-      actor_name:  _myResource?.name || null,
-      actor_resource_id: _myResource?.id || null,
-      outcome:     sigOutcome,
-      created_at:  new Date().toISOString(),
-      updated_at:  new Date().toISOString(),
-    };
-    ps.push(API.post('coc_events', cocEvt).catch(()=>{}));
+    // Write CoC progress event
+    ps.push(window.CoC.write('task.progress_update', itemId, {
+      entityType: 'task',
+      stepName:   pct !== null ? `Progress: ${pct}%` : 'Progress update',
+      notes:      comment,
+      outcome:    sigOutcome,
+      projectId:  projectId || null,
+    }));
     // Also write to workflow_step_instances if a workflow instance exists (keeps PM/mgmt views working)
     const wfByTask = (window._wfInstances||[]).find(w=>w.task_id===itemId);
     const instId   = wfByTask?.id || null;

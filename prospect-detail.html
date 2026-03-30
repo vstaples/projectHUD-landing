@@ -3110,6 +3110,25 @@ async function saveActivity() {
     // advance stage if requested
     if (stageAdv) {
       await API.patch(`prospects?id=eq.${PROSPECT_ID}`, { stage: stageAdv });
+
+      // CoC: record the stage transition
+      if (window.CoC) {
+        const isApproved = stageAdv === 'approved';
+        await window.CoC.write(
+          isApproved ? 'pipeline.prospect_approved' : 'pipeline.stage_changed',
+          PROSPECT_ID,
+          {
+            entityType: 'prospect',
+            stepName:   isApproved ? 'Prospect approved' : 'Stage advanced',
+            notes:      `${prospect.stage} → ${stageAdv}${summary ? ': ' + summary.slice(0,120) : ''}`,
+            outcome:    stageAdv === 'declined' ? 'blocked'
+                      : stageAdv === 'approved' ? 'on_track'
+                      : 'on_track',
+            actorName:  _currentResource?.name || null,
+            meta: { stage_from: prospect.stage, stage_to: stageAdv },
+          }
+        );
+      }
     }
 
     // update follow-up
@@ -3242,7 +3261,31 @@ async function promptStageChange() {
   if (!choice) return;
   const match = stages.find(s => s.toLowerCase() === choice.toLowerCase());
   if (!match) { alert('Invalid stage.'); return; }
+  const prevStage = prospect.stage;
   await API.patch(`prospects?id=eq.${PROSPECT_ID}`, { stage: match });
+
+  // CoC: record the stage transition
+  if (window.CoC) {
+    await window.CoC.write(
+      match === 'approved' ? 'pipeline.prospect_approved'
+    : match === 'declined' ? 'pipeline.prospect_declined'
+    : 'pipeline.stage_changed',
+      PROSPECT_ID,
+      {
+        entityType: 'prospect',
+        stepName:   match === 'approved' ? 'Prospect approved'
+                  : match === 'declined' ? 'Prospect declined'
+                  : 'Stage advanced',
+        notes:      `${prevStage} → ${match}`,
+        outcome:    match === 'declined' ? 'blocked'
+                  : match === 'approved' ? 'on_track'
+                  : 'on_track',
+        actorName:  _currentResource?.name || null,
+        meta: { stage_from: prevStage, stage_to: match },
+      }
+    );
+  }
+
   await loadAll();
 }
 

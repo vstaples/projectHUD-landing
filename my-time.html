@@ -1028,19 +1028,10 @@ async function submitTimesheet() {
     }
 
     // CoC event
-    await API.post('coc_events', {
-      id: crypto.randomUUID(),
-      firm_id: FIRM_ID,
-      entity_id: _weekRecord.id,
-      entity_type: 'timesheet',
-      event_type: 'timesheet_submitted',
-      step_name: 'Timesheet submitted',
-      event_notes: `Submitted ${fmtHr(totalHours)} for week of ${weekStart}`,
-      actor_name: resource.name || null,
-      actor_resource_id: resource.id,
-      outcome: 'submitted',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    await window.CoC.write('timesheet.submitted', _weekRecord.id, {
+      entityType: 'timesheet',
+      notes:      `Submitted ${fmtHr(totalHours)} for week of ${weekStart}`,
+      outcome:    'submitted',
     });
 
     window.compassToast && compassToast('Timesheet submitted for PM approval', 3000);
@@ -1067,19 +1058,10 @@ async function submitNextWeekPlan() {
   if (btn) { btn.disabled=true; btn.textContent='Submitting…'; }
 
   try {
-    await API.post('coc_events', {
-      id: crypto.randomUUID(),
-      firm_id: FIRM_ID,
-      entity_id: resource.id,
-      entity_type: 'resource_plan',
-      event_type: 'plan_submitted',
-      step_name: 'Next week plan submitted',
-      event_notes: flags || `Plan submitted for ${nwStart} – ${nwEnd}`,
-      actor_name: resource.name || null,
-      actor_resource_id: resource.id,
-      outcome: 'submitted',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    await window.CoC.write('timesheet.plan_submitted', resource.id, {
+      entityType: 'resource_plan',
+      notes:      flags || `Plan submitted for ${nwStart} – ${nwEnd}`,
+      outcome:    'submitted',
     });
     window.compassToast && compassToast('Next week plan submitted to PM', 3000);
     if (btn) { btn.textContent='Plan submitted ✓'; }

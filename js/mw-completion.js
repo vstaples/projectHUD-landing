@@ -118,20 +118,13 @@ async function skipCompletion() {
     time:timeStr, hours:0, signal:null, noTime:true });
 
   try {
-    await API.post('coc_events',{
-      id: crypto.randomUUID(),
-      firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
-      entity_id: item.id,
-      entity_type: item.type === 'task' ? 'task' : 'action_item',
-      event_type: 'completed',
-      step_name: item.type === 'task' ? 'Task completed' : 'Action item resolved',
-      event_notes: 'Completed — no time logged',
-      actor_name: _myResource?.name || null,
-      actor_resource_id: _myResource?.id || null,
-      outcome: 'on_track',
-      created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    }).catch(()=>{});
+    await window.CoC.write('task.completed', item.id, {
+      entityType: item.type === 'task' ? 'task' : 'action_item',
+      stepName:   item.type === 'task' ? 'Task completed' : 'Action item resolved',
+      notes:      'Completed — no time logged',
+      outcome:    'on_track',
+      projectId:  item.projectId || null,
+    });
     if (item.type==='task') await API.patch(`tasks?id=eq.${item.id}`,{status:'complete',pct_complete:100,updated_at:now.toISOString()}).catch(()=>{});
     else await API.patch(`workflow_action_items?id=eq.${item.id}`,{status:'resolved',resolved_at:now.toISOString()}).catch(()=>{});
   } catch(e) {}
@@ -220,26 +213,14 @@ async function submitCompletion() {
     );
   }
 
-  // ── 3. Write CoC completion event to coc_events ──────────
-  const cocEvtId = crypto.randomUUID();
-  const cocEvt = {
-    id:          cocEvtId,
-    firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
-    entity_id:   item.id,
-    entity_type: item.type === 'task' ? 'task' : 'action_item',
-    event_type:  'completed',
-    step_name:   item.type === 'task' ? 'Task completed' : 'Action item resolved',
-    event_notes: note || null,
-    actor_name:  _myResource?.name || null,
-    actor_resource_id: _myResource?.id || null,
-    outcome:     _cmpSignal === 'green' ? 'on_track' : _cmpSignal === 'yellow' ? 'at_risk' : _cmpSignal === 'red' ? 'blocked' : 'on_track',
-    created_at:  new Date().toISOString(),
-    updated_at:  new Date().toISOString(),
-  };
-  promises.push(API.post('coc_events', cocEvt).catch(()=>{}));
-  // Optimistically update local cache
-  if (!window._myCocEvents) window._myCocEvents = [];
-  window._myCocEvents.unshift(cocEvt);
+  // ── 3. Write CoC completion event ─────────────────────────
+  promises.push(window.CoC.write('task.completed', item.id, {
+    entityType: item.type === 'task' ? 'task' : 'action_item',
+    stepName:   item.type === 'task' ? 'Task completed' : 'Action item resolved',
+    notes:      note || null,
+    outcome:    _cmpSignal === 'green' ? 'on_track' : _cmpSignal === 'yellow' ? 'at_risk' : _cmpSignal === 'red' ? 'blocked' : 'on_track',
+    projectId:  item.projectId || null,
+  }));
 
   try {
     await Promise.all(promises);
@@ -291,3 +272,4 @@ function filterTimeLog(date) {
   _viewLoaded['user'] = false;
   _mwLoadUserView();
 }
+

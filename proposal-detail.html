@@ -1266,6 +1266,17 @@ async function saveTemplate() {
 
     templates.push({ id: tplId, name, industry_tag: industry });
     populateTemplateSelect();
+
+    // CoC: record the template save
+    if (window.CoC) {
+      await window.CoC.write('pipeline.template_saved', tplId, {
+        entityType: 'wbs_template',
+        stepName:   'WBS template saved',
+        notes:      `"${name}" — industry: ${industry || 'general'}, visibility: ${visibility}`,
+        outcome:    'on_track',
+        meta: { source_proposal_id: PROPOSAL_ID, visibility, industry_tag: industry },
+      });
+    }
   } catch(e) { console.error(e); alert('Failed to save template.'); }
 }
 
@@ -1310,6 +1321,27 @@ async function convertToProject() {
       status: 'approved',
       approved_date: new Date().toLocaleDateString('en-CA'),
     });
+
+    // CoC: record the project birth and the proposal approval
+    if (window.CoC) {
+      const projName = p.title.replace(/— Proposal.*/,'').trim();
+      await Promise.all([
+        window.CoC.write('pipeline.project_created', projId, {
+          entityType: 'project',
+          stepName:   'Project created from proposal',
+          notes:      `"${projName}" seeded from WBS — ${wbsTasks.length} task(s), budget $${(p.total_cost||0).toLocaleString()}`,
+          outcome:    'on_track',
+          meta: { source_proposal_id: PROPOSAL_ID, task_count: wbsTasks.length },
+        }),
+        window.CoC.write('pipeline.proposal_approved', PROPOSAL_ID, {
+          entityType: 'proposal',
+          stepName:   'Proposal approved',
+          notes:      `Converted to project — see project ${projId}`,
+          outcome:    'on_track',
+          meta: { project_id: projId },
+        }),
+      ]);
+    }
 
     if (confirm('Project created successfully!\n\nOpen the project now?')) {
       location.href = `/project-detail.html?id=${projId}`;

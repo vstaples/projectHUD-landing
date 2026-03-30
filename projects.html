@@ -2023,7 +2023,7 @@ async function loadAndToggleHistory(taskId, paneId, event) {
   content.textContent = 'Loading...';
   try {
     const annotations = await API.get(
-      `exception_annotations?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
+      `coc_events?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
     ).catch(()=>[]);
 
     if (!annotations || annotations.length === 0) {
@@ -2036,21 +2036,24 @@ async function loadAndToggleHistory(taskId, paneId, event) {
 
     content.innerHTML = annotations.map(a => {
       const actor = _resources.find(r => r.id === a.actor_resource_id);
-      const actorName = actor ? actor.first_name + ' ' + actor.last_name : 'System';
-      const color = typeColor[a.action_type] || 'var(--muted)';
-      const label = typeLabel[a.action_type] || a.action_type;
-      const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      const actorName = a.actor_name || (actor ? actor.first_name + ' ' + actor.last_name : 'System');
+      const actionType = a.event_type || a.metadata?.action_type || '';
+      const color = typeColor[actionType] || 'var(--muted)';
+      const label = typeLabel[actionType] || actionType;
+      const ts = new Date(a.occurred_at || a.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
       // Resolve any raw UUIDs in notes text
-      const resolvedNotes = a.notes ? a.notes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => {
+      const rawNotes = a.event_notes || '';
+      const resolvedNotes = rawNotes ? rawNotes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => {
         const r = resolveAssignee(id); return r ? r.first_name+' '+r.last_name : id;
       }) : '';
+      const intendedAction = a.metadata?.intended_action || '';
       return `<div class="hist-row" id="ann-${a.id}">
         <div class="hist-time">${ts}</div>
         <div style="flex:1;min-width:0">
           <div class="hist-type" style="color:${color}">${label}</div>
           <div class="hist-actor">${escHtml(actorName)}</div>
           ${resolvedNotes ? `<div class="hist-body">${escHtml(resolvedNotes)}</div>` : ''}
-          ${a.intended_action ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>` : ''}
+          ${intendedAction ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(intendedAction)}</div>` : ''}
           ${a.outcome ? `<div class="hist-body" style="color:var(--green)">Outcome: ${escHtml(a.outcome)}</div>` : ''}
         </div>
         <button onclick="deleteAnnotation('${a.id}',event)" title="Delete (dev)" style="background:none;border:none;color:var(--border2);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#f07a7a'" onmouseleave="this.style.color='var(--border2)'">🗑</button>
@@ -2068,12 +2071,9 @@ async function assignTask(taskId, resourceId, event) {
   try {
     await API.patch(`tasks?id=eq.${taskId}`, { assigned_to: resourceId });
     // Log annotation
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: null, entity_type: 'task', entity_id: taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID, action_type: 'intervention',
-      notes: 'Task assigned to ' + (_resources.find(r=>r.id===resourceId)?.first_name||resourceId) + ' via Exception Triage',
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(taskId, 'intervention',
+      'Task assigned to ' + (_resources.find(r=>r.id===resourceId)?.first_name||resourceId) + ' via Exception Triage',
+      null);
     // Update local state
     const t = _tasks.find(t => t.id === taskId);
     if (t) t.assigned_to = resourceId;
@@ -2240,13 +2240,9 @@ async function confirmResourcePicker() {
     });
 
     // Log to CoC
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: task?.project_id||null,
-      entity_type:'task', entity_id:_rpTaskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID, action_type:'intervention',
-      notes: `Task assigned to: ${names}${_rpSelected.length>1?' (team assignment)':''}`,
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(_rpTaskId, 'intervention',
+      `Task assigned to: ${names}${_rpSelected.length>1?' (team assignment)':''}`,
+      task?.project_id||null);
     closeResourcePicker();
     showToast(`Assigned to ${names} — recorded in chain of custody`, 'success');
     _patchTaskDisplayInPlace(_rpTaskId, primaryId, names);
@@ -2275,14 +2271,9 @@ async function setPriority(taskId, priority, btnEl, event) {
     if (unsetSpan) unsetSpan.remove();
 
     // Log to CoC
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: t?.project_id||null,
-      entity_type:'task', entity_id:taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type:'note',
-      notes: `Priority set to ${priority.toUpperCase()}`,
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(taskId, 'note',
+      `Priority set to ${priority.toUpperCase()}`,
+      t?.project_id||null);
 
     // Re-sort the group visually — move rows within parent
     const groupBody = btnEl.closest('.exc-group-body');
@@ -2322,14 +2313,9 @@ async function setExceptionStatus(taskId, status, btnEl, event) {
 
     // Log to CoC
     const labels = { unattended:'UNATTENDED', in_progress:'IN PROGRESS', resolved:'RESOLVED' };
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: t?.project_id || null,
-      entity_type: 'task', entity_id: taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type: 'note',
-      notes: `Exception status set to ${labels[status] || status.toUpperCase()}`,
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(taskId, 'note',
+      `Exception status set to ${labels[status] || status.toUpperCase()}`,
+      t?.project_id||null);
 
     // If resolved — remove the row/card from the exceptions list in-place
     if (status === 'resolved') {
@@ -2362,14 +2348,10 @@ async function setExceptionStatusFromDetail(taskId, status, btnEl) {
 
     // Log to CoC
     const labels = { unattended:'UNATTENDED', in_progress:'IN PROGRESS', resolved:'RESOLVED' };
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: t?.project_id || null,
-      entity_type: 'task', entity_id: taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type: status === 'resolved' ? 'resolution' : 'acknowledgment',
-      notes: `Exception status set to ${labels[status] || status.toUpperCase()}`,
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(taskId,
+      status === 'resolved' ? 'resolution' : 'acknowledgment',
+      `Exception status set to ${labels[status] || status.toUpperCase()}`,
+      t?.project_id||null);
 
     const shortId = taskId.replace(/-/g,'').substring(0,8);
 
@@ -2633,14 +2615,10 @@ async function setKanbanStatus(taskId, status, btnEl) {
     const t = _tasks.find(t => t.id === taskId);
     if (t) t.exception_status = status;
     const labels = { unattended:'UNATTENDED', in_progress:'IN PROGRESS', resolved:'RESOLVED' };
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: t?.project_id || null,
-      entity_type: 'task', entity_id: taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type: status === 'resolved' ? 'resolution' : 'acknowledgment',
-      notes: `Exception status set to ${labels[status]}`,
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(taskId,
+      status === 'resolved' ? 'resolution' : 'acknowledgment',
+      `Exception status set to ${labels[status]}`,
+      t?.project_id||null);
     // Re-render via renderExceptions so the toggle bar stays visible
     renderExceptions(document.getElementById('content'));
     showToast(`Moved → ${labels[status]}`, 'success');
@@ -2748,14 +2726,8 @@ async function saveAnnotation(taskId, actionType, containerId, event) {
 
   const task = _tasks.find(t=>t.id===taskId);
   try {
-    await API.post('exception_annotations', {
-      firm_id: FIRM_ID, project_id: task?.project_id||null,
-      entity_type:'task', entity_id:taskId,
-      actor_resource_id: CURRENT_USER_RESOURCE_ID,
-      action_type: actionType, notes,
-      intended_action: intentEl?.value?.trim() || null,
-      occurred_at: new Date().toISOString(),
-    });
+    await window.CoC.legacy.exceptionAnnotation(taskId, actionType, notes, task?.project_id||null,
+      { intended_action: intentEl?.value?.trim() || null });
     document.getElementById(containerId)?.remove();
     showToast('Saved to chain of custody', 'success');
     // Auto-refresh the CoC pane if open — don't re-render whole view
@@ -2827,14 +2799,9 @@ function openAddActionItem(taskId, projectId, event) {
     onCoCLog: async ({ description, responsible, target_date }) => {
       const assignee     = resolveAssignee(responsible);
       const assigneeName = assignee ? assignee.first_name + ' ' + assignee.last_name : responsible;
-      await API.post('exception_annotations', {
-        firm_id: FIRM_ID, project_id: projectId || null,
-        entity_type: 'task', entity_id: taskId,
-        actor_resource_id: CURRENT_USER_RESOURCE_ID,
-        action_type: 'action_item',
-        notes: `Action item created: "${description}" — assigned to ${assigneeName}, due ${target_date}`,
-        occurred_at: new Date().toISOString(),
-      });
+      await window.CoC.legacy.exceptionAnnotation(taskId, 'action_item',
+        `Action item created: "${description}" — assigned to ${assigneeName}, due ${target_date}`,
+        projectId||null);
     },
   });
 }
@@ -2842,7 +2809,7 @@ function openAddActionItem(taskId, projectId, event) {
 // ── Shared CoC content refresh ────────────────────────────────────────────────
 async function _refreshCoCContent(taskId, contentEl) {
   const annotations = await API.get(
-    `exception_annotations?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
+    `coc_events?entity_type=eq.task&entity_id=eq.${taskId}&order=occurred_at.desc&select=*`
   ).catch(()=>[]);
 
   const typeLabel = { block_discovery:'Block Discovered', block_classification:'Classified',
@@ -2859,20 +2826,23 @@ async function _refreshCoCContent(taskId, contentEl) {
   }
   contentEl.innerHTML = annotations.map(a => {
     const actor = resolveAssignee(a.actor_resource_id);
-    const actorName = actor ? actor.first_name+' '+actor.last_name : 'System';
-    const color = typeColor[a.action_type] || 'var(--muted)';
-    const label = typeLabel[a.action_type] || a.action_type;
-    const ts = new Date(a.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-    const resolvedNotes = a.notes ? a.notes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => {
+    const actorName = a.actor_name || (actor ? actor.first_name+' '+actor.last_name : 'System');
+    const actionType = a.event_type || a.metadata?.action_type || '';
+    const color = typeColor[actionType] || 'var(--muted)';
+    const label = typeLabel[actionType] || actionType;
+    const ts = new Date(a.occurred_at || a.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const rawNotes = a.event_notes || '';
+    const resolvedNotes = rawNotes ? rawNotes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => {
       const r = resolveAssignee(id); return r ? r.first_name+' '+r.last_name : id;
     }) : '';
+    const intendedAction = a.metadata?.intended_action || '';
     return `<div class="hist-row" id="ann-${a.id}">
       <div class="hist-time">${ts}</div>
       <div style="flex:1;min-width:0">
         <div class="hist-type" style="color:${color}">${label}</div>
         <div class="hist-actor">${escHtml(actorName)}</div>
         ${resolvedNotes ? `<div class="hist-body">${escHtml(resolvedNotes)}</div>` : ''}
-        ${a.intended_action ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(a.intended_action)}</div>` : ''}
+        ${intendedAction ? `<div class="hist-body" style="color:var(--cyan)">Intent: ${escHtml(intendedAction)}</div>` : ''}
         ${a.outcome ? `<div class="hist-body" style="color:var(--green)">Outcome: ${escHtml(a.outcome)}</div>` : ''}
       </div>
       <button onclick="deleteAnnotation('${a.id}',event)" title="Delete (dev)" style="background:none;border:none;color:var(--border2);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color .15s" onmouseenter="this.style.color='#f07a7a'" onmouseleave="this.style.color='var(--border2)'">🗑</button>
@@ -3030,12 +3000,8 @@ async function submitResourceRequest(taskId, projectId, event) {
       sla_tier1_hours: 4, sla_tier2_hours: 24, sla_tier3_hours: 48,
     });
     if (req) {
-      await API.post('resource_request_events', {
-        firm_id: FIRM_ID, request_id: req.id,
-        actor_resource_id: CURRENT_USER_RESOURCE_ID, actor_role:'pm',
-        event_type:'submitted', heartbeat_tier:0,
-        notes:'Request submitted from Exception Triage', occurred_at: new Date().toISOString(),
-      });
+      await window.CoC.legacy.resourceRequestEvent(req.id, 'submitted',
+        'Request submitted from Exception Triage', 'pm');
       _requests.push(req);
     }
     document.getElementById('rr-overlay')?.remove();
@@ -3051,7 +3017,7 @@ async function deleteAnnotation(annotationId, event) {
   if (event) event.stopPropagation();
   if (!confirm('Delete this chain of custody entry? (Development only)')) return;
   try {
-    await API.del(`exception_annotations?id=eq.${annotationId}`);
+    await API.del(`coc_events?id=eq.${annotationId}`);
     const row = document.getElementById('ann-' + annotationId);
     if (row) row.remove();
     showToast('Entry deleted', 'success');

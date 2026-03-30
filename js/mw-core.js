@@ -219,7 +219,7 @@ window._mwLoadUserView = async function() {
     window._today = today;
 
     // ── Fetch CoC events for all instances backing the user's work ────
-    // ── Fetch CoC events from coc_events (entity-based, no FK constraints) ──
+    // ── Fetch CoC events via CoC service (entity-based + actor-based) ────────
     // Collect all entity IDs this user cares about: task IDs, action item IDs, project IDs
     const myTaskIds      = workItems.map(w=>w.id).filter(Boolean);
     const myAiIds        = (myActionItems||[]).map(a=>a.id).filter(Boolean);
@@ -229,20 +229,30 @@ window._mwLoadUserView = async function() {
       myProjectIds.includes(w.project_id) || workItems.some(wi=>wi.id===w.task_id)
     ).map(w=>w.id);
     const allEntityIds   = [...new Set([...myTaskIds, ...myAiIds, ...myProjectIds, ...myInstIds])];
-    let myCocEvents = [];
-    if (allEntityIds.length) {
-      myCocEvents = await API.get(
-        `coc_events?select=id,entity_id,entity_type,event_type,step_name,event_notes,actor_name,outcome,metadata,created_at&entity_id=in.(${allEntityIds.join(',')})&order=created_at.desc&limit=300`
+    // Primary fetch: all events touching the user's entities
+    const myCocEvents    = allEntityIds.length
+      ? await window.CoC.readMany(allEntityIds, { limit: 300 })
+      : [];
+    // Secondary fetch: events the user personally wrote on any entity
+    // Uses actor_resource_id (preferred) with actor_name fallback for legacy rows
+    let actorCocEvents = [];
+    if (_myResource?.id) {
+      actorCocEvents = await window.CoC.readMany([], {
+        actorResourceId: _myResource.id, limit: 100
+      }).catch(() => []);
+    }
+    if (!actorCocEvents.length && _myResource?.name) {
+      // Fallback for legacy rows written before actor_resource_id was enforced
+      actorCocEvents = await API.get(
+        `coc_events?actor_name=eq.${encodeURIComponent(_myResource.name)}&order=occurred_at.desc&limit=100&select=*`
       ).catch(() => []);
     }
-    // Also fetch by actor_name to catch any events the user wrote on other entities
-    const actorCocEvents = await API.get(
-      `coc_events?select=id,entity_id,entity_type,event_type,step_name,event_notes,actor_name,outcome,metadata,created_at&actor_name=eq.${encodeURIComponent(_myResource.name||'')}&order=created_at.desc&limit=100`
-    ).catch(() => []);
-    // Merge and deduplicate by id
+    // Merge and deduplicate by id, sort by occurred_at (canonical timestamp)
     const cocMap = new Map();
     [...myCocEvents, ...actorCocEvents].forEach(e => cocMap.set(e.id, e));
-    window._myCocEvents = [...cocMap.values()].sort((a,b)=>b.created_at?.localeCompare(a.created_at||'')||0);
+    window._myCocEvents = [...cocMap.values()].sort(
+      (a,b) => (b.occurred_at||b.created_at||'').localeCompare(a.occurred_at||a.created_at||'')
+    );
     console.log('[Compass] myCocEvents:', window._myCocEvents.length, 'entity IDs:', allEntityIds.length);
     if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null;
 
@@ -1653,54 +1663,21 @@ window.showCardPopup = function(type, cardEl) {
       setTimeout(buildWorkDiagram, 50);
     }
 
-    // ── Populate CoC panel ──────────────────────────────
+    // ── Populate CoC panel via CoC.render() ────────────
     (function() {
       const body  = document.getElementById('mw-coc-body');
       const count = document.getElementById('mw-coc-count');
-      // Events already filtered server-side by actor_name
       const evts  = window._myCocEvents || [];
       if (count) count.textContent = evts.length + ' events';
       if (!body) return;
       if (!evts.length) {
-        body.innerHTML = '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.7">No CoC events found.<br><br>Events appear when you complete workflow steps or save progress updates.</div>';
+        body.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);line-height:1.7">No CoC events yet.<br><br>Events appear when you complete workflow steps or save progress updates.</div>';
         return;
       }
-      const evtColor = {
-        instance_launched:'#00D2FF',instance_completed:'#1D9E75',
-        step_activated:'#e8a838',step_completed:'#1D9E75',
-        step_reset:'#E24B4A',management_decision:'#EF9F27',
-        intervention:'#8B5CF6',flag_acknowledged:'#00D2FF',meeting_created:'#00D2FF',
-      };
-      const evtLabel = {
-        instance_launched:'Instance Launched',instance_completed:'Instance Completed',
-        step_activated:'Step Activated',step_completed:'Step Completed',
-        step_reset:'Step Reset',management_decision:'Management Decision',
-        intervention:'Intervention',flag_acknowledged:'Flag Acknowledged',meeting_created:'Meeting Created',
-      };
-      const E = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      let html = '';
-      evts.forEach((e, i) => {
-        const col   = evtColor[e.event_type] || '#5A84A8';
-        const label = evtLabel[e.event_type] || (e.event_type||'').replace(/_/g,' ');
-        const step  = (e.step_name||'').replace(/^CONCERN:\s*/,'');
-        const note  = e.event_notes || '';
-        const ts    = e.created_at ? new Date(e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
-        const oCol  = e.outcome==='on_track'?'#1D9E75':e.outcome==='at_risk'?'#EF9F27':e.outcome==='blocked'?'#E24B4A':col;
-        const oLbl  = e.outcome==='on_track'?'On track':e.outcome==='at_risk'?'At risk':e.outcome==='blocked'?'Blocked':(e.outcome||'').replace(/_/g,' ');
-        html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
-        html += '<div style="display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0">';
-        html += '<div style="width:7px;height:7px;border-radius:50%;background:'+col+';margin-top:3px"></div>';
-        if (i < evts.length-1) html += '<div style="width:1px;flex:1;min-height:10px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
-        html += '</div><div style="flex:1;min-width:0">';
-        html += '<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+E(label)+'</div>';
-        if (step) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+E(step)+'</div>';
-        if (oLbl)  html += '<div style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 8px;border-radius:10px;border:1px solid '+oCol+'44"><div style="width:5px;height:5px;border-radius:50%;background:'+oCol+'"></div><span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:'+oCol+'">'+E(oLbl)+'</span></div>';
-        if (e.actor_name) html += '<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:2px">By '+E(e.actor_name)+'</div>';
-        if (note) html += '<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);margin-top:3px;padding:3px 7px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.45;word-break:break-word">'+E(note.slice(0,200))+'</div>';
-        if (ts) html += '<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.22);margin-top:2px">'+ts+'</div>';
-        html += '</div></div>';
-      });
-      body.innerHTML = html;
+      // _timelineHtml is the internal renderer exposed by coc.js
+      if (window.CoC?._timelineHtml) {
+        body.innerHTML = window.CoC._timelineHtml(evts);
+      }
     })();
 
 
@@ -1709,3 +1686,4 @@ window.showCardPopup = function(type, cardEl) {
     if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-head);font-size:11px">Failed to load — check console</div>';
   }
 }
+

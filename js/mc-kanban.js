@@ -800,13 +800,11 @@ async function _kbNegSubmit() {
   document.getElementById('kb-neg-panel').style.display = 'none';
   if (taskId && API) {
     try {
-      const resource = window._calResource || window._mtResource || window._myResource;
-      await API.post('coc_events', {
-        id: crypto.randomUUID(), firm_id: FIRM_ID, entity_id: taskId, entity_type: 'task',
-        event_type: 'calendar_reposition', step_name: 'Calendar slot moved past due date',
-        event_notes: 'Moved to ' + (_kbNeg.destColId||'unknown') + ' past original due date. Submitted for PM approval.',
-        actor_name: resource?.name||null, actor_resource_id: resource?.id||null,
-        outcome: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      await window.CoC.write('calendar.reposition', taskId, {
+        entityType: 'task',
+        stepName:   'Calendar slot moved past due date',
+        notes:      'Moved to ' + (_kbNeg.destColId||'unknown') + ' past original due date. Submitted for PM approval.',
+        outcome:    'pending',
       });
     } catch(err) { console.error('[Compass] Kanban CoC write failed:', err); }
   }
@@ -894,15 +892,10 @@ function _kbAddConfirm() {
 
   // Write a CoC event for non-local types if API available
   if ((type === 'task' || type === 'focus') && API) {
-    const resource = window._calResource || window._mtResource || window._myResource;
-    API.post('coc_events', {
-      id: crypto.randomUUID(), firm_id: FIRM_ID,
-      entity_id: newId, entity_type: 'calendar_item',
-      event_type: 'calendar_reposition',
-      step_name: 'Item added to calendar',
-      event_notes: title + (desc ? ': ' + desc : '') + ' — ' + dur + 'h on ' + (card.dataset.due||colId),
-      actor_name: resource?.name||null, actor_resource_id: resource?.id||null,
-      outcome: 'scheduled', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+    window.CoC.write('calendar.item_added', newId, {
+      entityType: 'calendar_item',
+      notes:      title + (desc ? ': ' + desc : '') + ' — ' + dur + 'h on ' + (card.dataset.due||colId),
+      outcome:    'scheduled',
     }).catch(() => {});
   }
 
@@ -920,14 +913,12 @@ async function _kbDelConfirm() {
   }
   document.getElementById('kb-del-panel').style.display = 'none';
   const taskId  = _kbDel.taskId;
-  const resource = window._calResource || window._mtResource || window._myResource;
-  if (taskId && API) {
+  if (taskId) {
     try {
-      await API.post('coc_events', {
-        id: crypto.randomUUID(), firm_id: FIRM_ID, entity_id: taskId, entity_type: 'task',
-        event_type: 'slice_deleted', step_name: 'Calendar slice removed',
-        event_notes: reason, actor_name: resource?.name||null, actor_resource_id: resource?.id||null,
-        outcome: 'hours_reduced', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      await window.CoC.write('calendar.slice_deleted', taskId, {
+        entityType: 'task',
+        notes:      reason,
+        outcome:    'at_risk',
       });
     } catch(err) { console.error('[Compass] Kanban delete CoC failed:', err); }
   }

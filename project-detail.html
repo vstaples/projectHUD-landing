@@ -1813,9 +1813,24 @@ function renderDocuments() {
 
 async function renderJournalTab() {
   const el = document.getElementById('journal-list');
-  document.getElementById('journal-count').textContent = STATE.journal.length;
-  if (!STATE.journal.length) { el.innerHTML = UI.allClear('NO JOURNAL ENTRIES', 'No work has been logged yet'); return; }
-  el.innerHTML = STATE.journal.slice(0, 50).map(e => {
+  // STATE.journal now contains coc_events rows (event_class='progress') from CoC.readByProject
+  // Reshape to the legacy display format this renderer expects
+  const journalEntries = (STATE.journal || [])
+    .filter(e => e.event_class === 'progress')
+    .slice(0, 50)
+    .map(e => ({
+      id:                    e.id,
+      task_id:               e.entity_id,
+      user_id:               e.actor_resource_id,
+      entry_date:            (e.occurred_at || e.created_at || '').slice(0,10),
+      accomplishment:        e.metadata?.accomplishment || e.event_notes || '',
+      hours_spent:           e.metadata?.hours_spent || 0,
+      pct_complete_snapshot: e.metadata?.pct_complete ?? null,
+      blockers:              e.metadata?.blockers || null,
+    }));
+  document.getElementById('journal-count').textContent = journalEntries.length;
+  if (!journalEntries.length) { el.innerHTML = UI.allClear('NO JOURNAL ENTRIES', 'No work has been logged yet'); return; }
+  el.innerHTML = journalEntries.map(e => {
     const author = STATE.users.find(u => u.id === e.user_id);
     const task   = STATE.tasks.find(t => t.id === e.task_id);
     return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}">
@@ -1841,22 +1856,9 @@ async function renderJournalTab() {
 
 // ── AUDIT LOG ─────────────────────────────────────────────────
 async function _writeAudit(action, table, recordId, before, after) {
-  try {
-    // Get current user from STATE (loaded on init)
-    const userId = STATE.currentUserId || null;
-    await API.post('audit_log', {
-      firm_id:            STATE.project?.firm_id || null,
-      user_id:            userId,
-      action:             action,
-      affected_table:     table,
-      affected_record_id: recordId || null,
-      before_value:       before ? JSON.stringify(before) : null,
-      after_value:        after  ? JSON.stringify(after)  : null,
-      ip_address:         null,
-    });
-  } catch(e) {
-    console.warn('Audit write failed:', e.message);
-  }
+  // Routes through CoC platform service — writes to coc_events
+  await window.CoC.legacy.auditLog(table, recordId || PROJECT_ID, action, before, after)
+    .catch(e => console.warn('Audit write failed:', e.message));
 }
 
 // Diff two objects — returns only changed fields with before/after
@@ -1884,7 +1886,7 @@ async function loadProjectDetail() {
       API.getFirms(),
       API.getRisksByProject(PROJECT_ID),
       API.getDocumentsByProject(PROJECT_ID),
-      API.get(`task_journal?select=*&project_id=eq.${PROJECT_ID}&order=entry_date.desc`),
+      window.CoC.readByProject(PROJECT_ID, { limit: 200 }),
       API.get(`expenditures?select=*&project_id=eq.${PROJECT_ID}&order=forecast_date.asc`),
     ]);
     if (!project) { window.location.href = '/projects.html'; return; }
@@ -3656,18 +3658,18 @@ const _auditTT = {
     }
     let query;
     if (entityType === 'task') {
-      query = `audit_log?affected_table=eq.tasks&affected_record_id=eq.${entityId}&order=created_at.desc&limit=5`;
+      query = `coc_events?event_class=eq.audit&entity_id=eq.${entityId}&order=occurred_at.desc&limit=5&select=*`;
     } else {
       // Phase — search by before_value or after_value containing the phase name
-      query = `audit_log?affected_table=eq.phases&order=created_at.desc&limit=5`;
+      query = `coc_events?event_class=eq.audit&entity_type=eq.phases&order=occurred_at.desc&limit=5&select=*`;
     }
     API.get(query)
       .then(rows => {
         // Filter phase rows by name match client-side
         if (entityType === 'phase' && entityName) {
           rows = rows.filter(r => {
-            const bv = r.before_value ? JSON.parse(r.before_value) : {};
-            const av = r.after_value  ? JSON.parse(r.after_value)  : {};
+            const bv = r.metadata?.before_value ? JSON.parse(r.metadata.before_value) : {};
+            const av = r.metadata?.after_value  ? JSON.parse(r.metadata.after_value)  : {};
             return bv.phase === entityName || av.phase === entityName;
           });
         }
@@ -3685,14 +3687,15 @@ const _auditTT = {
       return;
     }
     body.innerHTML = rows.map(r => {
-      const user   = STATE.users?.find(u => u.id === r.user_id);
-      const who    = user?.name || 'Unknown';
-      const when   = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit', hour:'numeric', minute:'2-digit' }) : '';
-      const action = (r.action || '').replace('_', ' ').toUpperCase();
+      // coc_events: actor_resource_id, occurred_at, event_notes, metadata.{before_value,after_value}
+      const user   = STATE.users?.find(u => u.id === r.actor_resource_id);
+      const who    = user?.name || r.actor_name || 'Unknown';
+      const when   = r.occurred_at ? new Date(r.occurred_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit', hour:'numeric', minute:'2-digit' }) : '';
+      const action = (r.event_notes || r.event_type || '').replace(/_/g, ' ').toUpperCase();
       let fields = '';
       try {
-        const bv = r.before_value ? JSON.parse(r.before_value) : null;
-        const av = r.after_value  ? JSON.parse(r.after_value)  : null;
+        const bv = r.metadata?.before_value ? JSON.parse(r.metadata.before_value) : null;
+        const av = r.metadata?.after_value  ? JSON.parse(r.metadata.after_value)  : null;
         if (bv && av) {
           const changed = Object.keys(av).filter(k => bv[k] !== av[k])
             .map(k => `${k}: ${bv[k] ?? '—'} → ${av[k] ?? '—'}`).join('  ·  ');
@@ -3769,13 +3772,26 @@ async function openJournalPanel(taskId, taskName) {
 async function _renderJournalBody(taskId) {
   const body = document.getElementById('jp-body');
   try {
-    const entries = await API.getJournalByTask(taskId);
+    // Read progress entries from unified coc_events (event_class = 'progress')
+    const allEntries = await window.CoC.read('task', taskId);
+    const entries = allEntries.filter(e => e.event_class === 'progress');
+    // Reconstruct legacy-shaped objects from metadata for the existing renderer
+    const reshapedEntries = entries.map(e => ({
+      id:                    e.id,
+      task_id:               e.entity_id,
+      user_id:               e.actor_resource_id,
+      entry_date:            (e.occurred_at || e.created_at || '').slice(0,10),
+      accomplishment:        e.metadata?.accomplishment || e.event_notes || '',
+      hours_spent:           e.metadata?.hours_spent || 0,
+      pct_complete_snapshot: e.metadata?.pct_complete ?? null,
+      blockers:              e.metadata?.blockers || null,
+    }));
     const users = STATE.users;
     let html = '';
-    if (!entries?.length) {
+    if (!reshapedEntries?.length) {
       html = '<div style="padding:16px;font-family:var(--font-mono);font-size:11px;color:var(--text3);text-align:center;">No journal entries yet</div>';
     } else {
-      html = entries.map(e => {
+      html = reshapedEntries.map(e => {
         const author = users.find(u => u.id === e.user_id);
         return `<div class="journal-entry" data-journal-id="${e.id}" data-task-id="${e.task_id}">
           <div class="journal-header">
@@ -3836,17 +3852,13 @@ async function submitJournalEntry(taskId) {
   btn.textContent = 'SAVING...'; btn.disabled = true;
 
   try {
-    const entry = {
-      task_id:               taskId,
-      project_id:            PROJECT_ID,
-      user_id:               STATE.currentUserId || null,
-      entry_date:            new Date().toISOString().substring(0, 10),
+    // Write progress entry via CoC platform service
+    await window.CoC.legacy.taskJournal(taskId, PROJECT_ID, {
       accomplishment,
-      hours_spent:           hours,
-      pct_complete_snapshot: pct,
-      blockers:              blockers,
-    };
-    await API.post('task_journal', entry);
+      hours: hours,
+      pct:   pct,
+      blockers: blockers,
+    });
     // Also update task pct_complete and actual_hours
     const task = STATE.tasks.find(t => t.id === taskId);
     if (task) {

@@ -211,20 +211,12 @@ function openFullWeeklyTimesheet({ expandDay=null }={}) {
     }
     if(ev.target.closest('.mark-today-complete-btn')){
       const todayHrs=dayTotals[today]||0;
-      await API.post('coc_events',{
-        id: crypto.randomUUID(),
-        firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
-        entity_id: _myResource?.id || crypto.randomUUID(),
-        entity_type: 'task',
-        event_type: 'progress_update',
-        step_name: 'Daily timesheet complete',
-        event_notes: todayHrs.toFixed(1) + 'h logged today',
-        actor_name: _myResource?.name || null,
-        actor_resource_id: _myResource?.id || null,
-        outcome: 'on_track',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).catch(()=>{});
+      await window.CoC.write('timesheet.submitted', _myResource?.id || 'unknown', {
+        entityType: 'timesheet',
+        stepName:   'Daily timesheet complete',
+        notes:      todayHrs.toFixed(1) + 'h logged today',
+        outcome:    'on_track',
+      });
       compassToast('Today marked complete ✓');drawer.remove();_viewLoaded['user']=false;_mwLoadUserView();
     }
     if(ev.target.closest('.ts-submit-wts-btn')){
@@ -866,3 +858,4 @@ function openWeeklyTimesheet(entry) {
     });
   }, 50);
 }
+

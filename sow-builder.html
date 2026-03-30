@@ -1297,7 +1297,19 @@ async function saveAll() {
       payload.title   = proposal?.title + ' — SOW';
       payload.status  = 'draft';
       const res = await API.post('sow_documents', payload);
-      if (res?.[0]?.id) _doc._sowId = res[0].id;
+      if (res?.[0]?.id) {
+        _doc._sowId = res[0].id;
+        // CoC: first save of this SOW document
+        if (window.CoC) {
+          window.CoC.write('pipeline.sow_saved', _doc._sowId, {
+            entityType: 'sow_document',
+            stepName:   'SOW saved',
+            notes:      `SOW created for proposal ${PROPOSAL_ID}`,
+            outcome:    'on_track',
+            meta: { proposal_id: PROPOSAL_ID },
+          }).catch(() => {});  // non-blocking — autosave must not fail
+        }
+      }
     }
     setAutosave('saved');
     setTimeout(() => setAutosave(''), 3000);
