@@ -3159,6 +3159,7 @@ window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
 window._viewsOpenNote   = _notesOpenNote; // scoped — do NOT overwrite MY NOTES
 window._viewsCloseTile  = _notesCloseTile; // scoped — do NOT overwrite MY NOTES
+window._notesCloseTile  = _notesCloseTile; // needed by tile header onclick attributes
 window._viewsNew        = _notesNew; // scoped — do NOT overwrite MY NOTES
 window._notesNew        = _notesNew; // also needed by empty-slot onclick guard
 window._notesSearch        = _notesSearch;
@@ -3405,13 +3406,16 @@ function _loadResources() {
   if (!api) return Promise.resolve([]);
   var FIRM = (typeof FIRM_ID !== 'undefined' ? FIRM_ID : null) ||
              (window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001');
-  return api.get('resources?firm_id=eq.' + FIRM + '&select=id,first_name,last_name,user_id,hud_role_id,level&order=first_name.asc&limit=200')
+  return api.get('resources?firm_id=eq.' + FIRM + '&select=id,first_name,last_name,user_id,hud_role_id,level,department,is_external,title&order=first_name.asc&limit=200')
     .then(function(rows) {
       var resources = (Array.isArray(rows) ? rows : []).map(function(r) {
         return {
-          id:      r.id,
-          user_id: r.user_id,
-          name:    ((r.first_name || '') + ' ' + (r.last_name || '')).trim()
+          id:          r.id,
+          user_id:     r.user_id,
+          name:        ((r.first_name || '') + ' ' + (r.last_name || '')).trim(),
+          department:  r.department  || null,
+          is_external: r.is_external || false,
+          title:       r.title       || null,
         };
       });
       window._inviteResources = resources;
@@ -3426,76 +3430,10 @@ _loadResources();
 window._notesGetInviteResources = function() { return window._inviteResources || []; };
 
 window._notesShowResourcePicker = function(anchorEl, onSelect) {
-  // Remove any existing picker
-  document.querySelectorAll('.wcf-res-popup').forEach(function(el) { el.remove(); });
-
-  var resources = window._inviteResources || [];
-
-  function buildPicker(list) {
-    var pop = document.createElement('div');
-    pop.className = 'wcf-res-popup';
-    pop.style.cssText = 'position:fixed;z-index:9999;background:#0d1e35;border:1px solid rgba(0,210,255,.3);' +
-      'box-shadow:0 8px 32px rgba(0,0,0,.6);width:240px;max-height:280px;display:flex;flex-direction:column;overflow:hidden;border-radius:4px';
-
-    var search = document.createElement('input');
-    search.type = 'text';
-    search.placeholder = 'Search people…';
-    search.style.cssText = 'padding:7px 10px;background:#0a1628;border:none;border-bottom:1px solid rgba(0,210,255,.15);' +
-      'color:#F0F6FF;font-family:var(--font-mono,monospace);font-size:12px;outline:none;flex-shrink:0';
-    pop.appendChild(search);
-
-    var listEl = document.createElement('div');
-    listEl.style.cssText = 'overflow-y:auto;flex:1';
-    pop.appendChild(listEl);
-
-    function renderList(filter) {
-      var filtered = filter
-        ? list.filter(function(r) { return r.name.toLowerCase().includes(filter.toLowerCase()); })
-        : list;
-      listEl.innerHTML = filtered.length === 0
-        ? '<div style="padding:10px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)">No results</div>'
-        : filtered.map(function(r) {
-            return '<div class="wcf-res-row" data-rid="' + r.id + '" style="padding:7px 12px;cursor:pointer;' +
-              'font-family:var(--font-mono,monospace);font-size:12px;color:#C8DFF0;border-bottom:1px solid rgba(255,255,255,.05)">' +
-              r.name + '</div>';
-          }).join('');
-      listEl.querySelectorAll('.wcf-res-row').forEach(function(row) {
-        row.onmouseenter = function() { this.style.background = 'rgba(0,210,255,.08)'; };
-        row.onmouseleave = function() { this.style.background = ''; };
-        row.onclick = function() {
-          var rid = this.dataset.rid;
-          var res = list.find(function(r) { return r.id === rid; });
-          if (res) { pop.remove(); onSelect(res); }
-        };
-      });
-    }
-
-    search.addEventListener('input', function() { renderList(this.value); });
-    renderList('');
-
-    // Position below anchor
-    document.body.appendChild(pop);
-    var r = anchorEl.getBoundingClientRect();
-    pop.style.left = Math.min(r.left, window.innerWidth - 250) + 'px';
-    pop.style.top  = (r.bottom + 4) + 'px';
-
-    // Close on outside click
-    setTimeout(function() {
-      document.addEventListener('mousedown', function _closePicker(e) {
-        if (!pop.contains(e.target) && e.target !== anchorEl) {
-          pop.remove();
-          document.removeEventListener('mousedown', _closePicker);
-        }
-      });
-    }, 0);
-
-    search.focus();
-  }
-
-  if (resources.length > 0) {
-    buildPicker(resources);
-  } else {
-    _loadResources().then(function(list) { buildPicker(list); });
+  // Delegates to PersonPicker — the single source of truth for person selection UI.
+  // See /js/person-picker.js for the full implementation.
+  if (window.PersonPicker) {
+    window.PersonPicker.show(anchorEl, onSelect);
   }
 };
 
