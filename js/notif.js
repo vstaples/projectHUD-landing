@@ -217,8 +217,8 @@ window.HUDNotif = (() => {
     panel.id = 'hud-notif-panel';
     panel.style.cssText = [
       'position:fixed',
-      'bottom:' + (window.innerHeight - rect.top + 8) + 'px',
-      'left:' + (rect.right + 8) + 'px',
+      'top:' + (rect.bottom + 6) + 'px',
+      'right:14px',
       'width:340px',
       'max-height:480px',
       'background:#080f1e',
