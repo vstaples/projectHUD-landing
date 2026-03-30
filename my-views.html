@@ -752,16 +752,10 @@ function _notesWireLeft() {
           overlay.addEventListener('mousedown', e => { if (e.target === overlay) dismiss(); });
           return;
         }
-        // Check if already accepted
-        const userId = _userId;
-        if (userId) {
-          API.get('note_participants?note_id=eq.' + note.entity_id + '&user_id=eq.' + userId + '&select=accepted_at&limit=1')
-            .then(rows => {
-              if (rows?.[0]?.accepted_at) {
-              } else {
-              }
-        } else {
-        }
+        // MY VIEWS: note collaboration invites not supported — dismiss inbox item
+        API.del('notes?id=eq.' + note.id).catch(() => {});
+        _notes = _notes.filter(n => n.id !== note.id);
+        _notesRenderLeft();
         return;
       }
 
@@ -2233,8 +2227,6 @@ window._notesCloneView = async function() {
 function _notesSwitchView(viewName) {
   if (!viewName || viewName === _workspace.activeView) return;
   if (!_workspace.views[viewName]) return;
-  // ── STEP 5: stop presence on previous view ────────────────────────────
-  }
   _workspace.activeView = viewName;
   // STEP 5: persist wasActive flag for shared views so refresh restores them
   const switchedView = _workspace.views[viewName];
@@ -2279,10 +2271,7 @@ function _notesSwitchView(viewName) {
     } else if (attempts > 0) {
       setTimeout(function() { _switchViewWidgetRefresh(attempts - 1); }, 100);
     }
-  // ── STEP 5: start presence on new view ───────────────────────────────
-  setTimeout(function() {
-    }
-  }, 0);
+  })(30); // retry up to 3s after view switch
 }
 
 function _notesNewView() {
@@ -3201,10 +3190,7 @@ window._notesSwitchToSharedView = async function(ownerUserId, viewName) {
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
-    // Start view presence as participant
-    setTimeout(function() {
-      }
-    }, 0);
+    // (presence not used in MY VIEWS)
   } catch(e) {
     console.warn('[Compass] Switch to shared view error:', e);
   }
