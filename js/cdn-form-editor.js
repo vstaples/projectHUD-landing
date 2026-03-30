@@ -1485,34 +1485,27 @@ async function _multiInstanceImport(mode, info) {
 async function _detectFieldsViaClaudeVision(pdfDoc, pageNum) {
   try {
     const page   = await pdfDoc.getPage(pageNum);
-    const vp     = page.getViewport({ scale: 1.5 });
+    // Scale 1.0 not 1.5 — smaller image = fewer tokens spent on pixels.
+    const vp     = page.getViewport({ scale: 1.0 });
     const canvas = document.createElement('canvas');
     canvas.width  = vp.width;
     canvas.height = vp.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    // JPEG 0.75 — reduces payload, labels remain legible
+    const base64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
 
-    const prompt = `You are analyzing a scanned form document. Extract all form fields.
+    // Compact output format — abbreviated keys mean more fields fit in 4096 tokens
+    const prompt = `Analyze this form image. List every fillable field and section header.
 
-For each field identify:
-- label: the text label for this field
-- type: one of: text, date, number, checkbox, signature, review, textarea
-  - Use "review" for checklist items with a blank/underscore where someone marks pass/fail/N/A
-  - Use "signature" for signature lines or "Authorized By" / "Built By" fields
-  - Use "date" for date fields
-- approximate_region: one of: top_third, middle_third, bottom_third
-- x_pct: approximate x position as 0-100 percentage of page width
-- y_pct: approximate y position as 0-100 percentage of page height
-- width_pct: approximate width as percentage of page width
-- is_section_header: true if this is a bold section heading, not a fillable field
+Field types: text, date, number, checkbox, signature, review (checklist pass/fail/NA line), textarea
+Skip: fixed document control metadata in top corner (Type, Document Number, Revision, Page, etc.)
 
-Do NOT include document control metadata (Type, Document Number, Revision, etc. in the header block).
-Return ONLY a JSON array of field objects, no explanation or markdown.`;
+Return ONLY a JSON array. Use compact short keys:
+[{"l":"label","t":"type","x":10,"y":20,"w":40},...]
+x/y/w are 0-100 percentages of page dimensions.
+Add "s":true only for bold section headers. Omit "s" otherwise.
+Labels max 50 chars. No markdown, no explanation.`;
 
-    // Call the edge function directly — it has Access-Control-Allow-Origin: *
-    // so CORS is fine. Vercel rewrites strip custom headers before forwarding,
-    // which caused the 401. Calling directly with the anon key works correctly.
-    // SUPA_KEY is the anon key — intentionally public, safe in client JS.
     const response = await fetch(`${SUPA_URL}/functions/v1/ai-form-vision`, {
       method:  'POST',
       headers: {
@@ -1526,7 +1519,7 @@ Return ONLY a JSON array of field objects, no explanation or markdown.`;
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({}));
       if (response.status === 401) {
-        console.warn('[FormEditor] ai-form-vision 401 — redeploy with --no-verify-jwt or check SUPA_KEY');
+        console.warn('[FormEditor] ai-form-vision 401 — redeploy with: supabase functions deploy ai-form-vision --no-verify-jwt');
         return [];
       }
       if (response.status === 404) {
@@ -1535,34 +1528,57 @@ Return ONLY a JSON array of field objects, no explanation or markdown.`;
       }
       throw new Error(`Vision API ${response.status}: ${errBody.error || 'unknown'}`);
     }
-    const data = await response.json();
-    const raw  = data.text || data.content?.map(c => c.text || '').join('') || '[]';
+
+    const data  = await response.json();
+    const raw   = data.text || data.content?.map(c => c.text || '').join('') || '[]';
     const clean = raw.replace(/```json|```/g, '').trim();
-    const aiFields = JSON.parse(clean);
+
+    // Truncation-safe parser — if response was cut mid-array, recover complete objects
+    let aiFields;
+    try {
+      aiFields = JSON.parse(clean);
+    } catch (parseErr) {
+      console.warn('[FormEditor] Vision JSON truncated — recovering partial response');
+      const lastBrace = clean.lastIndexOf('}');
+      if (lastBrace === -1) { console.warn('[FormEditor] No complete objects in vision response'); return []; }
+      const partial   = clean.slice(0, lastBrace + 1);
+      const recovered = partial.startsWith('[') ? partial + ']' : '[' + partial + ']';
+      try {
+        aiFields = JSON.parse(recovered);
+        console.log(`[FormEditor] Recovered ${aiFields.length} fields from truncated response`);
+      } catch { console.warn('[FormEditor] Could not recover truncated vision JSON'); return []; }
+    }
 
     if (!Array.isArray(aiFields)) return [];
 
-    // Convert percentage-based positions to PDF point coordinates
+    // Support both compact (l/t/x/y/w) and verbose (label/type/x_pct) key formats
     const pdfVp = page.getViewport({ scale: 1 });
     return aiFields
-      .filter(f => !f.is_section_header)
-      .map((f, i) => ({
-        id:        `ai_${pageNum}_${i}`,
-        page:      pageNum,
-        rect: {
-          x: (f.x_pct     / 100) * pdfVp.width,
-          y: (f.y_pct     / 100) * pdfVp.height,
-          w: (f.width_pct / 100) * pdfVp.width || 120,
-          h: f.type === 'signature' ? 28 : f.type === 'textarea' ? 40 : 16,
-        },
-        label:     f.label || 'Field',
-        type:      f.type  || 'text',
-        role:      /sign|approv|authoriz/i.test(f.label) ? 'reviewer'
-                 : /pm|manager/i.test(f.label) ? 'pm' : 'assignee',
-        required:  f.type === 'signature',
-        detection: 'claude_vision',
-        confidence: 'ai',
-      }));
+      .filter(f => !f.s)
+      .map((f, i) => {
+        const label = f.l || f.label || 'Field';
+        const type  = f.t || f.type  || 'text';
+        const xPct  = f.x ?? f.x_pct ?? 5;
+        const yPct  = f.y ?? f.y_pct ?? 50;
+        const wPct  = f.w ?? f.width_pct ?? 30;
+        return {
+          id:        `ai_${pageNum}_${i}`,
+          page:      pageNum,
+          rect: {
+            x: (xPct / 100) * pdfVp.width,
+            y: (yPct / 100) * pdfVp.height,
+            w: (wPct / 100) * pdfVp.width || 120,
+            h: type === 'signature' ? 28 : type === 'textarea' ? 40 : 16,
+          },
+          label,
+          type,
+          role:      /sign|approv|authoriz/i.test(label) ? 'reviewer'
+                   : /pm|manager/i.test(label) ? 'pm' : 'assignee',
+          required:  type === 'signature',
+          detection: 'claude_vision',
+          confidence: 'ai',
+        };
+      });
   } catch(e) {
     console.warn('[FormEditor] Claude vision pass failed:', e.message);
     return [];
