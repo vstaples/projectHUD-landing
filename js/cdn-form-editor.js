@@ -31,6 +31,8 @@ let _pdfScale        = 1.5;
 let _pdfStartPage    = 1;  // absolute page in _pdfDoc that editor page 1 maps to
 let _drawingRect     = null;
 let _formMode        = 'select'; // 'select' | 'draw' — controls cursor and interaction
+let _selectedFieldIds = new Set(); // IDs currently selected (multi-select)
+let _marqueeDrag      = null;      // { startX, startY, active } for marquee selection
 
 // ── Role vocabulary ──────────────────────────────────────────────────────────
 // Maps field.role values to display labels and colours
@@ -233,12 +235,28 @@ function _renderFormEditor() {
             onmouseover="this.style.background='rgba(196,125,24,.3)'"
             onmouseout="if(!window._formDragCol)this.style.background='transparent'"
             onmousedown="_formColDragStart(event,'form-col-fields','left')"></div>
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);
-                      display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-            <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
-                         text-transform:uppercase;color:var(--muted)">
-              Fields <span style="font-weight:400;color:var(--text3)">(${totalFields})</span>
-            </span>
+          <div style="padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
+                           text-transform:uppercase;color:var(--muted)">
+                Fields <span style="font-weight:400;color:var(--text3)">(${totalFields})</span>
+              </span>
+              <span id="form-sel-count" style="font-size:10px;color:var(--cad);display:none">0 selected</span>
+            </div>
+            <!-- Arrange toolbar — shown when 2+ fields selected -->
+            <div id="form-arrange-bar" style="display:none;flex-direction:column;gap:4px">
+              <div style="display:flex;gap:3px;flex-wrap:wrap">
+                <button onclick="_formArrange('align-left')"   title="Align Left"          class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⬤←</button>
+                <button onclick="_formArrange('align-right')"  title="Align Right"         class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">→⬤</button>
+                <button onclick="_formArrange('align-top')"    title="Align Top"           class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⬤↑</button>
+                <button onclick="_formArrange('align-bottom')" title="Align Bottom"        class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">↓⬤</button>
+                <button onclick="_formArrange('center-h')"     title="Center Horizontal"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">↔</button>
+                <button onclick="_formArrange('center-v')"     title="Center Vertical"     class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">↕</button>
+                <button onclick="_formArrange('dist-h')"       title="Distribute Horizontally" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⇹H</button>
+                <button onclick="_formArrange('dist-v')"       title="Distribute Vertically"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⇹V</button>
+              </div>
+              <button onclick="_formClearSelection()" style="font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer;text-align:left;padding:0">✕ Clear selection</button>
+            </div>
           </div>
           <div id="form-field-list" style="flex:1;overflow-y:auto;padding:4px 0">
             ${_renderFieldList()}
@@ -1923,14 +1941,17 @@ function _renderFieldList() {
     const typeMeta  = FIELD_TYPE_META[field.type] || FIELD_TYPE_META.text;
     const confColor = _fieldConfidenceColor(field);
 
+    const isSelected = _selectedFieldIds.has(field.id);
     return `
       <div id="frow-${field.id}"
         style="padding:7px 12px;border-bottom:1px solid var(--border);
                display:flex;align-items:flex-start;gap:8px;cursor:pointer;
-               transition:background .1s"
-        onmouseenter="this.style.background='var(--surf2)'"
-        onmouseleave="this.style.background=''"
-        onclick="_formSelectField('${field.id}')">
+               transition:background .1s;
+               background:${isSelected ? 'var(--cad-dim)' : 'transparent'};
+               border-left:2px solid ${isSelected ? 'var(--cad)' : 'transparent'}"
+        onmouseenter="if(!_selectedFieldIds.has('${field.id}'))this.style.background='var(--surf2)'"
+        onmouseleave="if(!_selectedFieldIds.has('${field.id}'))this.style.background=''"
+        onclick="_formFieldListClick(event,'${field.id}')">
 
         <!-- Confidence dot -->
         <div style="width:6px;height:6px;border-radius:50%;background:${confColor};
@@ -2111,8 +2132,10 @@ function _renderFieldOverlays() {
         style="cursor:pointer" onclick="_formSelectField('${field.id}')">
         <!-- Main field rectangle -->
         <rect x="${x}" y="${y}" width="${w}" height="${h}"
-          fill="${roleConf.dim}" stroke="${confColor}" stroke-width="1.5"
-          rx="2" opacity="0.85"/>
+          fill="${_selectedFieldIds.has(field.id) ? roleConf.color.replace(')',',0.2)').replace('rgb','rgba') : roleConf.dim}"
+          stroke="${_selectedFieldIds.has(field.id) ? 'var(--cad)' : confColor}"
+          stroke-width="${_selectedFieldIds.has(field.id) ? '2.5' : '1.5'}"
+          rx="2" opacity="0.9"/>
         <!-- Label pill — inside rect so it's always visible -->
         <rect x="${x}" y="${y}" width="${Math.min(w, 110)}" height="16"
           fill="${confColor}" rx="2" opacity="0.88"/>
@@ -2533,3 +2556,296 @@ CREATE INDEX IF NOT EXISTS idx_form_definitions_firm
   ON workflow_form_definitions(firm_id);
   `);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTI-SELECT, MARQUEE, ARRANGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Selection management ─────────────────────────────────────────────────────
+
+function _formFieldListClick(event, fieldId) {
+  if (event.shiftKey || event.ctrlKey || event.metaKey) {
+    // Multi-select: toggle this field
+    if (_selectedFieldIds.has(fieldId)) {
+      _selectedFieldIds.delete(fieldId);
+    } else {
+      _selectedFieldIds.add(fieldId);
+    }
+    _formUpdateSelectionUI();
+    _renderFieldOverlays();
+  } else {
+    // Single click: clear selection, open edit popover, scroll canvas to field
+    _formClearSelection();
+    _formRevealField(fieldId);
+    _formSelectField(fieldId);
+  }
+}
+
+function _formClearSelection() {
+  _selectedFieldIds.clear();
+  _formUpdateSelectionUI();
+  _renderFieldOverlays();
+  // Re-render field list to remove highlight
+  const listEl = document.getElementById('form-field-list');
+  if (listEl) listEl.innerHTML = _renderFieldList();
+}
+
+function _formUpdateSelectionUI() {
+  const count   = _selectedFieldIds.size;
+  const cntEl   = document.getElementById('form-sel-count');
+  const barEl   = document.getElementById('form-arrange-bar');
+  if (cntEl) {
+    cntEl.textContent = `${count} selected`;
+    cntEl.style.display = count > 0 ? '' : 'none';
+  }
+  if (barEl) {
+    barEl.style.display = count >= 2 ? 'flex' : 'none';
+  }
+  // Re-render field list rows to update highlight styling
+  const listEl = document.getElementById('form-field-list');
+  if (listEl) listEl.innerHTML = _renderFieldList();
+}
+
+// ── Reveal field on canvas (scroll page into view, highlight rect) ───────────
+
+function _formRevealField(fieldId) {
+  const field = _formFields.find(f => f.id === fieldId);
+  if (!field) return;
+
+  const fieldPage = field.page || 1;
+
+  // If on a different page, navigate there first then highlight
+  if (fieldPage !== _pdfPage) {
+    _pdfPage = fieldPage;
+    _updatePageIndicator();
+    _renderPdfPage(_pdfStartPage + _pdfPage - 1).then(() => {
+      _highlightAndScrollToField(fieldId, field);
+    });
+  } else {
+    _highlightAndScrollToField(fieldId, field);
+  }
+}
+
+function _highlightAndScrollToField(fieldId, field) {
+  // Highlight the rect in the SVG
+  _highlightFieldRect(fieldId);
+
+  // Scroll the canvas wrap so the rect is visible
+  const wrap = document.getElementById('form-canvas-wrap');
+  if (!wrap || !field?.rect) return;
+
+  const r     = field.rect;
+  const rectY = r.y * _pdfScale;      // top of field in canvas pixels
+  const rectX = r.x * _pdfScale;      // left of field
+
+  // Target scroll: centre the field vertically in the visible area
+  const wrapH  = wrap.clientHeight;
+  const wrapW  = wrap.clientWidth;
+  const margin = 80; // px padding around target
+
+  // Account for the centering flex wrapper (24px top padding)
+  const canvasTopOffset = 24;
+
+  const targetScrollY = Math.max(0, canvasTopOffset + rectY - wrapH / 2);
+  const targetScrollX = Math.max(0, rectX - wrapW / 2);
+
+  wrap.scrollTo({ top: targetScrollY, left: targetScrollX, behavior: 'smooth' });
+}
+
+// ── SVG marquee selection (drag in select mode on empty canvas) ───────────────
+// Extends _formSvgMouseDown/Move/Up — add marquee logic when no field is hit
+
+const _origSvgMouseDown = _formSvgMouseDown;
+const _origSvgMouseMove = _formSvgMouseMove;
+const _origSvgMouseUp   = _formSvgMouseUp;
+
+function _formSvgMouseDown(event) {
+  if (_formMode === 'select') {
+    const group = event.target.closest('.field-rect-group');
+    if (!group) {
+      // Clicked empty canvas — start marquee
+      const svg     = document.getElementById('form-field-overlay');
+      const svgRect = svg?.getBoundingClientRect();
+      if (!svgRect) return;
+      const mx = event.clientX - svgRect.left;
+      const my = event.clientY - svgRect.top;
+      _marqueeDrag = { startX: mx, startY: my, active: true };
+
+      // Draw marquee rect in SVG
+      const mr = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      mr.id = 'form-marquee-rect';
+      mr.setAttribute('x', mx); mr.setAttribute('y', my);
+      mr.setAttribute('width', 0); mr.setAttribute('height', 0);
+      mr.setAttribute('fill', 'rgba(196,125,24,.12)');
+      mr.setAttribute('stroke', 'var(--cad)');
+      mr.setAttribute('stroke-width', '1');
+      mr.setAttribute('stroke-dasharray', '4 2');
+      mr.style.pointerEvents = 'none';
+      svg.appendChild(mr);
+
+      // Clear selection unless shift-held
+      if (!event.shiftKey) _formClearSelection();
+      event.preventDefault();
+      return;
+    }
+  }
+  _origSvgMouseDown(event);
+}
+
+function _formSvgMouseMove(event) {
+  if (_marqueeDrag?.active) {
+    const svg     = document.getElementById('form-field-overlay');
+    const svgRect = svg?.getBoundingClientRect();
+    if (!svgRect) return;
+    const mx = event.clientX - svgRect.left;
+    const my = event.clientY - svgRect.top;
+    const mr = document.getElementById('form-marquee-rect');
+    if (mr) {
+      const x = Math.min(mx, _marqueeDrag.startX);
+      const y = Math.min(my, _marqueeDrag.startY);
+      const w = Math.abs(mx - _marqueeDrag.startX);
+      const h = Math.abs(my - _marqueeDrag.startY);
+      mr.setAttribute('x', x); mr.setAttribute('y', y);
+      mr.setAttribute('width', w); mr.setAttribute('height', h);
+    }
+    return;
+  }
+  _origSvgMouseMove(event);
+}
+
+function _formSvgMouseUp(event) {
+  if (_marqueeDrag?.active) {
+    const svg     = document.getElementById('form-field-overlay');
+    const svgRect = svg?.getBoundingClientRect();
+    document.getElementById('form-marquee-rect')?.remove();
+
+    if (svgRect) {
+      const mx = event.clientX - svgRect.left;
+      const my = event.clientY - svgRect.top;
+
+      // Marquee bounds in PDF point space
+      const sx = Math.min(mx, _marqueeDrag.startX) / _pdfScale;
+      const sy = Math.min(my, _marqueeDrag.startY) / _pdfScale;
+      const ex = Math.max(mx, _marqueeDrag.startX) / _pdfScale;
+      const ey = Math.max(my, _marqueeDrag.startY) / _pdfScale;
+      const minSize = 8 / _pdfScale; // ignore tiny drags
+
+      if ((ex - sx) > minSize && (ey - sy) > minSize) {
+        // Select all fields whose rect intersects the marquee
+        _formFields
+          .filter(f => (f.page || 1) === _pdfPage)
+          .forEach(f => {
+            const r = f.rect;
+            // AABB intersection
+            if (r.x < ex && r.x + r.w > sx && r.y < ey && r.y + r.h > sy) {
+              _selectedFieldIds.add(f.id);
+            }
+          });
+
+        _formUpdateSelectionUI();
+        _renderFieldOverlays();
+      }
+    }
+    _marqueeDrag = null;
+    return;
+  }
+  _origSvgMouseUp(event);
+}
+
+// ── Arrange operations ───────────────────────────────────────────────────────
+
+function _formArrange(op) {
+  const ids    = [..._selectedFieldIds];
+  const fields = ids.map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  if (fields.length < 2) return;
+
+  const rects = fields.map(f => ({ f, r: f.rect }));
+
+  switch(op) {
+    case 'align-left': {
+      const minX = Math.min(...rects.map(({r}) => r.x));
+      rects.forEach(({f, r}) => { f.rect.x = minX; });
+      break;
+    }
+    case 'align-right': {
+      const maxX = Math.max(...rects.map(({r}) => r.x + r.w));
+      rects.forEach(({f, r}) => { f.rect.x = maxX - r.w; });
+      break;
+    }
+    case 'align-top': {
+      const minY = Math.min(...rects.map(({r}) => r.y));
+      rects.forEach(({f, r}) => { f.rect.y = minY; });
+      break;
+    }
+    case 'align-bottom': {
+      const maxY = Math.max(...rects.map(({r}) => r.y + r.h));
+      rects.forEach(({f, r}) => { f.rect.y = maxY - r.h; });
+      break;
+    }
+    case 'center-h': {
+      // Centre horizontally relative to the bounding box of the selection
+      const minX = Math.min(...rects.map(({r}) => r.x));
+      const maxX = Math.max(...rects.map(({r}) => r.x + r.w));
+      const midX = (minX + maxX) / 2;
+      rects.forEach(({f, r}) => { f.rect.x = midX - r.w / 2; });
+      break;
+    }
+    case 'center-v': {
+      const minY = Math.min(...rects.map(({r}) => r.y));
+      const maxY = Math.max(...rects.map(({r}) => r.y + r.h));
+      const midY = (minY + maxY) / 2;
+      rects.forEach(({f, r}) => { f.rect.y = midY - r.h / 2; });
+      break;
+    }
+    case 'dist-h': {
+      // Sort by x, then distribute evenly between leftmost and rightmost
+      rects.sort((a, b) => a.r.x - b.r.x);
+      const totalW   = rects.reduce((s, {r}) => s + r.w, 0);
+      const spanX    = rects[rects.length-1].r.x + rects[rects.length-1].r.w - rects[0].r.x;
+      const gapCount = rects.length - 1;
+      const gap      = (spanX - totalW) / gapCount;
+      let cursor     = rects[0].r.x + rects[0].r.w;
+      for (let i = 1; i < rects.length - 1; i++) {
+        rects[i].f.rect.x = cursor + gap;
+        cursor = rects[i].f.rect.x + rects[i].r.w;
+      }
+      break;
+    }
+    case 'dist-v': {
+      rects.sort((a, b) => a.r.y - b.r.y);
+      const totalH   = rects.reduce((s, {r}) => s + r.h, 0);
+      const spanY    = rects[rects.length-1].r.y + rects[rects.length-1].r.h - rects[0].r.y;
+      const gapCount = rects.length - 1;
+      const gap      = (spanY - totalH) / gapCount;
+      let cursor     = rects[0].r.y + rects[0].r.h;
+      for (let i = 1; i < rects.length - 1; i++) {
+        rects[i].f.rect.y = cursor + gap;
+        cursor = rects[i].f.rect.y + rects[i].r.h;
+      }
+      break;
+    }
+  }
+
+  _renderFieldOverlays();
+  cadToast(`Arranged: ${op.replace('-', ' ')}`, 'info');
+}
+
+// ── Keyboard: Escape clears selection, Delete removes selected fields ─────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (!document.getElementById('form-field-overlay')) return;
+
+  if (e.key === 'Escape') _formClearSelection();
+
+  if ((e.key === 'Delete' || e.key === 'Backspace') && _selectedFieldIds.size > 0) {
+    if (!confirm(`Delete ${_selectedFieldIds.size} selected field(s)?`)) return;
+    _selectedFieldIds.forEach(id => {
+      _formFields = _formFields.filter(f => f.id !== id);
+    });
+    _selectedFieldIds.clear();
+    _formUpdateSelectionUI();
+    _renderFieldOverlays();
+    const listEl = document.getElementById('form-field-list');
+    if (listEl) listEl.innerHTML = _renderFieldList();
+  }
+});
