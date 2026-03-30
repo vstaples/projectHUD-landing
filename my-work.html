@@ -6447,14 +6447,14 @@ window.renderNegPanel = function(itemId, assignerName) {
           style="width:60px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 4px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"
           oninput="negCheckSubmitGate('${itemId}')" />
         <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.6)">Proposed Due Date:</span>
-        <input id="neg-due-${itemId}" type="date" style="padding:4px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:11px;outline:none"/>
+        <input id="neg-due-${itemId}" type="date" style="padding:4px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:11px;outline:none" onchange="negCheckSubmitGate('${itemId}')"/>
       </div>
       <textarea id="neg-comment-${itemId}" rows="3" placeholder="Required: explain your LOE — what does this involve, why will it take this long, what constraints apply? (min 20 chars)"
         style="width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.3);color:#F0F6FF;font-family:var(--font-body);font-size:11px;outline:none;resize:none;margin-bottom:4px;box-sizing:border-box"
         oninput="negCheckSubmitGate('${itemId}')"></textarea>
       <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-bottom:7px">Comment is required and becomes a permanent CoC record.</div>
       <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="negSubmitRating('${itemId}')" id="neg-submit-${itemId}"
+        <button onclick="negCheckSubmitGate('${itemId}');negSubmitRating('${itemId}')" id="neg-submit-${itemId}"
           style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:not-allowed;letter-spacing:.06em;opacity:.5" disabled>Submit rating →</button>
         <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2)">Assigner will be notified</span>
       </div>`;
@@ -9833,7 +9833,11 @@ function openWorkItemExpanded(item) {
       neg.assignerName = aiData.created_by_name;
       negSaveState(item.id, neg);
     }
-    setTimeout(() => renderNegPanel(item.id, neg.assignerName || aiData?.created_by_name || 'Assigner'), 0);
+    setTimeout(() => {
+      renderNegPanel(item.id, neg.assignerName || aiData?.created_by_name || 'Assigner');
+      // Re-run gate in case form was pre-filled
+      setTimeout(() => window.negCheckSubmitGate && window.negCheckSubmitGate(item.id), 50);
+    }, 0);
   } else {
     setTimeout(() => document.getElementById(`wi-hrs-${item.id}`)?.focus(), 80);
   }
