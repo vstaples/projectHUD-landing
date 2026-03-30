@@ -822,14 +822,24 @@ function _notesRenderGrid() {
   // transplant them back in. This preserves the .tile-canvas and its
   // dataset.widgetRendered guard, preventing dataFn from re-firing on every
   // _notesRenderGrid call (which would otherwise cause continuous API polls).
+  //
+  // EXCEPTION: if the view's forResourceId changed (user switched dashboards),
+  // skip the transplant so widgets re-fetch with the correct person's data.
+  const currentForRid = cv.forResourceId || null;
+  const lastForRid    = gridArea.dataset.lastForResourceId || null;
+  const forRidChanged = currentForRid !== lastForRid;
+  gridArea.dataset.lastForResourceId = currentForRid || '';
+
   const existingWidgetEls = {};
-  gridArea.querySelectorAll('.views-tile[data-noteid]').forEach(function(el) {
-    const nid = el.dataset.noteid;
-    const canvas = el.querySelector('.tile-canvas');
-    if (canvas && canvas.dataset.widgetRendered) {
-      existingWidgetEls[nid] = el;
-    }
-  });
+  if (!forRidChanged) {
+    gridArea.querySelectorAll('.views-tile[data-noteid]').forEach(function(el) {
+      const nid = el.dataset.noteid;
+      const canvas = el.querySelector('.tile-canvas');
+      if (canvas && canvas.dataset.widgetRendered) {
+        existingWidgetEls[nid] = el;
+      }
+    });
+  }
 
   gridArea.innerHTML = '';
   rows.forEach(function(row) {
@@ -3374,7 +3384,15 @@ function startWidgetRefresh(tileEl, noteId, widgetId, config) {
   tileEl._widgetInterval = setInterval(function() {
     const canvas = tileEl.querySelector('.tile-canvas');
     if (!canvas || tileEl.classList.contains('minimized')) return;
-    WIDGET_REGISTRY.render(widgetId, config, canvas, _widgetContext());
+    // Re-read config from workspace each tick so forResourceId is always current
+    const cv = (typeof _cv === 'function') ? _cv() : null;
+    const liveConfig = cv
+      ? (function() {
+          var t = (cv.tiles || []).find(function(t) { return t.noteId === noteId; });
+          return (t && t.widgetConfig) ? t.widgetConfig : config;
+        })()
+      : config;
+    WIDGET_REGISTRY.render(widgetId, liveConfig, canvas, _widgetContext());
   }, widget.refreshInterval);
 }
 
