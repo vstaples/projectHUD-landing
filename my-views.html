@@ -1139,15 +1139,15 @@ function _notesWireRowDrag(bar) {
 }
 
 function _notesTileHTML(note, tileState, readOnly) {
-  // MY VIEWS: widget tiles only — no chat, no block editor, no invite
-  const _tileIsWidget = tileState && tileState.canvasMode === 'widget';
-  const modeBtn = (window._notesModeBtn ? window._notesModeBtn(note.id, tileState) : '');
+  // MY VIEWS: widget tiles only — no chat, no block editor, no invite.
+  // Mode btn + gear btn are intentionally NOT baked in here — injectModeSwitcher
+  // (Block 2, _viewsPostWire) inserts them in the correct order after Block 2 loads.
+  // This keeps button order consistent: title | [mode] | [gear] | maximize | close
   const closeBtn = '<button class="views-tile-ctrl" title="Close" onclick="_notesCloseTile(\'' + note.id + '\')"' +
     ' style="color:rgba(226,75,74,.5);font-size:14px;line-height:1;background:none;border:none;cursor:pointer;padding:0 2px">×</button>';
   return '<div class="views-tile-header" style="position:relative">' +
     '<div class="views-tile-title" contenteditable="false" spellcheck="false" ' +
       'data-viewid="' + _esc(note.id) + '">' + _esc(note.title || 'Untitled') + '</div>' +
-    modeBtn +
     '<button class="views-tile-ctrl" id="views-max-btn-' + note.id + '" title="Maximize" ' +
       'onclick="_notesMaximizeTile(\'' + note.id + '\')" ' +
       'style="font-size:13px;opacity:.6">◻</button>' +
@@ -3429,11 +3429,128 @@ _loadResources();
 
 window._notesGetInviteResources = function() { return window._inviteResources || []; };
 
-window._notesShowResourcePicker = function(anchorEl, onSelect) {
-  // Delegates to PersonPicker — the single source of truth for person selection UI.
-  // See /js/person-picker.js for the full implementation.
+window._notesShowResourcePicker = function(anchorEl, onSelect, opts) {
+  // If person-picker.js is loaded (compass.html shared script), delegate to it.
+  // If not yet loaded, fall back to the inline grouped implementation below.
   if (window.PersonPicker) {
-    window.PersonPicker.show(anchorEl, onSelect);
+    window.PersonPicker.show(anchorEl, onSelect, opts);
+    return;
+  }
+  // ── Inline grouped picker (used when person-picker.js not yet loaded) ────
+  var resources = (opts && opts.resources) || window._inviteResources || [];
+  var COLORS    = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+    ? window.PARTICIPANT_COLORS
+    : ['#00D2FF','#8B5CF6','#1D9E75','#EF9F27','#E24B4A','#58a6ff'];
+  var myResId = window._notesResource && window._notesResource.id;
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function initials(n){ return (n||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase(); }
+
+  function buildAndShow(list) {
+    document.querySelectorAll('.pp-overlay').forEach(function(el){el.remove();});
+    var pop = document.createElement('div');
+    pop.className = 'pp-overlay';
+    pop.style.cssText = 'position:fixed;z-index:9999;background:var(--bg1,#0c1628);' +
+      'border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 40px rgba(0,0,0,.65);' +
+      'width:280px;max-height:340px;display:flex;flex-direction:column;overflow:hidden;border-radius:4px';
+
+    var search = document.createElement('input');
+    search.type='text'; search.placeholder='Search by name or department…'; search.autocomplete='off';
+    search.style.cssText='padding:8px 12px;background:var(--bg0,#060a10);border:none;' +
+      'border-bottom:1px solid rgba(0,210,255,.12);color:var(--text0,#F0F6FF);' +
+      'font-family:var(--font-mono,monospace);font-size:12px;outline:none;flex-shrink:0';
+    pop.appendChild(search);
+
+    var listEl = document.createElement('div');
+    listEl.style.cssText='overflow-y:auto;flex:1';
+    pop.appendChild(listEl);
+
+    function renderRows(filter) {
+      var filtered = filter ? list.filter(function(r){
+        var low=filter.toLowerCase();
+        return r.name.toLowerCase().includes(low)||(r.department||'').toLowerCase().includes(low)||(r.title||'').toLowerCase().includes(low);
+      }) : list;
+
+      // Group by department / External
+      var groups={};
+      filtered.forEach(function(r){
+        var g = r.is_external?'External':(r.department||'Other');
+        if(!groups[g])groups[g]=[];
+        groups[g].push(r);
+      });
+      var keys = Object.keys(groups).sort(function(a,b){
+        if(a==='External')return 1; if(b==='External')return -1; return a.localeCompare(b);
+      });
+
+      var html=''; var ci=0;
+      keys.forEach(function(g){
+        html+='<div style="padding:4px 12px 2px;font-family:var(--font-mono,monospace);font-size:9px;'+
+          'color:var(--text3,#6A94B8);letter-spacing:.1em;text-transform:uppercase;'+
+          'border-top:1px solid rgba(0,210,255,.07);margin-top:2px">'+esc(g)+'</div>';
+        groups[g].forEach(function(r){
+          var col=COLORS[ci%COLORS.length]; ci++;
+          var ini=initials(r.name);
+          var isMe=r.id===myResId;
+          html+='<div class="pp-row" data-rid="'+esc(r.id)+'" data-uid="'+esc(r.user_id||'')+'" data-name="'+esc(r.name)+'" '+
+            'style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer">'+
+            '<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;'+
+              'justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-mono,monospace);'+
+              'background:'+col+'22;color:'+col+';border:1.5px solid '+col+'55">'+ini+'</div>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-family:var(--font-mono,monospace);font-size:13px;color:var(--text0,#F0F6FF);'+
+                'display:flex;align-items:center;gap:5px">'+esc(r.name)+
+                (isMe?'<span style="font-size:9px;color:var(--text3,#6A94B8)">(you)</span>':'')+
+              '</div>'+
+              (r.title?'<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);'+
+                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.title)+'</div>':'')+
+            '</div></div>';
+        });
+      });
+      if(!html) html='<div style="padding:12px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3)">No results</div>';
+      listEl.innerHTML=html;
+      listEl.querySelectorAll('.pp-row').forEach(function(row){
+        row.onmouseenter=function(){this.style.background='rgba(0,210,255,.05)';};
+        row.onmouseleave=function(){this.style.background='';};
+        row.onclick=function(){
+          var res=list.find(function(r){return r.id===this.dataset.rid;}.bind(this));
+          pop.remove();
+          if(res) onSelect(res);
+        };
+      });
+    }
+
+    search.addEventListener('input', function(){renderRows(this.value);});
+    renderRows('');
+    document.body.appendChild(pop);
+    var rect=anchorEl.getBoundingClientRect();
+    var left=Math.min(rect.left, window.innerWidth-290);
+    var top=rect.bottom+4;
+    if(top+340>window.innerHeight) top=rect.top-344;
+    pop.style.left=left+'px'; pop.style.top=top+'px';
+    setTimeout(function(){
+      document.addEventListener('mousedown',function _c(e){
+        if(!pop.contains(e.target)&&e.target!==anchorEl){pop.remove();document.removeEventListener('mousedown',_c);}
+      });
+    },0);
+    search.focus();
+  }
+
+  if (resources.length > 0) {
+    buildAndShow(resources);
+  } else {
+    // Fetch if not yet loaded
+    var api = (typeof API !== 'undefined' && API) || null;
+    var FIRM = (typeof FIRM_ID !== 'undefined' ? FIRM_ID : null) || window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+    if (!api) return;
+    api.get('resources?firm_id=eq.'+FIRM+'&select=id,first_name,last_name,user_id,department,is_external,title&order=first_name.asc&limit=200')
+      .then(function(rows){
+        var list=(Array.isArray(rows)?rows:[]).map(function(r){
+          return {id:r.id,user_id:r.user_id,name:((r.first_name||'')+' '+(r.last_name||'')).trim(),
+            department:r.department||null,is_external:r.is_external||false,title:r.title||null};
+        });
+        window._inviteResources=list;
+        buildAndShow(list);
+      }).catch(function(){});
   }
 };
 
@@ -3508,38 +3625,41 @@ function renderTileCanvas(tileEl, tileState, note, forceRefresh) {
 // ── Mode switcher button (injected into tile header) ──────────────────────
 function injectModeSwitcher(tileEl, tileState) {
   const header = tileEl.querySelector('.views-tile-header');
-  if (!header || header.querySelector('.tile-header-mode-btn')) return;
+  if (!header) return;
 
-  const mode   = tileState.canvasMode || 'note';
-  const label  = mode === 'widget' ? (WIDGET_REGISTRY.get(tileState.widgetId)?.label || 'Widget') : 'Note';
-  const btn    = document.createElement('button');
-  btn.className = 'tile-header-mode-btn' + (mode === 'widget' ? ' widget-active' : '');
-  btn.title     = mode === 'widget' ? 'Switch mode or reconfigure widget' : 'Switch canvas mode';
+  // Remove any existing mode/gear buttons before re-injecting (handles re-render after config)
+  header.querySelectorAll('.tile-header-mode-btn').forEach(function(el) { el.remove(); });
+
+  const mode  = tileState.canvasMode || 'note';
+  const label = mode === 'widget' ? (WIDGET_REGISTRY.get(tileState.widgetId)?.label || 'Widget') : 'Note';
+
+  // Insert before maximize button so order is: title | [mode] | [gear] | maximize | close
+  const maxBtn = header.querySelector('[id^="views-max-btn-"]');
+
+  const btn = document.createElement('button');
+  btn.className   = 'tile-header-mode-btn' + (mode === 'widget' ? ' widget-active' : '');
+  btn.title       = mode === 'widget' ? 'Switch mode or reconfigure widget' : 'Switch canvas mode';
   btn.textContent = label;
-
-  // Insert before the invite button
-  const inviteBtn = header.querySelector('.views-invite-btn');
-  if (inviteBtn) header.insertBefore(btn, inviteBtn);
-  else header.appendChild(btn);
-
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
     showModeSwitcher(btn, tileState);
   });
+  if (maxBtn) header.insertBefore(btn, maxBtn);
+  else header.appendChild(btn);
 
-  // If in widget mode, also add a ⚙ reconfigure button
+  // Gear button — always present on widget tiles for easy reconfiguration
   if (mode === 'widget' && tileState.widgetId) {
     const gearBtn = document.createElement('button');
-    gearBtn.className = 'tile-header-mode-btn';
-    gearBtn.title     = 'Reconfigure widget';
-    gearBtn.textContent = '⚙';
+    gearBtn.className       = 'tile-header-mode-btn';
+    gearBtn.title           = 'Reconfigure widget';
+    gearBtn.textContent     = '⚙';
     gearBtn.dataset.widgetGear = '1';
-    if (inviteBtn) header.insertBefore(gearBtn, inviteBtn);
-    else header.appendChild(gearBtn);
     gearBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       showWidgetConfig(tileState.widgetId, tileState, tileState.widgetConfig || {});
     });
+    if (maxBtn) header.insertBefore(gearBtn, maxBtn);
+    else header.appendChild(gearBtn);
   }
 }
 
