@@ -1,25 +1,6 @@
-<!-- my-time.html — Compass My Time module
-     Loaded dynamically by compass.html via loadMyTimeView() in mw-tabs.js.
-
-     EXPORTS
-       window._mtLoadView()   — first-load init: wires events + renders
-       window._mtRefresh()    — re-render on tab revisit (re-stamps globals from compass.html scope)
-
-     SHARED GLOBALS (set by mw-tabs.js loadMyTimeView before calling _mtLoadView)
-       window._mtResource     — {id, user_id, name} for the logged-in user
-       window._mtProjects     — _projects array from compass.html scope
-       window._mtTasks        — _tasks array from compass.html scope
-
-     SHARED GLOBALS (read bare-name, declared as `let` at compass.html top level)
-       _myResource, _projects, _tasks — accessible because they live in the top-level
-       script scope of compass.html (not inside an IIFE). Re-stamped on every _mtRefresh.
-
-     DEPENDENCIES (must be available on window before _mtLoadView runs)
-       API                    — Supabase wrapper from api.js
-       compassToast           — toast helper from ui.js
-       openFullWeeklyTimesheet — drawer from mw-timesheet.js (optional, degrades gracefully)
-       window.fmtDate         — date formatter from mw-core.js (optional, has local fallback)
--->
+<!-- my-time.html — Compass My Time module -->
+<!-- Exports: window._mtLoadView, window._mtRefresh -->
+<!-- Loaded dynamically by compass.html; depends on shared globals set before load -->
 
 <div id="mt-root">
 <style>
@@ -950,9 +931,6 @@ function buildNextWeekPanel(sun) {
   wireNwFlags();
 }
 
-/* ─── NEXT WEEK FLAG WIRING ──────────────────────────────────────────── */
-/* Called after buildNextWeekPanel renders — caches flag textarea values   */
-/* in _flagCache so they survive panel re-renders on week navigation.      */
 function wireNwFlags() {
   document.querySelectorAll('#mt-nw-body .mt-flag-inp').forEach(inp => {
     inp.addEventListener('input', function() {
@@ -1090,10 +1068,6 @@ async function submitNextWeekPlan() {
 }
 
 /* ─── UTILITY LOOKUPS ────────────────────────────────────────────────── */
-/* getProjectName / getTaskName read from window._mtProjects / window._mtTasks,  */
-/* which are set by mw-tabs.js loadMyTimeView() before _mtLoadView is called.    */
-/* fmtDate delegates to window.fmtDate (mw-core.js) if available, else falls     */
-/* back to a local implementation — safe to call before my-work loads.           */
 function getProjectName(pid) {
   if (!pid || pid === '__none__') return null;
   const projects = window._mtProjects || [];
@@ -1172,8 +1146,7 @@ function wireEvents() {
   if (editTs) editTs.addEventListener('click', () => {
     // Delegate to my-work.html's openFullWeeklyTimesheet if available
     if (window.openFullWeeklyTimesheet) {
-      // openFullWeeklyTimesheet expects { expandDay } — pass empty object (opens to current week)
-      window.openFullWeeklyTimesheet({});
+      window.openFullWeeklyTimesheet(_weekOffset);
     } else {
       window.compassToast && compassToast('Timesheet edit coming soon', 2000);
     }
@@ -1204,5 +1177,5 @@ window._mtRefresh = async function() {
   await renderAll();
 };
 
-})(); // end my-time.html module IIFE
+})();
 </script>

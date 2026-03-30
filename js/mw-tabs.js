@@ -171,9 +171,18 @@ window.loadMyTimeView = async function() {
       if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
     });
     for (const s of doc.querySelectorAll('script')) {
-      const el = document.createElement('script');
-      el.textContent = s.textContent;
-      document.head.appendChild(el);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
     window._myTimeLoaded = true;
     // Hand scoped lets from compass.html to my-time.html via window
@@ -215,9 +224,18 @@ window.loadMyCalView = async function() {
       if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
     });
     for (const s of doc.querySelectorAll('script')) {
-      const el = document.createElement('script');
-      el.textContent = s.textContent;
-      document.head.appendChild(el);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
     // Bridge scoped vars from compass.html / my-work.html into my-calendar.html
     window._calResource    = typeof _myResource !== 'undefined' ? _myResource : null;
@@ -257,9 +275,18 @@ window.loadMyMeetingsView = async function() {
       if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
     });
     for (const s of doc.querySelectorAll('script')) {
-      const el = document.createElement('script');
-      el.textContent = s.textContent;
-      document.head.appendChild(el);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
     // Bridge resource
     window._mtgResource = typeof _myResource !== 'undefined' ? _myResource : null;
@@ -296,9 +323,18 @@ window.loadMyNotesView = async function() {
       if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
     });
     for (const s of doc.querySelectorAll('script')) {
-      const el = document.createElement('script');
-      el.textContent = s.textContent;
-      document.head.appendChild(el);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
     // Bridge resource
     window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
@@ -333,9 +369,18 @@ window.loadMyViewsView = async function() {
       if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
     });
     for (const s of doc.querySelectorAll('script')) {
-      const el = document.createElement('script');
-      el.textContent = s.textContent;
-      document.head.appendChild(el);
+      await new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        if (s.src) {
+          el.src = s.src;
+          el.onload  = resolve;
+          el.onerror = () => reject(new Error('Failed to load ' + s.src));
+        } else {
+          el.textContent = s.textContent;
+        }
+        document.head.appendChild(el);
+        if (!s.src) resolve();
+      });
     }
     // Bridge resource — same pattern as MY NOTES
     window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
