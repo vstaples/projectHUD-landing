@@ -923,7 +923,7 @@ function _notesRenderGrid() {
           (function(rid, sl) {
             div.onclick = function(e) {
               if (e.target.closest && e.target.closest('button')) return;
-              if (window._notesNew) window._notesNew(rid, sl);
+              if (window._viewsNew) window._viewsNew(rid, sl);
             };
           })(row.id, s);
         }
@@ -3160,6 +3160,7 @@ window._notesSetGrid       = _notesSetGrid;
 window._viewsOpenNote   = _notesOpenNote; // scoped — do NOT overwrite MY NOTES
 window._viewsCloseTile  = _notesCloseTile; // scoped — do NOT overwrite MY NOTES
 window._viewsNew        = _notesNew; // scoped — do NOT overwrite MY NOTES
+window._notesNew        = _notesNew; // also needed by empty-slot onclick guard
 window._notesSearch        = _notesSearch;
 window._notesToggleSection = _notesToggleSection;
 window._viewsSwitchView      = _notesSwitchView; // scoped — do NOT overwrite MY NOTES
