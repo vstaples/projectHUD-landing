@@ -1,6 +1,47 @@
-<!-- my-notes.html — Compass My Notes module -->
-<!-- Exports: window._notesLoadView, window._notesRefresh -->
-<!-- Replaces utc-concerns / My Concerns tab -->
+<!-- my-notes.html — Compass My Notes module
+     Loaded dynamically by compass.html via loadMyNotesView() in mw-tabs.js.
+
+     PURPOSE
+       Personal knowledge management tool. Searchable tree of notes, block editor,
+       real-time collaboration, presence awareness, inbox, shared views.
+       No widgets. No widget registry. Widget-guard checks (if window.WIDGET_REGISTRY)
+       remain in the grid/tile code but silently no-op — WIDGET_REGISTRY is never
+       populated in this module.
+
+     EXPORTS
+       window._notesLoadView()      — first-load init: fetch notes, load workspace, render
+       window._notesRefresh()       — re-render on tab revisit
+       window._notesCv()            — accessor for current named view state
+       window._notesSaveNow()       — save workspace to state.views root key
+       window._notesRenderLeft()    — re-render left panel (tree + inbox)
+       window._notesRenderGrid()    — re-render tile grid
+       window._notesGetViewerRole() — shared-view role for read-only enforcement
+       window._notesGetMyColor()    — per-user block color for collaboration
+
+     WORKSPACE PERSISTENCE
+       Reads/writes state.views at root of notes_workspace table.
+       MY VIEWS writes state.viewsWorkspace (sub-key). These never collide.
+
+     SHARED GLOBALS (set by mw-tabs.js loadMyNotesView before calling _notesLoadView)
+       window._notesResource        — {id, user_id, name} for the logged-in user
+       window._myResource           — fallback from compass.html scope
+
+     DEPENDENCIES
+       API                          — Supabase wrapper from api.js
+       compassToast                 — toast helper from ui.js
+
+     SCRIPT BLOCKS (2 total — widget blocks 3+4 removed)
+       Block 1 (this block): notes shell, workspace, tree, grid, tile, block editor,
+                             view management, shared views, templates
+       Block 2: collaboration system (presence, invite, heartbeat, sync, participant cards)
+
+     WHAT WAS REMOVED (widgets — never belonged here)
+       — Block 3: widget system infrastructure (WIDGET_REGISTRY, renderTileCanvas)
+       — Block 4: widget library (hours_by_day, task_list, action_item_list, etc.)
+       Widget library now lives exclusively in MY VIEWS. MY NOTES has zero widget capability.
+
+     FONT POLICY: var(--font-mono) throughout. --font-ui/--font-head/--font-display banned.
+-->
 
 <style>
 /* ── Shell ───────────────────────────────────────────────────────────────── */
@@ -14,12 +55,12 @@
 #notes-left-header{padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.08);flex-shrink:0}
 #notes-search:focus{border-color:rgba(0,210,255,.35)}
 #notes-search::placeholder{color:var(--text3,#6A94B8)}
-#notes-new-btn{width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-head,'Barlow Condensed',sans-serif);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
+#notes-new-btn{width:100%;background:none;border:1px dashed rgba(0,210,255,.2);color:rgba(0,210,255,.5);font-family:var(--font-mono);font-size:11px;letter-spacing:.07em;padding:5px;cursor:pointer;transition:all .12s;text-transform:uppercase}
 #notes-new-btn:hover{border-color:rgba(0,210,255,.5);color:#00D2FF;background:rgba(0,210,255,.04)}
 
 /* ── Inbox section ───────────────────────────────────────────────────────── */
 #notes-inbox-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
-.notes-section-hdr{padding:6px 14px;font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.notes-section-hdr{padding:6px 14px;font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2,#90B8D8);display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
 .notes-section-hdr:hover{color:var(--text2,#90B8D8)}
 .notes-inbox-count{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.1);color:#00D2FF;border:0.5px solid rgba(0,210,255,.2);border-radius:2px;margin-left:auto}
 #notes-inbox-list{max-height:180px;overflow-y:auto}#notes-inbox-list .notes-item{padding-left:24px}
@@ -38,19 +79,19 @@
 .notes-item.active{background:rgba(0,210,255,.06);border-left-color:#00D2FF}
 .notes-item.in-grid{background:rgba(0,210,255,.05);border-left-color:#00D2FF}.notes-item.in-grid .notes-item-title{color:rgba(0,210,255,.7)}.notes-slot-badge{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.15);border:0.5px solid rgba(0,210,255,.4);color:#00D2FF;border-radius:2px;flex-shrink:0;margin-top:2px}
 .notes-item-body{flex:1;min-width:0}
-.notes-item-title{font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:400;color:var(--text1,#C8DFF0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.notes-item-title{font-family:var(--font-mono);font-size:12px;font-weight:400;color:var(--text1,#C8DFF0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .notes-item-meta{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .notes-item-source{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);color:var(--text3);border-radius:2px;flex-shrink:0;margin-top:2px}
 
 /* ── Tree nodes ──────────────────────────────────────────────────────────── */
-.notes-branch{padding:5px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:700;color:var(--text0,#F0F6FF);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.02em}
+.notes-branch{padding:5px 14px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text0,#F0F6FF);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;letter-spacing:.02em}
 .notes-branch-label,.notes-subbranch-label{flex:1;outline:none;cursor:text}
 .notes-branch-label:focus,.notes-subbranch-label:focus{color:var(--text0,#F0F6FF)}
 .notes-branch-add{width:14px;height:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0;opacity:0;transition:opacity .1s;flex-shrink:0;line-height:1}
 .notes-branch-del{width:14px;height:14px;background:none;border:none;color:rgba(226,75,74,.5);cursor:pointer;font-size:11px;padding:0;opacity:0;transition:opacity .1s;flex-shrink:0;line-height:1}
 .notes-branch:hover .notes-branch-add,.notes-branch:hover .notes-branch-del,
 .notes-subbranch:hover .notes-branch-add,.notes-subbranch:hover .notes-branch-del{opacity:1}
-.notes-add-root{padding:4px 14px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:11px;color:rgba(0,210,255,.4);cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:none;width:100%;transition:color .12s}
+.notes-add-root{padding:4px 14px;font-family:var(--font-mono);font-size:11px;color:rgba(0,210,255,.4);cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:none;width:100%;transition:color .12s}
 .notes-add-root:hover{color:#00D2FF}
 .notes-drop-target{background:rgba(0,210,255,.08)!important;border-left:2px solid rgba(0,210,255,.6)!important}.notes-children.notes-drop-target{background:transparent!important;border-left:none!important}
 .notes-drop-before{position:relative}
@@ -62,7 +103,7 @@
   background:#00D2FF;z-index:10;pointer-events:none;
   box-shadow:0 0 6px rgba(0,210,255,.6)}
 .notes-branch:hover{color:var(--text0,#F0F6FF)}
-.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.notes-subbranch{padding:4px 14px 4px 26px;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--text2,#90B8D8);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
 .notes-subbranch:hover{color:var(--text2)}
 .notes-chevron{width:10px;height:10px;transition:transform .15s;flex-shrink:0;opacity:.7;color:var(--text2,#90B8D8)}
 .notes-chevron.open{transform:rotate(90deg)}
@@ -74,10 +115,10 @@
 /* ── Grid workspace ──────────────────────────────────────────────────────── */
 #notes-right{display:flex;flex-direction:column;overflow:hidden}
 #notes-grid-header{padding:6px 16px;border-bottom:1px solid rgba(0,210,255,.08);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;flex-shrink:0}
-#notes-header-user{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:20px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#EF9F27;white-space:nowrap;pointer-events:none;text-align:center;justify-self:center;min-width:1px;visibility:hidden}
+#notes-header-user{font-family:var(--font-mono);font-size:20px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#EF9F27;white-space:nowrap;pointer-events:none;text-align:center;justify-self:center;min-width:1px;visibility:hidden}
 #notes-header-user.has-name{visibility:visible}
 #notes-grid-label{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);flex:1}
-.notes-grid-btn{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
+.notes-grid-btn{font-family:var(--font-mono);font-size:13px;padding:3px 8px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);cursor:pointer;transition:all .12s;letter-spacing:.04em}
 .notes-grid-btn:hover{border-color:rgba(0,210,255,.3);color:#00D2FF}
 .notes-grid-btn.active{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
 /* ── Row editor bar ── */
@@ -116,9 +157,9 @@
 .notes-invite-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:420px;max-width:95vw;padding:0}
 .nid-header{padding:20px 24px 16px;border-bottom:1px solid rgba(0,210,255,.1)}
 .nid-from{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
-.nid-title{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:18px;font-weight:700;color:var(--text0,#F0F6FF);margin-bottom:4px}
-.nid-note-name{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:14px;color:#00D2FF;margin-top:2px}
-.nid-body{padding:18px 24px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;color:var(--text2);line-height:1.6}
+.nid-title{font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--text0,#F0F6FF);margin-bottom:4px}
+.nid-note-name{font-family:var(--font-mono);font-size:14px;color:#00D2FF;margin-top:2px}
+.nid-body{padding:18px 24px;font-family:var(--font-mono);font-size:13px;color:var(--text2);line-height:1.6}
 .nid-actions{padding:14px 24px;border-top:1px solid rgba(0,210,255,.1);display:flex;gap:10px;justify-content:flex-end}
 .nid-btn{font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.08em;padding:9px 20px;cursor:pointer;transition:all .15s}
 .nid-btn-reject{background:none;border:1px solid rgba(226,75,74,.3);color:rgba(226,75,74,.7)}
@@ -146,12 +187,12 @@
 .notes-tile.empty:hover{background:rgba(0,210,255,.03);border-color:rgba(0,210,255,.25)}
 .notes-tile-header{padding:6px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15)}.notes-tile-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes-presence{display:flex;align-items:center;gap:3px;flex-shrink:0}
-.notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:pointer;position:relative}
+.notes-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;font-weight:700;color:#000;flex-shrink:0;border:1.5px solid rgba(0,0,0,.3);cursor:pointer;position:relative}
 .notes-avatar.active::after{content:"";position:absolute;bottom:-1px;right:-1px;width:5px;height:5px;border-radius:50%;background:#1D9E75;border:1px solid #0c1628}
 .notes-participant-card{position:fixed;z-index:1000;width:340px;background:var(--bg1,#0c1628);border:1px solid var(--border2,rgba(0,210,255,.2));box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 0 1px rgba(0,210,255,.08);pointer-events:all;overflow-y:auto;max-height:calc(100vh - 20px)}
 .npc-top{padding:14px 16px 10px;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:flex-start;gap:12px}
-.npc-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:15px;font-weight:700;flex-shrink:0}
-.npc-name{font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:15px;font-weight:700;color:var(--text0,#F0F6FF)}
+.npc-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:15px;font-weight:700;flex-shrink:0}
+.npc-name{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text0,#F0F6FF)}
 .npc-title{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3,#6A94B8);margin-top:2px}
 .npc-section{padding:10px 16px;border-bottom:1px solid rgba(0,210,255,.06)}
 .npc-section:last-child{border-bottom:none}
@@ -167,24 +208,24 @@
 .notes-invite-btn{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;padding:0}
 .notes-invite-btn:hover{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.4);color:#00D2FF}
 .notes-invite-pop{position:fixed;z-index:1000;cursor:default;user-select:none;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px;min-width:260px;max-height:70vh;overflow-y:auto}
-.notes-invite-pop input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;padding:5px 8px;outline:none;margin-bottom:6px;box-sizing:border-box}
+.notes-invite-pop input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-mono);font-size:12px;padding:5px 8px;outline:none;margin-bottom:6px;box-sizing:border-box}
 .notes-invite-pop input:focus{border-color:rgba(0,210,255,.4)}
 .notes-invite-result{max-height:480px;overflow-y:auto;cursor:default}.notes-invite-pop .notes-invite-row{cursor:pointer}
-.notes-invite-row{padding:5px 7px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:12px;color:var(--text1);transition:background .1s}
+.notes-invite-row{padding:5px 7px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;color:var(--text1);transition:background .1s}
 .notes-invite-row:hover{background:rgba(0,210,255,.06)}
 .notes-invite-row .notes-avatar{width:22px;height:22px;font-size:10px}
-.notes-tile-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none}
+.notes-tile-title{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none}
 .notes-tile-title:focus{color:#00D2FF}
 .notes-tile-source{font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;background:rgba(0,210,255,.08);border:0.5px solid rgba(0,210,255,.2);color:rgba(0,210,255,.7);border-radius:2px;flex-shrink:0}
 .notes-tile-ctrl{width:16px;height:16px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;display:flex;align-items:center;justify-content:center;transition:color .1s;flex-shrink:0}
 .notes-tile-ctrl:hover{color:var(--text0)}
 .notes-tile-body{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
-.notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
+.notes-tile-canvas{flex:1;padding:10px 12px;overflow-y:auto;font-family:var(--font-mono);font-size:13px;color:var(--text1,#C8DFF0);line-height:1.75;resize:none;background:transparent;border:none;outline:none;min-height:0}
 .notes-tile-canvas::placeholder{color:var(--text3);font-style:italic}
 /* ── Block collaborative canvas ── */
 .notes-block-canvas{display:flex;flex-direction:column;gap:0;flex:1;min-height:0;overflow-y:auto;padding:10px 12px;box-sizing:border-box}
 .nbc-block{position:relative;outline:none;min-height:1.6em;line-height:1.75;caret-color:#00D2FF;
-  font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;color:var(--text1,#C8DFF0);
+  font-family:var(--font-mono);font-size:13px;color:var(--text1,#C8DFF0);
   word-break:break-word;cursor:text;transition:background .1s;
   display:flex;align-items:flex-start;gap:6px}
 .nbc-block-text{flex:1;min-width:0;outline:none;word-break:break-word;line-height:1.75}
@@ -192,21 +233,21 @@
 .nbc-block[contenteditable="false"]{cursor:default}
 .nbc-avatar{width:16px;height:16px;border-radius:50%;flex-shrink:0;margin-top:2px;
   display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:8px;font-weight:700;
+  font-family:var(--font-mono);font-size:8px;font-weight:700;
   pointer-events:none}
 
 /* ── Chat panel — bottom strip ───────────────────────────────────────────── */
 .notes-chat{border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;max-height:160px}
 .notes-chat.hidden{display:none}
 .notes-chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
-.notes-chat-msg{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;line-height:1.5}
+.notes-chat-msg{font-family:var(--font-mono);font-size:13px;line-height:1.5}
 .notes-chat-author{font-weight:600;color:var(--text2);margin-bottom:1px}
 .notes-chat-body{color:var(--text1)}
 .notes-chat-time{color:var(--text3);font-size:11px}
 .notes-chat-compose{border-top:1px solid rgba(0,210,255,.08);padding:6px 8px;display:flex;gap:5px}
-.notes-chat-input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0);font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:4px 7px;outline:none;resize:none}
+.notes-chat-input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.12);color:var(--text0);font-family:var(--font-mono);font-size:13px;padding:4px 7px;outline:none;resize:none}
 .notes-chat-input:focus{border-color:rgba(0,210,255,.3)}
-.notes-chat-send{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.3);color:#00D2FF;font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:4px 8px;cursor:pointer}
+.notes-chat-send{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.3);color:#00D2FF;font-family:var(--font-mono);font-size:13px;padding:4px 8px;cursor:pointer}
 .notes-chat-send:hover{background:rgba(0,210,255,.18)}
 
 /* ── Empty grid slot ─────────────────────────────────────────────────────── */
@@ -219,7 +260,7 @@
 #notes-library-section{flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08)}
 .notes-lib-entry{padding:5px 14px 5px 28px;display:flex;align-items:center;gap:6px;cursor:default}
 .notes-lib-entry:hover{background:rgba(0,210,255,.03)}
-.notes-lib-name{font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notes-lib-name{font-family:var(--font-mono);font-size:12px;color:var(--text1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes-lib-badge{font-family:var(--font-mono,monospace);font-size:9px;padding:1px 5px;border:0.5px solid rgba(0,210,255,.2);color:var(--text3);background:rgba(0,210,255,.06);flex-shrink:0}
 .notes-lib-launch{font-family:var(--font-mono,monospace);font-size:9px;padding:2px 7px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF;cursor:pointer;opacity:0;transition:opacity .1s;flex-shrink:0}
 .notes-lib-entry:hover .notes-lib-launch{opacity:1}
@@ -231,12 +272,12 @@
 .ntd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .ntd-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:460px;max-width:95vw}
 .ntd-header{padding:18px 24px 14px;border-bottom:1px solid rgba(0,210,255,.1)}
-.ntd-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:17px;font-weight:700;color:var(--text0);margin-bottom:2px}
+.ntd-title{font-family:var(--font-mono);font-size:17px;font-weight:700;color:var(--text0);margin-bottom:2px}
 .ntd-sub{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
 .ntd-body{padding:16px 24px;display:flex;flex-direction:column;gap:12px}
 .ntd-field{display:flex;flex-direction:column;gap:4px}
 .ntd-label{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
-.ntd-input{background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:6px 10px;outline:none;width:100%;box-sizing:border-box}
+.ntd-input{background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-mono);font-size:13px;padding:6px 10px;outline:none;width:100%;box-sizing:border-box}
 .ntd-input:focus{border-color:rgba(0,210,255,.4)}
 .ntd-select{background:#0a1628;border:1px solid rgba(0,210,255,.15);color:var(--text2);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 8px;outline:none;width:100%;cursor:pointer}
 .ntd-select:focus{border-color:rgba(0,210,255,.4)}
@@ -261,11 +302,11 @@
 /* ── Widget system ───────────────────────────────────────────────────────── */
 .widget-error{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--font-mono,monospace);font-size:11px;color:#E24B4A;padding:8px;text-align:center}
 .widget-loading{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);letter-spacing:.06em}
-.widget-stat-row{display:flex;gap:8px;justify-content:center;padding:4px 8px;font-family:var(--font-ui,'Barlow Condensed',sans-serif)}
+.widget-stat-row{display:flex;gap:8px;justify-content:center;padding:4px 8px;font-family:var(--font-mono)}
 .wsr-item{display:flex;flex-direction:column;align-items:center;gap:1px}
 .wsr-val{font-size:13px;font-weight:500;line-height:1;color:var(--text0)}
 .wsr-lbl{font-size:9px;color:var(--text3);letter-spacing:.04em;text-transform:uppercase}
-.widget-counter{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;font-family:var(--font-ui,'Barlow Condensed',sans-serif);padding:8px}
+.widget-counter{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;font-family:var(--font-mono);padding:8px}
 .wc-big{font-size:32px;font-weight:600;line-height:1;color:var(--text0)}
 .wc-label{font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase}
 .wc-breakdown{display:flex;gap:10px;font-size:10px;margin-top:2px}
@@ -276,14 +317,14 @@
 .tile-header-mode-btn.widget-active{background:rgba(0,210,255,.15);border-color:rgba(0,210,255,.4);color:#00D2FF}
 /* Mode switcher dropdown */
 .widget-mode-pop{position:fixed;z-index:800;background:#0d1e35;border:1px solid rgba(0,210,255,.25);box-shadow:0 8px 32px rgba(0,0,0,.7);min-width:160px;padding:4px 0}
-.widget-mode-item{padding:7px 14px;font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.widget-mode-item{padding:7px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
 .widget-mode-item:hover{background:rgba(0,210,255,.06);color:var(--text0)}
 .widget-mode-item.active{color:#00D2FF}
 /* Widget picker modal */
 .widget-picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .widget-picker-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:560px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column}
 .widget-picker-header{padding:14px 20px;border-bottom:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:10px}
-.widget-picker-title{font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:16px;font-weight:700;color:var(--text0);flex:1}
+.widget-picker-title{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text0);flex:1}
 .widget-picker-search{background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.15);color:var(--text0);font-family:var(--font-mono,monospace);font-size:11px;padding:5px 10px;outline:none;width:180px}
 .widget-picker-search:focus{border-color:rgba(0,210,255,.4)}
 .widget-picker-body{overflow-y:auto;padding:12px 16px;flex:1}
@@ -292,7 +333,7 @@
 .widget-card{background:rgba(255,255,255,.03);border:1px solid rgba(0,210,255,.1);padding:10px 12px;cursor:pointer;transition:all .12s}
 .widget-card:hover{background:rgba(0,210,255,.06);border-color:rgba(0,210,255,.3)}
 .widget-card-icon{font-size:18px;margin-bottom:5px}
-.widget-card-name{font-family:var(--font-ui,sans-serif);font-size:12px;font-weight:600;color:var(--text0);margin-bottom:2px}
+.widget-card-name{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--text0);margin-bottom:2px}
 .widget-card-desc{font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);line-height:1.4}
 .widget-picker-close{background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0;line-height:1}
 .widget-picker-close:hover{color:var(--text0)}
@@ -363,7 +404,7 @@
       <div id="notes-view-name-wrap" style="display:flex;align-items:center;gap:6px;min-width:0">
         <select id="notes-view-switcher"
           style="background:#0a1628;border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
-            font-family:var(--font-ui,'Barlow Condensed',sans-serif);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
+            font-family:var(--font-mono);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
             font-weight:600;-webkit-appearance:auto;max-width:300px;width:auto"
           onchange="_notesSwitchView(this.value)">
         </select>
@@ -1260,7 +1301,7 @@ function _notesRenderGrid() {
         }
         div.innerHTML =
           '<div style="padding:6px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.15);width:100%;box-sizing:border-box">' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;font-weight:600;color:var(--text2);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin-right:8px">' +
+            '<div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text2);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin-right:8px">' +
               (tileIsReadOnly ? 'Empty' : 'New note…') +
             '</div>' +
             '<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">' +
@@ -1520,7 +1561,7 @@ function _notesTileHTML(note, tileState, readOnly) {
     canvasHtml +
     '<div class="notes-chat' + (chatOpen ? '' : ' hidden') + '" id="notes-chat-' + note.id + '">' +
       '<div class="notes-chat-msgs" id="notes-chat-msgs-' + note.id + '">' +
-        '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;color:var(--text3);padding:8px">Loading…</div>' +
+        '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text3);padding:8px">Loading…</div>' +
       '</div>' +
       '<div class="notes-chat-compose">' +
         '<textarea class="notes-chat-input" id="notes-chat-inp-' + note.id + '" ' +
@@ -2102,7 +2143,7 @@ async function _notesLoadAndRenderMsgs(noteId) {
   const msgsEl  = document.getElementById('notes-chat-msgs-' + noteId);
   if (!msgsEl) return;
   if (!msgs.length) {
-    msgsEl.innerHTML = '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;color:var(--text3);padding:8px">No messages yet</div>';
+    msgsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text3);padding:8px">No messages yet</div>';
     return;
   }
   msgsEl.innerHTML = msgs.map(m =>
@@ -2298,7 +2339,7 @@ async function _notesOpenFloatingNote(noteId, noteName) {
   win.innerHTML =
     '<div class="notes-float-titlebar" id="nfw-tb-' + _esc(noteId) + '">' +
       '<div class="notes-float-label">SHARED NOTE</div>' +
-      '<span style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(note.title || noteName) + '</span>' +
+      '<span style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text0,#F0F6FF);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(note.title || noteName) + '</span>' +
       '<span class="notes-float-hint">drag title bar to move</span>' +
     '<button class="notes-float-close" onclick="_notesFloatClose(\'' + _esc(noteId) + '\',this)">✕</button>' +
     '</div>' +
@@ -2471,7 +2512,7 @@ function _notesRenderLibrary() {
           '</span>' +
           (e.isActive ? '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:rgba(0,210,255,.6);margin-right:6px">active</span>' : '') +
           '<div title="' + _esc(personName) + '" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
-              'justify-content:center;font-family:var(--font-ui,sans-serif);font-size:8px;font-weight:700;' +
+              'justify-content:center;font-family:var(--font-mono);font-size:8px;font-weight:700;' +
               'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
             initials +
           '</div>' +
@@ -2608,7 +2649,7 @@ async function _notesLaunchTemplate(name) {
           '<div class="ntd-title">' + _esc(name) + '</div>' +
         '</div>' +
         '<div class="ntd-body" style="overflow-y:auto;flex:1;gap:10px;display:flex;flex-direction:column">' +
-          (tpl.description ? '<div style="font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text3)">' + _esc(tpl.description) + '</div>' : '') +
+          (tpl.description ? '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text3)">' + _esc(tpl.description) + '</div>' : '') +
           '<div class="ntd-field"><label class="ntd-label">View name</label>' +
             '<input class="ntd-input" id="ntd-launch-viewname" value="' + _esc(name) + '"/>' +
           '</div>' +
@@ -2667,7 +2708,7 @@ async function _notesLaunchTemplate(name) {
         groups[dept].forEach(function(r) {
           html += '<div class="ntd-inv-row" data-rid="' + _esc(r.id) + '" data-uid="' + _esc(r.user_id||'') + '" data-name="' + _esc(r.name) + '"' +
             ' style="padding:5px 10px;cursor:pointer;transition:background .1s">' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:12px;color:var(--text1)">' + _esc(r.name) + '</div>' +
+            '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text1)">' + _esc(r.name) + '</div>' +
             '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + _esc(r.email||'') + '</div>' +
           '</div>';
         });
@@ -3043,12 +3084,12 @@ window._notesCloneView = async function() {
             'onmouseover="this.style.background=\'rgba(0,210,255,.04)\'" ' +
             'onmouseout="this.style.background=this.classList.contains(\'selected\')?\'rgba(0,210,255,.09)\':\'\'">'+
           '<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
-              'justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-ui,sans-serif);' +
+              'justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-mono);' +
               'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
             initials +
           '</div>' +
           '<div style="flex:1;min-width:0">' +
-            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;color:var(--text0)">' +
+            '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text0)">' +
               _esc(r.name) + (isMe ? ' <span style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3)">(you)</span>' : '') +
             '</div>' +
             (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
@@ -3076,7 +3117,7 @@ window._notesCloneView = async function() {
           '</div>' +
           '<input id="clone-person-search" placeholder="Search by name or department…" autocomplete="off" ' +
             'style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.15);color:var(--text0);' +
-              'font-family:var(--font-ui,sans-serif);font-size:12px;padding:5px 8px;margin-bottom:4px;outline:none;width:100%;box-sizing:border-box"/>' +
+              'font-family:var(--font-mono);font-size:12px;padding:5px 8px;margin-bottom:4px;outline:none;width:100%;box-sizing:border-box"/>' +
           '<div id="clone-person-list" style="flex:1;max-height:280px;overflow-y:auto;' +
               'border:1px solid rgba(0,210,255,.1);background:rgba(0,0,0,.2)">' +
             personListHtml +
@@ -3373,12 +3414,12 @@ async function _notesShowRenameViewDialog(currentName) {
             'style="display:flex;align-items:center;gap:8px;padding:4px 8px;cursor:pointer;' +
               (isCurrent ? 'background:rgba(0,210,255,.09);' : '') + '">' +
           '<div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;' +
-              'justify-content:center;font-size:9px;font-weight:700;font-family:var(--font-ui,sans-serif);' +
+              'justify-content:center;font-size:9px;font-weight:700;font-family:var(--font-mono);' +
               'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' +
             initials +
           '</div>' +
           '<div style="flex:1;min-width:0">' +
-            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
+            '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
             (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
           '</div>' +
           (isCurrent ? '<span style="font-family:var(--font-mono,monospace);font-size:9px;color:rgba(0,210,255,.6)">✓</span>' : '') +
@@ -3404,7 +3445,7 @@ async function _notesShowRenameViewDialog(currentName) {
           '</div>' +
           '<input id="nrv-search" placeholder="Search…" autocomplete="off" ' +
             'style="background:rgba(0,0,0,.3);border:1px solid rgba(0,210,255,.15);color:var(--text0);' +
-              'font-family:var(--font-ui,sans-serif);font-size:12px;padding:4px 7px;margin-bottom:3px;outline:none;width:100%;box-sizing:border-box"/>' +
+              'font-family:var(--font-mono);font-size:12px;padding:4px 7px;margin-bottom:3px;outline:none;width:100%;box-sizing:border-box"/>' +
           '<div id="nrv-person-list" style="max-height:220px;overflow-y:auto;' +
               'border:1px solid rgba(0,210,255,.08);background:rgba(0,0,0,.2)">' +
             personListHtml +
@@ -3783,7 +3824,7 @@ function _notesDndInit() {
       _leftDragGhost = document.createElement('div');
       _leftDragGhost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;' +
         'background:rgba(6,10,16,.95);border:1px solid rgba(0,210,255,.5);' +
-        'padding:3px 10px;font-family:var(--font-ui,sans-serif);' +
+        'padding:3px 10px;font-family:var(--font-mono);' +
         'font-size:12px;color:#00D2FF;border-radius:2px;white-space:nowrap;' +
         'box-shadow:0 4px 16px rgba(0,0,0,.7)';
       const note = _notes.find(n => n.id === _dragNoteId);
@@ -3907,7 +3948,7 @@ function _notesDndInit() {
       e.dataTransfer.setData('application/noteid', _dragNoteId);
       const ghost = document.createElement('div');
       ghost.textContent = item.querySelector('.notes-item-title')?.textContent || 'Note';
-      ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;background:#0d1e35;border:1px solid rgba(0,210,255,.35);color:#00D2FF;font-family:var(--font-ui,"Barlow Condensed",sans-serif);font-size:13px;font-weight:600;padding:4px 12px;pointer-events:none;white-space:nowrap;';
+      ghost.style.cssText = 'position:fixed;top:-999px;left:-999px;background:#0d1e35;border:1px solid rgba(0,210,255,.35);color:#00D2FF;font-family:var(--font-mono);font-size:13px;font-weight:600;padding:4px 12px;pointer-events:none;white-space:nowrap;';
       document.body.appendChild(ghost);
       e.dataTransfer.setDragImage(ghost, 0, 0);
       setTimeout(() => ghost.remove(), 0);
@@ -4151,7 +4192,7 @@ function _notesConfirmDialog(title, subject, body, actionLabel, borderColor, col
           '<div class="ntd-title">' + _esc(subject) + '</div>' +
         '</div>' +
         '<div class="ntd-body" style="padding:14px 24px">' +
-          '<div style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text2);line-height:1.5">' +
+          '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text2);line-height:1.5">' +
             _esc(body) +
           '</div>' +
         '</div>' +
@@ -4660,11 +4701,11 @@ window._notesShowInvite = async function(noteId, btn) {
   const pop = document.createElement('div');
   pop.className = 'notes-invite-pop';
   pop.innerHTML =
-    '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;' +
+    '<div style="font-family:var(--font-mono);font-size:11px;' +
       'color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Invite to note</div>' +
     '<input id="notes-invite-input" placeholder="Search by name or department…" autocomplete="off"/>' +
     '<div class="notes-invite-result" id="notes-invite-results">' +
-      '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">Loading…</div>' +
+      '<div style="padding:6px 7px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">Loading…</div>' +
     '</div>';
 
   // Position fixed relative to the + button
@@ -4702,7 +4743,7 @@ window._notesShowInvite = async function(noteId, btn) {
 
     const resultsEl = pop.querySelector('#notes-invite-results');
     if (!filtered.length) {
-      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">No results</div>';
+      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No results</div>';
       return;
     }
 
@@ -4736,7 +4777,7 @@ window._notesShowInvite = async function(noteId, btn) {
           'data-color="' + _esc(color) + '" data-already="' + already + '">' +
           '<div class="notes-avatar" style="background:' + _esc(color) + ';color:#000">' + _esc(initials) + '</div>' +
           '<div style="flex:1;min-width:0">' +
-            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
+            '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
             (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
           '</div>' +
           (already ? '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">✓</span>' : '') +
@@ -4888,7 +4929,7 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
     domains.slice(0,3).forEach(d => {
       html += '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);">';
       const dom = (allDomains||[]).find(x => x.id === d.domain_id);
-      html += '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;font-weight:700;color:var(--text0)">' + _esc(dom?.name || d.domain_name || '—') + '</div>';
+      html += '<div style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text0)">' + _esc(dom?.name || d.domain_name || '—') + '</div>';
       if (d.subsystem) html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:#00D2FF;margin-top:1px">' + _esc(d.subsystem) + '</div>';
       const meta = [d.years_experience ? d.years_experience+'yr exp' : null, d.regulatory_class && d.regulatory_class!=='N/A' ? d.regulatory_class : null].filter(Boolean);
       if (meta.length) html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">' + _esc(meta.join(' · ')) + '</div>';
@@ -4905,7 +4946,7 @@ async function _notesShowParticipantCard(anchor, participant, res, name, color, 
   if (assignments?.length) {
     assignments.slice(0,3).forEach(a => {
       const t = a.tasks || {};
-      html += '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text1);padding:2px 0">' + _esc(t.name||'—') + '</div>';
+      html += '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text1);padding:2px 0">' + _esc(t.name||'—') + '</div>';
     });
   } else {
     html += '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);padding:4px 0">No active task assignments</div>';
@@ -5054,11 +5095,11 @@ window._notesShowResourcePicker = async function(anchorEl, onSelect) {
   const pop = document.createElement('div');
   pop.className = 'notes-invite-pop';
   pop.innerHTML =
-    '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;' +
+    '<div style="font-family:var(--font-mono);font-size:11px;' +
       'color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Select person</div>' +
     '<input id="notes-picker-input" placeholder="Search by name or department\u2026" autocomplete="off"/>' +
     '<div class="notes-invite-result" id="notes-picker-results">' +
-      '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">Loading\u2026</div>' +
+      '<div style="padding:6px 7px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">Loading\u2026</div>' +
     '</div>';
 
   document.body.appendChild(pop);
@@ -5089,7 +5130,7 @@ window._notesShowResourcePicker = async function(anchorEl, onSelect) {
     });
 
     if (!filtered.length) {
-      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:11px;color:var(--text3)">No results</div>';
+      resultsEl.innerHTML = '<div style="padding:6px 7px;font-family:var(--font-mono);font-size:11px;color:var(--text3)">No results</div>';
       return;
     }
 
@@ -5114,7 +5155,7 @@ window._notesShowResourcePicker = async function(anchorEl, onSelect) {
         html += '<div class="notes-invite-row" data-resid="' + _esc(r.id) + '" data-userid="' + _esc(r.user_id||'') + '" data-name="' + _esc(r.name) + '">' +
           '<div class="notes-avatar" style="background:' + color + ';color:#000">' + _esc(initials) + '</div>' +
           '<div style="flex:1;min-width:0">' +
-            '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
+            '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text0)">' + _esc(r.name) + '</div>' +
             (r.email ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _esc(r.email) + '</div>' : '') +
           '</div>' +
         '</div>';
@@ -5429,7 +5470,7 @@ window._notesShowShareViewDialog = async function() {
       return '<div class="nvsd-person-row" data-participantid="' + _esc(p.id) + '">' +
         '<div class="notes-avatar" style="background:' + _esc(p.color||'#00D2FF') + ';color:#000;width:22px;height:22px;font-size:10px;flex-shrink:0">' + _esc(p.initials||'?') + '</div>' +
         '<div style="flex:1;min-width:0">' +
-          '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(p.name||'Unknown') + '</div>' +
+          '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(p.name||'Unknown') + '</div>' +
           (isPending ? '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--amber,#EF9F27)">Invitation pending</div>' : '') +
         '</div>' +
         '<select class="nvsd-role-sel ntd-select" data-pid="' + _esc(p.id) + '" style="font-size:11px;padding:2px 4px;width:74px">' + roleOpts + '</select>' +
@@ -5452,7 +5493,7 @@ window._notesShowShareViewDialog = async function() {
         const editSlots   = new Set(myOverride ? (myOverride.slot_keys||[]) : []);
         const isEditor    = p.view_role === 'editor';
         body += '<div class="nvsd-matrix-row" data-matrixpid="' + _esc(p.id) + '">' +
-          '<div style="width:130px;flex-shrink:0;font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(p.name||'Unknown') + '</div>';
+          '<div style="width:130px;flex-shrink:0;font-family:var(--font-mono);font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(p.name||'Unknown') + '</div>';
         slots.forEach(function(sl) {
           const checked  = isEditor || editSlots.has(sl.slotKey);
           const disabled = isEditor;
@@ -5734,1808 +5775,6 @@ async function _notesShowViewInviteDialog(inviteNote) {
   };
 }
 window._notesShowViewInviteDialog = _notesShowViewInviteDialog;
-
-})();
-</script>
-
-<script>
-// ── Widget System — Phase 1 Infrastructure ────────────────────────────────
-(function() {
-'use strict';
-
-const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
-
-function _esc(s) {
-  if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── Widget Registry ───────────────────────────────────────────────────────
-const WIDGET_REGISTRY = (function() {
-  const _widgets = {};
-  return {
-    register: function(def) {
-      if (!def.id || !def.renderFn || !def.dataFn) {
-        console.error('[Widgets] Invalid registration:', def.id); return;
-      }
-      _widgets[def.id] = def;
-      console.log('[Widgets] Registered:', def.id);
-    },
-    get: function(id) { return _widgets[id] || null; },
-    getAll: function() { return Object.values(_widgets); },
-    getByCategory: function(cat) { return Object.values(_widgets).filter(function(w) { return w.category === cat; }); },
-    categories: function() {
-      const cats = [];
-      Object.values(_widgets).forEach(function(w) { if (!cats.includes(w.category)) cats.push(w.category); });
-      return cats;
-    },
-    render: async function(widgetId, config, container, context) {
-      const widget = _widgets[widgetId];
-      if (!widget) { container.innerHTML = '<div class="widget-error">Unknown widget: ' + _esc(widgetId) + '</div>'; return; }
-      try {
-        const prevHTML = container.innerHTML;
-        container.innerHTML = '<div class="widget-loading">Loading\u2026</div>';
-        const data = await widget.dataFn(config, context);
-        // If dataFn returns null (e.g. missing context), restore previous content and abort
-        if (data === null || data === undefined) {
-          container.innerHTML = prevHTML;
-          return;
-        }
-        container.innerHTML = '';
-        widget.renderFn(data, container, config);
-      } catch(err) {
-        console.error('[Widgets] Render error:', widgetId, err);
-        container.innerHTML = '<div class="widget-error">Failed to load</div>';
-      }
-    }
-  };
-})();
-window.WIDGET_REGISTRY = WIDGET_REGISTRY;
-
-// ── Widget context ────────────────────────────────────────────────────────
-function _widgetContext() {
-  const _res = window._notesResource || {};
-  // Detect shared-view: the active view's _sharedOwner tells us whose workspace
-  // the tile config was saved in (the owner). If the viewer is a participant,
-  // widgetConfigs with a hardcoded targetResourceId belong to the owner — the
-  // viewer should always see their OWN data instead.
-  const _cv  = window._notesCv && window._notesCv();
-  const _isShared   = !!(_cv && _cv._isSharedView);
-  const _ownerUserId = (_cv && _cv._sharedOwner) || null;
-  return {
-    firmId:      FIRM_ID,
-    userId:      _res.user_id || null,
-    resourceId:  _res.id     || null,
-    resource:    _res,
-    api:         (typeof API !== 'undefined' && API) || window._notesAPI || null,
-    isSharedView: _isShared,
-    ownerUserId:  _ownerUserId,
-  };
-}
-window._widgetContext = _widgetContext; // export so Phase 2 widgets can call it
-
-// ── Refresh management ────────────────────────────────────────────────────
-function startWidgetRefresh(tileEl, noteId, widgetId, config) {
-  stopWidgetRefresh(tileEl);
-  const widget = WIDGET_REGISTRY.get(widgetId);
-  if (!widget || !widget.refreshInterval) return;
-  tileEl._widgetInterval = setInterval(function() {
-    const canvas = tileEl.querySelector('.tile-canvas');
-    if (!canvas || tileEl.classList.contains('minimized')) return;
-    WIDGET_REGISTRY.render(widgetId, config, canvas, _widgetContext());
-  }, widget.refreshInterval);
-}
-
-function stopWidgetRefresh(tileEl) {
-  if (tileEl && tileEl._widgetInterval) {
-    clearInterval(tileEl._widgetInterval);
-    delete tileEl._widgetInterval;
-  }
-}
-
-// ── Canvas mode rendering ─────────────────────────────────────────────────
-// forceRefresh=true bypasses the already-rendered guard (used by the periodic interval only)
-function renderTileCanvas(tileEl, tileState, note, forceRefresh) {
-  const mode = tileState.canvasMode || 'note';
-  let canvas = tileEl.querySelector('.tile-canvas');
-  if (!canvas) {
-    canvas = document.createElement('div');
-    canvas.className = 'tile-canvas';
-    // Insert before chat panel
-    const chat = tileEl.querySelector('[id^="notes-chat-"]');
-    const body = tileEl.querySelector('[id^="notes-tbody-"]');
-    const textarea = tileEl.querySelector('.notes-tile-canvas');
-    if (textarea) textarea.style.display = mode === 'note' ? '' : 'none';
-    if (body) body.insertBefore(canvas, chat || null);
-  }
-
-  stopWidgetRefresh(tileEl);
-
-  if (mode === 'widget' && tileState.widgetId) {
-    canvas.style.display = '';
-    const textarea = tileEl.querySelector('.notes-tile-canvas');
-    if (textarea) textarea.style.display = 'none';
-    // Guard: skip dataFn if widget already rendered and this is just a re-wire call.
-    // forceRefresh=true is only set by the periodic startWidgetRefresh interval.
-    const alreadyRendered = canvas.dataset.widgetRendered === tileState.widgetId && !forceRefresh;
-    if (alreadyRendered) {
-      startWidgetRefresh(tileEl, tileState.noteId, tileState.widgetId, tileState.widgetConfig || {});
-      return;
-    }
-    canvas.dataset.widgetRendered = tileState.widgetId;
-    WIDGET_REGISTRY.render(tileState.widgetId, tileState.widgetConfig || {}, canvas, _widgetContext());
-    startWidgetRefresh(tileEl, tileState.noteId, tileState.widgetId, tileState.widgetConfig || {});
-  } else {
-    // Note mode — hide canvas div, show textarea
-    canvas.style.display = 'none';
-    const textarea = tileEl.querySelector('.notes-tile-canvas');
-    if (textarea) textarea.style.display = '';
-  }
-}
-
-// ── Mode switcher button (injected into tile header) ──────────────────────
-function injectModeSwitcher(tileEl, tileState) {
-  const header = tileEl.querySelector('.notes-tile-header');
-  if (!header || header.querySelector('.tile-header-mode-btn')) return;
-
-  const mode   = tileState.canvasMode || 'note';
-  const label  = mode === 'widget' ? (WIDGET_REGISTRY.get(tileState.widgetId)?.label || 'Widget') : 'Note';
-  const btn    = document.createElement('button');
-  btn.className = 'tile-header-mode-btn' + (mode === 'widget' ? ' widget-active' : '');
-  btn.title     = mode === 'widget' ? 'Switch mode or reconfigure widget' : 'Switch canvas mode';
-  btn.textContent = label;
-
-  // Insert before the invite button
-  const inviteBtn = header.querySelector('.notes-invite-btn');
-  if (inviteBtn) header.insertBefore(btn, inviteBtn);
-  else header.appendChild(btn);
-
-  btn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    showModeSwitcher(btn, tileState);
-  });
-
-  // If in widget mode, also add a ⚙ reconfigure button
-  if (mode === 'widget' && tileState.widgetId) {
-    const gearBtn = document.createElement('button');
-    gearBtn.className = 'tile-header-mode-btn';
-    gearBtn.title     = 'Reconfigure widget';
-    gearBtn.textContent = '⚙';
-    gearBtn.dataset.widgetGear = '1';
-    if (inviteBtn) header.insertBefore(gearBtn, inviteBtn);
-    else header.appendChild(gearBtn);
-    gearBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      showWidgetConfig(tileState.widgetId, tileState, tileState.widgetConfig || {});
-    });
-  }
-}
-
-function showModeSwitcher(btn, tileState) {
-  document.querySelectorAll('.widget-mode-pop').forEach(function(el) { el.remove(); });
-  const pop = document.createElement('div');
-  pop.className = 'widget-mode-pop';
-  const mode = tileState.canvasMode || 'note';
-
-  pop.innerHTML =
-    '<div class="widget-mode-item' + (mode === 'note' ? ' active' : '') + '" data-mode="note">' +
-      '<span style="font-size:13px">✎</span> Note canvas' +
-    '</div>' +
-    '<div class="widget-mode-item' + (mode === 'widget' ? ' active' : '') + '" data-mode="widget">' +
-      '<span style="font-size:13px">▦</span> Add widget' +
-    '</div>';
-
-  document.body.appendChild(pop);
-
-  // Position below button
-  const r = btn.getBoundingClientRect();
-  pop.style.left = r.left + 'px';
-  pop.style.top  = (r.bottom + 3) + 'px';
-
-  pop.querySelectorAll('.widget-mode-item').forEach(function(item) {
-    item.addEventListener('click', function() {
-      pop.remove();
-      const newMode = item.dataset.mode;
-      if (newMode === 'widget') {
-        showWidgetPicker(tileState);
-      } else {
-        // Switching to Note mode — if this is a placeholder tile (no DB record
-        // yet), materialise a real note record now before rendering.
-        const isPlaceholder = tileState.isPlaceholder ||
-          (tileState.noteId && (tileState.noteId.startsWith('ph-') || tileState.noteId.startsWith('wt-')));
-        if (isPlaceholder) {
-          (async function() {
-            try {
-              const res = await API.post('notes', {
-                firm_id:        FIRM_ID,
-                owner_user_id:  _userId,
-                title:          'New note',
-                content:        '',
-                hierarchy_path: 'Work',
-                is_inbox:       false,
-                created_at:     new Date().toISOString(),
-                updated_at:     new Date().toISOString(),
-              });
-              const newNote = res?.[0];
-              if (!newNote?.id) return;
-              _notes.unshift(newNote);
-              // Remap tileState to real note ID across ALL views (it may appear in tray too)
-              const oldId = tileState.noteId;
-              Object.values(_workspace.views || {}).forEach(function(v) {
-                (v.tiles || []).forEach(function(t) { if (t.noteId === oldId) t.noteId = newNote.id; });
-                v.tray = (v.tray || []).map(function(id) { return id === oldId ? newNote.id : id; });
-              });
-              tileState.noteId      = newNote.id;
-              tileState.isPlaceholder = false;
-              tileState.canvasMode  = 'note';
-              delete tileState.widgetId;
-              delete tileState.widgetConfig;
-              if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
-              _notesRenderLeft();
-              _notesRenderGrid();
-              setTimeout(function() {
-                const titleEl = document.querySelector('[data-noteid="' + newNote.id + '"].notes-tile-title');
-                if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
-              }, 50);
-            } catch(e) { console.error('[Compass] Failed to materialise note for placeholder tile:', e); }
-          })();
-        } else {
-          tileState.canvasMode = 'note';
-          delete tileState.widgetId;
-          delete tileState.widgetConfig;
-          if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
-          refreshTileWidget(tileState.noteId);
-        }
-      }
-    });
-  });
-
-  setTimeout(function() {
-    document.addEventListener('mousedown', function _close(e) {
-      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('mousedown', _close); }
-    });
-  }, 0);
-}
-
-// ── Widget picker ─────────────────────────────────────────────────────────
-function showWidgetPicker(tileState) {
-  document.querySelectorAll('.widget-picker-overlay').forEach(function(el) { el.remove(); });
-
-  const overlay = document.createElement('div');
-  overlay.className = 'widget-picker-overlay';
-
-  function renderPicker(q) {
-    const all  = WIDGET_REGISTRY.getAll();
-    const cats = WIDGET_REGISTRY.categories();
-    const lower = (q || '').toLowerCase().trim();
-    const filtered = lower
-      ? all.filter(function(w) { return w.label.toLowerCase().includes(lower) || (w.description||'').toLowerCase().includes(lower); })
-      : all;
-
-    const ICONS = { gauge:'⏱', counter:'🔢', sparkline:'📈', bars:'▬', feed:'📋', dial:'◉', heatmap:'▦', strip:'▬', default:'◈' };
-
-    let bodyHtml = '';
-    if (!filtered.length) {
-      bodyHtml = '<div style="padding:20px;text-align:center;font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3)">No widgets match</div>';
-    } else if (lower) {
-      bodyHtml = '<div class="widget-card-grid">' +
-        filtered.map(function(w) { return widgetCardHTML(w, ICONS); }).join('') +
-      '</div>';
-    } else {
-      cats.forEach(function(cat) {
-        const items = filtered.filter(function(w) { return w.category === cat; });
-        if (!items.length) return;
-        bodyHtml +=
-          '<div class="widget-cat-label">' + _esc(cat.charAt(0).toUpperCase() + cat.slice(1)) + '</div>' +
-          '<div class="widget-card-grid">' + items.map(function(w) { return widgetCardHTML(w, ICONS); }).join('') + '</div>';
-      });
-    }
-
-    overlay.innerHTML =
-      '<div class="widget-picker-dialog">' +
-        '<div class="widget-picker-header">' +
-          '<div class="widget-picker-title">Add Widget</div>' +
-          '<input class="widget-picker-search" id="wps-search" placeholder="Search widgets\u2026" value="' + _esc(q||'') + '" autocomplete="off"/>' +
-          '<button class="widget-picker-close" id="wps-close">\u00d7</button>' +
-        '</div>' +
-        '<div class="widget-picker-body">' + bodyHtml + '</div>' +
-      '</div>';
-
-    overlay.querySelector('#wps-close').onclick = function() { overlay.remove(); };
-    overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
-
-    const searchEl = overlay.querySelector('#wps-search');
-    searchEl.addEventListener('input', function() { renderPicker(searchEl.value); });
-    searchEl.focus();
-
-    overlay.querySelectorAll('.widget-card').forEach(function(card) {
-      card.addEventListener('click', function() {
-        const widgetId = card.dataset.widgetId;
-        overlay.remove();
-        const widget = WIDGET_REGISTRY.get(widgetId);
-        if (widget && widget.configSchema && widget.configSchema.length) {
-          showWidgetConfig(widgetId, tileState, {});
-        } else {
-          applyWidget(widgetId, {}, tileState);
-        }
-      });
-    });
-  }
-
-  function widgetCardHTML(w, icons) {
-    const icon = icons[w.icon] || icons.default;
-    return '<div class="widget-card" data-widget-id="' + _esc(w.id) + '">' +
-      '<div class="widget-card-icon">' + icon + '</div>' +
-      '<div class="widget-card-name">' + _esc(w.label) + '</div>' +
-      '<div class="widget-card-desc">' + _esc(w.description || '') + '</div>' +
-    '</div>';
-  }
-
-  renderPicker('');
-  document.body.appendChild(overlay);
-}
-
-// ── Widget config form ────────────────────────────────────────────────────
-async function showWidgetConfig(widgetId, tileState, existingConfig) {
-  const widget = WIDGET_REGISTRY.get(widgetId);
-  if (!widget) return;
-
-  // Pre-load projects for any project_picker fields
-  let _wcfProjects = [];
-  const hasProjectPicker = (widget.configSchema||[]).some(function(f) { return f.type === 'project_picker'; });
-  if (hasProjectPicker) {
-    try {
-      _wcfProjects = window._getProjectsForPicker
-        ? await window._getProjectsForPicker()
-        : [];
-    } catch(e) {}
-  }
-
-  // Per-field config values — resource_picker uses resource_id, display separately
-  const configValues = {};
-  (widget.configSchema||[]).forEach(function(f) {
-    configValues[f.key] = existingConfig[f.key] !== undefined ? existingConfig[f.key] : (f.default || '');
-  });
-
-  const overlay = document.createElement('div');
-  overlay.className = 'widget-config-overlay';
-
-  const fields = (widget.configSchema || []).map(function(field) {
-    const val = configValues[field.key];
-    let input = '';
-
-    if (field.type === 'select') {
-      input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '">' +
-        (field.options||[]).map(function(o) {
-          return '<option value="' + _esc(o.value) + '"' + (o.value == val ? ' selected' : '') + '>' + _esc(o.label) + '</option>';
-        }).join('') + '</select>';
-
-    } else if (field.type === 'boolean') {
-      input = '<input type="checkbox" class="wcf-input" data-key="' + _esc(field.key) + '"' + (val ? ' checked' : '') + ' style="width:auto"/>';
-
-    } else if (field.type === 'project_picker') {
-      input = '<select class="ntd-select wcf-input" data-key="' + _esc(field.key) + '" style="width:100%">' +
-        '<option value="">— Select project —</option>' +
-        _wcfProjects.map(function(p) {
-          return '<option value="' + _esc(p.id) + '"' + (p.id === val ? ' selected' : '') + '>' + _esc(p.name) + '</option>';
-        }).join('') +
-      '</select>';
-
-    } else if (field.type === 'resource_picker') {
-      const selfName = window._notesResource ? (window._notesResource.name || 'Me') : 'Me';
-      const displayName = val ? '' : selfName; // will be updated when loaded
-      input =
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<input type="hidden" class="wcf-input wcf-res-val" data-key="' + _esc(field.key) + '" value="' + _esc(String(val)) + '"/>' +
-          '<div class="wcf-res-display" style="font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--text1);flex:1;min-width:0">' + (val ? _esc(val) : _esc(selfName)) + '</div>' +
-          '<button class="ntd-btn ntd-btn-cancel wcf-res-pick-btn" type="button" style="padding:4px 10px;font-size:10px;flex-shrink:0">Choose…</button>' +
-        '</div>';
-
-    } else {
-      input = '<input class="ntd-input wcf-input" data-key="' + _esc(field.key) + '" type="' + (field.type === 'number' ? 'number' : 'text') + '" value="' + _esc(String(val)) + '" placeholder="' + _esc(field.label) + '"/>';
-    }
-    return '<div class="ntd-field"><label class="ntd-label">' + _esc(field.label) + '</label>' + input + '</div>';
-  }).join('');
-
-  overlay.innerHTML =
-    '<div class="widget-config-dialog">' +
-      '<div class="ntd-header">' +
-        '<div class="ntd-sub">Configure Widget</div>' +
-        '<div class="ntd-title">' + _esc(widget.label) + '</div>' +
-      '</div>' +
-      '<div class="ntd-body">' + fields + '</div>' +
-      '<div class="ntd-actions">' +
-        '<button class="ntd-btn ntd-btn-cancel" id="wcf-cancel">Cancel</button>' +
-        '<button class="ntd-btn ntd-btn-save" id="wcf-apply">Apply</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(overlay);
-
-  // Wire resource picker "Choose…" buttons — open the shared invite popover
-  overlay.querySelectorAll('.wcf-res-pick-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (!window._notesShowResourcePicker) return;
-      const hiddenInput  = btn.parentElement.querySelector('.wcf-res-val');
-      const displayEl    = btn.parentElement.querySelector('.wcf-res-display');
-      window._notesShowResourcePicker(btn, function(resource) {
-        hiddenInput.value  = resource.id || '';
-        displayEl.textContent = resource.name || 'Me (default)';
-      });
-    });
-  });
-
-  // Resolve saved resource IDs to names for display
-  overlay.querySelectorAll('.wcf-res-val').forEach(function(inp) {
-    const savedId  = inp.value;
-    const displayEl = inp.parentElement.querySelector('.wcf-res-display');
-    if (savedId && displayEl && window._notesGetInviteResources) {
-      const res = (window._notesGetInviteResources() || []).find(function(r) { return r.id === savedId; });
-      if (res) displayEl.textContent = res.name;
-    }
-  });
-
-  overlay.querySelector('#wcf-cancel').onclick = function() { overlay.remove(); };
-  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
-  overlay.querySelector('#wcf-apply').onclick = function() {
-    const config = {};
-    overlay.querySelectorAll('.wcf-input').forEach(function(inp) {
-      if (inp.type === 'checkbox') config[inp.dataset.key] = inp.checked;
-      else if (inp.dataset.key) config[inp.dataset.key] = inp.value;
-    });
-    overlay.remove();
-    applyWidget(widgetId, config, tileState);
-  };
-}
-
-// ── Apply widget to tile ──────────────────────────────────────────────────
-function applyWidget(widgetId, config, tileState) {
-  // If a real note record backs this tile, delete it — widget tiles have no
-  // institutional knowledge worth preserving in the notes table.
-  const noteId = tileState.noteId;
-  const isPlaceholder = tileState.isPlaceholder || (noteId && noteId.startsWith('ph-'));
-  if (!isPlaceholder && noteId) {
-    // Delete the backing note record silently
-    API.del('notes?id=eq.' + noteId).catch(function(){});
-    // Remove from local _notes array
-    if (typeof _notes !== 'undefined') {
-      _notes = _notes.filter(function(n){ return n.id !== noteId; });
-    }
-    console.log('[Widgets] Deleted backing note for widget tile:', noteId, widgetId);
-  }
-  // Assign a stable synthetic ID for placeholder tiles (never hits the DB)
-  let newNoteId = noteId;
-  if (isPlaceholder && (!noteId || noteId.startsWith('ph-'))) {
-    newNoteId = 'wt-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
-    tileState.noteId = newNoteId;
-    // Update the DOM element's data-noteid so refreshTileWidget can find it
-    const oldEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
-    if (oldEl) oldEl.dataset.noteid = newNoteId;
-  }
-  tileState.isPlaceholder = false;
-  tileState.canvasMode    = 'widget';
-  tileState.widgetId      = widgetId;
-  tileState.widgetConfig  = config;
-  if (window._notesSaveWorkspace) window._notesSaveWorkspace(true);
-  // Refresh left panel so deleted note disappears from knowledge tree
-  if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
-  refreshTileWidget(tileState.noteId);
-}
-
-// ── Refresh a specific tile's widget rendering ────────────────────────────
-function refreshTileWidget(noteId) {
-  const tileEl = document.querySelector('.notes-tile[data-noteid="' + noteId + '"]');
-  if (!tileEl) return;
-  const cv = window._notesCv && window._notesCv();
-  if (!cv) return;
-  const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
-  if (!tileState) return;
-  // Re-inject mode switcher (updates label, adds/removes gear button)
-  const existing = tileEl.querySelectorAll('.tile-header-mode-btn');
-  existing.forEach(function(el) { el.remove(); });
-  injectModeSwitcher(tileEl, tileState);
-  // Clear the rendered guard so the new config triggers a fresh dataFn call
-  const canvas = tileEl.querySelector('.tile-canvas');
-  if (canvas) delete canvas.dataset.widgetRendered;
-  renderTileCanvas(tileEl, tileState, null);
-}
-
-// ── Wire into tile rendering via _notesPostWire hook ─────────────────────
-// Export showWidgetPicker so _notesNew (Block 1) can open it directly
-window._notesShowWidgetPicker = function(tileState) { showWidgetPicker(tileState); };
-window._notesPostWire = function() {
-  const cv = window._notesCv && window._notesCv();
-  if (!cv) return;
-  const isLocked = !!cv.locked;
-  cv.tiles.forEach(function(tileState) {
-    const tileEl = document.querySelector('.notes-tile[data-noteid="' + tileState.noteId + '"]');
-    if (!tileEl) return;
-    // Don't inject mode switcher on locked views — prevents widget/note switching
-    if (!isLocked) injectModeSwitcher(tileEl, tileState);
-    if (tileState.canvasMode === 'widget' && tileState.widgetId) {
-      renderTileCanvas(tileEl, tileState, null);
-    }
-  });
-};
-
-// ── Gear icon for reconfiguring existing widget ───────────────────────────
-// Exposed so tile HTML can call it
-window._notesWidgetReconfigure = function(noteId) {
-  const cv = window._notesCv && window._notesCv();
-  if (!cv) return;
-  const tileState = cv.tiles.find(function(t) { return t.noteId === noteId; });
-  if (!tileState || !tileState.widgetId) return;
-  showWidgetConfig(tileState.widgetId, tileState, tileState.widgetConfig || {});
-};
-
-// ── Stub widget — validates full pipeline ────────────────────────────────
-WIDGET_REGISTRY.register({
-  id:          'stub_hello',
-  label:       'Hello Widget',
-  category:    'personal',
-  description: 'Stub widget — validates the full pipeline',
-  icon:        'gauge',
-  configSchema: [
-    { key: 'message', label: 'Message', type: 'text', default: 'Hello from the widget system!' }
-  ],
-  refreshInterval: 0,
-  minTileHeight:   'small',
-  dataFn: async function(config) {
-    return { message: config.message || 'Hello from the widget system!' };
-  },
-  renderFn: function(data, container) {
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;padding:16px">' +
-        '<div style="font-size:28px">▦</div>' +
-        '<div style="font-family:var(--font-ui,\'Barlow Condensed\',sans-serif);font-size:14px;font-weight:600;color:#00D2FF;text-align:center">' +
-          _esc((data && data.message) || 'Hello!') +
-        '</div>' +
-        '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.08em">WIDGET SYSTEM ACTIVE</div>' +
-      '</div>';
-  }
-});
-
-console.log('[Widgets] Phase 1 infrastructure loaded. Registry:', WIDGET_REGISTRY.getAll().length, 'widget(s).');
-
-})();
-</script>
-
-<script>
-// ── Widget Library — Phase 2 ──────────────────────────────────────────────
-// Fixed: window.API → bare API global (compass declares it as const, not window.API)
-// Fixed: status=neq.completed → status=neq.complete (matches actual DB values)
-// Fixed: setTimeout re-fires moved to AFTER all widget registrations
-// Added: console diagnostics throughout dataFn pipeline
-(function() {
-'use strict';
-
-const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
-const P2 = '[W2]'; // log prefix — short, scannable in console
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-function _esc(s) {
-  if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── API resolver ─────────────────────────────────────────────────────────
-// compass.html declares `const API = ...` at page scope — that is NOT a
-// property of window, so `window.API` is undefined inside an IIFE.
-// We must use `typeof API` to reach the bare global safely.
-function _resolveApi() {
-  if (typeof API !== 'undefined' && API && typeof API.get === 'function') return API;
-  if (window._notesAPI && typeof window._notesAPI.get === 'function') return window._notesAPI;
-  return null;
-}
-
-function _api(path) {
-  const api = _resolveApi();
-  if (!api) {
-    console.warn(P2, '_api() — no API object available for path:', path);
-    return Promise.resolve([]);
-  }
-  return api.get(path).catch(function(err) {
-    console.error(P2, '_api() fetch error:', path, err);
-    return [];
-  });
-}
-
-function _selfResourceId() { return window._notesResource && window._notesResource.id; }
-function _selfUserId()     { return window._notesResource && window._notesResource.user_id; }
-
-// ── Context helper ────────────────────────────────────────────────────────
-function _widgetCtx() {
-  if (window._widgetContext) return window._widgetContext();
-  const res = window._notesResource || {};
-  return {
-    firmId:     FIRM_ID,
-    userId:     res.user_id || null,
-    resourceId: res.id || null,
-    role:       res.role || res.title || '',
-    api:        _resolveApi(),
-  };
-}
-
-// ── Target resolver — shared-view aware ──────────────────────────────────
-// When a viewer opens a shared workspace, widgetConfig.targetResourceId may
-// contain the *owner's* resource ID (saved when the owner configured the tile).
-// The viewer should always see their own data. This helper resolves the correct
-// rid/uid to query, substituting the viewer's own IDs whenever the config ID
-// does not belong to the current user.
-function _resolveTarget(config) {
-  const ctx       = _widgetCtx();
-  const myRid     = ctx.resourceId;
-  const myUid     = ctx.userId;
-  const configRid = (config && config.targetResourceId) || '';
-  // Also accept legacy targetUserId key (next_week_queue/task_counter used this before the rename)
-  const configUid = (config && config.targetUserId) || '';
-
-  // In a shared view, if the saved ID is not ours → use our own IDs
-  if (ctx.isSharedView && configRid && configRid !== myRid) {
-    return { rid: myRid, uid: myUid };
-  }
-  if (ctx.isSharedView && configUid && configUid !== myUid) {
-    return { rid: myRid, uid: myUid };
-  }
-
-  // For cloned dashboards: the active view may have forResourceId stamped on it.
-  // When a widget config's targetResourceId is empty (owner didn't explicitly pick
-  // themselves), fall back to the view's associated person rather than the logged-in
-  // user. This is the key fix for cloned dashboards showing identical data.
-  const cv = window._notesCv && window._notesCv();
-  const viewRid = cv && cv.forResourceId  ? cv.forResourceId  : null;
-
-  // Prefer rid-derived uid over any raw configUid — a stale cloned config may have
-  // the previous owner's targetUserId baked in. When configRid (or viewRid) is
-  // available, always look up the uid fresh from _inviteResources instead.
-  // configUid is only used as a last resort when there is no rid at all.
-  const effectiveRid = configRid || viewRid || null;
-  let resolvedUid = null;
-  if (effectiveRid && window._inviteResources) {
-    const res = window._inviteResources.find(function(r) { return r.id === effectiveRid; });
-    if (res) resolvedUid = res.user_id || null;
-  }
-  if (!resolvedUid && !effectiveRid) resolvedUid = configUid || null;
-
-  // Only fall back to myUid when we're genuinely targeting self (no effectiveRid,
-  // or effectiveRid === myRid). When targeting another person whose user_id is null
-  // (no login yet), return uid:null so widgets show empty rather than self's data.
-  const targetingOther = effectiveRid && effectiveRid !== myRid;
-  return {
-    rid: effectiveRid || myRid,
-    uid: resolvedUid || (targetingOther ? null : myUid),
-  };
-}
-
-// ── Guard ─────────────────────────────────────────────────────────────────
-if (!window.WIDGET_REGISTRY) {
-  console.error(P2, 'WIDGET_REGISTRY not available — aborting Phase 2 registration');
-  return;
-}
-
-// ── Project picker helper — role-aware ────────────────────────────────────
-async function _getProjectsForPicker() {
-  const ctx  = _widgetCtx();
-  const api  = ctx.api;
-  if (!api) { console.warn(P2, '_getProjectsForPicker: no API'); return []; }
-  const role = (ctx.role || '').toLowerCase();
-  const isPM = role.includes('pm') || role.includes('manager') || role.includes('director');
-
-  if (isPM) {
-    const rows = await api.get(
-      'workflow_instances?select=project_id,title&status=eq.active&order=title.asc&limit=200'
-    ).catch(function(){return[];});
-    const seen = {};
-    return (rows||[]).filter(function(r) {
-      if (!r.project_id || seen[r.project_id]) return false;
-      seen[r.project_id] = true; return true;
-    }).map(function(r) { return { id: r.project_id, name: r.title }; });
-  } else {
-    const [taskRows, aiRows] = await Promise.all([
-      api.get('tasks?select=project_id,workflow_instances(title)&assigned_to=eq.' + ctx.userId +
-              '&status=neq.complete&not.project_id=is.null&limit=200').catch(function(){return[];}),
-      api.get('workflow_action_items?select=instance_id,workflow_instances(project_id,title)' +
-              '&owner_resource_id=eq.' + ctx.resourceId + '&status=eq.open&limit=200').catch(function(){return[];}),
-    ]);
-    const seen = {};
-    const projects = [];
-    (taskRows||[]).forEach(function(r) {
-      if (r.project_id && !seen[r.project_id]) {
-        seen[r.project_id] = true;
-        projects.push({ id: r.project_id, name: (r.workflow_instances&&r.workflow_instances.title) || r.project_id });
-      }
-    });
-    (aiRows||[]).forEach(function(r) {
-      const wi = r.workflow_instances;
-      if (wi && wi.project_id && !seen[wi.project_id]) {
-        seen[wi.project_id] = true;
-        projects.push({ id: wi.project_id, name: wi.title || wi.project_id });
-      }
-    });
-    return projects.sort(function(a,b){return a.name.localeCompare(b.name);});
-  }
-}
-window._getProjectsForPicker = _getProjectsForPicker;
-
-
-// ── 1. CAPACITY GAUGE ─────────────────────────────────────────────────────
-window.WIDGET_REGISTRY.register({
-  id:              'capacity_gauge',
-  label:           'Capacity gauge',
-  category:        'personal',
-  description:     'Load vs. capacity — hours when available, count when not',
-  icon:            'gauge',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
-      templatePlaceholder:'Select person when launching' },
-    { key:'dailyCapacity',   label:'Capacity (target open items)', type:'number', default:16 },
-  ],
-  refreshInterval: 120000,
-  minTileHeight:   'medium',
-
-  dataFn: async function(config) {
-    const { rid, uid } = _resolveTarget(config);
-    if (!rid && !uid) return null;
-    const today = new Date().toISOString().slice(0,10);
-    // dailyCapacity is reused as "target open items" — a simple workload ceiling.
-    // Default 16 = a reasonable ceiling for open tasks+actions before overload.
-    const cap = Math.max(1, parseFloat(config.dailyCapacity) || 16);
-
-    const [aiRows, taskRows] = await Promise.all([
-      rid ? _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500') : [],
-      uid ? _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date&limit=500') : [],
-    ]);
-
-    const items = Array.isArray(aiRows)   ? aiRows   : [];
-    const tasks = Array.isArray(taskRows) ? taskRows : [];
-    const all   = items.concat(tasks);
-
-    // Load % = open item count vs capacity ceiling. Capped at 200% for display.
-    const count = all.length;
-    const pct   = Math.round((count / cap) * 100);
-
-    return {
-      total:    count,
-      overdue:  all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
-      dueToday: all.filter(function(i){return i.due_date===today;}).length,
-      upcoming: all.filter(function(i){return i.due_date&&i.due_date>today;}).length,
-      cap, pct,
-      // hasHours always false now — count mode only, avoids misleading hour math
-      hasHours: false,
-      totalHours: 0,
-    };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const pct   = Math.min(data.pct, 200); // allow display up to 200%
-    const color = pct>=100?'#E24B4A':pct>=75?'#EF9F27':'#1D9E75';
-    container.innerHTML=
-      '<div class="widget-counter">'+
-        '<div class="wc-big" style="color:'+color+'">'+data.pct+'%</div>'+
-        '<div class="wc-label">LOAD · '+data.total+' open / '+data.cap+' target</div>'+
-        '<div class="widget-stat-row" style="margin-top:4px">'+
-          '<div class="wsr-item"><div class="wsr-val">'+data.total+'</div><div class="wsr-lbl">Open</div></div>'+
-          '<div class="wsr-item"><div class="wsr-val" style="color:#E24B4A">'+data.overdue+'</div><div class="wsr-lbl">Overdue</div></div>'+
-          '<div class="wsr-item"><div class="wsr-val" style="color:#EF9F27">'+data.dueToday+'</div><div class="wsr-lbl">Today</div></div>'+
-          '<div class="wsr-item"><div class="wsr-val" style="color:#4A9EFF">'+data.upcoming+'</div><div class="wsr-lbl">Upcoming</div></div>'+
-        '</div>'+
-      '</div>';
-  }
-});
-
-
-// ── 2. ACTION ITEM COUNTER ────────────────────────────────────────────────
-window.WIDGET_REGISTRY.register({
-  id:              'action_item_counter',
-  label:           'Action item counter',
-  category:        'personal',
-  description:     'Open action items — count with overdue breakdown',
-  icon:            'counter',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 60000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    const ctx   = _widgetCtx();
-    const { rid } = _resolveTarget(config);
-    if (!rid) return null;
-    const today = new Date().toISOString().slice(0,10);
-    const items = await _api('workflow_action_items?owner_resource_id=eq.'+rid+'&status=eq.open&select=id,due_date&limit=500');
-    const all   = Array.isArray(items) ? items : [];
-    return {
-      total:    all.length,
-      overdue:  all.filter(function(i){return i.due_date&&i.due_date<today;}).length,
-      dueToday: all.filter(function(i){return i.due_date===today;}).length,
-      upcoming: all.length - all.filter(function(i){return i.due_date&&i.due_date<=today;}).length,
-    };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const c = data.overdue>0?'#E24B4A':data.dueToday>0?'#EF9F27':'#00D2FF';
-    container.innerHTML=
-      '<div class="widget-counter">'+
-        '<div class="wc-big" style="color:'+c+'">'+data.total+'</div>'+
-        '<div class="wc-label">Open action items</div>'+
-        '<div class="wc-breakdown">'+
-          '<span style="color:#E24B4A">'+data.overdue+' overdue</span>'+
-          '<span style="color:#EF9F27">'+data.dueToday+' today</span>'+
-          '<span style="color:#4A9EFF">'+data.upcoming+' upcoming</span>'+
-        '</div>'+
-      '</div>';
-  }
-});
-
-
-// ── 3. NEXT WEEK QUEUE ───────────────────────────────────────────────────
-// Mirrors the "Next week" KPI from My Calendar:
-// Tasks with due_date beyond this Sunday, OR no due_date at all.
-// Hours = budget_hours || (effort_days * 8) || 2 per item (calendar default).
-window.WIDGET_REGISTRY.register({
-  id:              'next_week_queue',
-  label:           'Next week queue',
-  category:        'personal',
-  description:     'Tasks queued for next week — count and budgeted hours',
-  icon:            'counter',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 120000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    const { uid } = _resolveTarget(config);
-    // Return zero-state (not null) when uid unavailable — renderFn cleans up
-    // stale DOM and tooltip rather than leaving previous user's data visible.
-    if (!uid) return { count:0, hours:0, overdueN:0, thisWeekN:0,
-                       today:'', nextSunIso:'', rows:[], noLogin:true };
-
-    const now    = new Date();
-    const today  = now.toLocaleDateString('en-CA');
-
-    // Next Sunday — always advance (even if today is Sunday, target next one)
-    const dayOfWeek  = now.getDay();
-    const daysToSun  = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
-    const nextSun    = new Date(now);
-    nextSun.setDate(now.getDate() + daysToSun);
-    const nextSunIso = nextSun.toLocaleDateString('en-CA');
-
-    const tasks = await _api(
-      'tasks?assigned_to=eq.'+uid+
-      '&status=neq.complete' +
-      '&select=id,name,due_date,budget_hours,effort_days,status,pct_complete&limit=500'
-    );
-    // Filter cancelled client-side — 'cancelled' may not exist in the task_status enum
-    const all = (Array.isArray(tasks) ? tasks : []).filter(function(t){ return t.status !== 'cancelled'; });
-
-    // Bucket: tasks that are overdue OR due on/before next Sunday.
-    // Excludes tasks with no due date and tasks due beyond next Sunday.
-    const bucket = all.filter(function(t) {
-      if (!t.due_date) return false;
-      return t.due_date.slice(0,10) <= nextSunIso;
-    });
-
-    function taskHrs(t) {
-      return parseFloat(t.budget_hours || (t.effort_days ? t.effort_days * 8 : 0) || 2);
-    }
-
-    const totalHrs  = bucket.reduce(function(s,t){ return s + taskHrs(t); }, 0);
-    const overdueN  = bucket.filter(function(t){ return t.due_date.slice(0,10) < today; }).length;
-    const thisWeekN = bucket.length - overdueN;
-
-    // Detail rows for tooltip — sorted by due date (overdue first naturally)
-    const rows = bucket.slice().sort(function(a,b){
-      const da = a.due_date.slice(0,10), db = b.due_date.slice(0,10);
-      return da < db ? -1 : da > db ? 1 : 0;
-    }).map(function(t) {
-      const hrs  = taskHrs(t);
-      const p    = parseFloat(t.pct_complete)||0;
-      const pct  = p<=1&&p>0 ? Math.round(p*100) : Math.round(p);
-      const due  = t.due_date.slice(0,10);
-      return { name: t.name, hrs, pct, due, overdue: due < today, status: t.status||'' };
-    });
-
-    return {
-      count: bucket.length,
-      hours: Math.round(totalHrs * 10) / 10,
-      overdueN, thisWeekN, today, nextSunIso, rows,
-    };
-  },
-
-  renderFn: function(data, container) {
-    // Always remove any stale tooltip from a previous render first
-    if (container._nwqTip) { container._nwqTip.remove(); delete container._nwqTip; }
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    // No login — show clean zero state, no tooltip
-    if (data.noLogin) {
-      container.innerHTML=
-        '<div class="widget-counter">'+
-          '<div class="wc-big" style="color:rgba(0,210,255,.3)">0h</div>'+
-          '<div class="wc-label">NEXT WEEK</div>'+
-          '<div class="wc-breakdown"><span style="color:var(--text3)">No tasks — login not configured</span></div>'+
-        '</div>';
-      return;
-    }
-    const mono = 'font-family:var(--font-mono,monospace)';
-
-    function fmtH(h) { return (Math.round(h*10)/10)+'h'; }
-    function fmtD(iso) {
-      if (!iso) return '\u2013';
-      const d = new Date(iso+'T00:00:00');
-      return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    }
-    function _esc(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    container.innerHTML =
-      '<div class="widget-counter" style="position:relative">'+
-        '<div class="wc-big" style="color:#00D2FF">'+fmtH(data.hours)+'</div>'+
-        '<div class="wc-label">NEXT WEEK</div>'+
-        '<div class="wc-breakdown">'+
-          '<span style="color:rgba(255,255,255,.5)">'+data.count+' item'+(data.count!==1?'s':'')+' queued</span>'+
-        '</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:6px;display:flex;gap:10px;justify-content:center">'+
-          '<span style="color:rgba(226,75,74,.8)">'+data.overdueN+' overdue</span>'+
-          '<span>'+data.thisWeekN+' this/next week</span>'+
-        '</div>'+
-        (data.rows.length ? '<div style="'+mono+';font-size:8px;color:rgba(0,210,255,.3);margin-top:8px;letter-spacing:.04em">HOVER FOR DETAIL \u25b2</div>' : '')+
-      '</div>';
-
-    if (!data.rows.length) return;
-
-    // ── Tooltip ──────────────────────────────────────────────────────────
-    var tip = document.createElement('div');
-    tip.style.cssText =
-      'position:fixed;z-index:9999;display:none;'+
-      'background:#0A1628;border:1px solid rgba(0,210,255,.25);'+
-      'box-shadow:0 12px 48px rgba(0,0,0,.85);'+
-      'font-family:var(--font-ui,"Barlow Condensed",sans-serif);'+
-      'font-size:14px;color:var(--text1,#C8DFF0);'+
-      'min-width:720px;max-width:960px;pointer-events:none';
-
-    var COL = { name:'flex:1;padding-right:14px', hrs:'width:68px;text-align:right',
-                pct:'width:58px;text-align:right', due:'width:80px;text-align:right',
-                status:'width:100px;text-align:right' };
-
-    var html =
-      '<div style="padding:10px 16px 7px;border-bottom:1px solid rgba(0,210,255,.15);'+
-          'display:flex;gap:0;'+mono+';font-size:11px;color:rgba(0,210,255,.55);letter-spacing:.07em;text-transform:uppercase">'+
-        '<span style="'+COL.name+'">Task</span>'+
-        '<span style="'+COL.hrs+'">Effort</span>'+
-        '<span style="'+COL.pct+'">Done</span>'+
-        '<span style="'+COL.due+'">Due</span>'+
-        '<span style="'+COL.status+'">Status</span>'+
-      '</div>'+
-      '<div style="max-height:480px;overflow-y:auto">';
-
-    data.rows.forEach(function(r) {
-      var bg  = r.overdue ? 'rgba(226,75,74,.10)' : 'transparent';
-      var dc  = r.overdue ? '#E24B4A' : 'rgba(255,255,255,.4)';
-      var pc  = r.pct>=100 ? '#1D9E75' : r.pct>0 ? '#EF9F27' : 'rgba(255,255,255,.25)';
-      var sl  = r.status ? r.status.charAt(0).toUpperCase()+r.status.slice(1).replace(/_/g,' ') : '\u2013';
-      html +=
-        '<div style="display:flex;gap:0;align-items:center;padding:7px 16px;'+
-            'border-bottom:1px solid rgba(255,255,255,.04);background:'+bg+'">'+
-          '<span style="'+COL.name+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(r.overdue?'color:#E24B4A;':'')+'">'+_esc(r.name)+'</span>'+
-          '<span style="'+COL.hrs+';'+mono+';font-size:13px;color:#00D2FF">'+fmtH(r.hrs)+'</span>'+
-          '<span style="'+COL.pct+';'+mono+';font-size:13px;color:'+pc+'">'+r.pct+'%</span>'+
-          '<span style="'+COL.due+';'+mono+';font-size:13px;color:'+dc+'">'+fmtD(r.due)+'</span>'+
-          '<span style="'+COL.status+';font-size:13px;color:rgba(255,255,255,.4)">'+_esc(sl)+'</span>'+
-        '</div>';
-    });
-
-    // Footer — total must match KPI exactly
-    html +=
-      '</div>'+
-      '<div style="display:flex;gap:0;align-items:center;padding:8px 16px;'+
-          'border-top:1px solid rgba(0,210,255,.2);background:rgba(0,210,255,.05)">'+
-        '<span style="'+COL.name+';'+mono+';font-size:11px;color:rgba(0,210,255,.5);letter-spacing:.05em;text-transform:uppercase">'+
-          'Total \u2014 '+data.count+' task'+(data.count!==1?'s':'')+
-        '</span>'+
-        '<span style="'+COL.hrs+';'+mono+';font-size:15px;font-weight:700;color:#00D2FF">'+fmtH(data.hours)+'</span>'+
-        '<span style="'+COL.pct+'"></span>'+
-        '<span style="'+COL.due+'"></span>'+
-        '<span style="'+COL.status+'"></span>'+
-      '</div>';
-
-    tip.innerHTML = html;
-
-    // Remove any previously attached tooltip for this container before adding new one
-    if (container._nwqTip) { container._nwqTip.remove(); }
-    container._nwqTip = tip;
-    document.body.appendChild(tip);
-
-    var wrapEl = container.querySelector('.widget-counter') || container;
-    function showTip(e) { tip.style.display='block'; moveTip(e); }
-    function moveTip(e) {
-      var tw=tip.offsetWidth, th=tip.offsetHeight;
-      var vw=window.innerWidth, vh=window.innerHeight;
-      var x=e.clientX+16, y=e.clientY-24;
-      if (x+tw>vw-8) x=e.clientX-tw-16;
-      if (y+th>vh-8) y=vh-th-8;
-      if (y<8) y=8;
-      tip.style.left=x+'px'; tip.style.top=y+'px';
-    }
-    function hideTip() { tip.style.display='none'; }
-    wrapEl.addEventListener('mouseenter', showTip);
-    wrapEl.addEventListener('mousemove',  moveTip);
-    wrapEl.addEventListener('mouseleave', hideTip);
-    wrapEl.style.cursor = 'default';
-
-    // Cleanup when container leaves DOM (view switch re-renders the tile)
-    var obs = new MutationObserver(function() {
-      if (!document.body.contains(container)) {
-        tip.remove();
-        if (container._nwqTip === tip) delete container._nwqTip;
-        obs.disconnect();
-      }
-    });
-    obs.observe(document.body, { childList:true, subtree:true });
-  }
-});
-
-
-// ── 4. HOURS BY DAY ──────────────────────────────────────────────────────
-// Speedometer gauge per day — exact port of My Work's "This week — hours by day"
-// Cyan = billable arc, purple = non-billable arc, needle = total. Scale: 8h = full.
-window.WIDGET_REGISTRY.register({
-  id:              'hours_by_day',
-  label:           'Hours by day',
-  category:        'personal',
-  description:     'This week\'s time entries as daily speedometer gauges',
-  icon:            'bars',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 300000,
-  minTileHeight:   'medium',
-
-  dataFn: async function(config) {
-    const { rid } = _resolveTarget(config);
-    if (!rid) return null;
-
-    // Build Mon–Sun array in local time
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const isoOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const mon = new Date(now); mon.setDate(now.getDate() - isoOffset);
-    const weekDays = Array.from({length:7}, function(_,i) {
-      const d = new Date(mon); d.setDate(mon.getDate() + i);
-      return d.toLocaleDateString('en-CA');
-    });
-    const today    = now.toLocaleDateString('en-CA');
-    const monIso   = weekDays[0];
-    const sunIso   = weekDays[6];
-
-    const entries = await _api(
-      'time_entries?resource_id=eq.'+rid+
-      '&date=gte.'+monIso+'&date=lte.'+sunIso+
-      '&select=date,hours,is_billable&limit=500'
-    );
-    const all = Array.isArray(entries) ? entries : [];
-
-    const hoursByDay = {}, billByDay = {};
-    weekDays.forEach(function(d){ hoursByDay[d]=0; billByDay[d]=0; });
-    all.forEach(function(e) {
-      if (Object.prototype.hasOwnProperty.call(hoursByDay, e.date)) {
-        const h = parseFloat(e.hours||0);
-        hoursByDay[e.date] += h;
-        if (e.is_billable) billByDay[e.date] += h;
-      }
-    });
-
-    const weekTotal    = Object.values(hoursByDay).reduce(function(s,h){return s+h;},0);
-    const weekBillable = Object.values(billByDay).reduce(function(s,h){return s+h;},0);
-    const billPct = weekTotal > 0 ? Math.round((weekBillable/weekTotal)*100) : 0;
-
-    return {
-      weekDays, today, hoursByDay, billByDay,
-      weekTotal:    Math.round(weekTotal*10)/10,
-      weekBillable: Math.round(weekBillable*10)/10,
-      weekNonBill:  Math.round((weekTotal-weekBillable)*10)/10,
-      billPct,
-    };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-
-    const { weekDays, today, hoursByDay, billByDay } = data;
-    const DAY_LABELS = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
-    const gaugeMax = 8;
-
-    // SVG gauge geometry — exact match to My Work
-    const GW=74, GH=70, GCX=37, GCY=48, GR=30;
-
-    function gPt(deg) {
-      const a = (deg - 180) * Math.PI / 180;
-      return [(GCX + GR * Math.cos(a)).toFixed(1), (GCY + GR * Math.sin(a)).toFixed(1)];
-    }
-    function gArc(d1, d2) {
-      if (d2 <= d1) return '';
-      const p1 = gPt(d1), p2 = gPt(Math.min(d2, 179.9));
-      return 'M'+p1[0]+','+p1[1]+' A'+GR+','+GR+' 0 '+(d2-d1>180?1:0)+' 1 '+p2[0]+','+p2[1];
-    }
-
-    // Tick marks + % labels
-    const gTicks = Array.from({length:11}, function(_,i) {
-      const deg = i * 18;
-      const isMaj = i % 2 === 0;
-      const a = (deg - 180) * Math.PI / 180;
-      const r0 = GR + 2, r1 = isMaj ? GR + 7 : GR + 4;
-      const x0=(GCX+r0*Math.cos(a)).toFixed(1), y0=(GCY+r0*Math.sin(a)).toFixed(1);
-      const x1=(GCX+r1*Math.cos(a)).toFixed(1), y1=(GCY+r1*Math.sin(a)).toFixed(1);
-      const tick = '<line x1="'+x0+'" y1="'+y0+'" x2="'+x1+'" y2="'+y1+'" stroke="rgba(255,255,255,.28)" stroke-width="'+(isMaj?1:.6)+'"/>';
-      if (!isMaj) return tick;
-      const rl=GR+16, lx=(GCX+rl*Math.cos(a)).toFixed(1), ly=(GCY+rl*Math.sin(a)).toFixed(1);
-      return tick+'<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="central" font-size="7.5" font-family="monospace" font-weight="700" fill="rgba(255,255,255,.75)">'+(i*10)+'%</text>';
-    }).join('');
-
-    const gaugesHtml = weekDays.map(function(d, i) {
-      const hrs  = hoursByDay[d]||0;
-      const bill = billByDay[d]||0;
-      const nonBill = hrs - bill;
-      const isToday = d === today;
-      const pct     = Math.min(hrs/gaugeMax, 1);
-      const billPct = Math.min(bill/gaugeMax, 1);
-      const nbPct   = Math.min(nonBill/gaugeMax, 1);
-      const billEnd = billPct * 180;
-      const nbEnd   = (billPct + nbPct) * 180;
-      const needleRad = (pct * 180 - 180) * Math.PI / 180;
-      const nx = (GCX + (GR-6) * Math.cos(needleRad)).toFixed(1);
-      const ny = (GCY + (GR-6) * Math.sin(needleRad)).toFixed(1);
-      const arcColor  = isToday ? '#00D2FF' : hrs>0 ? '#1D9E75' : 'rgba(255,255,255,.08)';
-      const pillColor = isToday ? '#00D2FF' : hrs>0 ? '#1D9E75' : 'rgba(255,255,255,.2)';
-      const dayColor  = isToday ? '#00D2FF' : '#6A94B8';
-      const fw        = isToday ? '600' : '400';
-
-      return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0">'+
-        '<svg viewBox="0 0 '+GW+' '+GH+'" width="'+GW+'" height="'+GH+'" style="overflow:visible">'+
-          gTicks+
-          '<path d="'+gArc(0,179.9)+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="4" stroke-linecap="round"/>'+
-          (hrs>0
-            ? (bill>0 ? '<path d="'+gArc(0,billEnd)+'" fill="none" stroke="'+arcColor+'" stroke-width="4" stroke-linecap="round"/>' : '')+
-              (nonBill>0 ? '<path d="'+gArc(billEnd,nbEnd)+'" fill="none" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>' : '')+
-              '<line x1="'+GCX+'" y1="'+GCY+'" x2="'+nx+'" y2="'+ny+'" stroke="'+arcColor+'" stroke-width="1.5" stroke-linecap="round"/>'+
-              '<circle cx="'+GCX+'" cy="'+GCY+'" r="3" fill="'+arcColor+'"/>'
-            : '<circle cx="'+GCX+'" cy="'+GCY+'" r="2" fill="rgba(255,255,255,.12)"/>'
-          )+
-          '<rect x="'+(GCX-17)+'" y="'+(GCY+5)+'" width="34" height="14" rx="7" fill="rgba(6,10,16,.7)" stroke="'+pillColor+'" stroke-width="1.2"/>'+
-          '<text x="'+GCX+'" y="'+(GCY+12)+'" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="monospace" font-weight="700" fill="'+pillColor+'">'+
-            (hrs>0 ? hrs.toFixed(1)+'h' : '—')+
-          '</text>'+
-        '</svg>'+
-        '<div style="font-family:var(--font-head,sans-serif);font-size:11px;font-weight:700;color:'+(isToday?dayColor:'#F0F6FF')+';text-align:center;line-height:1.4;letter-spacing:.04em">'+
-          DAY_LABELS[i]+'<br>'+
-          '<span style="font-weight:'+fw+';color:'+dayColor+';font-size:11px">'+new Date(d+'T00:00:00').getDate()+'</span>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-
-    const mono = 'font-family:var(--font-mono,monospace)';
-    const billColor = '#00D2FF';
-    const nonBillColor = '#8B5CF6';
-    const billPct = data.billPct;
-    const nonPct  = 100 - billPct;
-
-    // Right-side summary panel — mirrors My Work's billable vs non-bill panel
-    const summaryPanel =
-      '<div style="display:flex;flex-direction:column;justify-content:center;padding:8px 14px;'+
-          'border-left:1px solid rgba(255,255,255,.07);flex-shrink:0;min-width:130px;gap:6px">'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Billable vs Non-Bill</div>'+
-        '<div style="display:flex;gap:16px;align-items:flex-end">'+
-          '<div>'+
-            '<div style="font-size:22px;font-weight:700;color:'+billColor+';line-height:1">'+data.weekBillable+'h</div>'+
-            '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:2px">billable</div>'+
-          '</div>'+
-          '<div>'+
-            '<div style="font-size:22px;font-weight:700;color:'+nonBillColor+';line-height:1">'+data.weekNonBill+'h</div>'+
-            '<div style="'+mono+';font-size:9px;color:var(--text3);margin-top:2px">non-bill</div>'+
-          '</div>'+
-        '</div>'+
-        // Split bar
-        '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;display:flex">'+
-          '<div style="height:100%;width:'+billPct+'%;background:'+billColor+';border-radius:3px 0 0 3px;transition:width .4s"></div>'+
-          '<div style="height:100%;width:'+nonPct+'%;background:'+nonBillColor+';transition:width .4s"></div>'+
-        '</div>'+
-        '<div style="display:flex;justify-content:space-between">'+
-          '<span style="'+mono+';font-size:10px;color:'+billColor+'">'+billPct+'%</span>'+
-          '<span style="'+mono+';font-size:10px;color:'+nonBillColor+'">'+nonPct+'%</span>'+
-        '</div>'+
-        '<div style="'+mono+';font-size:10px;color:#EF9F27">'+data.weekTotal+'h total this week</div>'+
-      '</div>';
-
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">'+
-        // Header
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;padding:5px 10px 3px;flex-shrink:0;border-left:2px solid rgba(0,210,255,.5)">'+
-          '\u2003This week \u2014 hours by day'+
-        '</div>'+
-        // Gauges + summary panel side by side
-        '<div style="display:flex;flex:1;min-height:0;overflow:hidden">'+
-          '<div style="display:flex;flex:1;align-items:flex-end;padding:0 4px;min-height:0;overflow:hidden">'+
-            gaugesHtml+
-          '</div>'+
-          summaryPanel+
-        '</div>'+
-        // Legend
-        '<div style="display:flex;align-items:center;gap:12px;padding:4px 10px 5px;flex-shrink:0;border-top:1px solid rgba(255,255,255,.05)">'+
-          '<div style="display:flex;align-items:center;gap:5px;'+mono+';font-size:10px;color:var(--text3)">'+
-            '<div style="width:14px;height:4px;background:'+billColor+';border-radius:2px"></div>Billable</div>'+
-          '<div style="display:flex;align-items:center;gap:5px;'+mono+';font-size:10px;color:var(--text3)">'+
-            '<div style="width:14px;height:4px;background:'+nonBillColor+';border-radius:2px"></div>Non-billable</div>'+
-          '<span style="'+mono+';font-size:10px;color:var(--text3)">Scale: 8h = full</span>'+
-        '</div>'+
-      '</div>';
-  }
-});
-
-
-// ── 5. TASK COUNTER ───────────────────────────────────────────────────────
-window.WIDGET_REGISTRY.register({
-  id:              'task_counter',
-  label:           'Task counter',
-  category:        'personal',
-  description:     'Open tasks assigned to you — hours when available',
-  icon:            'counter',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 120000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    const ctx   = _widgetCtx();
-    const { uid } = _resolveTarget(config);
-    if (!uid) return null;
-    const today = new Date().toISOString().slice(0,10);
-    const tasks = await _api('tasks?assigned_to=eq.'+uid+'&status=neq.complete&select=id,due_date,budget_hours&limit=500');
-    const all   = Array.isArray(tasks) ? tasks : [];
-    const totalHours = all.reduce(function(s,t){return s+(t.budget_hours||0);},0);
-    return {
-      total:      all.length,
-      overdue:    all.filter(function(t){return t.due_date&&t.due_date<today;}).length,
-      dueToday:   all.filter(function(t){return t.due_date===today;}).length,
-      upcoming:   all.filter(function(t){return t.due_date&&t.due_date>today;}).length,
-      totalHours: Math.round(totalHours*10)/10,
-      hasHours:   totalHours>0,
-    };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const c    = data.overdue>0?'#E24B4A':data.dueToday>0?'#EF9F27':'#00D2FF';
-    const main = data.hasHours ? data.totalHours+'h' : String(data.total);
-    const lbl  = data.hasHours ? 'hours of open tasks' : 'open tasks';
-    container.innerHTML=
-      '<div class="widget-counter">'+
-        '<div class="wc-big" style="color:'+c+'">'+main+'</div>'+
-        '<div class="wc-label">'+lbl+'</div>'+
-        '<div class="wc-breakdown">'+
-          '<span style="color:#E24B4A">'+data.overdue+' overdue</span>'+
-          '<span style="color:#EF9F27">'+data.dueToday+' today</span>'+
-          '<span style="color:#4A9EFF">'+data.upcoming+' upcoming</span>'+
-        '</div>'+
-      '</div>';
-  }
-});
-
-
-// ── 6. MEETING HEALTH SPARKLINE ───────────────────────────────────────────
-window.WIDGET_REGISTRY.register({
-  id:              'meeting_health_sparkline',
-  label:           'Meeting health',
-  category:        'project',
-  description:     'Last 7 meeting ratings — sparkline with trend',
-  icon:            'sparkline',
-  configSchema: [
-    { key:'projectId', label:'Project', type:'project_picker', default:'', required:false,
-      templatePlaceholder:'Select project when launching' },
-  ],
-  refreshInterval: 300000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    if (!config.projectId) return { ratings:[], avg:0, trend:'stable', noProject:true };
-    const ctx = _widgetCtx();
-    const meetings = await _api(
-      'v_meetings?select=id,meeting_date&firm_id=eq.'+ctx.firmId+
-      '&project_id=eq.'+config.projectId+'&order=meeting_date.desc&limit=7'
-    );
-    if (!meetings||!meetings.length) return { ratings:[], avg:0, trend:'stable' };
-    const ids = meetings.map(function(m){return m.id;});
-    const ratings = await _api('meeting_ratings?meeting_id=in.('+ids.join(',')+')'+'&select=meeting_id,rating');
-    const rMap={};
-    (ratings||[]).forEach(function(r){(rMap[r.meeting_id]=rMap[r.meeting_id]||[]).push(r.rating);});
-    const result = meetings.slice().reverse().map(function(m,i){
-      const mrs=rMap[m.id]||[];
-      const avg=mrs.length?Math.round((mrs.reduce(function(s,r){return s+r;},0)/mrs.length)*10)/10:0;
-      return {label:'M'+(i+1),value:avg};
-    });
-    const vals=result.map(function(r){return r.value;}).filter(function(v){return v>0;});
-    const avg=vals.length?Math.round((vals.reduce(function(s,v){return s+v;},0)/vals.length)*10)/10:0;
-    const trend=vals.length>=2?(vals[vals.length-1]>vals[0]?'up':vals[vals.length-1]<vals[0]?'down':'stable'):'stable';
-    return {ratings:result,avg,trend};
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    if (data.noProject) {
-      container.innerHTML='<div class="widget-error" style="font-size:10px;flex-direction:column;gap:4px"><span style="font-size:16px">&#9881;</span>Configure project</div>';
-      return;
-    }
-    if (!data.ratings||!data.ratings.length) {
-      container.innerHTML='<div class="widget-error" style="font-size:10px">No meeting data</div>'; return;
-    }
-    const W=200,H=56,n=data.ratings.length,barW=Math.floor(W/n)-3,maxVal=5;
-    const tc=data.trend==='up'?'#1D9E75':data.trend==='down'?'#E24B4A':'#EF9F27';
-    const ta=data.trend==='up'?'\u2191':data.trend==='down'?'\u2193':'\u2192';
-    const bars=data.ratings.map(function(r,i){
-      const x=i*(barW+3)+1,bh=r.value>0?Math.max(4,Math.round((r.value/maxVal)*H)):3,y=H-bh;
-      const c=r.value>=4?'#1D9E75':r.value>=2.5?'#EF9F27':r.value>0?'#E24B4A':'rgba(255,255,255,.1)';
-      return '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" fill="'+c+'" rx="1"/>';
-    }).join('');
-    container.innerHTML=
-      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:6px 8px;gap:4px">'+
-        '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+bars+'</svg>'+
-        '<div class="widget-sparkline-footer">'+
-          '<span>Avg <strong style="color:'+tc+'">'+data.avg+'</strong>/5</span>'+
-          '<span style="color:'+tc+'">'+ta+' '+data.trend+'</span>'+
-          '<span>'+n+' meetings</span>'+
-        '</div>'+
-      '</div>';
-  }
-});
-
-
-// ── 7. BILLABILITY BARS ───────────────────────────────────────────────────
-window.WIDGET_REGISTRY.register({
-  id:              'billability_bars',
-  label:           'Billable vs Non-Bill',
-  category:        'personal',
-  description:     'This week\'s billable vs non-billable hours with % split',
-  icon:            'bars',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:true,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 300000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    const { rid } = _resolveTarget(config);
-    if (!rid) return null;
-
-    // Use local date (not UTC) to match My Work's en-CA locale string
-    const now     = new Date();
-    const todayLocal = now.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
-    // ISO week: Monday = day 1. getDay() returns 0=Sun..6=Sat
-    const dayOfWeek = now.getDay();
-    const isoOffset = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // days since Monday
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - isoOffset);
-    const weekEnd   = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    const weekStartStr = weekStart.toLocaleDateString('en-CA');
-    const weekEndStr   = weekEnd.toLocaleDateString('en-CA');
-
-    // Query by date range — matches how My Work loads time_entries
-    const entries = await _api(
-      'time_entries?resource_id=eq.' + rid +
-      '&date=gte.' + weekStartStr +
-      '&date=lte.' + weekEndStr +
-      '&select=hours,is_billable&limit=500'
-    );
-
-    const all      = Array.isArray(entries) ? entries : [];
-    const billable = all.filter(function(e){ return e.is_billable; })
-                       .reduce(function(s,e){ return s + parseFloat(e.hours||0); }, 0);
-    const nonBill  = all.filter(function(e){ return !e.is_billable; })
-                       .reduce(function(s,e){ return s + parseFloat(e.hours||0); }, 0);
-    const total    = billable + nonBill;
-    const billPct  = total > 0 ? Math.round((billable / total) * 100) : 0;
-    const nonPct   = total > 0 ? (100 - billPct) : 0;
-
-    return {
-      billable:  Math.round(billable * 10) / 10,
-      nonBill:   Math.round(nonBill  * 10) / 10,
-      total:     Math.round(total    * 10) / 10,
-      billPct, nonPct,
-      weekStart: weekStartStr,
-    };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML = '<div class="widget-error">No data</div>'; return; }
-    const billColor = '#00D2FF';
-    const _tileEl   = container.closest('.notes-tile');
-    const _tileH    = (_tileEl && _tileEl.offsetHeight) || container.offsetHeight || 120;
-    const bigFont   = Math.min(26, Math.max(16, Math.round(_tileH * 0.18))) + 'px';
-    const _isSmall  = _tileH < 150;
-    const pad       = _isSmall ? '6px 12px' : '10px 12px';
-    const numMB     = _isSmall ? '4px' : '8px';
-    const barMB     = _isSmall ? '3px' : '5px';
-    const pctMB     = _isSmall ? '4px' : '8px';
-
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;padding:'+pad+';height:100%;justify-content:center;gap:0;box-sizing:border-box">' +
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:'+numMB+'">' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Billable vs Non-Bill</div>' +
-          '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:#EF9F27;letter-spacing:.04em">'+data.total+'h total this week</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:'+numMB+'">' +
-          '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:'+billColor+';line-height:1">'+data.billable+'h</div>' +
-            '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">billable</div>' +
-          '</div>' +
-          '<div>' +
-            '<div style="font-family:var(--font-ui,sans-serif);font-size:'+bigFont+';font-weight:700;color:#8B5CF6;line-height:1">'+data.nonBill+'h</div>' +
-            '<div style="font-family:var(--font-mono,monospace);font-size:9px;color:var(--text3);letter-spacing:.06em;margin-top:2px">non-bill</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:'+barMB+'">' +
-          '<div style="height:100%;width:'+data.billPct+'%;background:'+billColor+';border-radius:3px;transition:width .4s"></div>' +
-          '<div style="height:100%;width:'+data.nonPct+'%;background:#8B5CF6;border-radius:3px;transition:width .4s;float:right"></div>' +
-        '</div>' +
-        '<div style="display:flex;justify-content:space-between;margin-bottom:'+pctMB+'">' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:'+billColor+'">'+data.billPct+'%</span>' +
-          '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:#8B5CF6">'+data.nonPct+'%</span>' +
-        '</div>' +
-      '</div>';
-  }
-});
-
-
-// ── 8. TASK LIST ──────────────────────────────────────────────────────────
-window.WIDGET_REGISTRY.register({
-  id:              'task_list',
-  label:           'Task list',
-  category:        'personal',
-  description:     'Open tasks with progress and due dates',
-  icon:            'list',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 60000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    const W = '[W2:task_list]';
-
-    // ── 1. Resolve target person via shared _resolveTarget (handles clone/shared-view/self)
-    const { rid, uid: fetchUid } = _resolveTarget(config);
-    const today = new Date().toISOString().slice(0,10);
-    if (!fetchUid && !rid) return { items:[], today };
-
-    const api = _resolveApi();
-
-    // ── 2. Use _wiItems cache only when targeting self (logged-in user)
-    const myRid  = window._notesResource && window._notesResource.id;
-    const isSelf = rid === myRid;
-    if (isSelf && window._wiItems && window._wiItems.length) {
-      const cached = window._wiItems.filter(function(w){ return w.type === 'task'; });
-      if (cached.length) return { items: cached, today, source: 'cache' };
-    }
-
-    if (!fetchUid) return { items:[], today };
-
-    // ── 3. Fetch tasks
-    const taskQuery = 'tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days' +
-      '&assigned_to=eq.'+fetchUid+'&status=neq.complete&order=created_at.desc&limit=200';
-    const tasks = await api.get(taskQuery).catch(function(err){
-    });
-
-    // ── 6. Fetch project names
-    const projIds = {};
-    (tasks||[]).forEach(function(t){ if(t.project_id) projIds[t.project_id]=true; });
-    const pKeys = Object.keys(projIds);
-    const projs = pKeys.length
-      ? await _api('projects?id=in.('+pKeys.join(',')+')'+'&select=id,name&limit=200')
-      : [];
-    const pMap = {};
-    (projs||[]).forEach(function(p){ pMap[p.id]=p.name; });
-
-    // ── 7. Build items — filter cancelled and 100% complete
-    const items = (tasks||[])
-      .filter(function(t){ return t.status !== 'cancelled'; })
-      .filter(function(t){
-        const p = parseFloat(t.pct_complete)||0;
-        const n = p<=1&&p>0 ? Math.round(p*100) : Math.round(p);
-        return n < 100;
-      })
-      .map(function(t){
-        const p   = parseFloat(t.pct_complete)||0;
-        const pct = p<=1&&p>0 ? Math.round(p*100) : Math.round(p);
-        const overdue = t.due_date && t.due_date < today;
-        return {
-          type: 'task', id: t.id, title: t.name,
-          project: pMap[t.project_id] || '',
-          status: t.status, due: t.due_date, overdue, pct,
-          urgency: overdue ? 0 : (t.due_date ? 1 : 2),
-        };
-      });
-
-    items.sort(function(a,b){
-      if (a.urgency !== b.urgency) return a.urgency - b.urgency;
-      if (a.due && b.due) return a.due.localeCompare(b.due);
-      return 0;
-    });
-
-    return { items, today };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const items      = data.items || [];
-    const today      = data.today;
-    const overdueCnt = items.filter(function(t){ return t.overdue; }).length;
-
-    if (!items.length) {
-      container.innerHTML=
-        '<div class="widget-counter">'+
-          '<div class="wc-big" style="color:#1D9E75">&#10003;</div>'+
-          '<div class="wc-label">No open tasks</div>'+
-        '</div>';
-      return;
-    }
-
-    // Columns: type badge · title (flex) · progress · due · status
-    // Progress is wide so the bar has room; due/status get generous fixed px
-    const COLS = '28px minmax(0,1fr) 180px 58px 90px';
-    const mono = 'font-family:var(--font-mono,monospace)';
-
-    function fmtDue(due, overdue) {
-      if (!due) return '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.25)">—</span>';
-      if (overdue) {
-        const d = Math.round((new Date(today) - new Date(due)) / 86400000);
-        return '<span style="'+mono+';font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>';
-      }
-      return due === today
-        ? '<span style="'+mono+';font-size:11px;color:#EF9F27">Today</span>'
-        : '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.4)">'+
-            new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
-    }
-
-    function fmtProgress(t) {
-      if (t.pct <= 0) return '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.25)">—</span>';
-      const fc = t.pct>=80?'#1D9E75':t.pct>=40?'#00D2FF':'rgba(255,255,255,.35)';
-      return '<div style="display:flex;flex-direction:column;gap:3px;padding-right:12px;min-width:0">'+
-        '<div style="'+mono+';font-size:10px;color:'+fc+'">'+t.pct+'%</div>'+
-        '<div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">'+
-          '<div style="height:100%;width:'+Math.min(t.pct,100)+'%;background:'+fc+';border-radius:2px"></div>'+
-        '</div>'+
-      '</div>';
-    }
-
-    function fmtStatus(t) {
-      if (t.status==='blocked')
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 8px;text-align:center;white-space:nowrap">BLOCKED</div>';
-      if (t.status==='in_progress')
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#EF9F27;border:1px solid rgba(239,159,39,.4);padding:2px 8px;text-align:center;white-space:nowrap">In Progress</div>';
-      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 8px;text-align:center;white-space:nowrap">Start</div>';
-    }
-
-    const headerHtml =
-      '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
-          'padding:4px 10px 4px 8px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">'+
-        '<div></div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Task / Action</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Progress</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right;padding-right:4px">Due</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:center">Status</div>'+
-      '</div>';
-
-    const rowsHtml = items.map(function(t){
-      const leftBorder = t.overdue ? 'border-left:2px solid #E24B4A;' : '';
-      return '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
-          'padding:5px 10px 5px 8px;border-bottom:1px solid rgba(255,255,255,.05);'+leftBorder+'">'+
-        '<div style="display:flex;align-items:center">'+
-          '<div style="width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,210,255,.4);flex-shrink:0"></div>'+
-        '</div>'+
-        '<div style="min-width:0;padding-right:8px">'+
-          '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(t.title)+'">'+_esc(t.title)+'</div>'+
-          (t.project
-            ? '<div style="'+mono+';font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(t.project)+(t.due?' · Due '+new Date(t.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'')+'</div>'
-            : (t.due ? '<div style="'+mono+';font-size:10px;color:var(--text3)">Due '+new Date(t.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>' : '')
-          )+
-        '</div>'+
-        '<div>'+fmtProgress(t)+'</div>'+
-        '<div style="text-align:right;padding-right:4px">'+fmtDue(t.due, t.overdue)+'</div>'+
-        '<div style="display:flex;justify-content:center">'+fmtStatus(t)+'</div>'+
-      '</div>';
-    }).join('');
-
-    const summaryColor = overdueCnt>0 ? '#E24B4A' : 'rgba(255,255,255,.25)';
-    const summaryText  = items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'');
-
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">'+
-        headerHtml+
-        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>'+
-        '<div style="'+mono+';font-size:9px;color:'+summaryColor+';padding:3px 10px;flex-shrink:0;'+
-            'border-top:1px solid rgba(255,255,255,.05);text-align:right">'+summaryText+'</div>'+
-      '</div>';
-  }
-});
-
-
-// ── 9. ACTION ITEM LIST ───────────────────────────────────────────────────
-// Cloned from task_list's proven dataFn pattern.
-// Key differences vs task_list:
-//   • Cache source: window._wiItems filtered to type==='action' (not type==='task')
-//   • Fetch: workflow_action_items by owner_resource_id (not tasks by assigned_to/user_id)
-//   • No pct_complete — progress column replaced by "From" (created_by_name)
-window.WIDGET_REGISTRY.register({
-  id:              'action_item_list',
-  label:           'Action item list',
-  category:        'personal',
-  description:     'Open action items with due dates',
-  icon:            'list',
-  configSchema: [
-    { key:'targetResourceId', label:'Person', type:'resource_picker', default:'', required:false,
-      templatePlaceholder:'Select person when launching' },
-  ],
-  refreshInterval: 60000,
-  minTileHeight:   'small',
-
-  dataFn: async function(config) {
-    const W = '[W2:action_item_list]';
-
-    // ── 1. Resolve target person via shared _resolveTarget (handles clone/shared-view/self)
-    const { rid, uid } = _resolveTarget(config);
-    const today = new Date().toISOString().slice(0,10);
-    if (!rid) return { items:[], today };
-
-    const api = _resolveApi();
-
-    // ── 2. Use caches only when targeting self (logged-in user)
-    const myRid  = window._notesResource && window._notesResource.id;
-    const isSelf = rid === myRid;
-    if (isSelf && window._wiItems && window._wiItems.length) {
-      const cached = window._wiItems.filter(function(w){ return w.type === 'action'; });
-      if (cached.length) {
-        const items = cached.map(function(a){
-          return { id:a.id, title:a.title, due:a.due, overdue:a.overdue,
-            createdBy: a.createdBy || null };
-        });
-        return { items, today, source:'cache' };
-      }
-    }
-    if (isSelf && window.myActionItems && window.myActionItems.length) {
-      const cached = window.myActionItems.filter(function(a){ return a.status === 'open'; });
-      const items = cached.map(function(a){
-        return { id:a.id, title:a.title, due:a.due_date,
-          overdue: a.due_date && a.due_date < today,
-          createdBy: a.created_by_name || null };
-      });
-      return { items, today, source:'myActionItems-cache' };
-    }
-
-    // ── 3. Fetch fresh directly from DB
-    const targetRid = rid;
-
-    const aiQuery = 'workflow_action_items?select=id,title,due_date,owner_resource_id,created_by_name' +
-      '&owner_resource_id=eq.'+targetRid+'&status=eq.open&order=due_date.asc.nullslast&limit=100';
-    const rows = await api.get(aiQuery).catch(function(err){
-    });
-
-    const items = (rows||[]).map(function(a){
-      return { id:a.id, title:a.title, due:a.due_date,
-        overdue: a.due_date && a.due_date < today,
-        createdBy: a.created_by_name || null };
-    });
-    items.sort(function(a,b){
-      const ua = a.overdue?0:(a.due?1:2), ub = b.overdue?0:(b.due?1:2);
-      if (ua!==ub) return ua-ub;
-      if (a.due&&b.due) return a.due.localeCompare(b.due);
-      return 0;
-    });
-    return { items, today };
-  },
-
-  renderFn: function(data, container) {
-    if (!data) { container.innerHTML='<div class="widget-error">No data</div>'; return; }
-    const items      = data.items || [];
-    const today      = data.today;
-    const overdueCnt = items.filter(function(i){ return i.overdue; }).length;
-
-    if (!items.length) {
-      container.innerHTML=
-        '<div class="widget-counter">'+
-          '<div class="wc-big" style="color:#1D9E75">&#10003;</div>'+
-          '<div class="wc-label">No open action items</div>'+
-        '</div>';
-      return;
-    }
-
-    // Columns: type badge · title (flex) · due · status — mirrors task_list layout
-    const COLS = '28px minmax(0,1fr) 58px 90px';
-    const mono = 'font-family:var(--font-mono,monospace)';
-
-    function fmtDue(due, overdue) {
-      if (!due) return '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.25)">—</span>';
-      if (overdue) {
-        const d = Math.round((new Date(today) - new Date(due)) / 86400000);
-        return '<span style="'+mono+';font-size:11px;font-weight:700;color:#E24B4A">'+d+'d</span>';
-      }
-      return due === today
-        ? '<span style="'+mono+';font-size:11px;color:#EF9F27">Today</span>'
-        : '<span style="'+mono+';font-size:11px;color:rgba(255,255,255,.4)">'+
-            new Date(due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
-    }
-
-    // Action items carry status: 'open' always (we filter to open), but surface it
-    // the same way task_list surfaces Start/In Progress/Blocked
-    function fmtStatus(item) {
-      if (item.overdue)
-        return '<div style="'+mono+';font-size:10px;font-weight:600;color:#E24B4A;border:1px solid rgba(226,75,74,.4);padding:2px 8px;text-align:center;white-space:nowrap">Overdue</div>';
-      return '<div style="'+mono+';font-size:10px;font-weight:600;color:rgba(0,210,255,.8);border:1px solid rgba(0,210,255,.3);padding:2px 8px;text-align:center;white-space:nowrap">Open</div>';
-    }
-
-    const headerHtml =
-      '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
-          'padding:4px 10px 4px 8px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">'+
-        '<div></div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Action Item</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:right;padding-right:4px">Due</div>'+
-        '<div style="'+mono+';font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:center">Status</div>'+
-      '</div>';
-
-    const rowsHtml = items.map(function(item){
-      const leftBorder = item.overdue ? 'border-left:2px solid #E24B4A;' : '';
-      return '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;'+
-          'padding:5px 10px 5px 8px;border-bottom:1px solid rgba(255,255,255,.05);'+leftBorder+'">'+
-        '<div style="display:flex;align-items:center">'+
-          '<div style="width:14px;height:14px;border-radius:50%;border:1px solid rgba(74,158,255,.4);flex-shrink:0"></div>'+
-        '</div>'+
-        '<div style="min-width:0;padding-right:8px">'+
-          '<div style="font-size:12px;font-weight:500;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(item.title)+'">'+_esc(item.title)+'</div>'+
-          (item.due ? '<div style="'+mono+';font-size:10px;color:var(--text3)">Due '+new Date(item.due+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>' : '')+
-        '</div>'+
-        '<div style="text-align:right;padding-right:4px">'+fmtDue(item.due, item.overdue)+'</div>'+
-        '<div style="display:flex;justify-content:center">'+fmtStatus(item)+'</div>'+
-      '</div>';
-    }).join('');
-
-    const summaryColor = overdueCnt>0 ? '#E24B4A' : 'rgba(255,255,255,.25)';
-    const summaryText  = items.length+' open'+(overdueCnt>0?' · '+overdueCnt+' overdue':'');
-
-    container.innerHTML =
-      '<div style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;overflow:hidden">'+
-        headerHtml+
-        '<div style="flex:1;overflow-y:auto">'+rowsHtml+'</div>'+
-        '<div style="'+mono+';font-size:9px;color:'+summaryColor+';padding:3px 10px;flex-shrink:0;'+
-            'border-top:1px solid rgba(255,255,255,.05);text-align:right">'+summaryText+'</div>'+
-      '</div>';
-  }
-});
-
-
-// ── All widgets registered — now safe to re-fire _notesPostWire ───────────
-// (Moved here from mid-block so task_list and action_item_list are included)
-
-setTimeout(function() {
-  if (typeof window._notesPostWire === 'function') {
-    
-    window._notesPostWire();
-  }
-}, 50);
-setTimeout(function() {
-  if (typeof window._notesPostWire === 'function') {
-    
-    window._notesPostWire();
-  }
-}, 200);
 
 })();
 </script>
