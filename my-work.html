@@ -208,13 +208,15 @@ window._mwLoadUserView = async function() {
           actualHours:  t.actual_hours ? parseFloat(t.actual_hours) : null,
           actualStart:  t.actual_start||null,
           complexity:   t.complexity_rating||null,
+          assignedTo:   t.assigned_to||null,
           urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
       });
     (myActionItems||[]).filter(a=>a.owner_resource_id).forEach(a => {
       const overdue = a.due_date && a.due_date < today;
       workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
         projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency: overdue?0:1,
-        createdBy: a.created_by_name||null, ownerName: a.owner_name||null });
+        createdBy: a.created_by_name||null, ownerName: a.owner_name||null,
+        ownerResourceId: a.owner_resource_id||null });
     });
     workItems.sort((a,b) => {
       if (a.urgency !== b.urgency) return a.urgency - b.urgency;
@@ -9669,7 +9671,7 @@ function openWorkItemExpanded(item) {
 
           <!-- Row 2a: Status + Planned tiles -->
           <div style="display:flex;align-items:center;gap:5px;padding:5px 14px;border-bottom:1px solid rgba(0,210,255,.04);flex-shrink:0">
-            <div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(0,210,255,.4);text-transform:uppercase;white-space:nowrap;min-width:50px">Planned</div>
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;white-space:nowrap;min-width:52px">Planned</div>
             ${item.type==='task'?`
             <select id="wi-status-${item.id}"
               style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 6px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer;flex-shrink:0">
@@ -9681,17 +9683,17 @@ function openWorkItemExpanded(item) {
               ['Effort Hrs', bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
               ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
               ['Budget',     bh?'…':'—', '', 'budget'],
-            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
+            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0;width:90px;box-sizing:border-box"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
           </div>
           <!-- Row 2b: Actuals tiles + Log Time -->
           <div style="display:flex;align-items:center;gap:5px;padding:5px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
-            <div style="font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(0,210,255,.4);text-transform:uppercase;white-space:nowrap;min-width:50px">Actuals</div>
+            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;white-space:nowrap;min-width:52px">Actuals</div>
             ${[
               ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
               ['Act. Hrs',   ah.toFixed(1)+'h', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
               ['Spend',      bh?'…':'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'', 'spend'],
               ['Spend %',    bh?usedPct+'%':'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'var(--compass-green)'],
-            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
+            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0;width:90px;box-sizing:border-box"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
             <div style="width:1px;height:22px;background:rgba(255,255,255,.08);flex-shrink:0;margin-left:4px"></div>
             <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
               <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log Time (hrs)</span>
@@ -9751,7 +9753,7 @@ function openWorkItemExpanded(item) {
 
         <!-- RIGHT column: Chain of Custody — full height from row 2 top -->
         <div data-coc-col style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
-          <div data-coc-count style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
+          <div data-coc-count style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
           <div data-coc-body style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
         </div>
 
@@ -9765,20 +9767,43 @@ function openWorkItemExpanded(item) {
   // ── Fetch assignee labor rate from hud_role_levels ───────────────
   (async function() {
     try {
-      // Find the assignee resource — for tasks use assigned_to user_id, for actions use owner
-      const assigneeUserId = item.assignedTo || item.ownerUserId || null;
-      const assigneeRes = assigneeUserId
-        ? await API.get('resources?select=id,hud_role_id,level&user_id=eq.' + assigneeUserId + '&limit=1').catch(()=>[])
-        : [];
-      const aRes = assigneeRes && assigneeRes[0];
+      const LOG = (msg, data) => console.log('[RateLookup]', msg, data !== undefined ? data : '');
+      LOG('item.type', item.type);
+      LOG('item.assignedTo', item.assignedTo);
+      LOG('item.ownerResourceId', item.ownerResourceId);
+      LOG('_myResource.user_id', _myResource?.user_id);
+
+      let aRes = null;
+      if (item.type === 'action' && item.ownerResourceId) {
+        const r = await API.get('resources?select=id,hud_role_id,level&id=eq.' + item.ownerResourceId + '&limit=1').catch(()=>[]);
+        aRes = r && r[0];
+        LOG('action → resource by id', aRes);
+      } else if (item.assignedTo) {
+        const r = await API.get('resources?select=id,hud_role_id,level&user_id=eq.' + item.assignedTo + '&limit=1').catch(()=>[]);
+        aRes = r && r[0];
+        LOG('task → resource by user_id', aRes);
+      } else {
+        const r = await API.get('resources?select=id,hud_role_id,level&user_id=eq.' + (_myResource?.user_id||'') + '&limit=1').catch(()=>[]);
+        aRes = r && r[0];
+        LOG('fallback → current user resource', aRes);
+      }
+
       const roleId = aRes?.hud_role_id || null;
       const level  = aRes?.level || null;
+      LOG('hud_role_id', roleId);
+      LOG('level', level);
+
       let rate = null;
       if (roleId && level) {
         const rlRows = await API.get('hud_role_levels?select=overhead_rate_per_hour&role_id=eq.' + roleId + '&level=eq.' + level + '&limit=1').catch(()=>[]);
+        LOG('hud_role_levels result', rlRows);
         rate = rlRows && rlRows[0] ? parseFloat(rlRows[0].overhead_rate_per_hour) : null;
+      } else if (roleId && !level) {
+        const allLevels = await API.get('hud_role_levels?select=level,overhead_rate_per_hour&role_id=eq.' + roleId).catch(()=>[]);
+        LOG('no level set — available levels for this role', allLevels);
       }
-      // Update Budget and Spend tiles with real rate
+      LOG('resolved rate ($/hr)', rate);
+
       const bh = item.budgetHours || (item.effortDays ? item.effortDays * 8 : null);
       const loggedHrs2 = (_teEntries||[]).filter(e=>e.task_id===item.id).reduce((s,e)=>s+parseFloat(e.hours||0),0);
       const ah2 = item.actualHours || loggedHrs2;
@@ -9787,16 +9812,15 @@ function openWorkItemExpanded(item) {
       const cautionEl  = panel.querySelector('[data-rate-caution]');
       if (rate && bh && budgetTile) budgetTile.textContent = '$' + Math.round(bh * rate).toLocaleString();
       if (rate && spendTile) spendTile.textContent = '$' + Math.round(ah2 * rate).toLocaleString();
-      // Show caution if rate cannot be determined
       if (cautionEl) {
-        if (!aRes) cautionEl.textContent = '* Caution: assignee resource record not found — budget cost cannot be calculated.';
+        if (!aRes)    cautionEl.textContent = '* Caution: assignee resource record not found — budget cost cannot be calculated.';
         else if (!roleId) cautionEl.textContent = '* Caution: assignee has no role assigned — budget cost cannot be calculated.';
-        else if (!level) cautionEl.textContent = '* Caution: assignee has no seniority level assigned — budget cost cannot be calculated.';
-        else if (!rate) cautionEl.textContent = '* Caution: no labor rate defined for this role/level — budget cost cannot be calculated.';
+        else if (!level)  cautionEl.textContent = '* Caution: assignee has no seniority level assigned — budget cost cannot be calculated.';
+        else if (!rate)   cautionEl.textContent = '* Caution: no labor rate defined for this role/level — budget cost cannot be calculated.';
         else cautionEl.style.display = 'none';
       }
     } catch(e) {
-      console.warn('[Compass] Rate lookup error:', e);
+      console.warn('[RateLookup] Error:', e);
     }
   })();
 
