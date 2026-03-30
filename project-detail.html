@@ -3268,8 +3268,29 @@ async function saveLinkDeps() {
     }
 
     if (!newDeps.length) { _showErr('link-error','No valid task pairs found'); btn.textContent='\u26d3 CREATE LINKS'; btn.disabled=false; return; }
-    await API.post('task_dependencies', newDeps);
-    _writeAudit('linked', 'task_dependencies', null, null, { count: newDeps.length, type: _selectedLinkType });
+
+    // Filter out pairs that already exist in STATE.deps to avoid 409 unique constraint errors
+    const existingPairs = new Set(
+      (STATE.deps || []).map(d => d.predecessor_task_id + '|' + d.successor_task_id)
+    );
+    const depsToPost = newDeps.filter(d =>
+      !existingPairs.has(d.predecessor_task_id + '|' + d.successor_task_id)
+    );
+    const skipped = newDeps.length - depsToPost.length;
+
+    if (!depsToPost.length) {
+      _showErr('link-error',
+        skipped === newDeps.length
+          ? 'All selected dependencies already exist'
+          : 'No new dependencies to create — all pairs already linked'
+      );
+      btn.textContent = '\u26d3 CREATE LINKS'; btn.disabled = false;
+      return;
+    }
+
+    await API.post('task_dependencies', depsToPost);
+    _writeAudit('linked', 'task_dependencies', null, null, { count: depsToPost.length, type: _selectedLinkType });
+    if (skipped) showToast(`${skipped} pair${skipped>1?'s':''} already linked — skipped`, 'info');
 
     // Reload deps so PRED column refreshes
     window._taskCPM = null;  // invalidate CPM cache
