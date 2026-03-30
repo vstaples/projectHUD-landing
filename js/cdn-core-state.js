@@ -372,6 +372,20 @@ let _resources_cad = []; // all firm resources (for instance reassignment)
 let _myResourceId  = null; // current user's resource ID (for owner auto-select)
 let _myUserId      = null; // current user's user ID (for launched_by FK)
 
+// ── Instances tab UI state ────────────────────────────────────────────────────
+let _instFilter    = 'all';  // 'all' | 'mine' | 'active' | 'done'
+let _instSearch    = '';     // current search query string
+
+// ── Instance DAG (pan/zoom canvas) state ─────────────────────────────────────
+let _instDagScale      = 1;
+let _instDagPanX       = 0;
+let _instDagPanY       = 0;
+let _instDagFitted     = false;
+let _instDagPulseFrame = null;
+
+// ── Instance scrubber state ───────────────────────────────────────────────────
+let _instScrubEvents   = [];
+
 API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
   // Back-fill assignee_resource_id on any already-loaded steps
