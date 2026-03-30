@@ -38,18 +38,7 @@ function _resolveLinkedTaskName(instId, taskId) {
   }).catch(() => {});
 }
 
-function renderFormsTab(el) {
-  el.innerHTML = `
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:12px;padding:40px">
-      <div style="font-size:40px;opacity:.2">📄</div>
-      <div style="font-size:14px;font-weight:600;color:var(--text2)">Form Library</div>
-      <p style="font-size:13px;max-width:320px;text-align:center;line-height:1.6">
-        Upload a PDF or Word document to absorb it into a fillable form with role-assigned field regions.
-        Coming in Session 2.
-      </p>
-      <button class="btn btn-cad" disabled style="opacity:.4;cursor:not-allowed">↑ Upload Document</button>
-    </div>`;
-}
+// renderFormsTab is defined in cdn-form-editor.js (loaded after this file)
 
 function renderTriggersTab(el) {
   el.innerHTML = `
