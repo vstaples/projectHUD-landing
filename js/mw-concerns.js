@@ -55,28 +55,28 @@ function renderUserConcerns() {
   const quickCapture = `<div style="display:flex;gap:8px;margin-bottom:12px;padding:8px 10px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15)">
     <textarea id="concern-new-text" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:12px;padding:5px 8px;outline:none;resize:none;box-sizing:border-box" rows="2" placeholder="Describe your concern — logged with timestamp and routed to your PM…"></textarea>
     <div style="display:flex;flex-direction:column;gap:4px">
-      <select id="concern-new-priority" style="font-family:var(--font-head);font-size:11px;padding:3px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
+      <select id="concern-new-priority" style="font-family:var(--font-mono);font-size:11px;padding:3px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
         <option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option><option value="low">Low</option>
       </select>
-      <select id="concern-new-visibility" style="font-family:var(--font-head);font-size:11px;padding:3px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
+      <select id="concern-new-visibility" style="font-family:var(--font-mono);font-size:11px;padding:3px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
         <option value="pm">PM only</option><option value="management">Management</option><option value="all">All</option>
       </select>
-      <button onclick="uRaiseConcern()" style="font-family:var(--font-head);font-size:11px;padding:4px 10px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;white-space:nowrap;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(0,210,255,.08)'" onmouseleave="this.style.background='none'">+ Raise concern</button>
+      <button onclick="uRaiseConcern()" style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;white-space:nowrap;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(0,210,255,.08)'" onmouseleave="this.style.background='none'">+ Raise concern</button>
     </div>
   </div>`;
 
   const filterBar = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase">Status</span>
+    <span style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase">Status</span>
     ${[['all','All'],['unread','Unread'],['open','Open'],['inprogress','In progress'],['resolved','Resolved'],['rejected','Rejected']].map(([v,l])=>`<button onclick="window._concernFilter='${v}';renderUserConcerns()"
-      style="font-family:var(--font-head);font-size:11px;padding:2px 9px;background:${window._concernFilter===v?'rgba(0,210,255,.06)':'none'};border:1px solid ${window._concernFilter===v?'rgba(0,210,255,.4)':'rgba(255,255,255,.1)'};color:${window._concernFilter===v?'#00D2FF':'rgba(255,255,255,.5)'};cursor:pointer;transition:.12s">${l}</button>`).join('')}
+      style="font-family:var(--font-mono);font-size:11px;padding:2px 9px;background:${window._concernFilter===v?'rgba(0,210,255,.06)':'none'};border:1px solid ${window._concernFilter===v?'rgba(0,210,255,.4)':'rgba(255,255,255,.1)'};color:${window._concernFilter===v?'#00D2FF':'rgba(255,255,255,.5)'};cursor:pointer;transition:.12s">${l}</button>`).join('')}
   </div>`;
 
   if (!filtered.length && !(window._userConcerns||[]).length) {
-    el.innerHTML = quickCapture + filterBar + '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:24px 0;text-align:center">No concerns raised yet.<br>Use the form above to log your first concern.</div>';
+    el.innerHTML = quickCapture + filterBar + '<div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:24px 0;text-align:center">No concerns raised yet.<br>Use the form above to log your first concern.</div>';
     return;
   }
   if (!filtered.length) {
-    el.innerHTML = quickCapture + filterBar + '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0;text-align:center">No concerns match this filter.</div>';
+    el.innerHTML = quickCapture + filterBar + '<div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0;text-align:center">No concerns match this filter.</div>';
     return;
   }
 
@@ -95,7 +95,7 @@ function renderUserConcerns() {
           const replyHtml = replies.map(r=>`<div style="display:flex;gap:8px;margin:4px 0 0 24px">
             <div style="width:6px;height:6px;border-radius:50%;background:rgba(0,210,255,.4);flex-shrink:0;margin-top:3px"></div>
             <div style="flex:1">
-              <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">${esc(r.who||'You')} · ${r.when?_timeAgo(r.when):''}</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">${esc(r.who||'You')} · ${r.when?_timeAgo(r.when):''}</div>
               <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);line-height:1.5">${esc(r.text||'')}</div>
             </div>
           </div>`).join('');
@@ -106,9 +106,9 @@ function renderUserConcerns() {
             </div>
             <div style="flex:1;padding-bottom:8px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
-                <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);flex:1">${esc(e.who||'You')} · ${e.when?_timeAgo(e.when):''}</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);flex:1">${esc(e.who||'You')} · ${e.when?_timeAgo(e.when):''}</span>
                 <button onclick="uToggleConcernReply('${c.id}','${e.id}')"
-                  style="background:none;border:none;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;padding:0;transition:color .1s"
+                  style="background:none;border:none;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;padding:0;transition:color .1s"
                   onmouseenter="this.style.color='#00D2FF'" onmouseleave="this.style.color='rgba(255,255,255,.3)'">↩ Reply</button>
               </div>
               <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.5">${esc(e.text||'')}</div>
@@ -119,36 +119,36 @@ function renderUserConcerns() {
                     style="flex:1;padding:5px 8px;font-family:var(--font-body);font-size:11px;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.2);color:#C8DFF0;resize:none;min-height:40px;outline:none;box-sizing:border-box"
                     onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();uSubmitConcernReply('${c.id}','${e.id}')}"></textarea>
                   <button onclick="uSubmitConcernReply('${c.id}','${e.id}')"
-                    style="font-family:var(--font-head);font-size:11px;padding:0 12px;background:#00D2FF;border:none;color:#060a10;cursor:pointer;font-weight:700;white-space:nowrap;align-self:flex-end;height:30px">Reply</button>
+                    style="font-family:var(--font-mono);font-size:11px;padding:0 12px;background:#00D2FF;border:none;color:#060a10;cursor:pointer;font-weight:700;white-space:nowrap;align-self:flex-end;height:30px">Reply</button>
                 </div>
               </div>
             </div>
           </div>`;
         }).join('')
-      : `<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Awaiting acknowledgement from PM.</div>`;
+      : `<div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">Awaiting acknowledgement from PM.</div>`;
 
     return `<div style="display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.07)'">
       <div style="width:4px;align-self:stretch;background:${barCol};flex-shrink:0"></div>
       <div style="flex:1;padding:9px 12px">
         <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px">
-          <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${esc(c.title)}</div>
-          <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid ${statCol}40;color:${statCol};background:${statCol}12;flex-shrink:0;white-space:nowrap">${statLabel}</span>
+          <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${esc(c.title)}</div>
+          <span style="font-family:var(--font-mono);font-size:11px;padding:2px 8px;border:1px solid ${statCol}40;color:${statCol};background:${statCol}12;flex-shrink:0;white-space:nowrap">${statLabel}</span>
         </div>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px;display:flex;gap:10px;flex-wrap:wrap">${metaParts.map(p=>`<span>${p}</span>`).join('')}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px;display:flex;gap:10px;flex-wrap:wrap">${metaParts.map(p=>`<span>${p}</span>`).join('')}</div>
         ${c.description?`<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);line-height:1.55">${esc(c.description.slice(0,180))}${c.description.length>180?'…':''}</div>`:''}
         <div id="${expandId}" style="display:none;margin-top:8px">
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px">CoC history</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px">CoC history</div>
           <div style="border-left:1px solid rgba(0,210,255,.15);padding-left:8px;margin-bottom:8px">${threadHtml}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
-            ${['in_progress','resolved'].includes(c.status)?'':`<span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">Escalate to</span>
-            <select onchange="" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
+            ${['in_progress','resolved'].includes(c.status)?'':`<span style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35)">Escalate to</span>
+            <select onchange="" style="font-family:var(--font-mono);font-size:11px;padding:2px 8px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;outline:none;cursor:pointer">
               <option>PM</option><option>Management</option><option>Executive</option>
             </select>
-            <button onclick="uEscalateConcern('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Escalate →</button>`}
+            <button onclick="uEscalateConcern('${c.id}')" style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Escalate →</button>`}
             <button onclick="uToggleConcernCompose('${c.id}')"
-              style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;transition:color .1s"
+              style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;transition:color .1s"
               onmouseenter="this.style.color='#F0F6FF'" onmouseleave="this.style.color='rgba(255,255,255,.4)'">+ Add comment</button>
-            ${c.status==='in_progress'?`<button onclick="uResolveConcern('${c.id}')" style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(29,158,117,.35);color:#1D9E75;cursor:pointer">Mark resolved</button>`:''}
+            ${c.status==='in_progress'?`<button onclick="uResolveConcern('${c.id}')" style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(29,158,117,.35);color:#1D9E75;cursor:pointer">Mark resolved</button>`:''}
           </div>
           <!-- Inline comment compose (toggled) -->
           <div id="uconcern-compose-${c.id}" style="display:none;margin-top:8px;border-top:1px solid rgba(255,255,255,.06);padding-top:8px">
@@ -157,14 +157,14 @@ function renderUserConcerns() {
                 style="flex:1;padding:6px 8px;font-family:var(--font-body);font-size:12px;background:rgba(255,255,255,.04);border:1px solid rgba(0,210,255,.2);color:#C8DFF0;resize:none;min-height:48px;outline:none;box-sizing:border-box"
                 onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();uSubmitConcernComment('${c.id}')}"></textarea>
               <button onclick="uSubmitConcernComment('${c.id}')"
-                style="font-family:var(--font-head);font-size:11px;padding:0 14px;background:#00D2FF;border:none;color:#060a10;cursor:pointer;font-weight:700;align-self:flex-end;height:32px">Send</button>
+                style="font-family:var(--font-mono);font-size:11px;padding:0 14px;background:#00D2FF;border:none;color:#060a10;cursor:pointer;font-weight:700;align-self:flex-end;height:32px">Send</button>
             </div>
           </div>
         </div>
       </div>
       <div style="padding:9px 10px;flex-shrink:0">
         <button onclick="event.stopPropagation();uToggleConcernExpand('${expandId}')"
-          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid ${c.status==='unread'||c.status==='not_yet_read'?'rgba(0,210,255,.35)':'rgba(255,255,255,.15)'};color:${c.status==='unread'||c.status==='not_yet_read'?'#00D2FF':'rgba(255,255,255,.4)'};cursor:pointer;letter-spacing:.06em">Open</button>
+          style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;background:none;border:1px solid ${c.status==='unread'||c.status==='not_yet_read'?'rgba(0,210,255,.35)':'rgba(255,255,255,.15)'};color:${c.status==='unread'||c.status==='not_yet_read'?'#00D2FF':'rgba(255,255,255,.4)'};cursor:pointer;letter-spacing:.06em">Open</button>
       </div>
     </div>`;
   });
@@ -189,7 +189,7 @@ window.uRaiseConcern = async function() {
   try {
     await API.post('concerns',{
       id: newId,
-      firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+      firm_id: window.FIRM_ID,
       raiser_resource_id: resId||null,
       raiser_name: _myResource?.name||null,
       title: txt.slice(0,100),
@@ -202,7 +202,7 @@ window.uRaiseConcern = async function() {
     // First comment = the original concern text
     await API.post('concern_comments',{
       concern_id:          newId,
-      firm_id:             'aaaaaaaa-0001-0001-0001-000000000001',
+      firm_id:             window.FIRM_ID,
       author_resource_id:  resId||null,
       author_name:         _myResource?.name||'You',
       body:                txt,
@@ -224,7 +224,7 @@ window.uEscalateConcern = async function(concernId) {
     await API.patch(`concerns?id=eq.${concernId}`,{status:'in_progress'});
     await API.post('concern_comments',{
       concern_id: concernId,
-      firm_id:    'aaaaaaaa-0001-0001-0001-000000000001',
+      firm_id:    window.FIRM_ID,
       author_resource_id: _myResource?.id||null,
       author_name: _myResource?.name||'You',
       body: 'Concern escalated.',
@@ -253,7 +253,7 @@ window.uSubmitConcernComment = async function(concernId, parentId) {
   try {
     await API.post('concern_comments',{
       concern_id:          concernId,
-      firm_id:             'aaaaaaaa-0001-0001-0001-000000000001',
+      firm_id:             window.FIRM_ID,
       parent_id:           parentId||null,
       author_resource_id:  _myResource?.id||null,
       author_name:         _myResource?.name||'You',
@@ -307,7 +307,7 @@ window.uResolveConcern = async function(concernId) {
     });
     await API.post('concern_comments',{
       concern_id: concernId,
-      firm_id:    'aaaaaaaa-0001-0001-0001-000000000001',
+      firm_id:    window.FIRM_ID,
       author_resource_id: _myResource?.id||null,
       author_name: _myResource?.name||'You',
       body: 'Marked resolved.',
@@ -331,3 +331,5 @@ document.addEventListener('compass-identity-ready', () => {
     }).catch(()=>{});
   }
 });
+
+

@@ -407,7 +407,7 @@
 .ari-green  { background: rgba(29,158,117,.12); color: var(--compass-green); }
 
 .ar-title {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text0);
@@ -426,7 +426,7 @@
 .ar-due.amber { color: var(--compass-amber); }
 
 .ar-body {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text2);
   line-height: 1.5;
@@ -576,7 +576,7 @@
 .av-green  { background: rgba(29,158,117,.15);  border: 1px solid rgba(29,158,117,.3);  color: var(--compass-green); }
 
 .ur-name {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 500;
   color: var(--text0);
@@ -590,7 +590,7 @@
 }
 
 .ur-body {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text2);
   line-height: 1.5;
@@ -602,7 +602,7 @@
   padding-left: 8px;
   margin-left: 29px;
   color: var(--text1);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -618,7 +618,7 @@
 
 .thread-in input {
   flex: 1;
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 6px 10px;
   background: var(--bg2);
@@ -657,7 +657,7 @@
 .doc-info { flex: 1; min-width: 0; }
 
 .doc-name {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
   color: var(--text0);
@@ -739,7 +739,7 @@
 .scrubber-snapshot {
   padding: 8px 10px;
   background: var(--bg2);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text2);
   line-height: 1.5;
@@ -778,7 +778,7 @@
 }
 
 .rejection-context-text {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text1);
   line-height: 1.45;
@@ -955,7 +955,7 @@
     <!-- Morning Brief trigger -->
     <button id="nav-brief-btn"
       onclick="openMorningBrief()"
-      style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;
+      style="font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.08em;
         text-transform:uppercase;color:var(--text3);background:none;border:none;
         padding:0 12px;height:44px;cursor:pointer;transition:color .12s;display:flex;align-items:center;gap:6px"
       onmouseenter="this.style.color='var(--compass-amber)'"
@@ -967,7 +967,7 @@
     <!-- Simulator trigger -->
     <button id="nav-sim-btn"
       onclick="openDecisionSimulator(null,'Portfolio','Active portfolio — select a project context from PM View')"
-      style="font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.08em;
+      style="font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.08em;
         text-transform:uppercase;color:var(--text3);background:none;border:none;
         padding:0 12px;height:44px;cursor:pointer;transition:color .12s;display:flex;align-items:center;gap:6px"
       onmouseenter="this.style.color='var(--compass-purple)'"
@@ -1078,7 +1078,7 @@
 'use strict';
 
 // ── Constants ─────────────────────────────────────────────
-const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
+const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
 
 // ── State ─────────────────────────────────────────────────
 let _projects   = [];
@@ -1342,7 +1342,7 @@ async function loadUserView() {
     if (loading) loading.style.display = 'none';
     if (content) {
       content.style.display = 'block';
-      content.innerHTML = '<div style="padding:40px;font-family:var(--font-head);color:#E24B4A">Failed to load My Work view. Check console.</div>';
+      content.innerHTML = '<div style="padding:40px;font-family:var(--font-mono);color:#E24B4A">Failed to load My Work view. Check console.</div>';
     }
   }
 }

@@ -3214,7 +3214,7 @@ async function saveMeeting() {
     };
     const payload = {
       firm_id:          prospect.firm_id,
-      project_id:       '00000000-0000-0000-0001-000000000001', // placeholder project — required NOT NULL
+      project_id:       prospect.linked_project_id || null,  // null if schema allows, else omit field
       prospect_id:      PROSPECT_ID,
       title,
       scheduled_date:   meetingDatetime,
@@ -3222,7 +3222,7 @@ async function saveMeeting() {
       location:         document.getElementById('meet-location').value || null,
       status:           'scheduled',
       meeting_type:     meetingTypeMap[formatVal] || 'ad_hoc',
-      organizer_id:     '57b93738-6a2a-4098-ba12-bfffd1f7dd07',
+      organizer_id:     _currentResource?.id || null,
     };
 
     const result  = await API.post('meetings', payload);

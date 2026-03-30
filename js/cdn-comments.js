@@ -85,7 +85,7 @@ async function postStepComment(instId, stepId) {
   const newCommentId = crypto.randomUUID();
   const row = {
     id:                newCommentId,
-    firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
+    firm_id:           FIRM_ID_CAD,
     instance_id:       instId,
     template_step_id:  stepId,
     author_name:       authorName,
@@ -105,7 +105,7 @@ async function postStepComment(instId, stepId) {
       const today     = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
       const projId    = inst.project_id || null;
       const teRow = {
-        firm_id:                'aaaaaaaa-0001-0001-0001-000000000001',
+        firm_id:                FIRM_ID_CAD,
         resource_id:            _myResourceId || null,
         user_id:                _myUserId     || null,
         project_id:             projId,
@@ -641,7 +641,7 @@ async function createDirectActionItem(formKey, stepId) {
   const newId = crypto.randomUUID();
   const row = {
     id:                newId,
-    firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
+    firm_id:           FIRM_ID_CAD,
     instance_id:       inst.id,
     template_step_id:  stepId,
     source_comment_id: null,
@@ -778,7 +778,7 @@ async function createActionItem(commentId, stepId) {
   const attachments = await _uploadActionItemFiles(commentId, newId);
 
   const row = {
-    firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
+    firm_id:           FIRM_ID_CAD,
     instance_id:       inst.id,
     template_step_id:  stepId,
     source_comment_id: commentId,
@@ -1067,7 +1067,7 @@ async function postReply(parentCommentId, stepId) {
   const newReplyId = crypto.randomUUID();
   const row = {
     id:                newReplyId,
-    firm_id:           'aaaaaaaa-0001-0001-0001-000000000001',
+    firm_id:           FIRM_ID_CAD,
     instance_id:       inst.id,
     template_step_id:  stepId,
     parent_comment_id: parentCommentId,
@@ -1095,3 +1095,4 @@ function _populateAllCommentThreads() {
   _renderCommentThread(stepId);
   _renderActionItems(stepId);
 }
+

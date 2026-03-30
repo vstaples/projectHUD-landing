@@ -14,10 +14,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 'use strict';
 // ── State ────────────────────────────────────────────────────────────────────
-const FIRM_ID_CAD          = 'aaaaaaaa-0001-0001-0001-000000000001';
+const FIRM_ID_CAD          = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
 const AUTOSAVE_INTERVAL_MS = 30000; // 30 seconds
-const SUPA_URL  = 'https://dvbetgdzksatcgdfftbs.supabase.co';
-const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
+const SUPA_URL  = window.SUPABASE_URL || 'https://dvbetgdzksatcgdfftbs.supabase.co';
+const SUPA_KEY  = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
 const STORAGE_BUCKET = 'workflow-documents';
 let _currentTab     = 'templates';
 let _templates      = [];

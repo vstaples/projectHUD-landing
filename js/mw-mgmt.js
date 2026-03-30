@@ -5,7 +5,7 @@ async function loadManagementView() {
   const content = document.getElementById('mgmt-content');
   if (!content) return;
 
-  content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading management view…</div>`;
+  content.innerHTML = `<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">Loading management view…</div>`;
 
   try {
     const today = new Date().toLocaleDateString('en-CA');
@@ -176,21 +176,21 @@ async function loadManagementView() {
       .mg-sstrip{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid rgba(0,210,255,.1);background:#060b18}
       .mg-sc{padding:10px 14px;border-right:1px solid rgba(0,210,255,.08)}
       .mg-sc:last-child{border-right:none}
-      .mg-sc-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
-      .mg-sc-val{font-family:var(--font-display);font-size:24px;font-weight:700;line-height:1}
-      .mg-sc-sub{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .mg-sc-lbl{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
+      .mg-sc-val{font-family:var(--font-mono);font-size:24px;font-weight:700;line-height:1}
+      .mg-sc-sub{font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px}
       .mg-tabs{display:flex;gap:2px;padding:8px 10px;background:#07101f;border-bottom:1px solid rgba(0,210,255,.12)}
-      .mg-tab{font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.04em;padding:6px 16px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:6px;transition:all .12s}
+      .mg-tab{font-family:var(--font-mono);font-size:13px;font-weight:700;letter-spacing:.04em;padding:6px 16px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:6px;transition:all .12s}
       .mg-tab.on{color:#F0F6FF;background:#132035;border-color:rgba(0,210,255,.4)}
       .mg-tab:hover:not(.on){color:#90B8D8;background:#0e1e30}
       .mg-tbadge{font-size:11px;font-weight:700;padding:1px 6px;border-radius:2px}
       .mg-body{padding:10px 12px}
       .mg-panel{background:#0d1a2e;border:1px solid rgba(0,210,255,.1);margin-bottom:10px}
       .mg-panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:#07101e}
-      .mg-panel-title{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80}
+      .mg-panel-title{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80}
       .mg-overview{display:grid;grid-template-columns:1fr 280px;gap:10px}
       .mg-hgrid{width:100%;border-collapse:collapse}
-      .mg-hgrid th{padding:5px 10px;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#3A5C80;text-transform:uppercase;border-bottom:1px solid rgba(0,210,255,.08)}
+      .mg-hgrid th{padding:5px 10px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#3A5C80;text-transform:uppercase;border-bottom:1px solid rgba(0,210,255,.08)}
       .mg-hgrid th:first-child{text-align:left;min-width:140px}
       .mg-hgrid td{padding:7px 10px;border-bottom:1px solid rgba(0,210,255,.06)}
       .mg-hgrid td:first-child{font-family:var(--font-body);font-size:12px;color:#C8DFF0}
@@ -202,12 +202,12 @@ async function loadManagementView() {
       .mg-pair-box{background:#091522;border:1px solid rgba(0,210,255,.1);padding:10px 12px;margin:8px 12px}
       .mg-queue-item{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(0,210,255,.07)}
       .mg-qpriority{width:3px;align-self:stretch;flex-shrink:0;border-radius:1px}
-      .mg-qtype{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:2px}
+      .mg-qtype{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;margin-bottom:2px}
       .mg-qtitle{font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;margin-bottom:2px}
-      .mg-qmeta{font-family:var(--font-head);font-size:11px;color:#4A6E90}
-      .mg-qrec{font-family:var(--font-head);font-size:11px;color:#00D2FF;margin-top:4px;padding:3px 7px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15)}
+      .mg-qmeta{font-family:var(--font-mono);font-size:11px;color:#4A6E90}
+      .mg-qrec{font-family:var(--font-mono);font-size:11px;color:#00D2FF;margin-top:4px;padding:3px 7px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15)}
       .mg-qa{display:flex;gap:4px;margin-top:7px}
-      .mg-btn{font-family:var(--font-head);font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;border:1px solid;background:none;letter-spacing:.06em;transition:background .1s}
+      .mg-btn{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;border:1px solid;background:none;letter-spacing:.06em;transition:background .1s}
       .mg-btn-g{color:#1D9E75;border-color:rgba(29,158,117,.4)}.mg-btn-g:hover{background:rgba(29,158,117,.1)}
       .mg-btn-r{color:#E24B4A;border-color:rgba(226,75,74,.4)}.mg-btn-r:hover{background:rgba(226,75,74,.08)}
       .mg-btn-c{color:#00D2FF;border-color:rgba(0,210,255,.35)}.mg-btn-c:hover{background:rgba(0,210,255,.08)}
@@ -221,24 +221,24 @@ async function loadManagementView() {
       .mg-wf-bar{height:5px;background:rgba(255,255,255,.06);flex:1;border-radius:1px;overflow:hidden;margin-top:3px}
       .mg-wf-fill{height:100%;border-radius:1px}
       .mg-dl-row{display:flex;align-items:flex-start;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07)}
-      .mg-dl-badge{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;letter-spacing:.05em;flex-shrink:0;white-space:nowrap}
+      .mg-dl-badge{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;letter-spacing:.05em;flex-shrink:0;white-space:nowrap}
       .mg-dl-text{font-family:var(--font-body);font-size:12px;color:#C8DFF0;flex:1;line-height:1.5}
-      .mg-dl-meta{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .mg-dl-meta{font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px}
       .mg-tc{display:none}.mg-tc.on{display:block}
       .mg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:center;justify-content:center}
       .mg-modal-overlay.on{display:flex}
       .mg-modal{background:#0f1e35;border:1px solid rgba(0,210,255,.25);width:500px;max-height:82vh;overflow-y:auto}
       .mg-modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(0,210,255,.12)}
-      .mg-modal-title{font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF}
+      .mg-modal-title{font-family:var(--font-mono);font-size:16px;font-weight:700;color:#F0F6FF}
       .mg-modal-close{background:none;border:1px solid rgba(255,255,255,.15);color:#5A84A8;width:22px;height:22px;cursor:pointer;font-size:14px}
       .mg-modal-body{padding:14px;font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6}
-      .mg-modal-section{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin:10px 0 5px}
+      .mg-modal-section{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin:10px 0 5px}
       .mg-modal-section:first-child{margin-top:0}
       .mg-modal-block{padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);font-size:12px;color:#C8DFF0;line-height:1.55;margin-bottom:6px}
       .mg-modal-ai{border-left:2px solid #EF9F27;background:rgba(239,159,39,.04)}
       .mg-modal-input{width:100%;padding:6px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:12px;outline:none;resize:none;margin-top:4px}
       .mg-modal-input:focus{border-color:rgba(0,210,255,.3)}
-      .mg-modal-select{width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;cursor:pointer;margin-bottom:6px}
+      .mg-modal-select{width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-mono);font-size:12px;outline:none;cursor:pointer;margin-bottom:6px}
     `;
     if (!document.getElementById('mgmt-styles')) document.head.appendChild(s);
 
@@ -293,7 +293,7 @@ async function loadManagementView() {
       if (!tip) {
         tip = document.createElement('div');
         tip.id = 'mg-stat-tip';
-        tip.style.cssText = 'position:fixed;z-index:400;background:#0d1e35;border:1px solid rgba(0,210,255,.3);padding:10px 13px;min-width:220px;max-width:340px;font-family:var(--font-head);font-size:11px;color:#C8DFF0;line-height:1.7;box-shadow:0 8px 32px rgba(0,0,0,.7)';
+        tip.style.cssText = 'position:fixed;z-index:400;background:#0d1e35;border:1px solid rgba(0,210,255,.3);padding:10px 13px;min-width:220px;max-width:340px;font-family:var(--font-mono);font-size:11px;color:#C8DFF0;line-height:1.7;box-shadow:0 8px 32px rgba(0,0,0,.7)';
         document.body.appendChild(tip);
       }
       const r = el.getBoundingClientRect();
@@ -340,18 +340,18 @@ async function loadManagementView() {
         const col = d.color;
         return `<div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-bottom:1px solid rgba(0,210,255,.06)">
           <div style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;margin-top:2px"></div>
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;min-width:88px">${d.label}</div>
-          <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${d.score===null?'No data':Math.round(d.score*100)+'%'} · ${reason}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#90B8D8;min-width:88px">${d.label}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;flex:1">${d.score===null?'No data':Math.round(d.score*100)+'%'} · ${reason}</div>
         </div>`;
       }).join('');
       const exp = document.createElement('tr');
       exp.id = 'mg-exp-'+projId;
       exp.className = 'mg-row-expanded';
       exp.innerHTML = `<td colspan="7" style="padding:10px 14px;background:#091522;border-left:3px solid rgba(0,210,255,.3)">
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-bottom:6px">${esc(ps.p.name)} — Health breakdown</div>
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-bottom:6px">${esc(ps.p.name)} — Health breakdown</div>
         ${dimRows}
-        ${ps.projCoc.length>0?`<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-top:8px;margin-bottom:4px">Recent CoC events</div>
-          ${ps.projCoc.slice(0,3).map(e=>`<div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;padding:3px 0">${e.event_type==='step_reset'?'↩':'✓'} ${esc(e.step_name||'—')} · ${_timeAgo(e.created_at)}${e.actor_name?' · '+esc(e.actor_name):''}</div>`).join('')}`:''}
+        ${ps.projCoc.length>0?`<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3A5C80;margin-top:8px;margin-bottom:4px">Recent CoC events</div>
+          ${ps.projCoc.slice(0,3).map(e=>`<div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;padding:3px 0">${e.event_type==='step_reset'?'↩':'✓'} ${esc(e.step_name||'—')} · ${_timeAgo(e.created_at)}${e.actor_name?' · '+esc(e.actor_name):''}</div>`).join('')}`:''}
       </td>`;
       tr.insertAdjacentElement('afterend', exp);
     };
@@ -374,32 +374,32 @@ async function loadManagementView() {
       let html = '';
       if (q.type === 'escalation') {
         const projResets = (reworkEvents||[]).filter(e=>wfInstances.find(w=>w.id===e.instance_id)?.project_id===q.projId);
-        html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#E24B4A;margin-bottom:6px">Intervention history</div>`;
+        html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#E24B4A;margin-bottom:6px">Intervention history</div>`;
         if (projResets.length > 0) {
           const grouped = {};
           projResets.forEach(e=>{ grouped[e.instance_id]=(grouped[e.instance_id]||[]); grouped[e.instance_id].push(e); });
           Object.entries(grouped).forEach(([instId, evts]) => {
             const inst = wfInstances.find(w=>w.id===instId);
-            html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;margin-bottom:3px">${esc(inst?.title||instId)}</div>`;
+            html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#90B8D8;margin-bottom:3px">${esc(inst?.title||instId)}</div>`;
             evts.forEach(e=>{
               html += `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">
                 <div style="width:7px;height:7px;border-radius:50%;background:#E24B4A;flex-shrink:0;margin-top:2px"></div>
-                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${esc(e.step_name||'Step reset')}${e.event_notes?' — '+esc(e.event_notes.slice(0,80)):''}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;flex:1">${esc(e.step_name||'Step reset')}${e.event_notes?' — '+esc(e.event_notes.slice(0,80)):''}</div>
                 <div style="font-family:var(--font-data);font-size:11px;color:#3A5C80;flex-shrink:0">${_timeAgo(e.created_at)}</div>
               </div>`;
             });
           });
-          html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin:8px 0 4px">Assessment</div>
+          html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin:8px 0 4px">Assessment</div>
             <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:7px 9px;background:rgba(239,159,39,.05);border-left:2px solid #EF9F27">${instResets.length>=2 ? 'Two or more PM-level interventions have not resolved this issue. The blocking factor appears to require authority beyond PM level — likely direct client authority, an expedited sign-off channel, or a change in the approval architecture.' : 'Single reset on record. PM is managing. Monitor for recurrence before escalating.'}</div>`;
         } else {
-          html += `<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No CoC intervention history found for this project.</div>`;
+          html += `<div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80">No CoC intervention history found for this project.</div>`;
         }
       } else {
         const r = resourceReqs.find(req=>req.id===q.reqId);
         const ageH = r ? Math.round((Date.now()-new Date(r.submitted_at).getTime())/3600000) : q.age;
-        html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin-bottom:6px">Request detail</div>
-          <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0">Submitted ${ageH}h ago · Status: pending</div>
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin:8px 0 4px">Assessment</div>
+        html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin-bottom:6px">Request detail</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0">Submitted ${ageH}h ago · Status: pending</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#EF9F27;margin:8px 0 4px">Assessment</div>
           <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.55;padding:7px 9px;background:rgba(239,159,39,.05);border-left:2px solid #EF9F27">Request has been pending ${ageH}h. ${ageH>96?'Significantly overdue for response — resource planning impact increasing.':ageH>48?'Aging beyond healthy threshold. PM is blocked on staffing decision.':'Within normal response window.'}</div>`;
       }
       exp.innerHTML = html;
@@ -435,17 +435,17 @@ async function loadManagementView() {
             const dayBar = weekDays.map((d,i) => {
               const h = v.days[d]||0;
               return `<div style="text-align:center">
-                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${dayLbls[i]}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">${dayLbls[i]}</div>
                 <div style="height:22px;width:18px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden;margin:2px auto 0;position:relative">
                   ${h>0?`<div style="position:absolute;bottom:0;left:0;right:0;height:${Math.min(100,h/8*100)}%;background:var(--compass-cyan);opacity:.8"></div>`:''}
                 </div>
-                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;margin-top:2px">${h>0?h.toFixed(1):'—'}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;margin-top:2px">${h>0?h.toFixed(1):'—'}</div>
               </div>`;
             }).join('');
             return `<div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:8px 10px;margin-bottom:6px">
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
-                <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8">${esc(pname)}</span>
-                <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${tot.toFixed(1)}h · <span style="color:var(--compass-cyan)">${v.bill.toFixed(1)}h bill</span> / <span style="color:#8B5CF6">${v.nonbill.toFixed(1)}h non-bill</span></span>
+                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#90B8D8">${esc(pname)}</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">${tot.toFixed(1)}h · <span style="color:var(--compass-cyan)">${v.bill.toFixed(1)}h bill</span> / <span style="color:#8B5CF6">${v.nonbill.toFixed(1)}h non-bill</span></span>
               </div>
               <div style="height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;margin-bottom:6px">
                 <div style="height:100%;width:${billPct}%;background:var(--compass-cyan);border-radius:2px"></div>
@@ -453,17 +453,17 @@ async function loadManagementView() {
               <div style="display:flex;gap:8px;justify-content:space-between">${dayBar}</div>
             </div>`;
           }).join('')
-        : `<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No time entries this week</div>`;
+        : `<div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80">No time entries this week</div>`;
       const body = `
         <div class="mg-modal-section">Week arc — ${arcStr}</div>
         <div style="display:flex;gap:10px;margin-bottom:10px">
           ${arcStr.split('→').map((s,i)=>{
             const c=s==='G'?'#1D9E75':s==='Y'?'#EF9F27':s==='R'?'#E24B4A':'rgba(255,255,255,.12)';
-            return `<div style="text-align:center"><div style="width:14px;height:14px;border-radius:50%;background:${c};margin:0 auto"></div><div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:3px">${['M','T','W','Th','F'][i]||''}</div></div>`;
+            return `<div style="text-align:center"><div style="width:14px;height:14px;border-radius:50%;background:${c};margin:0 auto"></div><div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:3px">${['M','T','W','Th','F'][i]||''}</div></div>`;
           }).join('')}
           <div style="margin-left:auto;text-align:right">
-            <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--compass-cyan)">${weekHrs}h</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${taskCount} open tasks</div>
+            <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--compass-cyan)">${weekHrs}h</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">${taskCount} open tasks</div>
           </div>
         </div>
         <div class="mg-modal-section">Billable vs non-billable by project</div>
@@ -482,24 +482,24 @@ async function loadManagementView() {
         <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
           <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);cursor:pointer">
             <input type="radio" name="mg-esc-action" value="direct" style="margin-top:2px;accent-color:var(--compass-cyan)">
-            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Handle directly</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Contact the blocking authority yourself — escalates above PM and account manager level</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#F0F6FF">Handle directly</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Contact the blocking authority yourself — escalates above PM and account manager level</div></div>
           </label>
           <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);cursor:pointer">
             <input type="radio" name="mg-esc-action" value="guide" style="margin-top:2px;accent-color:var(--compass-cyan)">
-            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Send guidance to PM</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Provide PM with a specific escalation path or alternative approach to try</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#F0F6FF">Send guidance to PM</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Provide PM with a specific escalation path or alternative approach to try</div></div>
           </label>
           <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);cursor:pointer">
             <input type="radio" name="mg-esc-action" value="executive" style="margin-top:2px;accent-color:var(--compass-cyan)">
-            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Escalate to executive</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Assemble intervention record and brief executive tier — full chain of custody preserved</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#F0F6FF">Escalate to executive</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Assemble intervention record and brief executive tier — full chain of custody preserved</div></div>
           </label>
           <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);cursor:pointer">
             <input type="radio" name="mg-esc-action" value="monitor" style="margin-top:2px;accent-color:var(--compass-cyan)">
-            <div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF">Continue monitoring</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Log acknowledgement but allow PM to continue managing — set check-in window</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#F0F6FF">Continue monitoring</div><div style="font-family:var(--font-body);font-size:11px;color:#5A84A8">Log acknowledgement but allow PM to continue managing — set check-in window</div></div>
           </label>
         </div>
         <div class="mg-modal-section">Your response <span style="color:#E24B4A">*</span></div>
         <textarea id="mg-respond-text" class="mg-modal-input" rows="3" placeholder="Required — describe your response or intended action…"></textarea>
-        <div id="mg-respond-req" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Response is required</div>
+        <div id="mg-respond-req" style="font-family:var(--font-mono);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Response is required</div>
         <div style="display:flex;gap:6px;margin-top:10px">
           <button class="mg-btn mg-btn-c" onclick="mgSendResponse()">Log response &amp; act →</button>
           <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
@@ -523,7 +523,7 @@ async function loadManagementView() {
         event_type:'management_decision', step_name:'Escalation',
         event_notes: note, actor_name:_myResource?.name||null,
         created_at:new Date().toISOString(),
-        firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+        firm_id:window.FIRM_ID
       }).catch(()=>{});
       mgCloseModal();
       compassToast('Response logged to CoC',2200);
@@ -537,7 +537,7 @@ async function loadManagementView() {
         <div class="mg-modal-block">${esc(queueTitle||reqId)}</div>
         <div class="mg-modal-section">Conditions / comments <span style="color:#E24B4A">*</span></div>
         <textarea id="mg-approve-note" class="mg-modal-input" rows="3" placeholder="Required — note any conditions, constraints, or context for this approval…"></textarea>
-        <div id="mg-approve-req" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Comment required</div>
+        <div id="mg-approve-req" style="font-family:var(--font-mono);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Comment required</div>
         <div style="display:flex;gap:6px;margin-top:10px">
           <button class="mg-btn mg-btn-g" onclick="mgConfirmApprove('${reqId}')">Approve →</button>
           <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
@@ -554,7 +554,7 @@ async function loadManagementView() {
           event_type:'management_decision', step_name:'Resource',
           event_notes:'[Approved] '+txt,
           actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
-          firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+          firm_id:window.FIRM_ID
         }).catch(()=>{})
       ]);
       mgCloseModal();
@@ -567,7 +567,7 @@ async function loadManagementView() {
         <div class="mg-modal-block">${esc(queueTitle||reqId)}</div>
         <div class="mg-modal-section">Reason for rejection <span style="color:#E24B4A">*</span></div>
         <textarea id="mg-reject-note" class="mg-modal-input" rows="3" placeholder="Required — explain the rejection reason for the PM record…"></textarea>
-        <div id="mg-reject-req" style="font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Reason required</div>
+        <div id="mg-reject-req" style="font-family:var(--font-mono);font-size:11px;color:#E24B4A;margin-top:3px;display:none">Reason required</div>
         <div style="display:flex;gap:6px;margin-top:10px">
           <button class="mg-btn mg-btn-r" onclick="mgConfirmReject('${reqId}')">Reject &amp; log →</button>
           <button class="mg-btn" style="border-color:rgba(255,255,255,.2);color:#5A84A8" onclick="mgCloseModal()">Cancel</button>
@@ -584,7 +584,7 @@ async function loadManagementView() {
           event_type:'management_decision', step_name:'Resource',
           event_notes:'[Rejected] '+txt,
           actor_name:_myResource?.name||null, created_at:new Date().toISOString(),
-          firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+          firm_id:window.FIRM_ID
         }).catch(()=>{})
       ]);
       mgCloseModal();
@@ -595,7 +595,7 @@ async function loadManagementView() {
       const sel = document.getElementById('mg-dec-type')?.value||'';
       const txt = document.getElementById('mg-dec-text')?.value?.trim()||'';
       if (!txt) { document.getElementById('mg-dec-text').style.borderColor='rgba(226,75,74,.5)'; return; }
-      API.post('workflow_step_instances',{id:crypto.randomUUID(),instance_id:crypto.randomUUID(), step_type:'manual',event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:'aaaaaaaa-0001-0001-0001-000000000001',actor_name:_myResource?.name||null}).catch(()=>{});
+      API.post('workflow_step_instances',{id:crypto.randomUUID(),instance_id:crypto.randomUUID(), step_type:'manual',event_type:'management_decision',step_name:sel,event_notes:txt,created_at:new Date().toISOString(),firm_id:window.FIRM_ID,actor_name:_myResource?.name||null}).catch(()=>{});
       mgCloseModal();
       compassToast('Decision logged to CoC',2000);
       setTimeout(()=>{ _viewLoaded['management']=false; loadManagementView(); },600);
@@ -622,7 +622,7 @@ async function loadManagementView() {
         event_notes: txt || 'Management response logged.',
         actor_name: _myResource?.name||null,
         created_at: new Date().toISOString(),
-        firm_id:'aaaaaaaa-0001-0001-0001-000000000001'
+        firm_id:window.FIRM_ID
       }).catch(()=>{});
       mgCloseModal();
       compassToast('Response logged · PM notified', 2200);
@@ -635,8 +635,8 @@ async function loadManagementView() {
         <div class="mg-modal-block">${label}</div>
         <div class="mg-modal-section">Score</div>
         <div class="mg-modal-block">
-          <span style="font-family:var(--font-display);font-size:22px;font-weight:700;color:${color}">${score}%</span>
-          <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-left:8px">${status}</span>
+          <span style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:${color}">${score}%</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-left:8px">${status}</span>
         </div>
         <div style="height:5px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin:8px 0">
           <div style="height:100%;width:${score}%;background:${color};border-radius:2px"></div>
@@ -726,7 +726,7 @@ async function loadManagementView() {
             <div class="mg-panel">
               <div class="mg-panel-head">
                 <span class="mg-panel-title">Portfolio health grid</span>
-                <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Schedule · Cost · Confidence · Rework · Timesheets · Escalations · Click dots for detail</span>
+                <span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">Schedule · Cost · Confidence · Rework · Timesheets · Escalations · Click dots for detail</span>
               </div>
               <table class="mg-hgrid">
                 <thead><tr>
@@ -755,17 +755,17 @@ async function loadManagementView() {
                 ${briefItems.length ? briefItems.map(b=>`<div class="mg-brief-item" onclick="mgSwitchTab(document.querySelector('.mg-tab:nth-child(${['overview','queue','people','workflows','decisions'].indexOf(b.tab)+1})'), '${b.tab}')">
                   <div style="width:7px;height:7px;border-radius:50%;background:${b.color};flex-shrink:0;margin-top:4px"></div>
                   <span>${b.text}</span>
-                </div>`).join('') : '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:6px 0">No action items today</div>'}
+                </div>`).join('') : '<div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:6px 0">No action items today</div>'}
               </div>
             </div>
             ${topActor && topActorRate > firmAvgRate+20 ? `
             <div class="mg-panel">
               <div class="mg-panel-head"><span class="mg-panel-title">Pairing intelligence</span></div>
               <div class="mg-pair-box">
-                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;line-height:1.7">${esc(topActor[0])}</div>
-                <div style="font-family:var(--font-display);font-size:22px;font-weight:700;color:#E24B4A">${topActorRate}%</div>
-                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">reset rate on first submission</div>
-                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:3px">vs firm avg <strong style="color:#1D9E75">${firmAvgRate}%</strong> — consider restructuring approval chain or direct conversation</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;line-height:1.7">${esc(topActor[0])}</div>
+                <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#E24B4A">${topActorRate}%</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">reset rate on first submission</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:3px">vs firm avg <strong style="color:#1D9E75">${firmAvgRate}%</strong> — consider restructuring approval chain or direct conversation</div>
               </div>
             </div>` : ''}
           </div>
@@ -777,7 +777,7 @@ async function loadManagementView() {
         <div class="mg-panel" style="margin:10px 12px">
           <div class="mg-panel-head"><span class="mg-panel-title">Approval queue — ${queueItems.length} pending decisions</span></div>
           ${queueItems.length===0
-            ? '<div style="padding:16px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No pending decisions</div>'
+            ? '<div style="padding:16px 12px;font-family:var(--font-mono);font-size:12px;color:#3A5C80">No pending decisions</div>'
             : queueItems.map((q,qi)=>`
             <div class="mg-queue-item" id="mg-qi-${qi}" style="cursor:pointer"
               onclick="mgExpandQueue(${qi})"
@@ -821,18 +821,18 @@ async function loadManagementView() {
             const taskCount = _tasks.filter(t=>t.assigned_to===r.user_id&&!['complete','cancelled'].includes(t.status)).length;
             return `<div class="mg-pc" onclick="mgShowPerson('${esc(fullName).replace(/'/g,'\\x27')}','${arcStr}',${weekHrs.toFixed(1)},${taskCount})">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                <div style="width:28px;height:28px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;flex-shrink:0">${initials}</div>
+                <div style="width:28px;height:28px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;font-weight:700;color:#00D2FF;flex-shrink:0">${initials}</div>
                 <div>
                   <div style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(fullName)}</div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90">${weekHrs.toFixed(1)}h · ${taskCount} tasks</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#4A6E90">${weekHrs.toFixed(1)}h · ${taskCount} tasks</div>
                 </div>
               </div>
               <div class="mg-arc" style="flex-wrap:nowrap">${dots}</div>
-              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:5px">${arcStr}</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:5px">${arcStr}</div>
             </div>`;
           }).join('')}
         </div>
-        <div style="padding:0 12px 6px;font-family:var(--font-head);font-size:11px;color:#3A5C80">Click any person card for cross-project pattern analysis</div>
+        <div style="padding:0 12px 6px;font-family:var(--font-mono);font-size:11px;color:#3A5C80">Click any person card for cross-project pattern analysis</div>
       </div>
 
       <!-- WORKFLOWS -->
@@ -842,7 +842,7 @@ async function loadManagementView() {
             <span class="mg-panel-title">Workflow intelligence — ${wfTemplates.length} template${wfTemplates.length!==1?'s':''} · ${redesignCount} redesign recommended</span>
           </div>
           ${wfTemplates.length===0
-            ? '<div style="padding:16px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No rework data yet</div>'
+            ? '<div style="padding:16px 12px;font-family:var(--font-mono);font-size:12px;color:#3A5C80">No rework data yet</div>'
             : wfTemplates.map(t=>{
               const col = t.failureRate>=60?'#E24B4A':t.failureRate>=35?'#EF9F27':'#1D9E75';
               const lbl = t.failureRate>=60?'Redesign recommended':t.failureRate>=35?'Watch':'Healthy';
@@ -852,16 +852,16 @@ async function loadManagementView() {
                 ? 'Failure rate rising — monitor for 2 more weeks. Not yet at redesign threshold.'
                 : 'Template is healthy. No action required.';
               const actionHtml = t.failureRate>=60
-                ? '<div style=\'font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin:10px 0 5px\'>Action</div><button class=\'mg-btn mg-btn-c\' style=\'margin-top:4px\' onclick=\'compassToast(&quot;Redesign authorized&quot;,2000);mgCloseModal()\'>Authorize redesign &rarr;</button>'
+                ? '<div style=\'font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin:10px 0 5px\'>Action</div><button class=\'mg-btn mg-btn-c\' style=\'margin-top:4px\' onclick=\'compassToast(&quot;Redesign authorized&quot;,2000);mgCloseModal()\'>Authorize redesign &rarr;</button>'
                 : '';
               return `<div class="mg-wf-row" data-wf-name="${esc(t.name)}" data-wf-rate="${t.failureRate}" data-wf-resets="${t.resets}" data-wf-comp="${t.completions}" data-ai-narr="${esc(aiNarr)}" data-action-html="${esc(actionHtml)}"
                 onclick="mgOpenWfModal(this)">
                 <div style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;min-width:160px;flex-shrink:0">${esc(t.name)}</div>
                 <div style="flex:2;min-width:0">
                   <div class="mg-wf-bar"><div class="mg-wf-fill" style="width:${t.failureRate}%;background:${col}"></div></div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${t.failureRate}% own-failure rate · ${t.resets} instances</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">${t.failureRate}% own-failure rate · ${t.resets} instances</div>
                 </div>
-                <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${col};border-color:${col}40;flex-shrink:0">${lbl}</span>
+                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${col};border-color:${col}40;flex-shrink:0">${lbl}</span>
                 ${t.failureRate>=60?`<button class="mg-btn mg-btn-c" onclick="event.stopPropagation();compassToast('Redesign authorized',2000)">Authorize &rarr;</button>`:''}
               </div>`;
             }).join('')}
@@ -886,7 +886,7 @@ async function loadManagementView() {
                 <div class="mg-dl-meta">${_timeAgo(e.created_at)} · ${esc(e.actor_name||'—')}</div>
               </div>
             </div>`;
-          }).join('') || '<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No decisions logged yet — use + Log decision to create the first entry.</div>'}
+          }).join('') || '<div style="padding:14px 12px;font-family:var(--font-mono);font-size:12px;color:#3A5C80">No decisions logged yet — use + Log decision to create the first entry.</div>'}
         </div>
       </div>
 
@@ -905,6 +905,7 @@ async function loadManagementView() {
 
   } catch(e) {
     console.error('[Compass] loadManagementView error:', e);
-    content.innerHTML = '<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load management view — check console</div>';
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--compass-red)">Failed to load management view — check console</div>';
   }
 }
+

@@ -3369,8 +3369,8 @@ function showToast(msg, type='info') {
 }
 
 // ── Constants (hardcoded until auth is wired) ─────────────────────────────────
-const FIRM_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
-const CURRENT_USER_RESOURCE_ID = 'e1000001-0000-0000-0000-000000000001'; // Vaughn
+const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+const CURRENT_USER_RESOURCE_ID = window.CURRENT_USER?.id || window._myResource?.id || null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadAll();

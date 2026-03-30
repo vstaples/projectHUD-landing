@@ -338,7 +338,7 @@ function renderInstancesTab(el) {
         <!-- Filter tabs -->
         <div style="padding:8px 10px 0;flex-shrink:0;border-bottom:1px solid var(--border)">
           <div style="display:flex;gap:2px;margin-bottom:8px">
-            ${[['all','All'],['mine','My Work'],['active','Active'],['done','Done']].map(([f,lbl])=>`
+            ${[['all','All'],['mine','My Work'],['active','In Process'],['done','Complete']].map(([f,lbl])=>`
             <button onclick="_setInstFilter('${f}')" id="ifilter-${f}"
               style="flex:1;padding:5px 4px;font-size:10px;font-weight:600;border:none;
                 border-radius:3px;cursor:pointer;transition:all .15s;letter-spacing:.02em;
@@ -1016,7 +1016,7 @@ function renderInstanceDetail(el, inst) {
                               return '<span style="color:'+oColor+'">&#10003; '+escHtml(oLabel)+'</span>';
                             })() :
                             rejected ? '<span style="color:var(--red)">&#10005; Rejected</span>' :
-                            touched&&!done&&!rejected ? '<span style="font-size:9px;font-weight:700;color:var(--bg0);padding:2px 8px;border-radius:4px;background:var(--cad);letter-spacing:.06em">ACTIVE</span>' :
+                            touched&&!done&&!rejected ? '<span style="font-size:9px;font-weight:700;color:var(--bg0);padding:2px 8px;border-radius:4px;background:var(--cad);letter-spacing:.06em">IN PROCESS</span>' :
                             isReady&&!touched ? '<span style="color:var(--accent)">&#9679; Ready</span>' : ''
                           }</span>
                           <span style="color:var(--muted);font-size:10px;white-space:nowrap">${s.due_days!=null?'&#9201; '+(s.due_type==='before_completion'?s.due_days+'d before':'&#43;'+s.due_days+'d'):''}</span>
@@ -1862,7 +1862,7 @@ async function _notifyStepActivated(instId, step, inst, isBist = false) {
       await API.post('external_step_tokens', tokenRecord);
 
       // Build the approve.html URLs — use explicit base to ensure correct domain
-      const base = 'https://projecthud.com/approve.html';
+      const base = (window.location.origin || 'https://projecthud.com') + '/approve.html';
       approveUrl = `${base}?token=${rawToken}`;
       rejectUrl  = `${base}?token=${rawToken}&outcome=reject`;
 

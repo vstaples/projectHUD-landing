@@ -59,21 +59,21 @@ function openWorkItemExpanded(item) {
       padding:10px 14px 8px;border-bottom:1px solid rgba(0,210,255,.08)">
       <div>
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
-          <span style="font-family:var(--font-head);font-size:11px;font-weight:700;
+          <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;
             letter-spacing:.1em;color:${accentColor}">${typeLabel}</span>
           ${item.overdue
-            ? `<span style="font-family:var(--font-head);font-size:11px;font-weight:700;
+            ? `<span style="font-family:var(--font-mono);font-size:11px;font-weight:700;
                 color:var(--compass-red);border:1px solid rgba(226,75,74,.4);
                 background:rgba(226,75,74,.08);padding:1px 7px">${daysOverdue(item.due)}d overdue</span>`
             : item.status==='blocked'
-              ? `<span style="font-family:var(--font-head);font-size:11px;font-weight:700;
+              ? `<span style="font-family:var(--font-mono);font-size:11px;font-weight:700;
                   color:var(--compass-amber);border:1px solid rgba(239,159,39,.4);
                   background:rgba(239,159,39,.08);padding:1px 7px">Tasks Blocked</span>`
               : ''}
         </div>
         <div style="font-family:var(--font-body);font-size:14px;font-weight:600;
           color:var(--text0);line-height:1.3">${esc(item.title)}</div>
-        <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:3px">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:3px">
           ${item.type==='action' && item.ownerName ? '<span style="color:#F0F6FF">' + esc(item.ownerName) + '</span> · ' : ''}${item.type==='action' && item.createdBy ? '<span style="color:var(--text3)">Assignor:</span> <span style="color:#00D2FF;font-weight:700">' + esc(item.createdBy) + '</span> · ' : ''}${item.project && item.project.toLowerCase()!=='action item' ? esc(item.project) + ' · ' : ''}${item.due ? 'Due ' + fmtDate(item.due) + ' · ' : ''}<span style="text-transform:capitalize">${statusLabel}</span>${item.type==='action' ? ' · ' + getNegotiationBadgeHtml(negGetState(item.id).state) : ''}
         </div>
       </div>
@@ -120,14 +120,14 @@ function openWorkItemExpanded(item) {
     h+='<div style="width:6px;height:6px;border-radius:50%;background:'+col+';margin-top:2px;flex-shrink:0"></div>';
     if(i<_itemEvts.length-1) h+='<div style="width:1px;flex:1;min-height:8px;background:rgba(255,255,255,.08);margin-top:2px"></div>';
     h+='</div><div style="flex:1;min-width:0">';
-    h+='<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:'+col+'">'+_E(lbl)+'</div>';
-    if(step) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+_E(step.slice(0,40))+'</div>';
-    if(e.actor_name) h+='<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">By '+_E(e.actor_name)+'</div>';
+    h+='<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:'+col+'">'+_E(lbl)+'</div>';
+    if(step) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">&rarr; '+_E(step.slice(0,40))+'</div>';
+    if(e.actor_name) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)">By '+_E(e.actor_name)+'</div>';
     if(note) h+='<div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.65);margin-top:2px;padding:2px 6px;background:rgba(255,255,255,.03);border-left:2px solid '+col+';line-height:1.4;word-break:break-word">'+_E(note.slice(0,100))+'</div>';
     if(ts) h+='<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.2);margin-top:1px">'+ts+'</div>';
     h+='</div></div>';
     return h;
-  }).join('') : '<div style="font-family:var(--font-head);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
+  }).join('') : '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);line-height:1.6">No CoC history for this item yet.</div>';
 
   const detailHtml = `
     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
@@ -140,10 +140,10 @@ function openWorkItemExpanded(item) {
 
           <!-- Row 2a: Status + Planned tiles -->
           <div style="display:flex;align-items:center;gap:5px;padding:5px 14px;border-bottom:1px solid rgba(0,210,255,.04);flex-shrink:0">
-            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;white-space:nowrap;min-width:52px">Planned</div>
+            <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;white-space:nowrap;min-width:52px">Planned</div>
             ${item.type==='task'?`
             <select id="wi-status-${item.id}"
-              style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:4px 6px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer;flex-shrink:0">
+              style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:4px 6px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);cursor:pointer;flex-shrink:0">
               <option value="not_started" ${item.status==='not_started'?'selected':''}>Not started</option>
               <option value="in_progress" ${item.status==='in_progress'?'selected':''}>In progress</option>
               <option value="blocked" ${item.status==='blocked'?'selected':''}>Tasks Blocked</option>
@@ -152,23 +152,23 @@ function openWorkItemExpanded(item) {
               ['Effort Hrs', bh?bh+'h':item.effortDays?(item.effortDays*8)+'h':'—', ''],
               ['Due',        item.due?fmtDate(item.due):'—', item.overdue?'var(--compass-red)':''],
               ['Budget',     bh?'…':'—', '', 'budget'],
-            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0;width:90px;box-sizing:border-box"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
+            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0;width:90px;box-sizing:border-box"><div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
           </div>
           <!-- Row 2b: Actuals tiles + Log Time -->
           <div style="display:flex;align-items:center;gap:5px;padding:5px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
-            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;white-space:nowrap;min-width:52px">Actuals</div>
+            <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#00D2FF;text-transform:uppercase;white-space:nowrap;min-width:52px">Actuals</div>
             ${[
               ['Act. Start', item.actualStart?fmtDate(item.actualStart):loggedHrs>0?'In progress':'—', ''],
               ['Act. Hrs',   ah.toFixed(1)+'h', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':''],
               ['Spend',      bh?'…':'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'', 'spend'],
               ['Spend %',    bh?usedPct+'%':'—', usedPct>110?'var(--compass-red)':usedPct>80?'var(--compass-amber)':'var(--compass-green)'],
-            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0;width:90px;box-sizing:border-box"><div style="font-family:var(--font-head);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
+            ].map(([l,v,c,dt])=>`<div style="background:#0a1525;padding:3px 8px;border:1px solid rgba(0,210,255,.08);white-space:nowrap;flex-shrink:0;width:90px;box-sizing:border-box"><div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">${l}</div><div ${dt?'data-tile="'+dt+'"':''} style="font-family:var(--font-body);font-size:12px;font-weight:600;color:${c||'var(--text1)'}">${v}</div></div>`).join('')}
             <div style="width:1px;height:22px;background:rgba(255,255,255,.08);flex-shrink:0;margin-left:4px"></div>
             <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">Log Time (hrs)</span>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);white-space:nowrap">Log Time (hrs)</span>
               <input id="wi-hrs-${item.id}" type="number" min="0.25" max="24" step="0.25" placeholder="0.0"
-                style="width:52px;font-family:var(--font-display);font-size:14px;font-weight:700;padding:3px 4px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
-              <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">
+                style="width:52px;font-family:var(--font-mono);font-size:14px;font-weight:700;padding:3px 4px;background:#0a1525;border:1px solid rgba(0,210,255,.2);color:var(--compass-cyan);outline:none;text-align:center"/>
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text3);white-space:nowrap">
                 <input id="wi-bill-${item.id}" type="checkbox" checked style="accent-color:var(--compass-cyan)"/>Billable
               </label>
             </div>
@@ -177,44 +177,44 @@ function openWorkItemExpanded(item) {
           <!-- Row 3: Action item negotiation panel OR sentiment/% done for tasks -->
           ${item.type==='action'?`
           <div id="neg-panel-${item.id}" style="flex:1;overflow-y:auto;padding:12px 14px;min-height:0">
-            <div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">Loading negotiation panel…</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80">Loading negotiation panel…</div>
           </div>
           `:''}${item.type!=='action'?`
           <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid rgba(0,210,255,.07);flex-shrink:0">
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Sentiment <span style="color:#E24B4A">*</span></span>
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Sentiment <span style="color:#E24B4A">*</span></span>
               <button id="wi-sig-green-${item.id}" title="On track" onclick="wiSetSignal('${item.id}','green')" style="width:16px;height:16px;border-radius:50%;border:2px solid #1D9E75;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
               <button id="wi-sig-yellow-${item.id}" title="At risk" onclick="wiSetSignal('${item.id}','yellow')" style="width:16px;height:16px;border-radius:50%;border:2px solid #EF9F27;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
               <button id="wi-sig-red-${item.id}" title="Blocked / issue" onclick="wiSetSignal('${item.id}','red')" style="width:16px;height:16px;border-radius:50%;border:2px solid #E24B4A;background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
               <input type="hidden" id="wi-sig-active-${item.id}" value=""/>
-              <span id="wi-sig-label-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--text3)">— required</span>
+              <span id="wi-sig-label-${item.id}" style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">— required</span>
             </div>
             ${item.type==='task'?`
             <div style="width:1px;height:20px;background:rgba(255,255,255,.08);flex-shrink:0"></div>
             <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:80px">
-              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3);white-space:nowrap">% Done</span>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);white-space:nowrap">% Done</span>
               <input id="wi-pct-${item.id}" type="range" min="0" max="100" step="5" value="${pct}"
                 style="flex:1;accent-color:var(--compass-amber)"
                 oninput="document.getElementById('wi-pct-out-${item.id}').textContent=this.value+'%'"/>
-              <span id="wi-pct-out-${item.id}" style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${barColor};min-width:36px;text-align:right">${pct}%</span>
+              <span id="wi-pct-out-${item.id}" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${barColor};min-width:36px;text-align:right">${pct}%</span>
             </div>`:``}
           </div>
 
           <!-- Row 4: Work Completed textarea + buttons -->
           <div style="flex:1;padding:8px 14px 0;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden">
-            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
+            <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);flex-shrink:0">Work completed <span style="color:#E24B4A">*</span> <span id="wi-comment-req-${item.id}" style="font-weight:400;color:#E24B4A;display:none">Required</span></div>
             <textarea id="wi-comment-${item.id}" placeholder="Describe what was accomplished this session — required to save…" oninput="wiCheckGate('${item.id}')"
               style="flex:1;width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:var(--text1);outline:none;resize:none;box-sizing:border-box;line-height:1.5;min-height:0;overflow-y:auto"></textarea>
             <!-- Buttons + hint inside work completed pane -->
             <div style="display:flex;gap:6px;flex-shrink:0;padding-top:6px">
               <button id="wi-save-progress-${item.id}" onclick="wiSaveProgress('${item.id}','${item.projectId||''}')" disabled
-                style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
+                style="flex:1;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Save update →</button>
               <button id="wi-mark-complete-${item.id}" onclick="wiMarkComplete('${item.id}','${item.type}',${JSON.stringify(item.title)},'${item.projectId||''}')" disabled
-                style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Mark complete →</button>
+                style="flex:1;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;padding:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.1);cursor:not-allowed;transition:all .15s;text-align:center;opacity:.5">Mark complete →</button>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding-top:3px;min-height:16px">
-              <span id="wi-save-status-${item.id}" style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber)"></span>
-              <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Select sentiment and add a note to unlock</div>
+              <span id="wi-save-status-${item.id}" style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber)"></span>
+              <div id="wi-gate-hint-${item.id}" style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">Select sentiment and add a note to unlock</div>
             </div>
           </div>
           `:''}${''}
@@ -222,13 +222,13 @@ function openWorkItemExpanded(item) {
 
         <!-- RIGHT column: Chain of Custody — full height from row 2 top -->
         <div data-coc-col style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.15);min-height:0;overflow:hidden">
-          <div data-coc-count style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
+          <div data-coc-count style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;flex-shrink:0">Chain of Custody (${_itemEvts.length})</div>
           <div data-coc-body style="flex:1;overflow-y:auto;min-height:0">${_cocHtml}</div>
         </div>
 
       </div>
 
-    <div data-rate-caution style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);padding:4px 14px;border-top:1px solid rgba(239,159,39,.15);flex-shrink:0"></div>
+    <div data-rate-caution style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber);padding:4px 14px;border-top:1px solid rgba(239,159,39,.15);flex-shrink:0"></div>
     </div>`;
   panel.innerHTML = headerHtml + detailHtml;
   document.body.appendChild(panel);
@@ -495,7 +495,7 @@ async function wiSaveProgress(itemId, projectId) {
     if (hrs > 0 && _myResource?.id) {
       ps.push(API.post('time_entries', {
         id: crypto.randomUUID(),
-        firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+        firm_id: window.FIRM_ID,
         resource_id: _myResource.id,
         user_id: _myResource.user_id || null,
         project_id: projectId || null,
@@ -528,7 +528,7 @@ async function wiSaveProgress(itemId, projectId) {
         event_notes: comment,
         outcome:     sigOutcome,
         actor_name:  _myResource?.name || null,
-        firm_id:     'aaaaaaaa-0001-0001-0001-000000000001'
+        firm_id:     window.FIRM_ID
       }).catch(()=>{}));
     }
     // Optimistically update local CoC cache and refresh modal panel
@@ -569,7 +569,7 @@ function openNewTimeEntry(taskId = null, projectId = null) {
       <div>
         <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
           text-transform:uppercase;color:var(--compass-cyan);margin-bottom:3px">Log time</div>
-        <div style="font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--text0)">
+        <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--text0)">
           New time entry</div>
       </div>
       <button onclick="document.getElementById('te-edit-drawer').remove()"
@@ -658,7 +658,7 @@ async function saveNewTimeEntry(taskId, projectId) {
 
   try {
     await API.post('time_entries', {
-      firm_id:     'aaaaaaaa-0001-0001-0001-000000000001',
+      firm_id:     window.FIRM_ID,
       resource_id: _myResource?.id   || null,
       user_id:     _myResource?.user_id || null,
       project_id:  projId,
@@ -695,7 +695,7 @@ async function submitTimesheetWeek(weekId, weekStart, weekHours) {
     } else {
       // No week container yet — create it as submitted
       await API.post('timesheet_weeks', {
-        firm_id:        'aaaaaaaa-0001-0001-0001-000000000001',
+        firm_id:        window.FIRM_ID,
         resource_id:    _myResource?.id,
         week_start_date: weekStart,
         week_end_date:  new Date(new Date(weekStart+'T00:00:00').getTime() + 6*86400000).toLocaleDateString('en-CA'),
