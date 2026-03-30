@@ -219,7 +219,7 @@ window._mwLoadUserView = async function() {
     window._today = today;
 
     // ── Fetch CoC events for all instances backing the user's work ────
-    // ── Fetch CoC events via CoC service (entity-based + actor-based) ────────
+    // ── Fetch CoC events (entity-based + actor-based) ──────────────────────────
     // Collect all entity IDs this user cares about: task IDs, action item IDs, project IDs
     const myTaskIds      = workItems.map(w=>w.id).filter(Boolean);
     const myAiIds        = (myActionItems||[]).map(a=>a.id).filter(Boolean);
@@ -229,31 +229,45 @@ window._mwLoadUserView = async function() {
       myProjectIds.includes(w.project_id) || workItems.some(wi=>wi.id===w.task_id)
     ).map(w=>w.id);
     const allEntityIds   = [...new Set([...myTaskIds, ...myAiIds, ...myProjectIds, ...myInstIds])];
-    // Primary fetch: all events touching the user's entities
-    const myCocEvents    = allEntityIds.length
-      ? await window.CoC.readMany(allEntityIds, { limit: 300 })
-      : [];
-    // Secondary fetch: events the user personally wrote on any entity
-    // Uses actor_resource_id (preferred) with actor_name fallback for legacy rows
+
+    let myCocEvents   = [];
     let actorCocEvents = [];
-    if (_myResource?.id) {
-      actorCocEvents = await window.CoC.readMany([], {
-        actorResourceId: _myResource.id, limit: 100
-      }).catch(() => []);
+
+    // Use CoC service if fully loaded (coc.js deployed with readMany)
+    if (typeof window.CoC?.readMany === 'function') {
+      myCocEvents = allEntityIds.length
+        ? await window.CoC.readMany(allEntityIds, { limit: 300 }).catch(() => [])
+        : [];
+      if (_myResource?.id) {
+        actorCocEvents = await window.CoC.readMany([], {
+          actorResourceId: _myResource.id, limit: 100
+        }).catch(() => []);
+      }
+    } else {
+      // Direct API fallback — used when coc.js is absent or a pre-readMany version
+      // is deployed. Remove once coc.js is confirmed live on the server.
+      if (allEntityIds.length) {
+        myCocEvents = await API.get(
+          `coc_events?select=id,entity_id,entity_type,event_type,step_name,event_notes,actor_name,actor_resource_id,outcome,metadata,occurred_at,created_at&entity_id=in.(${allEntityIds.join(',')})&order=occurred_at.desc&limit=300`
+        ).catch(() => []);
+      }
     }
+
+    // Actor-name fallback for legacy rows (written before actor_resource_id was enforced)
     if (!actorCocEvents.length && _myResource?.name) {
-      // Fallback for legacy rows written before actor_resource_id was enforced
       actorCocEvents = await API.get(
         `coc_events?actor_name=eq.${encodeURIComponent(_myResource.name)}&order=occurred_at.desc&limit=100&select=*`
       ).catch(() => []);
     }
-    // Merge and deduplicate by id, sort by occurred_at (canonical timestamp)
+
+    // Merge, deduplicate by id, sort by occurred_at (canonical timestamp)
     const cocMap = new Map();
     [...myCocEvents, ...actorCocEvents].forEach(e => cocMap.set(e.id, e));
     window._myCocEvents = [...cocMap.values()].sort(
       (a,b) => (b.occurred_at||b.created_at||'').localeCompare(a.occurred_at||a.created_at||'')
     );
-    console.log('[Compass] myCocEvents:', window._myCocEvents.length, 'entity IDs:', allEntityIds.length);
+    console.log('[Compass] myCocEvents:', window._myCocEvents.length,
+      '| CoC service:', typeof window.CoC?.readMany === 'function' ? 'active' : 'fallback mode');
     if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null;
 
     const overdueCount = workItems.filter(w => w.overdue).length;
@@ -1686,4 +1700,3 @@ window.showCardPopup = function(type, cardEl) {
     if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-head);font-size:11px">Failed to load — check console</div>';
   }
 }
-

@@ -352,7 +352,32 @@ window.loadMyViewsView = async function() {
     return;
   }
   const container = document.getElementById('views-root');
-  if (!container) { console.error('[Compass] #views-root not found'); return; }
+  if (!container) {
+    // #views-root is rendered by _mwLoadUserView inside my-work.html.
+    // If MY WORK hasn't loaded yet, defer until it does.
+    console.warn('[Compass] #views-root not found — deferring until _mwLoadUserView completes');
+    const MAX_WAIT = 8000;
+    const POLL_MS  = 100;
+    let elapsed = 0;
+    await new Promise(resolve => {
+      const poll = setInterval(() => {
+        elapsed += POLL_MS;
+        if (document.getElementById('views-root') || elapsed >= MAX_WAIT) {
+          clearInterval(poll);
+          resolve();
+        }
+      }, POLL_MS);
+    });
+    if (!document.getElementById('views-root')) {
+      console.error('[Compass] #views-root still not found after ' + MAX_WAIT + 'ms — aborting');
+      return;
+    }
+    // Re-check loaded flag — another call may have succeeded while we waited
+    if (window._myViewsLoaded) {
+      window._viewsRefresh && window._viewsRefresh();
+      return;
+    }
+  }
   container.innerHTML = '';
   try {
     const resp = await fetch('/my-views.html');
