@@ -1102,6 +1102,12 @@ function renderInstanceDetail(el, inst) {
                       <div style="font-size:11px;color:var(--muted);padding:8px 0">Loading meeting…</div>
                     </div>` : ''}
 
+                    <!-- Form step: inline fill panel (populated by renderFormFillPanel) -->
+                    ${s.step_type === 'form' ? `
+                    <div id="cad-form-${s.id}" style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+                      <div style="font-size:11px;color:var(--muted);padding:8px 0">Loading form…</div>
+                    </div>` : ''}
+
                     ${(s._attachedDocs||[]).length ? `
                     <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
                       <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
@@ -1554,6 +1560,9 @@ function toggleInstanceStep(instId, stepId) {
     if (step?.step_type === 'meeting') {
       setTimeout(() => renderCadMeetingStep(inst, step), 60);
     }
+    if (step?.step_type === 'form') {
+      setTimeout(() => renderFormFillPanel(inst, step), 60);
+    }
     setTimeout(() => {
       _renderCommentThread(stepId);
       _renderActionItems(stepId);
@@ -1894,13 +1903,9 @@ async function _notifyStepActivated(instId, step, inst, isBist = false) {
     outcomes:       approveUrl ? _getOutcomes(step) : null,
   };
 
-  await fetch(`${SUPA_URL}/functions/v1/notify-step-activated`, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${SUPA_KEY}`,
-      'apikey':        SUPA_KEY,
-    },
+  await fetch('/api/notify-step-activated', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
@@ -1941,6 +1946,19 @@ async function submitComplete(instId, stepId) {
     cadToast('Notes are required when rejecting or requesting changes', 'error');
     document.getElementById(`complete-notes-${stepId}`)?.focus();
     return;
+  }
+
+  // Form gate check — block completion if required fields are unfilled
+  if (step?.step_type === 'form') {
+    const gateResult = await _formGateCheck(instId, stepId);
+    if (!gateResult.passed) {
+      cadToast(
+        `${gateResult.missing} required field${gateResult.missing !== 1 ? 's' : ''} unfilled — complete the form before submitting`,
+        'error'
+      );
+      document.getElementById(`cad-form-${stepId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
   }
 
   const submitBtn = document.getElementById(`complete-submit-${stepId}`);
