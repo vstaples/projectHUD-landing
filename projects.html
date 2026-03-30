@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Projects — ProjectHUD</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 
@@ -37,7 +38,7 @@
 }
 
 html, body { height:100%; overflow:hidden; }
-body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
+body { font-family:var(--font-mono); background:var(--bg); color:var(--text);
        display:flex; flex-direction:column; }
 #app  { display:flex; flex:1; overflow:hidden; }
 #main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
@@ -110,7 +111,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .view-btn { padding:10px 18px; font-size:11px; font-weight:600; letter-spacing:.08em;
             text-transform:uppercase; background:none; border:none; color:var(--muted);
             cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
-            transition:all .15s; font-family:var(--font-ui); }
+            transition:all .15s; font-family:var(--font-mono); }
 .view-btn.active { color:var(--cyan); border-bottom-color:var(--cyan); }
 .view-btn:hover:not(.active) { color:var(--text); }
 
@@ -285,7 +286,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 /* ── Add Project button ── */
 .add-btn { padding:8px 16px; background:rgba(0,210,255,.08); border:1px solid rgba(0,210,255,.25);
            color:var(--cyan); font-size:11px; font-weight:700; letter-spacing:.08em;
-           text-transform:uppercase; cursor:pointer; border-radius:4px; font-family:var(--font-ui);
+           text-transform:uppercase; cursor:pointer; border-radius:4px; font-family:var(--font-mono);
            transition:all .15s; }
 .add-btn:hover { background:rgba(0,210,255,.14); }
 
@@ -322,7 +323,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 
 /* Priority buttons */
 .pri-btn { font-size:9px; font-weight:700; letter-spacing:.08em; padding:2px 7px;
-  border-radius:3px; border:1px solid; cursor:pointer; font-family:var(--font-ui);
+  border-radius:3px; border:1px solid; cursor:pointer; font-family:var(--font-mono);
   transition:all .15s; opacity:.45; }
 .pri-btn:hover { opacity:.8; }
 .pri-btn.active { opacity:1; }
@@ -333,7 +334,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 
 /* exception status buttons */
 .status-btn { font-size:9px; font-weight:700; letter-spacing:.06em; padding:2px 7px;
-  border-radius:3px; border:1px solid; cursor:pointer; font-family:var(--font-ui);
+  border-radius:3px; border:1px solid; cursor:pointer; font-family:var(--font-mono);
   transition:all .15s; opacity:.4; }
 .status-btn:hover { opacity:.8; }
 .status-btn.active { opacity:1; }
@@ -346,7 +347,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .exc-toggle-btn {
   font-size:9px; font-weight:700; letter-spacing:.08em; padding:3px 10px;
   border-radius:3px; border:1px solid var(--border2); cursor:pointer;
-  font-family:var(--font-ui); background:transparent; color:var(--muted);
+  font-family:var(--font-mono); background:transparent; color:var(--muted);
   transition:all .15s;
 }
 .exc-toggle-btn:hover { color:var(--text); }
@@ -398,14 +399,14 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 
 /* assignee selector */
 .assignee-select { background:var(--surf2); border:1px solid var(--border2); color:var(--text);
-  font-size:11px; padding:4px 8px; border-radius:4px; font-family:var(--font-ui); width:100%;
+  font-size:11px; padding:4px 8px; border-radius:4px; font-family:var(--font-mono); width:100%;
   cursor:pointer; }
 .assignee-select:focus { outline:none; border-color:var(--cyan); }
 
 /* action buttons */
 .case-action-btn { background:rgba(0,210,255,.06); border:1px solid rgba(0,210,255,.2);
   color:var(--cyan); font-size:10px; font-weight:700; letter-spacing:.06em; padding:5px 10px;
-  border-radius:4px; cursor:pointer; font-family:var(--font-ui); transition:all .15s; }
+  border-radius:4px; cursor:pointer; font-family:var(--font-mono); transition:all .15s; }
 .case-action-btn:hover { background:rgba(0,210,255,.12); }
 .case-action-btn.amber { background:rgba(212,144,31,.06); border-color:rgba(212,144,31,.2); color:var(--amber); }
 .case-action-btn.red   { background:rgba(192,64,74,.06);  border-color:rgba(192,64,74,.2);  color:#f07a7a; }
@@ -446,7 +447,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
   display:flex; align-items:center; justify-content:center; padding:20px; }
 .hud-modal { background:var(--surf2); border:1px solid var(--border2); border-radius:8px;
   box-shadow:0 8px 40px rgba(0,0,0,.6); max-height:80vh; display:flex; flex-direction:column;
-  font-family:var(--font-ui); }
+  font-family:var(--font-mono); }
 .hud-modal-header { padding:14px 18px 12px; border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
 .hud-modal-title { font-size:13px; font-weight:700; color:var(--text0); letter-spacing:.04em; }
@@ -478,7 +479,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .rp-chip-x { cursor:pointer; font-size:13px; line-height:1; color:var(--muted); }
 .rp-chip-x:hover { color:#f07a7a; }
 .rp-search { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
-  font-size:11px; padding:6px 10px; border-radius:4px; font-family:var(--font-ui); margin-bottom:10px; }
+  font-size:11px; padding:6px 10px; border-radius:4px; font-family:var(--font-mono); margin-bottom:10px; }
 .rp-search:focus { outline:none; border-color:var(--cyan); }
 
 /* Form fields */
@@ -486,14 +487,14 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
   color:var(--muted); margin-bottom:4px; margin-top:12px; }
 .hud-field-label:first-child { margin-top:0; }
 .hud-input { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
-  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-ui); }
+  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-mono); }
 .hud-input:focus { outline:none; border-color:var(--cyan); }
 .hud-textarea { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
-  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-ui);
+  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-mono);
   resize:vertical; min-height:70px; }
 .hud-textarea:focus { outline:none; border-color:var(--cyan); }
 .hud-select { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
-  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-ui); }
+  font-size:12px; padding:7px 10px; border-radius:4px; font-family:var(--font-mono); }
 .hud-select:focus { outline:none; border-color:var(--cyan); }
 
 /* Inline annotation widget */
@@ -506,7 +507,7 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 .task-tip { position:fixed; background:var(--surf2); border:1px solid var(--border2);
   border-radius:6px; padding:0; z-index:350; min-width:420px; max-width:600px;
   max-height:400px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.6);
-  font-family:var(--font-ui); pointer-events:none; }
+  font-family:var(--font-mono); pointer-events:none; }
 .task-tip::-webkit-scrollbar { width:4px; }
 .task-tip::-webkit-scrollbar-thumb { background:var(--border2); }
 .task-tip-phase { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
@@ -523,11 +524,11 @@ body { font-family:var(--font-ui); background:var(--bg); color:var(--text);
 /* Save/Cancel buttons */
 .btn-save { background:rgba(0,210,255,.1); border:1px solid rgba(0,210,255,.3); color:var(--cyan);
   font-size:11px; font-weight:700; letter-spacing:.06em; padding:6px 14px; border-radius:4px;
-  cursor:pointer; font-family:var(--font-ui); transition:all .15s; }
+  cursor:pointer; font-family:var(--font-mono); transition:all .15s; }
 .btn-save:hover { background:rgba(0,210,255,.18); }
 .btn-cancel { background:transparent; border:1px solid var(--border); color:var(--muted);
   font-size:11px; font-weight:600; padding:6px 14px; border-radius:4px;
-  cursor:pointer; font-family:var(--font-ui); transition:all .15s; }
+  cursor:pointer; font-family:var(--font-mono); transition:all .15s; }
 .btn-cancel:hover { border-color:var(--text); color:var(--text); }
 
 /* ── Toast ── */

@@ -13,46 +13,46 @@ async function loadPMView() {
       .pm-alertrail{background:rgba(226,75,74,.08);border-bottom:2px solid rgba(226,75,74,.4)}
       .pm-alert{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(226,75,74,.12)}
       .pm-alert:last-child{border-bottom:none}
-      .pm-alert-type{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;white-space:nowrap;min-width:110px}
+      .pm-alert-type{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;white-space:nowrap;min-width:110px}
       .pm-alert-type.warn{color:#EF9F27}
-      .pm-alert-proj{font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;white-space:nowrap;margin-right:2px}
+      .pm-alert-proj{font-family:var(--font-mono);font-size:11px;font-weight:700;color:#00D2FF;white-space:nowrap;margin-right:2px}
       .pm-alert-msg{font-family:var(--font-body);font-size:11px;color:#C8DFF0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .pm-alert-age{font-family:var(--font-data);font-size:11px;color:#5A84A8;white-space:nowrap;margin:0 12px}
-      .pm-btn{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 13px;border:1px solid;cursor:pointer;white-space:nowrap;background:none;transition:background .1s}
+      .pm-btn{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 13px;border:1px solid;cursor:pointer;white-space:nowrap;background:none;transition:background .1s}
       .pm-btn-red{color:#E24B4A;border-color:rgba(226,75,74,.5)}.pm-btn-red:hover{background:rgba(226,75,74,.15)}
       .pm-btn-cyan{color:#00D2FF;border-color:rgba(0,210,255,.4)}.pm-btn-cyan:hover{background:rgba(0,210,255,.1)}
       /* Stat strip */
       .pm-sstrip{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid rgba(0,210,255,.12);background:#060d1c}
       .pm-sc{padding:10px 16px;border-right:1px solid rgba(0,210,255,.08)}
       .pm-sc:last-child{border-right:none}
-      .pm-sc-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
-      .pm-sc-val{font-family:var(--font-display);font-size:24px;font-weight:700;line-height:1}
-      .pm-sc-sub{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .pm-sc-lbl{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
+      .pm-sc-val{font-family:var(--font-mono);font-size:24px;font-weight:700;line-height:1}
+      .pm-sc-sub{font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px}
       /* Body */
       .pm-body{display:grid;grid-template-columns:1fr 280px;gap:0}
       .pm-left{border-right:1px solid rgba(0,210,255,.1);display:flex;flex-direction:column}
       .pm-right{display:flex;flex-direction:column;background:#060b18}
       /* Tabs — large readable buttons like mockup */
       .pm-tabs{display:flex;gap:2px;padding:10px 12px;background:#07101f;border-bottom:1px solid rgba(0,210,255,.12)}
-      .pm-tab{font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.04em;padding:7px 18px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:7px;transition:all .12s}
+      .pm-tab{font-family:var(--font-mono);font-size:14px;font-weight:700;letter-spacing:.04em;padding:7px 18px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);display:flex;align-items:center;gap:7px;transition:all .12s}
       .pm-tab.on{color:#F0F6FF;background:#132035;border-color:rgba(0,210,255,.4)}
       .pm-tab:hover:not(.on){color:#90B8D8;background:#0e1e30}
       .pm-tbadge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px}
       /* Section header */
-      .pm-sec-hdr{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.12em;color:#3A5C80;padding:6px 14px;background:#06101e;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:7px;text-transform:uppercase}
+      .pm-sec-hdr{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;color:#3A5C80;padding:6px 14px;background:#06101e;border-bottom:1px solid rgba(0,210,255,.08);display:flex;align-items:center;gap:7px;text-transform:uppercase}
       /* Cards */
       .pm-pcards{overflow-y:auto;background:#07101f;padding:8px}
       .pm-pcard{border-left:4px solid;padding:14px 14px 12px;cursor:pointer;transition:background .12s,border-color .12s;background:#0d1a2e;margin-bottom:6px;border-top:1px solid rgba(255,255,255,.05);border-right:1px solid rgba(0,210,255,.1);border-bottom:1px solid rgba(0,210,255,.1)}
       .pm-pcard:hover{background:#112030;border-right-color:rgba(0,210,255,.25)}
       .pm-pcard.open{background:rgba(0,210,255,.08)!important;border-right-color:rgba(0,210,255,.45)!important}
-      .pm-pn{font-family:var(--font-display);font-size:18px;font-weight:700;color:#F0F6FF;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .pm-pmeta{font-family:var(--font-head);font-size:11px;color:#4A6E90;margin:3px 0 8px}
+      .pm-pn{font-family:var(--font-mono);font-size:18px;font-weight:700;color:#F0F6FF;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .pm-pmeta{font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin:3px 0 8px}
       /* Day grid — each day in its own box like mockup */
       .pm-dgrid{display:flex;gap:6px;margin:8px 0}
       .pm-dcell{background:#0a1828;border:1px solid rgba(0,210,255,.12);padding:6px 8px;text-align:center;min-width:52px}
-      .pm-dlbl{font-family:var(--font-head);font-size:12px;font-weight:700;color:#4A6E90;margin-bottom:4px}
+      .pm-dlbl{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#4A6E90;margin-bottom:4px}
       .pm-dot{width:8px;height:8px;border-radius:50%;margin:0 auto 4px}
-      .pm-dhrs{font-family:var(--font-head);font-size:12px;font-weight:700}
+      .pm-dhrs{font-family:var(--font-mono);font-size:12px;font-weight:700}
       /* Progress bar */
       .pm-pbar{height:5px;background:rgba(255,255,255,.07);margin:8px 0 4px;border-radius:2px;position:relative;overflow:hidden}
       .pm-pbar-fill{height:100%;position:absolute;left:0;top:0;border-radius:2px}
@@ -60,11 +60,11 @@ async function loadPMView() {
       .pm-evmrow{display:flex;gap:0;margin:8px 0 4px;border:1px solid rgba(0,210,255,.1);background:#091522}
       .pm-evm-cell{padding:7px 14px;border-right:1px solid rgba(0,210,255,.08);flex:1}
       .pm-evm-cell:last-child{border-right:none}
-      .pm-evm-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#4A6E90;text-transform:uppercase}
-      .pm-evm-val{font-family:var(--font-display);font-size:20px;font-weight:700;line-height:1.1;margin-top:1px}
+      .pm-evm-lbl{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#4A6E90;text-transform:uppercase}
+      .pm-evm-val{font-family:var(--font-mono);font-size:20px;font-weight:700;line-height:1.1;margin-top:1px}
       /* Chips */
       .pm-chiprow{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;align-items:center}
-      .pm-chip{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px}
+      .pm-chip{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 8px}
       .pm-chip-r{color:#E24B4A;border:1px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08)}
       .pm-chip-a{color:#EF9F27;border:1px solid rgba(239,159,39,.4);background:rgba(239,159,39,.08)}
       .pm-chip-c{color:#00D2FF;border:1px solid rgba(0,210,255,.35);background:rgba(0,210,255,.07)}
@@ -75,8 +75,8 @@ async function loadPMView() {
       .pm-frow:hover{background:rgba(255,255,255,.025)}
       .pm-fstrip{width:4px;flex-shrink:0}
       .pm-ftag-col{display:flex;flex-direction:column;justify-content:center;padding:8px 9px 8px 8px;width:82px;flex-shrink:0;border-right:1px solid rgba(0,210,255,.08)}
-      .pm-ftag{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .pm-ftag-inst{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .pm-ftag{font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .pm-ftag-inst{font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px}
       .pm-fbody{flex:1;min-width:0;padding:8px 9px}
       .pm-ftitle{font-family:var(--font-body);font-size:12px;color:#C8DFF0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .pm-fsub{font-family:var(--font-body);font-size:11px;margin-top:2px}
@@ -85,39 +85,39 @@ async function loadPMView() {
       .pm-drawer{position:fixed;top:44px;right:0;bottom:0;width:540px;background:#08101f;border-left:1px solid rgba(0,210,255,.2);display:flex;flex-direction:column;z-index:200;box-shadow:-16px 0 48px rgba(0,0,0,.8);animation:pm-drawer-in .22s ease}
       @keyframes pm-drawer-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
       .pm-drhdr{padding:12px 15px 10px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0;background:#07101e}
-      .pm-drname{font-family:var(--font-display);font-size:20px;font-weight:700;color:#F0F6FF;line-height:1.1}
-      .pm-drdesc{font-family:var(--font-head);font-size:11px;color:#4A6E90;margin:3px 0 6px}
+      .pm-drname{font-family:var(--font-mono);font-size:20px;font-weight:700;color:#F0F6FF;line-height:1.1}
+      .pm-drdesc{font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin:3px 0 6px}
       .pm-drstrip{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid rgba(0,210,255,.1);flex-shrink:0;background:#07101e}
       .pm-drc{padding:8px;border-right:1px solid rgba(0,210,255,.08);text-align:center}
       .pm-drc:last-child{border-right:none}
-      .pm-drc-lbl{font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:.07em;color:#3A5C80;text-transform:uppercase}
-      .pm-drc-val{font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;margin-top:2px}
-      .pm-drc-sub{font-family:var(--font-head);font-size:10px;color:#3A5C80;margin-top:1px}
+      .pm-drc-lbl{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;color:#3A5C80;text-transform:uppercase}
+      .pm-drc-val{font-family:var(--font-mono);font-size:18px;font-weight:700;line-height:1;margin-top:2px}
+      .pm-drc-sub{font-family:var(--font-mono);font-size:10px;color:#3A5C80;margin-top:1px}
       .pm-drtabs{display:flex;border-bottom:1px solid rgba(0,210,255,.1);background:#060c18;flex-shrink:0;overflow-x:auto}
-      .pm-drtab{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.06em;padding:8px 14px;cursor:pointer;color:#4A6E90;border-bottom:2px solid transparent;white-space:nowrap;transition:color .1s}
+      .pm-drtab{font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.06em;padding:8px 14px;cursor:pointer;color:#4A6E90;border-bottom:2px solid transparent;white-space:nowrap;transition:color .1s}
       .pm-drtab.on{color:#F0F6FF;border-bottom-color:#00D2FF}
       .pm-drtab:hover:not(.on){color:#90B8D8}
       .pm-drbody{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:0}
       .pm-drcol{border-right:1px solid rgba(0,210,255,.08)}
       .pm-drcol:last-child{border-right:none}
-      .pm-dcsec{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#3A5C80;padding:7px 12px 4px;text-transform:uppercase;border-bottom:1px solid rgba(0,210,255,.07);background:#070d1c;display:flex;align-items:center;gap:6px}
+      .pm-dcsec{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#3A5C80;padding:7px 12px 4px;text-transform:uppercase;border-bottom:1px solid rgba(0,210,255,.07);background:#070d1c;display:flex;align-items:center;gap:6px}
       .pm-rfcard{margin:8px 10px;background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.3);border-left:3px solid #E24B4A;padding:10px 11px}
-      .pm-rf-tag{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#E24B4A;margin-bottom:5px}
+      .pm-rf-tag{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#E24B4A;margin-bottom:5px}
       .pm-rf-who{font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF;margin-bottom:3px}
       .pm-rf-quote{font-family:var(--font-body);font-size:11px;color:#C8DFF0;font-style:italic;margin-bottom:8px;line-height:1.5;border-left:2px solid rgba(226,75,74,.4);padding-left:8px}
-      .pm-rf-ctx{font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-bottom:9px}
+      .pm-rf-ctx{font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin-bottom:9px}
       .pm-aicard{margin:8px 10px;background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-left:3px solid #EF9F27;padding:9px 11px}
-      .pm-ai-lbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#EF9F27;margin-bottom:5px}
+      .pm-ai-lbl{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#EF9F27;margin-bottom:5px}
       .pm-ai-item{font-family:var(--font-body);font-size:11px;color:#C8DFF0;margin-bottom:4px;padding-left:12px;position:relative;line-height:1.5}
       .pm-ai-item::before{content:'·';position:absolute;left:2px;color:#EF9F27;font-weight:700}
       .pm-decrow{padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07);display:flex;gap:7px;align-items:flex-start}
-      .pm-dec-chip{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 7px;white-space:nowrap;flex-shrink:0}
+      .pm-dec-chip{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 7px;white-space:nowrap;flex-shrink:0}
       .pm-dec-text{font-family:var(--font-body);font-size:11px;color:#C8DFF0;line-height:1.5;flex:1}
       .pm-dec-date{font-family:var(--font-data);font-size:11px;color:#4A6E90;white-space:nowrap;margin-top:1px}
       .pm-brief-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid rgba(0,210,255,.07);cursor:pointer;transition:background .1s}
       .pm-brief-row:hover{background:rgba(255,255,255,.02)}
-      .pm-bdate{font-family:var(--font-head);font-size:11px;font-weight:600;color:#C8DFF0;min-width:90px}
-      .pm-bflag{font-family:var(--font-head);font-size:11px;flex:1}
+      .pm-bdate{font-family:var(--font-mono);font-size:11px;font-weight:600;color:#C8DFF0;min-width:90px}
+      .pm-bflag{font-family:var(--font-mono);font-size:11px;flex:1}
       .pm-feed-row{display:flex;gap:7px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07);transition:background .1s}
       .pm-feed-row:hover{background:rgba(255,255,255,.02)}
       .pm-live-dot{width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;flex-shrink:0}
@@ -129,14 +129,14 @@ async function loadPMView() {
         box-shadow:0 8px 32px rgba(0,0,0,.7);padding:10px 13px;min-width:200px;max-width:320px;
         pointer-events:none;opacity:0;transition:opacity .12s}
       .pm-tooltip.show{opacity:1}
-      .pm-tt-hdr{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+      .pm-tt-hdr{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;
         text-transform:uppercase;color:#3A5C80;margin-bottom:6px}
-      .pm-tt-row{display:flex;justify-content:space-between;gap:12px;font-family:var(--font-head);
+      .pm-tt-row{display:flex;justify-content:space-between;gap:12px;font-family:var(--font-mono);
         font-size:11px;color:#C8DFF0;margin-bottom:3px}
-      .pm-tt-row span:last-child{font-family:var(--font-display);font-weight:700}
+      .pm-tt-row span:last-child{font-family:var(--font-mono);font-weight:700}
       .pm-tt-bar{height:3px;background:rgba(255,255,255,.08);margin:5px 0 7px;border-radius:2px;overflow:hidden}
       .pm-tt-bar-fill{height:100%;background:var(--compass-cyan);border-radius:2px}
-      .pm-tt-person{display:flex;justify-content:space-between;gap:8px;font-family:var(--font-head);
+      .pm-tt-person{display:flex;justify-content:space-between;gap:8px;font-family:var(--font-mono);
         font-size:11px;padding:3px 0;border-bottom:1px solid rgba(0,210,255,.06)}
       .pm-tt-person:last-child{border-bottom:none}
     `;
@@ -368,7 +368,7 @@ async function loadPMView() {
       const cocHtml = projCoc.slice(0,2).map(e=>{
         const isRej=e.event_type==='step_reset', isDone=e.event_type==='step_completed';
         const c=isRej?'var(--compass-red)':isDone?'var(--compass-green)':'var(--compass-amber)';
-        return `<div style="display:flex;gap:6px;align-items:baseline;margin-top:3px;font-family:var(--font-head);font-size:11px">
+        return `<div style="display:flex;gap:6px;align-items:baseline;margin-top:3px;font-family:var(--font-mono);font-size:11px">
           <span style="color:${c};flex-shrink:0">${isRej?'↩':isDone?'✓':'●'}</span>
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${esc(e.step_name||'—')}${e.event_notes?' — <span style="color:'+c+'">'+esc(e.event_notes.slice(0,50))+'</span>':''}</span>
           <span style="color:#3A5C80;flex-shrink:0">${_timeAgo(e.created_at)}</span>
@@ -391,12 +391,12 @@ async function loadPMView() {
         <!-- 5-segment health bar -->
         ${(()=>{
           const segs = projectHealthSegments(ps);
-          const labels = segs.map(s=>`<span style="font-family:var(--font-head);font-size:11px;color:${s.color};opacity:.8">${s.label}</span>`).join('<span style="color:#2A4060;margin:0 3px">·</span>');
+          const labels = segs.map(s=>`<span style="font-family:var(--font-mono);font-size:11px;color:${s.color};opacity:.8">${s.label}</span>`).join('<span style="color:#2A4060;margin:0 3px">·</span>');
           return `<div style="margin:6px 0 4px">
             <div style="display:flex;gap:2px;height:5px;margin-bottom:4px">
               ${segs.map(s=>`<div style="flex:1;height:5px;background:${s.color};opacity:.85;border-radius:1px" title="${s.label}: ${Math.round(s.score*100)}%"></div>`).join('')}
             </div>
-            <div style="display:flex;gap:0;justify-content:space-between;font-family:var(--font-head);font-size:11px;flex-wrap:nowrap">${labels}</div>
+            <div style="display:flex;gap:0;justify-content:space-between;font-family:var(--font-mono);font-size:11px;flex-wrap:nowrap">${labels}</div>
           </div>`;
         })()}
 
@@ -431,7 +431,7 @@ async function loadPMView() {
         </div>
 
         <!-- Stats line + budget -->
-        <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:4px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin-top:4px">
           <span>${pct}% complete · ${doneTasks}/${totalTasks} tasks</span>
           ${p.budget_hours?`<span>${p.budget_hours_used?Math.round(p.budget_hours_used):'0'}h of ${Math.round(p.budget_hours)}h budget</span>`:''}
         </div>
@@ -445,7 +445,7 @@ async function loadPMView() {
             data-tt='${JSON.stringify({type:"reqs",items:projReqs.slice(0,6).map(r=>({d:r.submitted_at||'',p:(_projects.find(x=>x.id===r.project_id)?.name||'—').slice(0,30)}))}).replace(/'/g,"&#39;")}'
             onmouseenter="pmShowReqsTip(event,this)" onmouseleave="pmHideTip()">${projReqs.length} request${projReqs.length>1?'s':''}</span>`:''}
           ${projFlags.length>0?`<span class="pm-chip pm-chip-r">${projFlags.length} red signal${projFlags.length>1?'s':''}</span>`:''}
-          <span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#4A6E90">
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:#4A6E90">
             P50 <strong style="color:${barColor}">${p.target_date?fmtDate(p.target_date):'—'}</strong>
             ${p.target_date?` · target ${fmtDate(p.target_date)}`:''}
           </span>
@@ -535,12 +535,12 @@ async function loadPMView() {
             <div class="pm-sec-hdr">
               <span style="width:7px;height:7px;border-radius:50%;background:#E24B4A;display:inline-block;flex-shrink:0"></span>
               ACTIVE — URGENCY ORDERED
-              <span style="margin-left:auto;font-family:var(--font-head);font-size:11px;color:#3A5C80">${activeProjects.length} projects</span>
+              <span style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:#3A5C80">${activeProjects.length} projects</span>
             </div>
             <div class="pm-pcards" style="overflow-y:auto;flex:1">
               ${projStats.length>0
                 ? projStats.map((ps,i)=>projCardHtml(ps,i)).join('')
-                : `<div style="padding:20px 13px;text-align:center;font-family:var(--font-head);font-size:12px;color:var(--text3)">No active projects</div>`}
+                : `<div style="padding:20px 13px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text3)">No active projects</div>`}
             </div>
           </div>
 
@@ -550,14 +550,14 @@ async function loadPMView() {
               let html = '';
               // ── Red flags ─────────────────────────────────────
               if (redFlags.length > 0) {
-                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:8px;text-transform:uppercase">■ Red flags (${redFlags.length})</div>`;
+                html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:8px;text-transform:uppercase">■ Red flags (${redFlags.length})</div>`;
                 redFlags.forEach(f => {
                   html += `<div style="background:rgba(226,75,74,.07);border:1px solid rgba(226,75,74,.28);border-left:3px solid #E24B4A;padding:10px 12px;margin-bottom:7px">
                     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
                       <span style="font-family:var(--font-body);font-size:12px;font-weight:600;color:#F0F6FF">${esc(f.projName)} — ${esc(f.instTitle)}</span>
                       <span style="font-family:var(--font-data);font-size:11px;color:#5A84A8">${_timeAgo(f.created_at)}</span>
                     </div>
-                    ${f.actor_name?`<div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;margin-bottom:4px">${esc(f.actor_name)}</div>`:''}
+                    ${f.actor_name?`<div style="font-family:var(--font-mono);font-size:11px;color:#5A84A8;margin-bottom:4px">${esc(f.actor_name)}</div>`:''}
                     ${f.event_notes?`<div style="font-family:var(--font-body);font-size:11px;color:#C8DFF0;font-style:italic;border-left:2px solid rgba(226,75,74,.4);padding-left:8px;margin-bottom:8px">"${esc(f.event_notes.slice(0,120))}"</div>`:''}
                     <div style="display:flex;gap:6px;margin-top:8px">
                       <button class="pm-btn pm-btn-red" style="flex:1" onclick="pmAcknowledge('${f.instance_id}',null,this)">Acknowledge</button>
@@ -568,22 +568,22 @@ async function loadPMView() {
               }
               // ── Overdue tasks — flat list, ALL of them ─────────
               if (totalOverdue > 0) {
-                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:10px 0 8px;text-transform:uppercase">● Overdue tasks (${totalOverdue})</div>`;
+                html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:10px 0 8px;text-transform:uppercase">● Overdue tasks (${totalOverdue})</div>`;
                 projStats.filter(ps=>ps.overdueTasks.length>0).forEach(ps => {
-                  html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#90B8D8;padding:5px 0 3px;letter-spacing:.04em">${esc(ps.p.name)}</div>`;
+                  html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#90B8D8;padding:5px 0 3px;letter-spacing:.04em">${esc(ps.p.name)}</div>`;
                   ps.overdueTasks.forEach(t => {
                     const assignee = _resources.find(r=>r.user_id===t.assigned_to);
                     const name = assignee ? assignee.first_name+' '+assignee.last_name : null;
                     html += `<div style="display:flex;align-items:baseline;gap:8px;padding:5px 8px;border-bottom:1px solid rgba(0,210,255,.07)">
                       <span style="color:#E24B4A;flex-shrink:0">!</span>
                       <span style="font-family:var(--font-body);font-size:12px;color:#C8DFF0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name||t.title||'—')}</span>
-                      ${name?`<span style="font-family:var(--font-head);font-size:11px;color:#4A6E90;flex-shrink:0">${esc(name)}</span>`:''}
-                      <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#E24B4A;flex-shrink:0">${daysOverdue(t.due_date)}d</span>
+                      ${name?`<span style="font-family:var(--font-mono);font-size:11px;color:#4A6E90;flex-shrink:0">${esc(name)}</span>`:''}
+                      <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#E24B4A;flex-shrink:0">${daysOverdue(t.due_date)}d</span>
                     </div>`;
                   });
                 });
               }
-              if (!html) html = '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No exceptions — all projects on track</div>';
+              if (!html) html = '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);text-align:center;padding:24px">No exceptions — all projects on track</div>';
               return html;
             })()}
           </div>
@@ -619,22 +619,22 @@ async function loadPMView() {
               const depts = {};
               allRes.forEach(r => { const dept=r.department||'Unassigned'; if(!depts[dept])depts[dept]=[]; depts[dept].push(r); });
               const deptNames = Object.keys(depts).sort();
-              if (!allRes.length) return '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No team members found</div>';
+              if (!allRes.length) return '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);text-align:center;padding:24px">No team members found</div>';
 
               // ── Department filter bar ──────────────────────────
               let html = `<div id="pm-team-filter" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:8px 0 6px;border-bottom:1px solid rgba(0,210,255,.08)">
                 <button class="pm-team-filter-btn on" data-dept="all"
-                  style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:3px 10px;background:#132035;border:1px solid rgba(0,210,255,.4);color:#F0F6FF;cursor:pointer"
+                  style="font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;background:#132035;border:1px solid rgba(0,210,255,.4);color:#F0F6FF;cursor:pointer"
                   onclick="pmTeamFilter(this,'all')">All (${allRes.length})</button>
                 ${deptNames.map(d=>`<button class="pm-team-filter-btn" data-dept="${esc(d)}"
-                  style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:3px 10px;background:#0c1828;border:1px solid rgba(0,210,255,.12);color:#5A84A8;cursor:pointer"
+                  style="font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;background:#0c1828;border:1px solid rgba(0,210,255,.12);color:#5A84A8;cursor:pointer"
                   onclick="pmTeamFilter(this,'${esc(d)}')">${esc(d)} (${depts[d].length})</button>`).join('')}
               </div>`;
 
               // ── Per-resource rows with sentiment dot arc ───────
               deptNames.forEach(dept => {
                 html += `<div class="pm-team-group" data-dept="${esc(dept)}">
-                  <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;padding:6px 0 3px;border-bottom:1px solid rgba(0,210,255,.08);margin-bottom:3px">${esc(dept)}</div>`;
+                  <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80;padding:6px 0 3px;border-bottom:1px solid rgba(0,210,255,.08);margin-bottom:3px">${esc(dept)}</div>`;
 
                 depts[dept].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).forEach(r => {
                   const initials   = ((r.first_name||'')[0]||'').toUpperCase() + ((r.last_name||'')[0]||'').toUpperCase();
@@ -671,7 +671,7 @@ async function loadPMView() {
                     return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer"
                       title="${dotTitle}"
                       onclick="pmPersonDayBrief('${esc(fullName)}','${d}','${dayDotLabels[i]}','${esc(fullName+': '+dotTitle)}')">
-                      <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#3A5C80">${dayDotLabels[i]}</span>
+                      <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#3A5C80">${dayDotLabels[i]}</span>
                       <div style="width:11px;height:11px;border-radius:50%;background:${dotColor};transition:transform .1s"
                         onmouseenter="this.style.transform='scale(1.3)'" onmouseleave="this.style.transform='scale(1)'"></div>
                     </div>`;
@@ -689,20 +689,20 @@ async function loadPMView() {
                   const hrsColor = r.weekHrs >= expected*0.9 ? 'var(--compass-green)' : r.weekHrs >= expected*0.5 ? 'var(--compass-amber)' : 'var(--compass-red)';
 
                   html += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(0,210,255,.06)">
-                    <div style="width:32px;height:32px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials)}</div>
+                    <div style="width:32px;height:32px;border-radius:50%;background:#0f2040;border:1px solid rgba(0,210,255,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:700;color:#00D2FF;flex-shrink:0">${esc(initials)}</div>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(fullName)}</div>
-                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${projList.length?projList.map(n=>`<span style="color:#90B8D8">${esc(n)}</span>`).join(', '):'No active projects'}</div>
+                      <div style="font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${projList.length?projList.map(n=>`<span style="color:#90B8D8">${esc(n)}</span>`).join(', '):'No active projects'}</div>
                     </div>
                     <!-- Day sentiment dots -->
                     <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">${dotHtml}</div>
                     <!-- Hours + week summary -->
                     <div style="text-align:right;flex-shrink:0;min-width:52px">
-                      <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${hrsColor};line-height:1">${r.weekHrs.toFixed(1)}h</div>
-                      <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${billPct}% bill</div>
+                      <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${hrsColor};line-height:1">${r.weekHrs.toFixed(1)}h</div>
+                      <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">${billPct}% bill</div>
                     </div>
                     <button onclick="pmPersonWeekBrief('${esc(fullName)}','${arcStr}',${r.weekHrs.toFixed(1)},${expected})"
-                      style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;background:none;border:1px solid rgba(0,210,255,.2);padding:3px 7px;cursor:pointer;flex-shrink:0;transition:background .1s"
+                      style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#00D2FF;background:none;border:1px solid rgba(0,210,255,.2);padding:3px 7px;cursor:pointer;flex-shrink:0;transition:background .1s"
                       onmouseenter="this.style.background='rgba(0,210,255,.08)'"
                       onmouseleave="this.style.background='none'">wk →</button>
                   </div>`;
@@ -716,12 +716,12 @@ async function loadPMView() {
           <!-- Action items tab -->
           <div id="pm-tab-actions" class="pm-tabpanel">
             ${(function(){
-              if (!actionItems.length) return '<div style="font-family:var(--font-head);font-size:12px;color:var(--text3);text-align:center;padding:24px">No open action items</div>';
+              if (!actionItems.length) return '<div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);text-align:center;padding:24px">No open action items</div>';
               const overdueAIs = actionItems.filter(a=>a.due_date&&a.due_date<today);
               const currentAIs = actionItems.filter(a=>!a.due_date||a.due_date>=today);
               let html = '';
               if (overdueAIs.length) {
-                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:6px;text-transform:uppercase">● Overdue (${overdueAIs.length})</div>`;
+                html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#E24B4A;margin-bottom:6px;text-transform:uppercase">● Overdue (${overdueAIs.length})</div>`;
                 overdueAIs.forEach(a => {
                   const inst=wfInstances.find(w=>w.id===a.instance_id);
                   const proj=_projects.find(p=>p.id===inst?.project_id);
@@ -729,14 +729,14 @@ async function loadPMView() {
                     <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:var(--compass-red)"></div>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'—')}</div>
-                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}Due ${fmtDate(a.due_date)}</div>
+                      <div style="font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin-top:1px">${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}Due ${fmtDate(a.due_date)}</div>
                     </div>
                     <span class="pm-chip pm-chip-r" style="flex-shrink:0">${daysOverdue(a.due_date)}d late</span>
                   </div>`;
                 });
               }
               if (currentAIs.length) {
-                html += `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:${overdueAIs.length?'12px':0} 0 6px;text-transform:uppercase">● Open (${currentAIs.length})</div>`;
+                html += `<div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;margin:${overdueAIs.length?'12px':0} 0 6px;text-transform:uppercase">● Open (${currentAIs.length})</div>`;
                 currentAIs.forEach(a => {
                   const inst=wfInstances.find(w=>w.id===a.instance_id);
                   const proj=_projects.find(p=>p.id===inst?.project_id);
@@ -744,9 +744,9 @@ async function loadPMView() {
                     <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;background:var(--compass-amber)"></div>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title||'—')}</div>
-                      <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:1px">${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}${a.due_date?'Due '+fmtDate(a.due_date):'No due date'}</div>
+                      <div style="font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin-top:1px">${proj?esc(proj.name)+' · ':''}${a.owner_name?esc(a.owner_name)+' · ':''}${a.due_date?'Due '+fmtDate(a.due_date):'No due date'}</div>
                     </div>
-                    ${a.due_date?`<span style="font-family:var(--font-head);font-size:11px;color:#4A6E90;flex-shrink:0">${fmtDate(a.due_date)}</span>`:''}
+                    ${a.due_date?`<span style="font-family:var(--font-mono);font-size:11px;color:#4A6E90;flex-shrink:0">${fmtDate(a.due_date)}</span>`:''}
                   </div>`;
                 });
               }
@@ -757,7 +757,7 @@ async function loadPMView() {
 
         <div class="pm-right">
           <div class="pm-feed-hdr">
-            <span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text1)">Portfolio feed</span>
+            <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text1)">Portfolio feed</span>
             <div style="display:flex;align-items:center;gap:5px">
               <span class="pm-live-dot"></span>
               <span style="font-family:var(--font-data);font-size:11px;color:var(--compass-green)">live · click to open</span>
@@ -765,7 +765,7 @@ async function loadPMView() {
           </div>
           <div id="pm-live-feed" style="overflow-y:auto;flex:1">
             ${feedEvents.length===0
-              ? `<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No recent activity</div>`
+              ? `<div style="padding:14px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">No recent activity</div>`
               : feedEvents.map(({e,proj,isRej,isDone,color,icon,age})=>`
               <div class="pm-frow" onclick="pmOpenDrawer('${proj?.id||''}')">
                 <div class="pm-fstrip" style="background:${color}"></div>
@@ -834,7 +834,7 @@ async function loadPMView() {
               html += '</div>';
             }
           } else {
-            html += `<div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">No time logged</div>`;
+            html += `<div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">No time logged</div>`;
           }
           t.innerHTML = html;
           t.classList.add('show');
@@ -944,21 +944,21 @@ async function loadPMView() {
         const labels = ['M','T','W','Th','F'];
         return `<div style="display:flex;gap:8px;align-items:flex-end;margin:10px 0 8px;padding:10px 12px;background:#091522;border:1px solid rgba(0,210,255,.1)">
           ${steps.map((s,i)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${colors[s]||'#3A5C80'}">${s}</span>
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${colors[s]||'#3A5C80'}">${s}</span>
             <div style="width:14px;height:14px;border-radius:50%;background:${colors[s]||'rgba(255,255,255,.08)'}"></div>
-            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">${labels[i]||''}</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">${labels[i]||''}</span>
           </div>`).join('<span style="color:#2A4060;align-self:center;font-size:11px;padding-bottom:14px">→</span>')}
           <div style="margin-left:auto;text-align:right;border-left:1px solid rgba(0,210,255,.08);padding-left:10px">
-            <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${extra.hrs>=extra.expected*0.9?'var(--compass-green)':extra.hrs>=extra.expected*0.5?'var(--compass-amber)':'var(--compass-red)'};">${extra.hrs}h</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">of ${extra.expected}h</div>
+            <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:${extra.hrs>=extra.expected*0.9?'var(--compass-green)':extra.hrs>=extra.expected*0.5?'var(--compass-amber)':'var(--compass-red)'};">${extra.hrs}h</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">of ${extra.expected}h</div>
           </div>
         </div>`;
       })() : '';
       panel.innerHTML = `
         <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(0,210,255,.1);background:#07101e;flex-shrink:0;display:flex;align-items:flex-start;justify-content:space-between">
           <div>
-            <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF">${title}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90;margin-top:2px">${subtitle}</div>
+            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:#F0F6FF">${title}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:#4A6E90;margin-top:2px">${subtitle}</div>
           </div>
           <button onclick="document.getElementById('pm-brief-overlay')?.remove();document.getElementById('pm-brief-panel')?.remove()"
             style="background:none;border:none;color:#5A84A8;font-size:16px;cursor:pointer;padding:0"
@@ -966,10 +966,10 @@ async function loadPMView() {
         </div>
         <div style="flex:1;overflow-y:auto;padding:14px">
           ${arcHtml}
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;text-transform:uppercase;margin-bottom:6px">AI NARRATIVE</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:#EF9F27;text-transform:uppercase;margin-bottom:6px">AI NARRATIVE</div>
           <div style="background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-left:3px solid #EF9F27;padding:10px 12px;font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6">${narrative}</div>
           <div style="margin-top:14px">
-            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#3A5C80;text-transform:uppercase;margin-bottom:5px">PM ANNOTATION</div>
+            <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#3A5C80;text-transform:uppercase;margin-bottom:5px">PM ANNOTATION</div>
             <textarea placeholder="Add context for this brief…"
               style="width:100%;font-family:var(--font-body);font-size:12px;padding:8px 10px;background:#0a1525;border:1px solid rgba(0,210,255,.15);color:#C8DFF0;outline:none;resize:none;box-sizing:border-box;line-height:1.5" rows="3"></textarea>
           </div>
@@ -1052,7 +1052,7 @@ async function loadPMView() {
             <button class="pm-btn pm-btn-cyan" style="flex:1" onclick="window.location.href='/cadence.html?instance=${f.instance_id}'">Open instance →</button>
           </div>
         </div>`;
-      }).join('') : `<div style="padding:10px 11px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No unacknowledged flags</div>`;
+      }).join('') : `<div style="padding:10px 11px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">No unacknowledged flags</div>`;
       // CoC-derived AI brief (pattern analysis)
       const rejCount = projCoc.filter(e=>e.event_type==='step_reset').length;
       const overdueCount = overdueTasks.length;
@@ -1063,7 +1063,7 @@ async function loadPMView() {
         ${projFlags.length===0&&projReqs.length===0?`<div class="pm-ai-item">No immediate actions required</div>`:''}
         ${overdueCount>0?`<div style="margin-top:6px"><div class="pm-ai-lbl">● TRENDING TO RISK</div><div class="pm-ai-item">${overdueCount} task${overdueCount!==1?'s':''} overdue — review assignments</div></div>`:''}
         <div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(239,159,39,.15);display:flex;justify-content:space-between;align-items:center">
-          <span style="font-family:var(--font-head);font-size:11px;color:#5A84A8">AI morning brief</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:#5A84A8">AI morning brief</span>
           <button class="pm-btn pm-btn-cyan" style="padding:3px 10px;font-size:11px">Full brief →</button>
         </div>
       </div>`;
@@ -1083,7 +1083,7 @@ async function loadPMView() {
           <div class="pm-bdate">${dLabel}${isToday?' · Today':''}</div>
           <div class="pm-bflag">${label}</div>
         </div>`;
-      }).join('') : `<div style="padding:8px 11px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No activity this week</div>`;
+      }).join('') : `<div style="padding:8px 11px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">No activity this week</div>`;
       drawer.innerHTML = `
         <div class="pm-drhdr">
           <div style="display:flex;align-items:flex-start;justify-content:space-between">
@@ -1099,8 +1099,8 @@ async function loadPMView() {
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:12px">
-              <div style="font-family:var(--font-head);font-size:11px;color:#5A84A8">PM / Owner</div>
-              <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF">${pmName?esc(pmName.first_name+' '+pmName.last_name):'—'}</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:#5A84A8">PM / Owner</div>
+              <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#F0F6FF">${pmName?esc(pmName.first_name+' '+pmName.last_name):'—'}</div>
               <div style="font-family:var(--font-data);font-size:11px;color:#5A84A8;margin-top:2px">${new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
               <button onclick="document.getElementById('pm-drawer').remove();document.querySelectorAll('.pm-pcard').forEach(c=>c.classList.remove('open'))"
                 style="background:none;border:none;color:#5A84A8;font-size:16px;cursor:pointer;margin-top:3px;padding:0;line-height:1"
@@ -1143,12 +1143,12 @@ async function loadPMView() {
                     <span style="color:${c};font-size:12px;flex-shrink:0">${isRej?'↩':isDone?'✓':'●'}</span>
                     <div style="flex:1;min-width:0">
                       <div style="font-family:var(--font-body);font-size:11px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.step_name||'—')}${e.actor_name?' — '+esc(e.actor_name):''}</div>
-                      ${e.event_notes&&isRej?`<div style="font-family:var(--font-head);font-size:11px;color:var(--compass-red);font-style:italic">"${esc(e.event_notes.slice(0,50))}"</div>`:''}
+                      ${e.event_notes&&isRej?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--compass-red);font-style:italic">"${esc(e.event_notes.slice(0,50))}"</div>`:''}
                     </div>
                     <div style="font-family:var(--font-data);font-size:11px;color:#5A84A8;flex-shrink:0">${_timeAgo(e.created_at)}</div>
                   </div>`;
                 }).join('')
-              : `<div style="padding:10px 11px;font-family:var(--font-head);font-size:12px;color:var(--text3)">No activity for this project</div>`}
+              : `<div style="padding:10px 11px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">No activity for this project</div>`}
             <div class="pm-dcsec" style="margin-top:4px">BRIEF ARCHIVE</div>
             ${archiveHtml}
           </div>
@@ -1168,6 +1168,6 @@ async function loadPMView() {
 
   } catch(e) {
     console.error('[Compass] loadPMView error:', e);
-    content.innerHTML = '<div style="padding:20px;font-family:var(--font-head);font-size:11px;color:var(--compass-red)">Failed to load PM view — check console</div>';
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:11px;color:var(--compass-red)">Failed to load PM view — check console</div>';
   }
 }

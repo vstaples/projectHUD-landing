@@ -5,7 +5,7 @@ async function loadExecutiveView() {
   const content = document.getElementById('exec-content');
   if (!content) return;
 
-  content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading executive view…</div>`;
+  content.innerHTML = `<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">Loading executive view…</div>`;
 
   try {
     const today = new Date().toLocaleDateString('en-CA');
@@ -87,17 +87,17 @@ async function loadExecutiveView() {
       .ex-kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
       .ex-kc:last-child{border-right:none}
       .ex-kc:hover{background:rgba(0,210,255,.04)}
-      .ex-klbl{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
-      .ex-kval{font-family:var(--font-display);font-size:20px;font-weight:700;line-height:1}
-      .ex-ksub{font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px}
+      .ex-klbl{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.09em;color:#3A5C80;margin-bottom:3px;text-transform:uppercase}
+      .ex-kval{font-family:var(--font-mono);font-size:20px;font-weight:700;line-height:1}
+      .ex-ksub{font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px}
       .ex-tabs{display:flex;gap:2px;padding:8px 10px;background:#07101f;border-bottom:1px solid rgba(0,210,255,.12)}
-      .ex-tab{font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.04em;padding:6px 16px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);transition:all .12s}
+      .ex-tab{font-family:var(--font-mono);font-size:13px;font-weight:700;letter-spacing:.04em;padding:6px 16px;cursor:pointer;color:#5A84A8;background:#0c1828;border:1px solid rgba(0,210,255,.1);transition:all .12s}
       .ex-tab.on{color:#F0F6FF;background:#132035;border-color:rgba(0,210,255,.4)}
       .ex-tab:hover:not(.on){color:#90B8D8;background:#0e1e30}
       .ex-body{padding:10px 12px}
       .ex-panel{background:#0d1a2e;border:1px solid rgba(0,210,255,.1);margin-bottom:10px;overflow:hidden}
       .ex-ph{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.08);background:#07101e}
-      .ex-pt{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80}
+      .ex-pt{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3A5C80}
       .ex-tc{display:none}.ex-tc.on{display:block}
       .ex-brief{border-left:3px solid #EF9F27;margin:10px 12px;padding:9px 11px;background:rgba(239,159,39,.05);font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6}
       .ex-proj-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07);cursor:pointer;transition:background .1s}
@@ -108,12 +108,12 @@ async function loadExecutiveView() {
       .ex-spark{display:flex;align-items:flex-end;gap:2px;height:28px;width:60px;flex-shrink:0}
       .ex-spark-bar{background:rgba(0,210,255,.25);flex:1;border-radius:1px 1px 0 0}
       .ex-spark-bar.hi{background:#00D2FF}
-      .ex-arch-dot{width:18px;height:18px;border-radius:50%;cursor:pointer;border:1.5px solid transparent;font-family:var(--font-head);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .12s;flex-shrink:0}
+      .ex-arch-dot{width:18px;height:18px;border-radius:50%;cursor:pointer;border:1.5px solid transparent;font-family:var(--font-mono);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .12s;flex-shrink:0}
       .ex-arch-dot:hover{transform:scale(1.2)}
       .ex-arch-dot.sel{border-color:rgba(255,255,255,.5)}
       .ex-roi{background:#091522;border:1px solid rgba(0,210,255,.1);padding:10px 12px}
       .ex-pipe-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(0,210,255,.07)}
-      .ex-pipe-stage{font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid rgba(255,255,255,.1);color:#5A84A8;flex-shrink:0;min-width:80px;text-align:center}
+      .ex-pipe-stage{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid rgba(255,255,255,.1);color:#5A84A8;flex-shrink:0;min-width:80px;text-align:center}
     `;
     if(!document.getElementById('exec-styles')) document.head.appendChild(s);
 
@@ -205,7 +205,7 @@ async function loadExecutiveView() {
         <div class="ex-body" style="display:grid;grid-template-columns:1fr 280px;gap:10px">
           <div>
             <div class="ex-panel">
-              <div class="ex-ph"><span class="ex-pt">Morning brief — executive tier</span><span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Generated ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
+              <div class="ex-ph"><span class="ex-pt">Morning brief — executive tier</span><span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">Generated ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
               <div class="ex-brief">Portfolio is running ${activeProjects.length} active project${activeProjects.length!==1?'s':''}. Rework cost is ${formatYen(reworkCost)} — ${reworkRate}% of all workflow completions result in rework. ${redesignTemplates.length>0?redesignTemplates.length+' workflow template'+( redesignTemplates.length!==1?'s':'')+' have crossed the redesign threshold. ':''} ${resourceReqs.length>0?resourceReqs.length+' resource request'+( resourceReqs.length!==1?'s':'')+' pending management approval. ':''} ${portfolioSPI&&portfolioSPI<0.9?'Portfolio SPI '+portfolioSPI.toFixed(2)+' — schedule pressure across active projects. ':'No critical executive action required today.'}${roi>500?' High-ROI template redesign available — '+formatYen(redesignSavings)+' annual saving projected.':''}</div>
             </div>
             <div class="ex-panel">
@@ -225,13 +225,13 @@ async function loadExecutiveView() {
                   </div>
                   <div style="flex:1;min-width:0">
                     <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:#F0F6FF">${esc(p.name)}</div>
-                    <div style="font-family:var(--font-head);font-size:11px;color:#4A6E90">Target: ${fmtDate2(p.target_date)} · ${rw} rework cycle${rw!==1?'s':''}</div>
+                    <div style="font-family:var(--font-mono);font-size:11px;color:#4A6E90">Target: ${fmtDate2(p.target_date)} · ${rw} rework cycle${rw!==1?'s':''}</div>
                   </div>
-                  <span style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${statusColor};border-color:${statusColor}40">${statusLabel}</span>
-                  ${p.budget_hours?`<span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right">${formatYen(parseFloat(p.budget_hours)*HOURLY_RATE)}</span>`:''}
-                  ${rw>0?`<span style="font-family:var(--font-head);font-size:11px;color:${reworkColor};min-width:70px;text-align:right">${formatYen(rwCost)} rework</span>`:''}
+                  <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 8px;border:1px solid;color:${statusColor};border-color:${statusColor}40">${statusLabel}</span>
+                  ${p.budget_hours?`<span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right">${formatYen(parseFloat(p.budget_hours)*HOURLY_RATE)}</span>`:''}
+                  ${rw>0?`<span style="font-family:var(--font-mono);font-size:11px;color:${reworkColor};min-width:70px;text-align:right">${formatYen(rwCost)} rework</span>`:''}
                 </div>`;
-              }).join('')||'<div style="padding:14px 12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No active projects</div>'}
+              }).join('')||'<div style="padding:14px 12px;font-family:var(--font-mono);font-size:12px;color:#3A5C80">No active projects</div>'}
             </div>
           </div>
           <div>
@@ -244,11 +244,11 @@ async function loadExecutiveView() {
                   const pct = Math.round(rwCost/Math.max(reworkCost,1)*100);
                   const col = pct>60?'#E24B4A':pct>30?'#EF9F27':'#1D9E75';
                   return `<div class="ex-fin-row">
-                    <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${esc(p.name.slice(0,20))}</div>
+                    <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;flex:1">${esc(p.name.slice(0,20))}</div>
                     <div class="ex-bar-wrap"><div class="ex-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-                    <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${col};min-width:50px;text-align:right">${formatYen(rwCost)}</div>
+                    <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${col};min-width:50px;text-align:right">${formatYen(rwCost)}</div>
                   </div>`;
-                }).join('')||'<div style="padding:12px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No rework recorded</div>'}
+                }).join('')||'<div style="padding:12px;font-family:var(--font-mono);font-size:12px;color:#3A5C80">No rework recorded</div>'}
               </div>
             </div>
             <div class="ex-panel">
@@ -275,8 +275,8 @@ async function loadExecutiveView() {
                 const col = i===2?'#00D2FF':'rgba(0,210,255,.3)';
                 return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
                   <div style="background:${col};border-radius:1px 1px 0 0;width:100%;height:${heights[i]}%;min-height:4px"></div>
-                  <span style="font-family:var(--font-head);font-size:11px;color:${i===2?'#00D2FF':'#3A5C80'}">${q}'26</span>
-                  <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${i===2?'#00D2FF':'#3A5C80'}">${vals[i]}</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:${i===2?'#00D2FF':'#3A5C80'}">${q}'26</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${i===2?'#00D2FF':'#3A5C80'}">${vals[i]}</span>
                 </div>`;
               }).join('')}
             </div>
@@ -286,25 +286,25 @@ async function loadExecutiveView() {
             <div style="padding:8px 0">
               ${[['Revenue Q1','100%','#00D2FF'],['Labor cost','55%','#8B5CF6'],['Rework cost','7%','#E24B4A'],['Gross margin','39%','#1D9E75']].map(([l,w,c])=>`
               <div class="ex-fin-row">
-                <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${l}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;flex:1">${l}</div>
                 <div class="ex-bar-wrap"><div class="ex-bar-fill" style="width:${w};background:${c};opacity:.7"></div></div>
-                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${c};min-width:40px;text-align:right">${w}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${c};min-width:40px;text-align:right">${w}</div>
               </div>`).join('')}
-              <div style="margin:8px 12px 0;padding:6px 8px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.15);border-left:2px solid #EF9F27;font-family:var(--font-head);font-size:11px;color:#C8DFF0">Without rework: margin projects to ~41% — gap is ${formatYen(reworkCost)} avoidable cost</div>
+              <div style="margin:8px 12px 0;padding:6px 8px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.15);border-left:2px solid #EF9F27;font-family:var(--font-mono);font-size:11px;color:#C8DFF0">Without rework: margin projects to ~41% — gap is ${formatYen(reworkCost)} avoidable cost</div>
             </div>
           </div>
           <div class="ex-panel" style="grid-column:1/-1">
             <div class="ex-ph"><span class="ex-pt">Q2 forecast — two scenarios</span></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 12px">
               <div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.15);padding:10px 12px">
-                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#E24B4A;margin-bottom:4px;text-transform:uppercase">If no change</div>
-                <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#E24B4A">37%</div>
-                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">Rework cost projects to ${formatYen(reworkCost*1.25)} Q2 at current rate</div>
+                <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#E24B4A;margin-bottom:4px;text-transform:uppercase">If no change</div>
+                <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:#E24B4A">37%</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px">Rework cost projects to ${formatYen(reworkCost*1.25)} Q2 at current rate</div>
               </div>
               <div style="background:rgba(29,158,117,.05);border:1px solid rgba(29,158,117,.2);padding:10px 12px">
-                <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:#1D9E75;margin-bottom:4px;text-transform:uppercase">With template redesign</div>
-                <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#1D9E75">41%</div>
-                <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">Redesign reduces rework by ~60% — margin recovery ${formatYen(redesignSavings)}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:#1D9E75;margin-bottom:4px;text-transform:uppercase">With template redesign</div>
+                <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:#1D9E75">41%</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px">Redesign reduces rework by ~60% — margin recovery ${formatYen(redesignSavings)}</div>
               </div>
             </div>
           </div>
@@ -321,17 +321,17 @@ async function loadExecutiveView() {
                 ${[{q:'Q3',h:29,v:'¥180k',c:'rgba(239,159,39,.4)'},{q:'Q4',h:50,v:'¥310k',c:'rgba(239,159,39,.6)'},{q:'Q1',h:100,v:formatYen(reworkCost),c:'#E24B4A'}].map(b=>`
                 <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
                   <div style="background:${b.c};border-radius:1px 1px 0 0;width:100%;height:${b.h}%;min-height:4px"></div>
-                  <span style="font-family:var(--font-head);font-size:11px;color:${b.c==='#E24B4A'?'#E24B4A':'#3A5C80'}">${b.q}'26</span>
-                  <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${b.c==='#E24B4A'?'#E24B4A':'#3A5C80'}">${b.v}</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:${b.c==='#E24B4A'?'#E24B4A':'#3A5C80'}">${b.q}'26</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${b.c==='#E24B4A'?'#E24B4A':'#3A5C80'}">${b.v}</span>
                 </div>`).join('')}
               </div>
-              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;padding:0 12px 8px">Rework costs ${reworkCount>5?'have tripled':'are rising'} over 3 quarters</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;padding:0 12px 8px">Rework costs ${reworkCount>5?'have tripled':'are rising'} over 3 quarters</div>
               <div style="padding:0 0 8px">
                 ${[[`Process Quality Failure`,Math.round(reworkRate*0.66),'#E24B4A','66% preventable'],[`Dependency / inputs not ready`,Math.round(reworkRate*0.22),'#EF9F27','22%'],[`Novel work / complexity`,reworkRate-Math.round(reworkRate*0.88),'#1D9E75','12% expected']].map(([l,w,c,v])=>`
                 <div class="ex-fin-row">
-                  <div style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;flex:1">${l}</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#C8DFF0;flex:1">${l}</div>
                   <div class="ex-bar-wrap"><div class="ex-bar-fill" style="width:${w}%;background:${c}"></div></div>
-                  <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:${c};min-width:80px;text-align:right">${v}</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${c};min-width:80px;text-align:right">${v}</div>
                 </div>`).join('')}
               </div>
             </div>
@@ -339,26 +339,26 @@ async function loadExecutiveView() {
           <div>
             ${redesignTemplates.length>0?`
             <div class="ex-roi">
-              <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:10px">Template redesign ROI</div>
+              <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:10px">Template redesign ROI</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
                 <div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:8px 10px">
-                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-transform:uppercase;letter-spacing:.08em">Redesign cost</div>
-                  <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#EF9F27">${formatYen(redesignCost)}</div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">2-week sprint</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;text-transform:uppercase;letter-spacing:.08em">Redesign cost</div>
+                  <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:#EF9F27">${formatYen(redesignCost)}</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">2-week sprint</div>
                 </div>
                 <div style="background:#091522;border:1px solid rgba(0,210,255,.1);padding:8px 10px">
-                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;text-transform:uppercase;letter-spacing:.08em">Annual saving</div>
-                  <div style="font-family:var(--font-display);font-size:20px;font-weight:700;color:#1D9E75">${formatYen(redesignSavings)}</div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80">projected rework reduction</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;text-transform:uppercase;letter-spacing:.08em">Annual saving</div>
+                  <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:#1D9E75">${formatYen(redesignSavings)}</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">projected rework reduction</div>
                 </div>
               </div>
-              <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#1D9E75;margin-bottom:4px">ROI: ${roi}%</div>
-              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-bottom:10px">Payback period: &lt;${Math.max(1,Math.round(redesignCost/redesignSavings*12))} week${redesignCost/redesignSavings*12>1?'s':''}</div>
+              <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:#1D9E75;margin-bottom:4px">ROI: ${roi}%</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-bottom:10px">Payback period: &lt;${Math.max(1,Math.round(redesignCost/redesignSavings*12))} week${redesignCost/redesignSavings*12>1?'s':''}</div>
               <button onclick="exAuthorize(this)"
-                style="width:100%;font-family:var(--font-head);font-size:12px;font-weight:700;padding:8px 16px;background:#1D9E75;border:none;color:#060a10;cursor:pointer;letter-spacing:.08em;transition:opacity .1s"
+                style="width:100%;font-family:var(--font-mono);font-size:12px;font-weight:700;padding:8px 16px;background:#1D9E75;border:none;color:#060a10;cursor:pointer;letter-spacing:.08em;transition:opacity .1s"
                 onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Authorize template redesign →</button>
             </div>`:
-            `<div class="ex-roi"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No templates currently at redesign threshold</div></div>`}
+            `<div class="ex-roi"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80">No templates currently at redesign threshold</div></div>`}
           </div>
         </div>
       </div>
@@ -370,12 +370,12 @@ async function loadExecutiveView() {
           <div id="ex-arch-dots" style="display:flex;gap:6px;padding:10px 12px;flex-wrap:wrap"></div>
           <div id="ex-brief-detail" style="display:none;padding:10px 12px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF" id="ex-bd-date"></div>
-              <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;padding:2px 9px;border:1px solid rgba(0,210,255,.12)" id="ex-bd-delta"></div>
+              <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#F0F6FF" id="ex-bd-date"></div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;padding:2px 9px;border:1px solid rgba(0,210,255,.12)" id="ex-bd-delta"></div>
             </div>
             <div style="border-left:2px solid #EF9F27;padding:8px 10px;background:rgba(239,159,39,.04);font-family:var(--font-body);font-size:12px;color:#C8DFF0;line-height:1.6" id="ex-bd-text"></div>
           </div>
-          <div style="padding:4px 12px 8px;font-family:var(--font-head);font-size:11px;color:#3A5C80">Green = healthy · Amber = watch · Red = action required</div>
+          <div style="padding:4px 12px 8px;font-family:var(--font-mono);font-size:11px;color:#3A5C80">Green = healthy · Amber = watch · Red = action required</div>
         </div>
       </div>
 
@@ -384,17 +384,17 @@ async function loadExecutiveView() {
         <div class="ex-panel" style="margin:10px 12px">
           <div class="ex-ph">
             <span class="ex-pt">Pipeline — ${pipelineRows.length} active prospects</span>
-            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80">Win rate this quarter: 67%</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80">Win rate this quarter: 67%</span>
           </div>
           ${pipelineRows.map(r=>`<div class="ex-pipe-row">
             <span class="ex-pipe-stage">${r.stage}</span>
             <div style="flex:1;font-family:var(--font-body);font-size:12px;color:#C8DFF0">${r.name}</div>
-            <span style="font-family:var(--font-head);font-size:11px;color:#3A5C80;min-width:40px;text-align:right">${r.prob}%</span>
-            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right">${r.val}</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;min-width:40px;text-align:right">${r.prob}%</span>
+            <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#00D2FF;min-width:55px;text-align:right">${r.val}</span>
           </div>`).join('')}
-          <div style="padding:7px 12px;border-top:1px solid rgba(0,210,255,.08);display:flex;justify-content:space-between;font-family:var(--font-head);font-size:11px">
+          <div style="padding:7px 12px;border-top:1px solid rgba(0,210,255,.08);display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px">
             <span style="color:#3A5C80">Expected close value at current win rates:</span>
-            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF">¥3.8M</span>
+            <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#00D2FF">¥3.8M</span>
           </div>
         </div>
       </div>
@@ -403,7 +403,7 @@ async function loadExecutiveView() {
 
   } catch(e) {
     console.error('[Compass] loadExecutiveView error:', e);
-    content.innerHTML = '<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load executive view — check console</div>';
+    content.innerHTML = '<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--compass-red)">Failed to load executive view — check console</div>';
   }
 }
 
@@ -414,7 +414,7 @@ async function loadClientView() {
   const content = document.getElementById('client-content');
   if (!content) return;
 
-  content.innerHTML = `<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--text3)">Loading client portal…</div>`;
+  content.innerHTML = `<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">Loading client portal…</div>`;
 
   try {
     const clientProjectId = new URLSearchParams(window.location.search).get('project')||null;
@@ -423,7 +423,7 @@ async function loadClientView() {
       : _projects.find(p=>p.status==='active')||null;
 
     if (!clientProject) {
-      content.innerHTML='<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:#3A5C80">No active project found for client portal</div>';
+      content.innerHTML='<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:#3A5C80">No active project found for client portal</div>';
       return;
     }
 
@@ -642,7 +642,7 @@ async function loadClientView() {
 
   } catch(e) {
     console.error('[Compass] loadClientView error:', e);
-    content.innerHTML='<div style="padding:20px;font-family:var(--font-head);font-size:12px;color:var(--compass-red)">Failed to load client portal — check console</div>';
+    content.innerHTML='<div style="padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--compass-red)">Failed to load client portal — check console</div>';
   }
 }
 
@@ -805,16 +805,16 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
     <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
       <!-- Nav -->
       <div style="display:flex;align-items:center;height:40px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.12);padding:0 14px;flex-shrink:0;gap:8px">
-        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">COM<span style="color:#00D2FF">PASS</span></div>
+        <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">COM<span style="color:#00D2FF">PASS</span></div>
         <div style="width:1px;height:16px;background:rgba(0,210,255,.15);margin:0 4px"></div>
-        <div style="font-family:var(--font-head);font-size:11px;color:#5A84A8;display:flex;align-items:center;gap:5px">
+        <div style="font-family:var(--font-mono);font-size:11px;color:#5A84A8;display:flex;align-items:center;gap:5px">
           <span>${esc(projectName||'Portfolio')}</span>
           <span style="color:rgba(255,255,255,.2)">›</span>
           <span style="color:#8B5CF6">Decision simulator</span>
         </div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07);margin-left:auto">CPM + Pattern analysis</span>
+        <span style="font-family:var(--font-mono);font-size:11px;padding:2px 8px;border:1px solid rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07);margin-left:auto">CPM + Pattern analysis</span>
         <button onclick="document.getElementById('sim-modal')?.remove()"
-          style="background:none;border:1px solid rgba(255,255,255,.15);color:#5A84A8;padding:3px 10px;cursor:pointer;font-family:var(--font-head);font-size:11px;margin-left:8px;transition:color .1s"
+          style="background:none;border:1px solid rgba(255,255,255,.15);color:#5A84A8;padding:3px 10px;cursor:pointer;font-family:var(--font-mono);font-size:11px;margin-left:8px;transition:color .1s"
           onmouseenter="this.style.color='#F0F6FF'" onmouseleave="this.style.color='#5A84A8'">✕ Close</button>
       </div>
       <!-- Body -->
@@ -828,25 +828,25 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
               <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px;cursor:pointer;transition:border-color .12s" id="sim-kpi-slip" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.06)'">
-                <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Slip</div>
-                <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${slipDays>0?'#E24B4A':'#1D9E75'}">${slipDays>0?slipDays+'d':'0d'}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Slip</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${slipDays>0?'#E24B4A':'#1D9E75'}">${slipDays>0?slipDays+'d':'0d'}</div>
               </div>
               <div id="sim-kpi-daily" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px;cursor:pointer;transition:border-color .12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.06)'">
-                <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Daily cost</div>
-                <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#EF9F27">¥12k</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Daily cost</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#EF9F27">¥12k</div>
               </div>
               <div id="sim-kpi-levers" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:4px 7px;cursor:pointer;transition:border-color .12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.06)'">
-                <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Levers</div>
-                <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#00D2FF">${LEVERS_LIVE.length}</div>
+                <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Levers</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#00D2FF">${LEVERS_LIVE.length}</div>
               </div>
             </div>
           </div>
           <!-- Left tabs -->
           <div style="display:flex;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
             <button id="sim-tab-levers" onclick="simSwitchTab('levers')"
-              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:6px 12px;color:#00D2FF;border:none;border-bottom:2px solid #00D2FF;background:none;cursor:pointer;text-transform:uppercase">Levers</button>
+              style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:6px 12px;color:#00D2FF;border:none;border-bottom:2px solid #00D2FF;background:none;cursor:pointer;text-transform:uppercase">Levers</button>
             <button id="sim-tab-cpm" onclick="simSwitchTab('cpm')"
-              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:6px 12px;color:rgba(255,255,255,.35);border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;text-transform:uppercase">CPM view</button>
+              style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:6px 12px;color:rgba(255,255,255,.35);border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;text-transform:uppercase">CPM view</button>
           </div>
           <!-- Lever list -->
           <div id="sim-lv-levers" style="flex:1;overflow-y:auto;padding:8px 10px">
@@ -868,11 +868,11 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
           </div>
           <!-- Commit bar -->
           <div id="sim-cb" style="display:none;background:#060a10;border-top:1px solid rgba(0,210,255,.1);padding:9px 14px;display:none;align-items:center;justify-content:space-between;flex-shrink:0">
-            <div id="sim-cb-sum" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4)"></div>
+            <div id="sim-cb-sum" style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.4)"></div>
             <div style="display:flex;gap:5px">
-              <button onclick="simCommit()" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(29,158,117,.5);color:#1D9E75;background:none;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(29,158,117,.1)'" onmouseleave="this.style.background='none'">Commit → Log interventions</button>
-              <button onclick="compassToast('Saved to brief annotation',2000)" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(0,210,255,.35);color:#00D2FF;background:none;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(0,210,255,.08)'" onmouseleave="this.style.background='none'">Save annotation</button>
-              <button onclick="simResetAll()" style="font-family:var(--font-head);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);background:none;letter-spacing:.06em;transition:color .1s" onmouseenter="this.style.color='#fff'" onmouseleave="this.style.color='rgba(255,255,255,.4)'">Reset</button>
+              <button onclick="simCommit()" style="font-family:var(--font-mono);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(29,158,117,.5);color:#1D9E75;background:none;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(29,158,117,.1)'" onmouseleave="this.style.background='none'">Commit → Log interventions</button>
+              <button onclick="compassToast('Saved to brief annotation',2000)" style="font-family:var(--font-mono);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(0,210,255,.35);color:#00D2FF;background:none;letter-spacing:.06em;transition:background .1s" onmouseenter="this.style.background='rgba(0,210,255,.08)'" onmouseleave="this.style.background='none'">Save annotation</button>
+              <button onclick="simResetAll()" style="font-family:var(--font-mono);font-size:11px;padding:5px 13px;cursor:pointer;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);background:none;letter-spacing:.06em;transition:color .1s" onmouseenter="this.style.color='#fff'" onmouseleave="this.style.color='rgba(255,255,255,.4)'">Reset</button>
             </div>
           </div>
         </div>
@@ -949,16 +949,16 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
     sp.style.cssText = `left:${Math.min(360+spCount*16,520)}px;top:${Math.min(60+spCount*16,180)}px;width:300px`;
     sp.style.borderLeftColor = colorBorder||'rgba(0,210,255,.35)';
     sp.innerHTML = `<div class="sim-sp-head" id="sph-${pid}">
-      <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#00D2FF;text-transform:uppercase;letter-spacing:.06em">${title}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#00D2FF;text-transform:uppercase;letter-spacing:.06em">${title}</span>
       <button onclick="document.getElementById('${pid}').remove()" style="background:none;border:1px solid rgba(226,75,74,.4);color:#E24B4A;width:18px;height:18px;cursor:pointer;font-size:10px">✕</button>
     </div>
     <div style="padding:10px 12px;max-height:380px;overflow-y:auto">
-      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:14px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:4px">
+      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:14px;font-family:var(--font-mono);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:4px">
         <span style="color:rgba(255,255,255,.4);flex-shrink:0;max-width:160px">${r[0]}</span>
         <span style="font-weight:700;color:#F0F6FF;text-align:right">${r[1]}</span>
       </div>`).join('')}
       <div style="height:1px;background:rgba(0,210,255,.2);margin:7px 0"></div>
-      <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF;margin:3px 0">${result}</div>
+      <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#F0F6FF;margin:3px 0">${result}</div>
       ${note?`<div style="font-family:var(--font-body);font-size:11px;color:rgba(255,255,255,.4);margin-top:6px;line-height:1.5;border-top:1px solid rgba(255,255,255,.07);padding-top:6px">${note}</div>`:''}
     </div>
     <div style="position:absolute;bottom:0;right:0;width:12px;height:12px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,210,255,.25) 50%)" id="spr-${pid}"></div>`;
@@ -1021,92 +1021,92 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
     document.getElementById('sim-cb-sum').innerHTML = `<span>${selected.size}</span> lever${selected.size>1?'s':''} · <span>${recovDays}d</span> recovered · <span>${formatYen(totalHard)}</span> hard cost · net: <span style="color:${netCost<=0?'#1D9E75':'#EF9F27'}">${netCost<=0?formatYen(Math.abs(netCost))+' benefit':formatYen(netCost)+' cost'}</span>`;
 
     const patternBlock = patterns.length ? `<div style="margin-bottom:12px;padding:9px 11px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.2);border-left:3px solid #8B5CF6">
-      <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#8B5CF6;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Pattern analysis — active warning</div>
+      <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#8B5CF6;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Pattern analysis — active warning</div>
       <div style="font-family:var(--font-body);font-size:11px;color:rgba(240,246,255,.7);line-height:1.55">${patterns[0]}</div>
     </div>` : '';
 
     const unblockList = [...unblockedTasks].map(id=>{
       const t = projTasks.find(tt=>tt.id===id);
-      return `<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px"><span style="font-weight:700;color:rgba(0,210,255,.6);min-width:60px">${id.slice(0,8)}</span>${esc(t?.name||'Task')}</div>`;
+      return `<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px"><span style="font-weight:700;color:rgba(0,210,255,.6);min-width:60px">${id.slice(0,8)}</span>${esc(t?.name||'Task')}</div>`;
     }).join('');
     const advanceList = [...advancedTasks].map(id=>{
-      return `<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px"><span style="font-weight:700;color:#8B5CF6;min-width:60px">${id.slice(0,8)}</span>Parallel advance</div>`;
+      return `<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(240,246,255,.75);margin-bottom:3px"><span style="font-weight:700;color:#8B5CF6;min-width:60px">${id.slice(0,8)}</span>Parallel advance</div>`;
     }).join('');
     const remainingBlocked = escalations.length>0 && !selected.has('esc-mgmt') && !selected.has('esc-client') && !selected.has('mat-exp')
-      ? overdueTasks.slice(0,3).map(t=>`<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:#E24B4A;margin-bottom:3px"><span style="font-weight:700;min-width:60px">${t.id.slice(0,8)}</span>${esc(t.name||'task')}</div>`).join('')
+      ? overdueTasks.slice(0,3).map(t=>`<div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:#E24B4A;margin-bottom:3px"><span style="font-weight:700;min-width:60px">${t.id.slice(0,8)}</span>${esc(t.name||'task')}</div>`).join('')
       : '';
 
     results.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div>
-          <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:#F0F6FF">Projected outcome</div>
-          <div style="font-family:var(--font-head);font-size:11px;color:#3A5C80;margin-top:2px">${selected.size} lever${selected.size>1?'s':''} · click any value to open explanation</div>
+          <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:#F0F6FF">Projected outcome</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:#3A5C80;margin-top:2px">${selected.size} lever${selected.size>1?'s':''} · click any value to open explanation</div>
         </div>
       </div>
       ${patternBlock}
       <!-- Scenario comparison -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div style="border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02)">
-          <div style="padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase">If no action</span></div>
+          <div style="padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:var(--font-mono);font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase">If no action</span></div>
           <div style="padding:9px 11px">
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Delivery</div>
-            <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:#E24B4A">${slipDays>0?fmt(noActionDate):'On track'}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">${slipDays>0?'+'+slipDays+'d and growing':'No current slip'}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Delivery</div>
+            <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:#E24B4A">${slipDays>0?fmt(noActionDate):'On track'}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">${slipDays>0?'+'+slipDays+'d and growing':'No current slip'}</div>
             <div style="height:1px;background:rgba(255,255,255,.05);margin:7px 0"></div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Cost accumulating</div>
-            <div id="sim-slip-cl" style="font-family:var(--font-display);font-size:18px;font-weight:700;color:#E24B4A;cursor:pointer">${formatYen(slipDays*dailyCost)}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">click for detail</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Cost accumulating</div>
+            <div id="sim-slip-cl" style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:#E24B4A;cursor:pointer">${formatYen(slipDays*dailyCost)}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)">click for detail</div>
           </div>
         </div>
         <div style="border:1px solid rgba(29,158,117,.3);background:rgba(29,158,117,.04)">
           <div style="padding:7px 11px;border-bottom:1px solid rgba(29,158,117,.15);display:flex;align-items:center;justify-content:space-between">
-            <span style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase">With selected levers</span>
-            <span id="sim-sr-badge" style="font-family:var(--font-head);font-size:11px;padding:1px 7px;border:1px solid rgba(29,158,117,.4);color:#1D9E75;background:rgba(29,158,117,.08);cursor:pointer">${minSR}% success</span>
+            <span style="font-family:var(--font-mono);font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.35);text-transform:uppercase">With selected levers</span>
+            <span id="sim-sr-badge" style="font-family:var(--font-mono);font-size:11px;padding:1px 7px;border:1px solid rgba(29,158,117,.4);color:#1D9E75;background:rgba(29,158,117,.08);cursor:pointer">${minSR}% success</span>
           </div>
           <div style="padding:9px 11px">
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Projected delivery</div>
-            <div id="sim-del-cl" style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${projSlip<=2?'#1D9E75':projSlip<=5?'#EF9F27':'#E24B4A'};cursor:pointer">${projSlip===0?'On contract':fmt(pd)}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">${projSlip===0?'On contract':'+'+projSlip+'d from contract'}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Projected delivery</div>
+            <div id="sim-del-cl" style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:${projSlip<=2?'#1D9E75':projSlip<=5?'#EF9F27':'#E24B4A'};cursor:pointer">${projSlip===0?'On contract':fmt(pd)}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">${projSlip===0?'On contract':'+'+projSlip+'d from contract'}</div>
             <div style="height:1px;background:rgba(255,255,255,.05);margin:7px 0"></div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Net economic position</div>
-            <div id="sim-net-cl" style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${netCost<=0?'#1D9E75':'#EF9F27'};cursor:pointer">${netCost<=0?'+'+formatYen(Math.abs(netCost))+' benefit':'-'+formatYen(netCost)+' cost'}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">click for breakdown</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:1px">Net economic position</div>
+            <div id="sim-net-cl" style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:${netCost<=0?'#1D9E75':'#EF9F27'};cursor:pointer">${netCost<=0?'+'+formatYen(Math.abs(netCost))+' benefit':'-'+formatYen(netCost)+' cost'}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)">click for breakdown</div>
             <div style="margin-top:6px">
               <div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
                 <div style="height:100%;border-radius:2px;background:${avgConf>=75?'#1D9E75':avgConf>=55?'#EF9F27':'#E24B4A'};width:${avgConf}%"></div>
               </div>
-              <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">${avgConf}% avg confidence</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">${avgConf}% avg confidence</div>
             </div>
-            <div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.6);margin-top:5px;line-height:1.5">${levers.map(l=>l.name).join(' + ')}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:rgba(0,210,255,.6);margin-top:5px;line-height:1.5">${levers.map(l=>l.name).join(' + ')}</div>
           </div>
         </div>
       </div>
       <!-- Waterfall -->
       <div style="margin-bottom:12px">
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:6px">Cost &amp; schedule waterfall</div>
-        ${slipDays>0?`<div class="sim-wf-row" id="sim-wf-slip"><div style="font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Current slip (¥12k × ${slipDays}d)</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#E24B4A;width:100%"></div></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#E24B4A">-${formatYen(slipDays*dailyCost)}</div></div>`:''}
-        ${totalHard>0?`<div class="sim-wf-row" id="sim-wf-int"><div style="font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Intervention hard cost</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#EF9F27;width:${Math.min(100,Math.round(totalHard/(slipDays*dailyCost||84000)*100))}%"></div></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#EF9F27">-${formatYen(totalHard)}</div></div>`:''}
-        ${recovDays>0?`<div class="sim-wf-row" id="sim-wf-rec"><div style="font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Schedule value recovered</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#1D9E75;width:${Math.min(100,Math.round(schedVal/(slipDays*dailyCost||84000)*100))}%"></div></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#1D9E75">+${formatYen(schedVal)}</div></div>`:''}
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:6px">Cost &amp; schedule waterfall</div>
+        ${slipDays>0?`<div class="sim-wf-row" id="sim-wf-slip"><div style="font-family:var(--font-mono);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Current slip (¥12k × ${slipDays}d)</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#E24B4A;width:100%"></div></div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#E24B4A">-${formatYen(slipDays*dailyCost)}</div></div>`:''}
+        ${totalHard>0?`<div class="sim-wf-row" id="sim-wf-int"><div style="font-family:var(--font-mono);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Intervention hard cost</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#EF9F27;width:${Math.min(100,Math.round(totalHard/(slipDays*dailyCost||84000)*100))}%"></div></div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#EF9F27">-${formatYen(totalHard)}</div></div>`:''}
+        ${recovDays>0?`<div class="sim-wf-row" id="sim-wf-rec"><div style="font-family:var(--font-mono);font-size:11px;color:rgba(240,246,255,.7);min-width:220px;flex-shrink:0">Schedule value recovered</div><div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:#1D9E75;width:${Math.min(100,Math.round(schedVal/(slipDays*dailyCost||84000)*100))}%"></div></div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:#1D9E75">+${formatYen(schedVal)}</div></div>`:''}
         <div class="sim-wf-row" id="sim-wf-net" style="border-top:1px solid rgba(255,255,255,.08);padding-top:5px;margin-top:3px">
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;min-width:220px;flex-shrink:0">Net position</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#F0F6FF;min-width:220px;flex-shrink:0">Net position</div>
           <div style="flex:1;height:14px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden"><div style="height:100%;border-radius:1px;background:${netCost<=0?'#1D9E75':'#EF9F27'};width:${Math.min(100,Math.round(Math.abs(netCost)/(slipDays*dailyCost||84000)*100))}%"></div></div>
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:${netCost<=0?'#1D9E75':'#EF9F27'}">${netCost<=0?'+'+formatYen(Math.abs(netCost)):'-'+formatYen(netCost)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;min-width:65px;text-align:right;color:${netCost<=0?'#1D9E75':'#EF9F27'}">${netCost<=0?'+'+formatYen(Math.abs(netCost)):'-'+formatYen(netCost)}</div>
         </div>
       </div>
       <!-- Task network impact -->
       <div style="margin-bottom:12px">
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:7px">Task network impact</div>
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:7px">Task network impact</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
-          ${unblockedTasks.size?`<div style="border:1px solid rgba(29,158,117,.25);background:rgba(29,158,117,.04);padding:7px 9px"><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Tasks unblocked</div>${unblockList}</div>`:''}
-          ${advancedTasks.size?`<div style="border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.04);padding:7px 9px"><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Tasks advanced now</div>${advanceList}</div>`:''}
-          ${remainingBlocked?`<div style="border:1px solid rgba(226,75,74,.18);background:rgba(226,75,74,.03);padding:7px 9px"><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Still blocked</div>${remainingBlocked}</div>`:''}
+          ${unblockedTasks.size?`<div style="border:1px solid rgba(29,158,117,.25);background:rgba(29,158,117,.04);padding:7px 9px"><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Tasks unblocked</div>${unblockList}</div>`:''}
+          ${advancedTasks.size?`<div style="border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.04);padding:7px 9px"><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Tasks advanced now</div>${advanceList}</div>`:''}
+          ${remainingBlocked?`<div style="border:1px solid rgba(226,75,74,.18);background:rgba(226,75,74,.03);padding:7px 9px"><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:4px">Still blocked</div>${remainingBlocked}</div>`:''}
         </div>
       </div>
       <!-- Risks -->
       ${risks.length?`<div style="border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);margin-bottom:12px">
         <div style="padding:6px 11px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:6px">
           <div style="width:3px;height:11px;border-radius:1px;background:#EF9F27;flex-shrink:0"></div>
-          <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase">Second-order effects</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.35);text-transform:uppercase">Second-order effects</div>
         </div>
         ${risks.map(r=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 11px;border-bottom:1px solid rgba(255,255,255,.04)">
           <div style="width:6px;height:6px;border-radius:50%;background:${r.sev};flex-shrink:0;margin-top:3px"></div>
@@ -1174,7 +1174,7 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
       const gm = GROUP_META[curGroup];
       const gh = document.createElement('div');
       gh.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0 5px';
-      gh.innerHTML = `<div style="width:3px;height:13px;border-radius:1px;background:${gm.color};flex-shrink:0"></div><div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.4);text-transform:uppercase;flex:1">${gm.label}</div>`;
+      gh.innerHTML = `<div style="width:3px;height:13px;border-radius:1px;background:${gm.color};flex-shrink:0"></div><div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.4);text-transform:uppercase;flex:1">${gm.label}</div>`;
       ll.appendChild(gh);
     }
     const card = document.createElement('div');
@@ -1186,11 +1186,11 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:3px">
         <div class="sim-chk">✓</div>
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${lev.name}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${lev.name}</div>
         <span data-sim-lid="${lev.id}" data-sim-tt="cost"
-          style="font-family:var(--font-head);font-size:11px;padding:1px 5px;border:1px solid ${tc}40;color:${tc};flex-shrink:0;cursor:help">${tl}</span>
+          style="font-family:var(--font-mono);font-size:11px;padding:1px 5px;border:1px solid ${tc}40;color:${tc};flex-shrink:0;cursor:help">${tl}</span>
       </div>
-      <div style="display:flex;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">
+      <div style="display:flex;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35)">
         <span data-sim-lid="${lev.id}" data-sim-tt="success"
           style="display:flex;align-items:center;gap:3px;cursor:help">
           <div style="width:5px;height:5px;border-radius:50%;background:${lev.sr>=80?'#1D9E75':lev.sr>=65?'#EF9F27':'#E24B4A'}"></div>${lev.sr}% success</span>
@@ -1198,10 +1198,10 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
           style="display:flex;align-items:center;gap:3px;cursor:help">
           <div style="width:5px;height:5px;border-radius:50%;background:#8B5CF6"></div>${lev.conf}% conf</span>
       </div>
-      ${lev.warn?`<div style="font-family:var(--font-head);font-size:11px;padding:4px 7px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.2);border-left:2px solid #EF9F27;color:rgba(239,159,39,.85);line-height:1.45;margin-top:5px">${lev.warn}</div>`:''}
-      ${lev.pattern?`<div style="font-family:var(--font-head);font-size:11px;padding:4px 7px;background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.18);border-left:2px solid rgba(226,75,74,.6);color:rgba(226,75,74,.8);line-height:1.45;margin-top:5px">${lev.pattern}</div>`:''}
-      ${lev.advances?.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px">${lev.advances.map(t=>`<span style="font-family:var(--font-head);font-size:11px;padding:1px 6px;border:1px solid rgba(139,92,246,.3);color:#8B5CF6">${t} →</span>`).join('')}</div>`:''}
-      ${lev.params?.length?`<div style="display:none;border-top:1px solid rgba(255,255,255,.05);padding-top:5px;margin-top:5px" class="sim-params">${lev.params.map(p=>`<div style="display:flex;align-items:center;gap:5px;margin-top:4px"><span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);min-width:75px">${p.l}</span><select onclick="event.stopPropagation();simRunSim()" style="flex:1;padding:2px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:11px;outline:none;cursor:pointer">${p.o.map(o=>`<option>${o}</option>`).join('')}</select></div>`).join('')}</div>`:''}`;
+      ${lev.warn?`<div style="font-family:var(--font-mono);font-size:11px;padding:4px 7px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.2);border-left:2px solid #EF9F27;color:rgba(239,159,39,.85);line-height:1.45;margin-top:5px">${lev.warn}</div>`:''}
+      ${lev.pattern?`<div style="font-family:var(--font-mono);font-size:11px;padding:4px 7px;background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.18);border-left:2px solid rgba(226,75,74,.6);color:rgba(226,75,74,.8);line-height:1.45;margin-top:5px">${lev.pattern}</div>`:''}
+      ${lev.advances?.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px">${lev.advances.map(t=>`<span style="font-family:var(--font-mono);font-size:11px;padding:1px 6px;border:1px solid rgba(139,92,246,.3);color:#8B5CF6">${t} →</span>`).join('')}</div>`:''}
+      ${lev.params?.length?`<div style="display:none;border-top:1px solid rgba(255,255,255,.05);padding-top:5px;margin-top:5px" class="sim-params">${lev.params.map(p=>`<div style="display:flex;align-items:center;gap:5px;margin-top:4px"><span style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);min-width:75px">${p.l}</span><select onclick="event.stopPropagation();simRunSim()" style="flex:1;padding:2px 6px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-mono);font-size:11px;outline:none;cursor:pointer">${p.o.map(o=>`<option>${o}</option>`).join('')}</select></div>`).join('')}</div>`:''}`;
     // Show params when selected
     const paramEl = card.querySelector('.sim-params');
     if (paramEl) {
@@ -1284,7 +1284,7 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
   sections.forEach(sec => {
     if (!sec.tasks.length) return;
     const lbl = document.createElement('div');
-    lbl.style.cssText='font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(0,210,255,.6);text-transform:uppercase;margin:8px 0 5px';
+    lbl.style.cssText='font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:rgba(0,210,255,.6);text-transform:uppercase;margin:8px 0 5px';
     lbl.textContent = sec.label;
     cpmList.appendChild(lbl);
     sec.tasks.slice(0,6).forEach(t=>{
@@ -1298,10 +1298,10 @@ window.openDecisionSimulator = async function(projectId, projectName, contextNot
       row.innerHTML=`<div style="width:3px;align-self:stretch;background:${col};flex-shrink:0"></div>
         <div style="flex:1;padding:6px 9px">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-            <div style="font-family:var(--font-head);font-size:11px;font-weight:700;color:rgba(0,210,255,.7);min-width:30px">${t.id.slice(0,8)}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:#F0F6FF;flex:1;line-height:1.3">${esc(t.name||'Task')}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:rgba(0,210,255,.7);min-width:30px">${t.id.slice(0,8)}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:#F0F6FF;flex:1;line-height:1.3">${esc(t.name||'Task')}</div>
           </div>
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);display:flex;gap:8px">
+          <div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);display:flex;gap:8px">
             <span style="color:${col};font-weight:700">${isOverdue?'OVERDUE':t.status}</span>
             <span>${pct}% complete</span>
             ${t.due_date?`<span>Due ${t.due_date}</span>`:''}

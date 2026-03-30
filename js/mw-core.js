@@ -75,7 +75,7 @@ window._mwLoadUserView = async function() {
     const d = _identityDebug;
     content.innerHTML = `
       <div style="padding:40px 20px;text-align:center">
-        <div style="font-family:var(--font-head);font-size:11px;color:var(--compass-red);
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--compass-red);
           margin-bottom:12px;letter-spacing:.12em">⚠ IDENTITY NOT RESOLVED</div>
         <div style="display:inline-block;text-align:left;background:var(--bg1);
           border:1px solid var(--border);padding:14px 20px;margin-bottom:16px;
@@ -100,11 +100,11 @@ window._mwLoadUserView = async function() {
             ?`Logged in as <strong style="color:var(--text1)">${esc(d.authEmail)}</strong> but no matching resource was found.`
             :'No email found in session token. Try logging out and back in.'}
         </div>
-        <a href="/users.html" style="font-family:var(--font-head);font-size:11px;
+        <a href="/users.html" style="font-family:var(--font-mono);font-size:11px;
           letter-spacing:.1em;color:var(--compass-cyan);text-decoration:none;
           border:1px solid rgba(0,210,255,.3);padding:6px 16px;margin-right:8px">USER MGMT →</a>
         <button onclick="_viewLoaded['user']=false;_mwLoadUserView()"
-          style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;
+          style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
             color:var(--text2);background:none;border:1px solid var(--border);
             padding:6px 16px;cursor:pointer">RETRY</button>
       </div>`;
@@ -326,11 +326,11 @@ window._mwLoadUserView = async function() {
         style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
         <div style="width:22px;height:22px;border-radius:50%;background:${fill};
           border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;
-          font-size:10px;color:${color};font-family:var(--font-head);font-weight:700;
+          font-size:10px;color:${color};font-family:var(--font-mono);font-weight:700;
           transition:transform .1s"
           onmouseenter="this.style.transform='scale(1.15)'"
           onmouseleave="this.style.transform='scale(1)'">${char}</div>
-        <span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:var(--text3)">${label}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text3)">${label}</span>
       </div>`;
     }
     const dotsHtml = weekDays.slice(0,5).map((d,i)=>dayDotHtml(d,['M','T','W','T','F'][i])).join('');
@@ -398,7 +398,7 @@ window._mwLoadUserView = async function() {
             ${hrs>0?hrs.toFixed(1)+'h':'—'}
           </text>
         </svg>
-        <div style="font-family:var(--font-head);font-size:11px;font-weight:700;
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;
           color:${isToday||isActive?dayColor:'#F0F6FF'};text-align:center;line-height:1.4;letter-spacing:.04em">
           ${weekLabels[i]}<br>
           <span style="font-weight:400;color:${dayColor};font-size:11px">${new Date(d+'T00:00:00').getDate()}</span>
@@ -468,7 +468,7 @@ window._mwLoadUserView = async function() {
           <div style="width:14px;height:4px;background:#8B5CF6;border-radius:2px"></div>
           <span>Non-billable</span></div>
         <span>Scale: 8h = full</span>
-        ${_activeGauge?`<button class="gauge-clear-btn" style="margin-left:auto;font-family:var(--font-head);
+        ${_activeGauge?`<button class="gauge-clear-btn" style="margin-left:auto;font-family:var(--font-mono);
           font-size:11px;color:var(--compass-amber);background:none;border:none;cursor:pointer;padding:0">
           ✕ clear filter</button>`:''}
       </div>`;
@@ -485,13 +485,13 @@ window._mwLoadUserView = async function() {
       return `<div style="border-left:3px solid ${c};background:${bg};padding:9px 12px;margin-top:10px;
         display:flex;align-items:center;justify-content:space-between;gap:8px">
         <div>
-          <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:${c}">
+          <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:${c}">
             ■ ${isRed?'No time logged today.':'Log today\'s time before EOD'}</div>
-          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:2px">
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">
             ${isRed?(8-todayTotal).toFixed(1)+'h gap':todayTotal.toFixed(1)+'h of ~8h expected'}</div>
         </div>
         <button class="open-weekly-ts-btn" data-expand-today="1"
-          style="font-family:var(--font-head);font-size:11px;font-weight:600;letter-spacing:.06em;
+          style="font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.06em;
             padding:5px 10px;background:none;border:1px solid ${c};color:${c};cursor:pointer;
             white-space:nowrap;flex-shrink:0">Log today →</button>
       </div>`;
@@ -512,28 +512,28 @@ window._mwLoadUserView = async function() {
         return true;
       });
       if (!filtered.length) return `<div style="padding:18px 13px;text-align:center;
-        font-family:var(--font-head);font-size:12px;color:var(--text3)">No items match filters</div>`;
+        font-family:var(--font-mono);font-size:12px;color:var(--text3)">No items match filters</div>`;
       return filtered.map(w => {
         const tc = w.type==='task'
           ?{c:'var(--compass-cyan)',bg:'rgba(0,210,255,.08)',lbl:'Task'}
           :{c:'var(--compass-green)',bg:'rgba(29,158,117,.08)',lbl:'Action'};
         const badge=`<div style="display:inline-flex;align-items:center;padding:1px 7px;
           border:1px solid ${tc.c};background:${tc.bg};border-radius:3px;
-          font-family:var(--font-head);font-size:11px;font-weight:600;color:${tc.c};
+          font-family:var(--font-mono);font-size:11px;font-weight:600;color:${tc.c};
           white-space:nowrap">${tc.lbl}</div>`;
-        let progressCell=`<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">—</span>`;
+        let progressCell=`<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>`;
         if (w.type==='task'&&w.pct>0) {
           const fc=w.pct>=80?'var(--compass-green)':w.pct>=40?'var(--compass-cyan)':'rgba(255,255,255,.25)';
           progressCell=`<div style="position:relative;margin-top:10px">
             <div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:visible;position:relative">
               <div style="height:100%;width:${Math.min(w.pct,100)}%;background:${fc};border-radius:3px;transition:width .3s;position:relative">
                 <span style="position:absolute;right:0;top:-14px;transform:translateX(50%);
-                  font-family:var(--font-head);font-size:11px;font-weight:700;color:${fc};white-space:nowrap">${w.pct}%</span>
+                  font-family:var(--font-mono);font-size:11px;font-weight:700;color:${fc};white-space:nowrap">${w.pct}%</span>
               </div></div></div>`;
         }
         const dueCell=w.overdue
-          ?`<span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--compass-red)">${daysOverdue(w.due)}d</span>`
-          :w.due?`<span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">${fmtDate(w.due)}</span>`
+          ?`<span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--compass-red)">${daysOverdue(w.due)}d</span>`
+          :w.due?`<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${fmtDate(w.due)}</span>`
           :`<span style="color:var(--text3);font-size:11px">—</span>`;
         let btnLabel,btnStyle;
         if (w.type==='action') {
@@ -573,7 +573,7 @@ window._mwLoadUserView = async function() {
           <div style="padding:8px 8px 8px 4px;min-width:0">
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <span>${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</span>
               ${w.type==='action'?(()=>{const _ns=negGetState(w.id).state;return _ns&&_ns!=='unrated'?getNegotiationBadgeHtml(_ns):'';})():''}</div>
           </div>
@@ -583,7 +583,7 @@ window._mwLoadUserView = async function() {
             <button class="wi-action-btn" data-wi-id="${w.id}" data-wi-type="${w.type}"
               data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
               data-wi-status="${w.status}" data-wi-pct="${w.pct||0}"
-              style="width:100%;font-family:var(--font-head);font-size:11px;font-weight:600;
+              style="width:100%;font-family:var(--font-mono);font-size:11px;font-weight:600;
                 letter-spacing:.06em;padding:4px 0;cursor:pointer;border-radius:3px;
                 transition:opacity .12s;${btnStyle}"
               onmouseenter="this.style.opacity='.8'" onmouseleave="this.style.opacity='1'">${btnLabel}</button>
@@ -604,11 +604,11 @@ window._mwLoadUserView = async function() {
           <div style="flex:1;min-width:0;overflow:hidden">
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
-            <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
               ${esc(item.project||'—')} · ${item.time||'—'}${item.noTime?' · <span style="color:var(--text3)">no time logged</span>':''}</div>
           </div>
           ${item.signal?`<div style="width:8px;height:8px;border-radius:50%;background:${sc};flex-shrink:0"></div>`:`<div style="width:8px;height:8px"></div>`}
-          <div style="font-family:var(--font-display);font-size:13px;font-weight:700;
+          <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;
             color:${item.noTime?'var(--text3)':'var(--compass-cyan)'};flex-shrink:0">
             ${item.noTime?'—':(item.hours||0).toFixed(1)+'h'}</div>
         </div>`;
@@ -619,7 +619,7 @@ window._mwLoadUserView = async function() {
     <!-- Calendar popup overlay -->
     <div id="user-cal-popup" style="display:none;position:fixed;top:44px;right:120px;width:310px;background:#0d1e35;border:1px solid rgba(0,210,255,.3);z-index:200;padding:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.06em" id="ucal-month-label">MARCH 2026</div>
+        <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.06em" id="ucal-month-label">MARCH 2026</div>
         <div style="display:flex;gap:4px">
           <button onclick="ucalNav(-1)" style="width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'" onmouseleave="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='rgba(255,255,255,.5)'">&#8249;</button>
           <button onclick="ucalNav(1)"  style="width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'" onmouseleave="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='rgba(255,255,255,.5)'">&#8250;</button>
@@ -627,18 +627,18 @@ window._mwLoadUserView = async function() {
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px">
-        ${['M','T','W','T','F','S','S'].map(d=>`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0;letter-spacing:.06em">${d}</div>`).join('')}
+        ${['M','T','W','T','F','S','S'].map(d=>`<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0;letter-spacing:.06em">${d}</div>`).join('')}
       </div>
       <div id="ucal-cells" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-        ${[['#8B5CF6','Meeting'],['#EF9F27','Due date'],['#00D2FF','Action item'],['#E24B4A','Concern']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:4px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:7px;height:7px;border-radius:50%;background:${c}"></div>${l}</div>`).join('')}
+        ${[['#8B5CF6','Meeting'],['#EF9F27','Due date'],['#00D2FF','Action item'],['#E24B4A','Concern']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:7px;height:7px;border-radius:50%;background:${c}"></div>${l}</div>`).join('')}
       </div>
       <div id="ucal-agenda" style="border-top:1px solid rgba(255,255,255,.06);padding-top:8px"></div>
     </div>
 
     <!-- Since-last-login delta strip -->
     <div id="mw-delta-strip" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px 7px;border-bottom:1px solid rgba(0,210,255,.07);background:rgba(0,210,255,.03)">
-      <span style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;white-space:nowrap">Since last login</span>
+      <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;white-space:nowrap">Since last login</span>
       <div id="mw-delta-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
 
@@ -653,7 +653,7 @@ window._mwLoadUserView = async function() {
       <button class="ust"    data-tab="requests"   onclick="uSwitchTab('requests',this)">My Requests <span id="ust-requests-badge" class="ust-badge" style="display:none"></span></button>
     </div>
     <style>
-      .ust{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 14px;cursor:pointer;color:rgba(255,255,255,.35);background:none;border:none;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:5px}
+      .ust{font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 14px;cursor:pointer;color:rgba(255,255,255,.35);background:none;border:none;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:5px}
       .ust.on{color:#00D2FF;border-bottom-color:#00D2FF}
       .ust:hover:not(.on){color:rgba(255,255,255,.7)}
       .ust-badge{font-size:11px;padding:1px 6px;border-radius:2px}
@@ -661,7 +661,7 @@ window._mwLoadUserView = async function() {
       .ust-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27}
       .ust-badge-green{background:rgba(29,158,117,.12);color:#1D9E75}
       .utc{display:none}.utc.on{display:block}#utc-concerns.on{display:block}
-      .myr-subnav{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.35);cursor:pointer;transition:.12s;display:flex;align-items:center;gap:5px}
+      .myr-subnav{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.35);cursor:pointer;transition:.12s;display:flex;align-items:center;gap:5px}
       .myr-subnav.on{color:#00D2FF;border-bottom-color:#00D2FF}
       .myr-subnav:hover:not(.on){color:rgba(255,255,255,.7)}
       .wf-catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:14px}
@@ -672,9 +672,9 @@ window._mwLoadUserView = async function() {
       .wf-card-title{font-size:12px;font-weight:700;color:#F0F6FF;line-height:1.3;flex:1}
       .wf-card-desc{font-size:11px;color:rgba(255,255,255,.45);line-height:1.55;margin-bottom:7px}
       .wf-card-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:rgba(255,255,255,.3)}
-      .wf-card-submit{position:absolute;right:10px;bottom:10px;font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;font-family:var(--font-head);letter-spacing:.06em;transition:.12s}
+      .wf-card-submit{position:absolute;right:10px;bottom:10px;font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;font-family:var(--font-mono);letter-spacing:.06em;transition:.12s}
       .wf-card-submit:hover{background:rgba(0,210,255,.15)}
-      .wf-card-new::before{content:'New';position:absolute;top:8px;right:8px;font-size:9px;padding:1px 6px;background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.3);color:#1D9E75;letter-spacing:.08em;font-family:var(--font-head)}
+      .wf-card-new::before{content:'New';position:absolute;top:8px;right:8px;font-size:9px;padding:1px 6px;background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.3);color:#1D9E75;letter-spacing:.08em;font-family:var(--font-mono)}
       .myr-cat-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin:10px 0 6px;display:flex;align-items:center;gap:6px}
       .myr-cat-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
       .myr-active-req{border:1px solid rgba(255,255,255,.08);margin-bottom:8px;overflow:hidden}
@@ -692,7 +692,7 @@ window._mwLoadUserView = async function() {
       .myr-ptd-pending{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)}
       .myr-pt-name{font-size:10px;color:rgba(255,255,255,.35);text-align:center;letter-spacing:.04em;line-height:1.3;max-width:64px}
       .myr-pt-name.done{color:#1D9E75}.myr-pt-name.active{color:#00D2FF}
-      .myr-hist-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--font-head);font-size:11px;cursor:pointer;transition:.12s}
+      .myr-hist-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--font-mono);font-size:11px;cursor:pointer;transition:.12s}
       .myr-hist-row:hover{background:rgba(255,255,255,.02)}
       .myr-hist-outcome{font-size:11px;padding:1px 7px;border:1px solid;letter-spacing:.04em}
       .cal-tab-cell{height:40px;border-right:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.1);position:relative;cursor:pointer;transition:.12s}
@@ -703,7 +703,7 @@ window._mwLoadUserView = async function() {
       .cal-tab-ce-focus{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);color:#7DD8F0}
       .cal-tab-ce-pto{background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.25);color:#F0A0A0}
       .cal-tab-ce-nonbill{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);color:#C4B5F8}
-      .delta-chip{font-family:var(--font-head);font-size:11px;padding:2px 9px;border:1px solid;cursor:pointer;transition:.12s;white-space:nowrap}
+      .delta-chip{font-family:var(--font-mono);font-size:11px;padding:2px 9px;border:1px solid;cursor:pointer;transition:.12s;white-space:nowrap}
       .delta-chip:hover{filter:brightness(1.15)}
       #mw-coc-drag:hover{background:rgba(0,210,255,.3)!important}
       #mw-coc-drag:active{background:rgba(0,210,255,.5)!important}
@@ -719,8 +719,8 @@ window._mwLoadUserView = async function() {
     <!-- 1.A Greeting -->
     <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-bottom:14px">
       <div>
-        <div style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--text0);line-height:1.1">${greeting}, ${esc(firstName)}</div>
-        <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">
+        <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text0);line-height:1.1">${greeting}, ${esc(firstName)}</div>
+        <div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);margin-top:2px">
           ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -739,14 +739,14 @@ window._mwLoadUserView = async function() {
         </button>
         <!-- CoC icon — toggles CoC panel -->
         <button data-action="toggle-coc"
-          style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.08em;height:30px;padding:0 10px;background:none;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;transition:all .12s;flex-shrink:0"
+          style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;height:30px;padding:0 10px;background:none;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;transition:all .12s;flex-shrink:0"
           title="Chain of Custody">CoC</button>
         ${streak>0&&weekDoneCount>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
           background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
-          font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
+          font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
           ■ ${streak}-day streak · ${weekDoneLabel}</div>`:streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
           background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);border-radius:4px;
-          font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--compass-cyan);white-space:nowrap">
+          font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--compass-cyan);white-space:nowrap">
           ■ ${streak}-day streak</div>`:''}
       </div>
     </div>
@@ -754,44 +754,44 @@ window._mwLoadUserView = async function() {
     <!-- 1.A 8-Card Strip -->
     <div id="mw-stat-strip" style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px">
       <div class="stat-card" style="border-top:2px solid var(--text3)" onmouseenter="showStatTooltip(event,'waiting')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Tasks Waiting</div>
-        <div class="stat-value" style="font-family:var(--font-display);color:var(--text3)">${waiting}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">assigned</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Tasks Waiting</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:var(--text3)">${waiting}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">assigned</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-cyan)" onmouseenter="showStatTooltip(event,'inprogress')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Tasks In Progress</div>
-        <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${inProgress}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">active now</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Tasks In Progress</div>
+        <div class="stat-value sv-cyan" style="font-family:var(--font-mono)">${inProgress}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">active now</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-red)" onmouseenter="showStatTooltip(event,'blocked')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Tasks Blocked</div>
-        <div class="stat-value" style="font-family:var(--font-display);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">needs attention</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Tasks Blocked</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">needs attention</div>
       </div>
       <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green)" onmouseenter="showStatTooltip(event,'done')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Done Today</div>
-        <div class="stat-value" id="done-today-count" style="font-family:var(--font-display);color:var(--compass-green)">${_doneToday.length}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">completed</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Done Today</div>
+        <div class="stat-value" id="done-today-count" style="font-family:var(--font-mono);color:var(--compass-green)">${_doneToday.length}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">completed</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-amber)" onmouseenter="showStatTooltip(event,'hrs_week')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Hrs — Week</div>
-        <div class="stat-value sv-amber" style="font-family:var(--font-display)">${weekTotal.toFixed(1)}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">${weekBillable.toFixed(1)}h billable</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Hrs — Week</div>
+        <div class="stat-value sv-amber" style="font-family:var(--font-mono)">${weekTotal.toFixed(1)}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">${weekBillable.toFixed(1)}h billable</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-cyan)" onmouseenter="showStatTooltip(event,'hrs_today')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Hrs — Today</div>
-        <div class="stat-value sv-cyan" style="font-family:var(--font-display)">${todayTotal.toFixed(1)}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">of ~8h expected</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Hrs — Today</div>
+        <div class="stat-value sv-cyan" style="font-family:var(--font-mono)">${todayTotal.toFixed(1)}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">of ~8h expected</div>
       </div>
       <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'}" onmouseenter="showStatTooltip(event,'open')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Open Items</div>
-        <div class="stat-value" style="font-family:var(--font-display);color:${overdueCount>0?'var(--compass-amber)':'var(--text1)'}">${workItems.length}</div>
-        <div class="stat-sub" style="font-family:var(--font-head);color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Open Items</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:${overdueCount>0?'var(--compass-amber)':'var(--text1)'}">${workItems.length}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono);color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
       </div>
       <div class="stat-card" style="border-top:2px solid var(--compass-purple)" onmouseenter="showStatTooltip(event,'workflows')" onmouseleave="hideStatTooltip()">
-        <div class="stat-label" style="font-family:var(--font-head)">Active Workflows</div>
-        <div class="stat-value" style="font-family:var(--font-display);color:var(--compass-purple)">${wfInstances.length}</div>
-        <div class="stat-sub" style="font-family:var(--font-head)">firm-wide</div>
+        <div class="stat-label" style="font-family:var(--font-mono)">Active Workflows</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:var(--compass-purple)">${wfInstances.length}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">firm-wide</div>
       </div>
     </div>
 
@@ -835,16 +835,16 @@ window._mwLoadUserView = async function() {
             </div>
             <!-- Billable summary column -->
             <div style="padding:12px 14px 10px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:8px;min-width:0">
-              <div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Billable vs Non-Bill</div>
+              <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Billable vs Non-Bill</div>
               <!-- Big numbers -->
               <div style="display:flex;justify-content:space-between;align-items:baseline">
                 <div>
-                  <div style="font-family:var(--font-display);font-size:22px;font-weight:700;line-height:1;color:var(--compass-cyan)">${weekBillable.toFixed(1)}h</div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:2px">billable</div>
+                  <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;line-height:1;color:var(--compass-cyan)">${weekBillable.toFixed(1)}h</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">billable</div>
                 </div>
                 <div style="text-align:right">
-                  <div style="font-family:var(--font-display);font-size:22px;font-weight:700;line-height:1;color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h</div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:2px">non-bill</div>
+                  <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;line-height:1;color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">non-bill</div>
                 </div>
               </div>
               <!-- The bar -->
@@ -854,14 +854,14 @@ window._mwLoadUserView = async function() {
                   <div style="width:${(weekBillable/weekTotal*100).toFixed(1)}%;background:var(--compass-cyan);transition:width .4s ease"></div>
                   <div style="width:${((weekTotal-weekBillable)/weekTotal*100).toFixed(1)}%;background:#8B5CF6;transition:width .4s ease"></div>
                 </div>
-                <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-head);font-size:11px;font-weight:700">
+                <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-mono);font-size:11px;font-weight:700">
                   <span style="color:var(--compass-cyan)">${weekTotal>0?Math.round(weekBillable/weekTotal*100):0}%</span>
                   <span style="color:#8B5CF6">${weekTotal>0?Math.round((weekTotal-weekBillable)/weekTotal*100):0}%</span>
                 </div>
               </div>
-              <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px">
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px">
                 <span style="color:var(--text1);font-weight:600">${weekTotal.toFixed(1)}h</span> total this week
-              </div>`:`<div style="font-family:var(--font-head);font-size:12px;color:var(--text3)">No hours logged yet</div>`}
+              </div>`:`<div style="font-family:var(--font-mono);font-size:12px;color:var(--text3)">No hours logged yet</div>`}
             </div>
           </div>
         </div>
@@ -873,19 +873,19 @@ window._mwLoadUserView = async function() {
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
             <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">My Work Queue</div>
-            <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-head);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
+            <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-mono);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
-              <button data-action="diagram-list" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
-              <button data-action="diagram-diag" style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'rgba(239,159,39,.2)':'none'};color:${_diagramMode?'#EF9F27':'rgba(255,255,255,.3)'};border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .12s">DIAGRAM</button>
+              <button data-action="diagram-list" style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
+              <button data-action="diagram-diag" style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'rgba(239,159,39,.2)':'none'};color:${_diagramMode?'#EF9F27':'rgba(255,255,255,.3)'};border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .12s">DIAGRAM</button>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
               ${overdueCount>0?`<span class="panel-badge pb-red">${overdueCount} overdue</span>`:`<span class="panel-badge pb-green">All current</span>`}
               <div id="diag-zoom-controls" style="display:${_diagramMode?'flex':'none'};align-items:center;gap:4px">
-                <button data-action="diag-zoom-out" style="font-family:var(--font-head);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
-                <span id="diag-zoom-lbl" style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);min-width:34px;text-align:center">${Math.round(_diagScale*100)}%</span>
-                <button data-action="diag-zoom-in" style="font-family:var(--font-head);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
-                <button data-action="diag-zoom-reset" style="font-family:var(--font-head);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center">↺</button>
-                <button data-action="diag-maximize" style="font-family:var(--font-head);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Maximize">
+                <button data-action="diag-zoom-out" style="font-family:var(--font-mono);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
+                <span id="diag-zoom-lbl" style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);min-width:34px;text-align:center">${Math.round(_diagScale*100)}%</span>
+                <button data-action="diag-zoom-in" style="font-family:var(--font-mono);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+                <button data-action="diag-zoom-reset" style="font-family:var(--font-mono);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center">↺</button>
+                <button data-action="diag-maximize" style="font-family:var(--font-mono);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Maximize">
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="1" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.2"/></svg>
                 </button>
               </div>
@@ -893,19 +893,19 @@ window._mwLoadUserView = async function() {
           </div>
           <div style="display:flex;align-items:center;gap:6px;padding:7px 13px;
             border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg2)">
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em">TYPE</span>
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em">TYPE</span>
             <div style="display:flex;gap:3px">
-              ${['all','task','action'].map(t=>{const labels={all:'All',task:'Tasks',action:'Actions'},active=_wfType===t;return `<button class="wf-type-btn" data-type="${t}" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(139,92,246,.25)':'none'};color:${active?'#8B5CF6':'var(--text2)'};border:1px solid ${active?'#8B5CF6':'var(--border)'};cursor:pointer">${labels[t]}</button>`;}).join('')}
+              ${['all','task','action'].map(t=>{const labels={all:'All',task:'Tasks',action:'Actions'},active=_wfType===t;return `<button class="wf-type-btn" data-type="${t}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(139,92,246,.25)':'none'};color:${active?'#8B5CF6':'var(--text2)'};border:1px solid ${active?'#8B5CF6':'var(--border)'};cursor:pointer">${labels[t]}</button>`;}).join('')}
             </div>
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">STATUS</span>
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">STATUS</span>
             <div style="display:flex;gap:3px">
-              ${['all','not_started','in_progress','blocked'].map(s=>{const labels={all:'All',not_started:'Not started',in_progress:'In progress',blocked:'Blocked'},active=_wfStatus===s;return `<button class="wf-status-btn" data-status="${s}" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(0,210,255,.12)':'none'};color:${active?'var(--compass-cyan)':'var(--text2)'};border:1px solid ${active?'var(--compass-cyan)':'var(--border)'};cursor:pointer">${labels[s]}</button>`;}).join('')}
+              ${['all','not_started','in_progress','blocked'].map(s=>{const labels={all:'All',not_started:'Not started',in_progress:'In progress',blocked:'Blocked'},active=_wfStatus===s;return `<button class="wf-status-btn" data-status="${s}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(0,210,255,.12)':'none'};color:${active?'var(--compass-cyan)':'var(--text2)'};border:1px solid ${active?'var(--compass-cyan)':'var(--border)'};cursor:pointer">${labels[s]}</button>`;}).join('')}
             </div>
-            <span style="font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">RANGE</span>
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">RANGE</span>
             <div style="display:flex;gap:3px">
-              ${[['today','Today'],['week','Week'],['30d','30d'],['all','All time']].map(([v,l])=>{const active=_wfDateRange===v;return `<button class="wf-date-btn" data-range="${v}" style="font-family:var(--font-head);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(239,159,39,.15)':'none'};color:${active?'var(--compass-amber)':'var(--text2)'};border:1px solid ${active?'var(--compass-amber)':'var(--border)'};cursor:pointer">${l}</button>`;}).join('')}
+              ${[['today','Today'],['week','Week'],['30d','30d'],['all','All time']].map(([v,l])=>{const active=_wfDateRange===v;return `<button class="wf-date-btn" data-range="${v}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(239,159,39,.15)':'none'};color:${active?'var(--compass-amber)':'var(--text2)'};border:1px solid ${active?'var(--compass-amber)':'var(--border)'};cursor:pointer">${l}</button>`;}).join('')}
             </div>
-            <select class="wf-proj-sel" style="font-family:var(--font-head);font-size:11px;padding:3px 8px;
+            <select class="wf-proj-sel" style="font-family:var(--font-mono);font-size:11px;padding:3px 8px;
               background:var(--bg1);color:var(--text1);border:1px solid ${_wfProject?'var(--compass-cyan)':'var(--border)'};
               cursor:pointer;flex:1;min-width:100px;max-width:160px;margin-left:auto">
               <option value="">All projects</option>
@@ -914,7 +914,7 @@ window._mwLoadUserView = async function() {
           </div>
           <div style="display:grid;grid-template-columns:14px 80px 1fr 140px 56px 78px;
             gap:0;padding:5px 8px 5px 4px;border-bottom:1px solid var(--border);
-            font-family:var(--font-head);font-size:11px;font-weight:700;color:var(--text3);
+            font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase">
             <div></div><div style="padding-left:2px">TYPE</div>
             <div style="padding-left:4px">TASK / ACTION</div>
@@ -946,15 +946,15 @@ window._mwLoadUserView = async function() {
               </div>
             </div>
             <div style="display:flex;gap:12px;padding:5px 14px;border-top:1px solid rgba(255,255,255,.04);flex-wrap:wrap">
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#E24B4A"></div>Overdue</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#EF9F27"></div>Due today</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#00D2FF"></div>Task</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#8B5CF6"></div>Action item</div>
-              <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25)">Capacity bar:</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(29,158,117,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#1D9E75"></div>&lt;70%</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(239,159,39,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#EF9F27"></div>&gt;70%</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(226,75,74,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#E24B4A"></div>Over</div>
-              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">Scroll to zoom · drag to pan</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#E24B4A"></div>Overdue</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#EF9F27"></div>Due today</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#00D2FF"></div>Task</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#8B5CF6"></div>Action item</div>
+              <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.25)">Capacity bar:</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(29,158,117,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#1D9E75"></div>&lt;70%</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(239,159,39,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#EF9F27"></div>&gt;70%</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(226,75,74,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#E24B4A"></div>Over</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">Scroll to zoom · drag to pan</div>
             </div>
           </div>
         </div>
@@ -968,12 +968,12 @@ window._mwLoadUserView = async function() {
         <div class="cmp-panel" style="margin-bottom:14px">
           <div style="padding:10px 13px 6px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-              <span style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text1)">WEEK OF ${weekOf}</span>
-              <span style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;
+              <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text1)">WEEK OF ${weekOf}</span>
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;
                 color:${wsColor};border:1px solid ${wsColor};padding:1px 7px">${wsLabel}</span>
             </div>
-            <div style="font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--text0);line-height:1">${weekTotal.toFixed(1)}h</div>
-            <div style="font-family:var(--font-head);font-size:12px;color:var(--text3);margin-top:2px">
+            <div style="font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--text0);line-height:1">${weekTotal.toFixed(1)}h</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);margin-top:2px">
               <span style="color:var(--compass-cyan)">${weekBillable.toFixed(1)}h billable</span>
               · <span style="color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h non-billable</span>
             </div>
@@ -985,7 +985,7 @@ window._mwLoadUserView = async function() {
           ${eodNudgeHtml}
           <div style="padding:8px 13px;display:flex;gap:8px;align-items:center">
             <button class="open-weekly-ts-btn"
-              style="flex:1;font-family:var(--font-head);font-size:11px;font-weight:700;
+              style="flex:1;font-family:var(--font-mono);font-size:11px;font-weight:700;
                 letter-spacing:.07em;text-transform:uppercase;padding:7px;
                 background:none;border:1px solid rgba(0,210,255,.3);color:var(--compass-cyan);
                 cursor:pointer;transition:background .12s"
@@ -994,7 +994,7 @@ window._mwLoadUserView = async function() {
             ${(wsStatus==='draft'||wsStatus==='rejected'||wsStatus==='amended')?`
             <button class="ts-submit-btn" data-week-id="${myWeekRow?.id||''}"
               data-week-start="${weekStartDate}" data-week-hours="${weekTotal.toFixed(1)}"
-              style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.07em;
+              style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;
                 text-transform:uppercase;padding:7px 14px;background:var(--compass-cyan);
                 color:#060a10;border:none;cursor:pointer;transition:opacity .12s"
               onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Submit →</button>`:''}
@@ -1007,21 +1007,21 @@ window._mwLoadUserView = async function() {
             <div class="panel-title">Time log${filterLabel?' — '+filterLabel:' — recent'}</div>
             <div style="display:flex;gap:8px;align-items:center">
               ${filterLabel?`<button class="te-clear-filter"
-                style="font-family:var(--font-head);font-size:11px;color:var(--compass-amber);
+                style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber);
                   background:none;border:none;cursor:pointer;padding:0">✕ clear</button>`:''  }
               <button class="te-new-btn"
-                style="font-family:var(--font-head);font-size:11px;font-weight:700;
+                style="font-family:var(--font-mono);font-size:11px;font-weight:700;
                   letter-spacing:.06em;color:var(--compass-cyan);background:none;
                   border:1px solid rgba(0,210,255,.25);padding:3px 8px;cursor:pointer"
                 onmouseenter="this.style.background='rgba(0,210,255,.08)'"
                 onmouseleave="this.style.background='none'">+ Log time</button>
               <button class="te-week-footer"
-                style="font-family:var(--font-head);font-size:11px;color:var(--text3);
+                style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
                   background:none;border:none;cursor:pointer;padding:0">Week view →</button>
             </div>
           </div>
           ${displayEntries.length===0
-            ?`<div style="padding:14px 13px;font-family:var(--font-head);font-size:12px;color:var(--text3)">
+            ?`<div style="padding:14px 13px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">
               ${filterLabel?'No entries for this day':'No time entries this period'}</div>`
             :displayEntries.map(e=>{
               const proj=_projects.find(p=>p.id===e.project_id);
@@ -1040,24 +1040,24 @@ window._mwLoadUserView = async function() {
                   <div style="font-family:var(--font-body);font-size:12px;font-weight:500;
                     color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                     ${e.step_name?esc(e.step_name):esc(proj?.name||'—')}</div>
-                  <div style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px">
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">
                     ${fmtDate(e.date)} · ${e.is_billable?'Billable':'Non-billable'}
                     ${isCadence?' · <span style="color:var(--compass-cyan)">via Cadence</span>':''}</div>
                 </div>
-                <div style="font-family:var(--font-display);font-size:13px;font-weight:700;
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;
                   color:${e.is_billable?'var(--compass-green)':'var(--text2)'};flex-shrink:0">
                   ${parseFloat(e.hours).toFixed(1)}h</div>
               </div>`;
             }).join('')
             +`<div style="padding:8px 13px;display:flex;justify-content:space-between;
               align-items:center;border-top:1px solid var(--border)">
-              <span style="font-family:var(--font-head);font-size:11px;color:var(--text3)">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
                 ${filterLabel?filterLabel+' total':'Week of '+new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
               <div style="display:flex;align-items:center;gap:12px">
-                <span style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--compass-cyan)">
+                <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--compass-cyan)">
                   ${filterLabel?displayEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0).toFixed(1):weekTotal.toFixed(1)}h</span>
                 <button class="te-week-footer"
-                  style="font-family:var(--font-head);font-size:11px;color:var(--compass-cyan);
+                  style="font-family:var(--font-mono);font-size:11px;color:var(--compass-cyan);
                     background:none;border:1px solid rgba(0,210,255,.25);padding:3px 10px;cursor:pointer"
                   onmouseenter="this.style.background='rgba(0,210,255,.08)'"
                   onmouseleave="this.style.background='none'">Week view →</button>
@@ -1072,7 +1072,7 @@ window._mwLoadUserView = async function() {
           <div class="cmp-panel" style="height:100%;margin-bottom:0">
             <div class="panel-hdr" style="flex-shrink:0">
               <div class="panel-title">Done today
-                ${_doneToday.length>0?`<span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:var(--compass-green);margin-left:8px">${_doneToday.length} completed</span>`:''}</div>
+                ${_doneToday.length>0?`<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--compass-green);margin-left:8px">${_doneToday.length} completed</span>`:''}</div>
             </div>
             <div id="done-today-list" style="overflow-y:auto">${doneTodayRows()}</div>
           </div>
@@ -1086,12 +1086,12 @@ window._mwLoadUserView = async function() {
         <div style="display:flex;flex-direction:column;height:100%;overflow-y:auto">
         <div style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)">
           <div>
-            <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
-            <div id="mw-coc-count" style="font-family:var(--font-head);font-size:11px;color:var(--text3);margin-top:1px"></div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
+            <div id="mw-coc-count" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px"></div>
           </div>
         </div>
         <div id="mw-coc-body" style="padding:10px 14px">
-          <div style="font-family:var(--font-head);font-size:11px;color:var(--text3)">No history yet.</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">No history yet.</div>
         </div>
       </div>
 
@@ -1108,7 +1108,7 @@ window._mwLoadUserView = async function() {
 
     <!-- Tab: MEETINGS -->
     <div class="utc" id="utc-meetings">
-      <div id="user-meetings-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading meetings…</div></div>
+      <div id="user-meetings-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading meetings…</div></div>
     </div>
 
     <!-- Tab: MY VIEWS — my-views.html injected here on first activation -->
@@ -1133,16 +1133,16 @@ window._mwLoadUserView = async function() {
           <button class="myr-subnav on" data-myr="browse" onclick="myrSwitchView('browse',this)">Browse</button>
           <button class="myr-subnav" data-myr="active" onclick="myrSwitchView('active',this)">Active <span id="myr-active-badge" class="ust-badge ust-badge-amber" style="display:none"></span></button>
           <button class="myr-subnav" data-myr="history" onclick="myrSwitchView('history',this)">History</button>
-          <div style="margin-left:auto;font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.06em;padding-right:4px">Powered by <span style="color:rgba(0,210,255,.5)">CadenceHUD</span> workflow engine</div>
+          <div style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.06em;padding-right:4px">Powered by <span style="color:rgba(0,210,255,.5)">CadenceHUD</span> workflow engine</div>
         </div>
         <div id="myr-pane-browse">
-          <div id="myr-catalog-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading workflow catalog…</div></div>
+          <div id="myr-catalog-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading workflow catalog…</div></div>
         </div>
         <div id="myr-pane-active" style="display:none">
-          <div id="myr-active-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading active requests…</div></div>
+          <div id="myr-active-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading active requests…</div></div>
         </div>
         <div id="myr-pane-history" style="display:none">
-          <div id="myr-history-content"><div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:16px 0">Loading request history…</div></div>
+          <div id="myr-history-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading request history…</div></div>
         </div>
       </div>
     </div>`;
@@ -1697,6 +1697,6 @@ window.showCardPopup = function(type, cardEl) {
 
   } catch (e) {
     console.error('[Compass] _mwLoadUserView error:', e);
-    if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-head);font-size:11px">Failed to load — check console</div>';
+    if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-mono);font-size:11px">Failed to load — check console</div>';
   }
 }

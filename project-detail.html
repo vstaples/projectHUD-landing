@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProjectHUD — Project Detail</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="stylesheet" href="/css/hud.css">
 <style>
 /* Role abbreviation pill in task table */
@@ -96,7 +97,7 @@
   transform: rotate(45deg); border: 1.5px solid;
 }
 .ms-info { flex: 1; min-width: 0; }
-.ms-name  { font-family: var(--font-ui); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
+.ms-name  { font-family: var(--font-mono); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
 .ms-phase { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
 .ms-date  { font-family: var(--font-mono); font-size:11px; color: var(--text2); flex-shrink: 0; text-align: right; }
 .ms-slip  { font-family: var(--font-mono); font-size:11px; color: var(--amber); flex-shrink: 0; }
@@ -165,7 +166,7 @@
   position: sticky; top: 0;
 }
 .task-tbl td {
-  font-family: var(--font-ui); font-size:12.5px; color: var(--text1);
+  font-family: var(--font-mono); font-size:12.5px; color: var(--text1);
   padding: 8px 10px; border-bottom: 1px solid rgba(100,160,220,0.06);
   vertical-align: middle;
 }
@@ -222,7 +223,7 @@
   padding-top: 2px;
 }
 .risk-info { flex: 1; min-width: 0; }
-.risk-title { font-family: var(--font-ui); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
+.risk-title { font-family: var(--font-mono); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
 .risk-meta  { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
 
 /* Document rows */
@@ -235,7 +236,7 @@
 .doc-row:hover { background: var(--bg4); }
 .doc-icon { font-size:16.0px; flex-shrink: 0; color: var(--text2); }
 .doc-info { flex: 1; min-width: 0; }
-.doc-name { font-family: var(--font-ui); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
+.doc-name { font-family: var(--font-mono); font-size:13px; font-weight: 600; color: var(--text0); letter-spacing: 0.02em; }
 .doc-meta { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
 
 /* EVM detail table */
@@ -370,7 +371,7 @@
 .phase-progress-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .phase-progress-row:last-child { border-bottom: none; }
 .pp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.pp-name { font-family: var(--font-ui); font-size:12.5px; color: var(--text1); }
+.pp-name { font-family: var(--font-mono); font-size:12.5px; color: var(--text1); }
 .pp-stats { font-family: var(--font-mono); font-size:11px; color: var(--text3); }
 
 /* Slide-in journal panel */
@@ -439,7 +440,7 @@
         <div class="health-sep"></div>
         <div class="health-chip"><span class="hc-label">HRS CONSUMED</span><span class="hc-val" id="hc-hrs-pct" style="color:var(--purple)">—</span><span class="hc-sub" id="hc-hrs-sub">—</span></div>
         <div class="health-sep"></div>
-        <div class="health-chip"><span class="hc-label">PM / OWNER</span><span class="hc-val" id="hc-pm" style="font-size:13.0px;font-family:var(--font-ui);">—</span></div>
+        <div class="health-chip"><span class="hc-label">PM / OWNER</span><span class="hc-val" id="hc-pm" style="font-size:13.0px;font-family:var(--font-mono);">—</span></div>
       </div>
 
       <!-- TAB BAR -->
@@ -1284,7 +1285,7 @@ function taskRowHTML(t) {
   return `<tr class="overview-task-row" onclick="openJournalPanel('${t.id}','${t.name.replace(/'/g,"\\'")}')">
     <td style="padding:7px 12px 7px 14px;width:16px;">${UI.taskDot(t.status)}</td>
     <td style="padding:7px 8px;min-width:0;">
-      <div style="font-family:var(--font-ui);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;" title="${t.name}">${t.name}</div>
+      <div style="font-family:var(--font-mono);font-size:13px;color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;" title="${t.name}">${t.name}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;">${t.phase||'—'}${asgn?' · '+asgn.name:''}</div>
     </td>
     <td style="padding:7px 8px;text-align:center;">${UI.badge(_effectiveStatus(t))}</td>
@@ -1411,7 +1412,7 @@ function _taskAssignedCell(t, asgn) {
       const pct  = a.allocation_pct && a.allocation_pct < 100
         ? '<span style="font-family:var(--font-mono);font-size:9px;color:var(--amber);margin-left:2px;">' + a.allocation_pct + '%</span>'
         : '';
-      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' + UI.avatar(name.trim(), 20) + '<span style="font-family:var(--font-ui);font-size:12px;">' + name.trim() + '</span></span>' + pct;
+      return '<span title="' + name.trim() + '" style="display:inline-flex;align-items:center;gap:4px;">' + UI.avatar(name.trim(), 20) + '<span style="font-family:var(--font-mono);font-size:12px;">' + name.trim() + '</span></span>' + pct;
     }).filter(Boolean);
     return '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + parts.join('') + '</div>';
   }
@@ -1419,7 +1420,7 @@ function _taskAssignedCell(t, asgn) {
   if (asgn) {
     return '<div style="display:flex;align-items:center;gap:6px;">' +
       UI.avatar(asgn.name, 20) +
-      '<span style="font-family:var(--font-ui);font-size:12px;">' + asgn.name + '</span>' +
+      '<span style="font-family:var(--font-mono);font-size:12px;">' + asgn.name + '</span>' +
       '</div>';
   }
   // Role-only — show TBD with role hint
@@ -1737,9 +1738,9 @@ function renderExpenditures() {
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.phase||'—'}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.type||'—'}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.part_number||'—'}</td>
-              <td style="font-family:var(--font-ui);font-size:12px;color:${stateColor};padding:7px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.description}">${e.description}</td>
+              <td style="font-family:var(--font-mono);font-size:12px;color:${stateColor};padding:7px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.description}">${e.description}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;text-align:right;">${e.qty||1}</td>
-              <td style="font-family:var(--font-ui);font-size:12px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.vendor||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:12px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.vendor||'—'}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.vendor_pn||'—'}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;text-align:right;font-weight:700;">${UI.fmtCurrency(e.amount)}</td>
               <td style="font-family:var(--font-mono);font-size:11px;color:${stateColor};padding:7px 10px;white-space:nowrap;">${e.po_number||'—'}</td>
@@ -1788,7 +1789,7 @@ function renderLabor() {
         const user = STATE.users.find(u => u.id === uid);
         const pctOfMax = UI.pct(hrs, maxHrs);
         const cost = hrs * RATE;
-        return `<div class="wl-row" style="padding:10px 14px;">${UI.avatar(user, 28)}<div style="flex:1;min-width:0;"><div style="font-family:var(--font-ui);font-size:13px;color:var(--text1);margin-bottom:5px;">${user?.name||'—'}</div>${UI.progressBar(pctOfMax, 'var(--purple)')}</div><div style="text-align:right;min-width:90px;flex-shrink:0;"><div style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div></div></div>`;
+        return `<div class="wl-row" style="padding:10px 14px;">${UI.avatar(user, 28)}<div style="flex:1;min-width:0;"><div style="font-family:var(--font-mono);font-size:13px;color:var(--text1);margin-bottom:5px;">${user?.name||'—'}</div>${UI.progressBar(pctOfMax, 'var(--purple)')}</div><div style="text-align:right;min-width:90px;flex-shrink:0;"><div style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);font-weight:700;">${hrs.toFixed(1)}h</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);">${UI.fmtCurrency(cost)}</div></div></div>`;
       }).join('');
   }
 }
@@ -2902,7 +2903,7 @@ function _renderAssignmentRows(assignments) {
       </select>
       <select onchange="window._tfAssignments[${idx}].resource_id=this.value||null;_autoBackfillRole(${idx})"
         style="background:var(--bg2);border:1px solid var(--border);color:var(--text1);
-        font-family:var(--font-ui);font-size:12px;padding:3px 5px;outline:none;width:100%;
+        font-family:var(--font-mono);font-size:12px;padding:3px 5px;outline:none;width:100%;
         margin-top:${isPrimary?'10px':'0'};">
         ${_buildResourceOptions(a.resource_id)}
       </select>
@@ -3809,7 +3810,7 @@ async function _renderJournalBody(taskId) {
     // Add entry form at bottom
     html += `<div id="jp-add-entry" style="padding:14px;border-top:1px solid var(--border);margin-top:8px;">
       <div style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);letter-spacing:0.14em;margin-bottom:8px;">ADD JOURNAL ENTRY</div>
-      <textarea id="jp-accomplishment" placeholder="What was accomplished..." style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:8px;resize:vertical;min-height:72px;outline:none;" rows="3"></textarea>
+      <textarea id="jp-accomplishment" placeholder="What was accomplished..." style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-mono);font-size:12px;padding:8px;resize:vertical;min-height:72px;outline:none;" rows="3"></textarea>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
         <div>
           <label style="font-family:var(--font-mono);font-size:9px;color:var(--text3);display:block;margin-bottom:3px;">HOURS SPENT</label>
@@ -3820,7 +3821,7 @@ async function _renderJournalBody(taskId) {
           <input id="jp-pct" type="number" min="0" max="100" step="5" value="${(() => { const t=STATE.tasks.find(t=>t.id===taskId); return t?.pct_complete||0; })()}" style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-mono);font-size:12px;padding:6px;" />
         </div>
       </div>
-      <textarea id="jp-blockers" placeholder="Blockers (optional)..." style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:8px;resize:vertical;min-height:44px;outline:none;margin-top:6px;" rows="2"></textarea>
+      <textarea id="jp-blockers" placeholder="Blockers (optional)..." style="width:100%;box-sizing:border-box;background:var(--bg1);border:1px solid var(--border);color:var(--text1);font-family:var(--font-mono);font-size:12px;padding:8px;resize:vertical;min-height:44px;outline:none;margin-top:6px;" rows="2"></textarea>
       <div id="jp-entry-error" style="display:none;font-family:var(--font-mono);font-size:10px;color:var(--red);margin-top:4px;"></div>
       <button id="jp-submit-btn" onclick="submitJournalEntry('${taskId}')" style="margin-top:8px;width:100%;background:rgba(0,210,255,0.08);border:1px solid rgba(0,210,255,0.35);color:var(--cyan);font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;padding:8px;cursor:pointer;">+ ADD ENTRY</button>
     </div>`;
@@ -4455,7 +4456,7 @@ function _p2PatchFunctions() {
       return '<div style="display:grid;grid-template-columns:1fr 1fr 52px 22px;gap:5px;align-items:center;background:var(--bg3);border:1px solid var(--border);padding:6px 8px;position:relative;" data-idx="' + idx + '">' +
         primaryBadge +
         '<select onchange="window._tfAssignments[' + idx + '].hud_role_id=this.value||null;_renderAssignmentRows(window._tfAssignments)" style="' + mt + 'background:var(--bg2);border:1px solid var(--border);color:var(--cyan);font-family:var(--font-mono);font-size:10px;padding:3px 5px;outline:none;width:100%;">' + roleOpts + '</select>' +
-        '<select onchange="window._tfAssignments[' + idx + '].resource_id=this.value||null;_autoBackfillRole(' + idx + ')" style="' + mt + 'background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--font-ui);font-size:12px;padding:3px 5px;outline:none;width:100%;">' + resOpts + '</select>' +
+        '<select onchange="window._tfAssignments[' + idx + '].resource_id=this.value||null;_autoBackfillRole(' + idx + ')" style="' + mt + 'background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--font-mono);font-size:12px;padding:3px 5px;outline:none;width:100%;">' + resOpts + '</select>' +
         '<div style="display:flex;align-items:center;gap:2px;' + mt + '">' +
           '<input type="number" min="1" max="100" value="' + (a.allocation_pct||100) + '" onchange="window._tfAssignments[' + idx + '].allocation_pct=parseFloat(this.value)||100" style="width:38px;background:var(--bg2);border:1px solid var(--border);color:var(--amber);font-family:var(--font-mono);font-size:10px;padding:3px 4px;outline:none;text-align:center;" />' +
           '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text3);">%</span>' +
