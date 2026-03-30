@@ -372,9 +372,12 @@ let _resources_cad = []; // all firm resources (for instance reassignment)
 let _myResourceId  = null; // current user's resource ID (for owner auto-select)
 let _myUserId      = null; // current user's user ID (for launched_by FK)
 
+// ── Selected instance ─────────────────────────────────────────────────────────
+let _selectedInstance  = null;  // full instance object currently open in detail view
+
 // ── Instances tab UI state ────────────────────────────────────────────────────
-let _instFilter    = 'all';  // 'all' | 'mine' | 'active' | 'done'
-let _instSearch    = '';     // current search query string
+let _instFilter        = 'all';  // 'all' | 'mine' | 'active' | 'done'
+let _instSearch        = '';     // current search query string
 
 // ── Instance DAG (pan/zoom canvas) state ─────────────────────────────────────
 let _instDagScale      = 1;
@@ -382,9 +385,65 @@ let _instDagPanX       = 0;
 let _instDagPanY       = 0;
 let _instDagFitted     = false;
 let _instDagPulseFrame = null;
+let _instDagDrag       = false;  // drag-pan in progress
+let _instDagDSX        = 0;      // drag start clientX
+let _instDagDSY        = 0;      // drag start clientY
+let _instDagPSX        = 0;      // pan origin X at drag start
+let _instDagPSY        = 0;      // pan origin Y at drag start
 
 // ── Instance scrubber state ───────────────────────────────────────────────────
 let _instScrubEvents   = [];
+let _instScrubPos      = 100;    // scrubber position 0-100
+
+// ── Instance polling / realtime ───────────────────────────────────────────────
+let _lastCoCCount      = 0;      // CoC event count at last render - drives change detection
+let _pollTimer         = null;   // setInterval handle for CoC polling
+let _realtimeChannel   = null;   // Supabase realtime channel handle
+let _elapsedTimer      = null;   // setInterval handle for elapsed-time display
+
+// ── Template editor DAG state ─────────────────────────────────────────────────
+let _dagScale          = 1;
+let _dagPanX           = 0;
+let _dagPanY           = 0;
+let _dagAutoFitted     = false;
+let _dagDragging       = false;
+let _dagDragStartX     = 0;
+let _dagDragStartY     = 0;
+let _dagPanStartX      = 0;
+let _dagPanStartY      = 0;
+let _dagActiveCard     = -1;     // index of hovered/selected step card in DAG
+let _dagPanelOpen      = false;  // step config panel open
+let _dagInsertAfterIdx = null;   // insertion point for new step drag
+let _dragStepId        = null;   // step ID being dragged in spine
+let _editorView        = 'dag';  // 'dag' | 'spine' | 'split'
+
+// ── History / swimlane overlay (instance DAG) ─────────────────────────────────
+let _historyActive     = false;
+let _historyClusters   = [];
+let _swimlaneActive    = false;
+let _swimlaneClusters  = [];
+let _confDots          = [];
+
+// ── Tooltip state (cdn-tooltips.js) ───────────────────────────────────────────
+let _tooltipTimer      = null;
+let _tooltipVisible    = false;
+let _tooltipStepId     = null;
+let _tooltipSticky     = false;
+let _confTooltipEl     = null;
+let _confTooltipTimer  = null;
+let _historyPopup      = null;
+let _historyHideTimer  = null;
+let _hxHighlightStep   = null;
+let _hxHighlightTimer  = null;
+let _hxCardDwellTimer  = null;
+let _swimlanePopup     = null;
+let _swimlaneHideTimer = null;
+let _swimlaneDwellRow  = null;
+let _swimlaneDwellTimer = null;
+
+// ── DAG resize handle state ────────────────────────────────────────────────────
+let _resizeStartX      = 0;
+let _resizeStartW      = 0;
 
 API.get('users?is_active=eq.true&select=id,name,title,resource_id').then(u => {
   _users_cad = u || [];
