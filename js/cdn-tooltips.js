@@ -146,7 +146,7 @@ function _renderStepTooltip(stepId, event) {
     <div style="padding:8px 12px;background:rgba(0,0,0,0.4);
       border-bottom:1px solid rgba(0,210,255,0.12);
       display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <div style="font-family:var(--font-ui);font-size:12px;font-weight:700;
+      <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;
         color:#eef4ff;letter-spacing:0.04em;flex:1;min-width:0;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         ${escHtml(step.name || 'Step')}
@@ -265,7 +265,7 @@ function _showConfDotTooltip(dot, clientX, clientY) {
   tip.innerHTML = `
     <div style="padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);
       display:flex;align-items:center;gap:7px">
-      <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+      <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
         color:var(--muted)">Confidence signal</span>
     </div>
     <div style="padding:10px 12px">
@@ -279,7 +279,7 @@ function _showConfDotTooltip(dot, clientX, clientY) {
       <div style="font-size:10px;color:var(--muted)">
         ${escHtml(dot.author)}${ts ? ' · ' + ts : ''}
       </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:6px;font-style:italic">
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic">
         Latest signal on ${escHtml(dot.stepName)}
       </div>
     </div>`;
@@ -318,11 +318,11 @@ function _hxShowPopup(cluster, clientX, clientY, inst) {
 
   const maxCount = Math.max(...Object.values(heat.byInstance), 1);
   const typeNote = heat.typeB > heat.typeA
-    ? `<div style="font-size:9px;color:#8c50c8;padding:4px 12px 0;font-style:italic">
+    ? `<div style="font-size:10px;color:#8c50c8;padding:4px 12px 0;font-style:italic">
         &#8629; ${heat.typeB} reset${heat.typeB>1?'s':''} caused by upstream rejection/decline
        </div>`
     : heat.typeA > 0
-    ? `<div style="font-size:9px;color:#b432dc;padding:4px 12px 0;font-style:italic">
+    ? `<div style="font-size:10px;color:#b432dc;padding:4px 12px 0;font-style:italic">
         &#8629; ${heat.typeA} own failure${heat.typeA>1?'s':''} at this step
        </div>`
     : '';
@@ -334,12 +334,12 @@ function _hxShowPopup(cluster, clientX, clientY, inst) {
 
   popup.innerHTML = `
     <div style="padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);
-      font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${cols.text}">
+      font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${cols.text}">
       ${escHtml(stepName)} — ${heat.total} total rejections
     </div>
     ${typeNote}
     <div id="hx-popup-rows"></div>
-    <div style="padding:5px 12px;font-size:9px;color:var(--muted);font-style:italic;
+    <div style="padding:5px 12px;font-size:10px;color:var(--muted);font-style:italic;
       background:var(--bg2);border-top:0.5px solid var(--border)">
       Hold 1.5s on any row to open Intelligence Briefing
     </div>`;
@@ -584,13 +584,13 @@ function _swPopulateInfoPanel(inst) {
           white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${escHtml(i.title||'Untitled')}
         </div>
-        ${isSel?'<span style="font-size:8px;font-weight:700;letter-spacing:.06em;color:#00d2ff;padding:1px 5px;border:0.5px solid #00d2ff;border-radius:3px">YOU</span>':''}
+        ${isSel?'<span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#00d2ff;padding:1px 5px;border:0.5px solid #00d2ff;border-radius:3px">YOU</span>':''}
       </div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${escHtml(stepName)}</div>
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:10px;color:var(--muted)">${elapsed}</span>
-        ${rework>0?`<span style="font-size:9px;font-weight:700;color:#ff5f6b">&#8629; ${rework}\u00d7</span>`:''}
-        ${i.status==='complete'?'<span style="font-size:9px;font-weight:500;color:#26e8a0">&#10003; Done</span>':''}
+        ${rework>0?`<span style="font-size:10px;font-weight:700;color:#ff5f6b">&#8629; ${rework}\u00d7</span>`:''}
+        ${i.status==='complete'?'<span style="font-size:10px;font-weight:500;color:#26e8a0">&#10003; Done</span>':''}
       </div>
     </div>`;
   }).join('');
@@ -655,7 +655,7 @@ function _swShowPopup(cluster, clientX, clientY, wrap) {
   // Header
   const stepName = cluster.siblings[0]?.current_step_name || 'This step';
   const hdr = document.createElement('div');
-  hdr.style.cssText = 'padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)';
+  hdr.style.cssText = 'padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)';
   hdr.textContent = `${cluster.siblings.length} instance${cluster.siblings.length>1?'s':''} · ${stepName}`;
   popup.appendChild(hdr);
 
@@ -686,9 +686,9 @@ function _swShowPopup(cluster, clientX, clientY, wrap) {
 
     const prio = sib.priority || 'normal';
     const prioHtml = prio==='critical'
-      ? `<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;color:#E24B4A;border:0.5px solid rgba(226,75,74,.4)">CRIT</span>`
+      ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;color:#E24B4A;border:0.5px solid rgba(226,75,74,.4)">CRIT</span>`
       : prio==='important'
-      ? `<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;color:var(--amber);border:0.5px solid rgba(232,168,56,.4)">HIGH</span>`
+      ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;color:var(--amber);border:0.5px solid rgba(232,168,56,.4)">HIGH</span>`
       : '';
 
     const row = document.createElement('div');
@@ -699,7 +699,7 @@ function _swShowPopup(cluster, clientX, clientY, wrap) {
         <div class="sw-rname" style="font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .1s">${escHtml(sib.title||'Untitled')}</div>
         <div style="font-size:10px;color:var(--muted)">${elapsed}</div>
       </div>
-      ${rework>0?`<span style="font-size:9px;font-weight:700;color:#E24B4A">↩ ${rework}×</span>`:''}
+      ${rework>0?`<span style="font-size:10px;font-weight:700;color:#E24B4A">↩ ${rework}×</span>`:''}
       ${prioHtml}
       <div class="sw-dbar" style="position:absolute;bottom:0;left:0;height:2px;background:var(--cad);width:0;border-radius:0"></div>`;
 
@@ -718,7 +718,7 @@ function _swShowPopup(cluster, clientX, clientY, wrap) {
 
   // "Hold 1.5s" hint
   const hint = document.createElement('div');
-  hint.style.cssText = 'padding:5px 12px;font-size:9px;color:var(--muted);font-style:italic;background:var(--bg2)';
+  hint.style.cssText = 'padding:5px 12px;font-size:10px;color:var(--muted);font-style:italic;background:var(--bg2)';
   hint.textContent = 'Hold 1.5s on any row to open Intelligence Briefing';
   popup.appendChild(hint);
 
@@ -837,3 +837,4 @@ function _swUpdateBottleneckBanner(inst) {
   textEl.innerHTML = `<strong>Bottleneck detected</strong> — ${count} of ${total} instances clustered at <strong>${escHtml(stepName)}</strong>`;
   banner.style.display = 'flex';
 }
+

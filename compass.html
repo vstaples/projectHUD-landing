@@ -8,6 +8,12 @@
 <style>
 /* ── Compass shell variables ─────────────────────────────── */
 :root {
+
+  /* ── Typography floor: 10px minimum (10pt rule) ─────────────────────────
+     All text in the app must be at minimum 10px. Inline styles < 10px were
+     mechanically raised. This comment documents the policy. Any new additions
+     below 10px are a violation. --font-size-min enforces it in new code.   */
+  --font-size-min: 10px;
   --compass-cyan:   #00D2FF;
   --compass-amber:  #EF9F27;
   --compass-green:  #1D9E75;
@@ -68,7 +74,7 @@
 #hud-notif-badge {
   position:absolute; top:-5px; right:-5px;
   background:#E24B4A; color:#fff;
-  font-family:var(--font-mono,monospace); font-size:9px; font-weight:700;
+  font-family:var(--font-mono,monospace); font-size:10px; font-weight:700;
   min-width:16px; height:16px; border-radius:8px;
   display:flex; align-items:center; justify-content:center;
   padding:0 3px; pointer-events:none;

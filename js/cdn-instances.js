@@ -34,7 +34,7 @@ function launchInstance() {
 
         <!-- ── STAKES LAYER ─────────────────────────────────── -->
         <div style="margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--border)">
-          <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cad);text-transform:uppercase;margin-bottom:10px">Stakes & Priority</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--cad);text-transform:uppercase;margin-bottom:10px">Stakes & Priority</div>
 
           <!-- Priority -->
           <div style="margin-bottom:12px">
@@ -411,7 +411,7 @@ function renderInstancesTab(el) {
                       color:${isCrit?'var(--red)':isImp?'var(--amber)':'var(--text2)'};
                       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">
                       ${escHtml(inst.stakes)}</span>`:''}
-                    ${highVar?`<span style="font-size:9px;color:var(--red);font-weight:600;white-space:nowrap">⚠ High variance</span>`:''}
+                    ${highVar?`<span style="font-size:10px;color:var(--red);font-weight:600;white-space:nowrap">⚠ High variance</span>`:''}
                   </div>`:''}
 
                   <!-- Title -->
@@ -422,7 +422,7 @@ function renderInstancesTab(el) {
 
                   <!-- Status + template -->
                   <div style="font-size:10px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-bottom:3px">
-                    <span style="color:${color};font-weight:600;font-size:9px;
+                    <span style="color:${color};font-weight:600;font-size:10px;
                       letter-spacing:.08em;text-transform:uppercase">${statusLabel[inst.status]||inst.status}</span>
                     <span>${escHtml(tmpl?.name||'—')}</span>
                   </div>
@@ -449,7 +449,7 @@ function renderInstancesTab(el) {
                   </div>`:''}
 
                   <!-- PERT expected duration -->
-                  ${pertExp?`<div style="font-size:9px;color:var(--muted);margin-top:2px">
+                  ${pertExp?`<div style="font-size:10px;color:var(--muted);margin-top:2px">
                     Expected: ${pertExp}d${pertVar>0?` ±${((pertVar)/6).toFixed(1)}d`:''}
                   </div>`:''}
 
@@ -753,12 +753,12 @@ function renderInstanceDetail(el, inst) {
             return String(d).padStart(2,'0')+':'+String(h%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
           })()}
         </div>
-        <div style="font-size:8px;color:var(--muted);text-transform:uppercase;
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;
           letter-spacing:.12em;margin-top:3px">Elapsed Time<br/>dd:hh:mm</div>
       </div>` : ''}
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <!-- Status badge -->
-        <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+        <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
           color:${statusColor[inst.status]||'var(--muted)'};
           border:1px solid ${statusColor[inst.status]||'var(--border)'};
           padding:3px 8px;border-radius:3px">
@@ -832,7 +832,7 @@ function renderInstanceDetail(el, inst) {
           <div id="inst-dag-coc-panel" style="width:0;display:none;overflow:hidden;transition:width .22s cubic-bezier(.4,0,.2,1);
             border-left:0px solid var(--border);background:var(--bg1);flex-shrink:0;display:flex;flex-direction:column">
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-              <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase">Chain of Custody</span>
+              <span style="font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase">Chain of Custody</span>
             </div>
             <div id="inst-dag-coc-body" style="flex:1;overflow-y:auto;padding:10px 14px;font-size:10px"></div>
           </div>
@@ -932,9 +932,9 @@ function renderInstanceDetail(el, inst) {
 
       <!-- Workflow Steps — fills remaining width -->
       <div style="flex:1;overflow-y:auto;padding:16px 20px;min-width:0">
-        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+        <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
           color:var(--muted);margin-bottom:12px">Workflow Steps
-          <span style="font-weight:400;font-size:9px;color:var(--muted);margin-left:8px">
+          <span style="font-weight:400;font-size:10px;color:var(--muted);margin-left:8px">
             — click a step to start, complete, or reassign
           </span>
         </div>
@@ -1006,7 +1006,7 @@ function renderInstanceDetail(el, inst) {
                           ${escHtml(s.name||meta.label)}
                         </div>
                         <div style="display:grid;grid-template-columns:130px 150px 100px 80px;gap:0 12px;margin-top:3px;align-items:center">
-                          <span style="color:${meta.badgeText};font-size:9px;letter-spacing:.06em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${meta.label}</span>
+                          <span style="color:${meta.badgeText};font-size:10px;letter-spacing:.06em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${meta.label}</span>
                           <span style="color:var(--text2);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${assigneeDisplay}</span>
                           <span style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${
                             done ? (() => {
@@ -1016,7 +1016,7 @@ function renderInstanceDetail(el, inst) {
                               return '<span style="color:'+oColor+'">&#10003; '+escHtml(oLabel)+'</span>';
                             })() :
                             rejected ? '<span style="color:var(--red)">&#10005; Rejected</span>' :
-                            touched&&!done&&!rejected ? '<span style="font-size:9px;font-weight:700;color:var(--bg0);padding:2px 8px;border-radius:4px;background:var(--cad);letter-spacing:.06em">IN PROCESS</span>' :
+                            touched&&!done&&!rejected ? '<span style="font-size:10px;font-weight:700;color:var(--bg0);padding:2px 8px;border-radius:4px;background:var(--cad);letter-spacing:.06em">IN PROCESS</span>' :
                             isReady&&!touched ? '<span style="color:var(--accent)">&#9679; Ready</span>' : ''
                           }</span>
                           <span style="color:var(--muted);font-size:10px;white-space:nowrap">${s.due_days!=null?'&#9201; '+(s.due_type==='before_completion'?s.due_days+'d before':'&#43;'+s.due_days+'d'):''}</span>
@@ -1040,7 +1040,7 @@ function renderInstanceDetail(el, inst) {
                         const activatedAt  = stepActivatedAt[s.id];
                         const completedAt  = stepCompletedAt[s.id];
                         const monoStyle    = 'font-family:var(--font-mono);font-size:13px;letter-spacing:.04em';
-                        const labelStyle   = 'font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px';
+                        const labelStyle   = 'font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin-top:1px';
                         
                         function calcElapsed(from, to) {
                           const ms = (to ? new Date(to) : new Date()) - new Date(from);
@@ -1088,11 +1088,11 @@ function renderInstanceDetail(el, inst) {
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;
                       font-size:11px;margin-bottom:12px;padding-bottom:12px;
                       border-bottom:1px solid var(--border)">
-                      <div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Due</span>
+                      <div><span style="color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase">Due</span>
                         <div style="color:var(--text2);font-size:10px;margin-top:2px">${s.due_days!=null?(s.due_type==='before_completion'?s.due_days+'d before target':'+'+s.due_days+' business days'):'Not set'}</div></div>
-                      ${s.escalate_after_days?`<div><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Escalate After</span>
+                      ${s.escalate_after_days?`<div><span style="color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase">Escalate After</span>
                         <div style="color:var(--amber);font-size:10px;margin-top:2px">${s.escalate_after_days}d → ${s.escalate_to||'PM'}</div></div>`:''}
-                      ${s.instructions?`<div style="grid-column:1/-1"><span style="color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Instructions</span>
+                      ${s.instructions?`<div style="grid-column:1/-1"><span style="color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase">Instructions</span>
                         <div style="color:var(--text2);font-size:11px;margin-top:2px;line-height:1.4">${escHtml(s.instructions)}</div></div>`:''}
                     </div>` : ''}
 
@@ -1110,7 +1110,7 @@ function renderInstanceDetail(el, inst) {
 
                     ${(s._attachedDocs||[]).length ? `
                     <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+                      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--muted);margin-bottom:6px">Attached Documents</div>
                       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
                         ${(s._attachedDocs||[]).map(d => {
@@ -1119,7 +1119,7 @@ function renderInstanceDetail(el, inst) {
                           return `<div class="attached-doc" style="gap:6px">
                             <span style="color:${roleColor};flex-shrink:0">${roleIcon}</span>
                             <span class="attached-doc-name" style="flex:1;font-size:11px">${escHtml(d.name)}</span>
-                            <span style="font-size:9px;color:var(--cad);font-family:var(--font-mono);flex-shrink:0;white-space:nowrap">${escHtml(d.version||'')}</span>
+                            <span style="font-size:10px;color:var(--cad);font-family:var(--font-mono);flex-shrink:0;white-space:nowrap">${escHtml(d.version||'')}</span>
                             ${d.url?`<button class="attached-doc-remove" style="color:var(--accent)"
                               onclick="window.open('${d.url}','_blank')" title="View">⤢</button>`:''}
                           </div>`;
@@ -1133,10 +1133,10 @@ function renderInstanceDetail(el, inst) {
                       <button onclick="toggleCadReassign('${s.id}')"
                         style="background:none;border:none;cursor:pointer;padding:0;
                           display:flex;align-items:center;gap:5px;
-                          font-size:9px;font-weight:600;letter-spacing:.12em;
+                          font-size:10px;font-weight:600;letter-spacing:.12em;
                           text-transform:uppercase;color:var(--muted)">
                         <span id="cad-reassign-chevron-${s.id}"
-                          style="font-size:8px;transition:transform .2s">▶</span>
+                          style="font-size:10px;transition:transform .2s">▶</span>
                         ↻ Reassign for This Instance
                       </button>
                       <div id="cad-reassign-panel-${s.id}" style="display:none;margin-top:8px">
@@ -1187,7 +1187,7 @@ function renderInstanceDetail(el, inst) {
                       <!-- Add assignee — grouped by department/external -->
                       <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end;margin-bottom:8px">
                         <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Add Assignee</label>
+                          <label style="font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px">Add Assignee</label>
                           <select class="config-select" id="reassign-res-${s.id}" style="font-size:11px">
                             ${renderResourceOptions('', '— Select resource —')}
                           </select>
@@ -1199,13 +1199,13 @@ function renderInstanceDetail(el, inst) {
                       ${s.assignee_type==='external'?`
                       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
                         <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px">Name Override</label>
+                          <label style="font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px">Name Override</label>
                           <input class="config-input" id="reassign-name-${s.id}" style="font-size:11px"
                             value="${escHtml(reassign?.assignee_name||s.assignee_name||'')}"
                             placeholder="Full name" />
                         </div>
                         <div>
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px">Email Override</label>
+                          <label style="font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px">Email Override</label>
                           <input class="config-input" id="reassign-email-${s.id}" type="email" style="font-size:11px"
                             value="${escHtml(reassign?.assignee_email||s.assignee_email||'')}"
                             placeholder="email@example.com" />
@@ -1221,7 +1221,7 @@ function renderInstanceDetail(el, inst) {
                     <!-- Complete Step — outcome selection (shown when step is active or ready, not yet done) -->
                     ${canAct && (touched || isReady) && !done ? `
                     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-                      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+                      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                         color:var(--muted);margin-bottom:8px">Complete this step</div>
 
                       <!-- Tier 1: Semantic outcome buttons — hollow dot, fills on select -->
@@ -1241,15 +1241,15 @@ function renderInstanceDetail(el, inst) {
                               border:1.5px solid ${o.color};background:transparent"></div>
                           <span style="font-size:12px;font-weight:500;color:${o.color};
                             pointer-events:none">${escHtml(o.label)}</span>
-                          ${o.holdsForActions ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7;pointer-events:none">holds until actions resolve</span>` : ''}
-                          ${o.requiresSuspend ? `<span style="margin-left:auto;font-size:9px;color:${o.color};opacity:.7;pointer-events:none">suspends instance</span>` : ''}
+                          ${o.holdsForActions ? `<span style="margin-left:auto;font-size:10px;color:${o.color};opacity:.7;pointer-events:none">holds until actions resolve</span>` : ''}
+                          ${o.requiresSuspend ? `<span style="margin-left:auto;font-size:10px;color:${o.color};opacity:.7;pointer-events:none">suspends instance</span>` : ''}
                         </button>`).join('')}
                       </div>
 
                       <!-- Notes — required for reset/reject outcomes, optional otherwise -->
                       <div style="margin-top:8px">
                         <label id="complete-notes-label-${s.id}"
-                          style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                          style="font-size:10px;color:var(--muted);letter-spacing:.1em;
                           text-transform:uppercase;display:block;margin-bottom:3px">
                           Notes (optional)
                         </label>
@@ -1260,7 +1260,7 @@ function renderInstanceDetail(el, inst) {
 
                       <!-- Routing disposition — hidden until a reset outcome is selected -->
                       <div id="routing-disposition-${s.id}" style="display:none;margin-top:10px">
-                        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;
+                        <div style="font-size:10px;font-weight:600;letter-spacing:.12em;
                           text-transform:uppercase;color:var(--muted);margin-bottom:6px">
                           Return workflow to
                         </div>
@@ -1271,7 +1271,7 @@ function renderInstanceDetail(el, inst) {
 
                       <!-- Suspend condition — hidden until a suspend outcome is selected -->
                       <div id="suspend-condition-wrap-${s.id}" style="display:none;margin-top:8px">
-                        <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                        <label style="font-size:10px;color:var(--muted);letter-spacing:.1em;
                           text-transform:uppercase;display:block;margin-bottom:3px">
                           Condition to re-activate</label>
                         <input class="config-input" id="suspend-condition-${s.id}"
@@ -1286,11 +1286,11 @@ function renderInstanceDetail(el, inst) {
                             cursor:pointer;display:flex;align-items:center;justify-content:space-between;
                             font-size:10px;color:var(--muted);text-align:left">
                           <span>↩ Override routing</span>
-                          <span id="routing-chevron-${s.id}" style="font-size:9px;transition:transform .15s">▶</span>
+                          <span id="routing-chevron-${s.id}" style="font-size:10px;transition:transform .15s">▶</span>
                         </button>
                         <div id="routing-body-${s.id}" style="display:none;padding:10px 12px;
                           border-top:1px solid var(--border);background:var(--bg1)">
-                          <label style="font-size:9px;color:var(--muted);letter-spacing:.1em;
+                          <label style="font-size:10px;color:var(--muted);letter-spacing:.1em;
                             text-transform:uppercase;display:block;margin-bottom:4px">Return to step</label>
                           <select id="route-target-${s.id}" class="config-select" style="font-size:11px;width:100%">
                             <option value="">— Advance normally —</option>
@@ -1347,14 +1347,14 @@ function renderInstanceDetail(el, inst) {
                     padding:10px 14px 12px;margin-bottom:0">
 
                     <!-- Thread header -->
-                    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;
+                    <div style="font-size:10px;font-weight:600;letter-spacing:.12em;
                       text-transform:uppercase;color:var(--muted);margin-bottom:8px;
                       display:flex;align-items:center;gap:8px">
                       <span>&#9997; Comments</span>
                       <span id="comment-count-${s.id}" style="color:var(--text2);font-weight:400"></span>
                       <div style="flex:1"></div>
                       <button onclick="openDirectActionItem('${s.id}')"
-                        style="font-size:9px;font-weight:600;letter-spacing:.08em;
+                        style="font-size:10px;font-weight:600;letter-spacing:.08em;
                           text-transform:uppercase;padding:3px 10px;
                           background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.35);
                           border-radius:3px;color:var(--accent);cursor:pointer;
@@ -1377,7 +1377,7 @@ function renderInstanceDetail(el, inst) {
                       <!-- Confidence + flags row -->
                       <div style="display:flex;align-items:center;gap:6px;
                         padding:6px 10px;border-bottom:1px solid var(--border)">
-                        <span style="font-size:9px;color:var(--muted);letter-spacing:.06em;
+                        <span style="font-size:10px;color:var(--muted);letter-spacing:.06em;
                           text-transform:uppercase;margin-right:2px">Signal</span>
                         <button id="conf-green-${s.id}" onclick="setCommentConf('${s.id}','green')"
                           title="On track"
@@ -1392,7 +1392,7 @@ function renderInstanceDetail(el, inst) {
                           style="width:18px;height:18px;border-radius:50%;border:2px solid var(--red);
                             background:transparent;cursor:pointer;transition:all .12s;flex-shrink:0"></button>
                         <div style="width:1px;height:14px;background:var(--border);margin:0 4px"></div>
-                        <span style="font-size:9px;color:var(--muted);letter-spacing:.06em;
+                        <span style="font-size:10px;color:var(--muted);letter-spacing:.06em;
                           text-transform:uppercase;margin-right:4px">Hours Worked</span>
                         <input id="comment-hours-${s.id}" type="number" min="0" max="24" step="0.25"
                           placeholder="0.0" oninput="_validateCommentPost('${s.id}')"
@@ -1433,7 +1433,7 @@ function renderInstanceDetail(el, inst) {
 
       <!-- Chain of Custody — fixed 300px right -->
       <div style="width:300px;flex-shrink:0;border-left:1px solid var(--border);overflow-y:auto;padding:16px">
-        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+        <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
           color:var(--muted);margin-bottom:12px">Chain of Custody</div>
         ${!coc.length
           ? `<div style="font-size:11px;color:var(--muted)">No events yet.</div>`
@@ -1450,7 +1450,7 @@ function renderInstanceDetail(el, inst) {
                 </div>
                 <div style="flex:1;min-width:0;padding-bottom:2px">
                   <div style="font-size:10px;font-weight:600;color:${color}">${label}</div>
-                  ${step?`<div style="font-size:9px;color:var(--muted);margin-top:1px">→ ${escHtml(step.name||'')}</div>`:''}
+                  ${step?`<div style="font-size:10px;color:var(--muted);margin-top:1px">→ ${escHtml(step.name||'')}</div>`:''}
                   ${evt.outcome ? (() => {
                     const outDef = step ? _getOutcomes(step).find(o => o.id === evt.outcome) : null;
                     const outColor = outDef?.color || color;
@@ -1472,11 +1472,11 @@ function renderInstanceDetail(el, inst) {
                       padding:3px 6px;background:var(--surf2);border-left:2px solid var(--amber)">
                       Awaiting: ${escHtml(evt.suspend_condition)}
                     </div>` : ''}
-                  ${evt.actor_name?`<div style="font-size:9px;color:var(--text2)">By ${escHtml(evt.actor_name)}</div>`:''}
+                  ${evt.actor_name?`<div style="font-size:10px;color:var(--text2)">By ${escHtml(evt.actor_name)}</div>`:''}
                   ${evt.notes||evt.event_notes?`<div style="font-size:10px;color:var(--text2);margin-top:2px;
                     padding:3px 6px;background:var(--surf2);border-left:2px solid ${color}">
                     ${escHtml(evt.notes||evt.event_notes)}</div>`:''}
-                  ${ts?`<div style="font-size:9px;color:var(--muted);margin-top:1px;font-family:var(--font-mono)">
+                  ${ts?`<div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--font-mono)">
                     ${ts.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>`:''}
                 </div>
               </div>`;
@@ -2269,3 +2269,4 @@ async function _reloadInstance(instId) {
   if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
   setTimeout(_populateReworkBadges, 50);
 }
+

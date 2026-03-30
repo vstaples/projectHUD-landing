@@ -55,7 +55,7 @@ function renderFormsTab(el) {
                   display:flex;flex-direction:column;background:var(--bg1)">
         <div style="padding:10px 14px;border-bottom:1px solid var(--border);
                     display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.14em;
+          <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
                        text-transform:uppercase;color:var(--muted)">Form Library</span>
           <button class="btn btn-cad btn-sm" onclick="_formUploadClick()"
             style="font-size:10px;padding:3px 9px">↑ Import</button>
@@ -69,7 +69,7 @@ function renderFormsTab(el) {
       </div>
 
       <!-- ── Main area: editor or empty state ─────────────────────── -->
-      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden">
+      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0;width:100%;height:100%">
         ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
       </div>
 
@@ -113,7 +113,7 @@ function _renderFormList() {
 
 function _routingBadge(form) {
   const mode = form.routing?.mode || 'serial';
-  return `<span style="color:${mode === 'parallel' ? 'var(--accent)' : 'var(--amber)'};font-size:9px">
+  return `<span style="color:${mode === 'parallel' ? 'var(--accent)' : 'var(--amber)'};font-size:10px">
     ${mode === 'parallel' ? '⇉ parallel' : '↓ serial'}
   </span>`;
 }
@@ -124,11 +124,12 @@ function _routingBadge(form) {
 
 function _renderFormEmpty() {
   return `
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;
-                justify-content:center;gap:14px;color:var(--muted)">
+    <div style="width:100%;height:100%;display:flex;flex-direction:column;
+                align-items:center;justify-content:center;gap:14px;
+                background:var(--bg);color:var(--muted)">
       <div style="font-size:48px;opacity:.12">📄</div>
       <div style="font-size:13px;font-weight:500;color:var(--text2)">No form selected</div>
-      <div style="font-size:11px;max-width:280px;text-align:center;line-height:1.7">
+      <div style="font-size:11px;max-width:280px;text-align:center;line-height:1.7;color:var(--muted)">
         Import a PDF or Word document — CadenceHUD will detect fields automatically.
         You can then add, edit, and assign roles to each field.
       </div>
@@ -158,14 +159,14 @@ function _renderFormEditor() {
         </span>
         <!-- Page navigation -->
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <button onclick="_formPrevPage()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px" ${_pdfPage <= 1 ? 'disabled' : ''}>‹</button>
+          <button id="form-page-prev" onclick="_formPrevPage()" class="btn btn-ghost btn-sm"
+            style="padding:3px 8px">‹</button>
           <span id="form-page-indicator"
             style="font-size:10px;color:var(--muted);white-space:nowrap;font-family:var(--font-mono)">
             ${_pdfPage} / ${_pdfTotalPages}
           </span>
-          <button onclick="_formNextPage()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px" ${_pdfPage >= _pdfTotalPages ? 'disabled' : ''}>›</button>
+          <button id="form-page-next" onclick="_formNextPage()" class="btn btn-ghost btn-sm"
+            style="padding:3px 8px">›</button>
         </div>
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
         <!-- Zoom -->
@@ -212,7 +213,7 @@ function _renderFormEditor() {
                     display:flex;flex-direction:column;background:var(--bg1)">
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);
                       display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-            <span style="font-size:9px;font-weight:600;letter-spacing:.14em;
+            <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
                          text-transform:uppercase;color:var(--muted)">
               Fields <span style="font-weight:400;color:var(--text3)">(${totalFields})</span>
             </span>
@@ -226,7 +227,7 @@ function _renderFormEditor() {
         <div style="width:220px;min-width:220px;border-left:1px solid var(--border);
                     display:flex;flex-direction:column;background:var(--bg1)">
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-            <span style="font-size:9px;font-weight:600;letter-spacing:.14em;
+            <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
                          text-transform:uppercase;color:var(--muted)">Fill Routing</span>
           </div>
           <div style="flex:1;overflow-y:auto;padding:14px">
@@ -277,12 +278,12 @@ function _renderFieldList() {
             ${escHtml(field.label || 'Unlabelled')}
           </div>
           <div style="display:flex;align-items:center;gap:5px">
-            <span style="font-size:9px;padding:1px 5px;border-radius:3px;
+            <span style="font-size:10px;padding:1px 5px;border-radius:3px;
                          background:${roleConf.dim};color:${roleConf.color}">
               ${roleConf.label}
             </span>
-            ${field.required ? `<span style="font-size:9px;color:var(--red)">required</span>` : ''}
-            <span style="font-size:9px;color:var(--muted)">p${field.page || 1}</span>
+            ${field.required ? `<span style="font-size:10px;color:var(--red)">required</span>` : ''}
+            <span style="font-size:10px;color:var(--muted)">p${field.page || 1}</span>
           </div>
         </div>
 
@@ -313,7 +314,7 @@ function _renderRoutingPanel(roles) {
   return `
     <!-- Mode selector -->
     <div style="margin-bottom:16px">
-      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:10px">Fill Order</div>
 
       <!-- Serial radio -->
@@ -359,7 +360,7 @@ function _renderRoutingPanel(roles) {
 
     <!-- Role sequence (shown always; drag handle only active in serial mode) -->
     <div>
-      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px">
         Roles in this form
         ${isSerial ? `<span style="font-weight:400;color:var(--text3)">— drag to reorder</span>` : ''}
@@ -420,7 +421,7 @@ function _renderRoleRows(roles, isSerial) {
               ${roleConf.label}
             </span>
           </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px">
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">
             ${fieldCount} field${fieldCount !== 1 ? 's' : ''}
           </div>
         </div>
@@ -580,7 +581,7 @@ function _formSelectField(fieldId) {
   ).join('');
 
   popover.innerHTML = `
-    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                 color:var(--muted);margin-bottom:10px">Edit Field</div>
 
     <div style="margin-bottom:8px">
@@ -856,8 +857,14 @@ function _formNextPage() {
 }
 
 function _updatePageIndicator() {
-  const el = document.getElementById('form-page-indicator');
-  if (el) el.textContent = `${_pdfPage} / ${_pdfTotalPages}`;
+  const el   = document.getElementById('form-page-indicator');
+  const prev = document.getElementById('form-page-prev');
+  const next = document.getElementById('form-page-next');
+  if (el)   el.textContent    = `${_pdfPage} / ${_pdfTotalPages}`;
+  if (prev) prev.disabled     = (_pdfPage <= 1);
+  if (next) next.disabled     = (_pdfPage >= _pdfTotalPages);
+  if (prev) prev.style.opacity = (_pdfPage <= 1)             ? '0.3' : '';
+  if (next) next.style.opacity = (_pdfPage >= _pdfTotalPages) ? '0.3' : '';
 }
 
 function _formZoomIn()  { _pdfScale = Math.min(3, _pdfScale * 1.25); _renderPdfPage(_pdfStartPage + _pdfPage - 1); }
@@ -1638,11 +1645,11 @@ function _renderStageRoutingPanel() {
 
   return `
     <div>
-      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
         Fill Stages
         <button onclick="_formAddStage()" class="btn btn-ghost btn-sm"
-          style="font-size:9px;padding:2px 8px;letter-spacing:.04em">+ Stage</button>
+          style="font-size:10px;padding:2px 8px;letter-spacing:.04em">+ Stage</button>
       </div>
 
       <div id="form-stage-list" style="display:flex;flex-direction:column;gap:8px">
@@ -1705,7 +1712,7 @@ function _renderStageRow(stage, si, totalStages) {
         </div>
 
         <!-- Field count + activation note -->
-        <div style="font-size:9px;color:var(--muted);margin-top:4px">
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">
           ${fieldCount} field${fieldCount !== 1 ? 's' : ''} assigned
           ${si > 0 ? ` · activates after Stage ${si}` : ' · activates on step start'}
         </div>
@@ -1825,13 +1832,13 @@ function _renderFieldList() {
             ${escHtml(field.label || 'Unlabelled')}
           </div>
           <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span style="font-size:9px;padding:1px 5px;border-radius:3px;
+            <span style="font-size:10px;padding:1px 5px;border-radius:3px;
                          background:${roleConf.dim};color:${roleConf.color}">
               ${roleConf.label}
             </span>
-            <span style="font-size:9px;color:var(--muted)">${typeMeta.label}</span>
-            ${field.required ? `<span style="font-size:9px;color:var(--red)">req</span>` : ''}
-            ${field.stage    ? `<span style="font-size:9px;color:var(--muted)">S${field.stage}</span>` : ''}
+            <span style="font-size:10px;color:var(--muted)">${typeMeta.label}</span>
+            ${field.required ? `<span style="font-size:10px;color:var(--red)">req</span>` : ''}
+            ${field.stage    ? `<span style="font-size:10px;color:var(--muted)">S${field.stage}</span>` : ''}
           </div>
         </div>
 
@@ -1893,10 +1900,10 @@ function _formSelectField(fieldId) {
     : '';
 
   popover.innerHTML = `
-    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                 color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
       Edit Field
-      <span style="font-size:9px;color:${_fieldConfidenceColor(field)};font-weight:400">
+      <span style="font-size:10px;color:${_fieldConfidenceColor(field)};font-weight:400">
         ${field.detection || ''}
       </span>
     </div>
@@ -2307,6 +2314,7 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
   // Re-render tab (replaces progress UI with the editor)
   if (tabEl) renderFormsTab(tabEl);
   await _renderPdfPage(startPage);
+  _updatePageIndicator(); // sync button states after import
 
   _importProgressUpdate(100, 'Done', '');
 

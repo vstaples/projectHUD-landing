@@ -255,13 +255,13 @@ function _renderCommentThread(stepId) {
       {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '';
     const conf = c.confidence;
     const confBadge = conf
-      ? `<span style="font-size:9px;color:${confColor[conf]};padding:1px 6px;
+      ? `<span style="font-size:10px;color:${confColor[conf]};padding:1px 6px;
            border:1px solid ${confColor[conf]}44;border-radius:10px;background:${confColor[conf]}11">
            &#9679; ${confLabel[conf]}
          </span>`
       : '';
     const hoursBadge = c.hours_logged
-      ? `<span style="font-size:9px;color:var(--amber);font-family:var(--font-mono);
+      ? `<span style="font-size:10px;color:var(--amber);font-family:var(--font-mono);
            padding:1px 6px;border:1px solid rgba(232,168,56,.3);border-radius:10px;
            background:rgba(232,168,56,.08)">
            &#9201; ${c.hours_logged}h
@@ -279,19 +279,19 @@ function _renderCommentThread(stepId) {
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
           ${_avatarHtml(c.author_name, 20)}
           <span style="font-size:10px;font-weight:700;color:var(--text)">${escHtml(c.author_name||'Unknown')}</span>
-          <span style="font-size:9px;color:var(--muted)">${ts}</span>
+          <span style="font-size:10px;color:var(--muted)">${ts}</span>
           ${confBadge}${hoursBadge}
           <div style="flex:1"></div>
           ${!isReply && canPromote ? (c.is_promoted
-            ? `<span style="font-size:9px;color:var(--muted);font-style:italic">&#128274; Promoted</span>`
+            ? `<span style="font-size:10px;color:var(--muted);font-style:italic">&#128274; Promoted</span>`
             : `<button onclick="promoteToActionItem('${c.id}','${stepId}')"
-                style="font-size:9px;color:var(--accent);background:none;border:none;
+                style="font-size:10px;color:var(--accent);background:none;border:none;
                   cursor:pointer;padding:0;opacity:.7"
                 onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.7'">
                 &#8679; Promote
               </button>`) : ''}
           <button onclick="showReplyInput('${c.id}','${stepId}')"
-            style="font-size:9px;color:var(--muted);background:none;border:none;
+            style="font-size:10px;color:var(--muted);background:none;border:none;
               cursor:pointer;padding:0;opacity:.7"
             onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.7'">
             &#8617; Reply${replyCount ? ' ('+replyCount+')' : ''}
@@ -324,7 +324,7 @@ function _renderActionItems(stepId) {
   const statusLabel = { open:'Open', in_progress:'In Progress', resolved:'Resolved', cancelled:'Cancelled' };
 
   el.innerHTML = `
-    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
       color:var(--muted);margin:10px 0 6px;display:flex;align-items:center;gap:6px">
       &#9654; Action Items
     </div>` +
@@ -349,16 +349,16 @@ function _renderActionItems(stepId) {
                 ${escHtml(a.title)}
               </div>
               <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap;align-items:center">
-                <span style="font-size:9px;color:${sc}">${sl}</span>
-                ${a.owner_name ? `<span style="display:inline-flex;align-items:center;gap:4px">${_avatarHtml(a.owner_name,16)}<span style="font-size:9px;color:var(--text2)">${escHtml(a.owner_name)}</span></span>` : '<span style="font-size:9px;color:var(--muted)">Unassigned</span>'}
-                ${due ? `<span style="font-size:9px;color:var(--muted)">&#128197; ${due}</span>` : ''}
-                ${attachments.length ? `<span style="font-size:9px;color:var(--muted)">&#128206; ${attachments.length} file${attachments.length>1?'s':''}</span>` : ''}
+                <span style="font-size:10px;color:${sc}">${sl}</span>
+                ${a.owner_name ? `<span style="display:inline-flex;align-items:center;gap:4px">${_avatarHtml(a.owner_name,16)}<span style="font-size:10px;color:var(--text2)">${escHtml(a.owner_name)}</span></span>` : '<span style="font-size:10px;color:var(--muted)">Unassigned</span>'}
+                ${due ? `<span style="font-size:10px;color:var(--muted)">&#128197; ${due}</span>` : ''}
+                ${attachments.length ? `<span style="font-size:10px;color:var(--muted)">&#128206; ${attachments.length} file${attachments.length>1?'s':''}</span>` : ''}
               </div>
             </div>
             <div style="display:flex;gap:5px;flex-shrink:0">
               ${!resolved ? `
               <button onclick="editActionItem('${a.id}','${stepId}')"
-                style="font-size:9px;color:var(--muted);background:none;
+                style="font-size:10px;color:var(--muted);background:none;
                   border:1px solid var(--border);border-radius:3px;
                   padding:2px 8px;cursor:pointer;white-space:nowrap"
                 onmouseenter="this.style.borderColor='var(--cad)';this.style.color='var(--cad)'"
@@ -366,7 +366,7 @@ function _renderActionItems(stepId) {
                 &#9998; Edit
               </button>
               <button onclick="resolveActionItem('${a.id}','${stepId}')"
-                style="font-size:9px;color:var(--green);background:none;
+                style="font-size:10px;color:var(--green);background:none;
                   border:1px solid rgba(29,158,117,.3);border-radius:3px;
                   padding:2px 8px;cursor:pointer;white-space:nowrap"
                 onmouseenter="this.style.background='rgba(29,158,117,.1)'"
@@ -379,14 +379,14 @@ function _renderActionItems(stepId) {
           ${a.instructions ? `
           <div style="padding:0 10px 8px 26px;font-size:10px;color:var(--text2);
             line-height:1.5;border-top:1px solid var(--border);padding-top:6px">
-            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
               color:var(--muted);display:block;margin-bottom:3px">Instructions</span>
             ${escHtml(a.instructions)}
           </div>` : ''}
           <!-- Attachments -->
           ${attachments.length ? `
           <div style="padding:0 10px 8px 26px;border-top:1px solid var(--border)">
-            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
               color:var(--muted);display:block;margin:6px 0 4px">Attachments</span>
             ${attachments.map(f => `
               <button onclick="_viewAttachment('${escHtml(f.path)}','${escHtml(f.name)}')"
@@ -399,7 +399,7 @@ function _renderActionItems(stepId) {
           <!-- Resolution note -->
           ${a.resolution_note ? `
           <div style="padding:5px 10px 8px 26px;border-top:1px solid var(--border)">
-            <span style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
               color:var(--green);display:block;margin-bottom:3px">Resolution</span>
             <div style="font-size:10px;color:var(--green);line-height:1.5">
               ${escHtml(a.resolution_note)}
@@ -424,13 +424,13 @@ function promoteToActionItem(commentId, stepId) {
     <div id="promote-form-${commentId}"
       style="margin:6px 0 8px;padding:10px 12px;border:1px solid rgba(79,142,247,.3);
         border-radius:5px;background:rgba(79,142,247,.06)">
-      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
         color:var(--accent);margin-bottom:8px">&#9650; Create Action Item</div>
 
       <!-- Source comment — read-only -->
       <div style="margin-bottom:8px;padding:7px 10px;background:var(--bg1);border-radius:4px;
         border-left:3px solid var(--border)">
-        <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
           color:var(--muted);margin-bottom:3px">From comment</div>
         <div style="font-size:10px;color:var(--text2);line-height:1.4;font-style:italic">
           ${escHtml(comment.body)}
@@ -439,7 +439,7 @@ function promoteToActionItem(commentId, stepId) {
 
       <!-- Title -->
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
           Title <span style="color:var(--red)">*</span>
         </label>
         <input id="ai-title-${commentId}" value="${escHtml(comment.body.slice(0,80))}"
@@ -451,7 +451,7 @@ function promoteToActionItem(commentId, stepId) {
 
       <!-- Instructions — required -->
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
           Instructions <span style="color:var(--red)">*</span>
           <span style="font-weight:400;font-style:italic;color:var(--muted)"> — describe what needs to be done</span>
         </label>
@@ -469,13 +469,13 @@ function promoteToActionItem(commentId, stepId) {
         <!-- Left: Owner + Due Date stacked -->
         <div style="display:flex;flex-direction:column;gap:6px">
           <div>
-            <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
+            <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
             <select id="ai-owner-${commentId}" class="config-select" style="font-size:11px;width:100%">
               ${ownerOpts}
             </select>
           </div>
           <div>
-            <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
+            <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
             <input id="ai-due-${commentId}" type="date"
               style="width:100%;font-size:11px;padding:5px 8px;
                 background:var(--bg1);border:1px solid var(--border);border-radius:3px;
@@ -484,7 +484,7 @@ function promoteToActionItem(commentId, stepId) {
         </div>
         <!-- Right: Attachments DnD -->
         <div style="display:flex;flex-direction:column;gap:3px">
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
             Attachments <span style="font-weight:400;color:var(--muted)">(optional)</span>
           </label>
           <div class="doc-drop-zone" id="ai-dropzone-${commentId}"
@@ -544,12 +544,12 @@ function openDirectActionItem(stepId) {
     <div id="promote-form-${formKey}"
       style="margin:0 0 8px;padding:10px 12px;border:1px solid rgba(79,142,247,.3);
         border-radius:5px;background:rgba(79,142,247,.06)">
-      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
         color:var(--accent);margin-bottom:8px">&#43; New Action Item</div>
 
       <!-- Title -->
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
           Title <span style="color:var(--red)">*</span>
         </label>
         <input id="ai-title-${formKey}" placeholder="What needs to be done?"
@@ -561,7 +561,7 @@ function openDirectActionItem(stepId) {
 
       <!-- Instructions -->
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
           Instructions
           <span style="font-weight:400;font-style:italic;color:var(--muted)"> — optional detail</span>
         </label>
@@ -576,13 +576,13 @@ function openDirectActionItem(stepId) {
       <!-- Owner + Due Date -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
         <div>
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
           <select id="ai-owner-${formKey}" class="config-select" style="font-size:11px;width:100%">
             ${ownerOpts}
           </select>
         </div>
         <div>
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
           <input id="ai-due-${formKey}" type="date"
             style="width:100%;font-size:11px;padding:5px 8px;
               background:var(--bg1);border:1px solid var(--border);border-radius:3px;
@@ -829,11 +829,11 @@ function editActionItem(actionItemId, stepId) {
     <div id="edit-form-${actionItemId}"
       style="border:1px solid var(--cad-wire);border-radius:5px;
         background:var(--bg1);padding:10px 12px;margin-bottom:6px">
-      <div style="font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
         color:var(--cad);margin-bottom:8px">&#9998; Edit Action Item</div>
 
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Title</label>
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Title</label>
         <input id="edit-title-${actionItemId}" value="${escHtml(a.title)}"
           style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 8px;
             background:var(--bg2);border:1px solid var(--border);border-radius:3px;
@@ -841,7 +841,7 @@ function editActionItem(actionItemId, stepId) {
       </div>
 
       <div style="margin-bottom:6px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
           Instructions <span style="color:var(--red)">*</span>
         </label>
         <textarea id="edit-instructions-${actionItemId}"
@@ -853,13 +853,13 @@ function editActionItem(actionItemId, stepId) {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <div>
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Owner</label>
           <select id="edit-owner-${actionItemId}" class="config-select" style="font-size:11px;width:100%">
             ${ownerOpts}
           </select>
         </div>
         <div>
-          <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Due Date</label>
           <input id="edit-due-${actionItemId}" type="date" value="${a.due_date || ''}"
             style="width:100%;font-size:11px;padding:5px 8px;
               background:var(--bg2);border:1px solid var(--border);border-radius:3px;
@@ -869,7 +869,7 @@ function editActionItem(actionItemId, stepId) {
 
       <!-- Add more attachments — DnD dropzone -->
       <div style="margin-bottom:8px">
-        <label style="font-size:9px;color:var(--muted);display:block;margin-bottom:3px">
+        <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">
           Add Attachments
         </label>
         <div class="doc-drop-zone" id="edit-dropzone-${actionItemId}"
@@ -889,7 +889,7 @@ function editActionItem(actionItemId, stepId) {
       <!-- Existing attachments -->
       ${(Array.isArray(a.attachments) && a.attachments.length) ? `
       <div style="margin-bottom:8px">
-        <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
           color:var(--muted);margin-bottom:4px">Existing Attachments</div>
         ${a.attachments.map((f,i) => `
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
@@ -899,7 +899,7 @@ function editActionItem(actionItemId, stepId) {
               &#128206; ${escHtml(f.name)}
             </button>
             <button onclick="_removeEditAttachment('${actionItemId}',${i})"
-              style="font-size:9px;color:var(--red);background:none;border:none;cursor:pointer">
+              style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">
               &#10005;
             </button>
           </div>`).join('')}
