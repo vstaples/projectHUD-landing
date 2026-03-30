@@ -581,8 +581,22 @@ async function _notesLoadWorkspace() {
         ? fullState.viewsWorkspace
         : fullState;
       if (s.views) {
-        _workspace.activeView = s.activeView || 'Default';
-        _workspace.views      = s.views;
+        // MY VIEWS: when seeding from state.views (MY NOTES fallback),
+        // only import views that contain widget tiles — skip pure-note views.
+        const isViewsWorkspace = !!(fullState.viewsWorkspace && fullState.viewsWorkspace.views);
+        const filteredViews = {};
+        Object.keys(s.views).forEach(function(vn) {
+          const v = s.views[vn];
+          const tiles = v.tiles || [];
+          const hasWidgets = tiles.some(function(t) { return t.canvasMode === 'widget'; });
+          const isEmpty = tiles.length === 0;
+          // Always import if this is our own viewsWorkspace (not a fallback seed)
+          if (isViewsWorkspace || hasWidgets || isEmpty) {
+            filteredViews[vn] = v;
+          }
+        });
+        _workspace.activeView = (filteredViews[s.activeView || 'Default'] ? s.activeView : Object.keys(filteredViews)[0]) || 'Default';
+        _workspace.views      = Object.keys(filteredViews).length > 0 ? filteredViews : s.views;
         _workspace.library    = s.library || {};
         if (!_workspace.views[_workspace.activeView]) {
           _workspace.views[_workspace.activeView] = _notesDefaultView();
@@ -3129,6 +3143,7 @@ let _syncPollInterval = null;
 
 // ── Expose to window for onclick handlers ────────────────────────────────
 window._viewsSaveNow         = _viewsSaveNow; // MY VIEWS save — does NOT overwrite window._notesSaveNow
+window._viewsSaveWorkspace   = _viewsSaveWorkspace; // expose to Blocks 2+3 (widget system)
 window._viewsCv              = _cv; // MY VIEWS: do NOT overwrite window._notesCv
 // MY VIEWS: poll functions scoped — do NOT overwrite MY NOTES poll functions
 window._viewsStartInboxPoll  = _notesStartInboxPoll;
@@ -3142,12 +3157,12 @@ window._notesRowDelete       = _notesRowDelete;
 window._notesMinimizeTile    = _notesMinimizeTile;
 window._notesMaximizeTile    = _notesMaximizeTile;
 window._notesSetGrid       = _notesSetGrid;
-window._notesOpenNote   = _notesOpenNote;
-window._notesCloseTile  = _notesCloseTile;
-window._notesNew        = _notesNew;
+window._viewsOpenNote   = _notesOpenNote; // scoped — do NOT overwrite MY NOTES
+window._viewsCloseTile  = _notesCloseTile; // scoped — do NOT overwrite MY NOTES
+window._viewsNew        = _notesNew; // scoped — do NOT overwrite MY NOTES
 window._notesSearch        = _notesSearch;
 window._notesToggleSection = _notesToggleSection;
-window._notesSwitchView      = _notesSwitchView;
+window._viewsSwitchView      = _notesSwitchView; // scoped — do NOT overwrite MY NOTES
 window._notesNewView           = _notesNewView;
 // MY VIEWS: _workspace intentionally NOT exported to window — would clobber MY NOTES workspace
 window._viewsWorkspace         = _workspace; // safe alias for external inspection only
@@ -3541,9 +3556,9 @@ function showModeSwitcher(btn, tileState) {
               tileState.canvasMode  = 'note';
               delete tileState.widgetId;
               delete tileState.widgetConfig;
-              _viewsSaveWorkspace(true);
-              _notesRenderLeft();
-              _notesRenderGrid();
+              window._viewsSaveWorkspace(true);
+              window._notesRenderLeft && window._notesRenderLeft();
+              window._notesRenderGrid && window._notesRenderGrid();
               setTimeout(function() {
                 const titleEl = document.querySelector('[data-viewid="' + newNote.id + '"].views-tile-title');
                 if (titleEl) { titleEl.focus(); document.execCommand('selectAll', false, null); }
@@ -3554,7 +3569,7 @@ function showModeSwitcher(btn, tileState) {
           tileState.canvasMode = 'note';
           delete tileState.widgetId;
           delete tileState.widgetConfig;
-          _viewsSaveWorkspace(true);
+          window._viewsSaveWorkspace(true);
           refreshTileWidget(tileState.noteId);
         }
       }
@@ -3788,7 +3803,7 @@ function applyWidget(widgetId, config, tileState) {
   tileState.canvasMode    = 'widget';
   tileState.widgetId      = widgetId;
   tileState.widgetConfig  = config;
-  _viewsSaveWorkspace(true);
+  window._viewsSaveWorkspace(true);
   // Refresh left panel so deleted note disappears from knowledge tree
   if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
   refreshTileWidget(tileState.noteId);
