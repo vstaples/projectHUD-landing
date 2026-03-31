@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-060927
-console.log('[cdn-form-editor] LOADED v20260331-060927');
+// VERSION: 20260331-061516
+console.log('[cdn-form-editor] LOADED v20260331-061516');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -266,78 +266,86 @@ function _renderFormEditor() {
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
 
       <!-- ── Editor toolbar ─────────────────────────────────────────── -->
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
-                  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-        <!-- Name (editable) -->
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;
+                  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
+                  font-family:Arial,sans-serif;font-size:12px">
+
+        <!-- Name (editable) — fixed width so it never collapses -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
-          style="font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:80px;
+          style="font-size:12px;font-weight:600;color:var(--text);width:160px;
                  background:transparent;border:none;border-bottom:1px solid transparent;
-                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;
+                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;flex-shrink:0;
                  transition:border-color .15s"
           onfocus="this.style.borderBottomColor='var(--cad)'"
           onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
           oninput="_formMarkDirty()"
           onkeydown="if(event.key==='Enter')this.blur()"
           title="Click to rename — press Enter to confirm"/>
-        <!-- State · Version · Category group -->
+
+        <!-- State · Version · Category — pill group -->
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <span style="font-size:11px;padding:2px 8px;border-radius:999px;
+          <span style="font-size:12px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
-                       color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif">
-            ${_formStateLabel(f.state||'draft')}
-          </span>
-          <span style="font-size:11px;padding:2px 8px;border-radius:999px;
+                       color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif;
+                       line-height:1.4">${_formStateLabel(f.state||'draft')}</span>
+          <span style="font-size:12px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
-                       color:var(--muted);font-family:Arial,sans-serif">
-            ${f.version||'0.1.0'}
-          </span>
-          ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat ? `<span style="font-size:11px;padding:2px 8px;border-radius:999px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif">${escHtml(cat.name)}</span>` : `<button onclick="_formPickCategory()" style="font-size:11px;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">+ Category</button>`; })()}
+                       color:var(--muted);font-family:Arial,sans-serif;
+                       line-height:1.4">${f.version||'0.1.0'}</span>
+          ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat
+            ? `<span style="font-size:12px;padding:3px 10px;border-radius:4px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif;line-height:1.4">${escHtml(cat.name)}</span>`
+            : `<button onclick="_formPickCategory()" style="font-size:12px;padding:3px 10px;border-radius:4px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
+          })()}
         </div>
+
+        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
+
         <!-- Page navigation -->
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <button id="form-page-prev" onclick="_formPrevPage()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px">‹</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <button id="form-page-prev" onclick="_formPrevPage()"
+            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">‹</button>
           <span id="form-page-indicator"
             style="font-size:12px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif">
             ${_pdfPage} / ${_pdfTotalPages}
           </span>
-          <button id="form-page-next" onclick="_formNextPage()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px">›</button>
+          <button id="form-page-next" onclick="_formNextPage()"
+            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">›</button>
         </div>
+
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
+
         <!-- Zoom -->
         <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
-          <button onclick="_formZoomOut()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px;font-size:14px" title="Zoom out (−)">−</button>
+          <button onclick="_formZoomOut()"
+            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom out">−</button>
           <span id="form-zoom-label"
-            style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;
-                   min-width:38px;text-align:center;cursor:pointer"
-            onclick="_formZoomReset()" title="Click to reset to 100%">
-            ${Math.round(_pdfScale * 100 / 1.5)}%
-          </span>
-          <button onclick="_formZoomIn()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px;font-size:14px" title="Zoom in (+)">+</button>
-          <button onclick="_formZoomFit()" class="btn btn-ghost btn-sm"
-            style="padding:3px 8px;font-size:11px" title="Fit to width">⊡</button>
+            style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;min-width:40px;text-align:center;cursor:pointer"
+            onclick="_formZoomReset()" title="Click to reset">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+          <button onclick="_formZoomIn()"
+            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom in">+</button>
+          <button onclick="_formZoomFit()"
+            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Fit to width">⊡</button>
         </div>
+
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
+
         <!-- Mode toggle: Select vs Draw -->
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
           <button id="form-mode-select" onclick="_formSetMode('select')"
             title="Select & move fields (S)"
-            style="padding:3px 10px;font-size:12px;border:none;cursor:pointer;
-                   background:var(--cad);color:var(--bg0);transition:all .12s">⊹ Select</button>
+            style="padding:3px 12px;font-size:12px;font-family:Arial,sans-serif;border:none;cursor:pointer;
+                   background:var(--cad);color:var(--bg);transition:all .12s;line-height:1.4">⊹ Select</button>
           <button id="form-mode-draw" onclick="_formSetMode('draw')"
             title="Draw new field (D)"
-            style="padding:3px 10px;font-size:12px;border:none;border-left:1px solid var(--border);
-                   cursor:pointer;background:transparent;color:var(--muted);transition:all .12s">✎ Draw</button>
+            style="padding:3px 12px;font-size:12px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
+                   cursor:pointer;background:transparent;color:var(--muted);transition:all .12s;line-height:1.4">✎ Draw</button>
         </div>
         <!-- H/W size widget — shown when fields selected -->
         <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
           <div style="width:1px;height:18px;background:var(--border)"></div>
           <div style="display:flex;flex-direction:column;gap:2px">
             <div style="display:flex;align-items:center;gap:3px">
-              <span style="font-size:12px;color:var(--muted);width:10px">H</span>
+              <span style="font-size:12px;color:var(--muted);width:14px;font-family:Arial,sans-serif">H</span>
               <input id="form-hw-h" type="number" step="0.01" min="0.05"
                 style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
                        border:1px solid var(--border);border-radius:3px;color:var(--text);
@@ -350,7 +358,7 @@ function _renderFormEditor() {
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:3px">
-              <span style="font-size:12px;color:var(--muted);width:10px">W</span>
+              <span style="font-size:12px;color:var(--muted);width:14px;font-family:Arial,sans-serif">W</span>
               <input id="form-hw-w" type="number" step="0.01" min="0.05"
                 style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
                        border:1px solid var(--border);border-radius:3px;color:var(--text);
@@ -2150,7 +2158,7 @@ function _formLifecycleButtons(f) {
       btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()" style="font-size:12px">Submit for Review →</button>`);
     } else {
       // No category = no approval gate — can release directly
-      btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:12px;padding:3px 12px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">Release</button>`);
+      btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:12px;padding:3px 12px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">Release</button>`);
     }
   }
 
@@ -2162,7 +2170,7 @@ function _formLifecycleButtons(f) {
 
   if (state === 'pending_approval') {
     btns.push(`<span style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif">Awaiting approval</span>`);
-    btns.push(`<button onclick="_formApproveAndRelease()" style="font-size:12px;padding:3px 14px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">✓ Approve & Release</button>`);
+    btns.push(`<button onclick="_formApproveAndRelease()" style="font-size:12px;padding:3px 14px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">✓ Approve & Release</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectToUnreleased()" style="font-size:12px;color:var(--red)">✗ Reject</button>`);
   }
 
