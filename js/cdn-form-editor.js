@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-091401
-console.log('[cdn-form-editor] LOADED v20260331-091401');
+// VERSION: 20260331-093008
+console.log('[cdn-form-editor] LOADED v20260331-093008');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -86,7 +86,11 @@ let _formMode        = 'select'; // 'select' | 'draw' — controls cursor and in
 let _selectedFieldIds = new Set(); // IDs currently selected (multi-select)
 let _marqueeDrag      = null;      // { startX, startY, active } for marquee selection
 let _lastFieldClick   = 0;
-let _formDirty        = false; // true after first edit, cleared on save         // timestamp of last field click (double-click detection)
+let _formDirty        = false; // true after first edit, cleared on save
+let _formPreviewMode  = false; // true when preview panel is active
+let _previewStage     = 1;     // current stage being previewed
+let _previewResponses = {};    // fieldId → value (in-memory only, never saved)
+let _sigDrawing       = {};    // fieldId → { canvas, ctx, drawing }         // timestamp of last field click (double-click detection)
 let _lastFieldClickId = null;      // field id of last click
 
 // ── Role vocabulary ──────────────────────────────────────────────────────────
@@ -343,7 +347,7 @@ function _renderFormEditor() {
 
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
 
-        <!-- Mode toggle: Select vs Draw -->
+        <!-- Mode toggle: Select / Draw / Preview -->
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
           <button id="form-mode-select" onclick="_formSetMode('select')"
             title="Select & move fields (S)"
@@ -353,7 +357,15 @@ function _renderFormEditor() {
             title="Draw new field (D)"
             style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
                    cursor:pointer;background:transparent;color:var(--muted);transition:all .12s;line-height:1.4">✎ Draw</button>
+          <button id="form-mode-preview" onclick="_formTogglePreview()"
+            title="Preview form fill (P)"
+            style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
+                   cursor:pointer;background:transparent;color:var(--muted);transition:all .12s;line-height:1.4">▶ Preview</button>
         </div>
+        <!-- Pop-out preview button -->
+        <button id="form-popout-btn" onclick="_formPopOutPreview()" title="Open preview in new window"
+          style="display:none;font-size:13px;padding:4px 10px;background:transparent;border:1px solid var(--border);
+                 border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">⤢</button>
         <!-- H/W size widget — shown when fields selected -->
         <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
           <div style="width:1px;height:18px;background:var(--border)"></div>
@@ -390,7 +402,7 @@ function _renderFormEditor() {
       </div>
 
       <!-- ── Three-column body + CoC panel ──────────────────────── -->
-      <div style="flex:1;display:flex;overflow:hidden;min-height:0">
+      <div style="flex:1;display:flex;overflow:hidden;min-height:0" id="form-body-row">
 
         <!-- Column 1: Document canvas -->
         <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0;isolation:isolate"
@@ -1170,6 +1182,7 @@ function _formSvgMouseUp(event) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _formPrevPage() {
+  if (_formPreviewMode) { document.querySelectorAll('.form-preview-input-wrap').forEach(el=>el.remove()); document.getElementById('form-preview-stagebar')?.remove(); }
   if (_pdfPage <= 1) return;
   _pdfPage--;
   _updatePageIndicator();
@@ -1177,6 +1190,7 @@ function _formPrevPage() {
 }
 
 function _formNextPage() {
+  if (_formPreviewMode) { document.querySelectorAll('.form-preview-input-wrap').forEach(el=>el.remove()); }
   if (_pdfPage >= _pdfTotalPages) return;
   _pdfPage++;
   _updatePageIndicator();
@@ -2862,6 +2876,7 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
   if (!document.getElementById('form-field-overlay')) return;
   if ((e.key==='z'||e.key==='Z') && (e.ctrlKey||e.metaKey)) { e.preventDefault(); _undoPop(); return; }
+  if (e.key==='p'||e.key==='P') { _formTogglePreview(); return; }
   if (e.key==='s'||e.key==='S') _formSetMode('select');
   if (e.key==='d'||e.key==='D') _formSetMode('draw');
   if (e.key==='Escape') _formClearSelection();
@@ -3158,6 +3173,389 @@ document.addEventListener('wheel', function _formWheelZoom(e) {
   const delta = e.deltaY > 0 ? 0.8 : 1.25;
   _formSetZoom(Math.max(0.3, Math.min(4.0, _pdfScale * delta)));
 }, { passive: false });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORM PREVIEW — inline fill mode, no DB writes
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _formTogglePreview() {
+  _formPreviewMode = !_formPreviewMode;
+  _previewStage     = 1;
+  _previewResponses = {};
+
+  const selBtn  = document.getElementById('form-mode-select');
+  const drwBtn  = document.getElementById('form-mode-draw');
+  const preBtn  = document.getElementById('form-mode-preview');
+  const popBtn  = document.getElementById('form-popout-btn');
+  const hwWgt   = document.getElementById('form-hw-widget');
+  const colFlds = document.getElementById('form-col-fields');
+  const colRout = document.getElementById('form-col-routing');
+
+  if (_formPreviewMode) {
+    // Enter preview
+    if (preBtn) { preBtn.style.background = 'var(--accent)'; preBtn.style.color = 'var(--bg)'; }
+    if (selBtn) { selBtn.style.background = 'transparent'; selBtn.style.color = 'var(--muted)'; }
+    if (drwBtn) { drwBtn.style.background = 'transparent'; drwBtn.style.color = 'var(--muted)'; }
+    if (popBtn) { popBtn.style.display = ''; }
+    if (hwWgt)  { hwWgt.style.display  = 'none'; }
+    // Collapse side columns, expand canvas
+    if (colFlds) { colFlds.style.display = 'none'; }
+    if (colRout) { colRout.style.display = 'none'; }
+    _formRenderPreviewOverlay();
+  } else {
+    // Exit preview
+    if (preBtn) { preBtn.style.background = 'transparent'; preBtn.style.color = 'var(--muted)'; }
+    if (popBtn) { popBtn.style.display = 'none'; }
+    if (colFlds) { colFlds.style.display = ''; }
+    if (colRout) { colRout.style.display = ''; }
+    _formSetMode('select');
+    _renderFieldOverlays();
+  }
+}
+
+function _formGetStages() {
+  const stages = _formRouting?.stages || [];
+  if (stages.length) return stages;
+  // Fall back: derive from unique field roles
+  const roles = [...new Set(_formFields.map(f => f.role||'assignee'))];
+  return roles.map((role, i) => ({ stage: i+1, role }));
+}
+
+function _formFieldsForStage(stageNum) {
+  const stages = _formGetStages();
+  const stage  = stages.find(s => s.stage === stageNum);
+  if (!stage) return [];
+  // Fields explicitly assigned to this stage, or fall back by role
+  const byStage = _formFields.filter(f => (f.stage||1) === stageNum && (f.page||1) === _pdfPage);
+  if (byStage.length) return byStage;
+  return _formFields.filter(f => f.role === stage.role && (f.page||1) === _pdfPage);
+}
+
+function _formRenderPreviewOverlay() {
+  const svg = document.getElementById('form-field-overlay');
+  if (!svg) return;
+  // Clear SVG field boxes — preview uses HTML inputs positioned over canvas
+  svg.innerHTML = '';
+
+  // Remove old preview inputs
+  document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+
+  const stages   = _formGetStages();
+  const maxStage = stages.length || 1;
+
+  // ── Stage bar (injected above canvas) ────────────────────────────────────
+  let stageBar = document.getElementById('form-preview-stagebar');
+  if (!stageBar) {
+    const wrap = document.getElementById('form-canvas-wrap');
+    if (wrap) {
+      stageBar = document.createElement('div');
+      stageBar.id = 'form-preview-stagebar';
+      stageBar.style.cssText = 'position:sticky;top:0;z-index:30;background:var(--bg2);' +
+        'border-bottom:1px solid var(--border);padding:8px 16px;display:flex;' +
+        'align-items:center;gap:10px;font-family:Arial,sans-serif;flex-shrink:0;';
+      wrap.prepend(stageBar);
+    }
+  }
+  if (stageBar) {
+    const FORM_ROLES_LABELS = { assignee:'Assignee', reviewer:'Reviewer', pm:'PM', external:'External' };
+    const pips = stages.map(s => {
+      const active = s.stage === _previewStage;
+      const done   = s.stage < _previewStage;
+      const role   = FORM_ROLES_LABELS[s.role] || s.role;
+      return `<div style="display:flex;align-items:center;gap:4px">
+        <div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+                    justify-content:center;font-size:11px;font-weight:700;
+                    background:${done?'var(--green)':active?'var(--accent)':'var(--surf2)'};
+                    color:${done||active?'white':'var(--muted)'};border:2px solid
+                    ${done?'var(--green)':active?'var(--accent)':'var(--border)'}">${done?'✓':s.stage}</div>
+        <span style="font-size:13px;color:${active?'var(--text)':'var(--muted)'}">${role}</span>
+        ${s.stage < maxStage ? '<span style="color:var(--muted)">→</span>' : ''}
+      </div>`;
+    }).join('');
+
+    stageBar.innerHTML = `
+      <span style="font-size:13px;font-weight:600;color:var(--accent)">▶ Preview</span>
+      <span style="color:var(--border);font-size:13px">|</span>
+      ${pips}
+      <div style="flex:1"></div>
+      <button onclick="_formPreviewSubmitStage()"
+        style="font-size:13px;padding:4px 16px;border-radius:999px;
+               background:var(--accent);color:white;border:none;cursor:pointer;
+               font-family:Arial,sans-serif;font-weight:600">
+        ${_previewStage < maxStage ? 'Submit Stage →' : '✓ Complete'}
+      </button>
+      <button onclick="_formTogglePreview()"
+        style="font-size:13px;padding:4px 12px;border-radius:4px;background:transparent;
+               border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">
+        ✕ Exit
+      </button>`;
+  }
+
+  // ── Render field inputs over PDF canvas ──────────────────────────────────
+  const canvas   = document.getElementById('form-pdf-canvas');
+  const canvasWrap = canvas?.parentElement;
+  if (!canvas || !canvasWrap) return;
+
+  const activeFields = _formFieldsForStage(_previewStage);
+  const activeIds    = new Set(activeFields.map(f => f.id));
+
+  _formFields.filter(f => (f.page||1) === _pdfPage).forEach(field => {
+    const r  = field.rect || { x:0, y:0, w:80, h:18 };
+    const x  = r.x * _pdfScale, y = r.y * _pdfScale;
+    const w  = r.w * _pdfScale, h = r.h * _pdfScale;
+    const active = activeIds.has(field.id);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'form-preview-input-wrap';
+    wrap.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;
+      box-sizing:border-box;overflow:hidden;`;
+
+    const val = _previewResponses[field.id] || '';
+
+    if (!active) {
+      // Locked field — show faint overlay
+      wrap.style.background = 'rgba(255,255,255,.04)';
+      wrap.style.border = '1px solid rgba(255,255,255,.08)';
+      wrap.style.borderRadius = '2px';
+      wrap.style.pointerEvents = 'none';
+      wrap.title = `Stage ${field.stage||1} field — not yet active`;
+    } else if (field.type === 'checkbox') {
+      wrap.style.display = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.justifyContent = 'center';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = val === 'true';
+      cb.style.cssText = 'width:16px;height:16px;cursor:pointer;accent-color:var(--accent)';
+      cb.addEventListener('change', () => { _previewResponses[field.id] = String(cb.checked); });
+      wrap.appendChild(cb);
+
+    } else if (field.type === 'signature') {
+      _formPreviewSignatureField(wrap, field, val, w, h);
+
+    } else if (field.type === 'review') {
+      const opts = ['','pass','fail','na'];
+      const labels = {'':'—','pass':'✓ Pass','fail':'✗ Fail','na':'N/A'};
+      const colors = {'':'var(--muted)','pass':'var(--green)','fail':'var(--red)','na':'var(--amber)'};
+      let cur = val || '';
+      wrap.style.cursor = 'pointer';
+      wrap.style.display = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.justifyContent = 'center';
+      wrap.style.fontSize = '12px';
+      wrap.style.fontFamily = 'Arial,sans-serif';
+      wrap.style.fontWeight = '600';
+      wrap.style.background = 'rgba(255,255,255,.04)';
+      wrap.style.border = '1px solid var(--border)';
+      wrap.style.borderRadius = '3px';
+      wrap.style.color = colors[cur];
+      wrap.textContent = labels[cur];
+      wrap.addEventListener('click', () => {
+        cur = opts[(opts.indexOf(cur)+1) % opts.length];
+        _previewResponses[field.id] = cur;
+        wrap.textContent = labels[cur];
+        wrap.style.color  = colors[cur];
+      });
+
+    } else if (field.type === 'textarea') {
+      const ta = document.createElement('textarea');
+      ta.value = val;
+      ta.style.cssText = `width:100%;height:100%;box-sizing:border-box;resize:none;
+        background:rgba(255,255,255,.06);border:1px solid var(--accent);border-radius:3px;
+        color:var(--text);font-family:Arial,sans-serif;font-size:12px;padding:3px 5px;outline:none;`;
+      ta.addEventListener('input', () => { _previewResponses[field.id] = ta.value; });
+      wrap.appendChild(ta);
+
+    } else {
+      // text / date / number
+      const inp = document.createElement('input');
+      inp.type  = field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text';
+      inp.value = val;
+      inp.placeholder = field.label || '';
+      inp.style.cssText = `width:100%;height:100%;box-sizing:border-box;
+        background:rgba(255,255,255,.06);border:1px solid var(--accent);border-radius:3px;
+        color:var(--text);font-family:Arial,sans-serif;font-size:12px;padding:2px 5px;outline:none;`;
+      inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
+      wrap.appendChild(inp);
+    }
+
+    canvasWrap.style.position = 'relative';
+    canvasWrap.appendChild(wrap);
+  });
+}
+
+function _formPreviewSignatureField(wrap, field, val, w, h) {
+  // Toggle: Type (default) or Draw
+  let mode = 'type';
+  wrap.style.background = 'rgba(255,255,255,.04)';
+  wrap.style.border = '1px solid var(--accent)';
+  wrap.style.borderRadius = '3px';
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+
+  const renderSig = () => {
+    wrap.innerHTML = '';
+    if (mode === 'type') {
+      // Type mode
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = val || (_previewResponses[field.id] || '');
+      inp.placeholder = 'Type your name…';
+      inp.style.cssText = `flex:1;width:100%;background:transparent;border:none;outline:none;
+        font-family:'Dancing Script',cursive;font-size:${Math.max(14, h*0.55)}px;
+        color:var(--accent);padding:2px 6px;`;
+      inp.addEventListener('input', () => {
+        _previewResponses[field.id] = inp.value;
+      });
+      wrap.appendChild(inp);
+      const toggle = document.createElement('div');
+      toggle.style.cssText = 'font-size:10px;color:var(--muted);cursor:pointer;padding:1px 4px;' +
+        'text-align:right;flex-shrink:0;font-family:Arial,sans-serif;background:rgba(0,0,0,.2)';
+      toggle.textContent = '✏ Draw instead';
+      toggle.addEventListener('click', () => { mode='draw'; renderSig(); });
+      wrap.appendChild(toggle);
+
+    } else {
+      // Draw mode
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(w); cv.height = Math.round(h - 16);
+      cv.style.cssText = 'display:block;cursor:crosshair;flex:1;';
+      const ctx = cv.getContext('2d');
+      ctx.strokeStyle = '#4f8ef7'; ctx.lineWidth = 2;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      // Restore previous drawing if any
+      if (_previewResponses[field.id + '_img']) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = _previewResponses[field.id + '_img'];
+      }
+      let drawing = false, lx = 0, ly = 0;
+      cv.addEventListener('mousedown', e => {
+        drawing = true;
+        const r = cv.getBoundingClientRect();
+        lx = e.clientX - r.left; ly = e.clientY - r.top;
+        ctx.beginPath(); ctx.moveTo(lx, ly);
+      });
+      cv.addEventListener('mousemove', e => {
+        if (!drawing) return;
+        const r = cv.getBoundingClientRect();
+        const cx = e.clientX - r.left, cy = e.clientY - r.top;
+        ctx.lineTo(cx, cy); ctx.stroke();
+        lx = cx; ly = cy;
+      });
+      const stopDraw = () => {
+        if (drawing) {
+          drawing = false;
+          _previewResponses[field.id + '_img'] = cv.toDataURL();
+          _previewResponses[field.id] = '[signature]';
+        }
+      };
+      cv.addEventListener('mouseup', stopDraw);
+      cv.addEventListener('mouseleave', stopDraw);
+
+      wrap.appendChild(cv);
+
+      const btns = document.createElement('div');
+      btns.style.cssText = 'display:flex;gap:4px;padding:1px 4px;background:rgba(0,0,0,.2);flex-shrink:0;';
+      btns.innerHTML = '<span style="font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif" ' +
+        'onclick="this.closest('.form-preview-input-wrap').__clearSig?.()">Clear</span>' +
+        '<span style="flex:1"></span>' +
+        '<span style="font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">Aa Type instead</span>';
+      btns.lastElementChild.addEventListener('click', () => { mode='type'; renderSig(); });
+      btns.firstElementChild.addEventListener('click', () => {
+        ctx.clearRect(0,0,cv.width,cv.height);
+        delete _previewResponses[field.id];
+        delete _previewResponses[field.id+'_img'];
+      });
+      wrap.appendChild(btns);
+    }
+  };
+
+  // Load Dancing Script font if not already loaded
+  if (!document.getElementById('dancing-script-font')) {
+    const link = document.createElement('link');
+    link.id = 'dancing-script-font';
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap';
+    document.head.appendChild(link);
+  }
+
+  renderSig();
+}
+
+function _formPreviewSubmitStage() {
+  const stages   = _formGetStages();
+  const maxStage = stages.length || 1;
+
+  // Validate required fields for current stage
+  const required = _formFieldsForStage(_previewStage).filter(f => f.required);
+  const missing  = required.filter(f => !_previewResponses[f.id]);
+  if (missing.length) {
+    cadToast(`${missing.length} required field${missing.length>1?'s':''} not filled`, 'error');
+    // Highlight missing
+    missing.forEach(f => {
+      const wraps = document.querySelectorAll('.form-preview-input-wrap');
+      const canvas = document.getElementById('form-pdf-canvas');
+      if (!canvas) return;
+      const r = f.rect; const x = r.x*_pdfScale, y = r.y*_pdfScale;
+      wraps.forEach(w => {
+        if (Math.abs(parseInt(w.style.left)-x)<2 && Math.abs(parseInt(w.style.top)-y)<2) {
+          w.style.border = '2px solid var(--red)';
+          setTimeout(() => w.style.border = '', 2000);
+        }
+      });
+    });
+    return;
+  }
+
+  if (_previewStage < maxStage) {
+    _previewStage++;
+    cadToast(`Stage ${_previewStage-1} complete — now previewing Stage ${_previewStage}`, 'info');
+    // Remove old inputs and re-render
+    document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+    _formRenderPreviewOverlay();
+  } else {
+    // Final stage complete
+    const total    = Object.keys(_previewResponses).filter(k => !k.endsWith('_img')).length;
+    const required = _formFields.filter(f => f.required).length;
+    document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+    document.getElementById('form-preview-stagebar')?.remove();
+    const canvas = document.getElementById('form-pdf-canvas');
+    const wrap   = canvas?.parentElement;
+    if (wrap) {
+      const done = document.createElement('div');
+      done.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;background:rgba(15,17,23,.85);z-index:50;gap:12px;';
+      done.innerHTML = `<div style="font-size:48px">✅</div>
+        <div style="font-size:18px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">Preview Complete</div>
+        <div style="font-size:14px;color:var(--muted);font-family:Arial,sans-serif">
+          ${total} fields filled · ${required} required fields
+        </div>
+        <button onclick="_formTogglePreview()"
+          style="margin-top:8px;font-size:14px;padding:8px 24px;border-radius:999px;
+                 background:var(--accent);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">
+          ← Back to Editor
+        </button>`;
+      wrap.appendChild(done);
+    }
+    cadToast('Preview complete — all stages filled', 'success');
+  }
+}
+
+function _formPopOutPreview() {
+  if (!_selectedForm) return;
+  // Encode form data into URL params for the standalone preview page
+  const params = new URLSearchParams({
+    form_id:   _selectedForm.id,
+    form_name: _selectedForm.source_name || 'Form Preview',
+    preview:   '1',
+  });
+  window.open(`/form-preview.html?${params}`, '_blank',
+    'width=1100,height=800,resizable=yes,scrollbars=yes');
+}
+
+// Keyboard shortcut P = toggle preview
+// (wired into existing keydown listener)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DB MIGRATION SQL (run in browser console: _formShowMigrationSQL())

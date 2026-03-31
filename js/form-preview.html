@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Form Preview — CadenceHUD</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap"/>
+<style>
+  :root {
+    --bg:#0f1117; --bg1:#0c1220; --bg2:#111827;
+    --surf2:#1e2535; --surf3:#232d3f;
+    --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.13);
+    --text:#e8eaf0; --text1:#c5c9d6; --text2:#8b91a5; --muted:#5a6070;
+    --cad:#c47d18; --accent:#4f8ef7; --green:#2a9d40; --red:#c0404a; --amber:#d4901f;
+    --font:Arial,sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font);
+         display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* Top bar */
+  #topbar { display:flex;align-items:center;gap:10px;padding:8px 16px;
+            background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0; }
+  #topbar .logo { font-size:14px;font-weight:700;color:var(--cad); }
+  #topbar .title { font-size:14px;font-weight:600;color:var(--text);flex:1; }
+  .badge { font-size:12px;padding:3px 10px;border-radius:4px;background:var(--surf2);
+           border:1px solid var(--border);color:var(--accent); }
+  .btn { font-size:13px;padding:5px 16px;border-radius:6px;cursor:pointer;
+         font-family:var(--font);border:1px solid var(--border);background:var(--surf2);color:var(--text1); }
+  .btn-primary { background:var(--accent);color:white;border-color:var(--accent); }
+  .btn-success { background:var(--green);color:white;border-color:var(--green); }
+
+  /* Stage bar */
+  #stagebar { display:flex;align-items:center;gap:8px;padding:8px 16px;
+              background:var(--bg1);border-bottom:1px solid var(--border);
+              flex-shrink:0;flex-wrap:wrap; }
+  .stage-pip { display:flex;align-items:center;gap:5px; }
+  .stage-pip .dot { width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+                    justify-content:center;font-size:11px;font-weight:700; }
+
+  /* Canvas area */
+  #canvas-col { flex:1;overflow:auto;background:var(--bg);position:relative; }
+  #canvas-inner { display:inline-flex;justify-content:center;padding:24px 40px;
+                  min-height:100%;min-width:100%;box-sizing:border-box; }
+  #canvas-wrap { position:relative;display:inline-block;flex-shrink:0; }
+  #preview-canvas { display:block;box-shadow:0 4px 24px rgba(0,0,0,.5); }
+
+  /* Page nav */
+  #pagenav { display:flex;align-items:center;gap:6px;padding:6px 16px;
+             border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;font-size:13px; }
+  #pagenav button { font-size:13px;padding:2px 10px;border-radius:4px;cursor:pointer;
+                    border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--font); }
+
+  /* Preview inputs */
+  .fp-wrap { position:absolute;box-sizing:border-box;overflow:hidden; }
+  .fp-input { width:100%;height:100%;box-sizing:border-box;background:rgba(255,255,255,.06);
+              border:1.5px solid var(--accent);border-radius:3px;color:var(--text);
+              font-family:var(--font);font-size:12px;padding:2px 5px;outline:none; }
+  .fp-sig-type { width:100%;height:100%;background:transparent;border:none;outline:none;
+                 font-family:'Dancing Script',cursive;font-size:20px;color:var(--accent);padding:2px 6px; }
+  .fp-locked { background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+               border-radius:2px;pointer-events:none; }
+  .fp-review { display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+               background:rgba(255,255,255,.04);border:1.5px solid var(--border);border-radius:3px;
+               cursor:pointer;font-size:12px;font-weight:600; }
+
+  /* Complete overlay */
+  #done-overlay { display:none;position:fixed;inset:0;background:rgba(15,17,23,.9);
+                  z-index:100;flex-direction:column;align-items:center;justify-content:center;gap:16px; }
+  #done-overlay.show { display:flex; }
+
+  .spinner { width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);
+             border-radius:50%;animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading { display:flex;flex-direction:column;align-items:center;justify-content:center;
+             height:100%;gap:12px;font-size:14px;color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo">⬡ CadenceHUD</div>
+  <div class="title" id="form-title">Form Preview</div>
+  <span class="badge">Preview Mode — No data saved</span>
+  <button class="btn" onclick="window.print()">🖨 Print</button>
+  <button class="btn" onclick="window.close()">✕ Close</button>
+</div>
+
+<div id="stagebar"></div>
+
+<div id="pagenav">
+  <button onclick="prevPage()">‹</button>
+  <span id="page-ind">1 / 1</span>
+  <button onclick="nextPage()">›</button>
+  <span style="color:var(--muted);font-size:12px;margin-left:8px">Preview — fill fields to test routing</span>
+  <div style="flex:1"></div>
+  <span style="font-size:12px;color:var(--muted)" id="fill-status">0 fields filled</span>
+</div>
+
+<div id="canvas-col">
+  <div id="canvas-inner">
+    <div id="canvas-wrap">
+      <canvas id="preview-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<div id="done-overlay">
+  <div style="font-size:56px">✅</div>
+  <div style="font-size:22px;font-weight:700;color:var(--text)">Preview Complete</div>
+  <div style="font-size:15px;color:var(--muted)" id="done-summary"></div>
+  <button class="btn btn-primary" style="margin-top:8px;font-size:14px;padding:8px 28px;border-radius:999px"
+    onclick="resetPreview()">↺ Start Over</button>
+  <button class="btn" style="font-size:14px;padding:8px 20px;border-radius:999px"
+    onclick="window.close()">Close Window</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTE0MDI0MDAsImV4cCI6MjAyNjk3ODQwMH0.placeholder';
+
+const ROLE_LABELS = { assignee:'Assignee', reviewer:'Reviewer', pm:'PM', external:'External' };
+const REVIEW_OPTS = ['','pass','fail','na'];
+const REVIEW_LABELS = {'':'—','pass':'✓ Pass','fail':'✗ Fail','na':'N/A'};
+const REVIEW_COLORS = {'':'var(--muted)','pass':'var(--green)','fail':'var(--red)','na':'var(--amber)'};
+
+let _form = null, _pdfDoc = null, _page = 1, _scale = 1.5;
+let _stage = 1, _stages = [], _responses = {};
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async () => {
+  const p = new URLSearchParams(location.search);
+  const formId = p.get('form_id');
+  const formName = p.get('form_name') || 'Form Preview';
+  document.getElementById('form-title').textContent = formName;
+
+  if (!formId) { showErr('No form ID provided.'); return; }
+
+  try {
+    const rows = await api(`workflow_form_definitions?id=eq.${formId}&select=*`);
+    if (!rows?.length) { showErr('Form not found.'); return; }
+    _form = rows[0];
+    document.getElementById('form-title').textContent = _form.source_name || formName;
+
+    // Derive stages
+    _stages = (_form.routing?.stages||[]);
+    if (!_stages.length) {
+      const roles = [...new Set((_form.fields||[]).map(f=>f.role||'assignee'))];
+      _stages = roles.map((role,i) => ({ stage:i+1, role }));
+    }
+    if (!_stages.length) _stages = [{ stage:1, role:'assignee' }];
+
+    renderStageBar();
+
+    if (_form.source_path) {
+      await loadPdf(_form.source_path);
+    } else {
+      showErr('No PDF stored for this form.');
+    }
+  } catch(e) { showErr('Load failed: ' + e.message); }
+})();
+
+async function api(path) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`, Accept:'application/json' }
+  });
+  return r.ok ? r.json() : null;
+}
+
+async function loadPdf(path) {
+  const sr = await fetch(`${SUPA_URL}/storage/v1/object/sign/forms-storage/${path}`, {
+    method:'POST', headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ expiresIn:3600 })
+  });
+  const sd = await sr.json();
+  _pdfDoc = await pdfjsLib.getDocument(`${SUPA_URL}/storage/v1${sd.signedURL}`).promise;
+  await renderPage();
+}
+
+async function renderPage() {
+  if (!_pdfDoc) return;
+  const page = await _pdfDoc.getPage(_page);
+  const rot  = (page.rotate||0) === 180 ? 0 : (page.rotate||0);
+  const vp   = page.getViewport({ scale:_scale, rotation:rot });
+  const cv   = document.getElementById('preview-canvas');
+  const wrap = document.getElementById('canvas-wrap');
+  cv.width=vp.width; cv.height=vp.height;
+  cv.style.width=vp.width+'px'; cv.style.height=vp.height+'px';
+  wrap.style.width=vp.width+'px'; wrap.style.height=vp.height+'px';
+  await page.render({ canvasContext:cv.getContext('2d'), viewport:vp }).promise;
+  document.getElementById('page-ind').textContent = `${_page} / ${_pdfDoc.numPages}`;
+  renderInputs();
+}
+
+function prevPage() { if (_page>1) { _page--; clearInputs(); renderPage(); } }
+function nextPage() { if (_pdfDoc&&_page<_pdfDoc.numPages) { _page++; clearInputs(); renderPage(); } }
+function clearInputs() { document.querySelectorAll('.fp-wrap').forEach(e=>e.remove()); }
+
+function showErr(msg) {
+  document.getElementById('canvas-col').innerHTML =
+    `<div style="padding:40px;text-align:center;color:var(--red);font-size:14px">${msg}</div>`;
+}
+
+// ── Stage bar ─────────────────────────────────────────────────────────────────
+function renderStageBar() {
+  const sb = document.getElementById('stagebar');
+  const max = _stages.length;
+  let html = _stages.map(s => {
+    const active=s.stage===_stage, done=s.stage<_stage;
+    const bg   = done?'var(--green)':active?'var(--accent)':'var(--surf2)';
+    const col  = done||active?'white':'var(--muted)';
+    const bcol = done?'var(--green)':active?'var(--accent)':'var(--border)';
+    return `<div class="stage-pip">
+      <div class="dot" style="background:${bg};color:${col};border:2px solid ${bcol}">${done?'✓':s.stage}</div>
+      <span style="font-size:13px;color:${active?'var(--text)':'var(--muted)'}">${ROLE_LABELS[s.role]||s.role}</span>
+      ${s.stage<max?'<span style="color:var(--muted)">→</span>':''}
+    </div>`;
+  }).join('');
+  html += `<div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="submitStage()"
+      style="font-size:13px;padding:4px 18px;border-radius:999px;font-weight:600">
+      ${_stage<max?'Submit Stage →':'✓ Complete Preview'}
+    </button>`;
+  sb.innerHTML = html;
+}
+
+// ── Inputs ────────────────────────────────────────────────────────────────────
+function activeFieldIds() {
+  const s = _stages.find(st=>st.stage===_stage);
+  if (!s) return new Set();
+  const byStage = (_form.fields||[]).filter(f=>(f.stage||1)===_stage);
+  if (byStage.length) return new Set(byStage.map(f=>f.id));
+  return new Set((_form.fields||[]).filter(f=>f.role===s.role).map(f=>f.id));
+}
+
+function renderInputs() {
+  clearInputs();
+  const wrap = document.getElementById('canvas-wrap');
+  const active = activeFieldIds();
+
+  (_form.fields||[]).filter(f=>(f.page||1)===_page).forEach(f => {
+    const r=f.rect||{x:0,y:0,w:80,h:18};
+    const x=r.x*_scale, y=r.y*_scale, w=r.w*_scale, h=r.h*_scale;
+    const div=document.createElement('div');
+    div.className='fp-wrap';
+    div.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px;`;
+    const isActive=active.has(f.id);
+    if (!isActive) { div.classList.add('fp-locked'); wrap.appendChild(div); return; }
+
+    const val=_responses[f.id]||'';
+    if (f.type==='checkbox') {
+      div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center';
+      const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=val==='true';
+      cb.style.cssText='width:16px;height:16px;cursor:pointer;accent-color:var(--accent)';
+      cb.onchange=()=>{_responses[f.id]=String(cb.checked);updateFillStatus();};
+      div.appendChild(cb);
+
+    } else if (f.type==='signature') {
+      renderSigField(div, f, val, w, h);
+
+    } else if (f.type==='review') {
+      let cur=val||'';
+      div.classList.add('fp-review');
+      div.style.color=REVIEW_COLORS[cur]; div.textContent=REVIEW_LABELS[cur];
+      div.onclick=()=>{
+        cur=REVIEW_OPTS[(REVIEW_OPTS.indexOf(cur)+1)%REVIEW_OPTS.length];
+        _responses[f.id]=cur; div.style.color=REVIEW_COLORS[cur]; div.textContent=REVIEW_LABELS[cur];
+        updateFillStatus();
+      };
+
+    } else if (f.type==='textarea') {
+      const ta=document.createElement('textarea'); ta.className='fp-input'; ta.value=val;
+      ta.style.resize='none'; ta.placeholder=f.label||'';
+      ta.oninput=()=>{_responses[f.id]=ta.value;updateFillStatus();};
+      div.appendChild(ta);
+
+    } else {
+      const inp=document.createElement('input'); inp.className='fp-input';
+      inp.type=f.type==='date'?'date':f.type==='number'?'number':'text';
+      inp.value=val; inp.placeholder=f.label||'';
+      inp.oninput=()=>{_responses[f.id]=inp.value;updateFillStatus();};
+      div.appendChild(inp);
+    }
+
+    wrap.appendChild(div);
+  });
+  updateFillStatus();
+}
+
+function renderSigField(div, f, val, w, h) {
+  let mode='type';
+  div.style.cssText+=';display:flex;flex-direction:column;background:rgba(255,255,255,.04);border:1.5px solid var(--accent);border-radius:3px;';
+  const build=()=>{
+    div.innerHTML='';
+    if (mode==='type') {
+      const inp=document.createElement('input'); inp.className='fp-sig-type';
+      inp.style.fontSize=Math.max(14,h*.5)+'px';
+      inp.value=_responses[f.id]||''; inp.placeholder='Type your name…';
+      inp.oninput=()=>{_responses[f.id]=inp.value;updateFillStatus();};
+      div.appendChild(inp);
+      const tog=document.createElement('div');
+      tog.style.cssText='font-size:10px;color:var(--muted);cursor:pointer;padding:1px 4px;text-align:right;background:rgba(0,0,0,.2);flex-shrink:0;font-family:Arial,sans-serif;';
+      tog.textContent='✏ Draw'; tog.onclick=()=>{mode='draw';build();};
+      div.appendChild(tog);
+    } else {
+      const cv=document.createElement('canvas'); cv.width=Math.round(w); cv.height=Math.round(h-16);
+      cv.style.cssText='display:block;flex:1;cursor:crosshair;';
+      const ctx=cv.getContext('2d'); ctx.strokeStyle='#4f8ef7'; ctx.lineWidth=2; ctx.lineCap='round';
+      if (_responses[f.id+'_img']) { const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0); img.src=_responses[f.id+'_img']; }
+      let dn=false,lx=0,ly=0;
+      cv.onmousedown=e=>{dn=true;const r=cv.getBoundingClientRect();lx=e.clientX-r.left;ly=e.clientY-r.top;ctx.beginPath();ctx.moveTo(lx,ly);};
+      cv.onmousemove=e=>{if(!dn)return;const r=cv.getBoundingClientRect();const cx=e.clientX-r.left,cy=e.clientY-r.top;ctx.lineTo(cx,cy);ctx.stroke();lx=cx;ly=cy;};
+      const stop=()=>{if(dn){dn=false;_responses[f.id+'_img']=cv.toDataURL();_responses[f.id]='[signature]';updateFillStatus();}};
+      cv.onmouseup=stop; cv.onmouseleave=stop;
+      div.appendChild(cv);
+      const btns=document.createElement('div');
+      btns.style.cssText='display:flex;padding:1px 4px;background:rgba(0,0,0,.2);flex-shrink:0;gap:6px;';
+      const clr=document.createElement('span'); clr.textContent='Clear'; clr.style.cssText='font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;';
+      clr.onclick=()=>{ctx.clearRect(0,0,cv.width,cv.height);delete _responses[f.id];delete _responses[f.id+'_img'];updateFillStatus();};
+      const tog=document.createElement('span'); tog.textContent='Aa Type'; tog.style.cssText='font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;margin-left:auto;';
+      tog.onclick=()=>{mode='type';build();};
+      btns.appendChild(clr); btns.appendChild(tog); div.appendChild(btns);
+    }
+  };
+  build();
+}
+
+function updateFillStatus() {
+  const filled=Object.keys(_responses).filter(k=>!k.endsWith('_img')&&_responses[k]).length;
+  const total=(_form.fields||[]).length;
+  document.getElementById('fill-status').textContent=`${filled} / ${total} fields filled`;
+}
+
+// ── Stage submit ──────────────────────────────────────────────────────────────
+function submitStage() {
+  const active=activeFieldIds();
+  const required=(_form.fields||[]).filter(f=>f.required&&active.has(f.id));
+  const missing=required.filter(f=>!_responses[f.id]);
+  if (missing.length) {
+    alert(`${missing.length} required field${missing.length>1?'s':''} not filled.`);
+    // Flash missing fields red
+    document.querySelectorAll('.fp-wrap').forEach(w=>{
+      const inp=w.querySelector('input,textarea');
+      if(inp&&!inp.value){ w.querySelector('.fp-input')?.style&&(w.querySelector('.fp-input').style.borderColor='var(--red)'); }
+    });
+    return;
+  }
+  if (_stage<_stages.length) {
+    _stage++;
+    clearInputs(); renderStageBar(); renderInputs();
+  } else {
+    const filled=Object.keys(_responses).filter(k=>!k.endsWith('_img')&&_responses[k]).length;
+    const req=(_form.fields||[]).filter(f=>f.required).length;
+    document.getElementById('done-summary').textContent=`${filled} fields filled · ${req} required fields validated`;
+    document.getElementById('done-overlay').classList.add('show');
+  }
+}
+
+function resetPreview() {
+  _stage=1; _responses={};
+  document.getElementById('done-overlay').classList.remove('show');
+  renderStageBar(); clearInputs(); renderInputs();
+}
+</script>
+</body>
+</html>
