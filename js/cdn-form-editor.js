@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-121626
-console.log('%c[cdn-form-editor] v20260331-121626','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260331-123426
+console.log('%c[cdn-form-editor] v20260331-123426','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3349,6 +3349,7 @@ function _formTogglePreview() {
     // ── Exit preview — clean up ALL preview DOM artifacts ────────────────────
     // 1. Remove all input overlays
     document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+    document.getElementById('form-preview-container')?.remove();
     // 2. Remove stage bar and role panel
     document.getElementById('form-preview-stagebar')?.remove();
     document.getElementById('form-preview-role-panel')?.remove();
@@ -3416,16 +3417,35 @@ function _formRenderPreviewOverlay() {
   const maxStage = _formGetStages().length || 1;
 
   // ── Render field inputs over PDF canvas ──────────────────────────────────
-  const canvas   = document.getElementById('form-pdf-canvas');
-  const canvasWrap = canvas?.parentElement;
-  if (!canvas || !canvasWrap) return;
+  const canvas = document.getElementById('form-pdf-canvas');
+  if (!canvas) return;
+
+  // Use a dedicated overlay container that sits exactly over the canvas.
+  // This avoids coordinate offset issues from centered/padded parent containers.
+  let previewContainer = document.getElementById('form-preview-container');
+  if (!previewContainer) {
+    previewContainer = document.createElement('div');
+    previewContainer.id = 'form-preview-container';
+    previewContainer.style.cssText = [
+      'position:absolute',
+      'top:0', 'left:0',
+      `width:${canvas.width}px`,
+      `height:${canvas.height}px`,
+      'pointer-events:none', // children set their own pointer-events
+      'overflow:visible',
+      'z-index:5',
+    ].join(';');
+    canvas.parentElement.appendChild(previewContainer);
+  } else {
+    previewContainer.style.width  = canvas.width  + 'px';
+    previewContainer.style.height = canvas.height + 'px';
+  }
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));
 
   _formFields.filter(f => (f.page||1) === _pdfPage).forEach(field => {
     const r = field.rect || { x:0, y:0, w:80, h:18 };
-    // Pixel dimensions on screen
     const x = r.x * _pdfScale, y = r.y * _pdfScale;
     const w = r.w * _pdfScale, h = r.h * _pdfScale;
     const active = activeIds.has(field.id);
@@ -3576,9 +3596,6 @@ function _formRenderPreviewOverlay() {
       console.log(`[PREVIEW] appending ${field.type} wrap: left=${wrap.style.left} top=${wrap.style.top} w=${wrap.style.width} h=${wrap.style.height} overflow=${wrap.style.overflow}`);
     }
     canvasWrap.appendChild(wrap);
-    if (field.type === 'signature' || field.type === 'attendees') {
-      console.log(`[PREVIEW] wrap in DOM:`, wrap.getBoundingClientRect(), 'visible:', wrap.offsetParent !== null);
-    }
   });
 }
 
