@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-120703
-console.log('[cdn-form-editor] LOADED v20260331-120703');
+// VERSION: 20260331-121237
+console.log('%c[cdn-form-editor] v20260331-121237','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -11,29 +11,27 @@ console.log('[cdn-form-editor] LOADED v20260331-120703');
   const s = document.createElement('style');
   s.id = 'form-editor-font-rules';
   s.textContent = `
-    /* Form editor — uniform font rule */
-    #form-editor-main,
-    #form-editor-main input,
-    #form-editor-main textarea,
-    #form-editor-main select,
-    #form-editor-main button,
-    #form-editor-main span,
-    #form-editor-main div,
-    #form-col-fields,
-    #form-col-routing,
-    #form-lib-col,
+    /* Form editor — uniform Arial font for UI chrome only */
+    #form-col-fields *, #form-col-routing *, #form-lib-col *,
+    #form-editor-main button { font-family: Arial, sans-serif !important; }
+
+    /* Preview wraps — force visible, never let app CSS hide them */
+    .form-preview-input-wrap {
+      visibility: visible !important;
+      opacity: 1 !important;
+      display: block !important;
+      pointer-events: auto;
+    }
+    /* Preview inputs — black text, white bg, no font-size override */
     .form-preview-input-wrap input,
     .form-preview-input-wrap textarea {
       font-family: Arial, sans-serif !important;
-    }
-    /* Preview inputs — NO font-size override; size is set inline per field height */
-    .form-preview-input-wrap input,
-    .form-preview-input-wrap textarea {
       color: #111 !important;
-      background: rgba(255,255,255,0.88) !important;
-      /* font-size intentionally NOT set here — set per-field by JS based on cell height */
+      visibility: visible !important;
+      opacity: 1 !important;
     }
-    /* Signature cursive */
+    /* Signature — cursive, never overridden */
+    .form-preview-input-wrap input[data-sig],
     .form-preview-sig-type {
       font-family: 'Dancing Script', cursive !important;
       color: #0a2280 !important;
@@ -451,9 +449,9 @@ function _renderFormEditor() {
       <div style="flex:1;display:flex;overflow:hidden;min-height:0" id="form-body-row">
 
         <!-- Column 1: Document canvas -->
-        <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0;isolation:isolate"
+        <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0"
           id="form-canvas-wrap">
-          <div style="display:inline-flex;justify-content:center;padding:24px 40px;min-height:100%;min-width:100%;box-sizing:border-box">
+          <div style="display:inline-flex;justify-content:center;padding:24px 40px;min-height:100%;min-width:100%;box-sizing:border-box;position:relative">
           <div style="display:inline-block;position:relative;flex-shrink:0">
             <canvas id="form-pdf-canvas" style="display:block;box-shadow:0 4px 24px rgba(0,0,0,.5)"></canvas>
             <!-- SVG overlay for field rectangles -->
@@ -3491,8 +3489,9 @@ function _formRenderPreviewOverlay() {
       wrap.appendChild(cb);
 
     } else if (field.type === 'signature') {
-      // No overflow:hidden — sig needs full height for cursive
-      wrap.style.overflow = 'visible';
+      wrap.style.overflow   = 'visible';
+      wrap.style.zIndex     = '15';
+      wrap.style.visibility = 'visible';
       _formPreviewSignatureField(wrap, field, val, w, h);
 
     } else if (field.type === 'review') {
@@ -3531,7 +3530,8 @@ function _formRenderPreviewOverlay() {
 
     } else if (field.type === 'attendees') {
       wrap.style.setProperty('overflow', 'visible', 'important');
-      wrap.style.zIndex = '20';
+      wrap.style.zIndex     = '20';
+      wrap.style.visibility = 'visible';
       _formPreviewAttendeesField(wrap, field, val, h, fs);
 
     } else if (field.type === 'date') {
@@ -4074,7 +4074,7 @@ function _formPreviewQuickSign() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DB MIGRATIOs SQL (run in browser console: _formShowMigrationSQL())
+// DB MIGRATION SQL (run in browser console: _formShowMigrationSQL())
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _formShowMigrationSQL() {
