@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-120000
-console.log('%c[cdn-form-editor] v20260401-130000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260401-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -270,7 +270,7 @@ function renderFormsTab(el) {
           <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
                        text-transform:uppercase;color:var(--muted)">Form Library</span>
           <button class="btn btn-cad btn-sm" onclick="_formUploadClick()"
-            style="font-size:12px;padding:3px 9px">↑ Import</button>
+            style="font-size:14px;padding:4px 10px;font-family:Arial,sans-serif">↑ Import</button>
         </div>
         <div id="form-list" style="flex:1;overflow-y:auto;padding:6px 0">
           ${_renderFormList()}
@@ -312,17 +312,17 @@ function _renderFormList() {
       <div onclick="_formSelect('${f.id}')"
         style="padding:9px 14px;cursor:pointer;border-left:2px solid ${sel ? 'var(--cad)' : 'transparent'};
                background:${sel ? 'var(--surf3)' : 'transparent'};transition:background .1s">
-        <div style="font-size:12px;font-weight:500;color:${sel ? 'var(--text)' : 'var(--text1)'};
+        <div style="font-size:14px;font-weight:500;color:${sel ? 'var(--text)' : 'var(--text1)'};font-family:Arial,sans-serif;
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${escHtml(f.source_name || 'Untitled form')}
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;font-family:Arial,sans-serif">
           <span>${fieldCount} field${fieldCount !== 1 ? 's' : ''}</span>
           <span>${f.page_count || '?'} page${(f.page_count || 1) !== 1 ? 's' : ''}</span>
-          ${f.version ? `<span style="color:var(--muted);font-size:11px">${escHtml(f.version)}</span>` : ''}
+          ${f.version ? `<span style="color:var(--muted);font-size:13px;font-family:Arial,sans-serif">${escHtml(f.version)}</span>` : ''}
           ${_routingBadge(f)}
-          ${f.updated_at ? `<span style="color:var(--muted);font-size:11px" title="${new Date(f.updated_at).toLocaleString()}">${_formRelativeTime(f.updated_at)}</span>` : ''}
-          ${f.state && f.state !== 'draft' ? `<span style="font-size:11px;padding:1px 6px;border-radius:3px;
+          ${f.updated_at ? `<span style="color:var(--muted);font-size:13px;font-family:Arial,sans-serif" title="${new Date(f.updated_at).toLocaleString()}">${_formRelativeTime(f.updated_at)}</span>` : ''}
+          ${f.state && f.state !== 'draft' ? `<span style="font-size:13px;padding:1px 6px;border-radius:3px;font-family:Arial,sans-serif;
             background:${{ in_review:'rgba(79,142,247,.15)', reviewed:'rgba(196,125,24,.15)',
               approved:'rgba(42,157,64,.15)', released:'rgba(42,157,64,.15)',
               archived:'rgba(255,255,255,.06)', unreleased:'rgba(212,144,31,.15)',
@@ -382,7 +382,7 @@ function _renderFormEditor() {
       <div id="form-top-toolbar"
            style="display:flex;align-items:center;gap:8px;padding:5px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
-                  font-family:Arial,sans-serif;font-size:12px">
+                  font-family:Arial,sans-serif;font-size:14px">
 
         <!-- Editable name -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
@@ -479,11 +479,13 @@ function _renderFormEditor() {
           <span id="form-zoom-label"
             style="font-size:11px;color:var(--muted);text-align:center;cursor:pointer;
                    width:52px;padding:2px 0;font-family:Arial,sans-serif"
-            onclick="_formZoomReset()" title="Reset zoom">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+            onclick="_formZoomReset()" title="Reset to 100%">${Math.round(_pdfScale * 100 / 1.5)}%</span>
           <button onclick="_formZoomOut()" title="Zoom out (-)"
             style="${_railBtn()}">−</button>
           <button onclick="_formZoomFit()" title="Fit to width"
             style="${_railBtn()}">⊡</button>
+          <button onclick="_formZoomReset()" title="Reset to 100%"
+            style="${_railBtn()}">1:1</button>
 
           <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
 
