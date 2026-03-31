@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-120000
-console.log('%c[cdn-form-editor] v20260401-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-150000
+console.log('%c[cdn-form-editor] v20260401-150000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2791,6 +2791,7 @@ async function _formSave() {
     } catch(e) { cadToast('Save failed: ' + e.message, 'error'); }
   } else {
     await API.patch(`workflow_form_definitions?id=eq.${_selectedForm.id}`, {
+      source_name:   _selectedForm.source_name,
       fields:        _selectedForm.fields,
       routing:       _selectedForm.routing,
       state:         _selectedForm.state         || 'draft',
