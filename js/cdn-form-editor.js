@@ -1756,6 +1756,7 @@ const _renderFieldOverlaysBase = _renderFieldOverlays;
 function _renderFieldOverlays() {
   const svg = document.getElementById('form-field-overlay');
   if (!svg) return;
+  if (_marqueeDrag?.active) return; // never wipe SVG while marquee is being drawn
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
   svg.innerHTML = currentPageFields.map(field => {
     const roleConf  = FORM_ROLES[field.role] || FORM_ROLES.assignee;
@@ -2101,14 +2102,14 @@ const _formSvgMouseDownOverride = (event) => {
       const svgRect = svg?.getBoundingClientRect();
       if (!svgRect) return;
       const mx = event.clientX - svgRect.left, my = event.clientY - svgRect.top;
-      _marqueeDrag = { startX:mx, startY:my, active:true };
+      if (!event.shiftKey) _formClearSelection(); // clears+redraws BEFORE marquee appended
+      _marqueeDrag = { startX:mx, startY:my, active:true }; // set BEFORE appending so guard fires
       const mr = document.createElementNS('http://www.w3.org/2000/svg','rect');
       mr.id='form-marquee-rect';
       mr.setAttribute('x',mx); mr.setAttribute('y',my); mr.setAttribute('width',0); mr.setAttribute('height',0);
       mr.setAttribute('fill','rgba(79,142,247,.10)'); mr.setAttribute('stroke','rgba(79,142,247,.9)');
-      mr.setAttribute('stroke-width','1.5'); mr.setAttribute('stroke-dasharray','none');
+      mr.setAttribute('stroke-width','1.5'); mr.setAttribute('stroke-dasharray','4 3');
       mr.style.pointerEvents='none'; svg.appendChild(mr);
-      if (!event.shiftKey) _formClearSelection();
       event.preventDefault(); return;
     }
   }
