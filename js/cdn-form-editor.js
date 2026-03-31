@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-101339
-console.log('[cdn-form-editor] LOADED v20260331-101339');
+// VERSION: 20260331-102545
+console.log('[cdn-form-editor] LOADED v20260331-102545');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3290,20 +3290,41 @@ function _formTogglePreview() {
 
 function _formGetStages() {
   const stages = _formRouting?.stages || [];
+  // If stages are configured, use them
+  if (stages.length > 1) return stages;
+  // Single-stage or no stages — derive from unique roles present in fields
+  // to give reviewer/approver their own simulate slots
+  const roleOrder = ['assignee','pm','reviewer','external'];
+  const presentRoles = [...new Set(_formFields.map(f => f.role||'assignee'))]
+    .sort((a,b) => roleOrder.indexOf(a) - roleOrder.indexOf(b));
+  if (presentRoles.length > 1) {
+    return presentRoles.map((role, i) => ({ stage: i+1, role }));
+  }
+  // Fall back to configured stages (even if only 1)
   if (stages.length) return stages;
-  // Fall back: derive from unique field roles
-  const roles = [...new Set(_formFields.map(f => f.role||'assignee'))];
-  return roles.map((role, i) => ({ stage: i+1, role }));
+  return [{ stage:1, role:'assignee' }];
 }
 
 function _formFieldsForStage(stageNum) {
   const stages = _formGetStages();
   const stage  = stages.find(s => s.stage === stageNum);
   if (!stage) return [];
-  // Fields explicitly assigned to this stage, or fall back by role
-  const byStage = _formFields.filter(f => (f.stage||1) === stageNum && (f.page||1) === _pdfPage);
+  // Current page only for overlay rendering
+  const pageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
+  const byStage = pageFields.filter(f => (f.stage||1) === stageNum);
   if (byStage.length) return byStage;
-  return _formFields.filter(f => f.role === stage.role && (f.page||1) === _pdfPage);
+  // Fall back by role (across all fields, then filter to current page)
+  return pageFields.filter(f => f.role === stage.role);
+}
+
+function _formAllFieldsForStage(stageNum) {
+  // All fields for stage across ALL pages (for Sign button)
+  const stages = _formGetStages();
+  const stage  = stages.find(s => s.stage === stageNum);
+  if (!stage) return [];
+  const byStage = _formFields.filter(f => (f.stage||1) === stageNum);
+  if (byStage.length) return byStage;
+  return _formFields.filter(f => f.role === stage.role);
 }
 
 function _formRenderPreviewOverlay() {
@@ -3388,7 +3409,8 @@ function _formRenderPreviewOverlay() {
       ta.value = val;
       ta.style.cssText = `width:100%;height:100%;box-sizing:border-box;resize:none;
         background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
-        color:#111;font-family:Arial,sans-serif;font-size:13px;padding:3px 5px;outline:none;`;
+        color:#111;font-family:Arial,sans-serif;font-size:${Math.max(9,h*0.82)}px;line-height:1.15;
+        padding:${h*0.06}px 4px;outline:none;`;
       ta.addEventListener('input', () => { _previewResponses[field.id] = ta.value; });
       wrap.appendChild(ta);
 
@@ -3403,7 +3425,8 @@ function _formRenderPreviewOverlay() {
       inp.placeholder = field.label || '';
       inp.style.cssText = `width:100%;height:100%;box-sizing:border-box;
         background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
-        color:#111;font-family:Arial,sans-serif;font-size:13px;padding:2px 5px;outline:none;`;
+        color:#111;font-family:Arial,sans-serif;font-size:${Math.max(9,h*0.82)}px;line-height:${h}px;
+        padding:0 4px;outline:none;`;
       inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
       wrap.appendChild(inp);
     }
@@ -3431,9 +3454,9 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
       inp.value = val || (_previewResponses[field.id] || '');
       inp.placeholder = 'Type your name…';
       inp.className = 'form-preview-sig-type';
-      inp.style.cssText = `flex:1;width:100%;background:rgba(255,255,255,.88);border:none;outline:none;
-        font-family:'Dancing Script',cursive;font-size:${Math.max(16, h*0.6)}px;
-        color:#1a3a8a;padding:2px 6px;`;
+      inp.style.cssText = `flex:1;width:100%;background:transparent;border:none;outline:none;
+        font-family:'Dancing Script',cursive;font-size:${Math.max(12, h*0.82)}px;
+        color:#0a2280;padding:0 6px;font-weight:600;line-height:${h}px;`;
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
         if (inp.value.trim().length > 1) _formPreviewAutoDate(field);
@@ -3634,9 +3657,9 @@ function _formPreviewAttendeesField(wrap, field, existingVal) {
     chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;flex:1;overflow-y:auto;';
     attendees.forEach((a, i) => {
       const chip = document.createElement('span');
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:1px 6px;' +
-        'background:rgba(79,142,247,.15);border:1px solid var(--accent);border-radius:3px;' +
-        'font-size:11px;color:#111;font-family:Arial,sans-serif;white-space:nowrap;';
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px;' +
+        'background:#dbeafe;border:1px solid #3b82f6;border-radius:3px;' +
+        'font-size:12px;color:#1e3a8a;font-family:Arial,sans-serif;white-space:nowrap;font-weight:500;';
       chip.textContent = a.name || a;
       const rm = document.createElement('span');
       rm.textContent = '×'; rm.style.cssText = 'cursor:pointer;color:#c0404a;font-weight:700;margin-left:2px;';
@@ -3771,17 +3794,36 @@ function _formPreviewQuickSign() {
   const name = prompt('Sign as (enter your name):');
   if (!name?.trim()) return;
 
-  const sigFields = _formFieldsForStage(_previewStage).filter(f => f.type === 'signature');
-  sigFields.forEach(f => {
+  // Sign ALL signature fields for this stage across all pages
+  const allSigFields = _formAllFieldsForStage(_previewStage).filter(f => f.type === 'signature');
+  if (!allSigFields.length) {
+    cadToast('No signature fields found for this stage', 'info'); return;
+  }
+
+  allSigFields.forEach(f => {
     _previewResponses[f.id] = name.trim();
     _formPreviewAutoDate(f);
   });
 
-  // Re-render inputs to show the filled signature
-  document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
-  _formRenderPreviewOverlay();
-  _formRefreshRolePanel();
-  cadToast(`Signed as "${name.trim()}"`, 'success');
+  // If sig fields are on a different page, navigate there
+  const sigPages = [...new Set(allSigFields.map(f => f.page||1))];
+  const currentPageSigs = allSigFields.filter(f => (f.page||1) === _pdfPage);
+
+  const refresh = () => {
+    document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+    _formRenderPreviewOverlay();
+    _formRefreshRolePanel();
+  };
+
+  if (!currentPageSigs.length && sigPages.length) {
+    // Navigate to the page with the signature
+    _pdfPage = sigPages[0];
+    _updatePageIndicator();
+    _renderPdfPage(_pdfStartPage + _pdfPage - 1).then(refresh);
+  } else {
+    refresh();
+  }
+  cadToast(`Signed as "${name.trim()}" on ${allSigFields.length} field(s)`, 'success');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
