@@ -1707,7 +1707,14 @@ function _formSelectField(fieldId) {
   popover.style.top  = Math.max(8,top)  + 'px';
   popover.style.left = Math.max(8,left) + 'px';
 
-  const roleOptions = Object.entries(FORM_ROLES).map(([key,conf])=>`<option value="${key}" ${field.role===key?'selected':''}>${conf.label}</option>`).join('');
+  // Pull roles from ProjectHUD global if available, else use built-in FORM_ROLES
+  const _liveRoles = (() => {
+    const pr = window.FIRM_ROLES || window.projectRoles || window.PROJECT_ROLES;
+    if (pr && typeof pr === 'object' && !Array.isArray(pr)) return pr;
+    if (Array.isArray(pr)) return Object.fromEntries(pr.map(r => [r.key||r.id||r.name, { label: r.label||r.name||r.key }]));
+    return FORM_ROLES;
+  })();
+  const roleOptions = Object.entries(_liveRoles).map(([key,conf])=>`<option value="${key}" ${field.role===key?'selected':''}>${conf.label||key}</option>`).join('');
   const typeOptions = (FIELD_TYPES_FULL||['text','date','number','checkbox','signature','textarea','review','doc_ref']).map(t=>{
     const meta = FIELD_TYPE_META?.[t]||{label:t};
     return `<option value="${t}" ${field.type===t?'selected':''}>${meta.label||t}</option>`;
@@ -1717,22 +1724,40 @@ function _formSelectField(fieldId) {
     ? stages.map(s=>`<option value="${s.stage}" ${(field.stage||1)===s.stage?'selected':''}>Stage ${s.stage} — ${FORM_ROLES[s.role]?.label||s.role}</option>`).join('')
     : '';
 
+  const isMulti = _selectedFieldIds.size > 1;
+  const multiIds = isMulti ? JSON.stringify([..._selectedFieldIds]) : null;
+
+  // For multi-select: role/type/required changes apply to ALL selected fields
+  const onRoleChange  = isMulti
+    ? `_formUpdateMulti('role',this.value)`
+    : `_formUpdateField('${fieldId}','role',this.value)`;
+  const onTypeChange  = isMulti
+    ? `_formUpdateMulti('type',this.value)`
+    : `_formUpdateField('${fieldId}','type',this.value)`;
+  const onStageChange = isMulti
+    ? `_formUpdateMulti('stage',parseInt(this.value))`
+    : `_formUpdateField('${fieldId}','stage',parseInt(this.value))`;
+  const onReqClick    = isMulti
+    ? `_formToggleRequiredMulti()`
+    : `_formToggleRequired('${fieldId}')`;
+
   popover.innerHTML = `
     <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-      Edit Field <span style="font-size:10px;color:${_fieldConfidenceColor(field)};font-weight:400">${field.detection||''}</span>
+      ${isMulti ? `Edit ${_selectedFieldIds.size} Fields` : 'Edit Field'}
+      <span style="font-size:10px;color:${_fieldConfidenceColor(field)};font-weight:400">${isMulti?'multi':'${field.detection||""}'}</span>
     </div>
-    <div style="margin-bottom:8px"><label class="config-label">Label</label>
-      <input class="config-input" value="${escHtml(field.label||'')}" placeholder="Field label" style="font-size:11px" oninput="_formUpdateField('${fieldId}','label',this.value)"/></div>
+    ${!isMulti?`<div style="margin-bottom:8px"><label class="config-label">Label</label>
+      <input class="config-input" value="${escHtml(field.label||'')}" placeholder="Field label" style="font-size:11px" oninput="_formUpdateField('${fieldId}','label',this.value)"/></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
       <div><label class="config-label">Type</label>
-        <select class="config-select" style="font-size:11px" onchange="_formUpdateField('${fieldId}','type',this.value)">${typeOptions}</select></div>
+        <select class="config-select" style="font-size:11px" onchange="${onTypeChange}">${typeOptions}</select></div>
       <div><label class="config-label">Role</label>
-        <select class="config-select" style="font-size:11px" onchange="_formUpdateField('${fieldId}','role',this.value)">${roleOptions}</select></div>
+        <select class="config-select" style="font-size:11px" onchange="${onRoleChange}">${roleOptions}</select></div>
     </div>
     ${stages.length>1?`<div style="margin-bottom:8px"><label class="config-label">Fill Stage</label>
-      <select class="config-select" style="font-size:11px" onchange="_formUpdateField('${fieldId}','stage',parseInt(this.value))">${stageOptions}</select></div>`:''}
+      <select class="config-select" style="font-size:11px" onchange="${onStageChange}">${stageOptions}</select></div>`:''}
     <div style="margin-bottom:10px">
-      <div class="config-toggle" onclick="_formToggleRequired('${fieldId}')" style="display:flex;align-items:center;gap:7px;cursor:pointer">
+      <div class="config-toggle" onclick="${onReqClick}" style="display:flex;align-items:center;gap:7px;cursor:pointer">
         <div class="toggle-box${field.required?' on':''}" id="fedit-req-toggle"></div>
         <span style="font-size:11px">Required</span>
       </div>
@@ -1767,20 +1792,28 @@ function _renderFieldOverlays() {
     const w = r.w * _pdfScale, h = r.h * _pdfScale;
     const labelText = (field.label||'field').slice(0,16);
     const typeIcon  = FIELD_TYPE_META?.[field.type]?.icon || 'T';
+    const CH = 5; // corner handle half-size
+    const corners = isSelected ? [
+      [x,y],[x+w,y],[x,y+h],[x+w,y+h]
+    ].map(([cx,cy])=>`<rect x="${cx-CH}" y="${cy-CH}" width="${CH*2}" height="${CH*2}" fill="white" stroke="var(--accent)" stroke-width="1.5" rx="1" style="pointer-events:none"/>`).join('') : '';
     return `
       <g class="field-rect-group" data-field-id="${field.id}" style="cursor:pointer">
         <rect x="${x}" y="${y}" width="${w}" height="${h}"
-          fill="${isSelected?roleConf.color.replace(')',',0.2)').replace('rgb','rgba'):roleConf.dim}"
-          stroke="${isSelected?'var(--cad)':confColor}"
-          stroke-width="${isSelected?'2.5':'1.5'}" rx="2" opacity="0.9"/>
+          fill="${isSelected?'rgba(79,142,247,.13)':roleConf.dim}"
+          stroke="${isSelected?'var(--accent)':confColor}"
+          stroke-width="${isSelected?'2':'1.5'}"
+          stroke-dasharray="${isSelected?'6 3':'none'}"
+          rx="2" opacity="0.95"/>
         <rect x="${x}" y="${y}" width="${Math.min(w,110)}" height="16" fill="${confColor}" rx="2" opacity="0.88"/>
         <text x="${x+4}" y="${y+11}" fill="white" font-size="10" font-family="monospace" style="pointer-events:none">
           ${typeIcon} ${escHtml(labelText)}
         </text>
         ${field.required?`<text x="${x+w-10}" y="${y+h-4}" fill="var(--red)" font-size="10" font-family="sans-serif" style="pointer-events:none">*</text>`:''}
+        ${corners}
       </g>`;
   }).join('');
-  setTimeout(() => { _renderResizeHandles(); _updateHWWidget(); }, 0);
+  _renderResizeHandles();
+  _updateHWWidget();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2060,6 +2093,33 @@ function _formUpdateSelectionUI() {
   _updateHWWidget();
 }
 
+
+function _formUpdateMulti(key, value) {
+  _undoPush();
+  [..._selectedFieldIds].forEach(id => {
+    const f = _formFields.find(f => f.id === id);
+    if (f) f[key] = value;
+  });
+  const listEl = document.getElementById('form-field-list');
+  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderRoutingPanel();
+  _renderFieldOverlays();
+}
+
+function _formToggleRequiredMulti() {
+  _undoPush();
+  // Toggle to majority-opposite: if most are required, set all to not-required
+  const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  const reqCount = sel.filter(f => f.required).length;
+  const newVal = reqCount < sel.length / 2;
+  sel.forEach(f => f.required = newVal);
+  const toggle = document.getElementById('fedit-req-toggle');
+  if (toggle) toggle.className = 'toggle-box' + (newVal ? ' on' : '');
+  const listEl = document.getElementById('form-field-list');
+  if (listEl) listEl.innerHTML = _renderFieldList();
+  _renderFieldOverlays();
+}
+
 function _formRevealField(fieldId) {
   const field = _formFields.find(f => f.id === fieldId);
   if (!field) return;
@@ -2299,6 +2359,14 @@ function _renderResizeHandles() {
 
   const g = document.createElementNS('http://www.w3.org/2000/svg','g');
   g.classList.add('resize-handle-group');
+  // Bounding box outline (always shown around selection)
+  const bbox = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bbox.setAttribute('x', minX); bbox.setAttribute('y', minY);
+  bbox.setAttribute('width', maxX - minX); bbox.setAttribute('height', maxY - minY);
+  bbox.setAttribute('fill','none'); bbox.setAttribute('stroke','var(--accent)');
+  bbox.setAttribute('stroke-width','1'); bbox.setAttribute('stroke-dasharray','5 3');
+  bbox.setAttribute('rx','2'); bbox.style.pointerEvents = 'none';
+  g.appendChild(bbox);
   handles.forEach(({ edge, cx, cy, cursor }) => {
     const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
     rect.setAttribute('x', cx - HS); rect.setAttribute('y', cy - HS);
