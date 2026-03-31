@@ -658,17 +658,11 @@ function _undoPop() {
 // [original _renderFieldOverlays removed — enhanced version below is the sole definition]
 
 function _highlightFieldRect(fieldId) {
-  document.querySelectorAll('.field-rect-group rect:first-child').forEach(r => {
-    r.style.strokeWidth = '1.5';
-    r.style.filter = '';
-  });
-  const group = document.querySelector(`.field-rect-group[data-field-id="${fieldId}"]`);
-  if (group) {
-    const rect = group.querySelector('rect');
-    if (rect) {
-      rect.style.strokeWidth = '2.5';
-      rect.style.filter = 'drop-shadow(0 0 4px currentColor)';
-    }
+  // Selection highlight is now driven entirely by _renderFieldOverlays via _selectedFieldIds.
+  // This function is retained for call-site compatibility but rendering is handled centrally.
+  if (fieldId && !_selectedFieldIds.has(fieldId)) {
+    _selectedFieldIds.add(fieldId);
+    _renderFieldOverlays();
   }
 }
 
@@ -927,9 +921,18 @@ function _formSvgMouseUp(event) {
       const listEl = document.getElementById('form-field-list');
       if (listEl) listEl.innerHTML = _renderFieldList();
     } else {
-      // No movement — it was a click; open edit popover for the hit field
+      // No movement — it was a click; select field then open popover
       const group = event.target.closest('.field-rect-group');
-      if (group) _formSelectField(group.dataset.fieldId);
+      if (group) {
+        const fid = group.dataset.fieldId;
+        if (!_selectedFieldIds.has(fid)) {
+          _selectedFieldIds.clear();
+          _selectedFieldIds.add(fid);
+          _formUpdateSelectionUI();
+        }
+        _renderFieldOverlays();
+        _formSelectField(fid);
+      }
     }
 
     _svgGroupDrag = null;
@@ -943,20 +946,7 @@ function _formSvgMouseUp(event) {
 // FIELD RECT HIGHLIGHT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _highlightFieldRect(fieldId) {
-  document.querySelectorAll('.field-rect-group rect:first-child').forEach(r => {
-    r.style.strokeWidth = '1.5';
-    r.style.filter = '';
-  });
-  const group = document.querySelector(`.field-rect-group[data-field-id="${fieldId}"]`);
-  if (group) {
-    const rect = group.querySelector('rect');
-    if (rect) {
-      rect.style.strokeWidth = '2.5';
-      rect.style.filter = 'drop-shadow(0 0 4px currentColor)';
-    }
-  }
-}
+// [original _highlightFieldRect removed — see updated version below]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE NAVIGATION
@@ -1634,12 +1624,12 @@ function _renderFieldOverlays() {
     return `
       <g class="field-rect-group" data-field-id="${field.id}" style="cursor:pointer">
         <rect x="${x}" y="${y}" width="${w}" height="${h}"
-          fill="${isSelected?'rgba(79,142,247,.18)':roleConf.dim}"
-          stroke="${isSelected?'#4f8ef7':confColor}"
+          fill="${isSelected?'rgba(160,80,255,.22)':roleConf.dim}"
+          stroke="${isSelected?'#a050ff':confColor}"
           stroke-width="${isSelected?'2.5':'1.5'}"
           stroke-dasharray="${isSelected?'7 3':'none'}"
           rx="2"/>
-        <rect x="${x}" y="${y}" width="${Math.min(w,110)}" height="16" fill="${isSelected?'#4f8ef7':confColor}" rx="2" opacity="${isSelected?'1':'0.88'}"/>
+        <rect x="${x}" y="${y}" width="${Math.min(w,110)}" height="16" fill="${isSelected?'#a050ff':confColor}" rx="2" opacity="${isSelected?'1':'0.88'}"/>
         <text x="${x+4}" y="${y+11}" fill="white" font-size="10" font-family="monospace" style="pointer-events:none">
           ${typeIcon} ${escHtml(labelText)}
         </text>
@@ -1659,7 +1649,7 @@ function _renderFieldOverlays() {
 
     // Outer dashed bounding box
     html += `<rect class="sel-bbox" x="${minX}" y="${minY}" width="${maxX-minX}" height="${maxY-minY}"
-      fill="none" stroke="#4f8ef7" stroke-width="1.5" stroke-dasharray="6 3" rx="2" style="pointer-events:none"/>`;
+      fill="none" stroke="#a050ff" stroke-width="1.5" stroke-dasharray="6 3" rx="2" style="pointer-events:none"/>`;
 
     // 4 midpoint resize handles — use data-edge so mousedown can identify
     const hDefs = [
@@ -1671,7 +1661,7 @@ function _renderFieldOverlays() {
     hDefs.forEach(({ edge, cx, cy, cur }) => {
       html += `<rect class="resize-handle" data-edge="${edge}"
         x="${cx-HS}" y="${cy-HS}" width="${HS*2}" height="${HS*2}"
-        fill="white" stroke="#4f8ef7" stroke-width="2" rx="2"
+        fill="white" stroke="#a050ff" stroke-width="2" rx="2"
         style="cursor:${cur}" />`;
     });
   }
