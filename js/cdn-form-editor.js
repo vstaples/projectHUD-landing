@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-110713
-console.log('[cdn-form-editor] LOADED v20260331-110713');
+// VERSION: 20260331-113345
+console.log('[cdn-form-editor] LOADED v20260331-113345');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3360,36 +3360,36 @@ function _formTogglePreview() {
 }
 
 function _formGetStages() {
-  const roleOrder = ['assignee','reviewer','approver','pm','external'];
-  // Union of: roles present on fields + roles in routing stage config
-  const fromFields  = _formFields.map(f => f.role||'assignee');
-  const fromRouting = (_formRouting?.stages||[]).map(s => s.role).filter(Boolean);
-  const allRoles = [...new Set([...fromFields, ...fromRouting])]
+  // PREVIEW = Reviewer & Approver validation only. Assignee is runtime, not preview.
+  const reviewOrder = ['reviewer','approver','pm','external'];
+  const fromFields  = _formFields.map(f => f.role||'assignee').filter(r => r !== 'assignee');
+  const fromRouting = (_formRouting?.stages||[]).map(s => s.role).filter(r => r && r !== 'assignee');
+  const roles = [...new Set([...fromFields, ...fromRouting])]
     .sort((a,b) => {
-      const ai = roleOrder.indexOf(a); const bi = roleOrder.indexOf(b);
+      const ai = reviewOrder.indexOf(a), bi = reviewOrder.indexOf(b);
       return (ai<0?99:ai) - (bi<0?99:bi);
     });
-  return allRoles.length ? allRoles.map((role,i)=>({stage:i+1,role})) : [{stage:1,role:'assignee'}];
+  // If no reviewer/approver fields configured, default to a single reviewer stage
+  return roles.length ? roles.map((role,i)=>({stage:i+1,role})) : [{stage:1,role:'reviewer'}];
 }
 
 function _formFieldsForStage(stageNum) {
   const stages = _formGetStages();
   const stage  = stages.find(s => s.stage === stageNum);
   if (!stage) return [];
-  // Current page only for overlay rendering
   const pageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
-  const byStage = pageFields.filter(f => (f.stage||1) === stageNum);
+  // Match by explicit stage assignment first, then fall back to role
+  const byStage = pageFields.filter(f => (f.stage||1) === stageNum && f.role !== 'assignee');
   if (byStage.length) return byStage;
-  // Fall back by role (across all fields, then filter to current page)
   return pageFields.filter(f => f.role === stage.role);
 }
 
 function _formAllFieldsForStage(stageNum) {
-  // All fields for stage across ALL pages (for Sign button)
+  // All fields for this stage across ALL pages (used by Sign button)
   const stages = _formGetStages();
   const stage  = stages.find(s => s.stage === stageNum);
   if (!stage) return [];
-  const byStage = _formFields.filter(f => (f.stage||1) === stageNum);
+  const byStage = _formFields.filter(f => (f.stage||1) === stageNum && f.role !== 'assignee');
   if (byStage.length) return byStage;
   return _formFields.filter(f => f.role === stage.role);
 }
@@ -3422,10 +3422,18 @@ function _formRenderPreviewOverlay() {
     const active = activeIds.has(field.id);
     const val = _previewResponses[field.id] || '';
 
-    // FONT RULE: fill ~88% of field height. No padding stealing space.
-    // Use a <div> wrapper with flex+align-items to center vertically without padding tricks.
-    const fs = Math.max(8, h * 0.82);   // 82% of pixel height
-    // !important on font-size beats any app-shell stylesheet rule
+    // Determine stage membership — assignee fields are always background (never locked)
+    const isAssigneeField = field.role === 'assignee' || !field.role;
+    const fieldStage = isAssigneeField ? null : _formGetStages().find(s => {
+      const byStage = _formFields.filter(f => (f.stage||1) === s.stage && f.role !== 'assignee');
+      if (byStage.length) return (field.stage||1) === s.stage;
+      return field.role === s.role;
+    });
+    const fieldStageNum = fieldStage?.stage || _previewStage;
+    const isCompleted   = !isAssigneeField && fieldStageNum < _previewStage;
+    const isFuture      = !isAssigneeField && fieldStageNum > _previewStage;
+
+    const fs = Math.max(8, h * 0.82);
     const BASE_STYLE = [
       'width:100%;height:100%;box-sizing:border-box',
       'background:rgba(255,255,255,.92)',
@@ -3433,34 +3441,38 @@ function _formRenderPreviewOverlay() {
       'border-radius:2px',
       'color:#111',
       'font-family:Arial,sans-serif',
-      `font-size:${fs}px !important`,
+      `font-size:${fs}px`,
       'padding:0 4px',
       'outline:none',
     ].join(';');
 
     const wrap = document.createElement('div');
     wrap.className = 'form-preview-input-wrap';
-    wrap.style.position   = 'absolute';
-    wrap.style.left       = x + 'px';
-    wrap.style.top        = y + 'px';
-    wrap.style.width      = w + 'px';
-    wrap.style.height     = h + 'px';
-    wrap.style.boxSizing  = 'border-box';
-    wrap.style.overflow   = 'hidden';
+    wrap.style.position  = 'absolute';
+    wrap.style.left      = x + 'px';
+    wrap.style.top       = y + 'px';
+    wrap.style.width     = w + 'px';
+    wrap.style.height    = h + 'px';
+    wrap.style.boxSizing = 'border-box';
+    wrap.style.overflow  = 'hidden';
 
-    // Determine if this field belongs to a completed stage (locked) or future stage (visible but dimmed)
-    const fieldStage = _formGetStages().find(s => {
-      const byStage = _formFields.filter(f => (f.stage||1) === s.stage);
-      if (byStage.length) return (field.stage||1) === s.stage;
-      return field.role === s.role;
-    });
-    const fieldStageNum = fieldStage?.stage || 1;
-    const isCompleted   = fieldStageNum < _previewStage;  // locked — already submitted
-    const isFuture      = fieldStageNum > _previewStage;  // visible but dimmer border
+    if (isAssigneeField) {
+      // Assignee fields = form content — shown as read-only background for reviewer context
+      wrap.style.background    = 'rgba(255,255,255,.5)';
+      wrap.style.border        = '1px solid rgba(100,150,200,.2)';
+      wrap.style.borderRadius  = '2px';
+      wrap.style.pointerEvents = 'none';
+      wrap.style.fontSize      = fs + 'px';
+      wrap.style.fontFamily    = 'Arial,sans-serif';
+      wrap.style.color         = '#444';
+      wrap.style.padding       = '0 4px';
+      wrap.style.display       = 'flex';
+      wrap.style.alignItems    = 'center';
+      wrap.textContent         = val || '';
 
-    if (isCompleted) {
-      // Stage already submitted — show filled value, read-only
-      wrap.style.background    = 'rgba(240,255,240,.6)';
+    } else if (isCompleted) {
+      // Prior stage submitted — green tint, read-only
+      wrap.style.background    = 'rgba(240,255,240,.7)';
       wrap.style.border        = '1px solid #86efac';
       wrap.style.borderRadius  = '2px';
       wrap.style.pointerEvents = 'none';
@@ -3928,7 +3940,7 @@ function _formRefreshRolePanel() {
 
   const stages   = _formGetStages();
   const LABELS   = { assignee:'Assignee', reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' };
-  const COLORS   = { assignee:'var(--accent)', reviewer:'var(--cad)', approver:'var(--green)', pm:'var(--purple,#7c4dff)', external:'var(--muted)' };
+  const COLORS   = { reviewer:'var(--cad)', approver:'var(--green)', pm:'#7c4dff', external:'var(--muted)' };
 
   let html = `
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
