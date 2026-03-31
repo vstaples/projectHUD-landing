@@ -1611,7 +1611,8 @@ function _renderFieldOverlays() {
   if (_marqueeDrag?.active) return;
 
   const sel = _selectedFieldIds;
-  console.log('[renderFieldOverlays] sel.size=', sel.size, 'fields=', _formFields.length);
+  if (sel.size === 0) console.trace('[renderFieldOverlays] sel.size=0 — CALLER:');
+  else console.log('[renderFieldOverlays] sel.size=', sel.size);
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
 
   // ── Field rects ───────────────────────────────────────────────────────────
