@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-042359
-console.log('[cdn-form-editor] LOADED v20260331-042359');
+// VERSION: 20260331-051725
+console.log('[cdn-form-editor] LOADED v20260331-051725');
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,6 +70,45 @@ const REVIEW_COLORS  = { '': 'var(--muted)', pass: 'var(--green)', fail: 'var(--
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB ENTRY POINT
 // ─────────────────────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VERSION HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function _formInitVersion(fmt) {
+  if (fmt === 'rev_letter') return 'Rev A';
+  if (fmt === 'integer')    return 'v1';
+  return '0.1.0';
+}
+
+function _formBumpVersion(ver, fmt, type='minor') {
+  if (fmt === 'rev_letter') {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const cur = ver?.replace('Rev ','') || 'A';
+    const idx = letters.indexOf(cur);
+    return 'Rev ' + (letters[idx+1] || 'Z');
+  }
+  if (fmt === 'integer') {
+    const n = parseInt(ver?.replace('v','') || '1');
+    return 'v' + (n+1);
+  }
+  // semver
+  const parts = (ver||'0.1.0').split('.').map(Number);
+  if (type === 'major') { parts[0]++; parts[1]=0; parts[2]=0; }
+  else if (type === 'minor') { parts[1]++; parts[2]=0; }
+  else { parts[2]++; }
+  return parts.join('.');
+}
+
+function _formStateLabel(state) {
+  return { draft:'Draft', unreleased:'Unreleased', pending_review:'Pending Review',
+           pending_approval:'Pending Approval', released:'Released', archived:'Archived' }[state] || state;
+}
+
+function _formStateColor(state) {
+  return { draft:'var(--muted)', unreleased:'var(--amber)', pending_review:'var(--accent)',
+           pending_approval:'var(--cad)', released:'var(--green)', archived:'var(--muted)' }[state] || 'var(--muted)';
+}
 
 function renderFormsTab(el) {
   el.innerHTML = `
@@ -178,15 +217,32 @@ function _renderFormEditor() {
       <!-- ── Editor toolbar ─────────────────────────────────────────── -->
       <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-        <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
-          style="font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;
-                 background:transparent;border:none;border-bottom:1px solid transparent;
-                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;
-                 transition:border-color .15s"
-          onfocus="this.style.borderBottomColor='var(--cad)'"
-          onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()"
-          title="Click to rename"/>
+        <!-- Name (editable) + lifecycle badges -->
+        <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
+          <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
+            style="font-size:13px;font-weight:500;color:var(--text);
+                   background:transparent;border:none;border-bottom:1px solid transparent;
+                   outline:none;font-family:Arial,sans-serif;padding:2px 4px;min-width:0;flex:1;
+                   transition:border-color .15s"
+            onfocus="this.style.borderBottomColor='var(--cad)'"
+            onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()"
+            title="Click to rename"/>
+          <!-- State badge -->
+          <span style="font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;
+                       background:var(--surf2);border:1px solid var(--border);
+                       color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif">
+            ${_formStateLabel(f.state||'draft')}
+          </span>
+          <!-- Version badge -->
+          <span style="font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;
+                       background:var(--surf2);border:1px solid var(--border);
+                       color:var(--muted);font-family:Arial,sans-serif">
+            ${f.version||'0.1.0'}
+          </span>
+          <!-- Category badge -->
+          ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat ? `<span style="font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif">${escHtml(cat.name)}</span>` : `<button onclick="_formPickCategory()" style="font-size:11px;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;flex-shrink:0">+ Category</button>`; })()}
+        </div>
         <!-- Page navigation -->
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <button id="form-page-prev" onclick="_formPrevPage()" class="btn btn-ghost btn-sm"
@@ -249,10 +305,7 @@ function _renderFormEditor() {
             </div>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="_formDelete('${f.id}')"
-          style="color:var(--red);font-size:12px">🗑 Remove</button>
-        <button class="btn btn-solid btn-sm" onclick="_formSave()"
-          style="font-size:12px">Save</button>
+        ${_formLifecycleButtons(f)}
       </div>
 
       <!-- ── Three-column body ────────────────────────────────────── -->
@@ -607,7 +660,10 @@ function _formRoleDragEnd() {
 function _formUpdateField(fieldId, key, value) {
   const field = _formFields.find(f => f.id === fieldId);
   if (!field) return;
+  const oldVal = field[key];
   field[key] = value;
+  if (_selectedForm?.id) _formCoCWrite('form.field_modified', _selectedForm.id,
+    { field_id:fieldId, field_label:field.label, key, old:oldVal, new:value });
 
   // Re-render the field list row and routing panel
   const listEl = document.getElementById('form-field-list');
@@ -1885,6 +1941,277 @@ async function _formSelect(formId) {
   }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIFECYCLE TOOLBAR BUTTONS
+// ─────────────────────────────────────────────────────────────────────────────
+function _formLifecycleButtons(f) {
+  const state = f.state || 'draft';
+  const locked = ['pending_review','pending_approval','released','archived'].includes(state);
+  const btns = [];
+
+  // Remove (always)
+  btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formDeleteWithConfirm('${f.id}')"
+    style="color:var(--red);font-size:12px">🗑 Remove</button>`);
+
+  if (state === 'draft' || state === 'unreleased') {
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formSave()" style="font-size:12px">Save</button>`);
+    if (f.category_id) {
+      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()" style="font-size:12px">Submit for Review →</button>`);
+    } else {
+      // No category = no approval gate — can release directly
+      btns.push(`<button class="btn btn-solid btn-sm" onclick="_formSave()" style="font-size:12px">Save</button>`);
+      btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:12px;padding:3px 12px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">Release</button>`);
+    }
+  }
+
+  if (state === 'pending_review') {
+    btns.push(`<span style="font-size:12px;color:var(--accent);font-family:Arial,sans-serif">Awaiting review</span>`);
+    btns.push(`<button class="btn btn-cad btn-sm" onclick="_formApproveReview()" style="font-size:12px">✓ Approve Review</button>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectToUnreleased()" style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+  }
+
+  if (state === 'pending_approval') {
+    btns.push(`<span style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif">Awaiting approval</span>`);
+    btns.push(`<button onclick="_formApproveAndRelease()" style="font-size:12px;padding:3px 14px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">✓ Approve & Release</button>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectToUnreleased()" style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+  }
+
+  if (state === 'released') {
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCreateRevision()" style="font-size:12px">Create Revision</button>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formArchive()" style="font-size:12px;color:var(--muted)">Archive</button>`);
+  }
+
+  if (state === 'archived') {
+    btns.push(`<span style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif">[Archived — read only]</span>`);
+  }
+
+  return btns.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REMOVE WITH DB CONFIRM
+// ─────────────────────────────────────────────────────────────────────────────
+async function _formDeleteWithConfirm(formId) {
+  const form = _formDefs.find(f => f.id === formId);
+  const name = form?.source_name || 'this form';
+  const inDB = form && !form._unsaved;
+  const msg = inDB
+    ? `Remove "${name}" from the Form Library?\n\nThis will permanently delete the form definition from the database. The source PDF in Storage will be retained.`
+    : `Remove "${name}" from the Form Library?`;
+  if (!confirm(msg)) return;
+
+  if (inDB) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/workflow_form_definitions?id=eq.${formId}`, {
+        method:'DELETE',
+        headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+await Auth.getToken(),
+                  'Content-Type':'application/json' }
+      });
+      // CoC write
+      _formCoCWrite('form.archived', formId, { action:'deleted', name });
+      cadToast(`"${name}" removed from library`, 'info');
+    } catch(e) { cadToast('Delete failed: ' + e.message, 'error'); return; }
+  }
+
+  _formDefs = _formDefs.filter(f => f.id !== formId);
+  if (_selectedForm?.id === formId) { _selectedForm = null; _formFields = []; _pdfDoc = null; }
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATEGORY PICKER
+// ─────────────────────────────────────────────────────────────────────────────
+async function _formPickCategory() {
+  const cats = window.FormSettings?.getCategories?.() || [];
+  if (!cats.length) {
+    cadToast('No categories configured — add them in Settings', 'info'); return;
+  }
+  // Simple inline picker modal
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+                padding:20px;min-width:300px;box-shadow:0 16px 48px rgba(0,0,0,.7)">
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;font-family:Arial,sans-serif">
+        Select Category
+      </div>
+      ${cats.map(c=>`
+        <div onclick="_formSetCategory('${c.id}');document.getElementById('fs-cat-picker').remove()"
+          style="padding:10px 12px;border-radius:5px;cursor:pointer;border:1px solid var(--border);
+                 margin-bottom:6px;background:var(--surf2);transition:border-color .12s"
+          onmouseover="this.style.borderColor='var(--cad)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:13px;font-weight:500;color:var(--text);font-family:Arial,sans-serif">${escHtml(c.name)}</div>
+          <div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif">${escHtml(c.description||'')}</div>
+        </div>`).join('')}
+      <button onclick="document.getElementById('fs-cat-picker').remove()"
+        style="margin-top:8px;width:100%;padding:6px;border-radius:999px;background:transparent;
+               border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">
+        Cancel
+      </button>
+    </div>`;
+  overlay.id = 'fs-cat-picker';
+  document.body.appendChild(overlay);
+}
+
+function _formSetCategory(catId) {
+  if (!_selectedForm) return;
+  _selectedForm.category_id = catId;
+  const cat = window.FormSettings?.getCategoryById?.(catId);
+  // Init version format from category
+  if (cat && (!_selectedForm.version || _selectedForm.version === '0.1.0')) {
+    _selectedForm.version = _formInitVersion(cat.version_format);
+  }
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIFECYCLE STATE TRANSITIONS
+// ─────────────────────────────────────────────────────────────────────────────
+async function _formSubmitForReview() {
+  if (!_selectedForm) return;
+  const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+  const baseReviewers = cat?.reviewer_ids || [];
+
+  // Let author add more reviewers via PersonPicker
+  const addMore = confirm('Submit for review? Click OK to proceed, or add more reviewers first.');
+  if (!addMore) return;
+
+  _selectedForm.state = 'pending_review';
+  _selectedForm.pending_reviewer_ids = [...baseReviewers];
+  _selectedForm.reviewed_by = [];
+  await _formSave();
+  _formCoCWrite('form.state_changed', _selectedForm.id, { from:'draft', to:'pending_review', note:'Submitted for review' });
+  cadToast('Submitted for review', 'success');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+async function _formApproveReview() {
+  if (!_selectedForm) return;
+  const userId = window.CURRENT_USER?.id || 'current_user';
+  _selectedForm.reviewed_by = [...(_selectedForm.reviewed_by||[]), userId];
+  const allReviewed = (_selectedForm.pending_reviewer_ids||[]).every(id =>
+    (_selectedForm.reviewed_by||[]).includes(id)
+  ) || (_selectedForm.pending_reviewer_ids||[]).length === 0;
+
+  if (allReviewed) {
+    _selectedForm.state = 'pending_approval';
+    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'pending_review', to:'pending_approval', note:'All reviewers approved' });
+    cadToast('Review complete — awaiting final approval', 'success');
+  } else {
+    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'pending_review', to:'pending_review', note:`Reviewer ${userId} approved` });
+    cadToast('Your review recorded', 'info');
+  }
+  await _formSave();
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+async function _formApproveAndRelease() {
+  if (!_selectedForm) return;
+  const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+  const fmt = cat?.version_format || 'semver';
+  const newVer = _formBumpVersion(_selectedForm.version, fmt, 'minor');
+  const note = prompt(`Release as version ${newVer}. Add a release note (optional):`)||'';
+
+  // Mark prior released version as superseded
+  const priorReleased = _formDefs.find(f =>
+    f.id !== _selectedForm.id &&
+    f.state === 'released' &&
+    f.source_name === _selectedForm.source_name
+  );
+
+  _selectedForm.state       = 'released';
+  _selectedForm.version     = newVer;
+  _selectedForm.released_at = new Date().toISOString();
+  _selectedForm.approved_by = window.CURRENT_USER?.id || null;
+  _selectedForm.review_note = note;
+
+  await _formSave();
+
+  if (priorReleased) {
+    priorReleased.superseded_by = _selectedForm.id;
+    await API.patch(`workflow_form_definitions?id=eq.${priorReleased.id}`,
+      { superseded_by: _selectedForm.id }).catch(()=>{});
+  }
+
+  _formCoCWrite('form.released', _selectedForm.id, { version:newVer, note, supersedes:priorReleased?.id });
+  cadToast(`Released as ${newVer}`, 'success');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+async function _formReleaseDirectly() {
+  if (!_selectedForm) return;
+  const note = prompt('Release this form? Add a release note (optional):')||'';
+  _selectedForm.state       = 'released';
+  _selectedForm.released_at = new Date().toISOString();
+  _selectedForm.review_note = note;
+  await _formSave();
+  _formCoCWrite('form.released', _selectedForm.id, { version:_selectedForm.version, note });
+  cadToast(`Released ${_selectedForm.version}`, 'success');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+async function _formRejectToUnreleased() {
+  if (!_selectedForm) return;
+  const note = prompt('Reason for rejection (required):');
+  if (!note?.trim()) { cadToast('Rejection note is required', 'error'); return; }
+  const from = _selectedForm.state;
+  _selectedForm.state = _selectedForm.version === _formInitVersion(
+    window.FormSettings?.getCategoryById?.(_selectedForm.category_id)?.version_format||'semver'
+  ) ? 'draft' : 'unreleased';
+  _selectedForm.review_note = note;
+  await _formSave();
+  _formCoCWrite('form.state_changed', _selectedForm.id, { from, to:_selectedForm.state, note });
+  cadToast('Returned for revision', 'info');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+async function _formCreateRevision() {
+  if (!_selectedForm) return;
+  if (!confirm(`Create a new revision of "${_selectedForm.source_name}"? The current Released version will remain active until the new revision is released.`)) return;
+  _selectedForm.state = 'unreleased';
+  await _formSave();
+  _formCoCWrite('form.state_changed', _selectedForm.id, { from:'released', to:'unreleased', note:'Revision started' });
+  cadToast('Revision opened for editing', 'info');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+async function _formArchive() {
+  if (!_selectedForm) return;
+  if (!confirm(`Archive "${_selectedForm.source_name} ${_selectedForm.version}"? It will become read-only.`)) return;
+  _selectedForm.state       = 'archived';
+  _selectedForm.archived_at = new Date().toISOString();
+  await _formSave();
+  _formCoCWrite('form.archived', _selectedForm.id, { version:_selectedForm.version });
+  cadToast('Form archived', 'info');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COC WRITER
+// ─────────────────────────────────────────────────────────────────────────────
+function _formCoCWrite(eventType, formId, details) {
+  if (!window.CoC?.write) { console.warn('[form-editor] CoC not available'); return; }
+  try {
+    window.CoC.write({
+      entity_type: 'workflow_form_definition',
+      entity_id:   formId,
+      event_type:  eventType,
+      details:     { ...details, form_name: _selectedForm?.source_name },
+      actor_id:    window.CURRENT_USER?.id || null,
+    });
+  } catch(e) { console.warn('[form-editor] CoC write failed:', e.message); }
+}
+
 function _formDelete(formId) {
   if (!confirm('Remove this form definition? The source document is not deleted.')) return;
   _formDefs = _formDefs.filter(f => f.id !== formId);
@@ -1926,15 +2253,29 @@ async function _formSave() {
         source_name:_selectedForm.source_name, page_count:_selectedForm.page_count,
         archetype:_selectedForm.archetype||'data_entry',
         fields:_selectedForm.fields, routing:_selectedForm.routing,
+        state:_selectedForm.state||'draft', version:_selectedForm.version||'0.1.0',
+        category_id:_selectedForm.category_id||null,
       });
       if (rows?.[0]?.id) { _selectedForm.id = rows[0].id; _selectedForm._unsaved = false; delete _selectedForm._file; }
       cadToast('Form saved', 'success');
+      _formCoCWrite('form.saved', _selectedForm.id, { version:_selectedForm.version, state:_selectedForm.state });
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
     } catch(e) { cadToast('Save failed: ' + e.message, 'error'); }
   } else {
     await API.patch(`workflow_form_definitions?id=eq.${_selectedForm.id}`, {
-      fields:_selectedForm.fields, routing:_selectedForm.routing,
+      fields:        _selectedForm.fields,
+      routing:       _selectedForm.routing,
+      state:         _selectedForm.state         || 'draft',
+      version:       _selectedForm.version       || '0.1.0',
+      category_id:   _selectedForm.category_id   || null,
+      superseded_by: _selectedForm.superseded_by || null,
+      review_note:   _selectedForm.review_note   || null,
+      pending_reviewer_ids: _selectedForm.pending_reviewer_ids || [],
+      reviewed_by:   _selectedForm.reviewed_by   || [],
+      approved_by:   _selectedForm.approved_by   || null,
+      released_at:   _selectedForm.released_at   || null,
+      archived_at:   _selectedForm.archived_at   || null,
     }).catch(e => cadToast('Save failed: ' + e.message, 'error'));
     cadToast('Form saved', 'success');
     const listEl = document.getElementById('form-list');
