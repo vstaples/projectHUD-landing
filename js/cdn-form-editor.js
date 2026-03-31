@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-103248
-console.log('[cdn-form-editor] LOADED v20260331-103248');
+// VERSION: 20260331-104147
+console.log('[cdn-form-editor] LOADED v20260331-104147');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -239,6 +239,8 @@ function renderFormsTab(el) {
         <!-- Hidden file input -->
         <input type="file" id="form-file-input" accept=".pdf,.doc,.docx"
           style="display:none" onchange="_formFileChosen(event)"/>
+        <input type="file" id="form-replace-input" accept=".pdf"
+          style="display:none" onchange="_formReplacePdfChosen(event)"/>
       </div>
 
       <!-- ── Main area: editor or empty state ─────────────────────── -->
@@ -2234,10 +2236,15 @@ function _formLifecycleButtons(f) {
   const locked = ['pending_review','pending_approval','released','archived'].includes(state);
   const btns = [];
 
-  // Separator then Remove
+  // Separator then Remove + Replace PDF
   btns.push(`<div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>`);
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formDeleteWithConfirm('${f.id}')"
     style="color:var(--red);font-size:13px;font-family:Arial,sans-serif">🗑 Remove</button>`);
+  if (state === 'draft' || state === 'unreleased') {
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formReplacePdf()"
+      title="Swap background PDF without changing fields"
+      style="font-size:13px;font-family:Arial,sans-serif">↺ Replace PDF</button>`);
+  }
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formToggleCoC()" id="form-coc-btn"
     title="Chain of Custody history" style="font-size:13px;font-family:Arial,sans-serif">CoC</button>`);
 
@@ -2278,6 +2285,73 @@ function _formLifecycleButtons(f) {
 // ─────────────────────────────────────────────────────────────────────────────
 // REMOVE WITH DB CONFIRM
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPLACE PDF — swap background document, keep all fields intact
+// ─────────────────────────────────────────────────────────────────────────────
+function _formReplacePdf() {
+  document.getElementById('form-replace-input')?.click();
+}
+
+async function _formReplacePdfChosen(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  event.target.value = '';
+
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    cadToast('Only PDF files supported for replacement', 'error'); return;
+  }
+
+  const confirmed = confirm(
+    `Replace the background PDF with "${file.name}"?\n\n` +
+    `All ${_formFields.length} field definitions will be kept exactly as-is.\n` +
+    `Field positions are stored in PDF point coordinates and will re-align automatically ` +
+    `if the new PDF has the same page dimensions.`
+  );
+  if (!confirmed) return;
+
+  cadToast('Loading new PDF…', 'info');
+
+  try {
+    await _ensurePdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Store new file for save upload
+    if (_selectedForm) {
+      _selectedForm._file         = file;
+      _selectedForm._unsaved      = true; // force re-upload on next save
+      _selectedForm.source_name   = _selectedForm.source_name || file.name;
+      window._pendingImportFile   = file;
+    }
+
+    // Load the new PDF into _pdfDoc
+    const newPdfDoc     = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const oldPageCount  = _pdfTotalPages;
+    _pdfDoc             = newPdfDoc;
+    _pdfTotalPages      = newPdfDoc.numPages;
+    _pdfPage            = 1;
+    _pdfStartPage       = 1;
+
+    // Update page count on the form
+    if (_selectedForm) _selectedForm.page_count = _pdfTotalPages;
+
+    await _renderPdfPage(1);
+    _updatePageIndicator();
+    _renderFieldOverlays();
+    _formMarkDirty();
+
+    const pageNote = _pdfTotalPages !== oldPageCount
+      ? ` (page count changed: ${oldPageCount} → ${_pdfTotalPages})`
+      : ' (same page count — fields aligned)';
+
+    cadToast(`PDF replaced — ${_formFields.length} fields preserved${pageNote}`, 'success');
+    cadToast('Remember to Save to store the new PDF', 'info');
+
+  } catch(e) {
+    cadToast('PDF replacement failed: ' + e.message, 'error');
+  }
+}
+
 async function _formDeleteWithConfirm(formId) {
   const form = _formDefs.find(f => f.id === formId);
   const name = form?.source_name || 'this form';
