@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-115910
-console.log('[cdn-form-editor] LOADED v20260331-115910');
+// VERSION: 20260331-120348
+console.log('[cdn-form-editor] LOADED v20260331-120348');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3403,8 +3403,7 @@ function _formRenderPreviewOverlay() {
   // Remove old preview inputs
   document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
 
-  const stages   = _formGetStages();
-  const maxStage = stages.length || 1;
+  const maxStage = _formGetStages().length || 1;
 
   // ── Render field inputs over PDF canvas ──────────────────────────────────
   const canvas   = document.getElementById('form-pdf-canvas');
@@ -3415,8 +3414,8 @@ function _formRenderPreviewOverlay() {
   const pageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
   console.log('[PREVIEW DEBUG] page:', _pdfPage, 'total fields:', _formFields.length, 'on this page:', pageFields.length);
   pageFields.forEach(f => console.log(`  field: type=${f.type} role=${f.role} label="${f.label}" rect=`, f.rect));
-  const stages = _formGetStages();
-  console.log('[PREVIEW DEBUG] stages:', JSON.stringify(stages), 'previewStage:', _previewStage);
+  const dbgStages = _formGetStages();
+  console.log('[PREVIEW DEBUG] stages:', JSON.stringify(dbgStages), 'previewStage:', _previewStage);
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));

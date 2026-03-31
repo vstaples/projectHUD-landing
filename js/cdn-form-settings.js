@@ -454,4 +454,3 @@ if (_origSwitchTabFS) {
     _origSwitchTabFS(tab); // all other tabs pass through normally
   };
 }
-}
