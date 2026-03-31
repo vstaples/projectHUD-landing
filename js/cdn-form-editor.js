@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-053430
-console.log('[cdn-form-editor] LOADED v20260331-053430');
+// VERSION: 20260331-053911
+console.log('[cdn-form-editor] LOADED v20260331-053911');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -392,14 +392,14 @@ function _renderFormEditor() {
       <div style="flex:1;display:flex;overflow:hidden;min-height:0">
 
         <!-- Column 1: Document canvas -->
-        <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0"
+        <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0;isolation:isolate"
           id="form-canvas-wrap">
-          <div style="display:flex;justify-content:center;padding:24px 20px;min-height:100%">
+          <div style="display:inline-flex;justify-content:center;padding:24px 40px;min-height:100%;min-width:100%;box-sizing:border-box">
           <div style="display:inline-block;position:relative;flex-shrink:0">
             <canvas id="form-pdf-canvas" style="display:block;box-shadow:0 4px 24px rgba(0,0,0,.5)"></canvas>
             <!-- SVG overlay for field rectangles -->
             <svg id="form-field-overlay" style="position:absolute;top:0;left:0;
-              pointer-events:all;overflow:visible;cursor:crosshair"
+              pointer-events:all;overflow:hidden;cursor:crosshair"
               width="100%" height="100%"
               onmousedown="_formSvgMouseDownOverride(event)"
               onmousemove="_formSvgMouseMoveOverride(event)"
