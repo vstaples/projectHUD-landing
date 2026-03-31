@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-041458
-console.log('[cdn-form-editor] LOADED v20260331-041458');
+// VERSION: 20260331-041707
+console.log('[cdn-form-editor] LOADED v20260331-041707');
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1705,6 +1705,7 @@ async function _formFileChosen(event) {
     await _ensurePdfJs();
     const arrayBuffer = await file.arrayBuffer();
     window._pendingImportName = file.name;
+    window._pendingImportFile = file;  // preserve File ref for save upload
     _pdfDoc        = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     _pdfTotalPages = _pdfDoc.numPages;
     _pdfPage       = 1;
@@ -1804,6 +1805,7 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
     id:'local_'+Date.now(), source_name:sourceName, page_count:totalPages, archetype,
     fields:allFields, routing:{ stages:[{ stage:1, role:'assignee', parallel_within_stage:false, requires_all:true }] },
     _unsaved:true,
+    _file: window._pendingImportFile || null,  // File object for Storage upload on save
   };
   _formDefs.push(newForm);
   _formFields   = allFields;
@@ -1842,8 +1844,7 @@ async function _formSelect(formId) {
   if (form.source_path) {
     try {
       await _ensurePdfJs();
-      console.log('[formSelect] loading source_path:', form.source_path);
-      console.log('[formSelect] STORAGE_BUCKET:', typeof STORAGE_BUCKET !== 'undefined' ? STORAGE_BUCKET : 'UNDEFINED');
+
       let url;
       try {
         url = await _getSignedUrl(form.source_path);
@@ -1879,7 +1880,7 @@ async function _formSave() {
   if (!_selectedForm) return;
   _selectedForm.fields  = JSON.parse(JSON.stringify(_formFields));
   _selectedForm.routing = JSON.parse(JSON.stringify(_formRouting));
-  if (_selectedForm._unsaved) {
+  if (_selectedForm._unsaved || (!_selectedForm.source_path && _selectedForm._file)) {
     cadToast('Saving…', 'info');
     try {
       if (_selectedForm._file) {
