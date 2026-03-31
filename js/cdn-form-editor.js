@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-012807
-console.log('[cdn-form-editor] LOADED v20260331-012807');
+// VERSION: 20260331-014700
+console.log('[cdn-form-editor] LOADED v20260331-014700');
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1943,6 +1943,7 @@ function _formFieldListClick(event, fieldId) {
 }
 
 function _formClearSelection() {
+  console.trace('[formClearSelection] called');
   _selectedFieldIds.clear();
   _formUpdateSelectionUI();
   _renderFieldOverlays();
@@ -2031,63 +2032,71 @@ const _formSvgMouseDownOverride = (event) => {
       if (!svgRect) return;
       const mx = event.clientX - svgRect.left, my = event.clientY - svgRect.top;
       // Do NOT clear here — clear only on mouseup if no drag occurred (prevents wiping marquee result)
-      _marqueeDrag = { startX:mx, startY:my, active:true, shiftKey:event.shiftKey };
+      _marqueeDrag = { startX:mx, startY:my, active:true, shiftKey:event.shiftKey, svg, svgRect };
       const mr = document.createElementNS('http://www.w3.org/2000/svg','rect');
       mr.id='form-marquee-rect';
       mr.setAttribute('x',mx); mr.setAttribute('y',my); mr.setAttribute('width',0); mr.setAttribute('height',0);
       mr.setAttribute('fill','rgba(79,142,247,.10)'); mr.setAttribute('stroke','rgba(79,142,247,.9)');
       mr.setAttribute('stroke-width','1.5'); mr.setAttribute('stroke-dasharray','4 3');
       mr.style.pointerEvents='none'; svg.appendChild(mr);
+      // Attach to document so fast mouse movement outside SVG bounds still tracks
+      document.addEventListener('mousemove', _marqueeMouseMove);
+      document.addEventListener('mouseup',   _marqueeMouseUp, { once: true });
       event.preventDefault(); return;
     }
   }
   _origSvgMouseDown(event);
 };
 
-// Override: rubber-band marquee rect update during drag
-const _formSvgMouseMoveOverride = (event) => {
-  if (_marqueeDrag?.active) {
-    const svg = document.getElementById('form-field-overlay');
-    const svgRect = svg?.getBoundingClientRect(); if (!svgRect) return;
-    const mx = event.clientX-svgRect.left, my = event.clientY-svgRect.top;
-    const mr = document.getElementById('form-marquee-rect');
-    if (mr) {
-      const x=Math.min(mx,_marqueeDrag.startX), y=Math.min(my,_marqueeDrag.startY);
-      mr.setAttribute('x',x); mr.setAttribute('y',y);
-      mr.setAttribute('width',Math.abs(mx-_marqueeDrag.startX));
-      mr.setAttribute('height',Math.abs(my-_marqueeDrag.startY));
-    }
-    return;
+// Standalone document-level marquee move handler (tracks outside SVG bounds)
+function _marqueeMouseMove(event) {
+  if (!_marqueeDrag?.active) return;
+  const svgRect = _marqueeDrag.svgRect || _marqueeDrag.svg?.getBoundingClientRect();
+  if (!svgRect) return;
+  const mx = event.clientX - svgRect.left, my = event.clientY - svgRect.top;
+  const mr = document.getElementById('form-marquee-rect');
+  if (mr) {
+    const x=Math.min(mx,_marqueeDrag.startX), y=Math.min(my,_marqueeDrag.startY);
+    mr.setAttribute('x',x); mr.setAttribute('y',y);
+    mr.setAttribute('width',Math.abs(mx-_marqueeDrag.startX));
+    mr.setAttribute('height',Math.abs(my-_marqueeDrag.startY));
   }
+}
+
+// Override: SVG mousemove — delegates to standalone handler or original
+const _formSvgMouseMoveOverride = (event) => {
+  if (_marqueeDrag?.active) { _marqueeMouseMove(event); return; }
   _origSvgMouseMove(event);
 };
 
-// Override: commit marquee selection on mouseup
-const _formSvgMouseUpOverride = (event) => {
-  console.log('[mouseUpOverride] marqueeDrag=', !!_marqueeDrag?.active, 'svgGroupDrag=', !!_svgGroupDrag);
-  if (_marqueeDrag?.active) {
-    const svg = document.getElementById('form-field-overlay');
-    const svgRect = svg?.getBoundingClientRect();
-    document.getElementById('form-marquee-rect')?.remove();
-    if (svgRect) {
-      const mx=event.clientX-svgRect.left, my=event.clientY-svgRect.top;
-      const sx=Math.min(mx,_marqueeDrag.startX)/_pdfScale, sy=Math.min(my,_marqueeDrag.startY)/_pdfScale;
-      const ex=Math.max(mx,_marqueeDrag.startX)/_pdfScale, ey=Math.max(my,_marqueeDrag.startY)/_pdfScale;
-      console.log('[mouseUpOverride] box size:', (ex-sx).toFixed(1), 'x', (ey-sy).toFixed(1), 'threshold:', (8/_pdfScale).toFixed(1));
-      if ((ex-sx)>8/_pdfScale && (ey-sy)>8/_pdfScale) {
-        if (!_marqueeDrag.shiftKey) _selectedFieldIds.clear();
-        _formFields.filter(f=>(f.page||1)===_pdfPage).forEach(f => {
-          const r=f.rect;
-          if (r.x<ex && r.x+r.w>sx && r.y<ey && r.y+r.h>sy) _selectedFieldIds.add(f.id);
-        });
-        console.log('[mouseUpOverride] selected', _selectedFieldIds.size, 'fields');
-        _formUpdateSelectionUI(); _renderFieldOverlays();
-      } else {
-        if (!_marqueeDrag.shiftKey) { _selectedFieldIds.clear(); _formUpdateSelectionUI(); _renderFieldOverlays(); }
-      }
+// Standalone document-level marquee commit (fires even if cursor left SVG)
+function _marqueeMouseUp(event) {
+  if (!_marqueeDrag?.active) return;
+  document.removeEventListener('mousemove', _marqueeMouseMove);
+  const svgRect = _marqueeDrag.svgRect || _marqueeDrag.svg?.getBoundingClientRect();
+  document.getElementById('form-marquee-rect')?.remove();
+  if (svgRect) {
+    const mx=event.clientX-svgRect.left, my=event.clientY-svgRect.top;
+    const sx=Math.min(mx,_marqueeDrag.startX)/_pdfScale, sy=Math.min(my,_marqueeDrag.startY)/_pdfScale;
+    const ex=Math.max(mx,_marqueeDrag.startX)/_pdfScale, ey=Math.max(my,_marqueeDrag.startY)/_pdfScale;
+    if ((ex-sx)>8/_pdfScale && (ey-sy)>8/_pdfScale) {
+      if (!_marqueeDrag.shiftKey) _selectedFieldIds.clear();
+      _formFields.filter(f=>(f.page||1)===_pdfPage).forEach(f => {
+        const r=f.rect;
+        if (r.x<ex && r.x+r.w>sx && r.y<ey && r.y+r.h>sy) _selectedFieldIds.add(f.id);
+      });
+    } else {
+      if (!_marqueeDrag.shiftKey) _selectedFieldIds.clear();
     }
-    _marqueeDrag = null; return;
   }
+  _marqueeDrag = null;
+  _formUpdateSelectionUI();
+  _renderFieldOverlays();
+}
+
+// Override: SVG mouseup — delegates to standalone handler or original
+const _formSvgMouseUpOverride = (event) => {
+  if (_marqueeDrag?.active) { _marqueeMouseUp(event); return; }
   _origSvgMouseUp(event);
 };
 
