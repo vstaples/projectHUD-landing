@@ -1,6 +1,52 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-095637
-console.log('[cdn-form-editor] LOADED v20260331-095637');
+// VERSION: 20260331-101339
+console.log('[cdn-form-editor] LOADED v20260331-101339');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBAL FONT RULE — injected once, applies to all form editor UI
+// Rule: Arial, 14px minimum. No exceptions. Monospace banned in form UI.
+// ─────────────────────────────────────────────────────────────────────────────
+(function _injectFormEditorFonts() {
+  if (document.getElementById('form-editor-font-rules')) return;
+  const s = document.createElement('style');
+  s.id = 'form-editor-font-rules';
+  s.textContent = `
+    /* Form editor — uniform font rule */
+    #form-editor-main,
+    #form-editor-main input,
+    #form-editor-main textarea,
+    #form-editor-main select,
+    #form-editor-main button,
+    #form-editor-main span,
+    #form-editor-main div,
+    #form-col-fields,
+    #form-col-routing,
+    #form-lib-col,
+    .form-preview-input-wrap input,
+    .form-preview-input-wrap textarea {
+      font-family: Arial, sans-serif !important;
+    }
+    /* Minimum 14px everywhere in form editor UI */
+    #form-editor-main *:not(svg *):not(canvas) {
+      font-size: max(14px, 1em);
+    }
+    /* Preview inputs match PDF text — transparent bg, black text, no border glow */
+    .form-preview-input-wrap input:not([type=date]):not([type=number]),
+    .form-preview-input-wrap textarea {
+      font-size: 13px !important; /* slightly smaller — sits over PDF text */
+      color: #111 !important;
+      background: rgba(255,255,255,0.88) !important;
+    }
+    /* Signature type field keeps cursive */
+    .form-preview-sig-type {
+      font-family: 'Dancing Script', cursive !important;
+      color: #1a3a8a !important;
+    }
+  `;
+  document.head.appendChild(s);
+})();
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -1905,6 +1951,7 @@ function _renderFieldOverlays() {
   const svg = document.getElementById('form-field-overlay');
   if (!svg) return;
   if (_marqueeDrag?.active) return;
+  if (_formPreviewMode) { _formRenderPreviewOverlay(); return; } // in preview — re-render preview not edit boxes
 
   const sel = _selectedFieldIds;
   if (sel.size > 0) {
@@ -3209,30 +3256,33 @@ function _formTogglePreview() {
     if (drwBtn) { drwBtn.style.background = 'transparent'; drwBtn.style.color = 'var(--muted)'; }
     if (popBtn) { popBtn.style.display = ''; }
     if (hwWgt)  { hwWgt.style.display  = 'none'; }
-    // Collapse side columns, expand canvas
+    // Collapse side columns + CoC
     if (colFlds) { colFlds.style.display = 'none'; }
     if (colRout) { colRout.style.display = 'none'; }
+    const cocPanel = document.getElementById('form-coc-panel');
+    if (cocPanel?.classList.contains('open')) cocPanel.classList.remove('open');
+    // Inject role switcher panel
+    _formShowRolePanel();
     _formRenderPreviewOverlay();
   } else {
     // ── Exit preview — clean up ALL preview DOM artifacts ────────────────────
     // 1. Remove all input overlays
     document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
-    // 2. Remove stage bar
+    // 2. Remove stage bar and role panel
     document.getElementById('form-preview-stagebar')?.remove();
-    // 3. Remove done overlay (if completed)
+    document.getElementById('form-preview-role-panel')?.remove();
+    // 3. Remove done overlays
     document.querySelectorAll('[id^="form-preview-done"]').forEach(el => el.remove());
-    // 4. Remove any absolute done overlay appended to canvas wrap
     const cw = document.getElementById('form-canvas-wrap');
     if (cw) cw.querySelectorAll('div[style*="position:absolute"][style*="inset:0"]').forEach(el => el.remove());
-    // 5. Reset button states
+    // 4. Reset button states
     if (preBtn) { preBtn.style.background = 'transparent'; preBtn.style.color = 'var(--muted)'; }
     if (popBtn) { popBtn.style.display = 'none'; }
-    // 6. Restore side columns
+    // 5. Restore side columns
     if (colFlds) { colFlds.style.display = ''; }
     if (colRout) { colRout.style.display = ''; }
-    // 7. Reset canvas-wrap scroll padding (stage bar may have shifted it)
     if (cw) { const firstChild = cw.firstElementChild; if (firstChild?.id === 'form-preview-stagebar') firstChild.remove(); }
-    // 8. Return to select mode and re-render field boxes
+    // 6. Return to select mode
     _formSetMode('select');
     _renderFieldOverlays();
   }
@@ -3267,54 +3317,6 @@ function _formRenderPreviewOverlay() {
 
   const stages   = _formGetStages();
   const maxStage = stages.length || 1;
-
-  // ── Stage bar (injected above canvas) ────────────────────────────────────
-  let stageBar = document.getElementById('form-preview-stagebar');
-  if (!stageBar) {
-    const wrap = document.getElementById('form-canvas-wrap');
-    if (wrap) {
-      stageBar = document.createElement('div');
-      stageBar.id = 'form-preview-stagebar';
-      stageBar.style.cssText = 'position:sticky;top:0;z-index:30;background:var(--bg2);' +
-        'border-bottom:1px solid var(--border);padding:8px 16px;display:flex;' +
-        'align-items:center;gap:10px;font-family:Arial,sans-serif;flex-shrink:0;';
-      wrap.prepend(stageBar);
-    }
-  }
-  if (stageBar) {
-    const FORM_ROLES_LABELS = { assignee:'Assignee', reviewer:'Reviewer', pm:'PM', external:'External' };
-    const pips = stages.map(s => {
-      const active = s.stage === _previewStage;
-      const done   = s.stage < _previewStage;
-      const role   = FORM_ROLES_LABELS[s.role] || s.role;
-      return `<div style="display:flex;align-items:center;gap:4px">
-        <div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
-                    justify-content:center;font-size:11px;font-weight:700;
-                    background:${done?'var(--green)':active?'var(--accent)':'var(--surf2)'};
-                    color:${done||active?'white':'var(--muted)'};border:2px solid
-                    ${done?'var(--green)':active?'var(--accent)':'var(--border)'}">${done?'✓':s.stage}</div>
-        <span style="font-size:13px;color:${active?'var(--text)':'var(--muted)'}">${role}</span>
-        ${s.stage < maxStage ? '<span style="color:var(--muted)">→</span>' : ''}
-      </div>`;
-    }).join('');
-
-    stageBar.innerHTML = `
-      <span style="font-size:13px;font-weight:600;color:var(--accent)">▶ Preview</span>
-      <span style="color:var(--border);font-size:13px">|</span>
-      ${pips}
-      <div style="flex:1"></div>
-      <button onclick="_formPreviewSubmitStage()"
-        style="font-size:13px;padding:4px 16px;border-radius:999px;
-               background:var(--accent);color:white;border:none;cursor:pointer;
-               font-family:Arial,sans-serif;font-weight:600">
-        ${_previewStage < maxStage ? 'Submit Stage →' : '✓ Complete'}
-      </button>
-      <button onclick="_formTogglePreview()"
-        style="font-size:13px;padding:4px 12px;border-radius:4px;background:transparent;
-               border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">
-        ✕ Exit
-      </button>`;
-  }
 
   // ── Render field inputs over PDF canvas ──────────────────────────────────
   const canvas   = document.getElementById('form-pdf-canvas');
@@ -3385,8 +3387,8 @@ function _formRenderPreviewOverlay() {
       const ta = document.createElement('textarea');
       ta.value = val;
       ta.style.cssText = `width:100%;height:100%;box-sizing:border-box;resize:none;
-        background:rgba(255,255,255,.85);border:1px solid var(--accent);border-radius:3px;
-        color:#111;font-family:Arial,sans-serif;font-size:12px;padding:3px 5px;outline:none;`;
+        background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
+        color:#111;font-family:Arial,sans-serif;font-size:13px;padding:3px 5px;outline:none;`;
       ta.addEventListener('input', () => { _previewResponses[field.id] = ta.value; });
       wrap.appendChild(ta);
 
@@ -3400,8 +3402,8 @@ function _formRenderPreviewOverlay() {
       inp.value = val;
       inp.placeholder = field.label || '';
       inp.style.cssText = `width:100%;height:100%;box-sizing:border-box;
-        background:rgba(255,255,255,.85);border:1px solid var(--accent);border-radius:3px;
-        color:#111;font-family:Arial,sans-serif;font-size:12px;padding:2px 5px;outline:none;`;
+        background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
+        color:#111;font-family:Arial,sans-serif;font-size:13px;padding:2px 5px;outline:none;`;
       inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
       wrap.appendChild(inp);
     }
@@ -3428,8 +3430,9 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
       inp.type = 'text';
       inp.value = val || (_previewResponses[field.id] || '');
       inp.placeholder = 'Type your name…';
-      inp.style.cssText = `flex:1;width:100%;background:rgba(255,255,255,.85);border:none;outline:none;
-        font-family:'Dancing Script',cursive;font-size:${Math.max(14, h*0.55)}px;
+      inp.className = 'form-preview-sig-type';
+      inp.style.cssText = `flex:1;width:100%;background:rgba(255,255,255,.88);border:none;outline:none;
+        font-family:'Dancing Script',cursive;font-size:${Math.max(16, h*0.6)}px;
         color:#1a3a8a;padding:2px 6px;`;
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
@@ -3538,36 +3541,15 @@ function _formPreviewSubmitStage() {
 
   if (_previewStage < maxStage) {
     _previewStage++;
-    cadToast(`Stage ${_previewStage-1} complete — now previewing Stage ${_previewStage}`, 'info');
-    // Remove old inputs and re-render
     document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
     _formRenderPreviewOverlay();
+    _formRefreshRolePanel();
+    cadToast(`Stage ${_previewStage-1} submitted — now simulating Stage ${_previewStage}`, 'info');
   } else {
-    // Final stage complete
-    const total    = Object.keys(_previewResponses).filter(k => !k.endsWith('_img')).length;
-    const required = _formFields.filter(f => f.required).length;
-    document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
-    document.getElementById('form-preview-stagebar')?.remove();
-    const canvas = document.getElementById('form-pdf-canvas');
-    const wrap   = canvas?.parentElement;
-    if (wrap) {
-      const done = document.createElement('div');
-      done.id = 'form-preview-done';
-      done.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;' +
-        'align-items:center;justify-content:center;background:rgba(15,17,23,.85);z-index:50;gap:12px;';
-      done.innerHTML = `<div style="font-size:48px">✅</div>
-        <div style="font-size:18px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">Preview Complete</div>
-        <div style="font-size:14px;color:var(--muted);font-family:Arial,sans-serif">
-          ${total} fields filled · ${required} required fields
-        </div>
-        <button onclick="_formTogglePreview()"
-          style="margin-top:8px;font-size:14px;padding:8px 24px;border-radius:999px;
-                 background:var(--accent);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">
-          ← Back to Editor
-        </button>`;
-      wrap.appendChild(done);
-    }
-    cadToast('Preview complete — all stages filled', 'success');
+    // All stages done — toast and auto-exit
+    const total = Object.keys(_previewResponses).filter(k => !k.endsWith('_img') && _previewResponses[k]).length;
+    cadToast(`Preview complete — ${total} fields filled across all stages`, 'success');
+    setTimeout(() => _formTogglePreview(), 1200);
   }
 }
 
@@ -3684,6 +3666,122 @@ function _formPreviewAttendeesField(wrap, field, existingVal) {
   };
 
   refresh();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PREVIEW ROLE SWITCHER PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+function _formShowRolePanel() {
+  document.getElementById('form-preview-role-panel')?.remove();
+  const bodyRow = document.getElementById('form-body-row');
+  if (!bodyRow) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'form-preview-role-panel';
+  panel.style.cssText = [
+    'width:140px;min-width:140px;flex-shrink:0',
+    'background:var(--bg1)',
+    'border-left:1px solid var(--border)',
+    'display:flex;flex-direction:column',
+    'font-family:Arial,sans-serif',
+    'overflow:hidden',
+  ].join(';');
+
+  bodyRow.appendChild(panel);
+  _formRefreshRolePanel();
+}
+
+function _formRefreshRolePanel() {
+  const panel = document.getElementById('form-preview-role-panel');
+  if (!panel) return;
+
+  const stages   = _formGetStages();
+  const LABELS   = { assignee:'Assignee', reviewer:'Reviewer', pm:'PM', external:'External' };
+  const COLORS   = { assignee:'var(--accent)', reviewer:'var(--cad)', pm:'var(--green)', external:'var(--muted)' };
+
+  let html = `
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="font-size:13px;font-weight:700;color:var(--text);letter-spacing:.04em">SIMULATE</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:8px 0">`;
+
+  stages.forEach(s => {
+    const isActive = s.stage === _previewStage;
+    const isDone   = s.stage < _previewStage;
+    const color    = COLORS[s.role] || 'var(--muted)';
+    const label    = LABELS[s.role] || s.role;
+    html += `
+      <div onclick="_formSwitchPreviewStage(${s.stage})"
+        style="padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;
+               background:${isActive?'var(--surf3)':'transparent'};
+               border-left:3px solid ${isActive?color:'transparent'};
+               transition:background .1s">
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+                    background:${isDone?'var(--green)':isActive?color:'var(--border)'}"></div>
+        <span style="font-size:13px;font-weight:${isActive?'600':'400'};
+                     color:${isActive?'var(--text)':'var(--muted)'}">${label}</span>
+        ${isDone?'<span style="font-size:11px;color:var(--green);margin-left:auto">✓</span>':''}
+      </div>`;
+  });
+
+  html += `</div>
+    <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:6px">`;
+
+  // Sign button — only if current stage has a signature field
+  const stageSigFields = _formFieldsForStage(_previewStage).filter(f => f.type === 'signature');
+  if (stageSigFields.length) {
+    html += `<button onclick="_formPreviewQuickSign()"
+      style="font-size:13px;padding:6px 0;border-radius:6px;background:var(--accent);
+             color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;font-weight:600;width:100%">
+      ✍ Sign
+    </button>`;
+  }
+
+  // Submit / next stage
+  const isLast = _previewStage >= stages.length;
+  html += `<button onclick="_formPreviewSubmitStage()"
+    style="font-size:13px;padding:6px 0;border-radius:6px;
+           background:${isLast?'var(--green)':'var(--surf2)'};
+           color:${isLast?'white':'var(--text1)'};
+           border:1px solid ${isLast?'var(--green)':'var(--border)'};
+           cursor:pointer;font-family:Arial,sans-serif;font-weight:600;width:100%">
+    ${isLast?'✓ Done':'Submit →'}
+  </button>
+  <button onclick="_formTogglePreview()"
+    style="font-size:13px;padding:5px 0;border-radius:6px;background:transparent;
+           border:1px solid var(--border);color:var(--muted);cursor:pointer;
+           font-family:Arial,sans-serif;width:100%">
+    ✕ Exit
+  </button>`;
+
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+function _formSwitchPreviewStage(stage) {
+  // Allow jumping to any stage (forward preview)
+  _previewStage = stage;
+  document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+  _formRenderPreviewOverlay();
+  _formRefreshRolePanel();
+}
+
+function _formPreviewQuickSign() {
+  const name = prompt('Sign as (enter your name):');
+  if (!name?.trim()) return;
+
+  const sigFields = _formFieldsForStage(_previewStage).filter(f => f.type === 'signature');
+  sigFields.forEach(f => {
+    _previewResponses[f.id] = name.trim();
+    _formPreviewAutoDate(f);
+  });
+
+  // Re-render inputs to show the filled signature
+  document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+  _formRenderPreviewOverlay();
+  _formRefreshRolePanel();
+  cadToast(`Signed as "${name.trim()}"`, 'success');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
