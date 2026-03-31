@@ -3457,10 +3457,9 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
 
       const btns = document.createElement('div');
       btns.style.cssText = 'display:flex;gap:4px;padding:1px 4px;background:rgba(0,0,0,.2);flex-shrink:0;';
-      btns.innerHTML = '<span style="font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif" ' +
-        'onclick="this.closest('.form-preview-input-wrap').__clearSig?.()">Clear</span>' +
-        '<span style="flex:1"></span>' +
-        '<span style="font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">Aa Type instead</span>';
+      btns.innerHTML = `<span style="font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">Clear</span>`
+        + `<span style="flex:1"></span>`
+        + `<span style="font-size:10px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">Aa Type instead</span>`;
       btns.lastElementChild.addEventListener('click', () => { mode='type'; renderSig(); });
       btns.firstElementChild.addEventListener('click', () => {
         ctx.clearRect(0,0,cv.width,cv.height);
