@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-104147
-console.log('[cdn-form-editor] LOADED v20260331-104147');
+// VERSION: 20260331-105829
+console.log('[cdn-form-editor] LOADED v20260331-105829');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -26,21 +26,17 @@ console.log('[cdn-form-editor] LOADED v20260331-104147');
     .form-preview-input-wrap textarea {
       font-family: Arial, sans-serif !important;
     }
-    /* Minimum 14px everywhere in form editor UI */
-    #form-editor-main *:not(svg *):not(canvas) {
-      font-size: max(14px, 1em);
-    }
-    /* Preview inputs match PDF text — transparent bg, black text, no border glow */
-    .form-preview-input-wrap input:not([type=date]):not([type=number]),
+    /* Preview inputs — NO font-size override; size is set inline per field height */
+    .form-preview-input-wrap input,
     .form-preview-input-wrap textarea {
-      font-size: 13px !important; /* slightly smaller — sits over PDF text */
       color: #111 !important;
       background: rgba(255,255,255,0.88) !important;
+      /* font-size intentionally NOT set here — set per-field by JS based on cell height */
     }
-    /* Signature type field keeps cursive */
+    /* Signature cursive */
     .form-preview-sig-type {
       font-family: 'Dancing Script', cursive !important;
-      color: #1a3a8a !important;
+      color: #0a2280 !important;
     }
   `;
   document.head.appendChild(s);
@@ -144,8 +140,9 @@ let _lastFieldClickId = null;      // field id of last click
 const FORM_ROLES = {
   assignee: { label: 'Assignee',  color: '#4f8ef7', dim: 'rgba(79,142,247,.15)' },
   reviewer: { label: 'Reviewer',  color: '#c47d18', dim: 'rgba(196,125,24,.15)' },
-  pm:       { label: 'PM',        color: '#2a9d40', dim: 'rgba(42,157,64,.15)'  },
-  external: { label: 'External',  color: '#7c4dff', dim: 'rgba(124,77,255,.15)' },
+  approver: { label: 'Approver',  color: '#2a9d40', dim: 'rgba(42,157,64,.15)'  },
+  pm:       { label: 'PM',        color: '#7c4dff', dim: 'rgba(124,77,255,.15)' },
+  external: { label: 'External',  color: '#8b91a5', dim: 'rgba(139,145,165,.15)'},
 };
 
 const FIELD_TYPES = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea'];
@@ -1510,7 +1507,7 @@ function _detectTextHeuristicsV2(textContent, page, pageNum, startIdx, archetype
         found.push({ id:`heur_${pageNum}_${startIdx+found.length}`, page:pageNum,
           rect:{x:x+label.length*6, y:y-12, w:Math.max(80,underLen*5), h:16},
           label, type:/date|dated|as of/i.test(label)?'date':/quantity|qty|amount/i.test(label)?'number':'text',
-          role:/sign|approv|authoriz|review/i.test(label)?'reviewer':'assignee',
+          role:/approv|authoriz/i.test(label)?'approver':/sign|review/i.test(label)?'reviewer':'assignee',
           required:false, detection:'heuristic:colon_underscore' });
       }
       if (/^rev\.?\s*$/i.test(s)) {
@@ -1641,7 +1638,7 @@ Do NOT include document control metadata. Return ONLY a JSON array, no explanati
       rect:{ x:(f.x_pct/100)*pdfVp.width, y:(f.y_pct/100)*pdfVp.height,
              w:(f.width_pct/100)*pdfVp.width||120, h:f.type==='signature'?28:f.type==='textarea'?40:16 },
       label:f.label||'Field', type:f.type||'text',
-      role:/sign|approv|authoriz/i.test(f.label)?'reviewer':/pm|manager/i.test(f.label)?'pm':'assignee',
+      role:/approv|authoriz/i.test(f.label)?'approver':/sign|review/i.test(f.label)?'reviewer':/pm|manager/i.test(f.label)?'pm':'assignee',
       required:f.type==='signature', detection:'claude_vision', confidence:'ai',
     }));
   } catch(e) {
@@ -1780,7 +1777,7 @@ function _migrateToStages() {
 function _formAddStage() {
   const stages = _formRouting.stages || _migrateToStages();
   const nextNum = Math.max(0,...stages.map(s=>s.stage)) + 1;
-  const defaultRole = nextNum===2?'reviewer':nextNum>=3?'pm':'assignee';
+  const defaultRole = nextNum===2?'reviewer':nextNum===3?'approver':nextNum>=4?'pm':'assignee';
   stages.push({ stage:nextNum, role:defaultRole, parallel_within_stage:true, requires_all:true });
   _formRouting.stages = stages;
   _reRenderRoutingPanel();
@@ -3363,18 +3360,16 @@ function _formTogglePreview() {
 }
 
 function _formGetStages() {
-  // For PREVIEW: always derive stages from all unique roles in fields
-  // This ensures Reviewer/Approver always get their own simulate step
-  const roleOrder = ['assignee','pm','reviewer','external'];
-  const presentRoles = [...new Set(_formFields.map(f => f.role||'assignee'))]
+  const roleOrder = ['assignee','reviewer','approver','pm','external'];
+  // Union of: roles present on fields + roles in routing stage config
+  const fromFields  = _formFields.map(f => f.role||'assignee');
+  const fromRouting = (_formRouting?.stages||[]).map(s => s.role).filter(Boolean);
+  const allRoles = [...new Set([...fromFields, ...fromRouting])]
     .sort((a,b) => {
-      const ai = roleOrder.indexOf(a), bi = roleOrder.indexOf(b);
+      const ai = roleOrder.indexOf(a); const bi = roleOrder.indexOf(b);
       return (ai<0?99:ai) - (bi<0?99:bi);
     });
-  if (presentRoles.length) {
-    return presentRoles.map((role, i) => ({ stage: i+1, role }));
-  }
-  return [{ stage:1, role:'assignee' }];
+  return allRoles.length ? allRoles.map((role,i)=>({stage:i+1,role})) : [{stage:1,role:'assignee'}];
 }
 
 function _formFieldsForStage(stageNum) {
@@ -3420,91 +3415,140 @@ function _formRenderPreviewOverlay() {
   const activeIds    = new Set(activeFields.map(f => f.id));
 
   _formFields.filter(f => (f.page||1) === _pdfPage).forEach(field => {
-    const r  = field.rect || { x:0, y:0, w:80, h:18 };
-    const x  = r.x * _pdfScale, y = r.y * _pdfScale;
-    const w  = r.w * _pdfScale, h = r.h * _pdfScale;
+    const r = field.rect || { x:0, y:0, w:80, h:18 };
+    // Pixel dimensions on screen
+    const x = r.x * _pdfScale, y = r.y * _pdfScale;
+    const w = r.w * _pdfScale, h = r.h * _pdfScale;
     const active = activeIds.has(field.id);
+    const val = _previewResponses[field.id] || '';
+
+    // FONT RULE: fill ~88% of field height. No padding stealing space.
+    // Use a <div> wrapper with flex+align-items to center vertically without padding tricks.
+    const fs = Math.max(8, h * 0.82);   // 82% of pixel height
+    // !important on font-size beats any app-shell stylesheet rule
+    const BASE_STYLE = [
+      'width:100%;height:100%;box-sizing:border-box',
+      'background:rgba(255,255,255,.92)',
+      'border:1.5px solid #3b82f6',
+      'border-radius:2px',
+      'color:#111',
+      'font-family:Arial,sans-serif',
+      `font-size:${fs}px !important`,
+      'padding:0 4px',
+      'outline:none',
+    ].join(';');
 
     const wrap = document.createElement('div');
     wrap.className = 'form-preview-input-wrap';
-    wrap.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;
-      box-sizing:border-box;overflow:hidden;`;
-
-    const val = _previewResponses[field.id] || '';
+    wrap.style.position   = 'absolute';
+    wrap.style.left       = x + 'px';
+    wrap.style.top        = y + 'px';
+    wrap.style.width      = w + 'px';
+    wrap.style.height     = h + 'px';
+    wrap.style.boxSizing  = 'border-box';
+    wrap.style.overflow   = 'hidden';
 
     if (!active) {
-      // Locked field — show faint overlay
-      wrap.style.background = 'rgba(255,255,255,.04)';
-      wrap.style.border = '1px solid rgba(255,255,255,.08)';
-      wrap.style.borderRadius = '2px';
+      wrap.style.background    = 'rgba(255,255,255,.03)';
+      wrap.style.border        = '1px solid rgba(100,150,255,.12)';
+      wrap.style.borderRadius  = '2px';
       wrap.style.pointerEvents = 'none';
-      wrap.title = `Stage ${field.stage||1} field — not yet active`;
+
     } else if (field.type === 'checkbox') {
-      wrap.style.display = 'flex';
-      wrap.style.alignItems = 'center';
-      wrap.style.justifyContent = 'center';
+      wrap.style.display         = 'flex';
+      wrap.style.alignItems      = 'center';
+      wrap.style.justifyContent  = 'center';
+      const sz = Math.min(h * 0.75, w * 0.75, 22);
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.checked = val === 'true';
-      cb.style.cssText = 'width:16px;height:16px;cursor:pointer;accent-color:var(--accent)';
+      cb.style.width  = sz + 'px';
+      cb.style.height = sz + 'px';
+      cb.style.cursor = 'pointer';
+      cb.style.accentColor = '#3b82f6';
       cb.addEventListener('change', () => { _previewResponses[field.id] = String(cb.checked); });
       wrap.appendChild(cb);
 
     } else if (field.type === 'signature') {
+      // No overflow:hidden — sig needs full height for cursive
+      wrap.style.overflow = 'visible';
       _formPreviewSignatureField(wrap, field, val, w, h);
 
     } else if (field.type === 'review') {
-      const opts = ['','pass','fail','na'];
-      const labels = {'':'—','pass':'✓ Pass','fail':'✗ Fail','na':'N/A'};
-      const colors = {'':'var(--muted)','pass':'var(--green)','fail':'var(--red)','na':'var(--amber)'};
+      const opts   = ['','pass','fail','na'];
+      const labels = {'':'— Review','pass':'✓ Pass','fail':'✗ Fail','na':'N/A'};
+      const colors = {'':'#888','pass':'#16a34a','fail':'#dc2626','na':'#d97706'};
       let cur = val || '';
-      wrap.style.cursor = 'pointer';
-      wrap.style.display = 'flex';
-      wrap.style.alignItems = 'center';
-      wrap.style.justifyContent = 'center';
-      wrap.style.fontSize = '12px';
-      wrap.style.fontFamily = 'Arial,sans-serif';
-      wrap.style.fontWeight = '600';
-      wrap.style.background = 'rgba(255,255,255,.04)';
-      wrap.style.border = '1px solid var(--border)';
-      wrap.style.borderRadius = '3px';
-      wrap.style.color = colors[cur];
-      wrap.textContent = labels[cur];
+      wrap.style.background      = 'rgba(255,255,255,.9)';
+      wrap.style.border          = '1.5px solid #3b82f6';
+      wrap.style.borderRadius    = '2px';
+      wrap.style.cursor          = 'pointer';
+      wrap.style.display         = 'flex';
+      wrap.style.alignItems      = 'center';
+      wrap.style.justifyContent  = 'center';
+      wrap.style.fontSize        = fs + 'px';
+      wrap.style.fontFamily      = 'Arial,sans-serif';
+      wrap.style.fontWeight      = '700';
+      wrap.style.color           = colors[cur];
+      wrap.textContent           = labels[cur];
       wrap.addEventListener('click', () => {
         cur = opts[(opts.indexOf(cur)+1) % opts.length];
         _previewResponses[field.id] = cur;
         wrap.textContent = labels[cur];
-        wrap.style.color  = colors[cur];
+        wrap.style.color = colors[cur];
       });
 
     } else if (field.type === 'textarea') {
       const ta = document.createElement('textarea');
       ta.value = val;
       ta.style.cssText = `width:100%;height:100%;box-sizing:border-box;resize:none;
-        background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
-        color:#111;font-family:Arial,sans-serif;font-size:${Math.max(9,h*0.82)}px;line-height:1.15;
-        padding:${h*0.06}px 4px;outline:none;`;
+        background:rgba(255,255,255,.9);border:1.5px solid #3b82f6;border-radius:2px;
+        color:#111;font-family:Arial,sans-serif;font-size:${fs}px;line-height:1.2;
+        padding:2px 4px;outline:none;`;
       ta.addEventListener('input', () => { _previewResponses[field.id] = ta.value; });
       wrap.appendChild(ta);
 
     } else if (field.type === 'attendees') {
-      _formPreviewAttendeesField(wrap, field, val);
+      wrap.style.overflow = 'visible'; // popover extends beyond field bounds
+      const attH = h; // already scaled pixels
+      _formPreviewAttendeesField(wrap, field, val, attH, fs);
+
+    } else if (field.type === 'date') {
+      // type=text for date — browser date input ignores custom height & font
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.placeholder = 'MM/DD/YYYY';
+      inp.value = val;
+      inp.style.cssText = BASE_STYLE;
+      inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
+      // Auto-format: insert slashes as user types
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' || e.key === 'Delete') return;
+        const v = inp.value.replace(/\D/g,'');
+        if (v.length === 2 || v.length === 4) inp.value = inp.value + '/';
+      });
+      wrap.appendChild(inp);
 
     } else {
-      // text / date / number
+      // text / number
       const inp = document.createElement('input');
-      // Use text for date in preview — browser date input ignores custom height/font
-      inp.type  = field.type === 'number' ? 'number' : 'text';
       if (field.type === 'date') {
+        inp.type = 'text';
         inp.placeholder = 'MM/DD/YYYY';
-        inp.dataset.fieldType = 'date';
+        inp.maxLength = 10;
+        inp.addEventListener('input', () => {
+          let d = inp.value.replace(/\D/g,'').slice(0,8);
+          if (d.length > 4) d = d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4);
+          else if (d.length > 2) d = d.slice(0,2)+'/'+d.slice(2);
+          inp.value = d;
+          _previewResponses[field.id] = d;
+        });
+      } else {
+        inp.type = field.type === 'number' ? 'number' : 'text';
+        inp.placeholder = field.label || '';
+        inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
       }
       inp.value = val;
-      inp.placeholder = field.label || '';
-      inp.style.cssText = `width:100%;height:100%;box-sizing:border-box;
-        background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
-        color:#111;font-family:Arial,sans-serif;font-size:${Math.max(9,h*0.85)}px;
-        padding:0 4px;outline:none;display:flex;align-items:center;`;
-      inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
+      inp.setAttribute('style', BASE_STYLE);
       wrap.appendChild(inp);
     }
 
@@ -3514,37 +3558,42 @@ function _formRenderPreviewOverlay() {
 }
 
 function _formPreviewSignatureField(wrap, field, val, w, h) {
-  // Toggle: Type (default) or Draw
   let mode = 'type';
-  wrap.style.background = 'rgba(255,255,255,.04)';
-  wrap.style.border = '1px solid var(--accent)';
-  wrap.style.borderRadius = '3px';
-  wrap.style.display = 'flex';
-  wrap.style.flexDirection = 'column';
+  const fs = Math.min(Math.max(12, h * 0.85), 48); // fill the field height
+  wrap.style.background    = 'rgba(255,255,255,.9)';
+  wrap.style.border        = '1.5px solid #3b82f6';
+  wrap.style.borderRadius  = '3px';
+  wrap.style.display       = 'flex';
+  wrap.style.alignItems    = 'center';
+  wrap.style.position      = 'relative';
+  wrap.style.overflow      = 'hidden';
 
   const renderSig = () => {
     wrap.innerHTML = '';
     if (mode === 'type') {
-      // Type mode
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.value = val || (_previewResponses[field.id] || '');
-      inp.placeholder = 'Type your name…';
-      // Force Dancing Script — override any global font rule
-      inp.setAttribute('style', `flex:1;width:100%;background:transparent;border:none;outline:none;
-        font-family:'Dancing Script',cursive !important;font-size:${Math.max(12, h*0.82)}px !important;
-        color:#0a2280;padding:0 6px;font-weight:600;`);
+      inp.placeholder = 'Sign here…';
+      // setAttribute bypasses the global !important font rule
+      inp.setAttribute('style',
+        `flex:1;width:calc(100% - 24px);height:${h}px;background:transparent;border:none;outline:none;` +
+        `font-family:'Dancing Script',cursive !important;font-size:${fs}px !important;` +
+        `color:#0a2280 !important;padding:0 6px;font-weight:600;overflow:hidden;`
+      );
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
         if (inp.value.trim().length > 1) _formPreviewAutoDate(field);
       });
       wrap.appendChild(inp);
-      const toggle = document.createElement('div');
-      toggle.style.cssText = 'font-size:10px;color:var(--muted);cursor:pointer;padding:1px 4px;' +
-        'text-align:right;flex-shrink:0;font-family:Arial,sans-serif;background:rgba(0,0,0,.2)';
-      toggle.textContent = '✏ Draw instead';
-      toggle.addEventListener('click', () => { mode='draw'; renderSig(); });
-      wrap.appendChild(toggle);
+      // Small draw toggle in the corner — doesn't take height
+      const drawIcon = document.createElement('span');
+      drawIcon.title = 'Switch to draw mode';
+      drawIcon.textContent = '✏';
+      drawIcon.style.cssText = 'position:absolute;right:3px;bottom:2px;font-size:10px;' +
+        'color:#94a3b8;cursor:pointer;';
+      drawIcon.addEventListener('click', () => { mode='draw'; renderSig(); });
+      wrap.appendChild(drawIcon);
 
     } else {
       // Draw mode
@@ -3683,7 +3732,8 @@ function _formPopOutPreview() {
 // ─────────────────────────────────────────────────────────────────────────────
 function _formPreviewAutoDate(sigField) {
   const d = new Date();
-  const today = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; // MM/DD/YYYY
+  // Store as MM/DD/YYYY (matches our text date input format)
+  const today = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
   // Extract keyword from sig label (first word that isn't "Signature"/"Sign"/"Auth")
   const stopWords = new Set(['signature','sign','authorized','approval','approver','by','date','field']);
   const sigWords  = (sigField.label||'').toLowerCase().split(/\s+/).filter(w => !stopWords.has(w) && w.length > 2);
@@ -3727,15 +3777,23 @@ function _formPreviewAutoDate(sigField) {
 }
 
 
-function _formPreviewAttendeesField(wrap, field, existingVal) {
+function _formPreviewAttendeesField(wrap, field, existingVal, h, fs) {
   let attendees = [];
   try { attendees = JSON.parse(existingVal || '[]'); } catch(e) { attendees = []; }
 
   // The field cell is small — render a compact summary inside the cell
   // and an expanded popover above it for chip management
-  wrap.style.cssText += ';background:rgba(255,255,255,.88);border:1.5px solid #3b82f6;' +
-    'border-radius:3px;overflow:visible;cursor:pointer;display:flex;align-items:center;' +
-    'padding:0 4px;gap:4px;position:relative;';
+  wrap.style.background = 'rgba(255,255,255,.88)';
+  wrap.style.border = '1.5px solid #3b82f6';
+  wrap.style.borderRadius = '3px';
+  wrap.style.overflow = 'visible';
+  wrap.style.cursor = 'pointer';
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = 'center';
+  wrap.style.padding = '0 4px';
+  wrap.style.gap = '4px';
+  wrap.style.position = 'relative';
+  wrap.style.zIndex = '10'; // ensure popover isn't clipped by canvas overflow
 
   const renderCell = () => {
     wrap.innerHTML = '';
@@ -3744,7 +3802,7 @@ function _formPreviewAttendeesField(wrap, field, existingVal) {
     const summary = document.createElement('span');
     summary.style.cssText = 'flex:1;font-size:${Math.max(9,h*0.75)}px;color:#111;' +
       'font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-    summary.style.fontSize = Math.max(9, parseInt(wrap.style.height||'18')*0.75) + 'px';
+    summary.style.fontSize = (fs || Math.max(9, h*0.82)) + 'px';
     summary.textContent = attendees.length
       ? attendees.map(a=>a.name||a).join(', ')
       : '';
@@ -3851,8 +3909,8 @@ function _formRefreshRolePanel() {
   if (!panel) return;
 
   const stages   = _formGetStages();
-  const LABELS   = { assignee:'Assignee', reviewer:'Reviewer', pm:'PM', external:'External' };
-  const COLORS   = { assignee:'var(--accent)', reviewer:'var(--cad)', pm:'var(--green)', external:'var(--muted)' };
+  const LABELS   = { assignee:'Assignee', reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' };
+  const COLORS   = { assignee:'var(--accent)', reviewer:'var(--cad)', approver:'var(--green)', pm:'var(--purple,#7c4dff)', external:'var(--muted)' };
 
   let html = `
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
