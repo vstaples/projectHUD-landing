@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-055908
-console.log('[cdn-form-editor] LOADED v20260331-055908');
+// VERSION: 20260331-060927
+console.log('[cdn-form-editor] LOADED v20260331-060927');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -183,27 +183,9 @@ function renderFormsTab(el) {
           style="display:none" onchange="_formFileChosen(event)"/>
       </div>
 
-      <!-- ── Main area: editor or empty state + CoC as flex sibling ── -->
-      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0">
-        <div style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
-          ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
-        </div>
-        <!-- CoC panel: flex sibling so it pushes canvas left, not overlays -->
-        <div class="form-coc-panel" id="form-coc-panel">
-          <div class="form-coc-resize" id="form-coc-resize" title="Drag to resize"></div>
-          <div class="form-coc-inner">
-            <div class="form-coc-header">
-              <span class="form-coc-title">Chain of Custody</span>
-              <button onclick="_formToggleCoC()" style="background:none;border:none;
-                color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
-            </div>
-            <div class="form-coc-body" id="form-coc-body">
-              <div style="font-size:12px;color:var(--muted);text-align:center;padding-top:24px;font-family:Arial,sans-serif">
-                Select a form to view history.
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- ── Main area: editor or empty state ─────────────────────── -->
+      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
+        ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
       </div>
 
     </div>`;
@@ -286,31 +268,30 @@ function _renderFormEditor() {
       <!-- ── Editor toolbar ─────────────────────────────────────────── -->
       <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-        <!-- Name (editable) + lifecycle badges -->
-        <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
-          <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
-            style="font-size:13px;font-weight:500;color:var(--text);
-                   background:transparent;border:none;border-bottom:1px solid transparent;
-                   outline:none;font-family:Arial,sans-serif;padding:2px 4px;min-width:0;flex:1;
-                   transition:border-color .15s"
-            onfocus="this.style.borderBottomColor='var(--cad)'"
-            onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
-            onkeydown="if(event.key==='Enter')this.blur()"
-            title="Click to rename"/>
-          <!-- State badge -->
-          <span style="font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;
+        <!-- Name (editable) -->
+        <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
+          style="font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:80px;
+                 background:transparent;border:none;border-bottom:1px solid transparent;
+                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;
+                 transition:border-color .15s"
+          onfocus="this.style.borderBottomColor='var(--cad)'"
+          onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
+          oninput="_formMarkDirty()"
+          onkeydown="if(event.key==='Enter')this.blur()"
+          title="Click to rename — press Enter to confirm"/>
+        <!-- State · Version · Category group -->
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <span style="font-size:11px;padding:2px 8px;border-radius:999px;
                        background:var(--surf2);border:1px solid var(--border);
                        color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif">
             ${_formStateLabel(f.state||'draft')}
           </span>
-          <!-- Version badge -->
-          <span style="font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;
+          <span style="font-size:11px;padding:2px 8px;border-radius:999px;
                        background:var(--surf2);border:1px solid var(--border);
                        color:var(--muted);font-family:Arial,sans-serif">
             ${f.version||'0.1.0'}
           </span>
-          <!-- Category badge -->
-          ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat ? `<span style="font-size:11px;padding:2px 8px;border-radius:999px;flex-shrink:0;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif">${escHtml(cat.name)}</span>` : `<button onclick="_formPickCategory()" style="font-size:11px;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;flex-shrink:0">+ Category</button>`; })()}
+          ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat ? `<span style="font-size:11px;padding:2px 8px;border-radius:999px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif">${escHtml(cat.name)}</span>` : `<button onclick="_formPickCategory()" style="font-size:11px;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">+ Category</button>`; })()}
         </div>
         <!-- Page navigation -->
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -339,7 +320,6 @@ function _renderFormEditor() {
           <button onclick="_formZoomFit()" class="btn btn-ghost btn-sm"
             style="padding:3px 8px;font-size:11px" title="Fit to width">⊡</button>
         </div>
-        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
         <!-- Mode toggle: Select vs Draw -->
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
@@ -387,7 +367,7 @@ function _renderFormEditor() {
         ${_formLifecycleButtons(f)}
       </div>
 
-      <!-- ── Three-column body ────────────────────────────────────── -->
+      <!-- ── Three-column body + CoC panel ──────────────────────── -->
       <div style="flex:1;display:flex;overflow:hidden;min-height:0">
 
         <!-- Column 1: Document canvas -->
@@ -432,7 +412,13 @@ function _renderFormEditor() {
                            text-transform:uppercase;color:var(--muted)">
                 Fields <span style="font-weight:400;color:var(--text3)">(${totalFields})</span>
               </span>
-              <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <button onclick="_formAutoRename()" class="btn btn-ghost btn-sm"
+                  style="font-size:11px;padding:2px 8px" title="Auto-rename all fields by type and sequence">
+                  ⟳ Rename
+                </button>
+                <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
+              </div>
             </div>
             <!-- Arrange toolbar — shown when 2+ fields selected -->
             <div id="form-arrange-bar" style="display:none;flex-direction:column;gap:4px">
@@ -789,6 +775,7 @@ function _undoPop() {
   if (!_undoStack.length) { cadToast('Nothing to undo', 'info'); return; }
   _formFields = JSON.parse(_undoStack.pop());
   _selectedFieldIds.clear();
+  _formMarkDirty();
   _formUpdateSelectionUI();
   _renderFieldOverlays();
   const listEl = document.getElementById('form-field-list');
@@ -1634,6 +1621,24 @@ function _renderStageRoutingPanel() {
       </div>
       <div style="margin-top:12px;padding:8px 10px;border-radius:4px;background:rgba(196,125,24,.06);border:1px solid var(--cad-wire)">
         <div style="font-size:12px;color:var(--muted);line-height:1.5">Each stage activates only after the previous stage is fully complete.</div>
+
+        <!-- CoC panel: flex sibling of columns — aligns with field headers -->
+        <div class="form-coc-panel" id="form-coc-panel">
+          <div class="form-coc-resize" id="form-coc-resize" title="Drag to resize"></div>
+          <div class="form-coc-inner">
+            <div class="form-coc-header">
+              <span class="form-coc-title">Chain of Custody</span>
+              <button onclick="_formToggleCoC()" style="background:none;border:none;
+                color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
+            </div>
+            <div class="form-coc-body" id="form-coc-body">
+              <div style="font-size:12px;color:var(--muted);text-align:center;padding-top:24px;font-family:Arial,sans-serif">
+                No history yet.
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>`;
 }
@@ -2132,7 +2137,8 @@ function _formLifecycleButtons(f) {
   const locked = ['pending_review','pending_approval','released','archived'].includes(state);
   const btns = [];
 
-  // Remove (always)
+  // Separator then Remove
+  btns.push(`<div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>`);
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formDeleteWithConfirm('${f.id}')"
     style="color:var(--red);font-size:12px">🗑 Remove</button>`);
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formToggleCoC()" id="form-coc-btn"
@@ -2407,8 +2413,9 @@ function _formDelete(formId) {
 function _formRenameCurrent(newName) {
   const name = newName.trim();
   if (!name || !_selectedForm) return;
+  if (_selectedForm.source_name === name) return;
   _selectedForm.source_name = name;
-  // Update list sidebar
+  _formMarkDirty();
   const listEl = document.getElementById('form-list');
   if (listEl) listEl.innerHTML = _renderFormList();
 }
@@ -2557,6 +2564,38 @@ function _formToggleRequiredMulti() {
   const listEl = document.getElementById('form-field-list');
   if (listEl) listEl.innerHTML = _renderFieldList();
   _renderFieldOverlays();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-RENAME — strips (copy) chains, assigns Type+N labels
+// ─────────────────────────────────────────────────────────────────────────────
+function _formAutoRename() {
+  if (!_formFields.length) return;
+  _undoPush();
+  // Count per type per page
+  const counters = {};
+  // Sort by page then top-to-bottom, left-to-right
+  const sorted = [..._formFields].sort((a, b) => {
+    if ((a.page||1) !== (b.page||1)) return (a.page||1) - (b.page||1);
+    if (Math.abs((a.rect?.y||0) - (b.rect?.y||0)) > 8) return (a.rect?.y||0) - (b.rect?.y||0);
+    return (a.rect?.x||0) - (b.rect?.x||0);
+  });
+  sorted.forEach(field => {
+    const type = field.type || 'text';
+    const label = {
+      text:'Text', date:'Date', number:'Number', checkbox:'Checkbox',
+      signature:'Signature', textarea:'Textarea', review:'Review', doc_ref:'DocRef'
+    }[type] || type.charAt(0).toUpperCase() + type.slice(1);
+    counters[type] = (counters[type] || 0) + 1;
+    // Update in _formFields (sorted is a copy of refs, same objects)
+    field.label = `${label} ${counters[type]}`;
+  });
+  _formMarkDirty();
+  _renderFieldOverlays();
+  const listEl = document.getElementById('form-field-list');
+  if (listEl) listEl.innerHTML = _renderFieldList();
+  cadToast(`Renamed ${_formFields.length} fields`, 'info');
 }
 
 function _formRevealField(fieldId) {
