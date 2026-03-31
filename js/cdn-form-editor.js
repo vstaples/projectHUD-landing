@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-052750
-console.log('[cdn-form-editor] LOADED v20260331-052750');
+// VERSION: 20260331-053430
+console.log('[cdn-form-editor] LOADED v20260331-053430');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -326,10 +326,20 @@ function _renderFormEditor() {
         </div>
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
         <!-- Zoom -->
-        <button onclick="_formZoomOut()" class="btn btn-ghost btn-sm"
-          style="padding:3px 8px">−</button>
-        <button onclick="_formZoomIn()"  class="btn btn-ghost btn-sm"
-          style="padding:3px 8px">+</button>
+        <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+          <button onclick="_formZoomOut()" class="btn btn-ghost btn-sm"
+            style="padding:3px 8px;font-size:14px" title="Zoom out (−)">−</button>
+          <span id="form-zoom-label"
+            style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;
+                   min-width:38px;text-align:center;cursor:pointer"
+            onclick="_formZoomReset()" title="Click to reset to 100%">
+            ${Math.round(_pdfScale * 100 / 1.5)}%
+          </span>
+          <button onclick="_formZoomIn()" class="btn btn-ghost btn-sm"
+            style="padding:3px 8px;font-size:14px" title="Zoom in (+)">+</button>
+          <button onclick="_formZoomFit()" class="btn btn-ghost btn-sm"
+            style="padding:3px 8px;font-size:11px" title="Fit to width">⊡</button>
+        </div>
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
         <!-- Mode toggle: Select vs Draw -->
@@ -1122,8 +1132,43 @@ function _updatePageIndicator() {
   if (next) next.style.opacity = (_pdfPage >= _pdfTotalPages) ? '0.3' : '';
 }
 
-function _formZoomIn()  { _pdfScale = Math.min(3, _pdfScale * 1.25); _renderPdfPage(_pdfStartPage + _pdfPage - 1); }
-function _formZoomOut() { _pdfScale = Math.max(0.5, _pdfScale * 0.8); _renderPdfPage(_pdfStartPage + _pdfPage - 1); }
+function _formZoomIn()    { _formSetZoom(Math.min(4.0, _pdfScale * 1.25)); }
+function _formZoomOut()   { _formSetZoom(Math.max(0.3, _pdfScale * 0.8));  }
+function _formZoomReset() { _formSetZoom(1.5); }
+
+function _formZoomFit() {
+  const wrap = document.getElementById('form-canvas-wrap');
+  const canvas = document.getElementById('form-pdf-canvas');
+  if (!wrap || !canvas) return;
+  // Target: canvas fills wrap width minus padding
+  const availW = wrap.clientWidth - 48;
+  if (!_pdfDoc) return;
+  _pdfDoc.getPage(_pdfStartPage + _pdfPage - 1).then(page => {
+    const vp = page.getViewport({ scale: 1, rotation: (page.rotate||0) === 180 ? 0 : (page.rotate||0) });
+    const fitScale = availW / vp.width;
+    _formSetZoom(Math.max(0.3, Math.min(4.0, fitScale)));
+  });
+}
+
+function _formSetZoom(newScale) {
+  const wrap = document.getElementById('form-canvas-wrap');
+  // Preserve relative scroll position through zoom
+  let scrollRatioY = 0, scrollRatioX = 0;
+  if (wrap) {
+    scrollRatioY = wrap.scrollTop  / Math.max(1, wrap.scrollHeight);
+    scrollRatioX = wrap.scrollLeft / Math.max(1, wrap.scrollWidth);
+  }
+  _pdfScale = newScale;
+  _renderPdfPage(_pdfStartPage + _pdfPage - 1).then(() => {
+    if (wrap) {
+      wrap.scrollTop  = scrollRatioY * wrap.scrollHeight;
+      wrap.scrollLeft = scrollRatioX * wrap.scrollWidth;
+    }
+  });
+  // Update label
+  const lbl = document.getElementById('form-zoom-label');
+  if (lbl) lbl.textContent = Math.round(newScale / 1.5 * 100) + '%';
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PDF.js LOADER + PAGE RENDERER
@@ -2908,6 +2953,19 @@ function _formCoCWireResize() {
     document.addEventListener('mouseup', onUp);
   });
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS SCROLL-WHEEL ZOOM (Ctrl+scroll, canvas only)
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('wheel', function _formWheelZoom(e) {
+  const wrap = document.getElementById('form-canvas-wrap');
+  if (!wrap || !wrap.contains(e.target)) return;
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.8 : 1.25;
+  _formSetZoom(Math.max(0.3, Math.min(4.0, _pdfScale * delta)));
+}, { passive: false });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DB MIGRATION SQL (run in browser console: _formShowMigrationSQL())
