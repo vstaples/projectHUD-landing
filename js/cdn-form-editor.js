@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-120000
-console.log('%c[cdn-form-editor] v20260401-120000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260401-130000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -148,9 +148,9 @@ const FORM_ROLES = {
 // ─────────────────────────────────────────────────────────────────────────────
 function _railBtn(active = false) {
   return [
-    'width:28px;height:28px;border-radius:5px;border:none;cursor:pointer',
+    'width:52px;height:52px;border-radius:6px;border:none;cursor:pointer',
     'display:flex;align-items:center;justify-content:center',
-    'font-size:14px;font-family:Arial,sans-serif;transition:all .12s',
+    'font-size:20px;font-family:Arial,sans-serif;transition:all .12s',
     active
       ? 'background:var(--cad);color:var(--bg)'
       : 'background:transparent;color:var(--muted)'
@@ -456,36 +456,36 @@ function _renderFormEditor() {
 
         <!-- ── LEFT RAIL: canvas tools ─────────────────────────── -->
         <div id="form-left-rail"
-             style="width:36px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
-                    display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;
+             style="width:60px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+                    display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;
                     font-family:Arial,sans-serif;z-index:5">
 
           <!-- Page navigation group -->
           <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
             style="${_railBtn()}">‹</button>
           <span id="form-page-indicator"
-            style="font-size:10px;color:var(--muted);text-align:center;line-height:1.2;
-                   width:32px;padding:2px 0;font-family:Arial,sans-serif;white-space:nowrap">
+            style="font-size:11px;color:var(--muted);text-align:center;line-height:1.2;
+                   width:52px;padding:2px 0;font-family:Arial,sans-serif;white-space:nowrap">
             ${_pdfPage}/${_pdfTotalPages}
           </span>
           <button id="form-page-next" onclick="_formNextPage()" title="Next page"
             style="${_railBtn()}">›</button>
 
-          <div style="width:24px;height:1px;background:var(--border);margin:4px 0"></div>
+          <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
 
           <!-- Zoom group -->
           <button onclick="_formZoomIn()" title="Zoom in (+)"
             style="${_railBtn()}">+</button>
           <span id="form-zoom-label"
-            style="font-size:10px;color:var(--muted);text-align:center;cursor:pointer;
-                   width:32px;padding:2px 0;font-family:Arial,sans-serif"
+            style="font-size:11px;color:var(--muted);text-align:center;cursor:pointer;
+                   width:52px;padding:2px 0;font-family:Arial,sans-serif"
             onclick="_formZoomReset()" title="Reset zoom">${Math.round(_pdfScale * 100 / 1.5)}%</span>
           <button onclick="_formZoomOut()" title="Zoom out (-)"
             style="${_railBtn()}">−</button>
           <button onclick="_formZoomFit()" title="Fit to width"
             style="${_railBtn()}">⊡</button>
 
-          <div style="width:24px;height:1px;background:var(--border);margin:4px 0"></div>
+          <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
 
           <!-- Mode group -->
           <button id="form-mode-select" onclick="_formSetMode('select')" title="Select & move fields (S)"
@@ -497,7 +497,7 @@ function _renderFormEditor() {
           <button id="form-popout-btn" onclick="_formPopOutPreview()" title="Pop-out preview"
             style="${_railBtn()};display:none">⤢</button>
 
-          <div style="width:24px;height:1px;background:var(--border);margin:4px 0"></div>
+          <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
 
           <!-- Form actions group -->
           <button onclick="_formToggleCoC()" id="form-coc-btn" title="Chain of Custody"
