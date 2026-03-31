@@ -2064,6 +2064,7 @@ const _formSvgMouseMoveOverride = (event) => {
 
 // Override: commit marquee selection on mouseup
 const _formSvgMouseUpOverride = (event) => {
+  console.log('[mouseUpOverride] marqueeDrag=', !!_marqueeDrag?.active, 'svgGroupDrag=', !!_svgGroupDrag);
   if (_marqueeDrag?.active) {
     const svg = document.getElementById('form-field-overlay');
     const svgRect = svg?.getBoundingClientRect();
@@ -2072,16 +2073,16 @@ const _formSvgMouseUpOverride = (event) => {
       const mx=event.clientX-svgRect.left, my=event.clientY-svgRect.top;
       const sx=Math.min(mx,_marqueeDrag.startX)/_pdfScale, sy=Math.min(my,_marqueeDrag.startY)/_pdfScale;
       const ex=Math.max(mx,_marqueeDrag.startX)/_pdfScale, ey=Math.max(my,_marqueeDrag.startY)/_pdfScale;
+      console.log('[mouseUpOverride] box size:', (ex-sx).toFixed(1), 'x', (ey-sy).toFixed(1), 'threshold:', (8/_pdfScale).toFixed(1));
       if ((ex-sx)>8/_pdfScale && (ey-sy)>8/_pdfScale) {
-        // Real marquee — add intersecting fields
         if (!_marqueeDrag.shiftKey) _selectedFieldIds.clear();
         _formFields.filter(f=>(f.page||1)===_pdfPage).forEach(f => {
           const r=f.rect;
           if (r.x<ex && r.x+r.w>sx && r.y<ey && r.y+r.h>sy) _selectedFieldIds.add(f.id);
         });
+        console.log('[mouseUpOverride] selected', _selectedFieldIds.size, 'fields');
         _formUpdateSelectionUI(); _renderFieldOverlays();
       } else {
-        // Tiny drag = plain click on empty canvas — clear selection
         if (!_marqueeDrag.shiftKey) { _selectedFieldIds.clear(); _formUpdateSelectionUI(); _renderFieldOverlays(); }
       }
     }
