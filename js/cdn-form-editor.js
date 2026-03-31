@@ -1611,8 +1611,7 @@ function _renderFieldOverlays() {
   if (_marqueeDrag?.active) return;
 
   const sel = _selectedFieldIds;
-  if (sel.size === 0) console.trace('[renderFieldOverlays] sel.size=0 — CALLER:');
-  else console.log('[renderFieldOverlays] sel.size=', sel.size);
+
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
 
   // ── Field rects ───────────────────────────────────────────────────────────
@@ -2026,8 +2025,8 @@ const _formSvgMouseDownOverride = (event) => {
       const svgRect = svg?.getBoundingClientRect();
       if (!svgRect) return;
       const mx = event.clientX - svgRect.left, my = event.clientY - svgRect.top;
-      if (!event.shiftKey) _formClearSelection(); // clears+redraws BEFORE marquee appended
-      _marqueeDrag = { startX:mx, startY:my, active:true }; // set BEFORE appending so guard fires
+      // Do NOT clear here — clear only on mouseup if no drag occurred (prevents wiping marquee result)
+      _marqueeDrag = { startX:mx, startY:my, active:true, shiftKey:event.shiftKey };
       const mr = document.createElementNS('http://www.w3.org/2000/svg','rect');
       mr.id='form-marquee-rect';
       mr.setAttribute('x',mx); mr.setAttribute('y',my); mr.setAttribute('width',0); mr.setAttribute('height',0);
@@ -2069,11 +2068,16 @@ const _formSvgMouseUpOverride = (event) => {
       const sx=Math.min(mx,_marqueeDrag.startX)/_pdfScale, sy=Math.min(my,_marqueeDrag.startY)/_pdfScale;
       const ex=Math.max(mx,_marqueeDrag.startX)/_pdfScale, ey=Math.max(my,_marqueeDrag.startY)/_pdfScale;
       if ((ex-sx)>8/_pdfScale && (ey-sy)>8/_pdfScale) {
+        // Real marquee — add intersecting fields
+        if (!_marqueeDrag.shiftKey) _selectedFieldIds.clear();
         _formFields.filter(f=>(f.page||1)===_pdfPage).forEach(f => {
           const r=f.rect;
           if (r.x<ex && r.x+r.w>sx && r.y<ey && r.y+r.h>sy) _selectedFieldIds.add(f.id);
         });
         _formUpdateSelectionUI(); _renderFieldOverlays();
+      } else {
+        // Tiny drag = plain click on empty canvas — clear selection
+        if (!_marqueeDrag.shiftKey) { _selectedFieldIds.clear(); _formUpdateSelectionUI(); _renderFieldOverlays(); }
       }
     }
     _marqueeDrag = null; return;
