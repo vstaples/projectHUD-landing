@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-150000
-console.log('%c[cdn-form-editor] v20260401-150000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-160000
+console.log('%c[cdn-form-editor] v20260401-160000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -252,6 +252,11 @@ function _formStateColor(state) {
 }
 
 function renderFormsTab(el) {
+  // Ensure categories are always current when Form Library is open.
+  // _fsLoad is safe to call at any time — it just refreshes _fsCats in the background.
+  if (window.FormSettings?.loadCategories) {
+    window.FormSettings.loadCategories().catch(() => {});
+  }
   el.innerHTML = `
     <div style="display:flex;width:100%;height:100%;overflow:hidden">
 
@@ -2461,34 +2466,55 @@ async function _formDeleteWithConfirm(formId) {
 // CATEGORY PICKER
 // ─────────────────────────────────────────────────────────────────────────────
 async function _formPickCategory() {
-  const cats = window.FormSettings?.getCategories?.() || [];
-  if (!cats.length) {
-    cadToast('No categories configured — add them in Settings', 'info'); return;
+  // Dismiss any existing picker first
+  document.getElementById('fs-cat-picker')?.remove();
+
+  // Ensure categories are loaded — fetch fresh if empty
+  let cats = window.FormSettings?.getCategories?.() || [];
+  if (!cats.length && window.FormSettings?.loadCategories) {
+    await window.FormSettings.loadCategories().catch(() => {});
+    cats = window.FormSettings?.getCategories?.() || [];
   }
-  // Simple inline picker modal
+  if (!cats.length) {
+    cadToast('No categories configured — add them in ⚙ Form Settings', 'info');
+    return;
+  }
+
+  // Build overlay — set id BEFORE appending so onclick closures can find it
   const overlay = document.createElement('div');
+  overlay.id = 'fs-cat-picker';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center';
+
+  const rows = cats.map(c => `
+    <div onclick="_formSetCategory('${c.id}');document.getElementById('fs-cat-picker')?.remove()"
+      style="padding:10px 12px;border-radius:5px;cursor:pointer;border:1px solid var(--border);
+             margin-bottom:6px;background:var(--surf2);transition:border-color .12s"
+      onmouseover="this.style.borderColor='var(--cad)'"
+      onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:14px;font-weight:500;color:var(--text);font-family:Arial,sans-serif">${escHtml(c.name)}</div>
+      ${c.description ? `<div style="font-size:13px;color:var(--muted);margin-top:2px;font-family:Arial,sans-serif">${escHtml(c.description)}</div>` : ''}
+    </div>`).join('');
+
   overlay.innerHTML = `
     <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
-                padding:20px;min-width:300px;box-shadow:0 16px 48px rgba(0,0,0,.7)">
-      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;font-family:Arial,sans-serif">
-        Select Category
+                padding:20px;min-width:320px;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,.7)">
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;font-family:Arial,sans-serif">
+        Assign Category
       </div>
-      ${cats.map(c=>`
-        <div onclick="_formSetCategory('${c.id}');document.getElementById('fs-cat-picker').remove()"
-          style="padding:10px 12px;border-radius:5px;cursor:pointer;border:1px solid var(--border);
-                 margin-bottom:6px;background:var(--surf2);transition:border-color .12s"
-          onmouseover="this.style.borderColor='var(--cad)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div style="font-size:13px;font-weight:500;color:var(--text);font-family:Arial,sans-serif">${escHtml(c.name)}</div>
-          <div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif">${escHtml(c.description||'')}</div>
-        </div>`).join('')}
-      <button onclick="document.getElementById('fs-cat-picker').remove()"
-        style="margin-top:8px;width:100%;padding:6px;border-radius:999px;background:transparent;
-               border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">
+      ${rows}
+      <button onclick="document.getElementById('fs-cat-picker')?.remove()"
+        style="margin-top:8px;width:100%;padding:7px;border-radius:999px;background:transparent;
+               border:1px solid var(--border);color:var(--muted);cursor:pointer;
+               font-size:14px;font-family:Arial,sans-serif">
         Cancel
       </button>
     </div>`;
-  overlay.id = 'fs-cat-picker';
+
+  // Close on backdrop click
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+  });
+
   document.body.appendChild(overlay);
 }
 
@@ -2500,8 +2526,36 @@ function _formSetCategory(catId) {
   if (cat && (!_selectedForm.version || _selectedForm.version === '0.1.0')) {
     _selectedForm.version = _formInitVersion(cat.version_format);
   }
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  _formMarkDirty();
+  // Refresh just the top toolbar lifecycle area — no full re-render
+  // (full re-render wipes canvas + reloads PDF which is jarring)
+  _formRefreshToolbar();
+}
+
+function _formRefreshToolbar() {
+  if (!_selectedForm) return;
+  const f = _selectedForm;
+  // Refresh category pill / + Category button
+  const cat = window.FormSettings?.getCategoryById?.(f.category_id);
+  const topTb = document.getElementById('form-top-toolbar');
+  if (!topTb) {
+    // Toolbar not in DOM — fall back to full re-render
+    const el = document.getElementById('cad-content');
+    if (el) renderFormsTab(el);
+    return;
+  }
+  // Re-render just the lifecycle buttons
+  const lcDiv = document.getElementById('form-lifecycle-btns');
+  if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(f);
+  // Re-render state/version/category pills
+  const stateBadge = document.getElementById('form-state-badge');
+  if (stateBadge) {
+    stateBadge.textContent = _formStateLabel(f.state || 'draft');
+    stateBadge.style.color = _formStateColor(f.state || 'draft');
+  }
+  // Re-render form list to pick up any name/state changes
+  const listEl = document.getElementById('form-list');
+  if (listEl) listEl.innerHTML = _renderFormList();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
