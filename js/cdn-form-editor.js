@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-093008
-console.log('[cdn-form-editor] LOADED v20260331-093008');
+// VERSION: 20260331-094719
+console.log('[cdn-form-editor] LOADED v20260331-094719');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -425,8 +425,17 @@ function _renderFormEditor() {
           </div>
           </div>
           <div style="padding:6px 20px 4px;font-size:12px;color:var(--muted);
-                      display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span>✎ Click and drag on the document to add a field</span>
+                      display:flex;align-items:center;flex-shrink:0">
+            <span style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted)">
+              v${_selectedForm?.version||'0.1.0'}
+            </span>
+            <span style="flex:1;text-align:center;font-size:12px;color:var(--muted)">
+              ✎ Click and drag to add a field
+            </span>
+            <span id="form-page-footer"
+              style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted)">
+              ${_pdfPage} / ${_pdfTotalPages}
+            </span>
           </div>
         </div>
 
@@ -3204,11 +3213,25 @@ function _formTogglePreview() {
     if (colRout) { colRout.style.display = 'none'; }
     _formRenderPreviewOverlay();
   } else {
-    // Exit preview
+    // ── Exit preview — clean up ALL preview DOM artifacts ────────────────────
+    // 1. Remove all input overlays
+    document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+    // 2. Remove stage bar
+    document.getElementById('form-preview-stagebar')?.remove();
+    // 3. Remove done overlay (if completed)
+    document.querySelectorAll('[id^="form-preview-done"]').forEach(el => el.remove());
+    // 4. Remove any absolute done overlay appended to canvas wrap
+    const cw = document.getElementById('form-canvas-wrap');
+    if (cw) cw.querySelectorAll('div[style*="position:absolute"][style*="inset:0"]').forEach(el => el.remove());
+    // 5. Reset button states
     if (preBtn) { preBtn.style.background = 'transparent'; preBtn.style.color = 'var(--muted)'; }
     if (popBtn) { popBtn.style.display = 'none'; }
+    // 6. Restore side columns
     if (colFlds) { colFlds.style.display = ''; }
     if (colRout) { colRout.style.display = ''; }
+    // 7. Reset canvas-wrap scroll padding (stage bar may have shifted it)
+    if (cw) { const firstChild = cw.firstElementChild; if (firstChild?.id === 'form-preview-stagebar') firstChild.remove(); }
+    // 8. Return to select mode and re-render field boxes
     _formSetMode('select');
     _renderFieldOverlays();
   }
@@ -3361,8 +3384,8 @@ function _formRenderPreviewOverlay() {
       const ta = document.createElement('textarea');
       ta.value = val;
       ta.style.cssText = `width:100%;height:100%;box-sizing:border-box;resize:none;
-        background:rgba(255,255,255,.06);border:1px solid var(--accent);border-radius:3px;
-        color:var(--text);font-family:Arial,sans-serif;font-size:12px;padding:3px 5px;outline:none;`;
+        background:rgba(255,255,255,.85);border:1px solid var(--accent);border-radius:3px;
+        color:#111;font-family:Arial,sans-serif;font-size:12px;padding:3px 5px;outline:none;`;
       ta.addEventListener('input', () => { _previewResponses[field.id] = ta.value; });
       wrap.appendChild(ta);
 
@@ -3373,8 +3396,8 @@ function _formRenderPreviewOverlay() {
       inp.value = val;
       inp.placeholder = field.label || '';
       inp.style.cssText = `width:100%;height:100%;box-sizing:border-box;
-        background:rgba(255,255,255,.06);border:1px solid var(--accent);border-radius:3px;
-        color:var(--text);font-family:Arial,sans-serif;font-size:12px;padding:2px 5px;outline:none;`;
+        background:rgba(255,255,255,.85);border:1px solid var(--accent);border-radius:3px;
+        color:#111;font-family:Arial,sans-serif;font-size:12px;padding:2px 5px;outline:none;`;
       inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
       wrap.appendChild(inp);
     }
@@ -3401,9 +3424,9 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
       inp.type = 'text';
       inp.value = val || (_previewResponses[field.id] || '');
       inp.placeholder = 'Type your name…';
-      inp.style.cssText = `flex:1;width:100%;background:transparent;border:none;outline:none;
+      inp.style.cssText = `flex:1;width:100%;background:rgba(255,255,255,.85);border:none;outline:none;
         font-family:'Dancing Script',cursive;font-size:${Math.max(14, h*0.55)}px;
-        color:var(--accent);padding:2px 6px;`;
+        color:#1a3a8a;padding:2px 6px;`;
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
       });
@@ -3523,6 +3546,7 @@ function _formPreviewSubmitStage() {
     const wrap   = canvas?.parentElement;
     if (wrap) {
       const done = document.createElement('div');
+      done.id = 'form-preview-done';
       done.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;' +
         'align-items:center;justify-content:center;background:rgba(15,17,23,.85);z-index:50;gap:12px;';
       done.innerHTML = `<div style="font-size:48px">✅</div>
