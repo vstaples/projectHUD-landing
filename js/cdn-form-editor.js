@@ -1,6 +1,58 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-051725
-console.log('[cdn-form-editor] LOADED v20260331-051725');
+// VERSION: 20260331-052750
+console.log('[cdn-form-editor] LOADED v20260331-052750');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORM CoC PANEL — CSS (injected once)
+// ─────────────────────────────────────────────────────────────────────────────
+(function _injectFormCoCStyles() {
+  if (document.getElementById('form-coc-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'form-coc-styles';
+  s.textContent = `
+    .form-coc-panel {
+      position: absolute; top: 0; right: 0; bottom: 0;
+      width: 0; min-width: 0; overflow: hidden;
+      background: var(--bg1);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      transition: width .22s cubic-bezier(.4,0,.2,1);
+      z-index: 50;
+    }
+    .form-coc-panel.open { width: 300px; min-width: 220px; }
+    .form-coc-resize {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      cursor: col-resize; background: transparent; transition: background .15s; z-index: 10;
+    }
+    .form-coc-resize:hover, .form-coc-resize.dragging { background: var(--cad-wire); }
+    .form-coc-inner { display: flex; flex-direction: column; height: 100%; overflow: hidden; padding-left: 4px; }
+    .form-coc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .form-coc-title {
+      font-size: 12px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--muted); font-family: Arial, sans-serif;
+    }
+    .form-coc-body { flex: 1; overflow-y: auto; padding: 10px 12px; }
+    .form-coc-event {
+      display: flex; gap: 8px; margin-bottom: 12px; position: relative;
+    }
+    .form-coc-event::before {
+      content: ''; position: absolute; left: 5px; top: 16px; bottom: -12px;
+      width: 1px; background: var(--border);
+    }
+    .form-coc-event:last-child::before { display: none; }
+    .form-coc-dot {
+      width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+      margin-top: 3px; border: 2px solid var(--bg1);
+    }
+    .form-coc-who { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: Arial, sans-serif; }
+  `;
+  document.head.appendChild(s);
+})();
+
+
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,7 +186,25 @@ function renderFormsTab(el) {
 
       <!-- ── Main area: editor or empty state ─────────────────────── -->
       <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
-        ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
+        <div style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
+          ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
+        </div>
+        <!-- CoC slide-in panel -->
+        <div class="form-coc-panel" id="form-coc-panel">
+          <div class="form-coc-resize" id="form-coc-resize" title="Drag to resize"></div>
+          <div class="form-coc-inner">
+            <div class="form-coc-header">
+              <span class="form-coc-title">Chain of Custody</span>
+              <button onclick="_formToggleCoC()" style="background:none;border:none;
+                color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
+            </div>
+            <div class="form-coc-body" id="form-coc-body">
+              <div style="font-size:12px;color:var(--muted);text-align:center;padding-top:24px;font-family:Arial,sans-serif">
+                Select a form to view history.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>`;
@@ -1953,6 +2023,8 @@ function _formLifecycleButtons(f) {
   // Remove (always)
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formDeleteWithConfirm('${f.id}')"
     style="color:var(--red);font-size:12px">🗑 Remove</button>`);
+  btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formToggleCoC()" id="form-coc-btn"
+    title="Chain of Custody history">CoC</button>`);
 
   if (state === 'draft' || state === 'unreleased') {
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formSave()" style="font-size:12px">Save</button>`);
@@ -2003,12 +2075,13 @@ async function _formDeleteWithConfirm(formId) {
 
   if (inDB) {
     try {
-      await fetch(`${SUPA_URL}/rest/v1/workflow_form_definitions?id=eq.${formId}`, {
+      // Use apikey-only delete (matches RLS public role pattern)
+      const res = await fetch(`${SUPA_URL}/rest/v1/workflow_form_definitions?id=eq.${formId}`, {
         method:'DELETE',
-        headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+await Auth.getToken(),
-                  'Content-Type':'application/json' }
+        headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+SUPA_KEY,
+                  'Content-Type':'application/json', 'Prefer':'return=minimal' }
       });
-      // CoC write
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
       _formCoCWrite('form.archived', formId, { action:'deleted', name });
       cadToast(`"${name}" removed from library`, 'info');
     } catch(e) { cadToast('Delete failed: ' + e.message, 'error'); return; }
@@ -2200,7 +2273,7 @@ async function _formArchive() {
 // COC WRITER
 // ─────────────────────────────────────────────────────────────────────────────
 function _formCoCWrite(eventType, formId, details) {
-  if (!window.CoC?.write) { console.warn('[form-editor] CoC not available'); return; }
+  if (!window.CoC?.write) { return; } // CoC not yet wired — silent skip
   try {
     window.CoC.write({
       entity_type: 'workflow_form_definition',
@@ -2258,6 +2331,7 @@ async function _formSave() {
       });
       if (rows?.[0]?.id) { _selectedForm.id = rows[0].id; _selectedForm._unsaved = false; delete _selectedForm._file; }
       cadToast('Form saved', 'success');
+      _formRefreshCoCIfOpen();
       _formCoCWrite('form.saved', _selectedForm.id, { version:_selectedForm.version, state:_selectedForm.state });
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
@@ -2711,6 +2785,128 @@ function _resizeMouseUp() {
   document.removeEventListener('mousemove', _resizeMouseMove);
   _renderFieldOverlays();
   _updateHWWidget();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORM CoC PANEL — toggle, load, render
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _formToggleCoC() {
+  const panel  = document.getElementById('form-coc-panel');
+  const cocBtn = document.getElementById('form-coc-btn');
+  if (!panel) return;
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open');
+  if (cocBtn) {
+    cocBtn.style.color       = opening ? 'var(--cad)'      : '';
+    cocBtn.style.borderColor = opening ? 'var(--cad-wire)' : '';
+    cocBtn.style.background  = opening ? 'var(--cad-dim)'  : '';
+  }
+  if (opening && _selectedForm?.id) _formLoadCoC(_selectedForm.id);
+
+  // Wire resize drag on first open
+  if (opening) _formCoCWireResize();
+}
+
+async function _formLoadCoC(formId) {
+  const bodyEl = document.getElementById('form-coc-body');
+  if (!bodyEl) return;
+  bodyEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding-top:24px;font-family:Arial,sans-serif">Loading…</div>';
+  try {
+    const rows = await API.get(
+      `coc_events?entity_id=eq.${formId}&order=created_at.desc&limit=100`
+    ).catch(() => []) || [];
+    _formCoCRender(rows);
+  } catch(e) {
+    bodyEl.innerHTML = '<div style="font-size:12px;color:var(--red);padding:12px;font-family:Arial,sans-serif">Failed to load history.</div>';
+  }
+}
+
+function _formCoCRender(rows) {
+  const bodyEl = document.getElementById('form-coc-body');
+  if (!bodyEl) return;
+
+  if (!rows.length) {
+    bodyEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding-top:24px;font-family:Arial,sans-serif">No history yet.</div>';
+    return;
+  }
+
+  const evtColor = {
+    'form.released':       'var(--green)',
+    'form.archived':       'var(--muted)',
+    'form.state_changed':  'var(--accent)',
+    'form.saved':          'var(--cad)',
+    'form.field_modified': 'var(--text2)',
+  };
+  const evtLabel = {
+    'form.released':       'Released',
+    'form.archived':       'Archived',
+    'form.state_changed':  'State Changed',
+    'form.saved':          'Saved',
+    'form.field_modified': 'Field Modified',
+  };
+
+  bodyEl.innerHTML = rows.map(e => {
+    const color = evtColor[e.event_type] || 'var(--cad)';
+    const label = evtLabel[e.event_type] || e.event_type;
+    const det   = e.details || {};
+    const lines = [];
+
+    if (det.version)   lines.push(`Version: ${det.version}`);
+    if (det.state)     lines.push(`State: ${det.state}`);
+    if (det.from && det.to) lines.push(`${det.from} → ${det.to}`);
+    if (det.note)      lines.push(det.note);
+    if (det.field_label && det.key) lines.push(`${det.field_label}: ${det.key} changed`);
+    if (det.action)    lines.push(det.action);
+
+    const noteHtml = lines.map(l =>
+      `<div style="font-size:11px;color:var(--text2);line-height:1.7;font-family:Arial,sans-serif">
+         · ${escHtml(String(l))}
+       </div>`
+    ).join('');
+
+    const who = e.actor_name || e.actor_id || 'System';
+    const ver = det.version ? `<div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif">${escHtml(det.version)}</div>` : '';
+
+    return `
+      <div class="form-coc-event">
+        <div class="form-coc-dot" style="background:${color}"></div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div style="color:${color};font-weight:700;font-size:11px;
+              text-transform:uppercase;letter-spacing:.08em;font-family:Arial,sans-serif">${escHtml(label)}</div>
+            ${ver}
+          </div>
+          ${noteHtml}
+          <div class="form-coc-who">${escHtml(who)} · ${typeof fmtTs === 'function' ? fmtTs(e.created_at) : (e.created_at||'').slice(0,16).replace('T',' ')}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Refresh CoC if panel is open (called after saves/state changes)
+function _formRefreshCoCIfOpen() {
+  if (document.getElementById('form-coc-panel')?.classList.contains('open') && _selectedForm?.id) {
+    _formLoadCoC(_selectedForm.id);
+  }
+}
+
+// Resize drag for CoC panel
+function _formCoCWireResize() {
+  const handle = document.getElementById('form-coc-resize');
+  const panel  = document.getElementById('form-coc-panel');
+  if (!handle || !panel || handle._wired) return;
+  handle._wired = true;
+  handle.addEventListener('mousedown', ev => {
+    ev.preventDefault();
+    handle.classList.add('dragging');
+    const startX = ev.clientX, startW = panel.offsetWidth;
+    const onMove = e => { panel.style.width = Math.max(220, Math.min(600, startW + startX - e.clientX)) + 'px'; };
+    const onUp   = () => { handle.classList.remove('dragging'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
