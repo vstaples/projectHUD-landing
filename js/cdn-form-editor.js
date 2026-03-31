@@ -340,59 +340,7 @@ function _renderFormEditor() {
 // FIELD LIST (Column 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _renderFieldList() {
-  if (!_formFields.length) {
-    return `<div style="padding:16px 14px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center">
-              No fields detected yet.<br/>Draw rectangles on the document<br/>to add fields manually.
-            </div>`;
-  }
-
-  return _formFields.map((field, idx) => {
-    const roleConf = FORM_ROLES[field.role] || FORM_ROLES.assignee;
-    const typeIcon = { text:'T', date:'📅', number:'#', checkbox:'☑', signature:'✍', textarea:'¶' }[field.type] || 'T';
-
-    return `
-      <div id="frow-${field.id}"
-        style="padding:7px 12px;border-bottom:1px solid var(--border);
-               display:flex;align-items:flex-start;gap:8px;cursor:pointer;
-               transition:background .1s"
-        onmouseenter="this.style.background='var(--surf2)'"
-        onmouseleave="this.style.background=''"
-        onclick="_formSelectField('${field.id}')">
-
-        <!-- Type badge -->
-        <div style="flex-shrink:0;width:20px;height:20px;border-radius:3px;
-                    background:rgba(255,255,255,.05);border:1px solid var(--border2);
-                    display:flex;align-items:center;justify-content:center;
-                    font-size:10px;color:var(--text2);margin-top:1px">
-          ${typeIcon}
-        </div>
-
-        <!-- Label + meta -->
-        <div style="flex:1;min-width:0">
-          <div style="font-size:11px;color:var(--text1);white-space:nowrap;
-                      overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">
-            ${escHtml(field.label || 'Unlabelled')}
-          </div>
-          <div style="display:flex;align-items:center;gap:5px">
-            <span style="font-size:10px;padding:1px 5px;border-radius:3px;
-                         background:${roleConf.dim};color:${roleConf.color}">
-              ${roleConf.label}
-            </span>
-            ${field.required ? `<span style="font-size:10px;color:var(--red)">required</span>` : ''}
-            <span style="font-size:10px;color:var(--muted)">p${field.page || 1}</span>
-          </div>
-        </div>
-
-        <!-- Delete -->
-        <button onclick="event.stopPropagation();_formRemoveField('${field.id}')"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;
-                 font-size:11px;padding:0;opacity:0;transition:opacity .15s;flex-shrink:0"
-          onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0"
-          title="Remove field">✕</button>
-      </div>`;
-  }).join('');
-}
+// [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTING PANEL (Column 3) — the key UI you described
@@ -645,93 +593,7 @@ function _formRoleDragEnd() {
 // FIELD CLICK — inline edit popover
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _formSelectField(fieldId) {
-  const field = _formFields.find(f => f.id === fieldId);
-  if (!field) return;
-
-  // Remove any existing popover
-  document.getElementById('field-edit-popover')?.remove();
-
-  const row = document.getElementById(`frow-${fieldId}`);
-  if (!row) return;
-
-  const popover = document.createElement('div');
-  popover.id = 'field-edit-popover';
-  popover.style.cssText = `
-    position:fixed;z-index:200;background:var(--bg2);
-    border:1px solid var(--border2);border-radius:6px;
-    padding:14px;width:220px;
-    box-shadow:0 8px 32px rgba(0,0,0,.6);
-  `;
-
-  // Position relative to the row
-  const rect = row.getBoundingClientRect();
-  popover.style.top  = rect.top + 'px';
-  popover.style.left = (rect.right + 8) + 'px';
-
-  const roleOptions = Object.entries(FORM_ROLES).map(([key, conf]) =>
-    `<option value="${key}" ${field.role === key ? 'selected' : ''}>${conf.label}</option>`
-  ).join('');
-
-  const typeOptions = FIELD_TYPES.map(t =>
-    `<option value="${t}" ${field.type === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`
-  ).join('');
-
-  popover.innerHTML = `
-    <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                color:var(--muted);margin-bottom:10px">Edit Field</div>
-
-    <div style="margin-bottom:8px">
-      <label class="config-label">Label</label>
-      <input class="config-input" id="fedit-label" value="${escHtml(field.label || '')}"
-        placeholder="Field label" style="font-size:11px"
-        oninput="_formUpdateField('${fieldId}','label',this.value)"/>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      <div>
-        <label class="config-label">Type</label>
-        <select class="config-select" style="font-size:11px"
-          onchange="_formUpdateField('${fieldId}','type',this.value)">
-          ${typeOptions}
-        </select>
-      </div>
-      <div>
-        <label class="config-label">Role</label>
-        <select class="config-select" style="font-size:11px"
-          onchange="_formUpdateField('${fieldId}','role',this.value)">
-          ${roleOptions}
-        </select>
-      </div>
-    </div>
-
-    <div style="margin-bottom:10px">
-      <label class="config-toggle">
-        <div class="toggle-box${field.required ? ' on' : ''}" id="fedit-req-toggle"
-          onclick="_formToggleRequired('${fieldId}')"></div>
-        <span style="font-size:11px">Required</span>
-      </label>
-    </div>
-
-    <button onclick="document.getElementById('field-edit-popover')?.remove()"
-      class="btn btn-ghost btn-sm" style="width:100%;font-size:11px">Done</button>
-  `;
-
-  document.body.appendChild(popover);
-
-  // Close on outside click
-  setTimeout(() => {
-    document.addEventListener('click', function close(e) {
-      if (!popover.contains(e.target) && !row.contains(e.target)) {
-        popover.remove();
-        document.removeEventListener('click', close);
-      }
-    });
-  }, 50);
-
-  // Highlight corresponding SVG rect on canvas
-  _highlightFieldRect(fieldId);
-}
+// [original _formSelectField removed — enhanced version is sole definition]
 
 function _formUpdateField(fieldId, key, value) {
   const field = _formFields.find(f => f.id === fieldId);
@@ -793,34 +655,7 @@ function _undoPop() {
 // SVG OVERLAY — field rectangles on the canvas
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _renderFieldOverlays() {
-  const svg = document.getElementById('form-field-overlay');
-  if (!svg) return;
-
-  const currentPageFields = _formFields.filter(f => (f.page || 1) === _pdfPage);
-
-  svg.innerHTML = currentPageFields.map(field => {
-    const roleConf = FORM_ROLES[field.role] || FORM_ROLES.assignee;
-    const r = field.rect || { x: 0, y: 0, w: 80, h: 18 };
-    const x = r.x * _pdfScale, y = r.y * _pdfScale;
-    const w = r.w * _pdfScale, h = r.h * _pdfScale;
-
-    return `
-      <g class="field-rect-group" data-field-id="${field.id}"
-        style="cursor:pointer" onclick="_formSelectField('${field.id}')">
-        <rect x="${x}" y="${y}" width="${w}" height="${h}"
-          fill="${roleConf.dim}" stroke="${roleConf.color}" stroke-width="1.5"
-          rx="2" opacity="0.85"/>
-        <rect x="${x}" y="${y - 16}" width="${Math.min(w, 90)}" height="14"
-          fill="${roleConf.color}" rx="2" opacity="0.9"/>
-        <text x="${x + 4}" y="${y - 5}"
-          fill="white" font-size="10" font-family="monospace"
-          style="pointer-events:none">
-          ${escHtml((field.label || 'field').slice(0, 14))}
-        </text>
-      </g>`;
-  }).join('');
-}
+// [original _renderFieldOverlays removed — enhanced version below is the sole definition]
 
 function _highlightFieldRect(fieldId) {
   document.querySelectorAll('.field-rect-group rect:first-child').forEach(r => {
@@ -1645,7 +1480,7 @@ function _reRenderRoutingPanel() {
 // ENHANCED FIELD LIST (with confidence dots + stage badge)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _renderFieldListBase = _renderFieldList;
+// _renderFieldList — sole authoritative definition
 function _renderFieldList() {
   if (!_formFields.length) {
     return `<div style="padding:16px 14px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center">
@@ -1690,7 +1525,7 @@ function _renderFieldList() {
 // ENHANCED FIELD EDIT POPOVER (with stage assignment + full type list)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _formSelectFieldBase = _formSelectField;
+// _formSelectField — sole authoritative definition
 function _formSelectField(fieldId) {
   const field = _formFields.find(f => f.id === fieldId);
   if (!field) return;
@@ -1777,7 +1612,7 @@ function _formSelectField(fieldId) {
 // ENHANCED FIELD OVERLAYS (confidence-coded + selected state)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _renderFieldOverlaysBase = _renderFieldOverlays;
+// _renderFieldOverlays — single authoritative definition (original removed to prevent hoisting collision)
 function _renderFieldOverlays() {
   const svg = document.getElementById('form-field-overlay');
   if (!svg) return;
