@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-091013
-console.log('[cdn-form-editor] LOADED v20260331-091013');
+// VERSION: 20260331-091401
+console.log('[cdn-form-editor] LOADED v20260331-091401');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -2291,18 +2291,20 @@ async function _formSubmitForReview() {
   const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
   const baseReviewerIds = cat?.reviewer_ids || [];
 
-  // Show PersonPicker anchored to the Submit button for optional extra reviewers
+  // Only show PersonPicker if category has NO reviewers configured
   const extraReviewers = [];
-  const submitAnchor = document.querySelector('[onclick*="_formSubmitForReview"]');
-  if (window.PersonPicker?.show && submitAnchor) {
-    await new Promise(resolve => {
-      window.PersonPicker.show(submitAnchor, function(person) {
-        if (person?.id) extraReviewers.push({ id:person.id, name:person.name, email:'' });
-        resolve();
+  if (!baseReviewerIds.length) {
+    const submitAnchor = document.querySelector('[onclick*="_formSubmitForReview"]');
+    if (window.PersonPicker?.show && submitAnchor) {
+      await new Promise(resolve => {
+        window.PersonPicker.show(submitAnchor, function(person) {
+          if (person?.id) extraReviewers.push({ id:person.id, name:person.name, email:'' });
+          resolve();
+        });
       });
-    });
-  } else {
-    if (!confirm('Submit for review? Reviewers will be notified by email.')) return;
+    } else {
+      if (!confirm('Submit for review? No reviewers configured in category.')) return;
+    }
   }
 
   // Fetch category reviewer details from resources table

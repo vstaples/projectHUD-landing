@@ -66,6 +66,29 @@ async function _fsLoad() {
     _fsCats = await API.get(
       `form_categories?firm_id=eq.${FIRM_ID_FS()}&order=name.asc`
     ).catch(() => []) || [];
+
+    // Resolve all reviewer/approver UUIDs to names in one batch query
+    const allIds = [...new Set(_fsCats.flatMap(c => [
+      ...(c.reviewer_ids||[]), ...(c.approver_id?[c.approver_id]:[])
+    ]))].filter(Boolean);
+
+    if (allIds.length) {
+      const rows = await API.get(
+        `resources?id=in.(${allIds.join(',')})&select=id,first_name,last_name`
+      ).catch(()=>[]) || [];
+      const nameMap = Object.fromEntries(rows.map(r => [
+        r.id, ((r.first_name||'')+' '+(r.last_name||'')).trim() || r.id
+      ]));
+      _fsCats.forEach(cat => {
+        cat._reviewerNames = cat._reviewerNames || {};
+        (cat.reviewer_ids||[]).forEach(id => {
+          if (nameMap[id]) cat._reviewerNames[id] = nameMap[id];
+        });
+        if (cat.approver_id && nameMap[cat.approver_id]) {
+          cat._approverName = nameMap[cat.approver_id];
+        }
+      });
+    }
   } catch(e) { _fsCats = []; }
 }
 
@@ -249,28 +272,33 @@ function _fsRenderEditor(catId) {
 // RESOLVE NAMES (PersonPicker may expose a lookup)
 // ─────────────────────────────────────────────────────────────────────────────
 async function _fsResolveNames(cat) {
-  // If PersonPicker exposes a getUser(id) or similar, use it
-  // Otherwise display UUIDs — names are stored in the persons table
+  // PersonPicker already provides names via _reviewerNames / _approverName caches.
+  // If loading from DB (names not yet cached), try resources table fallback.
+  const needsResolve = (cat.reviewer_ids||[]).some(id => !cat._reviewerNames?.[id])
+    || (cat.approver_id && !cat._approverName);
+  if (!needsResolve) return;
+
   const allIds = [...(cat.reviewer_ids||[]), ...(cat.approver_id?[cat.approver_id]:[])];
   if (!allIds.length) return;
+
   try {
-    const rows = await API.get(`persons?id=in.(${allIds.join(',')})&select=id,full_name`).catch(()=>[]) || [];
-    const nameMap = Object.fromEntries(rows.map(r=>[r.id, r.full_name||r.id]));
-    (cat.reviewer_ids||[]).forEach((id,i) => {
-      const el = document.getElementById(`fs-reviewer-name-${i}`);
-      if (el && nameMap[id]) el.textContent = nameMap[id];
+    // Use resources table (not persons — that table doesn't exist in this app)
+    const rows = await API.get(
+      `resources?id=in.(${allIds.join(',')})&select=id,first_name,last_name`
+    ).catch(()=>[]) || [];
+    const nameMap = Object.fromEntries(rows.map(r=>[
+      r.id,
+      ((r.first_name||'')+' '+(r.last_name||'')).trim() || r.id
+    ]));
+    cat._reviewerNames = cat._reviewerNames || {};
+    (cat.reviewer_ids||[]).forEach(id => {
+      if (nameMap[id]) cat._reviewerNames[id] = nameMap[id];
     });
-    if (cat.approver_id) {
-      const apEl = document.getElementById('fs-approver-display');
-      if (nameMap[cat.approver_id]) {
-        cat._approverName = nameMap[cat.approver_id];
-        const apEl = document.getElementById('fs-approver-display');
-        if (apEl) apEl.innerHTML = (() => {
-          const n = cat._approverName, ini = n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-          return '<div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--cad);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0">'+ini+'</div><span style="font-size:14px;font-family:Arial,sans-serif">'+n+'</span></div>';
-        })();
-      }
+    if (cat.approver_id && nameMap[cat.approver_id]) {
+      cat._approverName = nameMap[cat.approver_id];
     }
+    // Re-render to show resolved names
+    if (Object.keys(nameMap).length) _fsRenderEditor(cat.id || 'new');
   } catch(e) { /* names stay as UUIDs */ }
 }
 
