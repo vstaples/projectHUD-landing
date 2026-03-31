@@ -4074,7 +4074,7 @@ function _formPreviewQuickSign() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DB MIGRATION SQL (run in browser console: _formShowMigrationSQL())
+// DB MIGRATIOs SQL (run in browser console: _formShowMigrationSQL())
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _formShowMigrationSQL() {
