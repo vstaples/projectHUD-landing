@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-054441
-console.log('[cdn-form-editor] LOADED v20260331-054441');
+// VERSION: 20260331-054812
+console.log('[cdn-form-editor] LOADED v20260331-054812');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -968,7 +968,9 @@ function _formDragMouseMove(event) {
     field.rect.x = origX + dx / _pdfScale;
     field.rect.y = origY + dy / _pdfScale;
   });
-  svg.style.cursor = (event.ctrlKey || event.metaKey) ? 'copy' : 'grabbing';
+  // Update isCopy live — Ctrl may be pressed/released after mousedown
+  _svgGroupDrag.isCopy = event.ctrlKey || event.metaKey;
+  svg.style.cursor = _svgGroupDrag.isCopy ? 'copy' : 'grabbing';
   _renderFieldOverlays();
 }
 
@@ -1040,6 +1042,10 @@ function _formSvgMouseMove(event) {
 function _formSvgMouseUp(event) {
   const svg = document.getElementById('form-field-overlay');
   if (!svg) return;
+  // Use canvas-wrap offset for coordinate calc (SVG overflow:hidden can clip getBCR)
+  const wrap = document.getElementById('form-canvas-wrap');
+  const ref  = wrap || svg;
+  const refRect = ref.getBoundingClientRect();
   const svgRect = svg.getBoundingClientRect();
   const mx = event.clientX - svgRect.left;
   const my = event.clientY - svgRect.top;
@@ -1074,7 +1080,8 @@ function _formSvgMouseUp(event) {
   // ── Group drag commit ─────────────────────────────────────────────────────
   if (_svgGroupDrag) {
     const drag   = _svgGroupDrag;
-    const isCopy = drag.isCopy || event.ctrlKey || event.metaKey;
+    // isCopy is kept live in drag.isCopy by _formDragMouseMove
+    const isCopy = drag.isCopy;
     svg.style.cursor = _formMode === 'draw' ? 'crosshair' : 'default';
 
     if (drag.hasMoved) {
