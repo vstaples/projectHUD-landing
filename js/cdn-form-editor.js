@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-189000
-console.log('%c[cdn-form-editor] v20260401-189000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-190000
+console.log('%c[cdn-form-editor] v20260401-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2721,24 +2721,185 @@ async function _formReleaseDirectly() {
 
 // _formRejectForm — called from reviewer (in_review) or approver (reviewed) reject buttons
 // rejectionStage: 'review' | 'approval'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REJECTION MODAL — professional alternative to browser prompt()
+// onSubmit(note) called with trimmed text when user clicks Submit
+// ─────────────────────────────────────────────────────────────────────────────
+function _formShowRejectModal({ title, subtitle, role, onSubmit }) {
+  document.getElementById('cad-reject-modal')?.remove();
+
+  const roleColors = {
+    reviewer: '#c47d18', approver: '#2a9d40', pm: '#7c4dff', external: '#8b91a5'
+  };
+  const accentColor = roleColors[role] || 'var(--red)';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cad-reject-modal';
+  overlay.style.cssText = [
+    'position:fixed;inset:0;z-index:1000',
+    'background:rgba(0,0,0,.6)',
+    'display:flex;align-items:center;justify-content:center',
+    'font-family:Arial,sans-serif',
+  ].join(';');
+
+  overlay.innerHTML = `
+    <div id="cad-reject-modal-box" style="
+      background:var(--bg2,#1a1f2e);
+      border:1px solid var(--border2,rgba(255,255,255,.12));
+      border-radius:10px;
+      width:480px;
+      max-width:calc(100vw - 40px);
+      box-shadow:0 24px 64px rgba(0,0,0,.7);
+      overflow:hidden;
+    ">
+      <!-- Header -->
+      <div style="
+        padding:18px 22px 14px;
+        border-bottom:1px solid var(--border,rgba(255,255,255,.08));
+        display:flex;align-items:flex-start;gap:12px;
+      ">
+        <div style="
+          width:36px;height:36px;border-radius:8px;flex-shrink:0;
+          background:rgba(220,60,60,.15);border:1px solid rgba(220,60,60,.3);
+          display:flex;align-items:center;justify-content:center;
+          font-size:18px;
+        ">✗</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:var(--text,#f0f0f0);margin-bottom:3px">
+            ${title}
+          </div>
+          <div style="font-size:13px;color:var(--muted,#8b91a5);line-height:1.4">
+            ${subtitle}
+          </div>
+        </div>
+        <button id="cad-reject-close" style="
+          background:none;border:none;color:var(--muted,#8b91a5);
+          font-size:20px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;
+        ">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:20px 22px">
+        <label style="
+          display:block;font-size:13px;font-weight:600;
+          color:var(--text2,#c8ccd6);margin-bottom:8px;
+          letter-spacing:.03em;
+        ">
+          Rejection Comments
+          <span style="color:var(--red,#dc2626);margin-left:2px">*</span>
+        </label>
+        <textarea id="cad-reject-textarea"
+          placeholder="Describe what needs to be corrected before this can be approved…"
+          style="
+            width:100%;min-height:120px;max-height:260px;
+            resize:vertical;box-sizing:border-box;
+            background:var(--bg,#111827);
+            border:1.5px solid var(--border2,rgba(255,255,255,.15));
+            border-radius:6px;
+            color:var(--text,#f0f0f0);
+            font-family:Arial,sans-serif;font-size:14px;line-height:1.6;
+            padding:10px 12px;outline:none;
+            transition:border-color .15s;
+          "
+          onfocus="this.style.borderColor='${accentColor}'"
+          onblur="this.style.borderColor='var(--border2,rgba(255,255,255,.15))'"
+        ></textarea>
+        <div id="cad-reject-error" style="
+          display:none;margin-top:6px;
+          font-size:12px;color:var(--red,#dc2626);
+          font-family:Arial,sans-serif;
+        ">A rejection comment is required.</div>
+      </div>
+
+      <!-- Footer -->
+      <div style="
+        padding:14px 22px 18px;
+        border-top:1px solid var(--border,rgba(255,255,255,.08));
+        display:flex;justify-content:flex-end;gap:10px;
+      ">
+        <button id="cad-reject-cancel" style="
+          padding:8px 22px;border-radius:6px;
+          background:transparent;
+          border:1px solid var(--border2,rgba(255,255,255,.15));
+          color:var(--muted,#8b91a5);cursor:pointer;
+          font-size:14px;font-family:Arial,sans-serif;
+          transition:all .12s;
+        "
+        onmouseover="this.style.borderColor='var(--text,#f0f0f0)';this.style.color='var(--text,#f0f0f0)'"
+        onmouseout="this.style.borderColor='var(--border2,rgba(255,255,255,.15))';this.style.color='var(--muted,#8b91a5)'"
+        >Cancel</button>
+        <button id="cad-reject-submit" style="
+          padding:8px 26px;border-radius:6px;
+          background:var(--red,#dc2626);
+          border:none;color:white;cursor:pointer;
+          font-size:14px;font-weight:600;font-family:Arial,sans-serif;
+          transition:opacity .12s;
+        "
+        onmouseover="this.style.opacity='.85'"
+        onmouseout="this.style.opacity='1'"
+        >Submit Rejection</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  // Focus textarea
+  const ta = document.getElementById('cad-reject-textarea');
+  setTimeout(() => ta?.focus(), 50);
+
+  // Wire close / cancel
+  const close = () => overlay.remove();
+  document.getElementById('cad-reject-close').onclick  = close;
+  document.getElementById('cad-reject-cancel').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  // Wire submit
+  document.getElementById('cad-reject-submit').onclick = () => {
+    const note = ta.value.trim();
+    const errEl = document.getElementById('cad-reject-error');
+    if (!note) {
+      errEl.style.display = 'block';
+      ta.style.borderColor = 'var(--red,#dc2626)';
+      ta.focus();
+      return;
+    }
+    overlay.remove();
+    onSubmit(note);
+  };
+
+  // Submit on Ctrl+Enter
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      document.getElementById('cad-reject-submit')?.click();
+    }
+  });
+}
+
 async function _formRejectForm(rejectionStage) {
   if (!_selectedForm) return;
-  const note = prompt(`Reason for rejection (required — will be recorded in CoC and shown to editor):`);
-  if (!note?.trim()) { cadToast('Rejection note is required', 'error'); return; }
-  const from = _selectedForm.state;
-  const to   = rejectionStage === 'review' ? 'rejected_review' : 'rejected_approval';
+  const roleLabel = rejectionStage === 'approval' ? 'Approver' : 'Reviewer';
+  _formShowRejectModal({
+    title:    `Reject — ${roleLabel} Review`,
+    subtitle: `This form will be returned to the editor. Your comments will be recorded in the Chain of Custody and shown to the editor.`,
+    role:     rejectionStage === 'approval' ? 'approver' : 'reviewer',
+    onSubmit: async (note) => {
+      const from = _selectedForm.state;
+      const to   = rejectionStage === 'review' ? 'rejected_review' : 'rejected_approval';
   _selectedForm.state       = to;
   _selectedForm.review_note = note;
   await _formSave();
-  _formCoCWrite('form.rejected', _selectedForm.id, {
-    from, to,
-    stage: rejectionStage,
-    note,
-    rejected_by: window.CURRENT_USER?.id || 'editor'
+      _formCoCWrite('form.rejected', _selectedForm.id, {
+        from, to,
+        stage: rejectionStage,
+        note,
+        rejected_by: window.CURRENT_USER?.id || 'editor'
+      });
+      cadToast('Rejected — returned to editor for revision', 'info');
+      const el = document.getElementById('cad-content');
+      if (el) renderFormsTab(el);
+    }
   });
-  cadToast('Rejected — returned to editor for revision', 'info');
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
 }
 
 // _formReleaseFinal — called from 'approved' state to formally publish
@@ -3906,27 +4067,27 @@ function _formPreviewReject() {
   const stage   = stages.find(s => s.stage === _previewStage);
   const roleLbl = { reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' }[stage?.role] || 'Reviewer';
 
-  const comment = prompt(`Reject as ${roleLbl} — enter rejection reason (will be recorded in CoC):`);
-  if (comment === null) return; // cancelled
-  if (!comment.trim()) { cadToast('Rejection reason required', 'error'); return; }
-
-  // Write to CoC if form is selected
-  if (_selectedForm) {
-    _formCoCWrite('form.preview_rejected', _selectedForm.id, {
-      role: stage?.role || 'reviewer',
-      stage: _previewStage,
-      comment: comment.trim(),
-      note: `Preview rejection by ${roleLbl}: "${comment.trim()}"`,
-    });
-  }
-
-  cadToast(`Rejected as ${roleLbl} — recorded in CoC`, 'info');
-  // Reset preview back to stage 1 so they can re-review from scratch
-  _previewStage = 1;
-  document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
-  _previewResponses = {};
-  _formRenderPreviewOverlay();
-  _formRefreshRolePanel();
+  _formShowRejectModal({
+    title:    `Reject as ${roleLbl}`,
+    subtitle: `Your rejection reason will be recorded in the Chain of Custody. The form will reset to Stage 1 for revision.`,
+    role:     stage?.role || 'reviewer',
+    onSubmit: (comment) => {
+      if (_selectedForm) {
+        _formCoCWrite('form.preview_rejected', _selectedForm.id, {
+          role: stage?.role || 'reviewer',
+          stage: _previewStage,
+          comment,
+          note: `Preview rejection by ${roleLbl}: "${comment}"`,
+        });
+      }
+      cadToast(`Rejected as ${roleLbl} — recorded in CoC`, 'info');
+      _previewStage = 1;
+      document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+      _previewResponses = {};
+      _formRenderPreviewOverlay();
+      _formRefreshRolePanel();
+    }
+  });
 }
 
 function _formPreviewSubmitStage() {
