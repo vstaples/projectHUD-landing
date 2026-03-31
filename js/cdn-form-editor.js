@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-183000
-console.log('%c[cdn-form-editor] v20260401-183000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-184000
+console.log('%c[cdn-form-editor] v20260401-184000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3510,18 +3510,13 @@ function _formTogglePreview() {
     if (cocPanel?.classList.contains('open')) cocPanel.classList.remove('open');
     // Inject role switcher panel
     _formShowRolePanel();
-    _formRenderPreviewOverlay();
-    // Scroll canvas so active-stage fields are visible
+    // Zoom to fit the full page so all fields are visible simultaneously,
+    // then scroll to top — avoids partial-view confusion at the bottom of the canvas.
+    _formZoomFit();
     requestAnimationFrame(() => {
-      const stages   = _formGetStages();
-      const stage    = stages.find(s => s.stage === _previewStage);
-      const roleFields = _formFields.filter(f => f.role === (stage?.role || 'reviewer'));
-      if (roleFields.length) {
-        const topField = roleFields.reduce((a,b) => (a.rect?.y||0) < (b.rect?.y||0) ? a : b);
-        const scrollY  = (topField.rect.y * _pdfScale) - 100; // 100px above the field
-        const outerWrap = document.getElementById('form-canvas-wrap');
-        if (outerWrap) outerWrap.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' });
-      }
+      const outerWrap = document.getElementById('form-canvas-wrap');
+      if (outerWrap) outerWrap.scrollTo({ top: 0, behavior: 'instant' });
+      _formRenderPreviewOverlay();
     });
   } else {
     // ── Exit preview — clean up ALL preview DOM artifacts ────────────────────
