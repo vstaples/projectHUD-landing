@@ -28,49 +28,33 @@ async function renderFormSettingsTab(el) {
 
 function _fsShell() {
   return `
-    <div style="display:flex;flex-direction:column;height:100%;overflow:hidden;background:var(--bg)">
-      <!-- Header -->
-      <div style="padding:16px 24px;border-bottom:1px solid var(--border);
-                  display:flex;align-items:center;justify-content:space-between;
-                  flex-shrink:0;background:var(--bg2)">
-        <div>
-          <div style="font-size:16px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">Form Settings</div>
-          <div style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;margin-top:2px">
-            Form categories, approval routing, and version formats
+    <div style="display:flex;height:100%;overflow:hidden;background:var(--bg)">
+
+      <!-- Left: category list -->
+      <div style="width:280px;min-width:220px;border-right:1px solid var(--border);
+                  display:flex;flex-direction:column;background:var(--bg1);flex-shrink:0">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);
+                    display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <span style="font-size:14px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">
+            Categories
+          </span>
+          <button class="btn btn-cad btn-sm" onclick="_fsNewCategory()"
+            style="font-size:14px;padding:4px 12px">+ New</button>
+        </div>
+        <div id="fs-cat-list" style="flex:1;overflow-y:auto;padding:6px 0">
+          <div style="padding:20px;text-align:center;color:var(--muted);font-size:14px;font-family:Arial,sans-serif">
+            Loading…
           </div>
         </div>
       </div>
 
-      <!-- Body: two-column -->
-      <div style="flex:1;display:flex;overflow:hidden;min-height:0">
-
-        <!-- Left: category list -->
-        <div style="width:280px;min-width:220px;border-right:1px solid var(--border);
-                    display:flex;flex-direction:column;background:var(--bg1)">
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);
-                      display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-            <span style="font-size:12px;font-weight:600;letter-spacing:.08em;
-                         text-transform:uppercase;color:var(--muted);font-family:Arial,sans-serif">
-              Categories
-            </span>
-            <button class="btn btn-cad btn-sm" onclick="_fsNewCategory()"
-              style="font-size:12px;padding:3px 10px">+ New</button>
-          </div>
-          <div id="fs-cat-list" style="flex:1;overflow-y:auto;padding:6px 0">
-            <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;font-family:Arial,sans-serif">
-              Loading…
-            </div>
-          </div>
+      <!-- Right: editor panel -->
+      <div id="fs-editor-panel" style="flex:1;overflow-y:auto;padding:28px;min-width:0">
+        <div style="padding:60px;text-align:center;color:var(--muted);font-size:14px;font-family:Arial,sans-serif">
+          Select a category to edit, or create a new one.
         </div>
-
-        <!-- Right: editor panel -->
-        <div id="fs-editor-panel" style="flex:1;overflow-y:auto;padding:24px;min-width:0">
-          <div style="padding:60px;text-align:center;color:var(--muted);font-size:13px;font-family:Arial,sans-serif">
-            Select a category to edit, or create a new one.
-          </div>
-        </div>
-
       </div>
+
     </div>`;
 }
 
@@ -96,7 +80,7 @@ function _fsRender() {
 
 function _fsCatListHtml() {
   if (!_fsCats.length) return `
-    <div style="padding:20px 14px;text-align:center;font-size:12px;color:var(--muted);
+    <div style="padding:20px 14px;text-align:center;font-size:14px;color:var(--muted);
                 line-height:1.8;font-family:Arial,sans-serif">
       No categories yet.<br/>Create one to enable<br/>controlled document routing.
     </div>`;
@@ -106,12 +90,12 @@ function _fsCatListHtml() {
     const rCount = (cat.reviewer_ids||[]).length;
     return `
       <div onclick="_fsRenderEditor('${cat.id}')"
-        style="padding:10px 14px;cursor:pointer;
+        style="padding:12px 16px;cursor:pointer;
                border-left:3px solid ${sel?'var(--cad)':'transparent'};
                background:${sel?'var(--surf3)':'transparent'};transition:background .1s">
-        <div style="font-size:13px;font-weight:500;color:${sel?'var(--text)':'var(--text1)'};
+        <div style="font-size:15px;font-weight:500;color:${sel?'var(--text)':'var(--text1)'};
                     font-family:Arial,sans-serif">${escHtml(cat.name)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px;font-family:Arial,sans-serif">
+        <div style="font-size:14px;color:var(--muted);margin-top:3px;font-family:Arial,sans-serif">
           ${VER_FORMATS[cat.version_format]?.label || cat.version_format}
           · ${rCount} reviewer${rCount!==1?'s':''}
           ${cat.approver_id?'· approver set':'· <span style="color:var(--amber)">no approver</span>'}
@@ -140,21 +124,21 @@ function _fsRenderEditor(catId) {
   const reviewerNames = (cat.reviewer_ids||[]).map((id,i) =>
     `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surf2);
                  border:1px solid var(--border);border-radius:4px;margin-bottom:4px">
-      <span style="flex:1;font-size:12px;color:var(--text1);font-family:Arial,sans-serif"
+      <span style="flex:1;font-size:14px;color:var(--text1);font-family:Arial,sans-serif"
         id="fs-reviewer-name-${i}">${id}</span>
       <button onclick="_fsRemoveReviewer('${catId}','${id}')"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">✕</button>
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px">✕</button>
     </div>`
   ).join('');
 
   panel.innerHTML = `
     <div style="max-width:540px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="font-size:15px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">
+        <div style="font-size:18px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">
           ${catId==='new'?'New Category':escHtml(cat.name)}
         </div>
         ${catId!=='new'?`<button onclick="_fsDeleteCategory('${cat.id}')"
-          style="font-size:12px;background:none;border:1px solid var(--red);color:var(--red);
+          style="font-size:14px;background:none;border:1px solid var(--red);color:var(--red);
                  border-radius:4px;padding:3px 10px;cursor:pointer;font-family:Arial,sans-serif">
           Delete
         </button>`:''}
@@ -162,46 +146,46 @@ function _fsRenderEditor(catId) {
 
       <!-- Name -->
       <div style="margin-bottom:14px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;
+        <label style="font-size:15px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px;
                       font-family:Arial,sans-serif">Category Name *</label>
         <input id="fs-cat-name" class="config-input" value="${escHtml(cat.name)}"
           placeholder="e.g. Engineering, HR, Purchasing"
-          style="font-size:13px;font-family:Arial,sans-serif;width:100%"/>
+          style="font-size:15px;font-family:Arial,sans-serif;width:100%"/>
       </div>
 
       <!-- Description -->
       <div style="margin-bottom:14px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;
+        <label style="font-size:14px;color:var(--muted);display:block;margin-bottom:4px;
                       font-family:Arial,sans-serif">Description</label>
         <input id="fs-cat-desc" class="config-input" value="${escHtml(cat.description||'')}"
           placeholder="Brief description of forms in this category"
-          style="font-size:13px;font-family:Arial,sans-serif;width:100%"/>
+          style="font-size:15px;font-family:Arial,sans-serif;width:100%"/>
       </div>
 
       <!-- Version Format -->
       <div style="margin-bottom:14px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;
+        <label style="font-size:14px;color:var(--muted);display:block;margin-bottom:4px;
                       font-family:Arial,sans-serif">Version Format</label>
         <select id="fs-cat-ver" class="config-select"
-          style="font-size:13px;font-family:Arial,sans-serif;width:100%"
+          style="font-size:15px;font-family:Arial,sans-serif;width:100%"
           onchange="_fsVerFormatChange(this.value)">
           ${verOpts}
         </select>
         <div id="fs-ver-example"
-          style="font-size:11px;color:var(--muted);margin-top:4px;font-family:Arial,sans-serif">
+          style="font-size:14px;color:var(--muted);margin-top:4px;font-family:Arial,sans-serif">
           ${VER_FORMATS[cat.version_format]?.example||''}
         </div>
       </div>
 
       <!-- Reviewers -->
       <div style="margin-bottom:14px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;
+        <label style="font-size:14px;color:var(--muted);display:block;margin-bottom:6px;
                       font-family:Arial,sans-serif">
           Reviewers <span style="color:var(--text3)">(all must approve)</span>
         </label>
-        <div id="fs-reviewer-list">${reviewerNames||'<div style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;padding:4px 0">No reviewers assigned</div>'}</div>
+        <div id="fs-reviewer-list">${reviewerNames||'<div style="font-size:14px;color:var(--muted);font-family:Arial,sans-serif;padding:4px 0">No reviewers assigned</div>'}</div>
         <button onclick="_fsAddReviewer('${catId}')"
-          style="margin-top:6px;font-size:12px;padding:4px 12px;background:var(--surf2);
+          style="margin-top:6px;font-size:14px;padding:4px 12px;background:var(--surf2);
                  border:1px solid var(--border);border-radius:4px;cursor:pointer;
                  color:var(--text2);font-family:Arial,sans-serif">
           + Add Reviewer
@@ -210,23 +194,23 @@ function _fsRenderEditor(catId) {
 
       <!-- Approver -->
       <div style="margin-bottom:20px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;
+        <label style="font-size:14px;color:var(--muted);display:block;margin-bottom:6px;
                       font-family:Arial,sans-serif">Approver (single)</label>
         <div style="display:flex;align-items:center;gap:8px">
           <div id="fs-approver-display"
-            style="flex:1;font-size:13px;color:${cat.approver_id?'var(--text1)':'var(--muted)'};
+            style="flex:1;font-size:15px;color:${cat.approver_id?'var(--text1)':'var(--muted)'};
                    font-family:Arial,sans-serif;padding:5px 8px;background:var(--surf2);
                    border:1px solid var(--border);border-radius:4px;min-height:32px">
             ${cat.approver_id ? cat.approver_id : 'No approver assigned'}
           </div>
           <button onclick="_fsPickApprover('${catId}')"
-            style="font-size:12px;padding:4px 12px;background:var(--surf2);
+            style="font-size:14px;padding:4px 12px;background:var(--surf2);
                    border:1px solid var(--border);border-radius:4px;cursor:pointer;
                    color:var(--text2);font-family:Arial,sans-serif;flex-shrink:0">
             ${cat.approver_id ? 'Change' : 'Assign'}
           </button>
           ${cat.approver_id?`<button onclick="_fsClearApprover('${catId}')"
-            style="font-size:12px;padding:4px 8px;background:none;border:1px solid var(--border);
+            style="font-size:14px;padding:4px 8px;background:none;border:1px solid var(--border);
                    border-radius:4px;cursor:pointer;color:var(--muted);font-family:Arial,sans-serif">✕</button>`:''}
         </div>
       </div>
@@ -235,14 +219,14 @@ function _fsRenderEditor(catId) {
       <div style="display:flex;gap:10px">
         <button onclick="_fsSaveCategory('${catId}')"
           style="padding:8px 28px;border-radius:999px;background:var(--cad);color:var(--bg);
-                 border:none;cursor:pointer;font-size:13px;font-weight:600;
+                 border:none;cursor:pointer;font-size:15px;font-weight:600;
                  font-family:Arial,sans-serif">
           ${catId==='new'?'Create':'Save'}
         </button>
         <button onclick="_fsCancelEdit()"
           style="padding:8px 20px;border-radius:999px;background:transparent;
                  border:1px solid var(--border);color:var(--muted);cursor:pointer;
-                 font-size:13px;font-family:Arial,sans-serif">
+                 font-size:15px;font-family:Arial,sans-serif">
           Cancel
         </button>
       </div>
@@ -286,7 +270,7 @@ function _fsCancelEdit() {
   _fsEditingId = null;
   const panel = document.getElementById('fs-editor-panel');
   if (panel) panel.innerHTML = `
-    <div style="padding:60px;text-align:center;color:var(--muted);font-size:13px;font-family:Arial,sans-serif">
+    <div style="padding:60px;text-align:center;color:var(--muted);font-size:15px;font-family:Arial,sans-serif">
       Select a category to edit, or create a new one.
     </div>`;
   const listEl = document.getElementById('fs-cat-list');
