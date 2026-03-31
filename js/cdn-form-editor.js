@@ -287,25 +287,25 @@ function _renderFormEditor() {
             onmousedown="_formColDragStart(event,'form-col-fields','left')"></div>
           <div style="padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
+              <span style="font-size:12px;font-weight:600;letter-spacing:.08em;
                            text-transform:uppercase;color:var(--muted)">
                 Fields <span style="font-weight:400;color:var(--text3)">(${totalFields})</span>
               </span>
-              <span id="form-sel-count" style="font-size:10px;color:var(--cad);display:none">0 selected</span>
+              <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
             </div>
             <!-- Arrange toolbar — shown when 2+ fields selected -->
             <div id="form-arrange-bar" style="display:none;flex-direction:column;gap:4px">
               <div style="display:flex;gap:3px;flex-wrap:wrap">
-                <button onclick="_formArrange('align-left')"   title="Align Left"          class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⬤←</button>
-                <button onclick="_formArrange('align-right')"  title="Align Right"         class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">→⬤</button>
-                <button onclick="_formArrange('align-top')"    title="Align Top"           class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⬤↑</button>
-                <button onclick="_formArrange('align-bottom')" title="Align Bottom"        class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">↓⬤</button>
-                <button onclick="_formArrange('center-h')"     title="Center Horizontal"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">↔</button>
-                <button onclick="_formArrange('center-v')"     title="Center Vertical"     class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">↕</button>
-                <button onclick="_formArrange('dist-h')"       title="Distribute Horizontally" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⇹H</button>
-                <button onclick="_formArrange('dist-v')"       title="Distribute Vertically"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px">⇹V</button>
+                <button onclick="_formArrange('align-left')"   title="Align Left"          class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:12px">⬤←</button>
+                <button onclick="_formArrange('align-right')"  title="Align Right"         class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">→⬤</button>
+                <button onclick="_formArrange('align-top')"    title="Align Top"           class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⬤↑</button>
+                <button onclick="_formArrange('align-bottom')" title="Align Bottom"        class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↓⬤</button>
+                <button onclick="_formArrange('center-h')"     title="Center Horizontal"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↔</button>
+                <button onclick="_formArrange('center-v')"     title="Center Vertical"     class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↕</button>
+                <button onclick="_formArrange('dist-h')"       title="Distribute Horizontally" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⇹H</button>
+                <button onclick="_formArrange('dist-v')"       title="Distribute Vertically"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⇹V</button>
               </div>
-              <button onclick="_formClearSelection()" style="font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer;text-align:left;padding:0">✕ Clear selection</button>
+              <button onclick="_formClearSelection()" style="font-size:12px;background:none;border:none;color:var(--muted);cursor:pointer;text-align:left;padding:0">✕ Clear selection</button>
             </div>
           </div>
           <div id="form-field-list" style="flex:1;overflow-y:auto;padding:4px 0">
@@ -1781,38 +1781,73 @@ const _renderFieldOverlaysBase = _renderFieldOverlays;
 function _renderFieldOverlays() {
   const svg = document.getElementById('form-field-overlay');
   if (!svg) return;
-  if (_marqueeDrag?.active) return; // never wipe SVG while marquee is being drawn
+  if (_marqueeDrag?.active) return;
+
+  const sel = _selectedFieldIds;
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
-  svg.innerHTML = currentPageFields.map(field => {
-    const roleConf  = FORM_ROLES[field.role] || FORM_ROLES.assignee;
-    const confColor = _fieldConfidenceColor(field);
-    const isSelected = _selectedFieldIds.has(field.id);
+
+  // ── Field rects ───────────────────────────────────────────────────────────
+  let html = currentPageFields.map(field => {
+    const roleConf   = FORM_ROLES[field.role] || FORM_ROLES.assignee;
+    const confColor  = _fieldConfidenceColor(field);
+    const isSelected = sel.has(field.id);
     const r = field.rect || { x:0, y:0, w:80, h:18 };
     const x = r.x * _pdfScale, y = r.y * _pdfScale;
     const w = r.w * _pdfScale, h = r.h * _pdfScale;
     const labelText = (field.label||'field').slice(0,16);
     const typeIcon  = FIELD_TYPE_META?.[field.type]?.icon || 'T';
-    const CH = 5; // corner handle half-size
-    const corners = isSelected ? [
-      [x,y],[x+w,y],[x,y+h],[x+w,y+h]
-    ].map(([cx,cy])=>`<rect x="${cx-CH}" y="${cy-CH}" width="${CH*2}" height="${CH*2}" fill="white" stroke="var(--accent)" stroke-width="1.5" rx="1" style="pointer-events:none"/>`).join('') : '';
     return `
       <g class="field-rect-group" data-field-id="${field.id}" style="cursor:pointer">
         <rect x="${x}" y="${y}" width="${w}" height="${h}"
-          fill="${isSelected?'rgba(79,142,247,.13)':roleConf.dim}"
-          stroke="${isSelected?'var(--accent)':confColor}"
-          stroke-width="${isSelected?'2':'1.5'}"
-          stroke-dasharray="${isSelected?'6 3':'none'}"
-          rx="2" opacity="0.95"/>
-        <rect x="${x}" y="${y}" width="${Math.min(w,110)}" height="16" fill="${confColor}" rx="2" opacity="0.88"/>
+          fill="${isSelected?'rgba(79,142,247,.18)':roleConf.dim}"
+          stroke="${isSelected?'#4f8ef7':confColor}"
+          stroke-width="${isSelected?'2.5':'1.5'}"
+          stroke-dasharray="${isSelected?'7 3':'none'}"
+          rx="2"/>
+        <rect x="${x}" y="${y}" width="${Math.min(w,110)}" height="16" fill="${isSelected?'#4f8ef7':confColor}" rx="2" opacity="${isSelected?'1':'0.88'}"/>
         <text x="${x+4}" y="${y+11}" fill="white" font-size="10" font-family="monospace" style="pointer-events:none">
           ${typeIcon} ${escHtml(labelText)}
         </text>
-        ${field.required?`<text x="${x+w-10}" y="${y+h-4}" fill="var(--red)" font-size="10" font-family="sans-serif" style="pointer-events:none">*</text>`:''}
-        ${corners}
+        ${field.required?`<text x="${x+w-10}" y="${y+h-4}" fill="#c0404a" font-size="10" font-family="sans-serif" style="pointer-events:none">*</text>`:''}
       </g>`;
   }).join('');
-  _renderResizeHandles();
+
+  // ── Selection bounding box + T/B/L/R resize handles (inline in SVG string) ─
+  const selFields = [...sel].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  if (selFields.length) {
+    const minX = Math.min(...selFields.map(f => f.rect.x)) * _pdfScale;
+    const minY = Math.min(...selFields.map(f => f.rect.y)) * _pdfScale;
+    const maxX = Math.max(...selFields.map(f => f.rect.x + f.rect.w)) * _pdfScale;
+    const maxY = Math.max(...selFields.map(f => f.rect.y + f.rect.h)) * _pdfScale;
+    const midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
+    const HS = 7; // handle half-size px
+
+    // Outer dashed bounding box
+    html += `<rect class="sel-bbox" x="${minX}" y="${minY}" width="${maxX-minX}" height="${maxY-minY}"
+      fill="none" stroke="#4f8ef7" stroke-width="1.5" stroke-dasharray="6 3" rx="2" style="pointer-events:none"/>`;
+
+    // 4 midpoint resize handles — use data-edge so mousedown can identify
+    const hDefs = [
+      { edge:'t', cx:midX, cy:minY, cur:'ns-resize' },
+      { edge:'b', cx:midX, cy:maxY, cur:'ns-resize' },
+      { edge:'l', cx:minX, cy:midY, cur:'ew-resize' },
+      { edge:'r', cx:maxX, cy:midY, cur:'ew-resize' },
+    ];
+    hDefs.forEach(({ edge, cx, cy, cur }) => {
+      html += `<rect class="resize-handle" data-edge="${edge}"
+        x="${cx-HS}" y="${cy-HS}" width="${HS*2}" height="${HS*2}"
+        fill="white" stroke="#4f8ef7" stroke-width="2" rx="2"
+        style="cursor:${cur}" />`;
+    });
+  }
+
+  svg.innerHTML = html;
+
+  // Wire resize handle mousedown after innerHTML set
+  svg.querySelectorAll('.resize-handle').forEach(el => {
+    el.addEventListener('mousedown', ev => _resizeHandleMouseDown(ev, el.dataset.edge));
+  });
+
   _updateHWWidget();
 }
 
@@ -2334,51 +2369,8 @@ function _formHWStep(dim, dir) {
 let _resizeDrag = null;
 // { edge: 't'|'b'|'l'|'r', startMouse, startBound, fields: [{field,origRect}] }
 
-function _renderResizeHandles() {
-  const svg = document.getElementById('form-field-overlay');
-  if (!svg) return;
-  // Remove existing handles
-  svg.querySelectorAll('.resize-handle-group').forEach(el => el.remove());
-  const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
-  if (!sel.length) return;
-
-  const minX = Math.min(...sel.map(f => f.rect.x)) * _pdfScale;
-  const minY = Math.min(...sel.map(f => f.rect.y)) * _pdfScale;
-  const maxX = Math.max(...sel.map(f => f.rect.x + f.rect.w)) * _pdfScale;
-  const maxY = Math.max(...sel.map(f => f.rect.y + f.rect.h)) * _pdfScale;
-  const midX = (minX + maxX) / 2;
-  const midY = (minY + maxY) / 2;
-  const HS = 6; // half-size of handle square
-
-  const handles = [
-    { edge:'t', cx:midX, cy:minY, cursor:'ns-resize'  },
-    { edge:'b', cx:midX, cy:maxY, cursor:'ns-resize'  },
-    { edge:'l', cx:minX, cy:midY, cursor:'ew-resize'  },
-    { edge:'r', cx:maxX, cy:midY, cursor:'ew-resize'  },
-  ];
-
-  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-  g.classList.add('resize-handle-group');
-  // Bounding box outline (always shown around selection)
-  const bbox = document.createElementNS('http://www.w3.org/2000/svg','rect');
-  bbox.setAttribute('x', minX); bbox.setAttribute('y', minY);
-  bbox.setAttribute('width', maxX - minX); bbox.setAttribute('height', maxY - minY);
-  bbox.setAttribute('fill','none'); bbox.setAttribute('stroke','var(--accent)');
-  bbox.setAttribute('stroke-width','1'); bbox.setAttribute('stroke-dasharray','5 3');
-  bbox.setAttribute('rx','2'); bbox.style.pointerEvents = 'none';
-  g.appendChild(bbox);
-  handles.forEach(({ edge, cx, cy, cursor }) => {
-    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    rect.setAttribute('x', cx - HS); rect.setAttribute('y', cy - HS);
-    rect.setAttribute('width', HS*2); rect.setAttribute('height', HS*2);
-    rect.setAttribute('fill','white'); rect.setAttribute('stroke','var(--accent)');
-    rect.setAttribute('stroke-width','1.5'); rect.setAttribute('rx','1');
-    rect.style.cursor = cursor;
-    rect.addEventListener('mousedown', ev => _resizeHandleMouseDown(ev, edge));
-    g.appendChild(rect);
-  });
-  svg.appendChild(g);
-}
+// _renderResizeHandles — now inlined inside _renderFieldOverlays SVG string
+function _renderResizeHandles() { /* no-op: handles rendered inline in _renderFieldOverlays */ }
 
 function _resizeHandleMouseDown(event, edge) {
   event.stopPropagation(); event.preventDefault();
