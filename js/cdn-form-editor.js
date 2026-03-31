@@ -78,10 +78,10 @@ function renderFormsTab(el) {
                   display:flex;flex-direction:column;background:var(--bg1)">
         <div style="padding:10px 14px;border-bottom:1px solid var(--border);
                     display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-          <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
+          <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
                        text-transform:uppercase;color:var(--muted)">Form Library</span>
           <button class="btn btn-cad btn-sm" onclick="_formUploadClick()"
-            style="font-size:10px;padding:3px 9px">↑ Import</button>
+            style="font-size:12px;padding:3px 9px">↑ Import</button>
         </div>
         <div id="form-list" style="flex:1;overflow-y:auto;padding:6px 0">
           ${_renderFormList()}
@@ -109,7 +109,7 @@ function renderFormsTab(el) {
 
 function _renderFormList() {
   if (!_formDefs.length) {
-    return `<div style="padding:24px 14px;text-align:center;font-size:11px;
+    return `<div style="padding:24px 14px;text-align:center;font-size:12px;
                         color:var(--muted);line-height:1.8">
               No forms yet.<br/>Import a PDF or Word document<br/>to create a fillable form.
             </div>`;
@@ -125,7 +125,7 @@ function _renderFormList() {
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${escHtml(f.source_name || 'Untitled form')}
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;display:flex;gap:8px">
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px">
           <span>${fieldCount} field${fieldCount !== 1 ? 's' : ''}</span>
           <span>${f.page_count || '?'} page${(f.page_count || 1) !== 1 ? 's' : ''}</span>
           ${_routingBadge(f)}
@@ -136,7 +136,7 @@ function _renderFormList() {
 
 function _routingBadge(form) {
   const mode = form.routing?.mode || 'serial';
-  return `<span style="color:${mode === 'parallel' ? 'var(--accent)' : 'var(--amber)'};font-size:10px">
+  return `<span style="color:${mode === 'parallel' ? 'var(--accent)' : 'var(--amber)'};font-size:12px">
     ${mode === 'parallel' ? '⇉ parallel' : '↓ serial'}
   </span>`;
 }
@@ -152,7 +152,7 @@ function _renderFormEmpty() {
                 background:var(--bg);color:var(--muted)">
       <div style="font-size:48px;opacity:.12">📄</div>
       <div style="font-size:13px;font-weight:500;color:var(--text2)">No form selected</div>
-      <div style="font-size:11px;max-width:280px;text-align:center;line-height:1.7;color:var(--muted)">
+      <div style="font-size:12px;max-width:280px;text-align:center;line-height:1.7;color:var(--muted)">
         Import a PDF or Word document — CadenceHUD will detect fields automatically.
         You can then add, edit, and assign roles to each field.
       </div>
@@ -185,7 +185,7 @@ function _renderFormEditor() {
           <button id="form-page-prev" onclick="_formPrevPage()" class="btn btn-ghost btn-sm"
             style="padding:3px 8px">‹</button>
           <span id="form-page-indicator"
-            style="font-size:10px;color:var(--muted);white-space:nowrap;font-family:var(--font-mono)">
+            style="font-size:12px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif">
             ${_pdfPage} / ${_pdfTotalPages}
           </span>
           <button id="form-page-next" onclick="_formNextPage()" class="btn btn-ghost btn-sm"
@@ -203,11 +203,11 @@ function _renderFormEditor() {
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
           <button id="form-mode-select" onclick="_formSetMode('select')"
             title="Select & move fields (S)"
-            style="padding:3px 10px;font-size:10px;border:none;cursor:pointer;
+            style="padding:3px 10px;font-size:12px;border:none;cursor:pointer;
                    background:var(--cad);color:var(--bg0);transition:all .12s">⊹ Select</button>
           <button id="form-mode-draw" onclick="_formSetMode('draw')"
             title="Draw new field (D)"
-            style="padding:3px 10px;font-size:10px;border:none;border-left:1px solid var(--border);
+            style="padding:3px 10px;font-size:12px;border:none;border-left:1px solid var(--border);
                    cursor:pointer;background:transparent;color:var(--muted);transition:all .12s">✎ Draw</button>
         </div>
         <!-- H/W size widget — shown when fields selected -->
@@ -215,11 +215,11 @@ function _renderFormEditor() {
           <div style="width:1px;height:18px;background:var(--border)"></div>
           <div style="display:flex;flex-direction:column;gap:2px">
             <div style="display:flex;align-items:center;gap:3px">
-              <span style="font-size:10px;color:var(--muted);width:10px">H</span>
+              <span style="font-size:12px;color:var(--muted);width:10px">H</span>
               <input id="form-hw-h" type="number" step="0.01" min="0.05"
-                style="width:58px;font-size:10px;padding:1px 4px;background:var(--bg);
+                style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
                        border:1px solid var(--border);border-radius:3px;color:var(--text);
-                       font-family:var(--font-mono)"
+                       font-family:Arial,sans-serif"
                 onchange="_formHWChange('h',parseFloat(this.value))"
                 onclick="this.select()"/>
               <div style="display:flex;flex-direction:column;gap:0">
@@ -228,11 +228,11 @@ function _renderFormEditor() {
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:3px">
-              <span style="font-size:10px;color:var(--muted);width:10px">W</span>
+              <span style="font-size:12px;color:var(--muted);width:10px">W</span>
               <input id="form-hw-w" type="number" step="0.01" min="0.05"
-                style="width:58px;font-size:10px;padding:1px 4px;background:var(--bg);
+                style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
                        border:1px solid var(--border);border-radius:3px;color:var(--text);
-                       font-family:var(--font-mono)"
+                       font-family:Arial,sans-serif"
                 onchange="_formHWChange('w',parseFloat(this.value))"
                 onclick="this.select()"/>
               <div style="display:flex;flex-direction:column;gap:0">
@@ -243,9 +243,9 @@ function _renderFormEditor() {
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="_formDelete('${f.id}')"
-          style="color:var(--red);font-size:10px">🗑 Remove</button>
+          style="color:var(--red);font-size:12px">🗑 Remove</button>
         <button class="btn btn-solid btn-sm" onclick="_formSave()"
-          style="font-size:10px">Save</button>
+          style="font-size:12px">Save</button>
       </div>
 
       <!-- ── Three-column body ────────────────────────────────────── -->
@@ -271,7 +271,7 @@ function _renderFormEditor() {
             </div>
           </div>
           </div>
-          <div style="padding:6px 20px 4px;font-size:10px;color:var(--muted);
+          <div style="padding:6px 20px 4px;font-size:12px;color:var(--muted);
                       display:flex;align-items:center;gap:8px;flex-shrink:0">
             <span>✎ Click and drag on the document to add a field</span>
           </div>
@@ -326,7 +326,7 @@ function _renderFormEditor() {
             onmouseout="if(!window._formDragCol)this.style.background='transparent'"
             onmousedown="_formColDragStart(event,'form-col-routing','left')"></div>
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-            <span style="font-size:10px;font-weight:600;letter-spacing:.14em;
+            <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
                          text-transform:uppercase;color:var(--muted)">Fill Routing</span>
           </div>
           <div style="flex:1;overflow-y:auto;padding:14px">
@@ -353,7 +353,7 @@ function _renderRoutingPanel(roles) {
   const isSerial = mode === 'serial';
 
   if (!roles.length) {
-    return `<div style="font-size:11px;color:var(--muted);line-height:1.8">
+    return `<div style="font-size:12px;color:var(--muted);line-height:1.8">
               Assign roles to fields to configure routing.
             </div>`;
   }
@@ -361,7 +361,7 @@ function _renderRoutingPanel(roles) {
   return `
     <!-- Mode selector -->
     <div style="margin-bottom:16px">
-      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+      <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:10px">Fill Order</div>
 
       <!-- Serial radio -->
@@ -375,10 +375,10 @@ function _renderRoutingPanel(roles) {
           onchange="_formSetRoutingMode('serial')"
           style="margin-top:2px;accent-color:var(--cad);flex-shrink:0"/>
         <div>
-          <div style="font-size:11px;font-weight:600;color:${isSerial ? 'var(--text)' : 'var(--text2)'}">
+          <div style="font-size:12px;font-weight:600;color:${isSerial ? 'var(--text)' : 'var(--text2)'}">
             Serial
           </div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5">
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5">
             Roles fill in sequence.<br/>Each is notified only after the prior role submits.
           </div>
         </div>
@@ -395,10 +395,10 @@ function _renderRoutingPanel(roles) {
           onchange="_formSetRoutingMode('parallel')"
           style="margin-top:2px;accent-color:var(--accent);flex-shrink:0"/>
         <div>
-          <div style="font-size:11px;font-weight:600;color:${!isSerial ? 'var(--text)' : 'var(--text2)'}">
+          <div style="font-size:12px;font-weight:600;color:${!isSerial ? 'var(--text)' : 'var(--text2)'}">
             Parallel
           </div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5">
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5">
             All roles notified simultaneously. Any can fill in any order.
           </div>
         </div>
@@ -407,7 +407,7 @@ function _renderRoutingPanel(roles) {
 
     <!-- Role sequence (shown always; drag handle only active in serial mode) -->
     <div>
-      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+      <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px">
         Roles in this form
         ${isSerial ? `<span style="font-weight:400;color:var(--text3)">— drag to reorder</span>` : ''}
@@ -418,13 +418,13 @@ function _renderRoutingPanel(roles) {
       ${isSerial ? `
       <div style="margin-top:10px;padding:8px 10px;border-radius:4px;
                   background:rgba(196,125,24,.06);border:1px solid var(--cad-wire)">
-        <div style="font-size:10px;color:var(--amber);line-height:1.5">
+        <div style="font-size:12px;color:var(--amber);line-height:1.5">
           ↓ Top role receives the form first. Each subsequent role is notified only after the role above submits.
         </div>
       </div>` : `
       <div style="margin-top:10px;padding:8px 10px;border-radius:4px;
                   background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2)">
-        <div style="font-size:10px;color:var(--accent);line-height:1.5">
+        <div style="font-size:12px;color:var(--accent);line-height:1.5">
           ⇉ All roles receive the form simultaneously. The form step completes when all have submitted.
         </div>
       </div>`}
@@ -455,7 +455,7 @@ function _renderRoleRows(roles, isSerial) {
 
         <!-- Order number (serial) or parallel indicator -->
         ${isSerial
-          ? `<span style="font-size:10px;font-weight:700;color:var(--muted);
+          ? `<span style="font-size:12px;font-weight:700;color:var(--muted);
                          width:14px;text-align:center;flex-shrink:0">${idx + 1}</span>`
           : `<span style="font-size:12px;color:var(--accent);flex-shrink:0">⇉</span>`}
 
@@ -464,11 +464,11 @@ function _renderRoleRows(roles, isSerial) {
           <div style="display:flex;align-items:center;gap:6px">
             <div style="width:7px;height:7px;border-radius:50%;
                         background:${roleConf.color};flex-shrink:0"></div>
-            <span style="font-size:11px;font-weight:600;color:${roleConf.color}">
+            <span style="font-size:12px;font-weight:600;color:${roleConf.color}">
               ${roleConf.label}
             </span>
           </div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">
             ${fieldCount} field${fieldCount !== 1 ? 's' : ''}
           </div>
         </div>
@@ -1083,7 +1083,7 @@ function _importProgressShow(filename, totalPages) {
                     text-overflow:ellipsis;white-space:nowrap">
           ${escHtml(filename)}
         </div>
-        <div style="font-size:11px;color:var(--muted)">${totalPages} page${totalPages !== 1 ? 's' : ''}</div>
+        <div style="font-size:12px;color:var(--muted)">${totalPages} page${totalPages !== 1 ? 's' : ''}</div>
       </div>
       <div style="width:min(420px,80%);display:flex;flex-direction:column;gap:8px">
         <div style="height:4px;background:var(--surf3);border-radius:2px;overflow:hidden">
@@ -1092,8 +1092,8 @@ function _importProgressShow(filename, totalPages) {
                    transition:width .35s cubic-bezier(.4,0,.2,1)"></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div id="import-progress-stage" style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">Initialising…</div>
-          <div id="import-progress-pct"   style="font-size:11px;color:var(--cad);font-family:var(--font-mono);font-weight:600">0%</div>
+          <div id="import-progress-stage" style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Initialising…</div>
+          <div id="import-progress-pct"   style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif;font-weight:600">0%</div>
         </div>
       </div>
       <div id="import-page-dots" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:360px;min-height:20px">
@@ -1101,7 +1101,7 @@ function _importProgressShow(filename, totalPages) {
           `<div id="import-dot-${i+1}" style="width:10px;height:10px;border-radius:50%;background:var(--surf3);transition:background .2s" title="Page ${i+1}"></div>`
         ).join('')}
       </div>
-      <div id="import-progress-detail" style="font-size:10px;color:var(--muted);text-align:center;min-height:16px;font-family:var(--font-mono)"></div>
+      <div id="import-progress-detail" style="font-size:12px;color:var(--muted);text-align:center;min-height:16px;font-family:Arial,sans-serif"></div>
     </div>`;
 }
 
@@ -1332,13 +1332,13 @@ function _checkAndPromptSignature(fields) {
     padding:14px 16px;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.6)`;
   overlay.innerHTML = `
     <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">No approval signature detected</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
       This form has no formal sign-off field. Add an approval stage with a digital signature?
     </div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-solid btn-sm" style="flex:1;font-size:11px"
+      <button class="btn btn-solid btn-sm" style="flex:1;font-size:12px"
         onclick="_addApprovalSignatureField();this.closest('[style]').remove()">Yes, add sign-off</button>
-      <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;color:var(--muted)"
+      <button class="btn btn-ghost btn-sm" style="flex:1;font-size:12px;color:var(--muted)"
         onclick="this.closest('[style]').remove()">No thanks</button>
     </div>`;
   document.body.appendChild(overlay);
@@ -1383,16 +1383,16 @@ function _renderStageRoutingPanel() {
   const stages = _formRouting.stages || _migrateToStages();
   return `
     <div>
-      <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+      <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
         Fill Stages
-        <button onclick="_formAddStage()" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">+ Stage</button>
+        <button onclick="_formAddStage()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px">+ Stage</button>
       </div>
       <div id="form-stage-list" style="display:flex;flex-direction:column;gap:8px">
         ${stages.map((stage,si) => _renderStageRow(stage,si,stages.length)).join('')}
       </div>
       <div style="margin-top:12px;padding:8px 10px;border-radius:4px;background:rgba(196,125,24,.06);border:1px solid var(--cad-wire)">
-        <div style="font-size:10px;color:var(--muted);line-height:1.5">Each stage activates only after the previous stage is fully complete.</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5">Each stage activates only after the previous stage is fully complete.</div>
       </div>
     </div>`;
 }
@@ -1405,18 +1405,18 @@ function _renderStageRow(stage, si, totalStages) {
     <div id="fstage-${stage.stage}" style="border:1px solid var(--border);border-radius:5px;background:var(--surf2);overflow:hidden">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--bg2)">
         <div style="width:18px;height:18px;border-radius:50%;background:${roleConf.dim};border:1px solid ${roleConf.color};
-                    display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${roleConf.color};flex-shrink:0">${si+1}</div>
-        <select class="config-select" style="flex:1;font-size:11px;padding:3px 6px" onchange="_formUpdateStageRole(${stage.stage},this.value)">
+                    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${roleConf.color};flex-shrink:0">${si+1}</div>
+        <select class="config-select" style="flex:1;font-size:12px;padding:3px 6px" onchange="_formUpdateStageRole(${stage.stage},this.value)">
           ${Object.entries(FORM_ROLES).map(([key,conf])=>`<option value="${key}" ${stage.role===key?'selected':''}>${conf.label}</option>`).join('')}
         </select>
-        ${totalStages>1?`<button onclick="_formRemoveStage(${stage.stage})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0;flex-shrink:0">✕</button>`:''}
+        ${totalStages>1?`<button onclick="_formRemoveStage(${stage.stage})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;flex-shrink:0">✕</button>`:''}
       </div>
       <div style="padding:8px 10px">
         <div class="config-toggle" onclick="_formToggleStageParallel(${stage.stage})" style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-bottom:6px">
           <div class="toggle-box${stage.parallel_within_stage?' on':''}"></div>
-          <span style="font-size:10px;color:var(--text2)">${stage.parallel_within_stage?'All notified at once':'Serial counter-sign'}</span>
+          <span style="font-size:12px;color:var(--text2)">${stage.parallel_within_stage?'All notified at once':'Serial counter-sign'}</span>
         </div>
-        <div style="font-size:10px;color:var(--muted)">${fieldCount} field${fieldCount!==1?'s':''} assigned${si>0?` · activates after Stage ${si}`:' · activates on step start'}</div>
+        <div style="font-size:12px;color:var(--muted)">${fieldCount} field${fieldCount!==1?'s':''} assigned${si>0?` · activates after Stage ${si}`:' · activates on step start'}</div>
       </div>
     </div>
     ${!isLast?`<div style="text-align:center;color:var(--muted);font-size:16px;line-height:1">↓</div>`:''}`;
@@ -1475,7 +1475,7 @@ function _reRenderRoutingPanel() {
 // _renderFieldList — sole authoritative definition
 function _renderFieldList() {
   if (!_formFields.length) {
-    return `<div style="padding:16px 14px;font-size:11px;color:var(--muted);line-height:1.8;text-align:center">
+    return `<div style="padding:16px 14px;font-size:12px;color:var(--muted);line-height:1.8;text-align:center">
               No fields detected yet.<br/>Draw rectangles on the document<br/>to add fields manually.
             </div>`;
   }
@@ -1496,18 +1496,18 @@ function _renderFieldList() {
         onclick="_formFieldListClick(event,'${field.id}')">
         <div style="width:6px;height:6px;border-radius:50%;background:${confColor};flex-shrink:0;margin-top:5px" title="Detection: ${field.detection||'unknown'}"></div>
         <div style="flex-shrink:0;width:20px;height:20px;border-radius:3px;background:rgba(255,255,255,.05);border:1px solid var(--border2);
-                    display:flex;align-items:center;justify-content:center;font-size:10px;color:${typeMeta.color};margin-top:1px">${typeMeta.icon}</div>
+                    display:flex;align-items:center;justify-content:center;font-size:12px;color:${typeMeta.color};margin-top:1px">${typeMeta.icon}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:11px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${escHtml(field.label||'Unlabelled')}</div>
+          <div style="font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${escHtml(field.label||'Unlabelled')}</div>
           <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:${roleConf.dim};color:${roleConf.color}">${roleConf.label}</span>
-            <span style="font-size:10px;color:var(--muted)">${typeMeta.label}</span>
-            ${field.required?`<span style="font-size:10px;color:var(--red)">req</span>`:''}
-            ${field.stage?`<span style="font-size:10px;color:var(--muted)">S${field.stage}</span>`:''}
+            <span style="font-size:12px;padding:1px 5px;border-radius:3px;background:${roleConf.dim};color:${roleConf.color}">${roleConf.label}</span>
+            <span style="font-size:12px;color:var(--muted)">${typeMeta.label}</span>
+            ${field.required?`<span style="font-size:12px;color:var(--red)">req</span>`:''}
+            ${field.stage?`<span style="font-size:12px;color:var(--muted)">S${field.stage}</span>`:''}
           </div>
         </div>
         <button onclick="event.stopPropagation();_formRemoveField('${field.id}')"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0;opacity:0;transition:opacity .15s;flex-shrink:0"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;opacity:0;transition:opacity .15s;flex-shrink:0"
           onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0" title="Remove field">✕</button>
       </div>`;
   }).join('');
@@ -1569,27 +1569,27 @@ function _formSelectField(fieldId) {
     : `_formToggleRequired('${fieldId}')`;
 
   popover.innerHTML = `
-    <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
       ${isMulti ? `Edit ${_selectedFieldIds.size} Fields` : 'Edit Field'}
-      <span style="font-size:10px;color:${_fieldConfidenceColor(field)};font-weight:400">${isMulti?'multi':'${field.detection||""}'}</span>
+      <span style="font-size:12px;color:${_fieldConfidenceColor(field)};font-weight:400">${isMulti?'multi':'${field.detection||""}'}</span>
     </div>
     ${!isMulti?`<div style="margin-bottom:8px"><label class="config-label">Label</label>
-      <input class="config-input" value="${escHtml(field.label||'')}" placeholder="Field label" style="font-size:11px" oninput="_formUpdateField('${fieldId}','label',this.value)"/></div>`:''}
+      <input class="config-input" value="${escHtml(field.label||'')}" placeholder="Field label" style="font-size:12px" oninput="_formUpdateField('${fieldId}','label',this.value)"/></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
       <div><label class="config-label">Type</label>
-        <select class="config-select" style="font-size:11px" onchange="${onTypeChange}">${typeOptions}</select></div>
+        <select class="config-select" style="font-size:12px" onchange="${onTypeChange}">${typeOptions}</select></div>
       <div><label class="config-label">Role</label>
-        <select class="config-select" style="font-size:11px" onchange="${onRoleChange}">${roleOptions}</select></div>
+        <select class="config-select" style="font-size:12px" onchange="${onRoleChange}">${roleOptions}</select></div>
     </div>
     ${stages.length>1?`<div style="margin-bottom:8px"><label class="config-label">Fill Stage</label>
-      <select class="config-select" style="font-size:11px" onchange="${onStageChange}">${stageOptions}</select></div>`:''}
+      <select class="config-select" style="font-size:12px" onchange="${onStageChange}">${stageOptions}</select></div>`:''}
     <div style="margin-bottom:10px">
       <div class="config-toggle" onclick="${onReqClick}" style="display:flex;align-items:center;gap:7px;cursor:pointer">
         <div class="toggle-box${field.required?' on':''}" id="fedit-req-toggle"></div>
-        <span style="font-size:11px">Required</span>
+        <span style="font-size:12px">Required</span>
       </div>
     </div>
-    <button onclick="document.getElementById('field-edit-popover')?.remove()" class="btn btn-ghost btn-sm" style="width:100%;font-size:11px">Done</button>`;
+    <button onclick="document.getElementById('field-edit-popover')?.remove()" class="btn btn-ghost btn-sm" style="width:100%;font-size:12px">Done</button>`;
 
   document.body.appendChild(popover);
   setTimeout(() => {
@@ -1611,6 +1611,11 @@ function _renderFieldOverlays() {
   if (_marqueeDrag?.active) return;
 
   const sel = _selectedFieldIds;
+  if (sel.size > 0) {
+    const firstId = [...sel][0];
+    const firstField = _formFields.find(f => f.id === firstId);
+    console.log('[overlay] sel ids:', [...sel].slice(0,3), '| first field.id:', firstField?.id, '| match:', firstField?.id === firstId);
+  }
 
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
 
@@ -1633,7 +1638,7 @@ function _renderFieldOverlays() {
           stroke-dasharray="${isSelected?'7 3':'none'}"
           rx="2"/>
         <rect x="${x}" y="${y}" width="${Math.min(w,110)}" height="16" fill="${isSelected?'#a050ff':confColor}" rx="2" opacity="${isSelected?'1':'0.88'}"/>
-        <text x="${x+4}" y="${y+11}" fill="white" font-size="10" font-family="monospace" style="pointer-events:none">
+        <text x="${x+4}" y="${y+11}" fill="white" font-size="10" font-family="Arial,sans-serif" style="pointer-events:none">
           ${typeIcon} ${escHtml(labelText)}
         </text>
         ${field.required?`<text x="${x+w-10}" y="${y+h-4}" fill="#c0404a" font-size="10" font-family="sans-serif" style="pointer-events:none">*</text>`:''}
