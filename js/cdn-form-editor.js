@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-180000
-console.log('%c[cdn-form-editor] v20260401-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-181000
+console.log('%c[cdn-form-editor] v20260401-181000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3625,6 +3625,17 @@ function _formRenderPreviewOverlay() {
     'overflow:visible',
     'z-index:5',
   ].join(';');
+  console.log('[preview-overlay] canvas BCR:', JSON.stringify({l:canvasR.left,t:canvasR.top,w:canvasR.width,h:canvasR.height}));
+  console.log('[preview-overlay] parent BCR:', JSON.stringify({l:parentR.left,t:parentR.top,w:parentR.width,h:parentR.height}));
+  console.log('[preview-overlay] container offset:', {offL, offT, cssW, cssH});
+  console.log('[preview-overlay] container offsetParent:', previewContainer.offsetParent?.id || previewContainer.offsetParent?.className || 'none');
+  // Also log a sample field's expected position
+  const sampleField = _formFields.find(f => (f.page||1) === _pdfPage);
+  if (sampleField) {
+    const sr = sampleField.rect;
+    console.log('[preview-overlay] sample field rect (PDF pts):', sr);
+    console.log('[preview-overlay] sample field CSS px:', {x: sr.x*_pdfScale, y: sr.y*_pdfScale, w: sr.w*_pdfScale, h: sr.h*_pdfScale});
+  }
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));
