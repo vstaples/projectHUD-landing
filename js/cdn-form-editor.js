@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-105829
-console.log('[cdn-form-editor] LOADED v20260331-105829');
+// VERSION: 20260331-110713
+console.log('[cdn-form-editor] LOADED v20260331-110713');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3429,7 +3429,7 @@ function _formRenderPreviewOverlay() {
     const BASE_STYLE = [
       'width:100%;height:100%;box-sizing:border-box',
       'background:rgba(255,255,255,.92)',
-      'border:1.5px solid #3b82f6',
+      isFuture ? 'border:1.5px solid #94a3b8' : 'border:1.5px solid #3b82f6',
       'border-radius:2px',
       'color:#111',
       'font-family:Arial,sans-serif',
@@ -3448,11 +3448,29 @@ function _formRenderPreviewOverlay() {
     wrap.style.boxSizing  = 'border-box';
     wrap.style.overflow   = 'hidden';
 
-    if (!active) {
-      wrap.style.background    = 'rgba(255,255,255,.03)';
-      wrap.style.border        = '1px solid rgba(100,150,255,.12)';
+    // Determine if this field belongs to a completed stage (locked) or future stage (visible but dimmed)
+    const fieldStage = _formGetStages().find(s => {
+      const byStage = _formFields.filter(f => (f.stage||1) === s.stage);
+      if (byStage.length) return (field.stage||1) === s.stage;
+      return field.role === s.role;
+    });
+    const fieldStageNum = fieldStage?.stage || 1;
+    const isCompleted   = fieldStageNum < _previewStage;  // locked — already submitted
+    const isFuture      = fieldStageNum > _previewStage;  // visible but dimmer border
+
+    if (isCompleted) {
+      // Stage already submitted — show filled value, read-only
+      wrap.style.background    = 'rgba(240,255,240,.6)';
+      wrap.style.border        = '1px solid #86efac';
       wrap.style.borderRadius  = '2px';
       wrap.style.pointerEvents = 'none';
+      wrap.style.fontSize      = fs + 'px';
+      wrap.style.fontFamily    = 'Arial,sans-serif';
+      wrap.style.color         = '#111';
+      wrap.style.padding       = '0 4px';
+      wrap.style.display       = 'flex';
+      wrap.style.alignItems    = 'center';
+      wrap.textContent         = val || '';
 
     } else if (field.type === 'checkbox') {
       wrap.style.display         = 'flex';
@@ -3516,7 +3534,7 @@ function _formRenderPreviewOverlay() {
       // type=text for date — browser date input ignores custom height & font
       const inp = document.createElement('input');
       inp.type = 'text';
-      inp.placeholder = 'MM/DD/YYYY';
+      inp.placeholder = 'Date';
       inp.value = val;
       inp.style.cssText = BASE_STYLE;
       inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
@@ -3533,7 +3551,7 @@ function _formRenderPreviewOverlay() {
       const inp = document.createElement('input');
       if (field.type === 'date') {
         inp.type = 'text';
-        inp.placeholder = 'MM/DD/YYYY';
+        inp.placeholder = 'Date';
         inp.maxLength = 10;
         inp.addEventListener('input', () => {
           let d = inp.value.replace(/\D/g,'').slice(0,8);
