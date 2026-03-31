@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-123734
-console.log('%c[cdn-form-editor] v20260331-123734','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260331-124058
+console.log('%c[cdn-form-editor] v20260331-124058','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3420,26 +3420,28 @@ function _formRenderPreviewOverlay() {
   const canvas = document.getElementById('form-pdf-canvas');
   if (!canvas) return;
 
-  // Use a dedicated overlay container that sits exactly over the canvas.
-  // This avoids coordinate offset issues from centered/padded parent containers.
+  // Overlay container positioned to match the SVG overlay exactly.
+  // Use canvas.offsetLeft/offsetTop and CSS dimensions (not bitmap dimensions).
   let previewContainer = document.getElementById('form-preview-container');
+  const cssW = canvas.offsetWidth;
+  const cssH = canvas.offsetHeight;
+  const offL = canvas.offsetLeft;
+  const offT = canvas.offsetTop;
   if (!previewContainer) {
     previewContainer = document.createElement('div');
     previewContainer.id = 'form-preview-container';
-    previewContainer.style.cssText = [
-      'position:absolute',
-      'top:0', 'left:0',
-      `width:${canvas.width}px`,
-      `height:${canvas.height}px`,
-      'pointer-events:none', // children set their own pointer-events
-      'overflow:visible',
-      'z-index:5',
-    ].join(';');
     canvas.parentElement.appendChild(previewContainer);
-  } else {
-    previewContainer.style.width  = canvas.width  + 'px';
-    previewContainer.style.height = canvas.height + 'px';
   }
+  previewContainer.style.cssText = [
+    'position:absolute',
+    `top:${offT}px`,
+    `left:${offL}px`,
+    `width:${cssW}px`,
+    `height:${cssH}px`,
+    'pointer-events:none',
+    'overflow:visible',
+    'z-index:5',
+  ].join(';');
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));
