@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-123426
-console.log('%c[cdn-form-editor] v20260331-123426','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260331-123734
+console.log('%c[cdn-form-editor] v20260331-123734','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3590,12 +3590,8 @@ function _formRenderPreviewOverlay() {
       wrap.appendChild(inp);
     }
 
-    canvasWrap.style.position = 'relative';
-    canvasWrap.style.overflow = 'visible';
-    if (field.type === 'signature' || field.type === 'attendees') {
-      console.log(`[PREVIEW] appending ${field.type} wrap: left=${wrap.style.left} top=${wrap.style.top} w=${wrap.style.width} h=${wrap.style.height} overflow=${wrap.style.overflow}`);
-    }
-    canvasWrap.appendChild(wrap);
+    wrap.style.pointerEvents = 'auto';
+    previewContainer.appendChild(wrap);
   });
 }
 
