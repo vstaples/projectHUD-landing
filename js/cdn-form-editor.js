@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-170000
-console.log('%c[cdn-form-editor] v20260401-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-180000
+console.log('%c[cdn-form-editor] v20260401-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3598,17 +3598,22 @@ function _formRenderPreviewOverlay() {
   const canvas = document.getElementById('form-pdf-canvas');
   if (!canvas) return;
 
-  // Overlay container positioned to match the SVG overlay exactly.
-  // Use canvas.offsetLeft/offsetTop and CSS dimensions (not bitmap dimensions).
+  // Overlay container positioned to match the canvas exactly.
+  // Use getBoundingClientRect() diff against the parent element so that
+  // padding, centering offsets, and scroll position are all accounted for.
+  // canvas.offsetLeft/offsetTop are unreliable inside the nested centering wrapper.
   let previewContainer = document.getElementById('form-preview-container');
-  const cssW = canvas.offsetWidth;
-  const cssH = canvas.offsetHeight;
-  const offL = canvas.offsetLeft;
-  const offT = canvas.offsetTop;
+  const parent    = canvas.parentElement;            // the inline-block wrapper
+  const canvasR   = canvas.getBoundingClientRect();
+  const parentR   = parent.getBoundingClientRect();
+  const offL      = canvasR.left - parentR.left;
+  const offT      = canvasR.top  - parentR.top;
+  const cssW      = canvasR.width;
+  const cssH      = canvasR.height;
   if (!previewContainer) {
     previewContainer = document.createElement('div');
     previewContainer.id = 'form-preview-container';
-    canvas.parentElement.appendChild(previewContainer);
+    parent.appendChild(previewContainer);
   }
   previewContainer.style.cssText = [
     'position:absolute',
