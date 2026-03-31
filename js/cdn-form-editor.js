@@ -208,6 +208,38 @@ function _renderFormEditor() {
             style="padding:3px 10px;font-size:10px;border:none;border-left:1px solid var(--border);
                    cursor:pointer;background:transparent;color:var(--muted);transition:all .12s">✎ Draw</button>
         </div>
+        <!-- H/W size widget — shown when fields selected -->
+        <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
+          <div style="width:1px;height:18px;background:var(--border)"></div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:center;gap:3px">
+              <span style="font-size:10px;color:var(--muted);width:10px">H</span>
+              <input id="form-hw-h" type="number" step="0.01" min="0.05"
+                style="width:58px;font-size:10px;padding:1px 4px;background:var(--bg);
+                       border:1px solid var(--border);border-radius:3px;color:var(--text);
+                       font-family:var(--font-mono)"
+                onchange="_formHWChange('h',parseFloat(this.value))"
+                onclick="this.select()"/>
+              <div style="display:flex;flex-direction:column;gap:0">
+                <button onclick="_formHWStep('h',1)"  style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
+                <button onclick="_formHWStep('h',-1)" style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:3px">
+              <span style="font-size:10px;color:var(--muted);width:10px">W</span>
+              <input id="form-hw-w" type="number" step="0.01" min="0.05"
+                style="width:58px;font-size:10px;padding:1px 4px;background:var(--bg);
+                       border:1px solid var(--border);border-radius:3px;color:var(--text);
+                       font-family:var(--font-mono)"
+                onchange="_formHWChange('w',parseFloat(this.value))"
+                onclick="this.select()"/>
+              <div style="display:flex;flex-direction:column;gap:0">
+                <button onclick="_formHWStep('w',1)"  style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
+                <button onclick="_formHWStep('w',-1)" style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <button class="btn btn-ghost btn-sm" onclick="_formDelete('${f.id}')"
           style="color:var(--red);font-size:10px">🗑 Remove</button>
         <button class="btn btn-solid btn-sm" onclick="_formSave()"
@@ -227,9 +259,9 @@ function _renderFormEditor() {
             <svg id="form-field-overlay" style="position:absolute;top:0;left:0;
               pointer-events:all;overflow:visible;cursor:crosshair"
               width="100%" height="100%"
-              onmousedown="_formSvgMouseDown(event)"
-              onmousemove="_formSvgMouseMove(event)"
-              onmouseup="_formSvgMouseUp(event)">
+              onmousedown="_formSvgMouseDownOverride(event)"
+              onmousemove="_formSvgMouseMoveOverride(event)"
+              onmouseup="_formSvgMouseUpOverride(event)">
             </svg>
             <!-- Interaction layer: transparent rect over SVG handles both select + draw -->
             <div id="form-draw-layer" style="position:absolute;top:0;left:0;
@@ -724,12 +756,37 @@ function _formToggleRequired(fieldId) {
 }
 
 function _formRemoveField(fieldId) {
+  _undoPush();
   _formFields = _formFields.filter(f => f.id !== fieldId);
   const listEl = document.getElementById('form-field-list');
   if (listEl) listEl.innerHTML = _renderFieldList();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
   document.getElementById('field-edit-popover')?.remove();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNDO STACK (in-memory, Ctrl-Z, max 50 snapshots)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _undoStack = [];   // array of JSON snapshots of _formFields
+const UNDO_MAX   = 50;
+
+function _undoPush() {
+  _undoStack.push(JSON.stringify(_formFields));
+  if (_undoStack.length > UNDO_MAX) _undoStack.shift();
+}
+
+function _undoPop() {
+  if (!_undoStack.length) { cadToast('Nothing to undo', 'info'); return; }
+  _formFields = JSON.parse(_undoStack.pop());
+  _selectedFieldIds.clear();
+  _formUpdateSelectionUI();
+  _renderFieldOverlays();
+  const listEl = document.getElementById('form-field-list');
+  if (listEl) listEl.innerHTML = _renderFieldList();
+  _updateHWWidget();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -978,6 +1035,7 @@ function _formSvgMouseUp(event) {
     if (w > 12 && h > 8) {
       const x       = Math.min(mx, _drawingRect.startX) / _pdfScale;
       const y       = Math.min(my, _drawingRect.startY) / _pdfScale;
+      _undoPush();
       const fieldId = 'manual_' + Date.now();
       _formFields.push({
         id: fieldId, page: _pdfPage,
@@ -1002,6 +1060,7 @@ function _formSvgMouseUp(event) {
     svg.style.cursor = _formMode === 'draw' ? 'crosshair' : 'default';
 
     if (drag.hasMoved) {
+      if (!isCopy) _undoPush(); // move — push before commit (copy already pushed in mousedown)
       if (isCopy) {
         // COPY: create duplicates at the new positions, return originals to start
         const newIds = [];
@@ -1720,6 +1779,7 @@ function _renderFieldOverlays() {
         ${field.required?`<text x="${x+w-10}" y="${y+h-4}" fill="var(--red)" font-size="10" font-family="sans-serif" style="pointer-events:none">*</text>`:''}
       </g>`;
   }).join('');
+  setTimeout(() => { _renderResizeHandles(); _updateHWWidget(); }, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1996,6 +2056,7 @@ function _formUpdateSelectionUI() {
   if (barEl) barEl.style.display = count >= 2 ? 'flex' : 'none';
   const listEl = document.getElementById('form-field-list');
   if (listEl) listEl.innerHTML = _renderFieldList();
+  _updateHWWidget();
 }
 
 function _formRevealField(fieldId) {
@@ -2095,14 +2156,13 @@ const _formSvgMouseUpOverride = (event) => {
   _origSvgMouseUp(event);
 };
 
-// Patch the SVG element's inline handlers to use the override functions.
-// The SVG uses onmousedown/move/up="..." string attributes, so we need to
-// expose the overrides on window and update the attributes after render.
-window._formSvgMouseDown = _formSvgMouseDownOverride;
-window._formSvgMouseMove = _formSvgMouseMoveOverride;
-window._formSvgMouseUp   = _formSvgMouseUpOverride;
+// Expose overrides globally so SVG onmousedown/move/up="..." attributes resolve them.
+window._formSvgMouseDownOverride = _formSvgMouseDownOverride;
+window._formSvgMouseMoveOverride = _formSvgMouseMoveOverride;
+window._formSvgMouseUpOverride   = _formSvgMouseUpOverride;
 
 function _formArrange(op) {
+  _undoPush();
   const fields = [..._selectedFieldIds].map(id=>_formFields.find(f=>f.id===id)).filter(Boolean);
   if (fields.length < 2) return;
   const rects = fields.map(f => ({ f, r:f.rect }));
@@ -2133,16 +2193,203 @@ function _formArrange(op) {
 document.addEventListener('keydown', e => {
   if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
   if (!document.getElementById('form-field-overlay')) return;
+  if ((e.key==='z'||e.key==='Z') && (e.ctrlKey||e.metaKey)) { e.preventDefault(); _undoPop(); return; }
   if (e.key==='s'||e.key==='S') _formSetMode('select');
   if (e.key==='d'||e.key==='D') _formSetMode('draw');
   if (e.key==='Escape') _formClearSelection();
   if ((e.key==='Delete'||e.key==='Backspace') && _selectedFieldIds.size>0) {
     if (!confirm(`Delete ${_selectedFieldIds.size} selected field(s)?`)) return;
+    _undoPush();
     _selectedFieldIds.forEach(id => { _formFields = _formFields.filter(f=>f.id!==id); });
     _selectedFieldIds.clear(); _formUpdateSelectionUI(); _renderFieldOverlays();
     const listEl=document.getElementById('form-field-list'); if(listEl) listEl.innerHTML=_renderFieldList();
   }
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// H/W SIZE WIDGET
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HW_STEP_IN = 0.1; // inches equivalent in PDF pts (72pt = 1in; we use pts directly)
+
+function _updateHWWidget() {
+  const widget = document.getElementById('form-hw-widget');
+  const hEl    = document.getElementById('form-hw-h');
+  const wEl    = document.getElementById('form-hw-w');
+  if (!widget || !hEl || !wEl) return;
+  const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  if (!sel.length) { widget.style.display = 'none'; return; }
+  widget.style.display = 'flex';
+  // Show bounding box of selection in inches (PDF pts / 72)
+  const minX = Math.min(...sel.map(f => f.rect.x));
+  const minY = Math.min(...sel.map(f => f.rect.y));
+  const maxX = Math.max(...sel.map(f => f.rect.x + f.rect.w));
+  const maxY = Math.max(...sel.map(f => f.rect.y + f.rect.h));
+  hEl.value = ((maxY - minY) / 72).toFixed(2);
+  wEl.value = ((maxX - minX) / 72).toFixed(2);
+}
+
+function _formHWChange(dim, valIn) {
+  if (!isFinite(valIn) || valIn <= 0) return;
+  _undoPush();
+  const valPt = valIn * 72;
+  const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  if (!sel.length) return;
+  if (sel.length === 1) {
+    // Single field: set exact dimension
+    if (dim === 'h') sel[0].rect.h = valPt;
+    else             sel[0].rect.w = valPt;
+  } else {
+    // Multi: scale all proportionally to fit new bounding box
+    const minX = Math.min(...sel.map(f => f.rect.x));
+    const minY = Math.min(...sel.map(f => f.rect.y));
+    const maxX = Math.max(...sel.map(f => f.rect.x + f.rect.w));
+    const maxY = Math.max(...sel.map(f => f.rect.y + f.rect.h));
+    const oldPt = dim === 'h' ? (maxY - minY) : (maxX - minX);
+    if (oldPt <= 0) return;
+    const scale = valPt / oldPt;
+    sel.forEach(f => {
+      if (dim === 'h') { f.rect.y = minY + (f.rect.y - minY) * scale; f.rect.h *= scale; }
+      else             { f.rect.x = minX + (f.rect.x - minX) * scale; f.rect.w *= scale; }
+    });
+  }
+  _renderFieldOverlays();
+  _updateHWWidget();
+}
+
+function _formHWStep(dim, dir) {
+  const el = document.getElementById(dim === 'h' ? 'form-hw-h' : 'form-hw-w');
+  if (!el) return;
+  const cur = parseFloat(el.value) || 0;
+  _formHWChange(dim, Math.max(0.05, cur + dir * HW_STEP_IN));
+  _updateHWWidget();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESIZE HANDLES — 4-point (T/B/L/R) on selection bounding box
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _resizeDrag = null;
+// { edge: 't'|'b'|'l'|'r', startMouse, startBound, fields: [{field,origRect}] }
+
+function _renderResizeHandles() {
+  const svg = document.getElementById('form-field-overlay');
+  if (!svg) return;
+  // Remove existing handles
+  svg.querySelectorAll('.resize-handle-group').forEach(el => el.remove());
+  const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  if (!sel.length) return;
+
+  const minX = Math.min(...sel.map(f => f.rect.x)) * _pdfScale;
+  const minY = Math.min(...sel.map(f => f.rect.y)) * _pdfScale;
+  const maxX = Math.max(...sel.map(f => f.rect.x + f.rect.w)) * _pdfScale;
+  const maxY = Math.max(...sel.map(f => f.rect.y + f.rect.h)) * _pdfScale;
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  const HS = 6; // half-size of handle square
+
+  const handles = [
+    { edge:'t', cx:midX, cy:minY, cursor:'ns-resize'  },
+    { edge:'b', cx:midX, cy:maxY, cursor:'ns-resize'  },
+    { edge:'l', cx:minX, cy:midY, cursor:'ew-resize'  },
+    { edge:'r', cx:maxX, cy:midY, cursor:'ew-resize'  },
+  ];
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.classList.add('resize-handle-group');
+  handles.forEach(({ edge, cx, cy, cursor }) => {
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', cx - HS); rect.setAttribute('y', cy - HS);
+    rect.setAttribute('width', HS*2); rect.setAttribute('height', HS*2);
+    rect.setAttribute('fill','white'); rect.setAttribute('stroke','var(--accent)');
+    rect.setAttribute('stroke-width','1.5'); rect.setAttribute('rx','1');
+    rect.style.cursor = cursor;
+    rect.addEventListener('mousedown', ev => _resizeHandleMouseDown(ev, edge));
+    g.appendChild(rect);
+  });
+  svg.appendChild(g);
+}
+
+function _resizeHandleMouseDown(event, edge) {
+  event.stopPropagation(); event.preventDefault();
+  const svg     = document.getElementById('form-field-overlay');
+  const svgRect = svg.getBoundingClientRect();
+  const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  if (!sel.length) return;
+  _undoPush();
+  _resizeDrag = {
+    edge,
+    startMouse: edge === 't' || edge === 'b'
+      ? event.clientY - svgRect.top
+      : event.clientX - svgRect.left,
+    startBound: {
+      minX: Math.min(...sel.map(f => f.rect.x)),
+      minY: Math.min(...sel.map(f => f.rect.y)),
+      maxX: Math.max(...sel.map(f => f.rect.x + f.rect.w)),
+      maxY: Math.max(...sel.map(f => f.rect.y + f.rect.h)),
+    },
+    fields: sel.map(f => ({ field: f, origRect: { ...f.rect } })),
+  };
+  document.addEventListener('mousemove', _resizeMouseMove);
+  document.addEventListener('mouseup',   _resizeMouseUp, { once: true });
+}
+
+function _resizeMouseMove(event) {
+  if (!_resizeDrag) return;
+  const svg     = document.getElementById('form-field-overlay');
+  const svgRect = svg?.getBoundingClientRect(); if (!svgRect) return;
+  const { edge, startMouse, startBound, fields } = _resizeDrag;
+  const isV = edge === 't' || edge === 'b';
+  const cur = isV ? event.clientY - svgRect.top : event.clientX - svgRect.left;
+  const delta = (cur - startMouse) / _pdfScale; // convert px → PDF pts
+
+  const bW = startBound.maxX - startBound.minX;
+  const bH = startBound.maxY - startBound.minY;
+
+  fields.forEach(({ field, origRect }) => {
+    const r = field.rect;
+    // Fractional position within original bounding box
+    const relX = bW > 0 ? (origRect.x - startBound.minX) / bW : 0;
+    const relY = bH > 0 ? (origRect.y - startBound.minY) / bH : 0;
+    const relW = bW > 0 ? origRect.w / bW : 1;
+    const relH = bH > 0 ? origRect.h / bH : 1;
+
+    if (edge === 'b') {
+      const newH = Math.max(5, bH + delta);
+      const scale = newH / Math.max(bH, 0.001);
+      r.y = startBound.minY + relY * bH * scale;
+      r.h = Math.max(4, origRect.h * scale);
+    } else if (edge === 't') {
+      const newH = Math.max(5, bH - delta);
+      const scale = newH / Math.max(bH, 0.001);
+      const newMinY = startBound.maxY - newH;
+      r.y = newMinY + relY * bH * scale;
+      r.h = Math.max(4, origRect.h * scale);
+    } else if (edge === 'r') {
+      const newW = Math.max(5, bW + delta);
+      const scale = newW / Math.max(bW, 0.001);
+      r.x = startBound.minX + relX * bW * scale;
+      r.w = Math.max(4, origRect.w * scale);
+    } else if (edge === 'l') {
+      const newW = Math.max(5, bW - delta);
+      const scale = newW / Math.max(bW, 0.001);
+      const newMinX = startBound.maxX - newW;
+      r.x = newMinX + relX * bW * scale;
+      r.w = Math.max(4, origRect.w * scale);
+    }
+  });
+
+  _renderFieldOverlays();
+  _updateHWWidget();
+}
+
+function _resizeMouseUp() {
+  _resizeDrag = null;
+  document.removeEventListener('mousemove', _resizeMouseMove);
+  _renderFieldOverlays();
+  _updateHWWidget();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DB MIGRATION SQL (run in browser console: _formShowMigrationSQL())
