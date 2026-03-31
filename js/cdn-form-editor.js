@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-181000
-console.log('%c[cdn-form-editor] v20260401-181000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-182000
+console.log('%c[cdn-form-editor] v20260401-182000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3598,22 +3598,24 @@ function _formRenderPreviewOverlay() {
   const canvas = document.getElementById('form-pdf-canvas');
   if (!canvas) return;
 
-  // Overlay container positioned to match the canvas exactly.
-  // Use getBoundingClientRect() diff against the parent element so that
-  // padding, centering offsets, and scroll position are all accounted for.
-  // canvas.offsetLeft/offsetTop are unreliable inside the nested centering wrapper.
+  // Overlay container strategy:
+  // Append to form-canvas-wrap (position:relative, overflow:auto) and offset
+  // by the canvas BCR relative to form-canvas-wrap BCR. This correctly accounts
+  // for the centering padding (24px 40px) and any scroll offset.
+  // canvas.parentElement is inline-block with no resolved offsetParent at runtime.
   let previewContainer = document.getElementById('form-preview-container');
-  const parent    = canvas.parentElement;            // the inline-block wrapper
-  const canvasR   = canvas.getBoundingClientRect();
-  const parentR   = parent.getBoundingClientRect();
-  const offL      = canvasR.left - parentR.left;
-  const offT      = canvasR.top  - parentR.top;
-  const cssW      = canvasR.width;
-  const cssH      = canvasR.height;
+  const scrollWrap  = document.getElementById('form-canvas-wrap');  // position:relative anchor
+  const canvasR     = canvas.getBoundingClientRect();
+  const wrapR       = scrollWrap.getBoundingClientRect();
+  // Add scrollWrap.scrollTop/Left so position stays correct when scrolled
+  const offL        = canvasR.left - wrapR.left + scrollWrap.scrollLeft;
+  const offT        = canvasR.top  - wrapR.top  + scrollWrap.scrollTop;
+  const cssW        = canvasR.width;
+  const cssH        = canvasR.height;
   if (!previewContainer) {
     previewContainer = document.createElement('div');
     previewContainer.id = 'form-preview-container';
-    parent.appendChild(previewContainer);
+    scrollWrap.appendChild(previewContainer);
   }
   previewContainer.style.cssText = [
     'position:absolute',
@@ -3625,17 +3627,6 @@ function _formRenderPreviewOverlay() {
     'overflow:visible',
     'z-index:5',
   ].join(';');
-  console.log('[preview-overlay] canvas BCR:', JSON.stringify({l:canvasR.left,t:canvasR.top,w:canvasR.width,h:canvasR.height}));
-  console.log('[preview-overlay] parent BCR:', JSON.stringify({l:parentR.left,t:parentR.top,w:parentR.width,h:parentR.height}));
-  console.log('[preview-overlay] container offset:', {offL, offT, cssW, cssH});
-  console.log('[preview-overlay] container offsetParent:', previewContainer.offsetParent?.id || previewContainer.offsetParent?.className || 'none');
-  // Also log a sample field's expected position
-  const sampleField = _formFields.find(f => (f.page||1) === _pdfPage);
-  if (sampleField) {
-    const sr = sampleField.rect;
-    console.log('[preview-overlay] sample field rect (PDF pts):', sr);
-    console.log('[preview-overlay] sample field CSS px:', {x: sr.x*_pdfScale, y: sr.y*_pdfScale, w: sr.w*_pdfScale, h: sr.h*_pdfScale});
-  }
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));
