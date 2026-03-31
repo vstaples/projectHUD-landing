@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-114734
-console.log('[cdn-form-editor] LOADED v20260331-114734');
+// VERSION: 20260331-115459
+console.log('[cdn-form-editor] LOADED v20260331-115459');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3534,7 +3534,9 @@ function _formRenderPreviewOverlay() {
       inp.placeholder = 'MM/DD/YYYY';
       inp.maxLength = 10;
       inp.value = val;
-      inp.style.cssText = BASE_STYLE;
+      // Clamp date font — small date boxes next to signatures should stay readable not huge
+      const dateStyle = BASE_STYLE.replace(`font-size:${fs}px`, `font-size:${Math.min(fs,16)}px`);
+      inp.style.cssText = dateStyle;
       inp.addEventListener('input', () => {
         // Reformat: strip non-digits, insert slashes at positions 2 and 4
         const cursor = inp.selectionStart;
@@ -3558,6 +3560,7 @@ function _formRenderPreviewOverlay() {
     }
 
     canvasWrap.style.position = 'relative';
+    canvasWrap.style.overflow = 'visible'; // allow attendees/sig popovers to escape
     canvasWrap.appendChild(wrap);
   });
 }
@@ -3571,7 +3574,7 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
   wrap.style.display       = 'flex';
   wrap.style.alignItems    = 'center';
   wrap.style.position      = 'relative';
-  wrap.style.overflow      = 'hidden';
+  // Keep overflow:visible (set by caller) so full-height cursive renders
 
   const renderSig = () => {
     wrap.innerHTML = '';
@@ -3582,9 +3585,9 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
       inp.placeholder = field.label || 'Sign here…';
       // setAttribute bypasses the global !important font rule
       inp.setAttribute('style',
-        `flex:1;width:calc(100% - 24px);height:${h}px;background:transparent;border:none;outline:none;` +
-        `font-family:'Dancing Script',cursive !important;font-size:${fs}px !important;` +
-        `color:#0a2280 !important;padding:0 6px;font-weight:600;overflow:hidden;`
+        `width:100%;height:${h}px;background:transparent;border:none;outline:none;` +
+        `font-family:'Dancing Script',cursive;font-size:${Math.min(fs, h*0.82)}px;` +
+        `color:#0a2280;padding:0 6px;font-weight:600;`
       );
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
@@ -3673,6 +3676,35 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
   }
 
   renderSig();
+}
+
+
+function _formPreviewReject() {
+  const stages  = _formGetStages();
+  const stage   = stages.find(s => s.stage === _previewStage);
+  const roleLbl = { reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' }[stage?.role] || 'Reviewer';
+
+  const comment = prompt(`Reject as ${roleLbl} — enter rejection reason (will be recorded in CoC):`);
+  if (comment === null) return; // cancelled
+  if (!comment.trim()) { cadToast('Rejection reason required', 'error'); return; }
+
+  // Write to CoC if form is selected
+  if (_selectedForm) {
+    _formCoCWrite('form.preview_rejected', _selectedForm.id, {
+      role: stage?.role || 'reviewer',
+      stage: _previewStage,
+      comment: comment.trim(),
+      note: `Preview rejection by ${roleLbl}: "${comment.trim()}"`,
+    });
+  }
+
+  cadToast(`Rejected as ${roleLbl} — recorded in CoC`, 'info');
+  // Reset preview back to stage 1 so they can re-review from scratch
+  _previewStage = 1;
+  document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
+  _previewResponses = {};
+  _formRenderPreviewOverlay();
+  _formRefreshRolePanel();
 }
 
 function _formPreviewSubmitStage() {
@@ -3943,6 +3975,14 @@ function _formRefreshRolePanel() {
 
   html += `</div>
     <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:6px">`;
+
+  // Reject button — always shown for reviewer/approver
+  html += `<button onclick="_formPreviewReject()"
+    style="font-size:13px;padding:6px 0;border-radius:6px;background:transparent;
+           border:1.5px solid #dc2626;color:#dc2626;cursor:pointer;
+           font-family:Arial,sans-serif;font-weight:600;width:100%;margin-bottom:2px">
+    ✗ Reject
+  </button>`;
 
   // Sign button — only if current stage has a signature field
   const stageSigFields = _formFieldsForStage(_previewStage).filter(f => f.type === 'signature');
