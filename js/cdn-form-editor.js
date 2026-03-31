@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-061955
-console.log('[cdn-form-editor] LOADED v20260331-061955');
+// VERSION: 20260331-084911
+console.log('[cdn-form-editor] LOADED v20260331-084911');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -224,10 +224,17 @@ function _renderFormList() {
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${escHtml(f.source_name || 'Untitled form')}
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px">
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
           <span>${fieldCount} field${fieldCount !== 1 ? 's' : ''}</span>
           <span>${f.page_count || '?'} page${(f.page_count || 1) !== 1 ? 's' : ''}</span>
           ${_routingBadge(f)}
+          ${f.state && f.state !== 'draft' ? `<span style="font-size:11px;padding:1px 6px;border-radius:3px;
+            background:${{ pending_review:'rgba(79,142,247,.15)', pending_approval:'rgba(196,125,24,.15)',
+              released:'rgba(42,157,64,.15)', archived:'rgba(255,255,255,.06)', unreleased:'rgba(212,144,31,.15)' }[f.state]||'transparent'};
+            color:${{ pending_review:'var(--accent)', pending_approval:'var(--cad)',
+              released:'var(--green)', archived:'var(--muted)', unreleased:'var(--amber)' }[f.state]||'var(--muted)'}"
+          >${{ pending_review:'● Review', pending_approval:'● Approval', released:'✓ Released',
+               archived:'Archived', unreleased:'Unreleased' }[f.state]||f.state}</span>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -2282,18 +2289,57 @@ function _formSetCategory(catId) {
 async function _formSubmitForReview() {
   if (!_selectedForm) return;
   const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-  const baseReviewers = cat?.reviewer_ids || [];
+  const baseReviewerIds = cat?.reviewer_ids || [];
 
-  // Let author add more reviewers via PersonPicker
-  const addMore = confirm('Submit for review? Click OK to proceed, or add more reviewers first.');
-  if (!addMore) return;
+  // Show submission dialog with reviewer list
+  let extraReviewers = [];
+  if (window.PersonPicker?.show) {
+    await new Promise(resolve => {
+      window.PersonPicker.show({ multi:true, title:'Add additional reviewers (optional)',
+        onSelect: people => { extraReviewers = (Array.isArray(people)?people:[people]).filter(Boolean); resolve(); },
+        onCancel: resolve });
+    });
+  } else {
+    if (!confirm('Submit for review? Reviewers will be notified by email.')) return;
+  }
 
+  // Fetch category reviewer details
+  let reviewers = [];
+  if (baseReviewerIds.length) {
+    const rows = await API.get(`persons?id=in.(${baseReviewerIds.join(',')})&select=id,full_name,email`).catch(()=>[]) || [];
+    reviewers = rows.map(r => ({ id:r.id, name:r.full_name, email:r.email }));
+  }
+  extraReviewers.forEach(p => {
+    const id = p.id||p;
+    if (!reviewers.find(r => r.id === id)) reviewers.push({ id, name:p.full_name||p.name||id, email:p.email||'' });
+  });
+
+  // Save, then update state
+  await _formSave();
   _selectedForm.state = 'pending_review';
-  _selectedForm.pending_reviewer_ids = [...baseReviewers];
+  _selectedForm.pending_reviewer_ids = reviewers.map(r => r.id);
   _selectedForm.reviewed_by = [];
   await _formSave();
-  _formCoCWrite('form.state_changed', _selectedForm.id, { from:'draft', to:'pending_review', note:'Submitted for review' });
-  cadToast('Submitted for review', 'success');
+
+  // Send email notifications
+  if (reviewers.length) {
+    try {
+      await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY },
+        body: JSON.stringify({ form_def_id:_selectedForm.id, reviewers, role:'reviewer' })
+      });
+      cadToast(`Submitted — ${reviewers.length} reviewer(s) notified`, 'success');
+    } catch(e) { cadToast('Submitted — email notification failed', 'info'); }
+  } else {
+    cadToast('Submitted for review (no reviewers notified)', 'info');
+  }
+
+  _formCoCWrite('form.state_changed', _selectedForm.id, {
+    from: _selectedForm.state === 'unreleased' ? 'unreleased' : 'draft',
+    to:'pending_review',
+    note:`Reviewers: ${reviewers.map(r=>r.name).join(', ')||'none'}`
+  });
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
 }
@@ -2348,6 +2394,20 @@ async function _formApproveAndRelease() {
   }
 
   _formCoCWrite('form.released', _selectedForm.id, { version:newVer, note, supersedes:priorReleased?.id });
+  // Notify approver if category has one
+  try {
+    const relCat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+    if (relCat?.approver_id) {
+      const apRows = await API.get(`persons?id=eq.${relCat.approver_id}&select=id,full_name,email`).catch(()=>[]);
+      if (apRows?.[0]) {
+        await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY },
+          body: JSON.stringify({ form_def_id:_selectedForm.id, reviewers:[{ id:apRows[0].id, name:apRows[0].full_name, email:apRows[0].email }], role:'approver' })
+        });
+      }
+    }
+  } catch(e) { console.warn('Approver notification failed:', e.message); }
   cadToast(`Released as ${newVer}`, 'success');
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
@@ -2490,6 +2550,8 @@ async function _formSave() {
       archived_at:   _selectedForm.archived_at   || null,
     }).catch(e => cadToast('Save failed: ' + e.message, 'error'));
     cadToast('Form saved', 'success');
+    _formDirty = false; _formUpdateSaveBtn();
+    _formRefreshCoCIfOpen();
     const listEl = document.getElementById('form-list');
     if (listEl) listEl.innerHTML = _renderFormList();
   }

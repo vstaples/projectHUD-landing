@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Form Review — CadenceHUD</title>
+<style>
+  :root {
+    --bg:#0f1117; --bg1:#0c1220; --bg2:#111827;
+    --surf2:#1e2535; --surf3:#232d3f;
+    --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.13);
+    --text:#e8eaf0; --text1:#c5c9d6; --text2:#8b91a5; --muted:#5a6070;
+    --cad:#c47d18; --cad-dim:rgba(196,125,24,.1); --cad-wire:rgba(196,125,24,.3);
+    --accent:#4f8ef7; --green:#2a9d40; --red:#c0404a; --amber:#d4901f;
+    --font:Arial,sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font);
+         display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* ── Top bar ── */
+  #topbar { display:flex; align-items:center; gap:12px; padding:10px 20px;
+            background:var(--bg2); border-bottom:1px solid var(--border);
+            flex-shrink:0; }
+  #topbar .logo { font-size:14px; font-weight:700; color:var(--cad); flex-shrink:0; }
+  #topbar .form-title { font-size:14px; font-weight:600; color:var(--text); flex:1; }
+  #topbar .badges { display:flex; gap:6px; flex-shrink:0; }
+  #topbar .badge { font-size:12px; padding:3px 10px; border-radius:4px;
+                   background:var(--surf2); border:1px solid var(--border); color:var(--text2); }
+  #topbar .role-badge { color:var(--cad); border-color:var(--cad-wire); background:var(--cad-dim); }
+  .btn { font-size:13px; padding:5px 16px; border-radius:6px; cursor:pointer;
+         font-family:var(--font); border:1px solid var(--border); background:var(--surf2);
+         color:var(--text1); transition:all .15s; }
+  .btn:hover { border-color:var(--border2); background:var(--surf3); }
+  .btn-approve { background:var(--green); color:#fff; border-color:var(--green); }
+  .btn-approve:hover { opacity:.85; }
+  .btn-reject { background:var(--red); color:#fff; border-color:var(--red); }
+  .btn-reject:hover { opacity:.85; }
+
+  /* ── Main layout ── */
+  #main { display:flex; flex:1; overflow:hidden; }
+
+  /* ── Canvas area ── */
+  #canvas-col { flex:1; overflow:auto; background:var(--bg); position:relative; }
+  #canvas-inner { display:inline-flex; justify-content:center;
+                  padding:24px 40px; min-height:100%; min-width:100%; }
+  #canvas-wrap { position:relative; display:inline-block; flex-shrink:0; }
+  #review-canvas { display:block; box-shadow:0 4px 24px rgba(0,0,0,.5); }
+  #ann-overlay { position:absolute; top:0; left:0; width:100%; height:100%;
+                 pointer-events:all; overflow:hidden; cursor:crosshair; }
+
+  /* ── Right panel ── */
+  #right-panel { width:320px; min-width:260px; display:flex; flex-direction:column;
+                 background:var(--bg1); border-left:1px solid var(--border); flex-shrink:0; }
+  #panel-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .ptab { flex:1; padding:10px; text-align:center; font-size:13px; color:var(--muted);
+          cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+  .ptab.active { color:var(--cad); border-bottom-color:var(--cad); }
+  #panel-body { flex:1; overflow-y:auto; padding:14px; }
+
+  /* ── Annotation pin ── */
+  .ann-pin { position:absolute; width:24px; height:24px; border-radius:50% 50% 50% 0;
+             transform:translate(-50%,-100%) rotate(-45deg);
+             cursor:pointer; border:2px solid white; box-shadow:0 2px 8px rgba(0,0,0,.4);
+             transition:transform .15s; }
+  .ann-pin:hover { transform:translate(-50%,-100%) rotate(-45deg) scale(1.2); }
+  .ann-pin.resolved { opacity:.45; }
+  .ann-region { position:absolute; border:2px dashed; border-radius:3px;
+                cursor:pointer; transition:opacity .15s; }
+  .ann-region:hover { opacity:.8; }
+
+  /* ── Comment card ── */
+  .comment-card { background:var(--surf2); border:1px solid var(--border);
+                  border-radius:6px; padding:10px 12px; margin-bottom:10px; }
+  .comment-card.resolved { opacity:.5; }
+  .comment-who { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .comment-text { font-size:13px; color:var(--text1); line-height:1.5; }
+  .comment-actions { display:flex; gap:8px; margin-top:8px; }
+  .comment-actions button { font-size:11px; padding:2px 8px; border-radius:4px;
+                             cursor:pointer; font-family:var(--font); }
+
+  /* ── New annotation toolbar ── */
+  #ann-toolbar { display:flex; align-items:center; gap:8px; padding:8px 12px;
+                 border-bottom:1px solid var(--border); flex-shrink:0; background:var(--bg2); }
+  #ann-toolbar .tool-btn { font-size:12px; padding:4px 10px; border-radius:4px;
+                           cursor:pointer; border:1px solid var(--border); background:transparent;
+                           color:var(--text2); font-family:var(--font); }
+  #ann-toolbar .tool-btn.active { background:var(--cad-dim); border-color:var(--cad-wire); color:var(--cad); }
+
+  /* ── Approve/Reject panel ── */
+  #action-panel { padding:14px; border-top:1px solid var(--border); flex-shrink:0;
+                  background:var(--bg2); }
+  #action-panel textarea { width:100%; padding:8px; background:var(--bg);
+                           border:1px solid var(--border); border-radius:4px;
+                           color:var(--text); font-family:var(--font); font-size:13px;
+                           resize:vertical; min-height:60px; margin-bottom:10px; }
+  #action-panel .action-btns { display:flex; gap:8px; }
+
+  /* ── Loading / error states ── */
+  #loading { display:flex; align-items:center; justify-content:center;
+             height:100%; font-size:14px; color:var(--muted); flex-direction:column; gap:12px; }
+  .spinner { width:32px; height:32px; border:3px solid var(--border);
+             border-top-color:var(--cad); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Page nav ── */
+  #page-nav { display:flex; align-items:center; gap:8px; padding:6px 12px;
+              border-bottom:1px solid var(--border); flex-shrink:0; background:var(--bg2); font-size:13px; }
+  #page-nav button { font-size:13px; padding:2px 10px; border-radius:4px; cursor:pointer;
+                     border:1px solid var(--border); background:transparent; color:var(--muted);
+                     font-family:var(--font); }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <div class="logo">⬡ CadenceHUD</div>
+  <div class="form-title" id="form-title">Loading…</div>
+  <div class="badges">
+    <span class="badge" id="state-badge">—</span>
+    <span class="badge" id="ver-badge">—</span>
+    <span class="badge role-badge" id="role-badge">—</span>
+  </div>
+  <button class="btn" onclick="window.print()">🖨 Print</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- Canvas -->
+  <div id="canvas-col">
+    <div id="page-nav">
+      <button onclick="reviewPrevPage()">‹</button>
+      <span id="page-indicator">1 / 1</span>
+      <button onclick="reviewNextPage()">›</button>
+      <span style="color:var(--muted);font-size:12px;margin-left:8px">
+        Click to place a pin · Drag to draw a region
+      </span>
+    </div>
+    <div id="canvas-inner">
+      <div id="canvas-wrap">
+        <canvas id="review-canvas"></canvas>
+        <svg id="ann-overlay"
+          onmousedown="annMouseDown(event)"
+          onmousemove="annMouseMove(event)"
+          onmouseup="annMouseUp(event)">
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div id="right-panel">
+    <div id="ann-toolbar">
+      <span style="font-size:12px;color:var(--muted)">Add:</span>
+      <button class="tool-btn active" id="tool-pin"    onclick="setTool('pin')">📌 Pin</button>
+      <button class="tool-btn"        id="tool-region" onclick="setTool('region')">⬜ Region</button>
+    </div>
+
+    <div id="panel-tabs">
+      <div class="ptab active" onclick="showTab('comments')">Comments</div>
+      <div class="ptab"        onclick="showTab('history')">History</div>
+    </div>
+
+    <div id="panel-body">
+      <div id="loading"><div class="spinner"></div>Loading…</div>
+    </div>
+
+    <div id="action-panel">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px" id="action-title">
+        Your decision
+      </div>
+      <textarea id="action-note" placeholder="Add a comment (optional for approval, required for rejection)…"></textarea>
+      <div class="action-btns">
+        <button class="btn btn-approve" onclick="submitDecision('approve')" id="btn-approve">✓ Approve</button>
+        <button class="btn btn-reject"  onclick="submitDecision('reject')"  id="btn-reject">✗ Reject</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTE0MDI0MDAsImV4cCI6MjAyNjk3ODQwMH0.placeholder';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let _token       = null;
+let _tokenRow    = null;
+let _form        = null;
+let _pdfDoc      = null;
+let _page        = 1;
+let _scale       = 1.5;
+let _annotations = [];
+let _activeTool  = 'pin';
+let _drawing     = null; // region draw state
+let _activeTab   = 'comments';
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+(async () => {
+  const params = new URLSearchParams(location.search);
+  _token = params.get('token');
+  if (!_token) { showError('No review token provided.'); return; }
+
+  // Validate token
+  const tokRes = await api(`form_review_tokens?token=eq.${_token}&select=*`);
+  if (!tokRes?.length) { showError('Invalid or expired review link.'); return; }
+  _tokenRow = tokRes[0];
+
+  if (new Date(_tokenRow.expires_at) < new Date()) {
+    showError('This review link has expired.'); return;
+  }
+
+  // Load form
+  const formRes = await api(`workflow_form_definitions?id=eq.${_tokenRow.form_def_id}&select=*`);
+  if (!formRes?.length) { showError('Form not found.'); return; }
+  _form = formRes[0];
+
+  // Update topbar
+  document.getElementById('form-title').textContent = _form.source_name || 'Untitled';
+  document.getElementById('state-badge').textContent = fmtState(_form.state);
+  document.getElementById('ver-badge').textContent   = _form.version || '0.1.0';
+  document.getElementById('role-badge').textContent  = _tokenRow.role === 'approver' ? 'Approver' : 'Reviewer';
+  document.getElementById('action-title').textContent =
+    _tokenRow.role === 'approver' ? 'Your approval decision' : 'Your review decision';
+
+  // Mark token used
+  await apiPatch(`form_review_tokens?token=eq.${_token}`, { used_at: new Date().toISOString() });
+
+  // Load annotations
+  await loadAnnotations();
+
+  // Load PDF
+  if (_form.source_path) {
+    await loadPdf(_form.source_path);
+  } else {
+    document.getElementById('loading').innerHTML =
+      '<div style="color:var(--amber)">No PDF stored for this form.</div>';
+  }
+
+  renderComments();
+})();
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+async function api(path) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, Accept: 'application/json' }
+  });
+  return r.ok ? r.json() : null;
+}
+async function apiPost(table, body) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    method:'POST', headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`,
+    'Content-Type':'application/json', Prefer:'return=representation' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+async function apiPatch(path, body) {
+  await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    method:'PATCH', headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`,
+    'Content-Type':'application/json' }, body: JSON.stringify(body)
+  });
+}
+
+function fmtState(s) {
+  return { draft:'Draft', pending_review:'Pending Review', pending_approval:'Pending Approval',
+           released:'Released', archived:'Archived', unreleased:'Unreleased' }[s] || s;
+}
+function showError(msg) {
+  document.getElementById('panel-body').innerHTML =
+    `<div style="color:var(--red);padding:20px;font-size:13px">${msg}</div>`;
+  document.getElementById('loading').innerHTML =
+    `<div style="color:var(--red);font-size:14px">${msg}</div>`;
+}
+
+// ─── PDF ──────────────────────────────────────────────────────────────────────
+async function loadPdf(path) {
+  try {
+    const signRes = await fetch(`${SUPA_URL}/storage/v1/object/sign/forms-storage/${path}`, {
+      method:'POST', headers:{ apikey:SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`,
+      'Content-Type':'application/json' }, body: JSON.stringify({ expiresIn:3600 })
+    });
+    const signData = await signRes.json();
+    const url = `${SUPA_URL}/storage/v1${signData.signedURL}`;
+    _pdfDoc = await pdfjsLib.getDocument(url).promise;
+    document.getElementById('loading').style.display = 'none';
+    await renderPage();
+  } catch(e) {
+    showError('Could not load PDF: ' + e.message);
+  }
+}
+
+async function renderPage() {
+  if (!_pdfDoc) return;
+  const page    = await _pdfDoc.getPage(_page);
+  const rot     = (page.rotate || 0) === 180 ? 0 : (page.rotate || 0);
+  const vp      = page.getViewport({ scale: _scale, rotation: rot });
+  const canvas  = document.getElementById('review-canvas');
+  const overlay = document.getElementById('ann-overlay');
+  canvas.width  = vp.width;  canvas.height  = vp.height;
+  canvas.style.width  = vp.width  + 'px';
+  canvas.style.height = vp.height + 'px';
+  overlay.setAttribute('width',  vp.width  + 'px');
+  overlay.setAttribute('height', vp.height + 'px');
+  overlay.style.width  = vp.width  + 'px';
+  overlay.style.height = vp.height + 'px';
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  document.getElementById('page-indicator').textContent = `${_page} / ${_pdfDoc.numPages}`;
+  renderAnnotationOverlay();
+}
+
+function reviewPrevPage() { if (_page > 1) { _page--; renderPage(); } }
+function reviewNextPage()  { if (_pdfDoc && _page < _pdfDoc.numPages) { _page++; renderPage(); } }
+
+// ─── Annotations ──────────────────────────────────────────────────────────────
+async function loadAnnotations() {
+  const rows = await api(`form_annotations?form_def_id=eq.${_form.id}&order=created_at.asc`);
+  _annotations = rows || [];
+}
+
+function renderAnnotationOverlay() {
+  const svg     = document.getElementById('ann-overlay');
+  const canvas  = document.getElementById('review-canvas');
+  const W = canvas.width, H = canvas.height;
+
+  svg.innerHTML = '';
+
+  _annotations.filter(a => a.page === _page).forEach(a => {
+    const color = a.reviewer_id === _tokenRow.reviewer_id ? '#c47d18' : '#4f8ef7';
+
+    if (a.type === 'pin') {
+      const cx = (a.x_pct / 100) * W;
+      const cy = (a.y_pct / 100) * H;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.style.cursor = 'pointer';
+      g.setAttribute('class', 'ann-pin-group');
+      // Drop shadow
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+      circle.setAttribute('r', 12); circle.setAttribute('fill', color);
+      circle.setAttribute('opacity', a.resolved ? '0.4' : '1');
+      circle.setAttribute('stroke','white'); circle.setAttribute('stroke-width','2');
+      const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+      text.setAttribute('x', cx); text.setAttribute('y', cy + 5);
+      text.setAttribute('text-anchor','middle'); text.setAttribute('font-size','12');
+      text.setAttribute('fill','white'); text.setAttribute('style','pointer-events:none');
+      text.textContent = '📌';
+      g.appendChild(circle); g.appendChild(text);
+      g.addEventListener('click', () => showAnnotationPopover(a, cx, cy));
+      svg.appendChild(g);
+
+    } else if (a.type === 'region') {
+      const x = (a.x_pct / 100) * W, y = (a.y_pct / 100) * H;
+      const w = ((a.w_pct||10) / 100) * W, h = ((a.h_pct||5) / 100) * H;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x',x); rect.setAttribute('y',y);
+      rect.setAttribute('width',w); rect.setAttribute('height',h);
+      rect.setAttribute('fill', color.replace(')',',0.12)').replace('rgb','rgba') || 'rgba(196,125,24,.12)');
+      rect.setAttribute('stroke', color); rect.setAttribute('stroke-width','2');
+      rect.setAttribute('stroke-dasharray','6 3'); rect.setAttribute('rx','3');
+      rect.setAttribute('opacity', a.resolved ? '0.4' : '1');
+      rect.style.cursor = 'pointer';
+      rect.addEventListener('click', () => showAnnotationPopover(a, x+w/2, y));
+      svg.appendChild(rect);
+    }
+  });
+}
+
+function showAnnotationPopover(ann, svgX, svgY) {
+  document.getElementById('ann-popover')?.remove();
+  const wrap = document.getElementById('canvas-wrap');
+  const wRect = wrap.getBoundingClientRect();
+  const col   = document.getElementById('canvas-col');
+  const scrollTop = col.scrollTop, scrollLeft = col.scrollLeft;
+
+  const pop = document.createElement('div');
+  pop.id = 'ann-popover';
+  pop.style.cssText = `position:absolute;z-index:200;background:var(--bg2);
+    border:1px solid var(--border2);border-radius:6px;padding:12px;width:240px;
+    box-shadow:0 8px 32px rgba(0,0,0,.7);font-family:Arial,sans-serif`;
+  pop.style.left = (svgX + 16) + 'px';
+  pop.style.top  = (svgY - 8)  + 'px';
+
+  pop.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+      ${ann.reviewer_name||'Reviewer'} · p.${ann.page}
+      ${ann.resolved ? '<span style="color:var(--green)"> · Resolved</span>' : ''}
+    </div>
+    <div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:10px">
+      ${ann.comment || '<em style="color:var(--muted)">No comment</em>'}
+    </div>
+    <div style="display:flex;gap:6px">
+      ${!ann.resolved ? `<button onclick="resolveAnnotation('${ann.id}')"
+        style="font-size:12px;padding:3px 10px;border-radius:4px;background:var(--green);
+               color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">✓ Resolve</button>` : ''}
+      <button onclick="document.getElementById('ann-popover')?.remove()"
+        style="font-size:12px;padding:3px 10px;border-radius:4px;background:transparent;
+               border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">Close</button>
+    </div>`;
+
+  document.getElementById('canvas-wrap').appendChild(pop);
+  setTimeout(() => document.addEventListener('click', function c(e) {
+    if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click',c); }
+  }), 50);
+}
+
+async function resolveAnnotation(id) {
+  await apiPatch(`form_annotations?id=eq.${id}`, { resolved: true });
+  _annotations = _annotations.map(a => a.id === id ? { ...a, resolved: true } : a);
+  document.getElementById('ann-popover')?.remove();
+  renderAnnotationOverlay();
+  renderComments();
+}
+
+// ─── Annotation drawing ───────────────────────────────────────────────────────
+function setTool(t) {
+  _activeTool = t;
+  document.getElementById('tool-pin').classList.toggle('active', t === 'pin');
+  document.getElementById('tool-region').classList.toggle('active', t === 'region');
+  document.getElementById('ann-overlay').style.cursor = t === 'region' ? 'crosshair' : 'crosshair';
+}
+
+function annMouseDown(e) {
+  if (_activeTool !== 'region') return;
+  const svg = document.getElementById('ann-overlay');
+  const r   = svg.getBoundingClientRect();
+  _drawing  = { startX: e.clientX - r.left, startY: e.clientY - r.top, active: true };
+  const preview = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  preview.id = 'ann-preview';
+  preview.setAttribute('fill','rgba(196,125,24,.12)');
+  preview.setAttribute('stroke','var(--cad)'); preview.setAttribute('stroke-width','2');
+  preview.setAttribute('stroke-dasharray','6 3'); preview.setAttribute('rx','3');
+  preview.style.pointerEvents = 'none';
+  svg.appendChild(preview);
+  e.preventDefault();
+}
+
+function annMouseMove(e) {
+  if (!_drawing?.active) return;
+  const svg = document.getElementById('ann-overlay');
+  const r   = svg.getBoundingClientRect();
+  const mx  = e.clientX - r.left, my = e.clientY - r.top;
+  const preview = document.getElementById('ann-preview');
+  if (preview) {
+    const x = Math.min(mx, _drawing.startX), y = Math.min(my, _drawing.startY);
+    preview.setAttribute('x',x); preview.setAttribute('y',y);
+    preview.setAttribute('width', Math.abs(mx-_drawing.startX));
+    preview.setAttribute('height', Math.abs(my-_drawing.startY));
+  }
+}
+
+function annMouseUp(e) {
+  const svg    = document.getElementById('ann-overlay');
+  const canvas = document.getElementById('review-canvas');
+  const r      = svg.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const W = canvas.width, H = canvas.height;
+
+  if (_activeTool === 'pin') {
+    promptAnnotation({ type:'pin', x_pct:(mx/W)*100, y_pct:(my/H)*100 }, mx, my);
+  } else if (_drawing?.active) {
+    document.getElementById('ann-preview')?.remove();
+    const x = Math.min(mx, _drawing.startX), y = Math.min(my, _drawing.startY);
+    const w = Math.abs(mx-_drawing.startX), h = Math.abs(my-_drawing.startY);
+    if (w > 20 && h > 10) {
+      promptAnnotation({
+        type:'region',
+        x_pct:(x/W)*100, y_pct:(y/H)*100,
+        w_pct:(w/W)*100,  h_pct:(h/H)*100
+      }, x+w/2, y);
+    }
+    _drawing = null;
+  }
+}
+
+function promptAnnotation(coords, svgX, svgY) {
+  document.getElementById('ann-prompt')?.remove();
+  const wrap = document.getElementById('canvas-wrap');
+  const pop  = document.createElement('div');
+  pop.id = 'ann-prompt';
+  pop.style.cssText = `position:absolute;z-index:300;background:var(--bg2);
+    border:1px solid var(--cad-wire);border-radius:6px;padding:12px;width:260px;
+    box-shadow:0 8px 32px rgba(0,0,0,.7);font-family:Arial,sans-serif;`;
+  pop.style.left = Math.min(svgX + 10, canvas.width - 280) + 'px';
+  pop.style.top  = Math.max(svgY - 10, 4) + 'px';
+  pop.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--cad);margin-bottom:8px">
+      ${coords.type === 'pin' ? '📌 Add Pin Comment' : '⬜ Add Region Comment'}
+    </div>
+    <textarea id="ann-input" placeholder="Enter your comment…"
+      style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);
+             border-radius:4px;color:var(--text);font-family:Arial,sans-serif;
+             font-size:13px;resize:none;height:70px;margin-bottom:8px"></textarea>
+    <div style="display:flex;gap:6px">
+      <button onclick="saveAnnotation()" style="flex:1;padding:5px;border-radius:4px;
+        background:var(--cad);color:var(--bg);border:none;cursor:pointer;
+        font-family:Arial,sans-serif;font-size:13px;font-weight:600">Save</button>
+      <button onclick="document.getElementById('ann-prompt')?.remove()"
+        style="padding:5px 10px;border-radius:4px;background:transparent;
+               border:1px solid var(--border);color:var(--muted);cursor:pointer;
+               font-family:Arial,sans-serif;font-size:13px">Cancel</button>
+    </div>`;
+  pop._coords = coords;
+  wrap.appendChild(pop);
+  setTimeout(() => pop.querySelector('#ann-input')?.focus(), 50);
+
+  window._pendingAnnotation = coords;
+}
+
+async function saveAnnotation() {
+  const coords = window._pendingAnnotation;
+  if (!coords) return;
+  const comment = document.getElementById('ann-input')?.value?.trim() || '';
+  document.getElementById('ann-prompt')?.remove();
+
+  const rows = await apiPost('form_annotations', {
+    form_def_id:   _form.id,
+    reviewer_id:   _tokenRow.reviewer_id,
+    reviewer_name: _tokenRow.reviewer_name,
+    page:          _page,
+    type:          coords.type,
+    x_pct:         coords.x_pct,
+    y_pct:         coords.y_pct,
+    w_pct:         coords.w_pct || null,
+    h_pct:         coords.h_pct || null,
+    comment,
+  });
+  if (rows?.[0]) _annotations.push(rows[0]);
+  renderAnnotationOverlay();
+  renderComments();
+  window._pendingAnnotation = null;
+}
+
+// ─── Comments panel ───────────────────────────────────────────────────────────
+function showTab(tab) {
+  _activeTab = tab;
+  document.querySelectorAll('.ptab').forEach((t,i) => {
+    t.classList.toggle('active', ['comments','history'][i] === tab);
+  });
+  if (tab === 'comments') renderComments();
+  else renderHistory();
+}
+
+function renderComments() {
+  if (_activeTab !== 'comments') return;
+  const body = document.getElementById('panel-body');
+  const pageAnns = _annotations.filter(a => a.page === _page);
+  const other    = _annotations.filter(a => a.page !== _page);
+
+  if (!_annotations.length) {
+    body.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No annotations yet.<br/>Click the PDF to add a pin or drag to add a region.</div>';
+    return;
+  }
+
+  const renderGroup = (anns, label) => anns.length ? `
+    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;
+                letter-spacing:.08em;margin:10px 0 6px">${label}</div>
+    ${anns.map(a => `
+      <div class="comment-card ${a.resolved?'resolved':''}"
+        onclick="setPage(${a.page});setTimeout(()=>renderAnnotationOverlay(),300)"
+        style="cursor:pointer">
+        <div class="comment-who">${a.reviewer_name||'Reviewer'} · p.${a.page} · ${a.type}
+          ${a.resolved ? '· <span style="color:var(--green)">Resolved</span>' : ''}
+        </div>
+        <div class="comment-text">${a.comment||'<em style="color:var(--muted)">No comment</em>'}</div>
+      </div>`).join('')}` : '';
+
+  body.innerHTML =
+    renderGroup(pageAnns, `Page ${_page}`) +
+    renderGroup(other, 'Other pages');
+}
+
+function renderHistory() {
+  document.getElementById('panel-body').innerHTML =
+    '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">CoC history available in the Form Library editor.</div>';
+}
+
+function setPage(p) { _page = p; renderPage(); }
+
+// ─── Approve / Reject ──────────────────────────────────────────────────────────
+async function submitDecision(decision) {
+  const note = document.getElementById('action-note')?.value?.trim() || '';
+  if (decision === 'reject' && !note) {
+    alert('A comment is required when rejecting.'); return;
+  }
+  if (!confirm(`${decision === 'approve' ? 'Approve' : 'Reject'} this form? This action will be recorded.`)) return;
+
+  const btn = document.getElementById(`btn-${decision}`);
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  try {
+    // Record decision via Supabase Edge Function
+    await fetch(`${SUPA_URL}/functions/v1/process-form-decision`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey: SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}` },
+      body: JSON.stringify({
+        token:     _token,
+        decision,
+        note,
+        form_def_id: _form.id,
+        reviewer_id: _tokenRow.reviewer_id,
+        reviewer_name: _tokenRow.reviewer_name,
+        role:        _tokenRow.role,
+      })
+    });
+
+    document.getElementById('action-panel').innerHTML = `
+      <div style="text-align:center;padding:20px;font-family:Arial,sans-serif">
+        <div style="font-size:32px;margin-bottom:12px">${decision === 'approve' ? '✅' : '❌'}</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px">
+          ${decision === 'approve' ? 'Approved' : 'Rejected'}
+        </div>
+        <div style="font-size:13px;color:var(--muted)">
+          Your decision has been recorded. You may close this page.
+        </div>
+      </div>`;
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = decision === 'approve' ? '✓ Approve' : '✗ Reject';
+    alert('Submission failed: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>
