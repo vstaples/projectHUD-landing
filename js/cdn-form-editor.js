@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-014700
-console.log('[cdn-form-editor] LOADED v20260331-014700');
+// VERSION: 20260331-041458
+console.log('[cdn-form-editor] LOADED v20260331-041458');
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1842,12 +1842,28 @@ async function _formSelect(formId) {
   if (form.source_path) {
     try {
       await _ensurePdfJs();
-      const url = await _getSignedUrl(form.source_path);
+      console.log('[formSelect] loading source_path:', form.source_path);
+      console.log('[formSelect] STORAGE_BUCKET:', typeof STORAGE_BUCKET !== 'undefined' ? STORAGE_BUCKET : 'UNDEFINED');
+      let url;
+      try {
+        url = await _getSignedUrl(form.source_path);
+        console.log('[formSelect] signed URL:', url?.slice(0,80));
+      } catch(signErr) {
+        console.warn('[formSelect] signed URL failed, trying public URL:', signErr.message);
+        url = `${SUPA_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${form.source_path}`;
+      }
       _pdfDoc = await pdfjsLib.getDocument(url).promise;
       _pdfTotalPages = _pdfDoc.numPages;
+      _pdfStartPage  = 1;
       await _renderPdfPage(1);
       _updatePageIndicator();
-    } catch(e) { cadToast('Could not load document: ' + e.message, 'error'); }
+    } catch(e) {
+      console.error('[formSelect] PDF load failed:', e);
+      cadToast('Could not load document: ' + e.message, 'error');
+    }
+  } else {
+    console.warn('[formSelect] no source_path on form:', form.id);
+    cadToast('No document stored for this form', 'info');
   }
 }
 
