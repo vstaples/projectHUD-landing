@@ -121,15 +121,20 @@ function _fsRenderEditor(catId) {
     `<option value="${k}" ${cat.version_format===k?'selected':''}>${v.label}</option>`
   ).join('');
 
-  const reviewerNames = (cat.reviewer_ids||[]).map((id,i) =>
-    `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surf2);
-                 border:1px solid var(--border);border-radius:4px;margin-bottom:4px">
-      <span style="flex:1;font-size:14px;color:var(--text1);font-family:Arial,sans-serif"
-        id="fs-reviewer-name-${i}">${id}</span>
+  const reviewerNames = (cat.reviewer_ids||[]).map((id,i) => {
+    const name = cat._reviewerNames?.[id] || id;
+    const ini  = name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;
+                 background:var(--surf2);border:1px solid var(--border);
+                 border-radius:4px;margin-bottom:6px">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:11px;font-weight:700;color:white;flex-shrink:0">${ini}</div>
+      <span style="flex:1;font-size:14px;color:var(--text1);font-family:Arial,sans-serif">${name}</span>
       <button onclick="_fsRemoveReviewer('${catId}','${id}')"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px">✕</button>
-    </div>`
-  ).join('');
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0">✕</button>
+    </div>`;
+  }).join('');
 
   panel.innerHTML = `
     <div style="max-width:540px">
@@ -184,7 +189,7 @@ function _fsRenderEditor(catId) {
           Reviewers <span style="color:var(--text3)">(all must approve)</span>
         </label>
         <div id="fs-reviewer-list">${reviewerNames||'<div style="font-size:14px;color:var(--muted);font-family:Arial,sans-serif;padding:4px 0">No reviewers assigned</div>'}</div>
-        <button onclick="_fsAddReviewer('${catId}')"
+        <button onclick="_fsAddReviewer('${catId}',this)"
           style="margin-top:6px;font-size:14px;padding:4px 12px;background:var(--surf2);
                  border:1px solid var(--border);border-radius:4px;cursor:pointer;
                  color:var(--text2);font-family:Arial,sans-serif">
@@ -201,9 +206,13 @@ function _fsRenderEditor(catId) {
             style="flex:1;font-size:15px;color:${cat.approver_id?'var(--text1)':'var(--muted)'};
                    font-family:Arial,sans-serif;padding:5px 8px;background:var(--surf2);
                    border:1px solid var(--border);border-radius:4px;min-height:32px">
-            ${cat.approver_id ? cat.approver_id : 'No approver assigned'}
+            ${cat.approver_id ? (()=>{
+              const n = cat._approverName||cat.approver_id;
+              const ini = n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+              return '<div style="display:flex;align-items:center;gap:8px"><div style=\"width:28px;height:28px;border-radius:50%;background:var(--cad);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0\">'+ini+'</div><span style=\"font-size:14px;font-family:Arial,sans-serif\">'+n+'</span></div>';
+            })() : '<span style=\"font-size:14px;font-family:Arial,sans-serif;color:var(--muted)\">No approver assigned</span>'}
           </div>
-          <button onclick="_fsPickApprover('${catId}')"
+          <button onclick="_fsPickApprover('${catId}',this)"
             style="font-size:14px;padding:4px 12px;background:var(--surf2);
                    border:1px solid var(--border);border-radius:4px;cursor:pointer;
                    color:var(--text2);font-family:Arial,sans-serif;flex-shrink:0">
@@ -253,7 +262,14 @@ async function _fsResolveNames(cat) {
     });
     if (cat.approver_id) {
       const apEl = document.getElementById('fs-approver-display');
-      if (apEl && nameMap[cat.approver_id]) apEl.textContent = nameMap[cat.approver_id];
+      if (nameMap[cat.approver_id]) {
+        cat._approverName = nameMap[cat.approver_id];
+        const apEl = document.getElementById('fs-approver-display');
+        if (apEl) apEl.innerHTML = (() => {
+          const n = cat._approverName, ini = n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+          return '<div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--cad);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0">'+ini+'</div><span style="font-size:14px;font-family:Arial,sans-serif">'+n+'</span></div>';
+        })();
+      }
     }
   } catch(e) { /* names stay as UUIDs */ }
 }
@@ -330,19 +346,24 @@ async function _fsDeleteCategory(catId) {
 // ─────────────────────────────────────────────────────────────────────────────
 // REVIEWER / APPROVER PICKERS
 // ─────────────────────────────────────────────────────────────────────────────
-function _fsAddReviewer(catId) {
+function _fsAddReviewer(catId, anchorEl) {
+  // anchorEl required — PersonPicker.show(anchorEl, onSelect, options)
   const cat = catId === 'new'
     ? { id:'new', reviewer_ids:[], approver_id:null, version_format:'semver' }
     : _fsCats.find(c => c.id === catId);
   if (!cat) return;
   if (window.PersonPicker?.show) {
-    window.PersonPicker.show({ multi:true, title:'Add Reviewers', onSelect: people => {
-      const ids = (Array.isArray(people)?people:[people]).map(p=>p.id||p).filter(Boolean);
-      cat.reviewer_ids = [...new Set([...(cat.reviewer_ids||[]), ...ids])];
+    window.PersonPicker.show(anchorEl, function(person) {
+      if (!person?.id) return;
+      if (!(cat.reviewer_ids||[]).includes(person.id)) {
+        cat.reviewer_ids = [...(cat.reviewer_ids||[]), person.id];
+        cat._reviewerNames = cat._reviewerNames || {};
+        cat._reviewerNames[person.id] = person.name;
+      }
       _fsRenderEditor(catId);
-    }});
+    });
   } else {
-    const id = prompt('Enter reviewer user ID (PersonPicker not available):');
+    const id = prompt('Enter reviewer user ID:');
     if (id?.trim()) { cat.reviewer_ids = [...new Set([...(cat.reviewer_ids||[]),id.trim()])]; _fsRenderEditor(catId); }
   }
 }
@@ -354,16 +375,17 @@ function _fsRemoveReviewer(catId, userId) {
   _fsRenderEditor(catId);
 }
 
-function _fsPickApprover(catId) {
+function _fsPickApprover(catId, anchorEl) {
   const cat = catId === 'new'
     ? { id:'new', reviewer_ids:[], approver_id:null, version_format:'semver' }
     : _fsCats.find(c => c.id === catId);
   if (!cat) return;
   if (window.PersonPicker?.show) {
-    window.PersonPicker.show({ multi:false, title:'Select Approver', onSelect: person => {
-      cat.approver_id = person?.id || person;
+    window.PersonPicker.show(anchorEl, function(person) {
+      cat.approver_id = person.id;
+      cat._approverName = person.name;
       _fsRenderEditor(catId);
-    }});
+    });
   } else {
     const id = prompt('Enter approver user ID:');
     if (id?.trim()) { cat.approver_id = id.trim(); _fsRenderEditor(catId); }
