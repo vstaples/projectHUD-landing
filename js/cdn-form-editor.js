@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-121237
-console.log('%c[cdn-form-editor] v20260331-121237','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260331-121626
+console.log('%c[cdn-form-editor] v20260331-121626','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3333,6 +3333,18 @@ function _formTogglePreview() {
     // Inject role switcher panel
     _formShowRolePanel();
     _formRenderPreviewOverlay();
+    // Scroll canvas so active-stage fields are visible
+    requestAnimationFrame(() => {
+      const stages   = _formGetStages();
+      const stage    = stages.find(s => s.stage === _previewStage);
+      const roleFields = _formFields.filter(f => f.role === (stage?.role || 'reviewer'));
+      if (roleFields.length) {
+        const topField = roleFields.reduce((a,b) => (a.rect?.y||0) < (b.rect?.y||0) ? a : b);
+        const scrollY  = (topField.rect.y * _pdfScale) - 100; // 100px above the field
+        const outerWrap = document.getElementById('form-canvas-wrap');
+        if (outerWrap) outerWrap.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' });
+      }
+    });
   } else {
     // ── Exit preview — clean up ALL preview DOM artifacts ────────────────────
     // 1. Remove all input overlays
@@ -3407,13 +3419,6 @@ function _formRenderPreviewOverlay() {
   const canvas   = document.getElementById('form-pdf-canvas');
   const canvasWrap = canvas?.parentElement;
   if (!canvas || !canvasWrap) return;
-
-  // DEBUG: log all fields on this page
-  const pageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
-  console.log('[PREVIEW DEBUG] page:', _pdfPage, 'total fields:', _formFields.length, 'on this page:', pageFields.length);
-  pageFields.forEach(f => console.log(`  field: type=${f.type} role=${f.role} label="${f.label}" rect=`, f.rect));
-  const dbgStages = _formGetStages();
-  console.log('[PREVIEW DEBUG] stages:', JSON.stringify(dbgStages), 'previewStage:', _previewStage);
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));
@@ -3750,6 +3755,17 @@ function _formPreviewSubmitStage() {
     _formRenderPreviewOverlay();
     _formRefreshRolePanel();
     cadToast(`Stage ${_previewStage-1} submitted — now simulating Stage ${_previewStage}`, 'info');
+    // Scroll to new stage fields
+    requestAnimationFrame(() => {
+      const stages = _formGetStages();
+      const stage  = stages.find(s => s.stage === _previewStage);
+      const roleFields = _formFields.filter(f => f.role === (stage?.role||'reviewer'));
+      if (roleFields.length) {
+        const topField = roleFields.reduce((a,b) => (a.rect?.y||0) < (b.rect?.y||0) ? a : b);
+        const outerWrap = document.getElementById('form-canvas-wrap');
+        if (outerWrap) outerWrap.scrollTo({ top: Math.max(0, topField.rect.y * _pdfScale - 100), behavior:'smooth' });
+      }
+    });
   } else {
     // All stages done — toast and auto-exit
     const total = Object.keys(_previewResponses).filter(k => !k.endsWith('_img') && _previewResponses[k]).length;
