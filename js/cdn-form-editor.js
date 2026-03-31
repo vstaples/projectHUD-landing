@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-041707
-console.log('[cdn-form-editor] LOADED v20260331-041707');
+// VERSION: 20260331-042359
+console.log('[cdn-form-editor] LOADED v20260331-042359');
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +35,8 @@ let _drawingRect     = null;
 let _formMode        = 'select'; // 'select' | 'draw' — controls cursor and interaction
 let _selectedFieldIds = new Set(); // IDs currently selected (multi-select)
 let _marqueeDrag      = null;      // { startX, startY, active } for marquee selection
+let _lastFieldClick   = 0;         // timestamp of last field click (double-click detection)
+let _lastFieldClickId = null;      // field id of last click
 
 // ── Role vocabulary ──────────────────────────────────────────────────────────
 // Maps field.role values to display labels and colours
@@ -176,10 +178,15 @@ function _renderFormEditor() {
       <!-- ── Editor toolbar ─────────────────────────────────────────── -->
       <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-        <span style="font-size:13px;font-weight:500;color:var(--text);
-                     flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          ${escHtml(f.source_name || 'Untitled')}
-        </span>
+        <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
+          style="font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;
+                 background:transparent;border:none;border-bottom:1px solid transparent;
+                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;
+                 transition:border-color .15s"
+          onfocus="this.style.borderBottomColor='var(--cad)'"
+          onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()"
+          title="Click to rename"/>
         <!-- Page navigation -->
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <button id="form-page-prev" onclick="_formPrevPage()" class="btn btn-ghost btn-sm"
@@ -923,17 +930,27 @@ function _formSvgMouseUp(event) {
       const listEl = document.getElementById('form-field-list');
       if (listEl) listEl.innerHTML = _renderFieldList();
     } else {
-      // No movement — it was a click; select field then open popover
+      // No movement — single click = select, double-click = open popover
       const group = event.target.closest('.field-rect-group');
       if (group) {
         const fid = group.dataset.fieldId;
-        if (!_selectedFieldIds.has(fid)) {
-          _selectedFieldIds.clear();
-          _selectedFieldIds.add(fid);
+        const now = Date.now();
+        const isDouble = (now - (_lastFieldClick||0)) < 350 && _lastFieldClickId === fid;
+        _lastFieldClick = now; _lastFieldClickId = fid;
+        if (isDouble) {
+          // Double-click: open edit popover
+          _formSelectField(fid);
+        } else {
+          // Single click: toggle selection
+          if (_svgGroupDrag?.isCopy || event.shiftKey) {
+            _selectedFieldIds.has(fid) ? _selectedFieldIds.delete(fid) : _selectedFieldIds.add(fid);
+          } else {
+            _selectedFieldIds.clear();
+            _selectedFieldIds.add(fid);
+          }
           _formUpdateSelectionUI();
+          _renderFieldOverlays();
         }
-        _renderFieldOverlays();
-        _formSelectField(fid);
       }
     }
 
@@ -1589,7 +1606,7 @@ function _formSelectField(fieldId) {
         <span style="font-size:12px">Required</span>
       </div>
     </div>
-    <button onclick="document.getElementById('field-edit-popover')?.remove()" class="btn btn-ghost btn-sm" style="width:100%;font-size:12px">Done</button>`;
+    <button onclick="document.getElementById('field-edit-popover')?.remove()" style="width:100%;font-size:12px;padding:6px 24px;border-radius:999px;background:var(--cad);color:var(--bg);border:none;cursor:pointer;font-family:Arial,sans-serif;font-weight:600">OK</button>`;
 
   document.body.appendChild(popover);
   setTimeout(() => {
@@ -1876,6 +1893,15 @@ function _formDelete(formId) {
   if (el) renderFormsTab(el);
 }
 
+function _formRenameCurrent(newName) {
+  const name = newName.trim();
+  if (!name || !_selectedForm) return;
+  _selectedForm.source_name = name;
+  // Update list sidebar
+  const listEl = document.getElementById('form-list');
+  if (listEl) listEl.innerHTML = _renderFormList();
+}
+
 async function _formSave() {
   if (!_selectedForm) return;
   _selectedForm.fields  = JSON.parse(JSON.stringify(_formFields));
@@ -2043,6 +2069,13 @@ const _origSvgMouseUp   = _formSvgMouseUp;
 const _formSvgMouseDownOverride = (event) => {
   if (_formMode === 'select') {
     const group = event.target.closest('.field-rect-group');
+    if (group && event.shiftKey) {
+      // Shift+click on field = additive toggle, no drag
+      const fid = group.dataset.fieldId;
+      _selectedFieldIds.has(fid) ? _selectedFieldIds.delete(fid) : _selectedFieldIds.add(fid);
+      _formUpdateSelectionUI(); _renderFieldOverlays();
+      event.preventDefault(); return;
+    }
     if (!group) {
       const svg = document.getElementById('form-field-overlay');
       const svgRect = svg?.getBoundingClientRect();
@@ -2074,9 +2107,31 @@ function _marqueeMouseMove(event) {
   const mr = document.getElementById('form-marquee-rect');
   if (mr) {
     const x=Math.min(mx,_marqueeDrag.startX), y=Math.min(my,_marqueeDrag.startY);
+    const mw=Math.abs(mx-_marqueeDrag.startX), mh=Math.abs(my-_marqueeDrag.startY);
     mr.setAttribute('x',x); mr.setAttribute('y',y);
-    mr.setAttribute('width',Math.abs(mx-_marqueeDrag.startX));
-    mr.setAttribute('height',Math.abs(my-_marqueeDrag.startY));
+    mr.setAttribute('width',mw); mr.setAttribute('height',mh);
+
+    // Live highlight: update _selectedFieldIds as marquee moves
+    const sx=x/_pdfScale, sy=y/_pdfScale, ex=(x+mw)/_pdfScale, ey=(y+mh)/_pdfScale;
+    if (!_marqueeDrag.shiftKey) _selectedFieldIds.clear();
+    _formFields.filter(f=>(f.page||1)===_pdfPage).forEach(f => {
+      const r=f.rect;
+      if (r.x<ex && r.x+r.w>sx && r.y<ey && r.y+r.h>sy) _selectedFieldIds.add(f.id);
+      else if (!_marqueeDrag.shiftKey) _selectedFieldIds.delete(f.id);
+    });
+    _renderFieldOverlays();
+    // Re-append marquee rect (renderFieldOverlays wipes SVG)
+    const svg = _marqueeDrag.svg || document.getElementById('form-field-overlay');
+    const freshMr = document.getElementById('form-marquee-rect');
+    if (!freshMr && svg) {
+      const nr = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      nr.id='form-marquee-rect';
+      nr.setAttribute('x',x); nr.setAttribute('y',y);
+      nr.setAttribute('width',mw); nr.setAttribute('height',mh);
+      nr.setAttribute('fill','rgba(79,142,247,.10)'); nr.setAttribute('stroke','rgba(79,142,247,.9)');
+      nr.setAttribute('stroke-width','1.5'); nr.setAttribute('stroke-dasharray','4 3');
+      nr.style.pointerEvents='none'; svg.appendChild(nr);
+    }
   }
 }
 
