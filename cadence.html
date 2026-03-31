@@ -637,9 +637,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="subnav-item" id="tab-triggers" onclick="switchTab('triggers')">
         ⚡ Triggers
       </div>
-      <div class="subnav-item" id="tab-form-settings" onclick="switchTab('form-settings')">
-        ⚙ Form Settings
-      </div>
     </div>
 
     <!-- Content -->
@@ -704,10 +701,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
      Person selection: use window.PersonPicker.show() — see cdn-assignee.js.
      Timestamp formatting: use fmtTs()/fmtTsShort() from cdn-coc.js.
 -->
+<script>
+if (typeof _stopElapsedTimer === "undefined") window._stopElapsedTimer = function() {};
+if (typeof _startElapsedTimer === "undefined") window._startElapsedTimer = function() {};
+</script>
 <script src="/js/cdn-core-state.js"></script>
 <script src="/js/cdn-utils.js"></script>
-<script src="/js/cdn-form-editor.js"></script>
-<script src="/js/cdn-form-settings.js"></script>
+<script src="/js/cdn-form-editor.js?v=20260331121014"></script>
 <script src="/js/cdn-assignee.js"></script>
 <script src="/js/cdn-outcomes.js"></script>
 <script src="/js/cdn-documents.js"></script>
