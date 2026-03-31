@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-186000
-console.log('%c[cdn-form-editor] v20260401-186000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-187000
+console.log('%c[cdn-form-editor] v20260401-187000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3675,16 +3675,28 @@ function _formRenderPreviewOverlay() {
       wrap.textContent         = val || '';
 
     } else if (field.type === 'checkbox') {
+      // Checkboxes: the detected rect often spans the full text line.
+      // Override wrap to be a small square anchored at the rect's x,y (where the
+      // actual box appears on the PDF) rather than centered in the wide rect.
+      const cbSz = Math.round(Math.min(h, w, 16) * _pdfScale / _pdfScale); // natural size
+      const sz   = Math.max(10, Math.min(h * 0.85, 18));  // 10–18px, proportional to field height
+      wrap.style.width           = sz + 'px';
+      wrap.style.height          = sz + 'px';
       wrap.style.display         = 'flex';
       wrap.style.alignItems      = 'center';
       wrap.style.justifyContent  = 'center';
-      const sz = Math.min(h * 0.75, w * 0.75, 22);
+      wrap.style.background      = 'transparent';
+      wrap.style.border          = 'none';
+      wrap.style.overflow        = 'visible';
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.checked = val === 'true';
-      cb.style.width  = sz + 'px';
-      cb.style.height = sz + 'px';
-      cb.style.cursor = 'pointer';
+      cb.style.width       = sz + 'px';
+      cb.style.height      = sz + 'px';
+      cb.style.cursor      = 'pointer';
+      cb.style.margin      = '0';
+      cb.style.flexShrink  = '0';
       cb.style.accentColor = '#3b82f6';
+      cb.style.pointerEvents = 'auto';
       cb.addEventListener('change', () => { _previewResponses[field.id] = String(cb.checked); });
       wrap.appendChild(cb);
 
