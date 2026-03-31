@@ -439,20 +439,19 @@ window.FormSettings = {
   getCategoryById: id => _fsCats.find(c => c.id === id),
 };
 
-// Patch switchTab to intercept form-settings tab only
-// IMPORTANT: must call through for ALL other tabs so renderFormsTab etc. stay reachable
+// Patch switchTab — intercept form-settings tab only, pass all others through
 const _origSwitchTabFS = typeof switchTab === 'function' ? switchTab : null;
 if (_origSwitchTabFS) {
   window.switchTab = function(tab) {
     if (tab === 'form-settings') {
-      // Handle nav highlight ourselves then render settings
       document.querySelectorAll('.subnav-item').forEach(el => el.classList.remove('active'));
       const tabEl = document.getElementById('tab-form-settings');
       if (tabEl) tabEl.classList.add('active');
       const content = document.getElementById('cad-content');
       if (content) renderFormSettingsTab(content);
-      return; // do NOT call through — core-state doesn't know this tab
+      return; // handled — do NOT pass to core-state
     }
-    _origSwitchTabFS(tab); // all other tabs handled normally
+    _origSwitchTabFS(tab); // all other tabs pass through normally
   };
+}
 }
