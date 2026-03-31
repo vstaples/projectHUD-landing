@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-113939
-console.log('[cdn-form-editor] LOADED v20260331-113939');
+// VERSION: 20260331-114734
+console.log('[cdn-form-editor] LOADED v20260331-114734');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3524,45 +3524,34 @@ function _formRenderPreviewOverlay() {
       wrap.appendChild(ta);
 
     } else if (field.type === 'attendees') {
-      wrap.style.overflow = 'visible'; // popover extends beyond field bounds
-      const attH = h; // already scaled pixels
-      _formPreviewAttendeesField(wrap, field, val, attH, fs);
+      wrap.style.setProperty('overflow', 'visible', 'important');
+      wrap.style.zIndex = '20';
+      _formPreviewAttendeesField(wrap, field, val, h, fs);
 
     } else if (field.type === 'date') {
-      // type=text for date — browser date input ignores custom height & font
       const inp = document.createElement('input');
       inp.type = 'text';
-      inp.placeholder = 'Date';
+      inp.placeholder = 'MM/DD/YYYY';
+      inp.maxLength = 10;
       inp.value = val;
       inp.style.cssText = BASE_STYLE;
-      inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
-      // Auto-format: insert slashes as user types
-      inp.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' || e.key === 'Delete') return;
-        const v = inp.value.replace(/\D/g,'');
-        if (v.length === 2 || v.length === 4) inp.value = inp.value + '/';
+      inp.addEventListener('input', () => {
+        // Reformat: strip non-digits, insert slashes at positions 2 and 4
+        const cursor = inp.selectionStart;
+        const digits = inp.value.replace(/\D/g, '').slice(0, 8);
+        let formatted = digits;
+        if (digits.length > 4) formatted = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4);
+        else if (digits.length > 2) formatted = digits.slice(0,2) + '/' + digits.slice(2);
+        inp.value = formatted;
+        _previewResponses[field.id] = formatted;
       });
       wrap.appendChild(inp);
 
     } else {
       // text / number
       const inp = document.createElement('input');
-      if (field.type === 'date') {
-        inp.type = 'text';
-        inp.placeholder = 'Date';
-        inp.maxLength = 10;
-        inp.addEventListener('input', () => {
-          let d = inp.value.replace(/\D/g,'').slice(0,8);
-          if (d.length > 4) d = d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4);
-          else if (d.length > 2) d = d.slice(0,2)+'/'+d.slice(2);
-          inp.value = d;
-          _previewResponses[field.id] = d;
-        });
-      } else {
-        inp.type = field.type === 'number' ? 'number' : 'text';
-        inp.placeholder = field.label || '';
-        inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
-      }
+      inp.type = field.type === 'number' ? 'number' : 'text';
+      inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
       inp.value = val;
       inp.setAttribute('style', BASE_STYLE);
       wrap.appendChild(inp);
@@ -3590,7 +3579,7 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.value = val || (_previewResponses[field.id] || '');
-      inp.placeholder = 'Sign here…';
+      inp.placeholder = field.label || 'Sign here…';
       // setAttribute bypasses the global !important font rule
       inp.setAttribute('style',
         `flex:1;width:calc(100% - 24px);height:${h}px;background:transparent;border:none;outline:none;` +
@@ -3816,9 +3805,8 @@ function _formPreviewAttendeesField(wrap, field, existingVal, h, fs) {
 
     // Compact name list inside the cell
     const summary = document.createElement('span');
-    summary.style.cssText = 'flex:1;font-size:${Math.max(9,h*0.75)}px;color:#111;' +
-      'font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-    summary.style.fontSize = (fs || Math.max(9, h*0.82)) + 'px';
+    summary.style.cssText = `flex:1;font-size:${Math.max(10, fs||0, (h||18)*0.75)}px;color:#111;
+      font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
     summary.textContent = attendees.length
       ? attendees.map(a=>a.name||a).join(', ')
       : '';
