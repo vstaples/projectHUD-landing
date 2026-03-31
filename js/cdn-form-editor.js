@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-102545
-console.log('[cdn-form-editor] LOADED v20260331-102545');
+// VERSION: 20260331-103248
+console.log('[cdn-form-editor] LOADED v20260331-103248');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3289,19 +3289,17 @@ function _formTogglePreview() {
 }
 
 function _formGetStages() {
-  const stages = _formRouting?.stages || [];
-  // If stages are configured, use them
-  if (stages.length > 1) return stages;
-  // Single-stage or no stages — derive from unique roles present in fields
-  // to give reviewer/approver their own simulate slots
+  // For PREVIEW: always derive stages from all unique roles in fields
+  // This ensures Reviewer/Approver always get their own simulate step
   const roleOrder = ['assignee','pm','reviewer','external'];
   const presentRoles = [...new Set(_formFields.map(f => f.role||'assignee'))]
-    .sort((a,b) => roleOrder.indexOf(a) - roleOrder.indexOf(b));
-  if (presentRoles.length > 1) {
+    .sort((a,b) => {
+      const ai = roleOrder.indexOf(a), bi = roleOrder.indexOf(b);
+      return (ai<0?99:ai) - (bi<0?99:bi);
+    });
+  if (presentRoles.length) {
     return presentRoles.map((role, i) => ({ stage: i+1, role }));
   }
-  // Fall back to configured stages (even if only 1)
-  if (stages.length) return stages;
   return [{ stage:1, role:'assignee' }];
 }
 
@@ -3420,13 +3418,18 @@ function _formRenderPreviewOverlay() {
     } else {
       // text / date / number
       const inp = document.createElement('input');
-      inp.type  = field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text';
+      // Use text for date in preview — browser date input ignores custom height/font
+      inp.type  = field.type === 'number' ? 'number' : 'text';
+      if (field.type === 'date') {
+        inp.placeholder = 'MM/DD/YYYY';
+        inp.dataset.fieldType = 'date';
+      }
       inp.value = val;
       inp.placeholder = field.label || '';
       inp.style.cssText = `width:100%;height:100%;box-sizing:border-box;
         background:rgba(255,255,255,.88);border:1.5px solid var(--accent);border-radius:2px;
-        color:#111;font-family:Arial,sans-serif;font-size:${Math.max(9,h*0.82)}px;line-height:${h}px;
-        padding:0 4px;outline:none;`;
+        color:#111;font-family:Arial,sans-serif;font-size:${Math.max(9,h*0.85)}px;
+        padding:0 4px;outline:none;display:flex;align-items:center;`;
       inp.addEventListener('input', () => { _previewResponses[field.id] = inp.value; });
       wrap.appendChild(inp);
     }
@@ -3453,10 +3456,10 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
       inp.type = 'text';
       inp.value = val || (_previewResponses[field.id] || '');
       inp.placeholder = 'Type your name…';
-      inp.className = 'form-preview-sig-type';
-      inp.style.cssText = `flex:1;width:100%;background:transparent;border:none;outline:none;
-        font-family:'Dancing Script',cursive;font-size:${Math.max(12, h*0.82)}px;
-        color:#0a2280;padding:0 6px;font-weight:600;line-height:${h}px;`;
+      // Force Dancing Script — override any global font rule
+      inp.setAttribute('style', `flex:1;width:100%;background:transparent;border:none;outline:none;
+        font-family:'Dancing Script',cursive !important;font-size:${Math.max(12, h*0.82)}px !important;
+        color:#0a2280;padding:0 6px;font-weight:600;`);
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
         if (inp.value.trim().length > 1) _formPreviewAutoDate(field);
@@ -3525,13 +3528,20 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
     }
   };
 
-  // Load Dancing Script font if not already loaded
+  // Ensure Dancing Script is loaded — inject link synchronously and await font
   if (!document.getElementById('dancing-script-font')) {
     const link = document.createElement('link');
     link.id = 'dancing-script-font';
     link.rel = 'stylesheet';
     link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap';
     document.head.appendChild(link);
+  }
+  // Also add @font-face override so the !important style rule works
+  if (!document.getElementById('sig-font-override')) {
+    const s = document.createElement('style');
+    s.id = 'sig-font-override';
+    s.textContent = `.form-preview-sig-type, input[data-sig='1'] { font-family:'Dancing Script',cursive !important; }`;
+    document.head.appendChild(s);
   }
 
   renderSig();
@@ -3598,7 +3608,8 @@ function _formPopOutPreview() {
 //   e.g. sig "Reviewer Signature" → date "Reviewer Date"
 // ─────────────────────────────────────────────────────────────────────────────
 function _formPreviewAutoDate(sigField) {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const d = new Date();
+  const today = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; // MM/DD/YYYY
   // Extract keyword from sig label (first word that isn't "Signature"/"Sign"/"Auth")
   const stopWords = new Set(['signature','sign','authorized','approval','approver','by','date','field']);
   const sigWords  = (sigField.label||'').toLowerCase().split(/\s+/).filter(w => !stopWords.has(w) && w.length > 2);
@@ -3643,52 +3654,98 @@ function _formPreviewAutoDate(sigField) {
 
 
 function _formPreviewAttendeesField(wrap, field, existingVal) {
-  // Parse existing attendees from JSON or comma-separated
   let attendees = [];
   try { attendees = JSON.parse(existingVal || '[]'); } catch(e) { attendees = []; }
 
-  wrap.style.cssText += ';background:rgba(255,255,255,.85);border:1.5px solid var(--accent);' +
-    'border-radius:3px;display:flex;flex-direction:column;overflow:hidden;padding:2px;';
+  // The field cell is small — render a compact summary inside the cell
+  // and an expanded popover above it for chip management
+  wrap.style.cssText += ';background:rgba(255,255,255,.88);border:1.5px solid #3b82f6;' +
+    'border-radius:3px;overflow:visible;cursor:pointer;display:flex;align-items:center;' +
+    'padding:0 4px;gap:4px;position:relative;';
 
-  const refresh = () => {
+  const renderCell = () => {
     wrap.innerHTML = '';
-    // Chips row
-    const chips = document.createElement('div');
-    chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;flex:1;overflow-y:auto;';
-    attendees.forEach((a, i) => {
-      const chip = document.createElement('span');
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px;' +
-        'background:#dbeafe;border:1px solid #3b82f6;border-radius:3px;' +
-        'font-size:12px;color:#1e3a8a;font-family:Arial,sans-serif;white-space:nowrap;font-weight:500;';
-      chip.textContent = a.name || a;
-      const rm = document.createElement('span');
-      rm.textContent = '×'; rm.style.cssText = 'cursor:pointer;color:#c0404a;font-weight:700;margin-left:2px;';
-      rm.onclick = () => { attendees.splice(i,1); _previewResponses[field.id]=JSON.stringify(attendees); refresh(); };
-      chip.appendChild(rm);
-      chips.appendChild(chip);
-    });
-    wrap.appendChild(chips);
-    // Add button
+
+    // Compact name list inside the cell
+    const summary = document.createElement('span');
+    summary.style.cssText = 'flex:1;font-size:${Math.max(9,h*0.75)}px;color:#111;' +
+      'font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    summary.style.fontSize = Math.max(9, parseInt(wrap.style.height||'18')*0.75) + 'px';
+    summary.textContent = attendees.length
+      ? attendees.map(a=>a.name||a).join(', ')
+      : '';
+
     const addBtn = document.createElement('button');
     addBtn.textContent = '+ Add';
-    addBtn.style.cssText = 'font-size:10px;padding:1px 6px;background:transparent;border:1px solid var(--accent);' +
-      'border-radius:3px;cursor:pointer;color:var(--accent);font-family:Arial,sans-serif;flex-shrink:0;align-self:flex-end;';
-    addBtn.onclick = () => {
+    addBtn.style.cssText = 'font-size:11px;padding:1px 6px;background:#3b82f6;border:none;' +
+      'border-radius:3px;cursor:pointer;color:white;font-family:Arial,sans-serif;flex-shrink:0;font-weight:600;';
+    addBtn.onclick = (e) => {
+      e.stopPropagation();
       if (window.PersonPicker?.show) {
         window.PersonPicker.show(addBtn, function(person) {
           if (!person?.id) return;
           if (!attendees.find(a => a.id === person.id)) {
             attendees.push({ id:person.id, name:person.name });
             _previewResponses[field.id] = JSON.stringify(attendees);
-            refresh();
+            renderCell();
           }
         });
       }
     };
+
+    wrap.appendChild(summary);
     wrap.appendChild(addBtn);
+
+    // Click on the cell (not the button) to open chip manager popover
+    if (attendees.length) {
+      summary.onclick = (e) => { e.stopPropagation(); renderPopover(); };
+    }
   };
 
-  refresh();
+  const renderPopover = () => {
+    document.getElementById('att-popover-'+field.id)?.remove();
+    const pop = document.createElement('div');
+    pop.id = 'att-popover-' + field.id;
+    pop.style.cssText = 'position:absolute;bottom:calc(100% + 4px);left:0;z-index:200;' +
+      'background:white;border:1.5px solid #3b82f6;border-radius:6px;padding:8px;' +
+      'min-width:200px;max-width:300px;box-shadow:0 4px 20px rgba(0,0,0,.25);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:12px;font-weight:700;color:#1e3a8a;margin-bottom:6px;font-family:Arial,sans-serif;';
+    title.textContent = 'Attendees';
+    pop.appendChild(title);
+
+    attendees.forEach((a, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 0;';
+      const name = document.createElement('span');
+      name.style.cssText = 'flex:1;font-size:13px;color:#111;font-family:Arial,sans-serif;';
+      name.textContent = a.name || a;
+      const rm = document.createElement('button');
+      rm.textContent = '✕';
+      rm.style.cssText = 'background:none;border:none;cursor:pointer;color:#dc2626;font-size:13px;padding:0;font-weight:700;';
+      rm.onclick = () => {
+        attendees.splice(i,1);
+        _previewResponses[field.id] = JSON.stringify(attendees);
+        pop.remove(); renderCell(); if (attendees.length) renderPopover();
+      };
+      row.appendChild(name); row.appendChild(rm);
+      pop.appendChild(row);
+    });
+
+    const closeBtn = document.createElement('div');
+    closeBtn.style.cssText = 'margin-top:6px;font-size:11px;color:#6b7280;cursor:pointer;text-align:right;font-family:Arial,sans-serif;';
+    closeBtn.textContent = '✕ Close';
+    closeBtn.onclick = () => pop.remove();
+    pop.appendChild(closeBtn);
+
+    wrap.appendChild(pop);
+    setTimeout(() => document.addEventListener('click', function _c(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click',_c); }
+    }), 50);
+  };
+
+  renderCell();
 }
 
 
