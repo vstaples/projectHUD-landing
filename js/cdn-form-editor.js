@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-115459
-console.log('[cdn-form-editor] LOADED v20260331-115459');
+// VERSION: 20260331-115910
+console.log('[cdn-form-editor] LOADED v20260331-115910');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3410,6 +3410,13 @@ function _formRenderPreviewOverlay() {
   const canvas   = document.getElementById('form-pdf-canvas');
   const canvasWrap = canvas?.parentElement;
   if (!canvas || !canvasWrap) return;
+
+  // DEBUG: log all fields on this page
+  const pageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
+  console.log('[PREVIEW DEBUG] page:', _pdfPage, 'total fields:', _formFields.length, 'on this page:', pageFields.length);
+  pageFields.forEach(f => console.log(`  field: type=${f.type} role=${f.role} label="${f.label}" rect=`, f.rect));
+  const stages = _formGetStages();
+  console.log('[PREVIEW DEBUG] stages:', JSON.stringify(stages), 'previewStage:', _previewStage);
 
   const activeFields = _formFieldsForStage(_previewStage);
   const activeIds    = new Set(activeFields.map(f => f.id));
