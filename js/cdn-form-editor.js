@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-160000
-console.log('%c[cdn-form-editor] v20260401-160000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-170000
+console.log('%c[cdn-form-editor] v20260401-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -410,12 +410,7 @@ function _renderFormEditor() {
           <span style="font-size:13px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
                        color:var(--muted);font-family:Arial,sans-serif;line-height:1.4">${f.version||'0.1.0'}</span>
-          ${(() => {
-            const cat = window.FormSettings?.getCategoryById?.(f.category_id);
-            return cat
-              ? `<span style="font-size:13px;padding:3px 10px;border-radius:4px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif;line-height:1.4">${escHtml(cat.name)}</span>`
-              : `<button onclick="_formPickCategory()" style="font-size:13px;padding:3px 10px;border-radius:4px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
-          })()}
+          <span id="form-category-pill">${_formCategoryPill(f)}</span>
         </div>
 
         <!-- H/W widget — shown when fields selected -->
@@ -2284,6 +2279,24 @@ function _formUpdateSaveBtn() {
   btn.style.fontSize = '12px';
 }
 
+// Renders the category pill (clickable if assigned) or + Category button
+function _formCategoryPill(f) {
+  const cat = window.FormSettings?.getCategoryById?.(f.category_id);
+  if (cat) {
+    // Assigned — show amber pill, clicking reopens picker to change it
+    return `<button onclick="_formPickCategory()"
+      title="Click to change category"
+      style="font-size:13px;padding:3px 10px;border-radius:4px;
+             background:var(--cad-dim);border:1px solid var(--cad-wire);
+             color:var(--cad);font-family:Arial,sans-serif;line-height:1.4;
+             cursor:pointer">${escHtml(cat.name)}</button>`;
+  }
+  return `<button onclick="_formPickCategory()"
+    style="font-size:13px;padding:3px 10px;border-radius:4px;background:transparent;
+           border:1px solid var(--border);color:var(--muted);cursor:pointer;
+           font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
+}
+
 function _formLifecycleButtons(f) {
   const state  = f.state || 'draft';
   const isEdit = ['draft','unreleased','rejected_review','rejected_approval'].includes(state);
@@ -2547,12 +2560,15 @@ function _formRefreshToolbar() {
   // Re-render just the lifecycle buttons
   const lcDiv = document.getElementById('form-lifecycle-btns');
   if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(f);
-  // Re-render state/version/category pills
+  // Refresh state badge
   const stateBadge = document.getElementById('form-state-badge');
   if (stateBadge) {
     stateBadge.textContent = _formStateLabel(f.state || 'draft');
     stateBadge.style.color = _formStateColor(f.state || 'draft');
   }
+  // Refresh category pill — this is the one that was previously not updating
+  const catPill = document.getElementById('form-category-pill');
+  if (catPill) catPill.innerHTML = _formCategoryPill(f);
   // Re-render form list to pick up any name/state changes
   const listEl = document.getElementById('form-list');
   if (listEl) listEl.innerHTML = _renderFormList();
