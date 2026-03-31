@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-182000
-console.log('%c[cdn-form-editor] v20260401-182000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-183000
+console.log('%c[cdn-form-editor] v20260401-183000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3598,29 +3598,25 @@ function _formRenderPreviewOverlay() {
   const canvas = document.getElementById('form-pdf-canvas');
   if (!canvas) return;
 
-  // Overlay container strategy:
-  // Append to form-canvas-wrap (position:relative, overflow:auto) and offset
-  // by the canvas BCR relative to form-canvas-wrap BCR. This correctly accounts
-  // for the centering padding (24px 40px) and any scroll offset.
-  // canvas.parentElement is inline-block with no resolved offsetParent at runtime.
+  // Overlay strategy: insert previewContainer as the NEXT SIBLING of the canvas
+  // inside canvas.parentElement (the inline-block div). Since it shares the same
+  // parent, top:0/left:0 aligns it exactly with the canvas with no offset math needed.
+  // We force position:relative on the parent so absolute children resolve correctly.
   let previewContainer = document.getElementById('form-preview-container');
-  const scrollWrap  = document.getElementById('form-canvas-wrap');  // position:relative anchor
-  const canvasR     = canvas.getBoundingClientRect();
-  const wrapR       = scrollWrap.getBoundingClientRect();
-  // Add scrollWrap.scrollTop/Left so position stays correct when scrolled
-  const offL        = canvasR.left - wrapR.left + scrollWrap.scrollLeft;
-  const offT        = canvasR.top  - wrapR.top  + scrollWrap.scrollTop;
-  const cssW        = canvasR.width;
-  const cssH        = canvasR.height;
+  const canvasParent = canvas.parentElement;
+  canvasParent.style.position = 'relative';   // ensure it resolves as offsetParent
+  const cssW = canvas.offsetWidth;
+  const cssH = canvas.offsetHeight;
   if (!previewContainer) {
     previewContainer = document.createElement('div');
     previewContainer.id = 'form-preview-container';
-    scrollWrap.appendChild(previewContainer);
+    // Insert immediately after the canvas (before SVG overlay) so z-index works
+    canvasParent.insertBefore(previewContainer, canvas.nextSibling);
   }
   previewContainer.style.cssText = [
     'position:absolute',
-    `top:${offT}px`,
-    `left:${offL}px`,
+    'top:0',
+    'left:0',
     `width:${cssW}px`,
     `height:${cssH}px`,
     'pointer-events:none',
