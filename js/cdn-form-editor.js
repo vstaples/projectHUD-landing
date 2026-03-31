@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-061516
-console.log('[cdn-form-editor] LOADED v20260331-061516');
+// VERSION: 20260331-061955
+console.log('[cdn-form-editor] LOADED v20260331-061955');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -166,8 +166,15 @@ function renderFormsTab(el) {
     <div style="display:flex;width:100%;height:100%;overflow:hidden">
 
       <!-- ── Left column: form list ───────────────────────────────── -->
-      <div style="width:220px;min-width:220px;border-right:1px solid var(--border);
-                  display:flex;flex-direction:column;background:var(--bg1)">
+      <div id="form-lib-col" style="width:220px;min-width:160px;max-width:400px;
+                  border-right:1px solid var(--border);display:flex;flex-direction:column;
+                  background:var(--bg1);position:relative;flex-shrink:0">
+        <!-- Drag handle on right edge -->
+        <div style="position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;
+                    z-index:10;background:transparent;transition:background .15s"
+          onmouseover="this.style.background='rgba(196,125,24,.3)'"
+          onmouseout="if(!window._formDragCol)this.style.background='transparent'"
+          onmousedown="_formColDragStart(event,'form-lib-col','right')"></div>
         <div style="padding:10px 14px;border-bottom:1px solid var(--border);
                     display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
           <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
@@ -270,11 +277,11 @@ function _renderFormEditor() {
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
                   font-family:Arial,sans-serif;font-size:12px">
 
-        <!-- Name (editable) — fixed width so it never collapses -->
+        <!-- Name (editable) -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
-          style="font-size:12px;font-weight:600;color:var(--text);width:160px;
+          style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:100px;
                  background:transparent;border:none;border-bottom:1px solid transparent;
-                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;flex-shrink:0;
+                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;
                  transition:border-color .15s"
           onfocus="this.style.borderBottomColor='var(--cad)'"
           onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
@@ -284,17 +291,17 @@ function _renderFormEditor() {
 
         <!-- State · Version · Category — pill group -->
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <span style="font-size:12px;padding:3px 10px;border-radius:4px;
+          <span style="font-size:13px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
                        color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif;
                        line-height:1.4">${_formStateLabel(f.state||'draft')}</span>
-          <span style="font-size:12px;padding:3px 10px;border-radius:4px;
+          <span style="font-size:13px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
                        color:var(--muted);font-family:Arial,sans-serif;
                        line-height:1.4">${f.version||'0.1.0'}</span>
           ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat
-            ? `<span style="font-size:12px;padding:3px 10px;border-radius:4px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif;line-height:1.4">${escHtml(cat.name)}</span>`
-            : `<button onclick="_formPickCategory()" style="font-size:12px;padding:3px 10px;border-radius:4px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
+            ? `<span style="font-size:13px;padding:3px 10px;border-radius:4px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif;line-height:1.4">${escHtml(cat.name)}</span>`
+            : `<button onclick="_formPickCategory()" style="font-size:13px;padding:3px 10px;border-radius:4px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
           })()}
         </div>
 
@@ -303,13 +310,13 @@ function _renderFormEditor() {
         <!-- Page navigation -->
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           <button id="form-page-prev" onclick="_formPrevPage()"
-            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">‹</button>
+            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">‹</button>
           <span id="form-page-indicator"
-            style="font-size:12px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif">
+            style="font-size:13px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif">
             ${_pdfPage} / ${_pdfTotalPages}
           </span>
           <button id="form-page-next" onclick="_formNextPage()"
-            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">›</button>
+            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">›</button>
         </div>
 
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
@@ -317,14 +324,14 @@ function _renderFormEditor() {
         <!-- Zoom -->
         <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
           <button onclick="_formZoomOut()"
-            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom out">−</button>
+            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom out">−</button>
           <span id="form-zoom-label"
-            style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;min-width:40px;text-align:center;cursor:pointer"
+            style="font-size:13px;color:var(--muted);font-family:Arial,sans-serif;min-width:44px;text-align:center;cursor:pointer"
             onclick="_formZoomReset()" title="Click to reset">${Math.round(_pdfScale * 100 / 1.5)}%</span>
           <button onclick="_formZoomIn()"
-            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom in">+</button>
+            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom in">+</button>
           <button onclick="_formZoomFit()"
-            style="font-size:12px;padding:2px 7px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Fit to width">⊡</button>
+            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Fit to width">⊡</button>
         </div>
 
         <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
@@ -333,11 +340,11 @@ function _renderFormEditor() {
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
           <button id="form-mode-select" onclick="_formSetMode('select')"
             title="Select & move fields (S)"
-            style="padding:3px 12px;font-size:12px;font-family:Arial,sans-serif;border:none;cursor:pointer;
+            style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;cursor:pointer;
                    background:var(--cad);color:var(--bg);transition:all .12s;line-height:1.4">⊹ Select</button>
           <button id="form-mode-draw" onclick="_formSetMode('draw')"
             title="Draw new field (D)"
-            style="padding:3px 12px;font-size:12px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
+            style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
                    cursor:pointer;background:transparent;color:var(--muted);transition:all .12s;line-height:1.4">✎ Draw</button>
         </div>
         <!-- H/W size widget — shown when fields selected -->
@@ -1269,10 +1276,11 @@ async function _renderPdfPage(pageNum) {
 // COLUMN DRAG-TO-RESIZE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _formColDragStart(event, colId) {
+function _formColDragStart(event, colId, direction) {
   const col = document.getElementById(colId);
   if (!col) return;
   window._formDragCol    = colId;
+  window._formDragDir    = direction || 'left'; // 'left' = handle on left edge; 'right' = right edge
   window._formDragStartX = event.clientX;
   window._formDragStartW = col.offsetWidth;
   document.body.style.cursor     = 'col-resize';
@@ -1284,7 +1292,10 @@ document.addEventListener('mousemove', e => {
   if (!window._formDragCol) return;
   const col = document.getElementById(window._formDragCol);
   if (!col) return;
-  const delta  = window._formDragStartX - e.clientX;
+  // 'left' handle: drag right → smaller; 'right' handle: drag right → wider
+  const delta  = window._formDragDir === 'right'
+    ? e.clientX - window._formDragStartX
+    : window._formDragStartX - e.clientX;
   const minW   = parseInt(col.style.minWidth) || 140;
   const maxW   = parseInt(col.style.maxWidth) || 480;
   const newW   = Math.max(minW, Math.min(maxW, window._formDragStartW + delta));
@@ -2148,17 +2159,17 @@ function _formLifecycleButtons(f) {
   // Separator then Remove
   btns.push(`<div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>`);
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formDeleteWithConfirm('${f.id}')"
-    style="color:var(--red);font-size:12px">🗑 Remove</button>`);
+    style="color:var(--red);font-size:13px;font-family:Arial,sans-serif">🗑 Remove</button>`);
   btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formToggleCoC()" id="form-coc-btn"
-    title="Chain of Custody history">CoC</button>`);
+    title="Chain of Custody history" style="font-size:13px;font-family:Arial,sans-serif">CoC</button>`);
 
   if (state === 'draft' || state === 'unreleased') {
     btns.push(`<button id="form-save-btn" class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}" onclick="_formSave()" style="font-size:12px">Save</button>`);
     if (f.category_id) {
-      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()" style="font-size:12px">Submit for Review →</button>`);
+      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()" style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
     } else {
       // No category = no approval gate — can release directly
-      btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:12px;padding:3px 12px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">Release</button>`);
+      btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:13px;padding:4px 14px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">Release</button>`);
     }
   }
 
