@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-120348
-console.log('[cdn-form-editor] LOADED v20260331-120348');
+// VERSION: 20260331-120703
+console.log('[cdn-form-editor] LOADED v20260331-120703');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3566,8 +3566,14 @@ function _formRenderPreviewOverlay() {
     }
 
     canvasWrap.style.position = 'relative';
-    canvasWrap.style.overflow = 'visible'; // allow attendees/sig popovers to escape
+    canvasWrap.style.overflow = 'visible';
+    if (field.type === 'signature' || field.type === 'attendees') {
+      console.log(`[PREVIEW] appending ${field.type} wrap: left=${wrap.style.left} top=${wrap.style.top} w=${wrap.style.width} h=${wrap.style.height} overflow=${wrap.style.overflow}`);
+    }
     canvasWrap.appendChild(wrap);
+    if (field.type === 'signature' || field.type === 'attendees') {
+      console.log(`[PREVIEW] wrap in DOM:`, wrap.getBoundingClientRect(), 'visible:', wrap.offsetParent !== null);
+    }
   });
 }
 
@@ -3840,6 +3846,8 @@ function _formPreviewAttendeesField(wrap, field, existingVal, h, fs) {
 
   const renderCell = () => {
     wrap.innerHTML = '';
+    // Restore overflow after innerHTML wipe
+    wrap.style.setProperty('overflow', 'visible', 'important');
 
     // Compact name list inside the cell
     const summary = document.createElement('span');
