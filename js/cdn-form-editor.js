@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-094719
-console.log('[cdn-form-editor] LOADED v20260331-094719');
+// VERSION: 20260331-095637
+console.log('[cdn-form-editor] LOADED v20260331-095637');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -105,7 +105,7 @@ const FORM_ROLES = {
 const FIELD_TYPES = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea'];
 
 // Extended type list including review (4-state) and doc_ref (paired number+rev)
-const FIELD_TYPES_FULL = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea', 'review', 'doc_ref'];
+const FIELD_TYPES_FULL = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea', 'review', 'doc_ref', 'attendees'];
 
 const FIELD_TYPE_META = {
   text:      { icon: 'T',  label: 'Text',      color: 'var(--text2)' },
@@ -116,6 +116,7 @@ const FIELD_TYPE_META = {
   textarea:  { icon: '¶', label: 'Textarea',  color: 'var(--text2)' },
   review:    { icon: '◑', label: 'Review',    color: '#00b9c3' },
   doc_ref:   { icon: '⎘', label: 'Doc Ref',   color: 'var(--accent)' },
+  attendees: { icon: '👥', label: 'Attendees', color: 'var(--green)' },
 };
 
 const REVIEW_VALUES  = ['', 'pass', 'fail', 'na'];
@@ -3389,6 +3390,9 @@ function _formRenderPreviewOverlay() {
       ta.addEventListener('input', () => { _previewResponses[field.id] = ta.value; });
       wrap.appendChild(ta);
 
+    } else if (field.type === 'attendees') {
+      _formPreviewAttendeesField(wrap, field, val);
+
     } else {
       // text / date / number
       const inp = document.createElement('input');
@@ -3429,6 +3433,7 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
         color:#1a3a8a;padding:2px 6px;`;
       inp.addEventListener('input', () => {
         _previewResponses[field.id] = inp.value;
+        if (inp.value.trim().length > 1) _formPreviewAutoDate(field);
       });
       wrap.appendChild(inp);
       const toggle = document.createElement('div');
@@ -3471,6 +3476,7 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
           drawing = false;
           _previewResponses[field.id + '_img'] = cv.toDataURL();
           _previewResponses[field.id] = '[signature]';
+          _formPreviewAutoDate(field);
         }
       };
       cv.addEventListener('mouseup', stopDraw);
@@ -3579,6 +3585,106 @@ function _formPopOutPreview() {
 
 // Keyboard shortcut P = toggle preview
 // (wired into existing keydown listener)
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-DATE — fill nearest matching date field when signature is given
+// Matching: date field whose label shares a keyword with the sig field label
+//   e.g. sig "Reviewer Signature" → date "Reviewer Date"
+// ─────────────────────────────────────────────────────────────────────────────
+function _formPreviewAutoDate(sigField) {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  // Extract keyword from sig label (first word that isn't "Signature"/"Sign"/"Auth")
+  const stopWords = new Set(['signature','sign','authorized','approval','approver','by','date','field']);
+  const sigWords  = (sigField.label||'').toLowerCase().split(/\s+/).filter(w => !stopWords.has(w) && w.length > 2);
+
+  // Find best matching date field on same page
+  const dateFields = _formFields.filter(f =>
+    f.type === 'date' && (f.page||1) === (sigField.page||1) && f.id !== sigField.id
+  );
+  if (!dateFields.length) return;
+
+  let best = null, bestScore = 0;
+  dateFields.forEach(df => {
+    const dWords = (df.label||'').toLowerCase().split(/\s+/);
+    // Score = number of shared keywords
+    const score = sigWords.filter(w => dWords.some(dw => dw.includes(w) || w.includes(dw))).length;
+    // Fallback: same role
+    const roleBonus = df.role === sigField.role ? 0.5 : 0;
+    // Proximity bonus: closer vertically = better
+    const dist = Math.abs((df.rect?.y||0) - (sigField.rect?.y||0));
+    const proxBonus = dist < 50 ? 0.3 : 0;
+    const total = score + roleBonus + proxBonus;
+    if (total > bestScore) { bestScore = total; best = df; }
+  });
+
+  if (!best) return;
+  // Auto-fill the date response
+  _previewResponses[best.id] = today;
+  // Update the input DOM element if visible
+  const wrap = document.getElementById('canvas-wrap') ||
+               document.getElementById('form-pdf-canvas')?.parentElement;
+  if (!wrap) return;
+  const allWraps = wrap.querySelectorAll('.form-preview-input-wrap');
+  // Find by position
+  const bx = best.rect.x * _pdfScale, by = best.rect.y * _pdfScale;
+  allWraps.forEach(w => {
+    if (Math.abs(parseInt(w.style.left)-bx) < 3 && Math.abs(parseInt(w.style.top)-by) < 3) {
+      const inp = w.querySelector('input[type="date"]');
+      if (inp) { inp.value = today; inp.style.borderColor = 'var(--green)'; }
+    }
+  });
+}
+
+
+function _formPreviewAttendeesField(wrap, field, existingVal) {
+  // Parse existing attendees from JSON or comma-separated
+  let attendees = [];
+  try { attendees = JSON.parse(existingVal || '[]'); } catch(e) { attendees = []; }
+
+  wrap.style.cssText += ';background:rgba(255,255,255,.85);border:1.5px solid var(--accent);' +
+    'border-radius:3px;display:flex;flex-direction:column;overflow:hidden;padding:2px;';
+
+  const refresh = () => {
+    wrap.innerHTML = '';
+    // Chips row
+    const chips = document.createElement('div');
+    chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;flex:1;overflow-y:auto;';
+    attendees.forEach((a, i) => {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:1px 6px;' +
+        'background:rgba(79,142,247,.15);border:1px solid var(--accent);border-radius:3px;' +
+        'font-size:11px;color:#111;font-family:Arial,sans-serif;white-space:nowrap;';
+      chip.textContent = a.name || a;
+      const rm = document.createElement('span');
+      rm.textContent = '×'; rm.style.cssText = 'cursor:pointer;color:#c0404a;font-weight:700;margin-left:2px;';
+      rm.onclick = () => { attendees.splice(i,1); _previewResponses[field.id]=JSON.stringify(attendees); refresh(); };
+      chip.appendChild(rm);
+      chips.appendChild(chip);
+    });
+    wrap.appendChild(chips);
+    // Add button
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ Add';
+    addBtn.style.cssText = 'font-size:10px;padding:1px 6px;background:transparent;border:1px solid var(--accent);' +
+      'border-radius:3px;cursor:pointer;color:var(--accent);font-family:Arial,sans-serif;flex-shrink:0;align-self:flex-end;';
+    addBtn.onclick = () => {
+      if (window.PersonPicker?.show) {
+        window.PersonPicker.show(addBtn, function(person) {
+          if (!person?.id) return;
+          if (!attendees.find(a => a.id === person.id)) {
+            attendees.push({ id:person.id, name:person.name });
+            _previewResponses[field.id] = JSON.stringify(attendees);
+            refresh();
+          }
+        });
+      }
+    };
+    wrap.appendChild(addBtn);
+  };
+
+  refresh();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DB MIGRATION SQL (run in browser console: _formShowMigrationSQL())
