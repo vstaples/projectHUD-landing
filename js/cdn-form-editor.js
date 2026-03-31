@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-188000
-console.log('%c[cdn-form-editor] v20260401-188000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-189000
+console.log('%c[cdn-form-editor] v20260401-189000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4048,60 +4048,116 @@ function _formPreviewAutoDate(sigField) {
 
 
 function _formPreviewAttendeesField(wrap, field, existingVal, h, fs) {
+  // Parse stored value — may be JSON array or legacy comma string
   let attendees = [];
-  try { attendees = JSON.parse(existingVal || '[]'); } catch(e) { attendees = []; }
+  try {
+    const parsed = JSON.parse(existingVal || '[]');
+    attendees = Array.isArray(parsed) ? parsed : [];
+  } catch(e) {
+    // Legacy comma-separated string — convert to objects
+    attendees = existingVal
+      ? existingVal.split(',').map(s => ({ id: s.trim(), name: s.trim() })).filter(a => a.name)
+      : [];
+  }
 
-  // The field cell is small — render a compact summary inside the cell
-  // and an expanded popover above it for chip management
-  wrap.style.background = 'rgba(255,255,255,.88)';
-  wrap.style.border = '1.5px solid #3b82f6';
+  // NOTE: do NOT set position:relative — wrap is position:absolute from caller
+  wrap.style.background   = 'rgba(255,255,255,.88)';
+  wrap.style.border       = '1.5px solid #3b82f6';
   wrap.style.borderRadius = '3px';
-  wrap.style.overflow = 'visible';
-  wrap.style.cursor = 'pointer';
-  wrap.style.display = 'flex';
-  wrap.style.alignItems = 'center';
-  wrap.style.padding = '0 4px';
-  wrap.style.gap = '4px';
-  wrap.style.position = 'relative';
-  wrap.style.zIndex = '10'; // ensure popover isn't clipped by canvas overflow
+  wrap.style.cursor       = 'pointer';
+  wrap.style.display      = 'flex';
+  wrap.style.alignItems   = 'center';
+  wrap.style.flexWrap     = 'wrap';
+  wrap.style.gap          = '3px';
+  wrap.style.padding      = '2px 4px';
+  wrap.style.zIndex       = '10';
+  wrap.style.setProperty('overflow', 'visible', 'important');
+
+  const chipFs  = Math.max(10, Math.min(fs * 0.75, 13));  // pill font size
+  const chipH   = Math.max(16, Math.min(h * 0.7, 22));    // pill height
 
   const renderCell = () => {
     wrap.innerHTML = '';
-    // Restore overflow after innerHTML wipe
     wrap.style.setProperty('overflow', 'visible', 'important');
 
-    // Compact name list inside the cell
-    const summary = document.createElement('span');
-    summary.style.cssText = `flex:1;font-size:${Math.max(10, fs||0, (h||18)*0.75)}px;color:#111;
-      font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
-    summary.textContent = attendees.length
-      ? attendees.map(a=>a.name||a).join(', ')
-      : '';
+    // Render each attendee as a pill chip
+    attendees.forEach(a => {
+      const pill = document.createElement('span');
+      const initials = (a.name || '?').split(' ').map(w => w[0] || '').join('').slice(0,2).toUpperCase();
+      pill.style.cssText = [
+        'display:inline-flex;align-items:center;gap:4px',
+        `height:${chipH}px`,
+        'padding:0 7px 0 4px',
+        'border-radius:999px',
+        'background:#1e3a8a',
+        'color:white',
+        `font-size:${chipFs}px`,
+        'font-family:Arial,sans-serif',
+        'font-weight:500',
+        'white-space:nowrap',
+        'flex-shrink:0',
+      ].join(';');
 
+      // Avatar circle
+      const avatar = document.createElement('span');
+      avatar.style.cssText = [
+        `width:${chipH - 4}px`,
+        `height:${chipH - 4}px`,
+        'border-radius:50%',
+        'background:rgba(255,255,255,.25)',
+        'display:flex;align-items:center;justify-content:center',
+        `font-size:${chipFs - 2}px`,
+        'font-weight:700',
+        'flex-shrink:0',
+      ].join(';');
+      avatar.textContent = initials;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = a.name || a.id;
+
+      pill.appendChild(avatar);
+      pill.appendChild(nameSpan);
+      wrap.appendChild(pill);
+    });
+
+    // + Add button
     const addBtn = document.createElement('button');
     addBtn.textContent = '+ Add';
-    addBtn.style.cssText = 'font-size:11px;padding:1px 6px;background:#3b82f6;border:none;' +
-      'border-radius:3px;cursor:pointer;color:white;font-family:Arial,sans-serif;flex-shrink:0;font-weight:600;';
+    addBtn.style.cssText = [
+      `font-size:${chipFs}px`,
+      `height:${chipH}px`,
+      'padding:0 8px',
+      'background:#3b82f6',
+      'border:none',
+      'border-radius:999px',
+      'cursor:pointer',
+      'color:white',
+      'font-family:Arial,sans-serif',
+      'font-weight:600',
+      'flex-shrink:0',
+    ].join(';');
     addBtn.onclick = (e) => {
       e.stopPropagation();
       if (window.PersonPicker?.show) {
         window.PersonPicker.show(addBtn, function(person) {
           if (!person?.id) return;
           if (!attendees.find(a => a.id === person.id)) {
-            attendees.push({ id:person.id, name:person.name });
+            attendees.push({ id: person.id, name: person.name });
             _previewResponses[field.id] = JSON.stringify(attendees);
             renderCell();
           }
         });
       }
     };
-
-    wrap.appendChild(summary);
     wrap.appendChild(addBtn);
 
-    // Click on the cell (not the button) to open chip manager popover
+    // Click pill to open remove popover
     if (attendees.length) {
-      summary.onclick = (e) => { e.stopPropagation(); renderPopover(); };
+      wrap.onclick = (e) => {
+        if (e.target === addBtn || addBtn.contains(e.target)) return;
+        e.stopPropagation();
+        renderPopover();
+      };
     }
   };
 
