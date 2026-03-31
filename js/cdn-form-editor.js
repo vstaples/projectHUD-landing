@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-084911
-console.log('[cdn-form-editor] LOADED v20260331-084911');
+// VERSION: 20260331-091013
+console.log('[cdn-form-editor] LOADED v20260331-091013');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -2291,23 +2291,25 @@ async function _formSubmitForReview() {
   const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
   const baseReviewerIds = cat?.reviewer_ids || [];
 
-  // Show submission dialog with reviewer list
-  let extraReviewers = [];
-  if (window.PersonPicker?.show) {
+  // Show PersonPicker anchored to the Submit button for optional extra reviewers
+  const extraReviewers = [];
+  const submitAnchor = document.querySelector('[onclick*="_formSubmitForReview"]');
+  if (window.PersonPicker?.show && submitAnchor) {
     await new Promise(resolve => {
-      window.PersonPicker.show({ multi:true, title:'Add additional reviewers (optional)',
-        onSelect: people => { extraReviewers = (Array.isArray(people)?people:[people]).filter(Boolean); resolve(); },
-        onCancel: resolve });
+      window.PersonPicker.show(submitAnchor, function(person) {
+        if (person?.id) extraReviewers.push({ id:person.id, name:person.name, email:'' });
+        resolve();
+      });
     });
   } else {
     if (!confirm('Submit for review? Reviewers will be notified by email.')) return;
   }
 
-  // Fetch category reviewer details
+  // Fetch category reviewer details from resources table
   let reviewers = [];
   if (baseReviewerIds.length) {
-    const rows = await API.get(`persons?id=in.(${baseReviewerIds.join(',')})&select=id,full_name,email`).catch(()=>[]) || [];
-    reviewers = rows.map(r => ({ id:r.id, name:r.full_name, email:r.email }));
+    const rows = await API.get(`resources?id=in.(${baseReviewerIds.join(',')})&select=id,first_name,last_name,email`).catch(()=>[]) || [];
+    reviewers = rows.map(r => ({ id:r.id, name:((r.first_name||'')+' '+(r.last_name||'')).trim(), email:r.email||'' }));
   }
   extraReviewers.forEach(p => {
     const id = p.id||p;
