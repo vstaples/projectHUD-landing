@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-054812
-console.log('[cdn-form-editor] LOADED v20260331-054812');
+// VERSION: 20260331-055908
+console.log('[cdn-form-editor] LOADED v20260331-055908');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -11,15 +11,13 @@ console.log('[cdn-form-editor] LOADED v20260331-054812');
   s.id = 'form-coc-styles';
   s.textContent = `
     .form-coc-panel {
-      position: absolute; top: 0; right: 0; bottom: 0;
-      width: 0; min-width: 0; overflow: hidden;
+      width: 0; min-width: 0; overflow: hidden; flex-shrink: 0;
       background: var(--bg1);
-      border-left: 1px solid var(--border);
+      border-left: 1px solid transparent;
       display: flex; flex-direction: column;
-      transition: width .22s cubic-bezier(.4,0,.2,1);
-      z-index: 50;
+      transition: width .22s cubic-bezier(.4,0,.2,1), border-color .22s;
     }
-    .form-coc-panel.open { width: 300px; min-width: 220px; }
+    .form-coc-panel.open { width: 300px; min-width: 220px; border-left-color: var(--border); }
     .form-coc-resize {
       position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
       cursor: col-resize; background: transparent; transition: background .15s; z-index: 10;
@@ -87,7 +85,8 @@ let _drawingRect     = null;
 let _formMode        = 'select'; // 'select' | 'draw' — controls cursor and interaction
 let _selectedFieldIds = new Set(); // IDs currently selected (multi-select)
 let _marqueeDrag      = null;      // { startX, startY, active } for marquee selection
-let _lastFieldClick   = 0;         // timestamp of last field click (double-click detection)
+let _lastFieldClick   = 0;
+let _formDirty        = false; // true after first edit, cleared on save         // timestamp of last field click (double-click detection)
 let _lastFieldClickId = null;      // field id of last click
 
 // ── Role vocabulary ──────────────────────────────────────────────────────────
@@ -184,12 +183,12 @@ function renderFormsTab(el) {
           style="display:none" onchange="_formFileChosen(event)"/>
       </div>
 
-      <!-- ── Main area: editor or empty state ─────────────────────── -->
-      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
+      <!-- ── Main area: editor or empty state + CoC as flex sibling ── -->
+      <div id="form-editor-main" style="flex:1;display:flex;overflow:hidden;min-width:0">
         <div style="flex:1;display:flex;overflow:hidden;min-width:0;position:relative">
           ${_selectedForm ? _renderFormEditor() : _renderFormEmpty()}
         </div>
-        <!-- CoC slide-in panel -->
+        <!-- CoC panel: flex sibling so it pushes canvas left, not overlays -->
         <div class="form-coc-panel" id="form-coc-panel">
           <div class="form-coc-resize" id="form-coc-resize" title="Drag to resize"></div>
           <div class="form-coc-inner">
@@ -742,6 +741,7 @@ function _formUpdateField(fieldId, key, value) {
   if (!field) return;
   const oldVal = field[key];
   field[key] = value;
+  _formMarkDirty();
   if (_selectedForm?.id) _formCoCWrite('form.field_modified', _selectedForm.id,
     { field_id:fieldId, field_label:field.label, key, old:oldVal, new:value });
 
@@ -953,6 +953,7 @@ function _formDragMouseMove(event) {
   let dy = my - _svgGroupDrag.startY;
   const dist = Math.sqrt(dx*dx + dy*dy);
   _svgGroupDrag.hasMoved = dist > 3;
+  if (_svgGroupDrag.hasMoved) _formMarkDirty();
   if (event.shiftKey) {
     if (!_svgGroupDrag.axisChosen && dist > 8) {
       _svgGroupDrag.axisLock   = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
@@ -1059,7 +1060,7 @@ function _formSvgMouseUp(event) {
     if (w > 12 && h > 8) {
       const x       = Math.min(mx, _drawingRect.startX) / _pdfScale;
       const y       = Math.min(my, _drawingRect.startY) / _pdfScale;
-      _undoPush();
+      _undoPush(); _formMarkDirty();
       const fieldId = 'manual_' + Date.now();
       _formFields.push({
         id: fieldId, page: _pdfPage,
@@ -1085,27 +1086,28 @@ function _formSvgMouseUp(event) {
     svg.style.cursor = _formMode === 'draw' ? 'crosshair' : 'default';
 
     if (drag.hasMoved) {
-      if (!isCopy) _undoPush(); // move — push before commit (copy already pushed in mousedown)
+      _undoPush(); // push before any mutation (move or copy)
       if (isCopy) {
-        // COPY: create duplicates at the new positions, return originals to start
+        // COPY: snap originals back, create new fields at the dragged position
         const newIds = [];
         drag.fields.forEach(({ field, origX, origY }) => {
-          const newId  = 'copy_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
-          const copyField = {
-            ...JSON.parse(JSON.stringify(field)), // deep clone
-            id:        newId,
-            detection: 'manual',
-            label:     field.label ? field.label + ' (copy)' : '',
-          };
-          // Copy lands at the dragged position; original snaps back
-          copyField.rect.x = field.rect.x;
-          copyField.rect.y = field.rect.y;
+          // Capture dragged position BEFORE snapping original back
+          const draggedX = field.rect.x;
+          const draggedY = field.rect.y;
+          // Snap original back to start
           field.rect.x = origX;
           field.rect.y = origY;
+          // Deep-clone AFTER snap so copy gets the dragged position
+          const newId = 'copy_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+          const copyField = JSON.parse(JSON.stringify(field));
+          copyField.id        = newId;
+          copyField.detection = 'manual';
+          copyField.label     = field.label ? field.label + ' (copy)' : '';
+          copyField.rect.x    = draggedX;
+          copyField.rect.y    = draggedY;
           _formFields.push(copyField);
           newIds.push(newId);
         });
-        // Select the copies
         _selectedFieldIds.clear();
         newIds.forEach(id => _selectedFieldIds.add(id));
         _formUpdateSelectionUI();
@@ -2111,6 +2113,20 @@ async function _formSelect(formId) {
 // ─────────────────────────────────────────────────────────────────────────────
 // LIFECYCLE TOOLBAR BUTTONS
 // ─────────────────────────────────────────────────────────────────────────────
+
+function _formMarkDirty() {
+  if (_formDirty) return;
+  _formDirty = true;
+  _formUpdateSaveBtn();
+}
+
+function _formUpdateSaveBtn() {
+  const btn = document.getElementById('form-save-btn');
+  if (!btn) return;
+  btn.className = _formDirty ? 'btn btn-solid btn-sm' : 'btn btn-ghost btn-sm';
+  btn.style.fontSize = '12px';
+}
+
 function _formLifecycleButtons(f) {
   const state = f.state || 'draft';
   const locked = ['pending_review','pending_approval','released','archived'].includes(state);
@@ -2123,12 +2139,11 @@ function _formLifecycleButtons(f) {
     title="Chain of Custody history">CoC</button>`);
 
   if (state === 'draft' || state === 'unreleased') {
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formSave()" style="font-size:12px">Save</button>`);
+    btns.push(`<button id="form-save-btn" class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}" onclick="_formSave()" style="font-size:12px">Save</button>`);
     if (f.category_id) {
       btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()" style="font-size:12px">Submit for Review →</button>`);
     } else {
       // No category = no approval gate — can release directly
-      btns.push(`<button class="btn btn-solid btn-sm" onclick="_formSave()" style="font-size:12px">Save</button>`);
       btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:12px;padding:3px 12px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif">Release</button>`);
     }
   }
@@ -2427,6 +2442,7 @@ async function _formSave() {
       });
       if (rows?.[0]?.id) { _selectedForm.id = rows[0].id; _selectedForm._unsaved = false; delete _selectedForm._file; }
       cadToast('Form saved', 'success');
+      _formDirty = false; _formUpdateSaveBtn();
       _formRefreshCoCIfOpen();
       _formCoCWrite('form.saved', _selectedForm.id, { version:_selectedForm.version, state:_selectedForm.state });
       const listEl = document.getElementById('form-list');
