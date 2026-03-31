@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-184000
-console.log('%c[cdn-form-editor] v20260401-184000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-186000
+console.log('%c[cdn-form-editor] v20260401-186000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3510,14 +3510,11 @@ function _formTogglePreview() {
     if (cocPanel?.classList.contains('open')) cocPanel.classList.remove('open');
     // Inject role switcher panel
     _formShowRolePanel();
-    // Zoom to fit the full page so all fields are visible simultaneously,
-    // then scroll to top — avoids partial-view confusion at the bottom of the canvas.
-    _formZoomFit();
-    requestAnimationFrame(() => {
-      const outerWrap = document.getElementById('form-canvas-wrap');
-      if (outerWrap) outerWrap.scrollTo({ top: 0, behavior: 'instant' });
-      _formRenderPreviewOverlay();
-    });
+    _formRenderPreviewOverlay();
+    // Scroll to top so the full form is visible from the beginning.
+    // Fields are correctly positioned — user scrolls down to reach signatures.
+    const outerWrap = document.getElementById('form-canvas-wrap');
+    if (outerWrap) outerWrap.scrollTo({ top: 0, behavior: 'instant' });
   } else {
     // ── Exit preview — clean up ALL preview DOM artifacts ────────────────────
     // 1. Remove all input overlays
@@ -3781,7 +3778,8 @@ function _formPreviewSignatureField(wrap, field, val, w, h) {
   wrap.style.borderRadius  = '3px';
   wrap.style.display       = 'flex';
   wrap.style.alignItems    = 'center';
-  wrap.style.position      = 'relative';
+  // NOTE: do NOT set position:relative here — wrap is already position:absolute
+  // set by _formRenderPreviewOverlay. Overriding it breaks placement.
   // Keep overflow:visible (set by caller) so full-height cursive renders
 
   const renderSig = () => {
