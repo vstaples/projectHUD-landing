@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-113345
-console.log('[cdn-form-editor] LOADED v20260331-113345');
+// VERSION: 20260331-113939
+console.log('[cdn-form-editor] LOADED v20260331-113939');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3437,7 +3437,7 @@ function _formRenderPreviewOverlay() {
     const BASE_STYLE = [
       'width:100%;height:100%;box-sizing:border-box',
       'background:rgba(255,255,255,.92)',
-      isFuture ? 'border:1.5px solid #94a3b8' : 'border:1.5px solid #3b82f6',
+      isAssigneeField ? 'border:1.5px solid #94a3b8' : isFuture ? 'border:1.5px solid #b0bec5' : 'border:1.5px solid #3b82f6',
       'border-radius:2px',
       'color:#111',
       'font-family:Arial,sans-serif',
@@ -3456,32 +3456,18 @@ function _formRenderPreviewOverlay() {
     wrap.style.boxSizing = 'border-box';
     wrap.style.overflow  = 'hidden';
 
-    if (isAssigneeField) {
-      // Assignee fields = form content — shown as read-only background for reviewer context
-      wrap.style.background    = 'rgba(255,255,255,.5)';
-      wrap.style.border        = '1px solid rgba(100,150,200,.2)';
-      wrap.style.borderRadius  = '2px';
-      wrap.style.pointerEvents = 'none';
-      wrap.style.fontSize      = fs + 'px';
-      wrap.style.fontFamily    = 'Arial,sans-serif';
-      wrap.style.color         = '#444';
-      wrap.style.padding       = '0 4px';
-      wrap.style.display       = 'flex';
-      wrap.style.alignItems    = 'center';
-      wrap.textContent         = val || '';
-
-    } else if (isCompleted) {
-      // Prior stage submitted — green tint, read-only
+    if (isCompleted) {
+      // Prior stage already submitted — green tint, read-only
       wrap.style.background    = 'rgba(240,255,240,.7)';
       wrap.style.border        = '1px solid #86efac';
       wrap.style.borderRadius  = '2px';
       wrap.style.pointerEvents = 'none';
+      wrap.style.display       = 'flex';
+      wrap.style.alignItems    = 'center';
       wrap.style.fontSize      = fs + 'px';
       wrap.style.fontFamily    = 'Arial,sans-serif';
       wrap.style.color         = '#111';
       wrap.style.padding       = '0 4px';
-      wrap.style.display       = 'flex';
-      wrap.style.alignItems    = 'center';
       wrap.textContent         = val || '';
 
     } else if (field.type === 'checkbox') {
