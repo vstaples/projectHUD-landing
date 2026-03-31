@@ -876,10 +876,12 @@ function _formSvgMouseDown(event) {
   const hitField  = _formFields.find(f => f.id === fieldId);
   if (!hitField) return;
 
-  // If hit field is not in current selection, make it the sole selection
-  // (unless shift/ctrl is held for additive selection — handled by _formFieldListClick)
+  // Ctrl/Cmd = copy-drag; Shift = additive select; plain click = sole selection
+  const isCopy     = event.ctrlKey || event.metaKey;
+  const isAdditive = event.shiftKey;
+
   if (!_selectedFieldIds.has(fieldId)) {
-    _selectedFieldIds.clear();
+    if (!isAdditive && !isCopy) _selectedFieldIds.clear();
     _selectedFieldIds.add(fieldId);
     _formUpdateSelectionUI();
   }
@@ -891,15 +893,16 @@ function _formSvgMouseDown(event) {
     .map(f => ({ field: f, origX: f.rect.x, origY: f.rect.y }));
 
   _svgGroupDrag = {
-    fields:    dragFields,
-    startX:    mx,
-    startY:    my,
-    isCopy:    event.ctrlKey || event.metaKey,
-    axisLock:  null,           // determined during move
-    hasMoved:  false,
+    fields:      dragFields,
+    startX:      mx,
+    startY:      my,
+    isCopy:      isCopy,
+    axisLock:    null,   // 'h' | 'v' — set once Shift held + dist > 8px
+    axisChosen:  false,  // once chosen stays until mouseup even if Shift released
+    hasMoved:    false,
   };
 
-  svg.style.cursor = (event.ctrlKey || event.metaKey) ? 'copy' : 'grabbing';
+  svg.style.cursor = isCopy ? 'copy' : 'grabbing';
   event.preventDefault();
 }
 
@@ -932,13 +935,16 @@ function _formSvgMouseMove(event) {
 
   _svgGroupDrag.hasMoved = dist > 3;
 
-  // Axis lock: determined once movement exceeds 8px, stays locked for drag
-  if (event.shiftKey && dist > 8) {
-    if (!_svgGroupDrag.axisLock) {
-      _svgGroupDrag.axisLock = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+  // Axis lock: Shift held + dist > 8px locks axis; releasing Shift unlocks (freeform)
+  if (event.shiftKey) {
+    if (!_svgGroupDrag.axisChosen && dist > 8) {
+      _svgGroupDrag.axisLock   = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+      _svgGroupDrag.axisChosen = true;
     }
-  } else if (!event.shiftKey) {
-    _svgGroupDrag.axisLock = null; // shift released mid-drag — free again
+  } else {
+    // Shift released — drop lock so drag is freeform from current position
+    _svgGroupDrag.axisLock   = null;
+    _svgGroupDrag.axisChosen = false;
   }
 
   if (_svgGroupDrag.axisLock === 'h') dy = 0;
@@ -2038,8 +2044,8 @@ const _formSvgMouseDownOverride = (event) => {
       const mr = document.createElementNS('http://www.w3.org/2000/svg','rect');
       mr.id='form-marquee-rect';
       mr.setAttribute('x',mx); mr.setAttribute('y',my); mr.setAttribute('width',0); mr.setAttribute('height',0);
-      mr.setAttribute('fill','rgba(196,125,24,.12)'); mr.setAttribute('stroke','var(--cad)');
-      mr.setAttribute('stroke-width','1'); mr.setAttribute('stroke-dasharray','4 2');
+      mr.setAttribute('fill','rgba(79,142,247,.10)'); mr.setAttribute('stroke','rgba(79,142,247,.9)');
+      mr.setAttribute('stroke-width','1.5'); mr.setAttribute('stroke-dasharray','none');
       mr.style.pointerEvents='none'; svg.appendChild(mr);
       if (!event.shiftKey) _formClearSelection();
       event.preventDefault(); return;
