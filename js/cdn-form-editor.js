@@ -1,4 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
+// VERSION: 20260331-012807
+console.log('[cdn-form-editor] LOADED v20260331-012807');
 // Renders the Forms tab: document list, form editor canvas, field list, routing panel
 // LOAD ORDER: after cdn-core-state.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1609,6 +1611,7 @@ function _renderFieldOverlays() {
   if (_marqueeDrag?.active) return;
 
   const sel = _selectedFieldIds;
+  console.log('[renderFieldOverlays] sel.size=', sel.size, 'fields=', _formFields.length);
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
 
   // ── Field rects ───────────────────────────────────────────────────────────
