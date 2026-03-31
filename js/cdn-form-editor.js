@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-053911
-console.log('[cdn-form-editor] LOADED v20260331-053911');
+// VERSION: 20260331-054441
+console.log('[cdn-form-editor] LOADED v20260331-054441');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — CSS (injected once)
@@ -934,7 +934,51 @@ function _formSvgMouseDown(event) {
   };
 
   svg.style.cursor = isCopy ? 'copy' : 'grabbing';
+  // Attach drag tracking to document so cursor can leave SVG/canvas without losing drag
+  document.addEventListener('mousemove', _formDragMouseMove);
+  document.addEventListener('mouseup',   _formDragMouseUp, { once: true });
   event.preventDefault();
+}
+
+// Document-level drag move (tracks outside SVG bounds)
+function _formDragMouseMove(event) {
+  if (!_svgGroupDrag) return;
+  const svg = document.getElementById('form-field-overlay');
+  if (!svg) return;
+  const svgRect = svg.getBoundingClientRect();
+  const mx = event.clientX - svgRect.left;
+  const my = event.clientY - svgRect.top;
+  // Reuse original mousemove logic inline
+  let dx = mx - _svgGroupDrag.startX;
+  let dy = my - _svgGroupDrag.startY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  _svgGroupDrag.hasMoved = dist > 3;
+  if (event.shiftKey) {
+    if (!_svgGroupDrag.axisChosen && dist > 8) {
+      _svgGroupDrag.axisLock   = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+      _svgGroupDrag.axisChosen = true;
+    }
+  } else {
+    _svgGroupDrag.axisLock   = null;
+    _svgGroupDrag.axisChosen = false;
+  }
+  if (_svgGroupDrag.axisLock === 'h') dy = 0;
+  if (_svgGroupDrag.axisLock === 'v') dx = 0;
+  _svgGroupDrag.fields.forEach(({ field, origX, origY }) => {
+    field.rect.x = origX + dx / _pdfScale;
+    field.rect.y = origY + dy / _pdfScale;
+  });
+  svg.style.cursor = (event.ctrlKey || event.metaKey) ? 'copy' : 'grabbing';
+  _renderFieldOverlays();
+}
+
+// Document-level drag mouseup
+function _formDragMouseUp(event) {
+  document.removeEventListener('mousemove', _formDragMouseMove);
+  if (_svgGroupDrag) {
+    // Synthesise a mouseup on the SVG to run commit logic
+    _formSvgMouseUp(event);
+  }
 }
 
 function _formSvgMouseMove(event) {
@@ -2529,12 +2573,13 @@ const _origSvgMouseUp   = _formSvgMouseUp;
 const _formSvgMouseDownOverride = (event) => {
   if (_formMode === 'select') {
     const group = event.target.closest('.field-rect-group');
-    if (group && event.shiftKey) {
-      // Shift+click on field = additive toggle, no drag
+    if (group && event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      // Shift+click on field = additive toggle selection only (no drag intent yet)
+      // Fall through to _origSvgMouseDown so drag can still be initiated
       const fid = group.dataset.fieldId;
       _selectedFieldIds.has(fid) ? _selectedFieldIds.delete(fid) : _selectedFieldIds.add(fid);
       _formUpdateSelectionUI(); _renderFieldOverlays();
-      event.preventDefault(); return;
+      // DO NOT return — fall through so _origSvgMouseDown sets up _svgGroupDrag
     }
     if (!group) {
       const svg = document.getElementById('form-field-overlay');
