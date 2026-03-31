@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260331-124058
-console.log('%c[cdn-form-editor] v20260331-124058','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-120000
+console.log('%c[cdn-form-editor] v20260401-120000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -143,6 +143,45 @@ const FORM_ROLES = {
   external: { label: 'External',  color: '#8b91a5', dim: 'rgba(139,145,165,.15)'},
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LEFT RAIL BUTTON STYLE HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+function _railBtn(active = false) {
+  return [
+    'width:28px;height:28px;border-radius:5px;border:none;cursor:pointer',
+    'display:flex;align-items:center;justify-content:center',
+    'font-size:14px;font-family:Arial,sans-serif;transition:all .12s',
+    active
+      ? 'background:var(--cad);color:var(--bg)'
+      : 'background:transparent;color:var(--muted)'
+  ].join(';');
+}
+
+// Updates the active state of rail mode buttons (called from _formSetMode + _formTogglePreview)
+function _formRefreshRailMode(mode) {
+  const btnMap = { select:'form-mode-select', draw:'form-mode-draw', preview:'form-mode-preview' };
+  Object.entries(btnMap).forEach(([m, id]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const isActive = (m === mode);
+    btn.style.background = isActive ? 'var(--cad)' : 'transparent';
+    btn.style.color      = isActive ? 'var(--bg)'  : 'var(--muted)';
+  });
+  // Pop-out only visible in preview mode
+  const po = document.getElementById('form-popout-btn');
+  if (po) po.style.display = (mode === 'preview') ? 'flex' : 'none';
+}
+
+function _formRelativeTime(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+  if (d > 30) return new Date(iso).toLocaleDateString();
+  if (d > 0)  return d + 'd ago';
+  if (h > 0)  return h + 'h ago';
+  if (m > 0)  return m + 'm ago';
+  return 'just now';
+}
+
 const FIELD_TYPES = ['text', 'date', 'number', 'checkbox', 'signature', 'textarea'];
 
 // Extended type list including review (4-state) and doc_ref (paired number+rev)
@@ -198,13 +237,18 @@ function _formBumpVersion(ver, fmt, type='minor') {
 }
 
 function _formStateLabel(state) {
-  return { draft:'Draft', unreleased:'Unreleased', pending_review:'Pending Review',
-           pending_approval:'Pending Approval', released:'Released', archived:'Archived' }[state] || state;
+  return { draft:'Draft', unreleased:'Unreleased',
+           in_review:'In Review', reviewed:'Reviewed',
+           approved:'Approved', released:'Released', archived:'Archived',
+           rejected_review:'Rejected — Review', rejected_approval:'Rejected — Approval' }[state] || state;
 }
 
 function _formStateColor(state) {
-  return { draft:'var(--muted)', unreleased:'var(--amber)', pending_review:'var(--accent)',
-           pending_approval:'var(--cad)', released:'var(--green)', archived:'var(--muted)' }[state] || 'var(--muted)';
+  return { draft:'var(--muted)', unreleased:'var(--amber)',
+           in_review:'var(--accent)', reviewed:'var(--cad)',
+           approved:'var(--green)', released:'var(--green)',
+           archived:'var(--muted)', rejected_review:'var(--red)',
+           rejected_approval:'var(--red)' }[state] || 'var(--muted)';
 }
 
 function renderFormsTab(el) {
@@ -275,14 +319,21 @@ function _renderFormList() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
           <span>${fieldCount} field${fieldCount !== 1 ? 's' : ''}</span>
           <span>${f.page_count || '?'} page${(f.page_count || 1) !== 1 ? 's' : ''}</span>
+          ${f.version ? `<span style="color:var(--muted);font-size:11px">${escHtml(f.version)}</span>` : ''}
           ${_routingBadge(f)}
+          ${f.updated_at ? `<span style="color:var(--muted);font-size:11px" title="${new Date(f.updated_at).toLocaleString()}">${_formRelativeTime(f.updated_at)}</span>` : ''}
           ${f.state && f.state !== 'draft' ? `<span style="font-size:11px;padding:1px 6px;border-radius:3px;
-            background:${{ pending_review:'rgba(79,142,247,.15)', pending_approval:'rgba(196,125,24,.15)',
-              released:'rgba(42,157,64,.15)', archived:'rgba(255,255,255,.06)', unreleased:'rgba(212,144,31,.15)' }[f.state]||'transparent'};
-            color:${{ pending_review:'var(--accent)', pending_approval:'var(--cad)',
-              released:'var(--green)', archived:'var(--muted)', unreleased:'var(--amber)' }[f.state]||'var(--muted)'}"
-          >${{ pending_review:'● Review', pending_approval:'● Approval', released:'✓ Released',
-               archived:'Archived', unreleased:'Unreleased' }[f.state]||f.state}</span>` : ''}
+            background:${{ in_review:'rgba(79,142,247,.15)', reviewed:'rgba(196,125,24,.15)',
+              approved:'rgba(42,157,64,.15)', released:'rgba(42,157,64,.15)',
+              archived:'rgba(255,255,255,.06)', unreleased:'rgba(212,144,31,.15)',
+              rejected_review:'rgba(220,60,60,.15)', rejected_approval:'rgba(220,60,60,.15)' }[f.state]||'transparent'};
+            color:${{ in_review:'var(--accent)', reviewed:'var(--cad)',
+              approved:'var(--green)', released:'var(--green)',
+              archived:'var(--muted)', unreleased:'var(--amber)',
+              rejected_review:'var(--red)', rejected_approval:'var(--red)' }[f.state]||'var(--muted)'}"
+          >${{ in_review:'● In Review', reviewed:'● Reviewed', approved:'✓ Approved',
+               released:'✓ Released', archived:'Archived', unreleased:'Unreleased',
+               rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -327,90 +378,42 @@ function _renderFormEditor() {
   return `
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
 
-      <!-- ── Editor toolbar ─────────────────────────────────────────── -->
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;
+      <!-- ── TOP TOOLBAR: lifecycle only ──────────────────────────── -->
+      <div id="form-top-toolbar"
+           style="display:flex;align-items:center;gap:8px;padding:5px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
                   font-family:Arial,sans-serif;font-size:12px">
 
-        <!-- Name (editable) -->
+        <!-- Editable name -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
           style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:100px;
                  background:transparent;border:none;border-bottom:1px solid transparent;
-                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;
-                 transition:border-color .15s"
+                 outline:none;font-family:Arial,sans-serif;padding:2px 4px;transition:border-color .15s"
           onfocus="this.style.borderBottomColor='var(--cad)'"
           onblur="this.style.borderBottomColor='transparent';_formRenameCurrent(this.value)"
           oninput="_formMarkDirty()"
           onkeydown="if(event.key==='Enter')this.blur()"
           title="Click to rename — press Enter to confirm"/>
 
-        <!-- State · Version · Category — pill group -->
+        <!-- State · Version · Category pills -->
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <span style="font-size:13px;padding:3px 10px;border-radius:4px;
+          <span id="form-state-badge"
+                style="font-size:13px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
                        color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif;
                        line-height:1.4">${_formStateLabel(f.state||'draft')}</span>
           <span style="font-size:13px;padding:3px 10px;border-radius:4px;
                        background:var(--surf2);border:1px solid var(--border);
-                       color:var(--muted);font-family:Arial,sans-serif;
-                       line-height:1.4">${f.version||'0.1.0'}</span>
-          ${(() => { const cat = window.FormSettings?.getCategoryById?.(f.category_id); return cat
-            ? `<span style="font-size:13px;padding:3px 10px;border-radius:4px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif;line-height:1.4">${escHtml(cat.name)}</span>`
-            : `<button onclick="_formPickCategory()" style="font-size:13px;padding:3px 10px;border-radius:4px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
+                       color:var(--muted);font-family:Arial,sans-serif;line-height:1.4">${f.version||'0.1.0'}</span>
+          ${(() => {
+            const cat = window.FormSettings?.getCategoryById?.(f.category_id);
+            return cat
+              ? `<span style="font-size:13px;padding:3px 10px;border-radius:4px;background:var(--cad-dim);border:1px solid var(--cad-wire);color:var(--cad);font-family:Arial,sans-serif;line-height:1.4">${escHtml(cat.name)}</span>`
+              : `<button onclick="_formPickCategory()" style="font-size:13px;padding:3px 10px;border-radius:4px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
           })()}
         </div>
 
-        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
-
-        <!-- Page navigation -->
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <button id="form-page-prev" onclick="_formPrevPage()"
-            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">‹</button>
-          <span id="form-page-indicator"
-            style="font-size:13px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif">
-            ${_pdfPage} / ${_pdfTotalPages}
-          </span>
-          <button id="form-page-next" onclick="_formNextPage()"
-            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">›</button>
-        </div>
-
-        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
-
-        <!-- Zoom -->
-        <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
-          <button onclick="_formZoomOut()"
-            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom out">−</button>
-          <span id="form-zoom-label"
-            style="font-size:13px;color:var(--muted);font-family:Arial,sans-serif;min-width:44px;text-align:center;cursor:pointer"
-            onclick="_formZoomReset()" title="Click to reset">${Math.round(_pdfScale * 100 / 1.5)}%</span>
-          <button onclick="_formZoomIn()"
-            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Zoom in">+</button>
-          <button onclick="_formZoomFit()"
-            style="font-size:13px;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4" title="Fit to width">⊡</button>
-        </div>
-
-        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
-
-        <!-- Mode toggle: Select / Draw / Preview -->
-        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
-          <button id="form-mode-select" onclick="_formSetMode('select')"
-            title="Select & move fields (S)"
-            style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;cursor:pointer;
-                   background:var(--cad);color:var(--bg);transition:all .12s;line-height:1.4">⊹ Select</button>
-          <button id="form-mode-draw" onclick="_formSetMode('draw')"
-            title="Draw new field (D)"
-            style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
-                   cursor:pointer;background:transparent;color:var(--muted);transition:all .12s;line-height:1.4">✎ Draw</button>
-          <button id="form-mode-preview" onclick="_formTogglePreview()"
-            title="Preview form fill (P)"
-            style="padding:4px 14px;font-size:13px;font-family:Arial,sans-serif;border:none;border-left:1px solid var(--border);
-                   cursor:pointer;background:transparent;color:var(--muted);transition:all .12s;line-height:1.4">▶ Preview</button>
-        </div>
-        <!-- Pop-out preview button -->
-        <button id="form-popout-btn" onclick="_formPopOutPreview()" title="Open preview in new window"
-          style="display:none;font-size:13px;padding:4px 10px;background:transparent;border:1px solid var(--border);
-                 border-radius:4px;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">⤢</button>
-        <!-- H/W size widget — shown when fields selected -->
+        <!-- H/W widget — shown when fields selected -->
         <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
           <div style="width:1px;height:18px;background:var(--border)"></div>
           <div style="display:flex;flex-direction:column;gap:2px">
@@ -418,10 +421,8 @@ function _renderFormEditor() {
               <span style="font-size:12px;color:var(--muted);width:14px;font-family:Arial,sans-serif">H</span>
               <input id="form-hw-h" type="number" step="0.01" min="0.05"
                 style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
-                       border:1px solid var(--border);border-radius:3px;color:var(--text);
-                       font-family:Arial,sans-serif"
-                onchange="_formHWChange('h',parseFloat(this.value))"
-                onclick="this.select()"/>
+                       border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:Arial,sans-serif"
+                onchange="_formHWChange('h',parseFloat(this.value))" onclick="this.select()"/>
               <div style="display:flex;flex-direction:column;gap:0">
                 <button onclick="_formHWStep('h',1)"  style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
                 <button onclick="_formHWStep('h',-1)" style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
@@ -431,10 +432,8 @@ function _renderFormEditor() {
               <span style="font-size:12px;color:var(--muted);width:14px;font-family:Arial,sans-serif">W</span>
               <input id="form-hw-w" type="number" step="0.01" min="0.05"
                 style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
-                       border:1px solid var(--border);border-radius:3px;color:var(--text);
-                       font-family:Arial,sans-serif"
-                onchange="_formHWChange('w',parseFloat(this.value))"
-                onclick="this.select()"/>
+                       border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:Arial,sans-serif"
+                onchange="_formHWChange('w',parseFloat(this.value))" onclick="this.select()"/>
               <div style="display:flex;flex-direction:column;gap:0">
                 <button onclick="_formHWStep('w',1)"  style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
                 <button onclick="_formHWStep('w',-1)" style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
@@ -442,13 +441,75 @@ function _renderFormEditor() {
             </div>
           </div>
         </div>
-        ${_formLifecycleButtons(f)}
+
+        <!-- Spacer -->
+        <div style="flex:1"></div>
+
+        <!-- Lifecycle action buttons (right-justified) -->
+        <div id="form-lifecycle-btns" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          ${_formLifecycleButtons(f)}
+        </div>
       </div>
 
-      <!-- ── Three-column body + CoC panel ──────────────────────── -->
+      <!-- ── Body row: left-rail + canvas + fields + routing ────── -->
       <div style="flex:1;display:flex;overflow:hidden;min-height:0" id="form-body-row">
 
-        <!-- Column 1: Document canvas -->
+        <!-- ── LEFT RAIL: canvas tools ─────────────────────────── -->
+        <div id="form-left-rail"
+             style="width:36px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+                    display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;
+                    font-family:Arial,sans-serif;z-index:5">
+
+          <!-- Page navigation group -->
+          <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
+            style="${_railBtn()}">‹</button>
+          <span id="form-page-indicator"
+            style="font-size:10px;color:var(--muted);text-align:center;line-height:1.2;
+                   width:32px;padding:2px 0;font-family:Arial,sans-serif;white-space:nowrap">
+            ${_pdfPage}/${_pdfTotalPages}
+          </span>
+          <button id="form-page-next" onclick="_formNextPage()" title="Next page"
+            style="${_railBtn()}">›</button>
+
+          <div style="width:24px;height:1px;background:var(--border);margin:4px 0"></div>
+
+          <!-- Zoom group -->
+          <button onclick="_formZoomIn()" title="Zoom in (+)"
+            style="${_railBtn()}">+</button>
+          <span id="form-zoom-label"
+            style="font-size:10px;color:var(--muted);text-align:center;cursor:pointer;
+                   width:32px;padding:2px 0;font-family:Arial,sans-serif"
+            onclick="_formZoomReset()" title="Reset zoom">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+          <button onclick="_formZoomOut()" title="Zoom out (-)"
+            style="${_railBtn()}">−</button>
+          <button onclick="_formZoomFit()" title="Fit to width"
+            style="${_railBtn()}">⊡</button>
+
+          <div style="width:24px;height:1px;background:var(--border);margin:4px 0"></div>
+
+          <!-- Mode group -->
+          <button id="form-mode-select" onclick="_formSetMode('select')" title="Select & move fields (S)"
+            style="${_railBtn(true)}">◈</button>
+          <button id="form-mode-draw" onclick="_formSetMode('draw')" title="Draw new field (D)"
+            style="${_railBtn()}">✎</button>
+          <button id="form-mode-preview" onclick="_formTogglePreview()" title="Preview form (P)"
+            style="${_railBtn()}">▶</button>
+          <button id="form-popout-btn" onclick="_formPopOutPreview()" title="Pop-out preview"
+            style="${_railBtn()};display:none">⤢</button>
+
+          <div style="width:24px;height:1px;background:var(--border);margin:4px 0"></div>
+
+          <!-- Form actions group -->
+          <button onclick="_formToggleCoC()" id="form-coc-btn" title="Chain of Custody"
+            style="${_railBtn()}">≡</button>
+          <button onclick="_formReplacePdf()" title="Replace PDF background"
+            id="form-replace-btn"
+            style="${_railBtn()};${['draft','unreleased'].includes(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
+          <button onclick="_formDeleteWithConfirm('${f.id}')" title="Remove form"
+            style="${_railBtn()};color:var(--red)">🗑</button>
+        </div>
+
+        <!-- ── Canvas column ────────────────────────────────────── -->
         <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0"
           id="form-canvas-wrap">
           <div style="display:inline-flex;justify-content:center;padding:24px 40px;min-height:100%;min-width:100%;box-sizing:border-box;position:relative">
@@ -462,7 +523,7 @@ function _renderFormEditor() {
               onmousemove="_formSvgMouseMoveOverride(event)"
               onmouseup="_formSvgMouseUpOverride(event)">
             </svg>
-            <!-- Interaction layer: transparent rect over SVG handles both select + draw -->
+            <!-- Interaction layer -->
             <div id="form-draw-layer" style="position:absolute;top:0;left:0;
               width:100%;height:100%;cursor:crosshair;display:none">
             </div>
@@ -483,7 +544,7 @@ function _renderFormEditor() {
           </div>
         </div>
 
-        <!-- Column 2: Field list -->
+        <!-- ── Fields column ─────────────────────────────────────── -->
         <div id="form-col-fields" style="width:240px;min-width:160px;max-width:480px;
                     border-left:1px solid var(--border);display:flex;flex-direction:column;
                     background:var(--bg1);position:relative;flex-shrink:0">
@@ -510,12 +571,12 @@ function _renderFormEditor() {
             <!-- Arrange toolbar — shown when 2+ fields selected -->
             <div id="form-arrange-bar" style="display:none;flex-direction:column;gap:4px">
               <div style="display:flex;gap:3px;flex-wrap:wrap">
-                <button onclick="_formArrange('align-left')"   title="Align Left"          class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:12px">⬤←</button>
-                <button onclick="_formArrange('align-right')"  title="Align Right"         class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">→⬤</button>
-                <button onclick="_formArrange('align-top')"    title="Align Top"           class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⬤↑</button>
-                <button onclick="_formArrange('align-bottom')" title="Align Bottom"        class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↓⬤</button>
-                <button onclick="_formArrange('center-h')"     title="Center Horizontal"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↔</button>
-                <button onclick="_formArrange('center-v')"     title="Center Vertical"     class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↕</button>
+                <button onclick="_formArrange('align-left')"   title="Align Left"              class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:12px">⬤←</button>
+                <button onclick="_formArrange('align-right')"  title="Align Right"             class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">→⬤</button>
+                <button onclick="_formArrange('align-top')"    title="Align Top"               class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⬤↑</button>
+                <button onclick="_formArrange('align-bottom')" title="Align Bottom"            class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↓⬤</button>
+                <button onclick="_formArrange('center-h')"     title="Center Horizontal"       class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↔</button>
+                <button onclick="_formArrange('center-v')"     title="Center Vertical"         class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↕</button>
                 <button onclick="_formArrange('dist-h')"       title="Distribute Horizontally" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⇹H</button>
                 <button onclick="_formArrange('dist-v')"       title="Distribute Vertically"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⇹V</button>
               </div>
@@ -527,7 +588,7 @@ function _renderFormEditor() {
           </div>
         </div>
 
-        <!-- Column 3: Routing panel -->
+        <!-- ── Routing column ─────────────────────────────────────── -->
         <div id="form-col-routing" style="width:220px;min-width:140px;max-width:400px;
                     border-left:1px solid var(--border);display:flex;flex-direction:column;
                     background:var(--bg1);position:relative;flex-shrink:0">
@@ -896,18 +957,8 @@ function _highlightFieldRect(fieldId) {
 function _formSetMode(mode) {
   _formMode = mode;
   const svg = document.getElementById('form-field-overlay');
-  const selBtn = document.getElementById('form-mode-select');
-  const drwBtn = document.getElementById('form-mode-draw');
-
-  if (mode === 'draw') {
-    if (svg) svg.style.cursor = 'crosshair';
-    if (selBtn) { selBtn.style.background = 'transparent'; selBtn.style.color = 'var(--muted)'; }
-    if (drwBtn) { drwBtn.style.background = 'var(--cad)';  drwBtn.style.color  = 'var(--bg0)'; }
-  } else {
-    if (svg) svg.style.cursor = 'default';
-    if (selBtn) { selBtn.style.background = 'var(--cad)';  selBtn.style.color  = 'var(--bg0)'; }
-    if (drwBtn) { drwBtn.style.background = 'transparent'; drwBtn.style.color = 'var(--muted)'; }
-  }
+  if (svg) svg.style.cursor = (mode === 'draw') ? 'crosshair' : 'default';
+  _formRefreshRailMode(mode);
 }
 
 // Keyboard shortcut: S = select, D = draw
@@ -1829,7 +1880,7 @@ function _renderFieldList() {
                display:flex;align-items:flex-start;gap:8px;cursor:pointer;
                transition:background .1s;
                background:${isSelected?'var(--cad-dim)':'transparent'};
-               border-left:2px solid ${isSelected?'var(--cad)':'transparent'}"
+               border-left:3px solid ${isSelected?'var(--cad)':roleConf.color}"
         onmouseenter="if(!_selectedFieldIds.has('${field.id}'))this.style.background='var(--surf2)'"
         onmouseleave="if(!_selectedFieldIds.has('${field.id}'))this.style.background=''"
         onclick="_formFieldListClick(event,'${field.id}')">
@@ -2227,51 +2278,79 @@ function _formUpdateSaveBtn() {
 }
 
 function _formLifecycleButtons(f) {
-  const state = f.state || 'draft';
-  const locked = ['pending_review','pending_approval','released','archived'].includes(state);
-  const btns = [];
+  const state  = f.state || 'draft';
+  const isEdit = ['draft','unreleased','rejected_review','rejected_approval'].includes(state);
+  const btns   = [];
 
-  // Separator then Remove + Replace PDF
-  btns.push(`<div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>`);
-  btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formDeleteWithConfirm('${f.id}')"
-    style="color:var(--red);font-size:13px;font-family:Arial,sans-serif">🗑 Remove</button>`);
-  if (state === 'draft' || state === 'unreleased') {
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formReplacePdf()"
-      title="Swap background PDF without changing fields"
-      style="font-size:13px;font-family:Arial,sans-serif">↺ Replace PDF</button>`);
+  // Save button — always visible in editable states
+  if (isEdit) {
+    btns.push(`<button id="form-save-btn"
+      class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}"
+      onclick="_formSave()"
+      style="font-size:13px;font-family:Arial,sans-serif">Save</button>`);
   }
-  btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formToggleCoC()" id="form-coc-btn"
-    title="Chain of Custody history" style="font-size:13px;font-family:Arial,sans-serif">CoC</button>`);
 
-  if (state === 'draft' || state === 'unreleased') {
-    btns.push(`<button id="form-save-btn" class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}" onclick="_formSave()" style="font-size:12px">Save</button>`);
+  // ── State-specific primary actions ──────────────────────────────────────
+
+  if (isEdit) {
     if (f.category_id) {
-      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()" style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
+      // Show rejection context if applicable
+      if (state === 'rejected_review' || state === 'rejected_approval') {
+        btns.push(`<span style="font-size:12px;color:var(--red);font-family:Arial,sans-serif">
+          ✗ Rejected — revise & resubmit</span>`);
+      }
+      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
+        style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
     } else {
-      // No category = no approval gate — can release directly
-      btns.push(`<button onclick="_formReleaseDirectly()" style="font-size:13px;padding:4px 14px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">Release</button>`);
+      btns.push(`<button onclick="_formReleaseDirectly()"
+        style="font-size:13px;padding:4px 16px;border-radius:999px;background:var(--green);
+               color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
+        ✓ Release</button>`);
     }
   }
 
-  if (state === 'pending_review') {
-    btns.push(`<span style="font-size:12px;color:var(--accent);font-family:Arial,sans-serif">Awaiting review</span>`);
-    btns.push(`<button class="btn btn-cad btn-sm" onclick="_formApproveReview()" style="font-size:12px">✓ Approve Review</button>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectToUnreleased()" style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+  if (state === 'in_review') {
+    btns.push(`<span style="font-size:12px;color:var(--accent);font-family:Arial,sans-serif;
+      padding:3px 8px;background:rgba(79,142,247,.1);border-radius:4px">● In Review</span>`);
+    // Editor-side simulate approve (for testing / admin override)
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formApproveReview()"
+      style="font-size:12px;color:var(--green)">✓ Mark Reviewed</button>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('review')"
+      style="font-size:12px;color:var(--red)">✗ Reject</button>`);
   }
 
-  if (state === 'pending_approval') {
-    btns.push(`<span style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif">Awaiting approval</span>`);
-    btns.push(`<button onclick="_formApproveAndRelease()" style="font-size:12px;padding:3px 14px;border-radius:999px;background:var(--green);color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">✓ Approve & Release</button>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectToUnreleased()" style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+  if (state === 'reviewed') {
+    btns.push(`<span style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif;
+      padding:3px 8px;background:rgba(196,125,24,.1);border-radius:4px">● Awaiting Approval</span>`);
+    btns.push(`<button onclick="_formApproveAndRelease()"
+      style="font-size:13px;padding:4px 16px;border-radius:999px;background:var(--green);
+             color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
+      ✓ Approve & Release</button>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('approval')"
+      style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+  }
+
+  if (state === 'approved') {
+    btns.push(`<span style="font-size:12px;color:var(--green);font-family:Arial,sans-serif;
+      padding:3px 8px;background:rgba(42,157,64,.1);border-radius:4px">✓ Approved</span>`);
+    btns.push(`<button onclick="_formReleaseFinal()"
+      style="font-size:13px;padding:4px 16px;border-radius:999px;background:var(--green);
+             color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
+      ↑ Release</button>`);
   }
 
   if (state === 'released') {
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCreateRevision()" style="font-size:12px">Create Revision</button>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formArchive()" style="font-size:12px;color:var(--muted)">Archive</button>`);
+    btns.push(`<span style="font-size:12px;color:var(--green);font-family:Arial,sans-serif;
+      padding:3px 8px;background:rgba(42,157,64,.1);border-radius:4px">✓ Released</span>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCreateRevision()"
+      style="font-size:12px">Create Revision</button>`);
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formArchive()"
+      style="font-size:12px;color:var(--muted)">Archive</button>`);
   }
 
   if (state === 'archived') {
-    btns.push(`<span style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif">[Archived — read only]</span>`);
+    btns.push(`<span style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;
+      padding:3px 8px;background:rgba(255,255,255,.04);border-radius:4px">Archived — read only</span>`);
   }
 
   return btns.join('\n');
@@ -2460,7 +2539,7 @@ async function _formSubmitForReview() {
 
   // Save, then update state
   await _formSave();
-  _selectedForm.state = 'pending_review';
+  _selectedForm.state = 'in_review';
   _selectedForm.pending_reviewer_ids = reviewers.map(r => r.id);
   _selectedForm.reviewed_by = [];
   await _formSave();
@@ -2480,8 +2559,8 @@ async function _formSubmitForReview() {
   }
 
   _formCoCWrite('form.state_changed', _selectedForm.id, {
-    from: _selectedForm.state === 'unreleased' ? 'unreleased' : 'draft',
-    to:'pending_review',
+    from: ['unreleased','rejected_review','rejected_approval'].includes(_selectedForm.state) ? _selectedForm.state : 'draft',
+    to:'in_review',
     note:`Reviewers: ${reviewers.map(r=>r.name).join(', ')||'none'}`
   });
   const el = document.getElementById('cad-content');
@@ -2497,11 +2576,11 @@ async function _formApproveReview() {
   ) || (_selectedForm.pending_reviewer_ids||[]).length === 0;
 
   if (allReviewed) {
-    _selectedForm.state = 'pending_approval';
-    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'pending_review', to:'pending_approval', note:'All reviewers approved' });
+    _selectedForm.state = 'reviewed';
+    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'in_review', to:'reviewed', note:'All reviewers approved — awaiting approval' });
     cadToast('Review complete — awaiting final approval', 'success');
   } else {
-    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'pending_review', to:'pending_review', note:`Reviewer ${userId} approved` });
+    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'in_review', to:'in_review', note:`Reviewer ${userId} approved` });
     cadToast('Your review recorded', 'info');
   }
   await _formSave();
@@ -2523,21 +2602,19 @@ async function _formApproveAndRelease() {
     f.source_name === _selectedForm.source_name
   );
 
-  _selectedForm.state       = 'released';
+  // Approver approval → 'approved' state; editor clicks Release to go live
+  _selectedForm.state       = 'approved';
   _selectedForm.version     = newVer;
-  _selectedForm.released_at = new Date().toISOString();
   _selectedForm.approved_by = window.CURRENT_USER?.id || null;
   _selectedForm.review_note = note;
 
   await _formSave();
 
-  if (priorReleased) {
-    priorReleased.superseded_by = _selectedForm.id;
-    await API.patch(`workflow_form_definitions?id=eq.${priorReleased.id}`,
-      { superseded_by: _selectedForm.id }).catch(()=>{});
-  }
-
-  _formCoCWrite('form.released', _selectedForm.id, { version:newVer, note, supersedes:priorReleased?.id });
+  _formCoCWrite('form.approved', _selectedForm.id, {
+    version: newVer,
+    note,
+    approved_by: _selectedForm.approved_by
+  });
   // Notify approver if category has one
   try {
     const relCat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
@@ -2570,18 +2647,50 @@ async function _formReleaseDirectly() {
   if (el) renderFormsTab(el);
 }
 
-async function _formRejectToUnreleased() {
+// _formRejectForm — called from reviewer (in_review) or approver (reviewed) reject buttons
+// rejectionStage: 'review' | 'approval'
+async function _formRejectForm(rejectionStage) {
   if (!_selectedForm) return;
-  const note = prompt('Reason for rejection (required):');
+  const note = prompt(`Reason for rejection (required — will be recorded in CoC and shown to editor):`);
   if (!note?.trim()) { cadToast('Rejection note is required', 'error'); return; }
   const from = _selectedForm.state;
-  _selectedForm.state = _selectedForm.version === _formInitVersion(
-    window.FormSettings?.getCategoryById?.(_selectedForm.category_id)?.version_format||'semver'
-  ) ? 'draft' : 'unreleased';
+  const to   = rejectionStage === 'review' ? 'rejected_review' : 'rejected_approval';
+  _selectedForm.state       = to;
   _selectedForm.review_note = note;
   await _formSave();
-  _formCoCWrite('form.state_changed', _selectedForm.id, { from, to:_selectedForm.state, note });
-  cadToast('Returned for revision', 'info');
+  _formCoCWrite('form.rejected', _selectedForm.id, {
+    from, to,
+    stage: rejectionStage,
+    note,
+    rejected_by: window.CURRENT_USER?.id || 'editor'
+  });
+  cadToast('Rejected — returned to editor for revision', 'info');
+  const el = document.getElementById('cad-content');
+  if (el) renderFormsTab(el);
+}
+
+// _formReleaseFinal — called from 'approved' state to formally publish
+async function _formReleaseFinal() {
+  if (!_selectedForm) return;
+  if (!confirm(`Release "${_selectedForm.source_name} ${_selectedForm.version}" to production?`)) return;
+  const priorReleased = _formDefs.find(f =>
+    f.id !== _selectedForm.id &&
+    f.state === 'released' &&
+    f.source_name === _selectedForm.source_name
+  );
+  _selectedForm.state       = 'released';
+  _selectedForm.released_at = new Date().toISOString();
+  await _formSave();
+  if (priorReleased) {
+    priorReleased.superseded_by = _selectedForm.id;
+    await API.patch(`workflow_form_definitions?id=eq.${priorReleased.id}`,
+      { superseded_by: _selectedForm.id, state: 'archived' }).catch(()=>{});
+  }
+  _formCoCWrite('form.released', _selectedForm.id, {
+    version: _selectedForm.version,
+    supersedes: priorReleased?.id
+  });
+  cadToast(`Released ${_selectedForm.version}`, 'success');
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
 }
@@ -3310,21 +3419,17 @@ function _formTogglePreview() {
   _previewStage     = 1;
   _previewResponses = {};
 
-  const selBtn  = document.getElementById('form-mode-select');
-  const drwBtn  = document.getElementById('form-mode-draw');
-  const preBtn  = document.getElementById('form-mode-preview');
-  const popBtn  = document.getElementById('form-popout-btn');
   const hwWgt   = document.getElementById('form-hw-widget');
   const colFlds = document.getElementById('form-col-fields');
   const colRout = document.getElementById('form-col-routing');
 
   if (_formPreviewMode) {
-    // Enter preview
-    if (preBtn) { preBtn.style.background = 'var(--accent)'; preBtn.style.color = 'var(--bg)'; }
-    if (selBtn) { selBtn.style.background = 'transparent'; selBtn.style.color = 'var(--muted)'; }
-    if (drwBtn) { drwBtn.style.background = 'transparent'; drwBtn.style.color = 'var(--muted)'; }
-    if (popBtn) { popBtn.style.display = ''; }
-    if (hwWgt)  { hwWgt.style.display  = 'none'; }
+    // Enter preview — highlight preview button in rail
+    _formRefreshRailMode('preview');
+    if (hwWgt) hwWgt.style.display = 'none';
+    // Collapse left rail in preview (only SIMULATE panel on right)
+    const leftRail = document.getElementById('form-left-rail');
+    if (leftRail) leftRail.style.display = 'none';
     // Collapse side columns + CoC
     if (colFlds) { colFlds.style.display = 'none'; }
     if (colRout) { colRout.style.display = 'none'; }
@@ -3357,10 +3462,10 @@ function _formTogglePreview() {
     document.querySelectorAll('[id^="form-preview-done"]').forEach(el => el.remove());
     const cw = document.getElementById('form-canvas-wrap');
     if (cw) cw.querySelectorAll('div[style*="position:absolute"][style*="inset:0"]').forEach(el => el.remove());
-    // 4. Reset button states
-    if (preBtn) { preBtn.style.background = 'transparent'; preBtn.style.color = 'var(--muted)'; }
-    if (popBtn) { popBtn.style.display = 'none'; }
-    // 5. Restore side columns
+    // 4. Reset button states — handled by _formSetMode('select') below
+    // 5. Restore side columns + left rail
+    const leftRailExit = document.getElementById('form-left-rail');
+    if (leftRailExit) leftRailExit.style.display = '';
     if (colFlds) { colFlds.style.display = ''; }
     if (colRout) { colRout.style.display = ''; }
     if (cw) { const firstChild = cw.firstElementChild; if (firstChild?.id === 'form-preview-stagebar') firstChild.remove(); }
