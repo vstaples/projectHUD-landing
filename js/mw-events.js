@@ -1,5 +1,8 @@
-// VERSION: 20260402-100500
-console.log('%c[mw-events] v20260402-100500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-100800
+console.log('%c[mw-events] v20260402-100800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+
+// Resolve FIRM_ID safely across page contexts
+function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window._mwFirmId(); } }
 
 // ── CSS for inline panels ─────────────────────────────────
 (function() {
@@ -376,7 +379,7 @@ async function saveInProgressUpdate(itemId, projectId) {
 async function openRequestReviewPanel(item) {
   document.getElementById('req-review-panel')?.remove();
 
-  const firmId  = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId  = _mwFirmId();
   const resName = _myResource?.name || 'Unknown';
   const resId   = _myResource?.id   || null;
 
@@ -541,7 +544,7 @@ async function openRequestReviewPanel(item) {
 // ── Review panel submit ───────────────────────────────────
 window._rrpSubmit = async function(actionItemId, instanceId, decision) {
   const comments = document.getElementById('rrp-comments')?.value?.trim() || '';
-  const firmId   = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId   = _mwFirmId();
   const resName  = _myResource?.name || 'Unknown';
   const resId    = _myResource?.id   || null;
   const now      = new Date().toISOString();
@@ -602,16 +605,17 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
       const inst = instRows?.[0];
       if (inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
         await API.post('workflow_action_items', {
-          id:               crypto.randomUUID(),
-          instance_id:      instanceId,
-          title:            approved
+          id:                crypto.randomUUID(),
+          firm_id:           _mwFirmId(),
+          instance_id:       instanceId,
+          title:             approved
             ? `✓ Approved: ${inst.title||'Document review request'}`
             : `↺ Changes requested: ${inst.title||'Document review request'}`,
           body: comments || (approved ? 'Your request has been approved.' : 'Changes were requested. Please revise and resubmit.'),
-          status:           'open',
+          status:            'open',
           owner_resource_id: inst.submitted_by_resource_id,
-          owner_name:       inst.submitted_by_name || '',
-          created_by_name:  resName,
+          owner_name:        inst.submitted_by_name || '',
+          created_by_name:   resName,
         }).catch(()=>{});
       }
     }

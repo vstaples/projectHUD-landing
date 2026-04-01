@@ -1,15 +1,16 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100700
+// VERSION: 20260402-100800
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-100800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
-// SUPA_URL/SUPA_KEY are defined in config.js but may be block-scoped
+// SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
 // when loaded from compass.html vs cadence.html. Resolve from any source.
-function _mwSupaURL()      { try { return SUPA_URL;         } catch(_) { return window.SUPA_URL       || 'https://dvbetgdzksatcgdfftbs.supabase.co'; } }
-function _mwSupaKey()      { try { return SUPA_KEY;         } catch(_) { return window.SUPA_KEY       || ''; } }
-function _mwStorageBucket(){ try { return STORAGE_BUCKET;   } catch(_) { return window.STORAGE_BUCKET || 'workflow-documents'; } }
+function _mwSupaURL()      { try { return SUPA_URL;       } catch(_) { return window.SUPA_URL       || 'https://dvbetgdzksatcgdfftbs.supabase.co'; } }
+function _mwSupaKey()      { try { return SUPA_KEY;       } catch(_) { return window.SUPA_KEY       || ''; } }
+function _mwStorageBucket(){ try { return STORAGE_BUCKET; } catch(_) { return window.STORAGE_BUCKET || 'workflow-documents'; } }
+function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return window.FIRM_ID        || 'aaaaaaaa-0001-0001-0001-000000000001'; } }
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -1358,7 +1359,7 @@ window.myrCloseModal = function() {
 // ── Withdraw a submitted request ──────────────────────────
 window.myrWithdrawRequest = async function(instanceId) {
   if (!instanceId) return;
-  const firmId  = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId  = _mwFirmId();
   const resName = _myResource?.name || 'Unknown';
   const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
@@ -1512,7 +1513,7 @@ window.myrSubmitContext = async function(instanceId) {
   const text = document.getElementById('myr-context-text')?.value?.trim();
   if (!text) { compassToast('Enter some context before submitting.', 2000); return; }
 
-  const firmId  = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId  = _mwFirmId();
   const resName = _myResource?.name || 'Unknown';
   const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
@@ -1551,9 +1552,101 @@ window.myrSubmitContext = async function(instanceId) {
 
 
 // ── Document upload helpers for doc-review requests ──────────────────────────
-// _myrPendingDocs: staging array of docs attached to the open modal.
-// Cleared on modal close and after successful submit.
-window._myrPendingDocs = [];
+// _myrPendingDocs:      staging array of docs attached to the open modal
+// _myrPendingReviewers: array of {id, name, email, dept} selected via PersonPicker
+// _myrPendingApprover:  single {id, name, email} or null
+// All cleared on modal close and after successful submit.
+window._myrPendingDocs      = [];
+window._myrPendingReviewers = [];
+window._myrPendingApprover  = null;
+
+// ── Reviewer pill helpers ─────────────────────────────────
+function _myrPersonPill(person, removeKey, removeFn, color) {
+  const ini = (person.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+  return `<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 5px;
+                      background:rgba(${color},.1);border:1px solid rgba(${color},.3);
+                      font-family:var(--font-head);font-size:11px;color:rgb(${color})">
+    <div style="width:20px;height:20px;border-radius:50%;background:rgba(${color},.2);
+                border:1px solid rgba(${color},.4);display:flex;align-items:center;
+                justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">
+      ${ini}
+    </div>
+    <div style="display:flex;flex-direction:column;line-height:1.2">
+      <span style="font-weight:600">${_esc(person.name)}</span>
+      ${person.dept||person.title?`<span style="font-size:10px;opacity:.6">${_esc(person.dept||person.title||'')}</span>`:''}
+    </div>
+    <button onclick="${removeFn}('${removeKey}')" type="button"
+      style="background:none;border:none;color:rgba(${color},.6);cursor:pointer;
+             font-size:12px;padding:0 0 0 3px;line-height:1">✕</button>
+  </div>`;
+}
+
+window.myrRenderReviewerPills = function() {
+  const el = document.getElementById('myr-reviewer-pills');
+  if (!el) return;
+  el.innerHTML = (_myrPendingReviewers||[])
+    .map(p => _myrPersonPill(p, p.id, 'myrRemoveReviewer', '0,210,255'))
+    .join('');
+};
+
+window.myrRemoveReviewer = function(id) {
+  window._myrPendingReviewers = (_myrPendingReviewers||[]).filter(r => r.id !== id);
+  myrRenderReviewerPills();
+};
+
+window.myrAddReviewer = function(btn) {
+  if (!window.PersonPicker?.show) {
+    compassToast('PersonPicker not available', 2000); return;
+  }
+  PersonPicker.show(btn, function(person) {
+    if (!person?.id) return;
+    window._myrPendingReviewers = window._myrPendingReviewers || [];
+    if (_myrPendingReviewers.find(r => r.id === person.id)) return; // no duplicates
+    _myrPendingReviewers.push({
+      id:    person.id,
+      name:  person.name  || '',
+      email: person.email || '',
+      dept:  person.dept  || person.department || '',
+      title: person.title || '',
+    });
+    myrRenderReviewerPills();
+  });
+};
+
+window.myrRenderApproverPill = function() {
+  const el    = document.getElementById('myr-approver-pill');
+  const btn   = document.getElementById('myr-set-approver-btn');
+  if (!el) return;
+  if (_myrPendingApprover) {
+    el.innerHTML = _myrPersonPill(_myrPendingApprover, 'approver', 'myrRemoveApprover', '196,125,24');
+    if (btn) btn.textContent = '↺ Change Approver';
+  } else {
+    el.innerHTML = '';
+    if (btn) btn.textContent = '+ Set Approver';
+  }
+};
+
+window.myrRemoveApprover = function() {
+  window._myrPendingApprover = null;
+  myrRenderApproverPill();
+};
+
+window.myrSetApprover = function(btn) {
+  if (!window.PersonPicker?.show) {
+    compassToast('PersonPicker not available', 2000); return;
+  }
+  PersonPicker.show(btn, function(person) {
+    if (!person?.id) return;
+    window._myrPendingApprover = {
+      id:    person.id,
+      name:  person.name  || '',
+      email: person.email || '',
+      dept:  person.dept  || person.department || '',
+      title: person.title || '',
+    };
+    myrRenderApproverPill();
+  });
+};
 
 // Called when the file input changes — uploads each file to Supabase Storage
 // then adds to _myrPendingDocs and re-renders the doc list.
@@ -1762,7 +1855,9 @@ window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
 // Clear pending docs when modal closes
 const _origMyrCloseModal = window.myrCloseModal;
 window.myrCloseModal = function() {
-  window._myrPendingDocs = [];
+  window._myrPendingDocs      = [];
+  window._myrPendingReviewers = [];
+  window._myrPendingApprover  = null;
   if (_origMyrCloseModal) _origMyrCloseModal();
 };
 
@@ -1781,16 +1876,18 @@ window.myrSubmitWorkflow = async function(wfId) {
   let title = '', details = {}, reviewerLabel = '';
   switch (wfId) {
     case 'doc-review': {
-      const reviewer     = getField('reviewer');
       const deadline     = getField('deadline');
       const instructions = getField('instructions');
-      const docs         = window._myrPendingDocs || [];
-      if (!docs.length) { compassToast('Add at least one document for review.', 2500); return; }
-      if (!reviewer)    { compassToast('Reviewer is required.', 2500); return; }
-      const docNames = docs.map(d => d.name).join(', ');
-      title        = `Document review: ${docs.length === 1 ? docs[0].name : docs.length + ' documents'}`;
-      reviewerLabel = reviewer;
-      details      = { docs, reviewer, deadline, instructions, doc_count: docs.length, doc_names: docNames };
+      const docs         = window._myrPendingDocs      || [];
+      const reviewers    = window._myrPendingReviewers  || [];
+      const approver     = window._myrPendingApprover   || null;
+      if (!docs.length)      { compassToast('Add at least one document for review.', 2500); return; }
+      if (!reviewers.length) { compassToast('Add at least one reviewer.', 2500); return; }
+      const docNames     = docs.map(d => d.name).join(', ');
+      title              = `Document review: ${docs.length === 1 ? docs[0].name : docs.length + ' documents'}`;
+      reviewerLabel      = reviewers[0]?.name || '';
+      details            = { docs, reviewers, approver, deadline, instructions,
+                             doc_count: docs.length, doc_names: docNames };
       break;
     }
     case 'resource-alloc': {
@@ -1843,7 +1940,7 @@ window.myrSubmitWorkflow = async function(wfId) {
 
   myrCloseModal();
 
-  const firmId   = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId   = _mwFirmId();
   const resId    = _myResource?.id || null;
   const resName  = _myResource?.name || 'Unknown';
   const now      = new Date().toISOString();
@@ -1894,38 +1991,80 @@ window.myrSubmitWorkflow = async function(wfId) {
       created_at:       now,
     });
 
-    // ── 5. Create action item for the reviewer in My Work ──
-    // Resolve reviewer resource_id: for doc-review, match label against _resources
-    // For other types, default to PM (first resource that is_pm, or fallback)
-    let ownerResId   = null;
-    let ownerResName = reviewerLabel || 'PM';
+    // ── 5. Create action items in My Work ──────────────────
+    // For doc-review: use _myrPendingReviewers (have .id directly — no fuzzy matching)
+    // For other types: fall back to label matching against _resources
+    const firmId = _mwFirmId();
 
-    if (reviewerLabel && _resources?.length) {
-      // Strip any role suffix like " (PM)" from the label
-      const cleanLabel = reviewerLabel.replace(/\s*\(.*?\)\s*$/,'').trim();
-      const match = _resources.find(r =>
-        r.name && r.name.toLowerCase().includes(cleanLabel.toLowerCase().split(' ')[0])
-      );
-      if (match) { ownerResId = match.id; ownerResName = match.name; }
-    }
-    // Fallback: find any PM resource
-    if (!ownerResId && _resources?.length) {
-      const pm = _resources.find(r => r.department?.toLowerCase().includes('pm') || r.title?.toLowerCase().includes('project manager'));
-      if (pm) { ownerResId = pm.id; ownerResName = pm.name; }
-    }
+    const actionRecipients = []; // [{id, name, role}] for toast
 
-    if (ownerResId) {
-      await API.post('workflow_action_items', {
-        id:               crypto.randomUUID(),
-        instance_id:      instanceId,
-        title:            `Review request: ${title}`,
-        body:             details.instructions || details.justification || details.description || '',
-        status:           'open',
-        owner_resource_id: ownerResId,
-        owner_name:       ownerResName,
-        created_by_name:  resName,
-        due_date:         details.deadline || null,
-      });
+    if (wfId === 'doc-review' && (details.reviewers||[]).length) {
+      // Create one action item per reviewer
+      for (const reviewer of (details.reviewers || [])) {
+        if (!reviewer.id) continue;
+        await API.post('workflow_action_items', {
+          id:                crypto.randomUUID(),
+          firm_id:           firmId,
+          instance_id:       instanceId,
+          title:             `Review request: ${title}`,
+          body:              details.instructions || '',
+          status:            'open',
+          owner_resource_id: reviewer.id,
+          owner_name:        reviewer.name || '',
+          created_by_name:   resName,
+          due_date:          details.deadline || null,
+        });
+        actionRecipients.push({ name: reviewer.name, role: 'Reviewer' });
+      }
+      // Create action item for approver if set
+      if (details.approver?.id) {
+        await API.post('workflow_action_items', {
+          id:                crypto.randomUUID(),
+          firm_id:           firmId,
+          instance_id:       instanceId,
+          title:             `Approve request: ${title}`,
+          body:              details.instructions || '',
+          status:            'open',
+          owner_resource_id: details.approver.id,
+          owner_name:        details.approver.name || '',
+          created_by_name:   resName,
+          due_date:          details.deadline || null,
+        });
+        actionRecipients.push({ name: details.approver.name, role: 'Approver' });
+      }
+    } else {
+      // Non-doc-review: resolve by label matching
+      let ownerResId   = null;
+      let ownerResName = reviewerLabel || 'PM';
+      if (reviewerLabel && _resources?.length) {
+        const cleanLabel = reviewerLabel.replace(/\s*\(.*?\)\s*$/,'').trim();
+        const match = _resources.find(r =>
+          r.name && r.name.toLowerCase().includes(cleanLabel.toLowerCase().split(' ')[0])
+        );
+        if (match) { ownerResId = match.id; ownerResName = match.name; }
+      }
+      if (!ownerResId && _resources?.length) {
+        const pm = _resources.find(r =>
+          r.department?.toLowerCase().includes('pm') ||
+          r.title?.toLowerCase().includes('project manager')
+        );
+        if (pm) { ownerResId = pm.id; ownerResName = pm.name; }
+      }
+      if (ownerResId) {
+        await API.post('workflow_action_items', {
+          id:                crypto.randomUUID(),
+          firm_id:           firmId,
+          instance_id:       instanceId,
+          title:             `Review request: ${title}`,
+          body:              details.instructions || details.justification || details.description || '',
+          status:            'open',
+          owner_resource_id: ownerResId,
+          owner_name:        ownerResName,
+          created_by_name:   resName,
+          due_date:          details.deadline || null,
+        });
+        actionRecipients.push({ name: ownerResName, role: 'Reviewer' });
+      }
     }
 
     // ── 6. Optimistic local update → re-render ─────────────
@@ -1972,7 +2111,11 @@ window.myrSubmitWorkflow = async function(wfId) {
     // Force re-fetch on next tab visit to sync with DB
     window._requestsLoaded = false;
 
-    compassToast(`✓ ${title} — submitted & routed to ${ownerResName}`);
+    const recipientSummary = actionRecipients.length
+      ? actionRecipients.map(r => r.name).join(', ')
+      : 'team';
+
+    compassToast(`✓ ${title} — routed to ${recipientSummary}`);
 
   } catch(e) {
     console.error('[MyRequests] submit failed:', e);
@@ -2060,17 +2203,14 @@ function _buildWorkflowFormBody(wfId, wf) {
                       letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
             Documents for review <span style="color:#E24B4A">*</span>
           </div>
-
-          <!-- Attached documents list -->
           <div id="myr-doc-list" style="margin-bottom:8px"></div>
-
-          <!-- Upload + select buttons -->
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <label style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
                            background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.25);
                            color:#00D2FF;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
               ↑ Upload file
-              <input type="file" id="myr-doc-upload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg"
+              <input type="file" id="myr-doc-upload" multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg"
                 style="display:none" onchange="myrHandleDocUpload(event)"/>
             </label>
             <button type="button" onclick="myrPickCadenceForm()"
@@ -2080,12 +2220,44 @@ function _buildWorkflowFormBody(wfId, wf) {
               ◈ Select CadenceHUD Form
             </button>
           </div>
-          <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);
-                      margin-top:4px">
-            PDF, Word, Excel, PowerPoint, or images. Or attach a released CadenceHUD form.
+          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);margin-top:4px">
+            PDF, Word, Excel, or attach a released CadenceHUD form.
           </div>
+        </div>
+
+        <!-- Reviewers — PersonPicker pills -->
+        <div style="margin-bottom:10px">
+          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
+                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
+            Reviewer(s) <span style="color:#E24B4A">*</span>
+            <span style="font-weight:400;text-transform:none;letter-spacing:0;
+                         color:rgba(255,255,255,.2);font-size:11px"> — all must approve</span>
+          </div>
+          <div id="myr-reviewer-pills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
+          <button type="button" id="myr-add-reviewer-btn" onclick="myrAddReviewer(this)"
+            style="font-family:var(--font-head);font-size:11px;padding:4px 12px;
+                   background:rgba(0,210,255,.05);border:1px dashed rgba(0,210,255,.3);
+                   color:#00D2FF;cursor:pointer;letter-spacing:.06em">
+            + Add Reviewer
+          </button>
+        </div>
+
+        <!-- Approver — PersonPicker single -->
+        <div style="margin-bottom:10px">
+          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
+                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
+            Approver
+            <span style="font-weight:400;text-transform:none;letter-spacing:0;
+                         color:rgba(255,255,255,.2);font-size:11px"> — optional</span>
+          </div>
+          <div id="myr-approver-pill" style="margin-bottom:6px"></div>
+          <button type="button" id="myr-set-approver-btn" onclick="myrSetApprover(this)"
+            style="font-family:var(--font-head);font-size:11px;padding:4px 12px;
+                   background:rgba(196,125,24,.05);border:1px dashed rgba(196,125,24,.3);
+                   color:#c47d18;cursor:pointer;letter-spacing:.06em">
+            + Set Approver
+          </button>
         </div>` +
-        sel('Reviewer(s)', 'reviewer', reviewerOpts) +
         inp('Review deadline', 'deadline', '') +
         ta('Review instructions', 'instructions', '', 2, false);
 
