@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-229001
-console.log('%c[cdn-form-editor] v20260401-229001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-229002
+console.log('%c[cdn-form-editor] v20260401-229002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2566,7 +2566,7 @@ async function _formSetCategory(catId) {
   _formRefreshToolbar();
 }
 
-function _formRefreshToolbar() {
+async function _formRefreshToolbar() {
   if (!_selectedForm) return;
   const f = _selectedForm;
   // Refresh category pill / + Category button
