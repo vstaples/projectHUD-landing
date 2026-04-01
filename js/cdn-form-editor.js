@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-220002
-console.log('%c[cdn-form-editor] v20260401-220002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-220004
+console.log('%c[cdn-form-editor] v20260401-220004','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3617,7 +3617,19 @@ async function _formSave() {
     // Auto-advance rejected states back to draft when editor saves
     const _rejectedStates = ['rejected_review','rejected_approval','rejected_release'];
     if (_rejectedStates.includes(_selectedForm.state)) {
-      _selectedForm.state = 'draft';
+      const _prevState = _selectedForm.state;
+      // Bump version on first save after rejection — new revision cycle begins
+      const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+      const _fmt    = _cat?.version_format || 'semver';
+      const _oldVer = _selectedForm.version;
+      _selectedForm.version = _formBumpVersion(_oldVer, _fmt, 'minor');
+      _selectedForm.state   = 'draft';
+      _formCoCWrite('form.state_changed', _selectedForm.id, {
+        from:    _prevState,
+        to:      'draft',
+        note:    `Returned to Draft — version bumped ${_oldVer} → ${_selectedForm.version}`,
+        version: _selectedForm.version,
+      });
     }
     // Upload replacement PDF if one was selected via Replace PDF button
     if (_selectedForm._file && !_selectedForm._unsaved) {
@@ -5437,6 +5449,9 @@ function _fphRenderActivity(rows) {
       return { role:'Editor',   action:'Rejected',          who, version: _formVersion };
     if (from === 'approved' && to === 'released')
       return { role:'Editor',   action:'Released',          who, version: notes.version || meta.version };
+    // rejected→draft: editor saved after rejection
+    if (from && from.startsWith('rejected') && to === 'draft')
+      return { role:'Editor',   action:'Returned to Draft', who, version: notes.version || _formVersion };
     // Unreleased without stage=release = deliberate revision start
     if (to === 'unreleased')
       return { role:'Editor',   action:'Revision Started',  who, version: _formVersion };
@@ -5453,7 +5468,15 @@ function _fphRenderActivity(rows) {
       return { role: rejRole, action:'Rejected', who, version: _formVersion };
     }
     if (evType === 'form.state_changed' && !from && !to) return null;
-    if (evType === 'form.saved')    return null;  // suppress routine saves
+    if (evType === 'form.saved') {
+      // Show as "In Draft" when editor is actively working (has a known actor)
+      // Pure system saves with no actor are suppressed
+      if (!who) return null;
+      const savedState = notes.state || '';
+      if (['draft','unreleased'].includes(savedState))
+        return { role:'Editor', action:'In Draft', who, version: notes.version || _formVersion };
+      return null; // suppress saves during other states
+    }
     if (evType === 'form.archived') return null;  // suppress archive/delete events
     if (!who) return null;
     return { role:'Editor', action: notes.note || evType.replace('form.',''), who };
@@ -5481,7 +5504,8 @@ function _fphRenderActivity(rows) {
     const rColor = roleColor(role);
     const aColor = action.toLowerCase().includes('reject') ? '#f87171'
                  : ['Approved','Review Complete','Released','Review Approved'].includes(action) ? '#4ade80'
-                 : action === 'Submitted for Review' ? '#60a5fa'
+                 : action === 'Submitted for Review' || action === 'Draft Complete' ? '#60a5fa'
+                 : action === 'In Draft' || action === 'Returned to Draft' ? '#f0a030'
                  : 'var(--text1)';
     return `<tr>
       ${td(fmt(r.created_at), 'var(--muted)', 'white-space:nowrap')}
