@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-101100
+// VERSION: 20260402-101400
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-101100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-101400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -778,7 +778,7 @@ window.loadUserRequests = async function() {
       .myr-coc-events.open { display: block; }
       .myr-coc-row {
         display: grid;
-        grid-template-columns: 7px 1fr auto;
+        grid-template-columns: 7px auto 1fr;
         gap: 8px; padding: 6px 0;
         border-bottom: 1px solid rgba(255,255,255,.04);
         align-items: start;
@@ -786,6 +786,11 @@ window.loadUserRequests = async function() {
       .myr-coc-row:last-child { border-bottom: none; }
       .myr-coc-dot {
         width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+      }
+      .myr-coc-time {
+        font-family: var(--font-head); font-size: 11px;
+        color: #c47d18; white-space: nowrap;
+        padding-top: 2px; flex-shrink: 0; min-width: 110px;
       }
       .myr-coc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
       .myr-coc-event-type {
@@ -800,11 +805,6 @@ window.loadUserRequests = async function() {
         font-family: var(--font-head); font-size: 11px;
         color: rgba(255,255,255,.35);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      .myr-coc-time {
-        font-family: var(--font-head); font-size: 11px;
-        color: rgba(255,255,255,.3); white-space: nowrap; text-align: right;
-        flex-shrink: 0; padding-top: 2px;
       }
       /* History rows */
       .myr-hist-row {
@@ -1150,12 +1150,12 @@ function renderMyRequestsActive() {
           try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
           return `<div class="myr-coc-row">
             <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
+            <div class="myr-coc-time">${_esc(t)}</div>
             <div class="myr-coc-main">
               <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
               <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
               ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
             </div>
-            <div class="myr-coc-time">${_esc(t)}</div>
           </div>`;
         }).join('')
       : `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">
@@ -1187,24 +1187,19 @@ function renderMyRequestsActive() {
               const sizeStr = a.size ? (a.size > 1048576
                 ? (a.size/1048576).toFixed(1)+'MB'
                 : (a.size/1024).toFixed(0)+'KB') : '';
-              const href = a.url && !a.url.includes('/public/') ? a.url :
-                           a.path ? 'javascript:void(0)' : '#';
-              const onclick = a.path
-                ? `myrOpenAttachment('${a.path}');return false;`
-                : '';
-              return `<a href="${href}" target="_blank" rel="noopener"
-                onclick="${onclick}"
-                style="display:flex;align-items:center;gap:6px;padding:4px 8px;
+              const safePathAttr = (a.path||'').replace(/'/g, "\\'");
+              return `<button onclick="myrOpenAttachment('${safePathAttr}')"
+                style="display:flex;align-items:center;gap:6px;padding:4px 8px;width:100%;
                        background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
                        color:#00D2FF;text-decoration:none;font-family:var(--font-head);font-size:11px;
-                       transition:background .12s"
+                       cursor:pointer;text-align:left;transition:background .12s"
                 onmouseover="this.style.background='rgba(0,210,255,.1)'"
                 onmouseout="this.style.background='rgba(0,210,255,.04)'">
                 <span>${icon}</span>
                 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
                 ${sizeStr?`<span style="color:rgba(255,255,255,.25);font-size:12px;flex-shrink:0">${sizeStr}</span>`:''}
                 <span style="color:rgba(255,255,255,.3);font-size:12px;flex-shrink:0">↗</span>
-              </a>`;
+              </button>`;
             }).join('')}
           </div>
         </div>` : ''}
@@ -1251,27 +1246,114 @@ function renderMyRequestsHistory() {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No completed requests yet.</div>`;
     return;
   }
-  let html = `<div style="border:1px solid rgba(255,255,255,.07);overflow:hidden">`;
+
+  const cocByInstance = window._myRequestCoc || {};
+  let html = '';
+
   hist.forEach((req, i) => {
-    const isLast = i === hist.length - 1;
-    const outcomeColor = req.status==='completed'?'#1D9E75':req.status==='rejected'?'#E24B4A':'#EF9F27';
-    const outcomeBorder = req.status==='completed'?'rgba(29,158,117,.3)':req.status==='rejected'?'rgba(226,75,74,.3)':'rgba(239,159,39,.3)';
-    const outcomeLabel = req.status==='completed'?'Approved':req.status==='rejected'?'Rejected':'Pending';
-    html += `<div class="myr-hist-row"${isLast?' style="border-bottom:none"':''}>
-      <div style="width:7px;height:7px;border-radius:50%;background:${outcomeColor};flex-shrink:0"></div>
-      <div style="flex:1;font-family:var(--font-head);font-size:11px;color:#F0F6FF">${_esc(req.title)}</div>
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.date||'')}</div>
-      <div style="font-family:var(--font-head);font-size:11px;padding:1px 7px;border:1px solid ${outcomeBorder};color:${outcomeColor}">${outcomeLabel}</div>
+    const isApproved   = req.status === 'completed';
+    const accentColor  = isApproved ? 'rgba(29,158,117,.5)'  : 'rgba(226,75,74,.5)';
+    const accentBg     = isApproved ? 'rgba(29,158,117,.03)' : 'rgba(226,75,74,.03)';
+    const badgeStyle   = isApproved
+      ? 'border:1px solid rgba(29,158,117,.4);color:#1D9E75'
+      : 'border:1px solid rgba(226,75,74,.4);color:#E24B4A';
+    const badgeLabel   = isApproved ? '✓ Approved'
+      : req.status === 'rejected' ? '✗ Rejected' : '✗ Withdrawn';
+
+    // Step progress — all done if approved, else show actual state
+    const stepsHtml = (req.steps||[]).map((s, si) => {
+      const cls     = s.done ? 'myr-ptd-done' : 'myr-ptd-pending';
+      const label   = s.done ? '&#10003;' : (si + 1);
+      const nameCls = s.done ? 'done' : '';
+      return `<div class="myr-pt-step">
+        <div class="myr-pt-dot ${cls}">${label}</div>
+        <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
+      </div>`;
+    }).join('');
+
+    // CoC rows
+    const instCoc = cocByInstance[req.id] || [];
+    const cocRows = instCoc.length
+      ? instCoc.map(e => {
+          const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+            {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+          const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
+          const dotColor  = e.event_type==='request.submitted' ? '#00D2FF'
+            : e.event_type==='request.approved'||e.event_type==='request.completed' ? '#1D9E75'
+            : (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw') ? '#E24B4A'
+            : '#EF9F27';
+          let notes = '';
+          try { const p=JSON.parse(e.event_notes||'{}'); notes=p.note||p.comments||p.title||p.doc_names||''; } catch(_){}
+          return `<div class="myr-coc-row">
+            <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
+            <div class="myr-coc-time">${_esc(t)}</div>
+            <div class="myr-coc-main">
+              <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
+              <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
+              ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
+            </div>
+          </div>`;
+        }).join('')
+      : `<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded.</div>`;
+
+    const bodyId = `myr-hist-body-${i}`;
+    const cocId  = `myr-hist-coc-${i}`;
+
+    html += `<div style="border:1px solid ${accentColor};border-left-width:3px;
+                         margin-bottom:8px;overflow:hidden;background:${accentBg};
+                         box-shadow:0 2px 8px rgba(0,0,0,.3)">
+      <div onclick="myrToggleReq('${bodyId}')"
+        style="display:flex;align-items:center;gap:8px;padding:10px 14px;
+               border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .12s"
+        onmouseover="this.style.background='rgba(255,255,255,.03)'"
+        onmouseout="this.style.background=''">
+        <div style="width:8px;height:8px;border-radius:50%;background:${isApproved?'#1D9E75':'#E24B4A'};flex-shrink:0"></div>
+        <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
+        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
+        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2)">&#9656;</div>
+      </div>
+      <div id="${bodyId}" class="myr-ar-body">
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
+        <div class="myr-pt-steps">${stepsHtml}</div>
+        ${(req.attachments||[]).length ? `
+        <div style="margin-bottom:8px">
+          <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;
+                      text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">Documents</div>
+          ${(req.attachments||[]).map(a => {
+            const icon = (a.type||'').includes('pdf') ? '📄' :
+                         (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
+                         a.source === 'form' ? '◈' : '📎';
+            const sp = (a.path||'').replace(/'/g,"\'");
+            return `<button onclick="myrOpenAttachment('${sp}')"
+              style="display:flex;align-items:center;gap:6px;padding:4px 8px;width:100%;
+                     background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
+                     color:#00D2FF;font-family:var(--font-head);font-size:11px;
+                     cursor:pointer;text-align:left;margin-bottom:3px">
+              <span>${icon}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
+              <span style="color:rgba(255,255,255,.3);font-size:11px">↗</span>
+            </button>`;
+          }).join('')}
+        </div>` : ''}
+        <div class="myr-coc-panel">
+          <div class="myr-coc-label" onclick="myrToggleCoc('${cocId}','${req.id}',this)">
+            <span>&#9656; Chain of Custody</span>
+            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
+          </div>
+          <div class="myr-coc-events" id="${cocId}">${cocRows}</div>
+        </div>
+      </div>
     </div>`;
   });
-  html += `</div>`;
+
   el.innerHTML = html;
 }
 
 // Open a storage attachment via signed URL (workflow-documents bucket is private)
 window.myrOpenAttachment = async function(path) {
   try {
-    const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
+    const token  = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
     const bucket = _mwStorageBucket();
     const res = await fetch(
       `${_mwSupaURL()}/storage/v1/object/sign/${bucket}/${path}`,
@@ -1282,12 +1364,19 @@ window.myrOpenAttachment = async function(path) {
           'Authorization': `Bearer ${token || _mwSupaKey()}`,
           'Content-Type':  'application/json',
         },
-        body: JSON.stringify({ expiresIn: 300 }), // 5-minute signed URL
+        body: JSON.stringify({ expiresIn: 300 }),
       }
     );
-    if (!res.ok) throw new Error('Signed URL failed: ' + res.status);
-    const { signedURL } = await res.json();
-    window.open(_mwSupaURL() + signedURL, '_blank');
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`${res.status}: ${err}`);
+    }
+    const data = await res.json();
+    // Supabase returns { signedUrl: "/storage/v1/..." } — prepend base only if relative
+    const url  = data.signedUrl || data.signedURL || '';
+    if (!url) throw new Error('No signed URL in response');
+    const fullUrl = url.startsWith('http') ? url : `${_mwSupaURL()}${url}`;
+    window.open(fullUrl, '_blank');
   } catch(e) {
     console.error('[Attachment] signed URL error:', e);
     compassToast('Could not open file — ' + e.message, 3000);
@@ -1331,12 +1420,12 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
         try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
         return `<div class="myr-coc-row">
           <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
+          <div class="myr-coc-time">${_esc(t)}</div>
           <div class="myr-coc-main">
             <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
             <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
             ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
           </div>
-          <div class="myr-coc-time">${_esc(t)}</div>
         </div>`;
       }).join('');
       // Update the event count in the label
