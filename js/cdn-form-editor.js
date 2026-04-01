@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-204000
-console.log('%c[cdn-form-editor] v20260401-204000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-205000
+console.log('%c[cdn-form-editor] v20260401-205000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4803,13 +4803,13 @@ function _fphRenderDag(currentState) {
   const el = document.getElementById('fph-dag');
   if (!el) return;
 
-  // Node definitions — fixed LC1 lifecycle
+  // Node definitions — labels split into lines for two-line display in taller nodes
   const NODES = [
-    { id:'draft',    label:'Draft',   color:'#8b91a5', activeColor:'#4f8ef7' },
-    { id:'in_review',label:'Review',  color:'#8b91a5', activeColor:'#c47d18' },
-    { id:'reviewed', label:'Reviewed',color:'#8b91a5', activeColor:'#c47d18' },
-    { id:'approved', label:'Approved',color:'#8b91a5', activeColor:'#2a9d40' },
-    { id:'released', label:'Released',color:'#8b91a5', activeColor:'#2a9d40' },
+    { id:'draft',    lines:['Draft'],             color:'#8b91a5', activeColor:'#4f8ef7' },
+    { id:'in_review',lines:['In','Review'],       color:'#8b91a5', activeColor:'#c47d18' },
+    { id:'reviewed', lines:['Awaiting','Approval'],color:'#8b91a5', activeColor:'#c47d18' },
+    { id:'approved', lines:['Approved'],           color:'#8b91a5', activeColor:'#2a9d40' },
+    { id:'released', lines:['Released'],           color:'#8b91a5', activeColor:'#2a9d40' },
   ];
 
   const isRejected  = currentState === 'rejected_review' || currentState === 'rejected_approval';
@@ -4822,14 +4822,14 @@ function _fphRenderDag(currentState) {
   // Derive panelW from actual container width so SVG always fits
   const panelEl = document.getElementById('form-preview-history-panel');
   const panelW  = Math.max(400, (panelEl?.clientWidth || 440) - 32); // 16px padding each side
-  const nodeW   = Math.floor((panelW - 4 * 10) / 5);  // fill available width
-  const nodeH   = 36, nodeR = 6;
-  const colGap  = 10;
+  const nodeW   = Math.floor((panelW - 4 * 8) / 5);   // fill available width
+  const nodeH   = 52, nodeR = 7;                        // taller for two-line labels
+  const colGap  = 8;
   const cols    = NODES.length;
   const totalW  = cols * nodeW + (cols - 1) * colGap;
   const startX  = (panelW - totalW) / 2;
-  const nodeY   = 48;
-  const svgH    = isRejected ? 160 : 110;
+  const nodeY   = 52;
+  const svgH    = isRejected ? 185 : 130;
 
   let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
     style="display:block;overflow:visible;max-width:100%" xmlns="http://www.w3.org/2000/svg">`;
@@ -4911,10 +4911,17 @@ function _fphRenderDag(currentState) {
     svg += `<circle cx="${x + 10}" cy="${nodeY + nodeH/2}" r="3" fill="${dotColor}"/>`;
 
     // Label
-    svg += `<text x="${x + nodeW/2 + 4}" y="${nodeY + nodeH/2 + 1}"
-      text-anchor="middle" dominant-baseline="middle"
-      font-size="10" font-weight="${isCurrent ? '700' : '400'}"
-      fill="${textCol}" font-family="Arial,sans-serif">${n.label}</text>`;
+    // Two-line label support
+    const lines   = n.lines || [n.label || ''];
+    const lineH   = 13;
+    const totalTH = lines.length * lineH;
+    const startTY = nodeY + nodeH/2 - totalTH/2 + lineH/2 + 4; // +4 for dot offset
+    lines.forEach((line, li) => {
+      svg += `<text x="${x + nodeW/2 + 5}" y="${startTY + li * lineH}"
+        text-anchor="middle" dominant-baseline="middle"
+        font-size="11" font-weight="${isCurrent ? '700' : '500'}"
+        fill="${textCol}" font-family="Arial,sans-serif">${line}</text>`;
+    });
 
     // Done checkmark
     if (isDone) {
@@ -5015,9 +5022,19 @@ function _fphRenderComments(rows) {
   // Comments = rejection notes + any note-bearing events, newest first
   // Comments: events with notes, newest first
   // event_notes is the column name; metadata.note/comment also checked
-  const commentEvents = rows
-    .filter(r => r.event_notes || r.metadata?.note || r.metadata?.comment)
-    .reverse();
+  // Only show events that have a human-readable note worth displaying
+  const commentEvents = rows.filter(r => {
+    const notes = r.event_notes || '';
+    if (!notes && !r.metadata?.note && !r.metadata?.comment) return false;
+    // Skip pure state-change events with no additional note
+    try {
+      const p = JSON.parse(notes);
+      const note = p.note || p.comment || '';
+      // Exclude auto-generated notes that are just state transitions with no human text
+      if (!note || note.startsWith('Reviewer current_user')) return false;
+      return true;
+    } catch(e) { return !!notes; }
+  }).reverse();
 
   if (!commentEvents.length) {
     el.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif;font-style:italic">No comments recorded.</div>';
@@ -5033,7 +5050,21 @@ function _fphRenderComments(rows) {
 
   el.innerHTML = commentEvents.map(r => {
     const who     = r.actor_name || r.actor_id || 'System';
-    const text    = r.event_notes || r.metadata?.comment || r.metadata?.note || '';
+    // event_notes is stored as JSON string — parse and extract the human note
+    let text = '';
+    const rawNotes = r.event_notes || '';
+    try {
+      const parsed = JSON.parse(rawNotes);
+      // Extract the most human-readable field
+      text = parsed.note || parsed.comment || parsed.message ||
+             (parsed.from && parsed.to ? `${parsed.from} → ${parsed.to}` : '') ||
+             rawNotes;
+    } catch(e) {
+      text = rawNotes; // not JSON — use as-is
+    }
+    if (!text && r.metadata) {
+      text = r.metadata?.note || r.metadata?.comment || '';
+    }
     const color   = isReject(r.event_type) ? '#dc2626' : 'var(--cad)';
     const badge   = isReject(r.event_type) ? '✗ Rejected' : '● Note';
     const ini     = who.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
@@ -5188,7 +5219,7 @@ function _formRefreshRolePanel() {
     const p   = people[approverId] || { name:approverId, email:'' };
     const ini = p.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
     const lbl = (isApproved||isReleased) ? 'Approved'
-      : isReviewed ? 'Approving'
+      : isReviewed ? 'Awaiting Approval'
       : state === 'rejected_approval' ? 'Rejected'
       : 'Pending';
     const col = (isApproved||isReleased) ? 'var(--green)'
