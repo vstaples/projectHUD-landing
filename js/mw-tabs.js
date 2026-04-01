@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-101400
+// VERSION: 20260402-101700
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-101400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-101700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -13,7 +13,9 @@ function _mwStorageBucket(){ try { return STORAGE_BUCKET; } catch(_) { return wi
 function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return window.FIRM_ID        || 'aaaaaaaa-0001-0001-0001-000000000001'; } }
 
 // ── Tab switcher ─────────────────────────────────────────
-let _uActiveTab = 'work';
+// var (not let) — my-work.html scripts are injected via document.head.appendChild
+// and may execute more than once per page session. var re-declaration is safe; let/const are not.
+var _uActiveTab = _uActiveTab || 'work';
 window.uSwitchTab = function(tab, btn) {
   // Flush any pending notes save before leaving the tab
   if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesSaveNow) {
@@ -57,8 +59,8 @@ window.uSwitchTab = function(tab, btn) {
 };
 
 // ── Calendar popup ────────────────────────────────────────
-let _ucalYear  = new Date().getFullYear();
-let _ucalMonth = new Date().getMonth(); // 0-indexed
+var _ucalYear  = (typeof _ucalYear  !== "undefined") ? _ucalYear  : new Date().getFullYear();
+var _ucalMonth = (typeof _ucalMonth !== "undefined") ? _ucalMonth : new Date().getMonth(); // 0-indexed
 
 window.toggleMwCoc = function() {
   const coc = document.getElementById('mw-coc');
@@ -363,13 +365,24 @@ window.loadMyNotesView = async function() {
 
 window.loadMyViewsView = async function() {
   if (window._myViewsLoaded) {
-    window._viewsRefresh && window._viewsRefresh();
+    // If _widgetContext is missing despite being loaded, the const collision killed
+    // the script block — force a clean re-init (page reload is the safest recovery)
+    if (!window._widgetContext) {
+      console.warn('[MyViews] _widgetContext missing after load — reloading page to recover');
+      window.location.reload();
+      return;
+    }
+    // Already loaded and healthy — just refresh data
+    if (window._viewsRefresh) {
+      window._viewsRefresh();
+    } else if (window._viewsLoadView) {
+      window._viewsLoaded = false;
+      await window._viewsLoadView();
+    }
     return;
   }
   const container = document.getElementById('views-root');
   if (!container) {
-    // #views-root is rendered by _mwLoadUserView inside my-work.html.
-    // If MY WORK hasn't loaded yet, defer until it does.
     console.warn('[Compass] #views-root not found — deferring until _mwLoadUserView completes');
     const MAX_WAIT = 8000;
     const POLL_MS  = 100;
@@ -387,7 +400,6 @@ window.loadMyViewsView = async function() {
       console.error('[Compass] #views-root still not found after ' + MAX_WAIT + 'ms — aborting');
       return;
     }
-    // Re-check loaded flag — another call may have succeeded while we waited
     if (window._myViewsLoaded) {
       window._viewsRefresh && window._viewsRefresh();
       return;
@@ -422,7 +434,7 @@ window.loadMyViewsView = async function() {
         if (!s.src) resolve();
       });
     }
-    // Bridge resource — same pattern as MY NOTES
+    // Bridge resource BEFORE calling _viewsLoadView so _widgetContext resolves correctly
     window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
     window._myViewsLoaded = true;
     if (window._viewsLoadView) await window._viewsLoadView();
@@ -866,23 +878,24 @@ window.loadUserRequests = async function() {
         const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
         const currentStep = r.current_step_name || '';
 
-        // currentStep matches the COMPLETED step — active is one AFTER it
-        // e.g. current_step_name='Submitted' means Submit is done, Route to reviewers is active
+        // Count CoC events to determine how many steps actually completed
+        const cocEvents = (window._myRequestCoc||{})[r.id] || [];
+        const cocDoneCount = cocEvents.length;
         const currentIdx = stepLabels.findIndex(s =>
           s.toLowerCase().replace(/\s+/g,'').includes(
             (currentStep||'').toLowerCase().replace(/\s+/g,'').slice(0,5)
           )
         );
-        // Active = step AFTER the current completed one (unless already at end)
         const activeIdx = r.status === 'complete' || r.status === 'completed'
           ? stepLabels.length
           : currentIdx >= 0
             ? Math.min(currentIdx + 1, stepLabels.length - 1)
-            : 1; // default to step 1 (Route to reviewers) for newly submitted requests
+            : 1;
+        const isComplete = r.status === 'complete' || r.status === 'completed';
         const steps = stepLabels.map((label, i) => ({
           label,
-          done:   r.status === 'complete' || r.status === 'completed' ? true : i < activeIdx,
-          active: r.status !== 'complete' && r.status !== 'completed' && i === activeIdx,
+          done:   i < cocDoneCount,
+          active: !isComplete && i === cocDoneCount,
         }));
 
         // Map instance status to display status
@@ -974,7 +987,7 @@ window.myrSwitchView = function(view, btn) {
 };
 
 // Workflow catalog definition
-const _WF_CATALOG = [
+var _WF_CATALOG = (typeof _WF_CATALOG !== "undefined") ? _WF_CATALOG : [
   { cat:'Resource & scheduling', items:[
     { id:'resource-alloc', title:'Resource allocation request', icon:'user', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
       desc:'Request a change to a team member\'s allocation across projects. Routes to PM then management for approval.',
@@ -2019,7 +2032,7 @@ window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
 };
 
 // Clear pending docs when modal closes
-const _origMyrCloseModal = window.myrCloseModal;
+var _origMyrCloseModal = window.myrCloseModal;
 window.myrCloseModal = function() {
   window._myrPendingDocs      = [];
   window._myrPendingReviewers = [];
