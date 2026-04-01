@@ -189,6 +189,13 @@ document.addEventListener('click', function(ev) {
     if (!item) return;
     const status = actionBtn.dataset.wiStatus;
     if (item.type==='action') {
+      // ── Review requests from My Requests system ──────────
+      // These are identified by instanceId + title prefix "Review request:"
+      // Route to the dedicated review panel instead of LOE negotiation.
+      if (item.instanceId && (item.title||'').startsWith('Review request:')) {
+        openRequestReviewPanel(item);
+        return;
+      }
       const _ns = negGetState(item.id).state;
       if (_ns==='unrated' || _ns==='pending' || _ns==='negotiating' || _ns==='escalated') {
         // Not yet agreed — open drawer to LOE negotiation panel
@@ -356,3 +363,272 @@ async function saveInProgressUpdate(itemId, projectId) {
     compassToast('Failed — '+e.message,2500);
   }
 }
+// ── Request Review Panel ───────────────────────────────────────────────────
+// Opens when a reviewer clicks their "Review request: ..." action item.
+// Shows the request details, reviewer instructions, and Approve / Reject buttons.
+// Writes to workflow_instances (status), workflow_action_items (resolved),
+// and coc_events (audit trail). Notifies the submitter via their My Work queue.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function openRequestReviewPanel(item) {
+  document.getElementById('req-review-panel')?.remove();
+
+  const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const resName = window._myResource?.name || 'Unknown';
+  const resId   = window._myResource?.id   || null;
+
+  // Fetch the workflow instance for full context
+  let instance = null;
+  let cocEvents = [];
+  if (item.instanceId) {
+    try {
+      const [instRows, coc] = await Promise.all([
+        API.get(`workflow_instances?id=eq.${item.instanceId}&select=*&limit=1`).catch(()=>[]),
+        API.get(`coc_events?entity_id=eq.${item.instanceId}&order=occurred_at.asc&select=*`).catch(()=>[]),
+      ]);
+      instance  = instRows?.[0] || null;
+      cocEvents = coc || [];
+    } catch(e) { console.warn('[ReviewPanel] fetch failed:', e); }
+  }
+
+  // Parse submission details from CoC event notes
+  let submittedDetails = {};
+  const submitEvent = cocEvents.find(e => e.event_type === 'request.submitted');
+  if (submitEvent) {
+    try { submittedDetails = JSON.parse(submitEvent.event_notes || '{}'); } catch(_) {}
+  }
+
+  const docName      = submittedDetails.doc_name || instance?.title || item.title;
+  const instructions = submittedDetails.instructions || item.body || '';
+  const deadline     = submittedDetails.deadline || item.due || '';
+  const submittedBy  = instance?.submitted_by_name || item.createdBy || 'Unknown';
+  const submittedAt  = submitEvent
+    ? new Date(submitEvent.occurred_at||submitEvent.created_at)
+        .toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
+    : '';
+
+  // CoC timeline rows
+  const cocHtml = cocEvents.length
+    ? cocEvents.map(e => {
+        const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+          {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
+        const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
+                          e.event_type==='request.completed'?'#1D9E75':
+                          (e.event_type||'').includes('reject')?'#E24B4A':'#EF9F27';
+        return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);
+                            font-family:var(--font-head);font-size:10px;align-items:flex-start">
+          <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:3px"></div>
+          <div style="color:rgba(0,210,255,.8);min-width:110px">${esc(typeLabel)}</div>
+          <div style="color:rgba(255,255,255,.4)">${esc(e.actor_name||'System')}</div>
+          <div style="color:rgba(255,255,255,.2);margin-left:auto">${esc(t)}</div>
+        </div>`;
+      }).join('')
+    : `<div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:4px 0">No events yet.</div>`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'req-review-panel';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:800;' +
+    'display:flex;align-items:center;justify-content:center;padding:20px';
+
+  overlay.innerHTML = `
+    <div style="background:#0d1b2e;border:1px solid rgba(0,210,255,.3);width:560px;max-height:88vh;
+                border-radius:4px;overflow:hidden;display:flex;flex-direction:column">
+
+      <!-- Header -->
+      <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
+                  display:flex;align-items:flex-start;gap:10px;flex-shrink:0">
+        <div style="flex:1">
+          <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;margin-bottom:3px">
+            Document Review Request
+          </div>
+          <div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.7)">
+            ${esc(docName)}
+          </div>
+          <div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">
+            Submitted by ${esc(submittedBy)}${submittedAt?' · '+submittedAt:''}
+            ${deadline?` · Due ${esc(deadline)}`:''}
+          </div>
+        </div>
+        <button onclick="document.getElementById('req-review-panel').remove()"
+          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;
+                 width:22px;height:22px;cursor:pointer;font-family:var(--font-head);
+                 font-size:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+          &#x2715;
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div style="flex:1;overflow-y:auto;padding:16px 18px">
+
+        <!-- Instructions -->
+        ${instructions ? `
+        <div style="margin-bottom:14px">
+          <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
+                      text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">
+            Review Instructions
+          </div>
+          <div style="font-family:var(--font-head);font-size:12px;color:rgba(240,246,255,.7);
+                      padding:9px 12px;background:rgba(0,210,255,.04);
+                      border:1px solid rgba(0,210,255,.12);border-left:2px solid rgba(0,210,255,.4);
+                      line-height:1.6">
+            ${esc(instructions)}
+          </div>
+        </div>` : ''}
+
+        <!-- Review comments -->
+        <div style="margin-bottom:14px">
+          <label style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
+                        text-transform:uppercase;color:rgba(255,255,255,.3);display:block;margin-bottom:6px">
+            Your Review Comments
+            <span style="text-transform:none;letter-spacing:0;color:rgba(255,255,255,.2)"> (optional)</span>
+          </label>
+          <textarea id="rrp-comments"
+            placeholder="Add your review notes, observations, or change requests…"
+            style="width:100%;padding:8px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+                   color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
+                   resize:none;box-sizing:border-box;line-height:1.6"
+            rows="4"
+            onfocus="this.style.borderColor='rgba(0,210,255,.5)'"
+            onblur="this.style.borderColor='rgba(0,210,255,.2)'"></textarea>
+        </div>
+
+        <!-- Chain of custody -->
+        <div>
+          <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
+                      text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">
+            Chain of Custody
+          </div>
+          <div style="padding:2px 0">${cocHtml}</div>
+        </div>
+      </div>
+
+      <!-- Action footer -->
+      <div style="padding:12px 18px;border-top:1px solid rgba(255,255,255,.07);
+                  display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;
+                  background:rgba(0,0,0,.2)">
+        <button onclick="document.getElementById('req-review-panel').remove()"
+          style="font-family:var(--font-head);font-size:11px;padding:6px 16px;
+                 background:none;border:1px solid rgba(255,255,255,.15);
+                 color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">
+          Cancel
+        </button>
+        <button id="rrp-reject-btn"
+          onclick="_rrpSubmit('${item.id}','${item.instanceId||''}','rejected')"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
+                 background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.4);
+                 color:#E24B4A;cursor:pointer;letter-spacing:.06em">
+          ✗ Request Changes
+        </button>
+        <button id="rrp-approve-btn"
+          onclick="_rrpSubmit('${item.id}','${item.instanceId||''}','approved')"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
+                 background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.4);
+                 color:#1D9E75;cursor:pointer;letter-spacing:.06em">
+          ✓ Approve
+        </button>
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  document.getElementById('rrp-comments')?.focus();
+}
+
+// ── Review panel submit ───────────────────────────────────
+window._rrpSubmit = async function(actionItemId, instanceId, decision) {
+  const comments = document.getElementById('rrp-comments')?.value?.trim() || '';
+  const firmId   = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const resName  = window._myResource?.name || 'Unknown';
+  const resId    = window._myResource?.id   || null;
+  const now      = new Date().toISOString();
+
+  // Disable buttons
+  ['rrp-approve-btn','rrp-reject-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
+  });
+
+  const approved   = decision === 'approved';
+  const newStatus  = approved ? 'completed' : 'pending';  // rejected goes back to pending for revision
+  const eventType  = approved ? 'request.approved' : 'request.changes_requested';
+  const stepName   = approved ? 'Approved' : 'Revisions';
+
+  try {
+    // 1. Update workflow_instance status + current step
+    if (instanceId) {
+      await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+        status:           newStatus,
+        current_step_name: stepName,
+        updated_at:       now,
+      }).catch(()=>{});
+    }
+
+    // 2. Resolve the action item
+    await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
+      status: 'resolved',
+      updated_at: now,
+    }).catch(()=>{});
+
+    // 3. Write CoC event
+    await API.post('coc_events', {
+      id:                crypto.randomUUID(),
+      firm_id:           firmId,
+      entity_id:         instanceId || actionItemId,
+      entity_type:       'workflow_instance',
+      event_type:        eventType,
+      event_class:       'lifecycle',
+      severity:          approved ? 'info' : 'warning',
+      event_notes:       JSON.stringify({
+        decision,
+        comments,
+        reviewer: resName,
+      }),
+      actor_name:        resName,
+      actor_resource_id: resId,
+      occurred_at:       now,
+      created_at:        now,
+    });
+
+    // 4. If approved, notify submitter via a new action item in their My Work
+    //    Fetch instance to get submitted_by_resource_id
+    if (instanceId) {
+      const instRows = await API.get(
+        `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title&limit=1`
+      ).catch(()=>[]);
+      const inst = instRows?.[0];
+      if (inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
+        await API.post('workflow_action_items', {
+          id:               crypto.randomUUID(),
+          instance_id:      instanceId,
+          title:            approved
+            ? `✓ Approved: ${inst.title||'Document review request'}`
+            : `↺ Changes requested: ${inst.title||'Document review request'}`,
+          body: comments || (approved ? 'Your request has been approved.' : 'Changes were requested. Please revise and resubmit.'),
+          status:           'open',
+          owner_resource_id: inst.submitted_by_resource_id,
+          owner_name:       inst.submitted_by_name || '',
+          created_by_name:  resName,
+        }).catch(()=>{});
+      }
+    }
+
+    document.getElementById('req-review-panel')?.remove();
+    compassToast(approved
+      ? `✓ Request approved${comments?' — comments recorded':''}. Submitter notified.`
+      : `↺ Changes requested${comments?' — feedback recorded':''}. Submitter notified.`
+    );
+
+    // Refresh My Work to remove resolved item
+    _viewLoaded['user'] = false;
+    _mwLoadUserView();
+
+  } catch(e) {
+    console.error('[ReviewPanel] submit failed:', e);
+    compassToast('Submit failed — ' + (e.message||'check console'), 4000);
+    ['rrp-approve-btn','rrp-reject-btn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    });
+  }
+};

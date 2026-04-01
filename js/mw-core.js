@@ -197,7 +197,9 @@ window._mwLoadUserView = async function() {
       workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
         projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency: overdue?0:1,
         createdBy: a.created_by_name||null,
-        ownerName: a.owner_name||null, ownerResourceId: a.owner_resource_id||null });
+        ownerName: a.owner_name||null, ownerResourceId: a.owner_resource_id||null,
+        instanceId: a.instance_id||null,   // needed to route review requests
+        body: a.body||null });
     });
     workItems.sort((a,b) => {
       if (a.urgency !== b.urgency) return a.urgency - b.urgency;
@@ -1700,4 +1702,3 @@ window.showCardPopup = function(type, cardEl) {
     if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-mono);font-size:11px">Failed to load — check console</div>';
   }
 }
-

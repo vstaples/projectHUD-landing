@@ -38,6 +38,11 @@ window.uSwitchTab = function(tab, btn) {
   if (tab === 'calendar' && !window._calLoaded) loadMyCalView();
   else if (tab === 'calendar' && window._calRefresh) window._calRefresh();
   if (tab === 'requests' && !window._requestsLoaded) loadUserRequests();
+  else if (tab === 'requests' && window._requestsLoaded) {
+    // Re-fetch on every visit to pick up reviewer actions and status changes
+    window._requestsLoaded = false;
+    loadUserRequests();
+  }
   if (tab === 'timesheet' && !window._myTimeLoaded) loadMyTimeView();
 };
 
@@ -731,7 +736,7 @@ window.loadUserRequests = async function() {
       const rows = await API.get(
         `workflow_instances?submitted_by_resource_id=eq.${resId}` +
         `&order=created_at.desc&limit=100` +
-        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at`
+        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
       ).catch(() => []);
 
       // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
@@ -775,14 +780,15 @@ window.loadUserRequests = async function() {
         };
 
         return {
-          id:        r.id,
-          title:     r.title || 'Untitled request',
-          status:    statusMap[r.status] || 'in_progress',
-          workflow:  wfType.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
-          submitted: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
+          id:          r.id,
+          title:       r.title || 'Untitled request',
+          status:      statusMap[r.status] || 'in_progress',
+          workflow:    wfType.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
+          submitted:   r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
           steps,
-          cocNote:   '',   // loaded lazily from CoC events if needed
-          _raw:      r,
+          cocNote:     '',
+          attachments: r.attachments || [],
+          _raw:        r,
         };
       });
     } catch(e) {
@@ -1042,6 +1048,39 @@ function renderMyRequestsActive() {
       <div class="myr-ar-body${req.expanded?' open':''}" id="myr-ar-body-${i}">
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
         <div class="myr-pt-steps">${stepsHtml}</div>
+        ${(req.attachments||[]).length ? `
+        <div style="margin-bottom:8px">
+          <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.07em;
+                      text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">
+            Documents
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            ${(req.attachments||[]).map(a => {
+              const icon = (a.type||'').includes('pdf') ? '📄' :
+                           (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
+                           (a.type||'').includes('sheet')||(a.name||'').endsWith('.xlsx') ? '📊' :
+                           (a.source === 'form') ? '◈' : '📎';
+              const sizeStr = a.size ? (a.size > 1048576
+                ? (a.size/1048576).toFixed(1)+'MB'
+                : (a.size/1024).toFixed(0)+'KB') : '';
+              const href = a.url || (a.path
+                ? `${window.SUPA_URL||''}/storage/v1/object/public/workflow-documents/${a.path}`
+                : '#');
+              return `<a href="${href}" target="_blank" rel="noopener"
+                style="display:flex;align-items:center;gap:6px;padding:4px 8px;
+                       background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
+                       color:#00D2FF;text-decoration:none;font-family:var(--font-head);font-size:11px;
+                       transition:background .12s"
+                onmouseover="this.style.background='rgba(0,210,255,.1)'"
+                onmouseout="this.style.background='rgba(0,210,255,.04)'">
+                <span>${icon}</span>
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
+                ${sizeStr?`<span style="color:rgba(255,255,255,.25);font-size:10px;flex-shrink:0">${sizeStr}</span>`:''}
+                <span style="color:rgba(255,255,255,.3);font-size:10px;flex-shrink:0">↗</span>
+              </a>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
         ${req.cocNote?`<div style="font-family:var(--font-head);font-size:11px;padding:6px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.35);color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">${_esc(req.cocNote)}</div>`:''}
         <div class="myr-coc-panel">
           <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
@@ -1363,6 +1402,223 @@ window.myrSubmitContext = async function(instanceId) {
   }
 };
 
+
+// ── Document upload helpers for doc-review requests ──────────────────────────
+// _myrPendingDocs: staging array of docs attached to the open modal.
+// Cleared on modal close and after successful submit.
+window._myrPendingDocs = [];
+
+// Called when the file input changes — uploads each file to Supabase Storage
+// then adds to _myrPendingDocs and re-renders the doc list.
+window.myrHandleDocUpload = async function(event) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+
+  const listEl = document.getElementById('myr-doc-list');
+  const uploadBtn = event.target.closest('label');
+  if (uploadBtn) { uploadBtn.style.opacity = '.5'; uploadBtn.style.pointerEvents = 'none'; }
+
+  for (const file of files) {
+    const docId   = crypto.randomUUID();
+    const ext     = file.name.split('.').pop();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path    = `requests/${docId}/${safeName}`;
+
+    try {
+      // Get auth token for storage upload
+      const token = await (window.Auth?.getFreshToken?.() || window.Auth?.getToken?.()).catch(() => null);
+
+      const res = await fetch(
+        `${window.SUPA_URL}/storage/v1/object/workflow-documents/${path}`,
+        {
+          method:  'POST',
+          headers: {
+            'apikey':         window.SUPA_KEY || '',
+            'Authorization':  `Bearer ${token || window.SUPA_KEY}`,
+            'Content-Type':   file.type || 'application/octet-stream',
+            'x-upsert':       'true',
+          },
+          body: file,
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        console.warn('[DocUpload] Storage upload failed:', err);
+        compassToast(`Upload failed: ${file.name}`, 3000);
+        continue;
+      }
+
+      // Build public URL
+      const url = `${window.SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`;
+
+      window._myrPendingDocs.push({
+        id:     docId,
+        name:   file.name,
+        path,
+        url,
+        size:   file.size,
+        mime:   file.type,
+        source: 'upload',
+      });
+
+      myrRenderDocList();
+
+    } catch(e) {
+      console.error('[DocUpload] error:', e);
+      compassToast(`Upload error: ${file.name} — ${e.message}`, 3000);
+    }
+  }
+
+  // Reset the file input so the same file can be re-selected if needed
+  event.target.value = '';
+  if (uploadBtn) { uploadBtn.style.opacity = '1'; uploadBtn.style.pointerEvents = ''; }
+};
+
+// Render the pending doc list inside the modal
+window.myrRenderDocList = function() {
+  const el = document.getElementById('myr-doc-list');
+  if (!el) return;
+  const docs = window._myrPendingDocs || [];
+  if (!docs.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = docs.map((d, i) => {
+    const icon = (d.mime||'').includes('pdf') ? '📄' :
+                 (d.mime||'').includes('word') || d.name.endsWith('.docx') ? '📝' :
+                 (d.mime||'').includes('sheet') || d.name.endsWith('.xlsx') ? '📊' :
+                 d.source === 'form' ? '◈' : '📎';
+    const sizeStr = d.size > 1048576
+      ? (d.size/1048576).toFixed(1) + 'MB'
+      : (d.size/1024).toFixed(0) + 'KB';
+    return `
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;
+                  background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">
+        <span style="font-size:13px">${icon}</span>
+        <span style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;
+                     flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="${_esc(d.name)}">${_esc(d.name)}</span>
+        <span style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.3);
+                     flex-shrink:0">${d.source === 'form' ? 'Form' : sizeStr}</span>
+        <button onclick="myrRemoveDoc(${i})"
+          style="background:none;border:none;color:rgba(226,75,74,.6);cursor:pointer;
+                 font-size:13px;padding:0 2px;line-height:1;flex-shrink:0"
+          title="Remove">&#x2715;</button>
+      </div>`;
+  }).join('');
+};
+
+// Remove a pending doc by index
+window.myrRemoveDoc = function(idx) {
+  window._myrPendingDocs = (window._myrPendingDocs || []).filter((_,i) => i !== idx);
+  myrRenderDocList();
+};
+
+// Open a picker to select a released CadenceHUD form definition as a document
+window.myrPickCadenceForm = async function() {
+  // Fetch released form definitions
+  let forms = [];
+  try {
+    forms = await API.get(
+      `workflow_form_definitions?state=eq.released&order=source_name.asc&limit=100` +
+      `&select=id,source_name,version,source_path,category_id`
+    ).catch(() => []);
+  } catch(e) { forms = []; }
+
+  if (!forms.length) {
+    compassToast('No released forms found in the Form Library.', 3000);
+    return;
+  }
+
+  // Show picker overlay
+  const existing = document.getElementById('myr-form-picker');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'myr-form-picker';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;' +
+    'display:flex;align-items:center;justify-content:center;padding:20px';
+
+  overlay.innerHTML = `
+    <div style="background:#0d1b2e;border:1px solid rgba(196,125,24,.35);width:460px;
+                max-height:70vh;border-radius:4px;overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:12px 16px 10px;border-bottom:1px solid rgba(255,255,255,.07);
+                  display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">
+          Select CadenceHUD Form
+        </div>
+        <span style="font-family:var(--font-head);font-size:10px;color:rgba(196,125,24,.7)">
+          Released forms only
+        </span>
+        <button onclick="document.getElementById('myr-form-picker').remove()"
+          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;
+                 width:20px;height:20px;cursor:pointer;font-size:11px;display:flex;
+                 align-items:center;justify-content:center">&#x2715;</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:8px">
+        ${forms.map(f => `
+          <div onclick="myrAttachForm('${f.id}','${_esc(f.source_name)}','${_esc(f.version||'0.1.0')}','${f.source_path||''}')"
+            style="padding:9px 12px;cursor:pointer;border:1px solid rgba(255,255,255,.06);
+                   margin-bottom:4px;transition:background .1s;display:flex;align-items:center;gap:10px"
+            onmouseover="this.style.background='rgba(196,125,24,.08)';this.style.borderColor='rgba(196,125,24,.3)'"
+            onmouseout="this.style.background='';this.style.borderColor='rgba(255,255,255,.06)'">
+            <span style="font-size:16px">◈</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:var(--font-head);font-size:12px;font-weight:600;
+                          color:#F0F6FF;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${_esc(f.source_name)}
+              </div>
+              <div style="font-family:var(--font-head);font-size:10px;color:rgba(196,125,24,.7);margin-top:1px">
+                v${_esc(f.version||'0.1.0')} · Released
+              </div>
+            </div>
+            <span style="font-family:var(--font-head);font-size:10px;color:rgba(0,210,255,.5)">
+              Attach ›
+            </span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+};
+
+// Attach a CadenceHUD form to the pending docs list
+window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
+  document.getElementById('myr-form-picker')?.remove();
+
+  // Don't add duplicates
+  if ((window._myrPendingDocs||[]).some(d => d.form_id === formId)) {
+    compassToast(`${formName} is already attached.`, 2000);
+    return;
+  }
+
+  const url = sourcePath
+    ? `${window.SUPA_URL}/storage/v1/object/public/workflow-documents/${sourcePath}`
+    : null;
+
+  window._myrPendingDocs = window._myrPendingDocs || [];
+  window._myrPendingDocs.push({
+    id:      crypto.randomUUID(),
+    name:    `${formName} v${formVersion}`,
+    path:    sourcePath || null,
+    url,
+    size:    0,
+    mime:    'application/pdf',
+    source:  'form',
+    form_id: formId,
+  });
+
+  myrRenderDocList();
+  compassToast(`${formName} attached.`, 1800);
+};
+
+// Clear pending docs when modal closes
+const _origMyrCloseModal = window.myrCloseModal;
+window.myrCloseModal = function() {
+  window._myrPendingDocs = [];
+  if (_origMyrCloseModal) _origMyrCloseModal();
+};
+
 window.myrSubmitWorkflow = async function(wfId) {
   // ── 1. Collect form values from modal ───────────────────
   const modal = document.getElementById('myr-modal');
@@ -1378,15 +1634,16 @@ window.myrSubmitWorkflow = async function(wfId) {
   let title = '', details = {}, reviewerLabel = '';
   switch (wfId) {
     case 'doc-review': {
-      const docName    = getField('doc_name');
-      const reviewer   = getField('reviewer');
-      const deadline   = getField('deadline');
+      const reviewer     = getField('reviewer');
+      const deadline     = getField('deadline');
       const instructions = getField('instructions');
-      if (!docName) { compassToast('Document name is required.', 2500); return; }
-      if (!reviewer) { compassToast('Reviewer is required.', 2500); return; }
-      title        = `Document review: ${docName}`;
+      const docs         = window._myrPendingDocs || [];
+      if (!docs.length) { compassToast('Add at least one document for review.', 2500); return; }
+      if (!reviewer)    { compassToast('Reviewer is required.', 2500); return; }
+      const docNames = docs.map(d => d.name).join(', ');
+      title        = `Document review: ${docs.length === 1 ? docs[0].name : docs.length + ' documents'}`;
       reviewerLabel = reviewer;
-      details      = { doc_name: docName, reviewer, deadline, instructions };
+      details      = { docs, reviewer, deadline, instructions, doc_count: docs.length, doc_names: docNames };
       break;
     }
     case 'resource-alloc': {
@@ -1447,6 +1704,11 @@ window.myrSubmitWorkflow = async function(wfId) {
 
   try {
     // ── 3. Create workflow_instance ────────────────────────
+    const attachments = (wfId === 'doc-review' ? (details.docs || []) : [])
+      .map(d => ({ id: d.id, name: d.name, path: d.path || null, url: d.url || null,
+                   size: d.size || 0, type: d.mime || '', source: d.source || 'upload',
+                   form_id: d.form_id || null, uploaded_at: now }));
+
     await API.post('workflow_instances', {
       id:                       instanceId,
       firm_id:                  firmId,
@@ -1456,9 +1718,13 @@ window.myrSubmitWorkflow = async function(wfId) {
       current_step_name:        'Submitted',
       submitted_by_resource_id: resId,
       submitted_by_name:        resName,
-      template_id:              null,   // My Requests submissions are template-free
+      template_id:              null,
+      attachments:              attachments,
       created_at:               now,
     });
+
+    // Clear pending docs after successful POST
+    window._myrPendingDocs = [];
 
     // ── 4. Write CoC event ─────────────────────────────────
     const cocId = crypto.randomUUID();
@@ -1533,14 +1799,15 @@ window.myrSubmitWorkflow = async function(wfId) {
 
     window._myRequests = window._myRequests || [];
     window._myRequests.unshift({
-      id:        instanceId,
+      id:          instanceId,
       title,
-      status:    'in_progress',
-      workflow:  wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
-      submitted: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),
+      status:      'in_progress',
+      workflow:    wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
+      submitted:   new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),
       steps,
-      cocNote:   details.instructions || details.description || '',
-      expanded:  true,
+      cocNote:     details.instructions || details.description || '',
+      attachments: attachments,
+      expanded:    true,
     });
 
     renderMyRequestsActive();
@@ -1554,6 +1821,9 @@ window.myrSubmitWorkflow = async function(wfId) {
     // Switch to Active sub-tab so the user sees their new request
     const activeBtn = document.querySelector('.myr-subnav[data-myr="active"]');
     if (activeBtn) myrSwitchView('active', activeBtn);
+
+    // Force re-fetch on next tab visit to sync with DB
+    window._requestsLoaded = false;
 
     compassToast(`✓ ${title} — submitted & routed to ${ownerResName}`);
 
@@ -1637,7 +1907,37 @@ function _buildWorkflowFormBody(wfId, wf) {
         ta('What needs to move, be delegated, or be dropped?', 'details', '', 3);
 
     case 'doc-review':
-      return inp('Document name / version', 'doc_name', '') +
+      return `
+        <div style="margin-bottom:10px">
+          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
+                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
+            Documents for review <span style="color:#E24B4A">*</span>
+          </div>
+
+          <!-- Attached documents list -->
+          <div id="myr-doc-list" style="margin-bottom:8px"></div>
+
+          <!-- Upload + select buttons -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <label style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
+                           background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.25);
+                           color:#00D2FF;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
+              ↑ Upload file
+              <input type="file" id="myr-doc-upload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg"
+                style="display:none" onchange="myrHandleDocUpload(event)"/>
+            </label>
+            <button type="button" onclick="myrPickCadenceForm()"
+              style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
+                     background:rgba(196,125,24,.06);border:1px solid rgba(196,125,24,.25);
+                     color:#c47d18;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
+              ◈ Select CadenceHUD Form
+            </button>
+          </div>
+          <div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);
+                      margin-top:4px">
+            PDF, Word, Excel, PowerPoint, or images. Or attach a released CadenceHUD form.
+          </div>
+        </div>` +
         sel('Reviewer(s)', 'reviewer', reviewerOpts) +
         inp('Review deadline', 'deadline', '') +
         ta('Review instructions', 'instructions', '', 2, false);
