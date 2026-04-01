@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100800
+// VERSION: 20260402-101000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-101000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1364,6 +1364,10 @@ window.myrWithdrawRequest = async function(instanceId) {
   const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
 
+  // Resolve title BEFORE building the modal
+  const req   = (window._myRequests||[]).find(r => r.id === instanceId);
+  const title = req?.title || 'this request';
+
   // Professional confirmation modal — no browser confirm()
   const confirmed = await new Promise(resolve => {
     const overlay = document.createElement('div');
@@ -1994,7 +1998,6 @@ window.myrSubmitWorkflow = async function(wfId) {
     // ── 5. Create action items in My Work ──────────────────
     // For doc-review: use _myrPendingReviewers (have .id directly — no fuzzy matching)
     // For other types: fall back to label matching against _resources
-    const firmId = _mwFirmId();
 
     const actionRecipients = []; // [{id, name, role}] for toast
 
