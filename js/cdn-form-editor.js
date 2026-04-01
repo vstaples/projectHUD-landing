@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-207000
-console.log('%c[cdn-form-editor] v20260401-207000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-207001
+console.log('%c[cdn-form-editor] v20260401-207001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3407,10 +3407,30 @@ function _formShowReleaseModal(form) {
   document.body.appendChild(overlay);
   setTimeout(() => document.getElementById('cad-release-notes')?.focus(), 50);
 
-  // Reject → return to editor for revision
+  // Reject → editor caught a last-minute issue, return to unreleased for revision
   document.getElementById('cad-release-reject-btn').onclick = () => {
     overlay.remove();
-    _formRejectForm('approval');
+    _formShowRejectModal({
+      title:    'Return for Revision',
+      subtitle: 'The form will be returned to the editor as Unreleased. ' +
+                'Your comments will be recorded in the Chain of Custody.',
+      role:     'approver',
+      onSubmit: async (note) => {
+        const from = _selectedForm.state;
+        _selectedForm.state       = 'unreleased';
+        _selectedForm.review_note = note;
+        await _formSave();
+        _formCoCWrite('form.rejected', _selectedForm.id, {
+          from, to: 'unreleased',
+          stage: 'release',
+          note,
+          rejected_by: window.CURRENT_USER?.id || null,
+        });
+        cadToast('Returned for revision', 'info');
+        const el = document.getElementById('cad-content');
+        if (el) renderFormsTab(el);
+      }
+    });
   };
 
   // Commit → execute the release
