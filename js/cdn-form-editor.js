@@ -2839,12 +2839,15 @@ async function _formDoSubmitForReview({ reviewers, approver }) {
   _selectedForm.reviewed_by          = [];
   await _formSave();
 
-  // Write CoC
+  // Write CoC — include version on first submission
+  const isFirstSubmit = fromState === 'draft';
   _formCoCWrite('form.state_changed', _selectedForm.id, {
-    from: fromState,
-    to:   'in_review',
-    note: `Reviewers: ${reviewers.map(r => r.name).join(', ') || 'none'}` +
-          (approver ? ` | Approver: ${approver.name}` : ''),
+    from:    fromState,
+    to:      'in_review',
+    version: _selectedForm.version || '0.1.0',
+    note: isFirstSubmit
+      ? `Version ${_selectedForm.version || '0.1.0'} initiated`
+      : `Re-submitted after revision`,
   });
 
   // Send emails via notify-form-review edge function
@@ -3475,7 +3478,7 @@ async function _formDoReleaseFinal(note) {
   }
   _formCoCWrite('form.released', _selectedForm.id, {
     version:    _selectedForm.version,
-    note,
+    note:       note || `Version ${_selectedForm.version} released`,
     supersedes: priorReleased?.id
   });
   cadToast(`Released ${_selectedForm.version}`, 'success');
@@ -5349,18 +5352,23 @@ function _fphRenderActivity(rows) {
     try { return JSON.parse(r.event_notes || '{}'); } catch(e) { return {}; }
   };
 
+  // Current user name as fallback for events with null actor_name
+  const _actorFallback = window.CURRENT_USER?.name || window.CURRENT_USER?.email || null;
+
   const deriveRoleAction = (r) => {
-    const notes = parseNotes(r);
-    const from  = notes.from || '';
-    const to    = notes.to   || '';
-    const who   = r.actor_name || null;
+    const notes  = parseNotes(r);
+    const from   = notes.from || '';
+    const to     = notes.to   || '';
+    // Use actor_name if present, then fallback to CURRENT_USER (early events missed capture)
+    const who    = r.actor_name || _actorFallback;
+    const evType = r.event_type || '';
 
-    // Suppress pure system events with no meaningful actor
-    if (!who && !from && !to) return null;
+    // Suppress if absolutely nothing to show
+    if (!who && !from && !to && !evType) return null;
 
-    // Map from→to transitions to role + action
+    // ── from→to state transition mapping ────────────────────────────────────
     if (from === 'draft' && to === 'in_review')
-      return { role:'Editor',   action:'Submitted for Review', who: who || _selectedForm?._editorName || 'Editor' };
+      return { role:'Editor',   action:'Draft Complete',       who, version: notes.version };
     if (from === 'in_review' && to === 'in_review')
       return { role:'Reviewer', action:'Review Approved',      who };
     if (from === 'in_review' && to === 'reviewed')
@@ -5372,18 +5380,18 @@ function _fphRenderActivity(rows) {
     if (to === 'rejected_approval')
       return { role:'Approver', action:'Approval Rejected',    who };
     if (to === 'rejected_release')
-      return { role:'Editor',   action:'Rejected at Release',  who };
+      return { role:'Editor',   action:'Rejected',             who };
     if (from === 'approved' && to === 'released')
-      return { role:'Editor',   action:'Released',             who };
+      return { role:'Editor',   action:'Released',             who, version: notes.version };
     if (to === 'unreleased')
       return { role:'Editor',   action:'Revision Started',     who };
 
-    // Fallback: use event_type label with best-guess role
-    const evType = r.event_type || '';
-    if (evType.includes('released'))  return { role:'Editor',   action:'Released',  who };
-    if (evType.includes('approved'))  return { role:'Approver', action:'Approved',  who };
-    if (evType.includes('rejected'))  return { role:'Reviewer', action:'Rejected',  who };
-    if (!who) return null; // drop System rows with no useful info
+    // ── event_type fallback ─────────────────────────────────────────────────
+    if (evType === 'form.released')  return { role:'Editor',   action:'Released',  who, version: notes.version };
+    if (evType === 'form.approved')  return { role:'Approver', action:'Approved',  who };
+    if (evType === 'form.rejected')  return { role:'Editor',   action:'Rejected',  who };
+    if (evType === 'form.state_changed' && !from && !to) return null; // no useful info
+    if (!who) return null;
     return { role:'Editor', action: notes.note || evType.replace('form.',''), who };
   };
 
@@ -5417,6 +5425,7 @@ function _fphRenderActivity(rows) {
       ${td(`<span style="padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;
         background:${rColor}18;border:1px solid ${rColor}44;color:${rColor}">${role}</span>`, 'inherit')}
       ${td(`<span style="font-weight:600;color:${aColor}">${escHtml(action)}</span>`, 'inherit')}
+      ${td(derived.version ? `<span style="font-size:12px;font-family:monospace;color:var(--muted)">${escHtml(derived.version)}</span>` : '', 'inherit')}
     </tr>`;
   }).filter(Boolean).join('');
 
@@ -5424,7 +5433,7 @@ function _fphRenderActivity(rows) {
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:var(--bg2);position:sticky;top:0">
-          ${th('Date/Time')}${th('Person')}${th('Role')}${th('Action')}
+          ${th('Date/Time')}${th('Person')}${th('Role')}${th('Action')}${th('Version')}
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
