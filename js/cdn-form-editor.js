@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-200000
-console.log('%c[cdn-form-editor] v20260401-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-201000
+console.log('%c[cdn-form-editor] v20260401-201000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3237,8 +3237,23 @@ function _formCoCWrite(eventType, formId, details) {
     try { window.CoC.write(payload); } catch(e) { console.warn('[CoC] write failed:', e.message); }
   }
 
-  // Always also write directly to coc_events table so activity panel has live data
-  API.post('coc_events', payload).catch(e =>
+  // Write directly to coc_events using actual column names from DB schema
+  const cocRow = {
+    firm_id:           payload.firm_id,
+    entity_id:         payload.entity_id,
+    entity_type:       payload.entity_type,
+    event_type:        payload.event_type,
+    event_notes:       typeof payload.details === 'object'
+                         ? JSON.stringify(payload.details)
+                         : (payload.details || ''),
+    actor_name:        payload.actor_name || null,
+    actor_resource_id: payload.actor_id   || null,  // actor_id → actor_resource_id
+    event_class:       'form',
+    severity:          'info',
+    occurred_at:       payload.created_at || new Date().toISOString(),
+    metadata:          payload.details || null,
+  };
+  API.post('coc_events', cocRow).catch(e =>
     console.warn('[form-editor] coc_events write failed:', e.message)
   );
 }
@@ -3311,7 +3326,7 @@ async function _formSave() {
       approved_by:   _selectedForm.approved_by   || null,
       released_at:   _selectedForm.released_at   || null,
       archived_at:   _selectedForm.archived_at   || null,
-    }).catch(e => cadToast('Save failed: ' + e.message, 'error'));
+    }).catch(e => { console.error('[formSave] PATCH failed:', e.message); cadToast('Save failed: ' + e.message, 'error'); });
     cadToast('Form saved', 'success');
     _formDirty = false; _formUpdateSaveBtn();
     _formRefreshCoCIfOpen();
@@ -4718,7 +4733,7 @@ async function _formShowPreviewHistoryPanel() {
   if (_selectedForm?.id) {
     try {
       const rows = await API.get(
-        `coc_events?entity_id=eq.${_selectedForm.id}&order=created_at.asc&limit=200`
+        `coc_events?entity_id=eq.${_selectedForm.id}&event_class=eq.form&order=created_at.asc&limit=200`
       ).catch(() => []) || [];
       _fphRenderActivity(rows);
       _fphRenderComments(rows);
@@ -4901,6 +4916,8 @@ function _fphRenderActivity(rows) {
     'form.archived':           'Archived',
     'form.content_rejected':   'Content Rejected',
     'form.content_approved':   'Content Approved',
+    'form.action_item_created':'Action Item Created',
+    'form.preview_rejected':   'Preview Rejected',
   };
   const evtColor = {
     'form.released':           '#2a9d40',
@@ -4949,8 +4966,10 @@ function _fphRenderComments(rows) {
   if (!el) return;
 
   // Comments = rejection notes + any note-bearing events, newest first
+  // Comments: events with notes, newest first
+  // event_notes is the column name; metadata.note/comment also checked
   const commentEvents = rows
-    .filter(r => r.details?.note || r.details?.comment)
+    .filter(r => r.event_notes || r.metadata?.note || r.metadata?.comment)
     .reverse();
 
   if (!commentEvents.length) {
@@ -4958,7 +4977,7 @@ function _fphRenderComments(rows) {
     return;
   }
 
-  const isReject = (type) => type?.includes('reject') || type?.includes('rejected');
+  const isReject = (type) => !!(type?.includes('reject') || type?.includes('rejected'));
   const fmt = (iso) => {
     if (!iso) return '';
     const d = new Date(iso);
@@ -4967,7 +4986,7 @@ function _fphRenderComments(rows) {
 
   el.innerHTML = commentEvents.map(r => {
     const who     = r.actor_name || r.actor_id || 'System';
-    const text    = r.details?.comment || r.details?.note || '';
+    const text    = r.event_notes || r.metadata?.comment || r.metadata?.note || '';
     const color   = isReject(r.event_type) ? '#dc2626' : 'var(--cad)';
     const badge   = isReject(r.event_type) ? '✗ Rejected' : '● Note';
     const ini     = who.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
