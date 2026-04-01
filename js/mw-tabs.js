@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100200
+// VERSION: 20260402-100400
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-100400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -684,48 +684,111 @@ window.loadUserRequests = async function() {
     const s = document.createElement('style');
     s.id = 'myr-ext-styles';
     s.textContent = `
-      /* Step tooltip */
-      .myr-pt-step { position:relative; }
-      .myr-pt-tip {
-        display:none; position:absolute; bottom:calc(100% + 8px); left:50%;
-        transform:translateX(-50%);
-        background:#0a1628; border:1px solid rgba(0,210,255,.3);
-        padding:5px 9px; min-width:140px; max-width:200px;
-        font-family:var(--font-head); font-size:10px; line-height:1.5;
-        color:#C8DFF0; white-space:nowrap; z-index:200;
-        pointer-events:none;
+      /* Active request card — raised, accented */
+      .myr-active-req {
+        border: 1px solid rgba(0,210,255,.18);
+        border-left: 3px solid rgba(0,210,255,.5);
+        margin-bottom: 10px;
+        overflow: hidden;
+        background: rgba(0,210,255,.03);
+        box-shadow: 0 2px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+        transition: border-color .15s, box-shadow .15s;
       }
-      .myr-pt-tip::after {
-        content:''; position:absolute; top:100%; left:50%;
-        transform:translateX(-50%);
-        border:5px solid transparent;
-        border-top-color:rgba(0,210,255,.3);
+      .myr-active-req:hover {
+        border-color: rgba(0,210,255,.35);
+        border-left-color: rgba(0,210,255,.8);
+        box-shadow: 0 3px 12px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
       }
-      .myr-pt-step:hover .myr-pt-tip { display:block; }
-      /* CoC panel inside request body */
+      .myr-ar-head {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(255,255,255,.05);
+        cursor: pointer; transition: background .12s;
+      }
+      .myr-ar-head:hover { background: rgba(255,255,255,.03); }
+      .myr-ar-body { padding: 10px 14px; display: none; }
+      .myr-ar-body.open { display: block; }
+      /* Step progress */
+      .myr-pt-steps {
+        display: flex; gap: 0; position: relative;
+        margin: 6px 0 12px;
+      }
+      .myr-pt-steps::before {
+        content: ''; position: absolute; top: 9px; left: 0; right: 0;
+        height: 1px; background: rgba(255,255,255,.08); z-index: 0;
+      }
+      .myr-pt-step {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 5px; flex: 1; position: relative; z-index: 1;
+      }
+      .myr-pt-dot {
+        width: 20px; height: 20px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 10px; font-weight: 700; flex-shrink: 0;
+      }
+      .myr-ptd-done   { background: #1D9E75; color: #fff; box-shadow: 0 0 0 3px rgba(29,158,117,.2); }
+      .myr-ptd-active { background: #00D2FF; color: #060a10; animation: myrActivePulse 1.5s infinite; box-shadow: 0 0 0 3px rgba(0,210,255,.2); }
+      @keyframes myrActivePulse { 0%,100%{opacity:1} 50%{opacity:.65} }
+      .myr-ptd-pending { background: rgba(255,255,255,.06); color: rgba(255,255,255,.3); border: 1px solid rgba(255,255,255,.12); }
+      .myr-pt-name {
+        font-size: 11px; color: rgba(255,255,255,.35);
+        text-align: center; letter-spacing: .03em; line-height: 1.3; max-width: 72px;
+      }
+      .myr-pt-name.done   { color: #1D9E75; }
+      .myr-pt-name.active { color: #00D2FF; font-weight: 600; }
+      /* CoC panel */
       .myr-coc-panel {
-        margin-top:8px; border-top:1px solid rgba(255,255,255,.06); padding-top:8px;
+        margin-top: 10px;
+        border-top: 1px solid rgba(255,255,255,.06);
+        padding-top: 8px;
       }
       .myr-coc-label {
-        font-family:var(--font-head); font-size:10px; letter-spacing:.08em;
-        text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:6px;
-        display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+        font-family: var(--font-head); font-size: 11px; letter-spacing: .07em;
+        text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 6px;
+        display: flex; align-items: center; justify-content: space-between;
+        cursor: pointer; padding: 2px 0;
       }
-      .myr-coc-label:hover { color:rgba(0,210,255,.6); }
-      .myr-coc-events { display:none; }
-      .myr-coc-events.open { display:block; }
+      .myr-coc-label:hover { color: rgba(0,210,255,.7); }
+      .myr-coc-events { display: none; }
+      .myr-coc-events.open { display: block; }
       .myr-coc-row {
-        display:flex; gap:8px; padding:4px 0;
-        border-bottom:1px solid rgba(255,255,255,.04);
-        font-family:var(--font-head); font-size:10px;
+        display: grid;
+        grid-template-columns: 7px 1fr auto;
+        gap: 8px; padding: 6px 0;
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        align-items: start;
       }
-      .myr-coc-row:last-child { border-bottom:none; }
+      .myr-coc-row:last-child { border-bottom: none; }
       .myr-coc-dot {
-        width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:3px;
+        width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
       }
-      .myr-coc-event-type { color:rgba(0,210,255,.8); flex-shrink:0; min-width:120px; }
-      .myr-coc-actor { color:rgba(255,255,255,.4); flex-shrink:0; }
-      .myr-coc-time  { color:rgba(255,255,255,.22); margin-left:auto; flex-shrink:0; }
+      .myr-coc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .myr-coc-event-type {
+        font-family: var(--font-head); font-size: 12px; font-weight: 600;
+        color: rgba(0,210,255,.9); letter-spacing: .03em; text-transform: capitalize;
+      }
+      .myr-coc-actor {
+        font-family: var(--font-head); font-size: 11px;
+        color: rgba(255,255,255,.55);
+      }
+      .myr-coc-note {
+        font-family: var(--font-head); font-size: 11px;
+        color: rgba(255,255,255,.35);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .myr-coc-time {
+        font-family: var(--font-head); font-size: 11px;
+        color: rgba(255,255,255,.3); white-space: nowrap; text-align: right;
+        flex-shrink: 0; padding-top: 2px;
+      }
+      /* History rows */
+      .myr-hist-row {
+        display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        font-family: var(--font-head); font-size: 12px; cursor: pointer; transition: .12s;
+      }
+      .myr-hist-row:hover { background: rgba(255,255,255,.02); }
+      .myr-hist-outcome { font-size: 11px; padding: 2px 8px; border: 1px solid; letter-spacing: .04em; }
     `;
     document.head.appendChild(s);
   }
@@ -797,6 +860,7 @@ window.loadUserRequests = async function() {
           'completed':  'completed',
           'rejected':   'rejected',
           'withdrawn':  'rejected',
+          'cancelled':  'rejected',
         };
 
         return {
@@ -1045,16 +1109,18 @@ function renderMyRequestsActive() {
                             e.event_type==='request.completed'?'#1D9E75':
                             e.event_type?.includes('reject')||e.event_type?.includes('withdraw')?'#E24B4A':'#EF9F27';
           let notes = '';
-          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||''; } catch(_){}
+          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
           return `<div class="myr-coc-row">
-            <div class="myr-coc-dot" style="background:${dotColor}"></div>
-            <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-            <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-            ${notes?`<div style="color:rgba(255,255,255,.35);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(notes)}</div>`:''}
+            <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
+            <div class="myr-coc-main">
+              <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
+              <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
+              ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
+            </div>
             <div class="myr-coc-time">${_esc(t)}</div>
           </div>`;
         }).join('')
-      : `<div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:4px 0">
+      : `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">
            Loading audit trail…
          </div>`;
 
@@ -1070,7 +1136,7 @@ function renderMyRequestsActive() {
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${(req.attachments||[]).length ? `
         <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.07em;
+          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.07em;
                       text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">
             Documents
           </div>
@@ -1095,8 +1161,8 @@ function renderMyRequestsActive() {
                 onmouseout="this.style.background='rgba(0,210,255,.04)'">
                 <span>${icon}</span>
                 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
-                ${sizeStr?`<span style="color:rgba(255,255,255,.25);font-size:10px;flex-shrink:0">${sizeStr}</span>`:''}
-                <span style="color:rgba(255,255,255,.3);font-size:10px;flex-shrink:0">↗</span>
+                ${sizeStr?`<span style="color:rgba(255,255,255,.25);font-size:12px;flex-shrink:0">${sizeStr}</span>`:''}
+                <span style="color:rgba(255,255,255,.3);font-size:12px;flex-shrink:0">↗</span>
               </a>`;
             }).join('')}
           </div>
@@ -1179,12 +1245,14 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
                           e.event_type==='request.completed'?'#1D9E75':
                           (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
         let notes = '';
-        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||''; } catch(_){}
+        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
         return `<div class="myr-coc-row">
-          <div class="myr-coc-dot" style="background:${dotColor}"></div>
-          <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-          <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-          ${notes?`<div style="color:rgba(255,255,255,.35);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(notes)}</div>`:''}
+          <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
+          <div class="myr-coc-main">
+            <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
+            <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
+            ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
+          </div>
           <div class="myr-coc-time">${_esc(t)}</div>
         </div>`;
       }).join('');
@@ -1194,7 +1262,7 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
         if (countEl) countEl.textContent = events.length + ' event' + (events.length!==1?'s':'');
       }
     } else {
-      panel.innerHTML = `<div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
+      panel.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
     }
   }
 };
@@ -1294,9 +1362,9 @@ window.myrWithdrawRequest = async function(instanceId) {
   if (!window.confirm(`Withdraw "${title}"?\n\nThis will cancel the request and notify the reviewer.`)) return;
 
   try {
-    // PATCH instance status to withdrawn
+    // PATCH instance status to cancelled (withdrawn by submitter)
     await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-      status: 'withdrawn',
+      status: 'cancelled',
       updated_at: now,
     });
 
@@ -1517,7 +1585,7 @@ window.myrRenderDocList = function() {
         <span style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;
                      flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
               title="${_esc(d.name)}">${_esc(d.name)}</span>
-        <span style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.3);
+        <span style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.3);
                      flex-shrink:0">${d.source === 'form' ? 'Form' : sizeStr}</span>
         <button onclick="myrRemoveDoc(${i})"
           style="background:none;border:none;color:rgba(226,75,74,.6);cursor:pointer;
@@ -1566,7 +1634,7 @@ window.myrPickCadenceForm = async function() {
         <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">
           Select CadenceHUD Form
         </div>
-        <span style="font-family:var(--font-head);font-size:10px;color:rgba(196,125,24,.7)">
+        <span style="font-family:var(--font-head);font-size:12px;color:rgba(196,125,24,.7)">
           Released forms only
         </span>
         <button onclick="document.getElementById('myr-form-picker').remove()"
@@ -1587,11 +1655,11 @@ window.myrPickCadenceForm = async function() {
                           color:#F0F6FF;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                 ${_esc(f.source_name)}
               </div>
-              <div style="font-family:var(--font-head);font-size:10px;color:rgba(196,125,24,.7);margin-top:1px">
+              <div style="font-family:var(--font-head);font-size:12px;color:rgba(196,125,24,.7);margin-top:1px">
                 v${_esc(f.version||'0.1.0')} · Released
               </div>
             </div>
-            <span style="font-family:var(--font-head);font-size:10px;color:rgba(0,210,255,.5)">
+            <span style="font-family:var(--font-head);font-size:12px;color:rgba(0,210,255,.5)">
               Attach ›
             </span>
           </div>`).join('')}
@@ -1953,7 +2021,7 @@ function _buildWorkflowFormBody(wfId, wf) {
               ◈ Select CadenceHUD Form
             </button>
           </div>
-          <div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);
+          <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);
                       margin-top:4px">
             PDF, Word, Excel, PowerPoint, or images. Or attach a released CadenceHUD form.
           </div>
