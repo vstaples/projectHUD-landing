@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-192000
-console.log('%c[cdn-form-editor] v20260401-192000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-193000
+console.log('%c[cdn-form-editor] v20260401-193000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4649,14 +4649,17 @@ async function _formShowPreviewHistoryPanel() {
 
   const panel = document.createElement('div');
   panel.id = 'form-preview-history-panel';
+  // nodeW=72, colGap=10, 5 nodes → 72*5 + 10*4 = 400px content + 2*16px padding = 432px min
+  const _fphMinW = 440;
   panel.style.cssText = [
-    'width:320px;min-width:260px;max-width:400px;flex-shrink:0',
+    `width:${_fphMinW}px;min-width:${_fphMinW}px;flex-shrink:0`,
     'background:var(--bg1)',
     'border-left:1px solid var(--border)',
     'display:flex;flex-direction:column',
     'font-family:Arial,sans-serif',
     'overflow-y:auto',
     'overflow-x:hidden',
+    'position:relative',   // needed for drag handle positioning
   ].join(';');
 
   // Insert BEFORE the SIMULATE panel (append adds it after canvas, before any existing panels)
@@ -4672,7 +4675,18 @@ async function _formShowPreviewHistoryPanel() {
        color:var(--muted);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
 
   // ── 1. WORKFLOW DAG ────────────────────────────────────────────────────────
-  panel.innerHTML = sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 10px 8px;flex-shrink:0"></div>`;
+  // Left-edge drag handle — reuses _formColDragStart infrastructure
+  const dragHandle = document.createElement('div');
+  dragHandle.style.cssText = [
+    'position:absolute;left:0;top:0;bottom:0;width:6px',
+    'cursor:col-resize;z-index:10;background:transparent;transition:background .15s',
+  ].join(';');
+  dragHandle.addEventListener('mouseover',  () => { dragHandle.style.background = 'rgba(196,125,24,.3)'; });
+  dragHandle.addEventListener('mouseout',   () => { if (!window._formDragCol) dragHandle.style.background = 'transparent'; });
+  dragHandle.addEventListener('mousedown',  (e) => _formColDragStart(e, 'form-preview-history-panel', 'left'));
+  panel.appendChild(dragHandle);
+
+  panel.innerHTML += sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 16px 8px;flex-shrink:0"></div>`;
 
   // ── 2. ACTIVITY TABLE placeholder ─────────────────────────────────────────
   panel.innerHTML += sectionHdr('Activity') +
@@ -4732,17 +4746,20 @@ function _fphRenderDag(currentState) {
   const stateOrder = ['draft','in_review','reviewed','approved','released'];
   const currentIdx  = stateOrder.indexOf(currentState);
 
-  const panelW = 300;
-  const nodeW  = 72, nodeH = 36, nodeR = 6;
-  const colGap = 10;  // gap between nodes
-  const cols   = NODES.length;
-  const totalW = cols * nodeW + (cols - 1) * colGap;
-  const startX = (panelW - totalW) / 2;
-  const nodeY  = 48;   // Y of node tops
-  const svgH   = isRejected ? 160 : 110;
+  // Derive panelW from actual container width so SVG always fits
+  const panelEl = document.getElementById('form-preview-history-panel');
+  const panelW  = Math.max(400, (panelEl?.clientWidth || 440) - 32); // 16px padding each side
+  const nodeW   = Math.floor((panelW - 4 * 10) / 5);  // fill available width
+  const nodeH   = 36, nodeR = 6;
+  const colGap  = 10;
+  const cols    = NODES.length;
+  const totalW  = cols * nodeW + (cols - 1) * colGap;
+  const startX  = (panelW - totalW) / 2;
+  const nodeY   = 48;
+  const svgH    = isRejected ? 160 : 110;
 
   let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
-    style="display:block;overflow:visible" xmlns="http://www.w3.org/2000/svg">`;
+    style="display:block;overflow:visible;max-width:100%" xmlns="http://www.w3.org/2000/svg">`;
 
   // ── Forward arrows between nodes ──────────────────────────────────────────
   NODES.forEach((n, i) => {
