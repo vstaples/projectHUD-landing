@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-208000
-console.log('%c[cdn-form-editor] v20260401-208000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-209000
+console.log('%c[cdn-form-editor] v20260401-209000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4959,7 +4959,7 @@ async function _formShowPreviewHistoryPanel() {
   const panel = document.createElement('div');
   panel.id = 'form-preview-history-panel';
   // nodeW=72, colGap=10, 5 nodes → 72*5 + 10*4 = 400px content + 2*16px padding = 432px min
-  const _fphMinW = 440;
+  const _fphMinW = 560;
   panel.style.cssText = [
     `width:${_fphMinW}px;min-width:${_fphMinW}px;flex-shrink:0`,
     'background:var(--bg1)',
@@ -5054,15 +5054,15 @@ function _fphRenderDag(currentState) {
 
   // Derive panelW from actual container width so SVG always fits
   const panelEl = document.getElementById('form-preview-history-panel');
-  const panelW  = Math.max(400, (panelEl?.clientWidth || 440) - 32); // 16px padding each side
-  const nodeW   = Math.floor((panelW - 4 * 8) / 5);   // fill available width
-  const nodeH   = 52, nodeR = 7;                        // taller for two-line labels
-  const colGap  = 8;
+  const panelW  = Math.max(500, (panelEl?.clientWidth || 560) - 24);
+  const colGap  = 10;
+  const nodeW   = Math.floor((panelW - 4 * colGap) / 5);
+  const nodeH   = 64, nodeR = 8;   // taller cards, larger text
   const cols    = NODES.length;
   const totalW  = cols * nodeW + (cols - 1) * colGap;
   const startX  = (panelW - totalW) / 2;
-  const nodeY   = 52;
-  const svgH    = isRejected ? 185 : 130;
+  const nodeY   = 56;   // extra top room for unrelease arc
+  const svgH    = isRejected ? 210 : 148;
 
   let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
     style="display:block;overflow:visible;max-width:100%" xmlns="http://www.w3.org/2000/svg">`;
@@ -5105,22 +5105,25 @@ function _fphRenderDag(currentState) {
     svg += `<path d="M${srcX},${nodeY + nodeH} Q${srcX},${arcY} ${(srcX+dstX)/2},${arcY} Q${dstX},${arcY} ${dstX},${nodeY + nodeH}"
       fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"
       marker-end="url(#arrR)"/>`;
-    svg += `<text x="${(srcX+dstX)/2}" y="${arcY + 14}" text-anchor="middle"
-      font-size="9" fill="#dc2626" font-family="Arial,sans-serif">
-      ${currentState === 'rejected_review' ? 'Review rejected' : 'Approval rejected'}
+    svg += `<text x="${(srcX+dstX)/2}" y="${arcY + 18}" text-anchor="middle"
+      font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">
+      ${currentState === 'rejected_review' ? 'Review Rejected' : 'Approval Rejected'}
     </text>`;
   }
 
-  // ── Unrelease arc (above) — unreleased → draft ─────────────────────────────
+  // ── Unrelease arc (above) — Released → Draft, arrow at Draft end ────────────
   if (isUnreleased) {
-    const arcY  = nodeY - 28;
+    const arcY  = nodeY - 32;
     const srcX  = startX + 4 * (nodeW + colGap) + nodeW / 2; // Released center
     const dstX  = startX + nodeW / 2;                         // Draft center
-    svg += `<path d="M${srcX},${nodeY} Q${srcX},${arcY} ${(srcX+dstX)/2},${arcY} Q${dstX},${arcY} ${dstX},${nodeY}"
+    const midX  = (srcX + dstX) / 2;
+    // Draw from Released to Draft so marker-end arrow points AT Draft (left)
+    // Use a smooth cubic bezier that arcs above the nodes
+    svg += `<path d="M${srcX},${nodeY} C${srcX},${arcY} ${dstX},${arcY} ${dstX},${nodeY}"
       fill="none" stroke="#c47d18" stroke-width="1.5" stroke-dasharray="5,3"
       marker-end="url(#arrA)"/>`;
-    svg += `<text x="${(srcX+dstX)/2}" y="${arcY - 6}" text-anchor="middle"
-      font-size="9" fill="#c47d18" font-family="Arial,sans-serif">Unrelease</text>`;
+    svg += `<text x="${midX}" y="${arcY - 8}" text-anchor="middle"
+      font-size="13" font-weight="600" fill="#c47d18" font-family="Arial,sans-serif">Unrelease</text>`;
   }
 
   // ── Node cards ─────────────────────────────────────────────────────────────
@@ -5141,41 +5144,41 @@ function _fphRenderDag(currentState) {
 
     // Status dot
     const dotColor = isCurrent ? n.activeColor : isDone ? '#2a9d40' : '#444';
-    svg += `<circle cx="${x + 10}" cy="${nodeY + nodeH/2}" r="3" fill="${dotColor}"/>`;
+    svg += `<circle cx="${x + 12}" cy="${nodeY + nodeH/2}" r="4" fill="${dotColor}"/>`;
 
     // Label
     // Two-line label support
     const lines   = n.lines || [n.label || ''];
-    const lineH   = 13;
+    const lineH   = 16;
     const totalTH = lines.length * lineH;
-    const startTY = nodeY + nodeH/2 - totalTH/2 + lineH/2 + 4; // +4 for dot offset
+    const startTY = nodeY + nodeH/2 - totalTH/2 + lineH/2 + 2;
     lines.forEach((line, li) => {
       svg += `<text x="${x + nodeW/2 + 5}" y="${startTY + li * lineH}"
         text-anchor="middle" dominant-baseline="middle"
-        font-size="11" font-weight="${isCurrent ? '700' : '500'}"
+        font-size="13" font-weight="${isCurrent ? '700' : '500'}"
         fill="${textCol}" font-family="Arial,sans-serif">${line}</text>`;
     });
 
     // Done checkmark
     if (isDone) {
-      svg += `<text x="${x + nodeW - 8}" y="${nodeY + 10}"
-        text-anchor="middle" font-size="8" fill="#2a9d40" font-family="Arial,sans-serif">✓</text>`;
+      svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
+        text-anchor="middle" font-size="12" fill="#2a9d40" font-family="Arial,sans-serif">✓</text>`;
     }
 
     // Rejected X badge on rejected node
     if ((currentState === 'rejected_review' && n.id === 'in_review') ||
         (currentState === 'rejected_approval' && n.id === 'approved')) {
-      svg += `<text x="${x + nodeW - 8}" y="${nodeY + 10}"
-        text-anchor="middle" font-size="9" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
+      svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
+        text-anchor="middle" font-size="12" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
     }
   });
 
   // ── State label below ─────────────────────────────────────────────────────
   const stateLabel = _formStateLabel(currentState);
   const stateColor = _formStateColor(currentState);
-  svg += `<text x="${panelW/2}" y="${nodeY + nodeH + (isRejected ? 68 : 16)}"
-    text-anchor="middle" font-size="11" fill="${stateColor}"
-    font-family="Arial,sans-serif" font-weight="600">${stateLabel}</text>`;
+  svg += `<text x="${panelW/2}" y="${nodeY + nodeH + (isRejected ? 72 : 20)}"
+    text-anchor="middle" font-size="13" fill="${stateColor}"
+    font-family="Arial,sans-serif" font-weight="700">${stateLabel}</text>`;
 
   svg += '</svg>';
   el.innerHTML = svg;
