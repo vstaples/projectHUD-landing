@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-219000
-console.log('%c[cdn-form-editor] v20260401-219000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-219002
+console.log('%c[cdn-form-editor] v20260401-219002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -5354,43 +5354,55 @@ function _fphRenderActivity(rows) {
 
   // Current user name as fallback for events with null actor_name
   const _actorFallback = window.CURRENT_USER?.name || window.CURRENT_USER?.email || null;
+  // Form version — shown on every row to identify the version being acted on
+  const _formVersion   = _selectedForm?.version || null;
 
   const deriveRoleAction = (r) => {
+    // event_notes may be JSON string or plain text; metadata is jsonb
     const notes  = parseNotes(r);
-    const from   = notes.from || '';
-    const to     = notes.to   || '';
-    // Use actor_name if present, then fallback to CURRENT_USER (early events missed capture)
+    // Also check metadata which may carry the from/to for older events
+    const meta   = r.metadata || {};
+    const from   = notes.from || meta.from || '';
+    const to     = notes.to   || meta.to   || '';
+    const stage  = notes.stage || meta.stage || '';
     const who    = r.actor_name || _actorFallback;
     const evType = r.event_type || '';
 
     // Suppress if absolutely nothing to show
     if (!who && !from && !to && !evType) return null;
 
-    // ── from→to state transition mapping ────────────────────────────────────
+    // ── from→to state transition mapping (checked before event_type) ─────────
     if (from === 'draft' && to === 'in_review')
-      return { role:'Editor',   action:'Draft Complete',       who, version: notes.version };
+      return { role:'Editor',   action:'Draft Complete',    who, version: notes.version || meta.version };
     if (from === 'in_review' && to === 'in_review')
-      return { role:'Reviewer', action:'Review Approved',      who };
+      return { role:'Reviewer', action:'Review Approved',   who, version: _formVersion };
     if (from === 'in_review' && to === 'reviewed')
-      return { role:'Reviewer', action:'Review Complete',      who };
+      return { role:'Reviewer', action:'Review Complete',   who, version: _formVersion };
     if (from === 'reviewed'  && to === 'approved')
-      return { role:'Approver', action:'Approved',             who };
+      return { role:'Approver', action:'Approved',          who, version: _formVersion };
     if (to === 'rejected_review')
-      return { role:'Reviewer', action:'Review Rejected',      who };
+      return { role:'Reviewer', action:'Review Rejected',   who, version: _formVersion };
     if (to === 'rejected_approval')
-      return { role:'Approver', action:'Approval Rejected',    who };
-    if (to === 'rejected_release')
-      return { role:'Editor',   action:'Rejected',             who };
+      return { role:'Approver', action:'Approval Rejected', who, version: _formVersion };
+    if (to === 'rejected_release' || stage === 'release' && evType === 'form.rejected')
+      return { role:'Editor',   action:'Rejected',          who, version: _formVersion };
     if (from === 'approved' && to === 'released')
-      return { role:'Editor',   action:'Released',             who, version: notes.version };
+      return { role:'Editor',   action:'Released',          who, version: notes.version || meta.version };
     if (to === 'unreleased')
-      return { role:'Editor',   action:'Revision Started',     who };
+      return { role:'Editor',   action:'Revision Started',  who, version: _formVersion };
 
-    // ── event_type fallback ─────────────────────────────────────────────────
-    if (evType === 'form.released')  return { role:'Editor',   action:'Released',  who, version: notes.version };
-    if (evType === 'form.approved')  return { role:'Approver', action:'Approved',  who };
-    if (evType === 'form.rejected')  return { role:'Editor',   action:'Rejected',  who };
-    if (evType === 'form.state_changed' && !from && !to) return null; // no useful info
+    // ── event_type fallback ───────────────────────────────────────────────────
+    if (evType === 'form.released')
+      return { role:'Editor',   action:'Released',          who, version: notes.version || meta.version };
+    if (evType === 'form.approved')
+      return { role:'Approver', action:'Approved',          who, version: _formVersion };
+    if (evType === 'form.rejected') {
+      // Determine role from stage if available
+      const rejRole = stage === 'release' ? 'Editor'
+                    : stage === 'approval' ? 'Approver' : 'Reviewer';
+      return { role: rejRole, action:'Rejected', who, version: _formVersion };
+    }
+    if (evType === 'form.state_changed' && !from && !to) return null;
     if (!who) return null;
     return { role:'Editor', action: notes.note || evType.replace('form.',''), who };
   };
