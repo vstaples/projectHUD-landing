@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-224002
-console.log('%c[cdn-form-editor] v20260401-224002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-224004
+console.log('%c[cdn-form-editor] v20260401-224004','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3761,6 +3761,8 @@ async function _formSave() {
     cadToast('Form saved', 'success');
     _formDirty = false; _formUpdateSaveBtn();
     _formRefreshCoCIfOpen();
+    // Write form.saved CoC so activity panel can detect "In Draft" state
+    _formCoCWrite('form.saved', _selectedForm.id, { version:_selectedForm.version, state:_selectedForm.state });
     const listEl = document.getElementById('form-list');
     if (listEl) listEl.innerHTML = _renderFormList();
   }
@@ -4259,11 +4261,9 @@ async function _formClearHistory(formId) {
   cadToast('Clearing history…', 'info');
 
   try {
-    // 1. Delete all coc_events — try multiple approaches
+    // 1. Delete all coc_events for this form
     const token = await Auth.getToken();
-
-    // Approach A: direct fetch with user JWT
-    const delRes = await fetch(
+    await fetch(
       `${SUPA_URL}/rest/v1/coc_events?entity_id=eq.${formId}`,
       {
         method: 'DELETE',
@@ -4271,28 +4271,10 @@ async function _formClearHistory(formId) {
           'apikey': SUPA_KEY,
           'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json',
-          'Prefer': 'return=representation',  // return deleted rows so we can count them
+          'Prefer': 'return=minimal',
         }
       }
     );
-    const delBody = await delRes.text();
-    if (!delRes.ok) {
-      console.warn('[devTool] DELETE failed:', delRes.status, delBody);
-      // Approach B: try service role key if available
-      const serviceKey = window.SUPA_SERVICE_KEY || SUPA_KEY;
-      if (serviceKey !== SUPA_KEY) {
-        const delRes2 = await fetch(
-          `${SUPA_URL}/rest/v1/coc_events?entity_id=eq.${formId}`,
-          { method:'DELETE', headers:{ 'apikey':serviceKey, 'Authorization':'Bearer '+serviceKey, 'Prefer':'return=minimal' } }
-        );
-        console.log('[devTool] DELETE (service key) status:', delRes2.status);
-      }
-    } else {
-      try {
-        const deleted = JSON.parse(delBody);
-        console.log(`[devTool] Deleted ${Array.isArray(deleted) ? deleted.length : '?'} CoC rows`);
-      } catch(e) { console.log('[devTool] DELETE OK, status:', delRes.status); }
-    }
 
     // 2. Reset form fields — bypass _formSave to avoid triggering CoC auto-writes
     form.state                = 'draft';
