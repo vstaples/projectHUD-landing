@@ -5018,7 +5018,11 @@ async function _formShowPreviewHistoryPanel() {
   panel.appendChild(dragHandle);
 
   // Render DAG immediately (no async needed — state is known)
-  _fphRenderDag(state);
+  _fphRenderDag(
+    state,
+    _selectedForm?.reviewed_by         || [],
+    _selectedForm?.pending_reviewer_ids || []
+  );
 
   // Load CoC data for activity + comments
   if (_selectedForm?.id) {
@@ -5043,213 +5047,232 @@ async function _formShowPreviewHistoryPanel() {
 }
 
 // ── Workflow DAG renderer ──────────────────────────────────────────────────
-function _fphRenderDag(currentState) {
+function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds) {
   const el = document.getElementById('fph-dag');
   if (!el) return;
 
-  // ── Node definitions ───────────────────────────────────────────────────────
-  const NODES = [
-    { id:'draft',     lines:['Draft'],              baseColor:'#4f8ef7' },
-    { id:'in_review', lines:['In','Review'],        baseColor:'#c47d18' },
-    { id:'reviewed',  lines:['Approval'],            baseColor:'#c47d18' },
-    { id:'approved',  lines:['Approved'],           baseColor:'#2a9d40' },
-    { id:'released',  lines:['Released'],           baseColor:'#2a9d40' },
-  ];
+  // ── 4-node lifecycle ──────────────────────────────────────────────────────
+  // DB states map to 4 visual nodes: Draft, Review, Approve, Release
+  // Each node has dynamic label + color based on current state
 
-  const stateOrder   = ['draft','in_review','reviewed','approved','released'];
+  const pendingCount  = (pendingReviewerIds || []).length;
+  const approvedCount = (reviewedBy || []).filter(id =>
+    /^[0-9a-f-]{36}$/i.test(id)).length;
 
-  // Map every form state to which node is "current" and what color it should be
-  const STATE_MAP = {
-    draft:               { activeId:'draft',    color:'#4f8ef7' },
-    unreleased:          { activeId:'draft',    color:'#4f8ef7' },   // ready to re-edit
-    in_review:           { activeId:'in_review',color:'#c47d18' },
-    reviewed:            { activeId:'reviewed', color:'#c47d18' },
-    approved:            { activeId:'approved', color:'#2a9d40' },
-    released:            { activeId:'released', color:'#2a9d40' },
-    rejected_review:     { activeId:'in_review',color:'#dc2626' },   // red — rejected here
-    rejected_approval:   { activeId:'reviewed', color:'#dc2626' },   // red — rejected here
-    rejected_release:    { activeId:'released', color:'#dc2626' },    // red — rejected at release gate
+  // Compute per-node display: { label, lines, color, status }
+  // status: 'ready'|'active'|'done'|'rejected'|'pending'
+  const nodeSpec = (id) => {
+    switch(id) {
+      case 'draft': {
+        if (['in_review','reviewed','approved','released'].includes(currentState))
+          return { lines:['Draft','Complete'], color:'#2a9d40', status:'done' };
+        if (currentState === 'draft')
+          return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
+        if (currentState === 'unreleased')
+          return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
+        if (['rejected_review','rejected_approval','rejected_release'].includes(currentState))
+          return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
+        return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
+      }
+      case 'review': {
+        if (['approved','released'].includes(currentState))
+          return { lines:['Review','Complete'], color:'#2a9d40', status:'done' };
+        if (currentState === 'reviewed')
+          return { lines:['Review','Complete'], color:'#2a9d40', status:'done' };
+        if (currentState === 'rejected_review')
+          return { lines:['Review','Rejected'], color:'#f87171', status:'rejected' };
+        if (currentState === 'in_review') {
+          if (approvedCount === 0)
+            return { lines:['Review'], color:'#4f8ef7', status:'active' };
+          if (pendingCount > 1 && approvedCount < pendingCount)
+            return { lines:['In','Review'], color:'#f0a030', status:'active' };
+          return { lines:['Review'], color:'#f0a030', status:'active' };
+        }
+        return { lines:['Review'], color:'#3a3f52', status:'pending' };
+      }
+      case 'approve': {
+        if (currentState === 'released')
+          return { lines:['Approve','Complete'], color:'#2a9d40', status:'done' };
+        if (currentState === 'approved')
+          return { lines:['Approved'], color:'#2a9d40', status:'done' };
+        if (currentState === 'rejected_approval')
+          return { lines:['Rejected'], color:'#f87171', status:'rejected' };
+        if (currentState === 'reviewed')
+          return { lines:['Approve'], color:'#4f8ef7', status:'active' };
+        return { lines:['Approve'], color:'#3a3f52', status:'pending' };
+      }
+      case 'release': {
+        if (currentState === 'released')
+          return { lines:['Released'], color:'#2a9d40', status:'done' };
+        if (currentState === 'rejected_release')
+          return { lines:['Rejected'], color:'#f87171', status:'rejected' };
+        if (currentState === 'approved')
+          return { lines:['Release'], color:'#4f8ef7', status:'active' };
+        return { lines:['Release'], color:'#3a3f52', status:'pending' };
+      }
+    }
   };
 
-  const mapped       = STATE_MAP[currentState] || STATE_MAP.draft;
-  const activeId     = mapped.activeId;
-  const activeColor  = mapped.color;
-  const activeIdx    = stateOrder.indexOf(activeId);
+  const NODES = ['draft','review','approve','release'].map(id => ({
+    id, ...nodeSpec(id)
+  }));
 
-  const isRejected   = currentState === 'rejected_review' || currentState === 'rejected_approval' || currentState === 'rejected_release';
-  const isReleaseRejected = currentState === 'unreleased' || isRejected;
+  const isRejected   = ['rejected_review','rejected_approval','rejected_release'].includes(currentState);
   const isUnreleased = currentState === 'unreleased';
+  const activeNode   = NODES.find(n => n.status === 'active' || n.status === 'ready' && ['draft','unreleased'].includes(currentState));
 
   // ── Dimensions ─────────────────────────────────────────────────────────────
-  const panelEl  = document.getElementById('form-preview-history-panel');
-  const panelW   = Math.max(500, (panelEl?.clientWidth || 560) - 24);
-  const colGap   = 10;
-  const nodeW    = Math.floor((panelW - 4 * colGap) / 5);
-  const nodeH    = 64, nodeR = 8;
-  const totalW   = 5 * nodeW + 4 * colGap;
-  const startX   = (panelW - totalW) / 2;
-  const nodeY    = isUnreleased ? 72 : 40;  // extra top room for unrelease arc + label
-  const svgH     = isRejected ? 210 : 148;  // unreleased uses top room via nodeY
+  const panelEl = document.getElementById('form-preview-history-panel');
+  const panelW  = Math.max(440, (panelEl?.clientWidth || 560) - 24);
+  const colGap  = 12;
+  const nodeW   = Math.floor((panelW - 3 * colGap) / 4);
+  const nodeH   = 64, nodeR = 8;
+  const totalW  = 4 * nodeW + 3 * colGap;
+  const startX  = (panelW - totalW) / 2;
+  const nodeY   = isUnreleased ? 72 : isRejected ? 40 : 40;
+  const svgH    = isRejected ? 200 : isUnreleased ? 180 : 140;
 
-  // ── SVG open + animation defs ──────────────────────────────────────────────
+  // ── SVG open + defs ─────────────────────────────────────────────────────────
   let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
     style="display:block;overflow:visible;max-width:100%" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>
       @keyframes dagGlow {
-        0%,100% { opacity:.55; r:${nodeH/2 + 6}; }
-        50%      { opacity:.9;  r:${nodeH/2 + 11}; }
+        0%,100% { opacity:.5; r:${nodeH/2 + 5}; }
+        50%      { opacity:.85; r:${nodeH/2 + 10}; }
       }
       .dag-pulse { animation: dagGlow 1.8s ease-in-out infinite; }
     </style>
     <marker id="arrG" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
       <path d="M0,0 L7,3.5 L0,7 Z" fill="#2a9d40"/>
     </marker>
+    <marker id="arrB" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#4f8ef7"/>
+    </marker>
     <marker id="arrD" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-      <path d="M0,0 L7,3.5 L0,7 Z" fill="#444"/>
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#3a3f52"/>
     </marker>
     <marker id="arrR" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-      <path d="M0,0 L7,3.5 L0,7 Z" fill="#dc2626"/>
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#f87171"/>
     </marker>
     <marker id="arrA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-      <path d="M0,0 L7,3.5 L0,7 Z" fill="#c47d18"/>
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#f0a030"/>
     </marker>
   </defs>`;
 
-  // ── Forward connector lines ─────────────────────────────────────────────────
+  // ── Connector lines ─────────────────────────────────────────────────────────
   NODES.forEach((n, i) => {
     if (i === NODES.length - 1) return;
     const x1 = startX + i * (nodeW + colGap) + nodeW;
     const x2 = startX + (i + 1) * (nodeW + colGap);
     const cy  = nodeY + nodeH / 2;
-    // Green if both nodes are done/completed, grey otherwise
-    const bothDone = i < activeIdx && (i + 1) < activeIdx;
-    const col = bothDone ? '#2a9d40' : '#444';
-    const sw  = bothDone ? 2 : 1;
+    const nxt = NODES[i + 1];
+    const col = n.status === 'done' ? '#2a9d40' : '#3a3f52';
+    const mk  = n.status === 'done' ? 'G' : 'D';
     svg += `<line x1="${x1}" y1="${cy}" x2="${x2}" y2="${cy}"
-      stroke="${col}" stroke-width="${sw}" marker-end="url(#arr${bothDone ? 'G' : 'D'})"/>`;
+      stroke="${col}" stroke-width="${n.status === 'done' ? 2 : 1}"
+      marker-end="url(#arr${mk})"/>`;
   });
 
   // ── Node cards ──────────────────────────────────────────────────────────────
   NODES.forEach((n, i) => {
-    const x         = startX + i * (nodeW + colGap);
-    const cx        = x + nodeW / 2;
-    const cy        = nodeY + nodeH / 2;
-    const isActive  = n.id === activeId;
-    const isDone    = !isActive && i < activeIdx;
-    // Released node gets red if state is rejected-at-release or unreleased
-    const isReleasedRejected = n.id === 'released' &&
-      (currentState === 'unreleased' || isRejected);
+    const x   = startX + i * (nodeW + colGap);
+    const cx  = x + nodeW / 2;
+    const cy  = nodeY + nodeH / 2;
 
-    // Draft is "ready" (blue) when form has been rejected and needs revision
-    const isDraftReady = n.id === 'draft' && isRejected;
+    const isActive   = n.status === 'active' || (n.status === 'ready' && n.id === 'draft');
+    const isDone     = n.status === 'done';
+    const isRej      = n.status === 'rejected';
+    const isPending  = n.status === 'pending';
 
-    // Color logic
-    const accent = isActive       ? activeColor
-                 : isDraftReady   ? '#4f8ef7'        // blue = ready to edit
-                 : isReleasedRejected ? '#dc2626'
-                 : isDone         ? '#2a9d40'
-                 : '#3a3f52';
+    const accent   = n.color;
+    const fillCol  = isDone    ? 'rgba(42,157,64,.12)'
+                   : isRej    ? 'rgba(248,113,113,.12)'
+                   : isActive  ? `${accent}28`
+                   : '#1a1f2e';
+    const textCol  = isPending ? '#555' : '#f0f0f0';
+    const sw       = isPending ? 1 : 2;
 
-    const fillCol = isActive       ? `${activeColor}28`
-                  : isDraftReady   ? 'rgba(79,142,247,.15)'
-                  : isReleasedRejected ? 'rgba(220,38,38,.12)'
-                  : isDone         ? 'rgba(42,157,64,.12)'
-                  : '#1a1f2e';
-
-    const textCol = isActive || isDone || isDraftReady ? '#f0f0f0'
-                  : isReleasedRejected ? '#f87171'
-                  : '#666';
-
-    const sw = isActive || isReleasedRejected || isDraftReady ? 2 : isDone ? 1.5 : 1;
-
-    // ── Glow ring around active node ─────────────────────────────────────────
-    // For rejected states, pulse on Draft (ready to edit), not the rejected node
-    const isDraftNode   = n.id === 'draft';
-    const glowOnDraft   = isRejected && isDraftNode;
-    const glowOnActive  = isActive && !isRejected;
-    if (glowOnActive || glowOnDraft) {
-      const glowColor = glowOnDraft ? '#4f8ef7' : activeColor;
-      svg += `<circle cx="${cx}" cy="${cy}" r="${nodeH/2 + 6}"
-        fill="none" stroke="${glowColor}" stroke-width="2" opacity="0.55"
+    // Glow ring on active/ready node
+    if (isActive) {
+      svg += `<circle cx="${cx}" cy="${cy}" r="${nodeH/2 + 5}"
+        fill="none" stroke="${accent}" stroke-width="2" opacity="0.5"
         class="dag-pulse"/>`;
     }
 
-    // ── Node rectangle ────────────────────────────────────────────────────────
+    // Node rect
     svg += `<rect x="${x}" y="${nodeY}" width="${nodeW}" height="${nodeH}"
       rx="${nodeR}" fill="${fillCol}" stroke="${accent}" stroke-width="${sw}"/>`;
 
-    // ── Status dot ─────────────────────────────────────────────────────────────
-    const dotColor = isActive ? activeColor : isDone ? '#2a9d40' : isReleasedRejected ? '#dc2626' : '#3a3f52';
-    svg += `<circle cx="${x + 12}" cy="${cy}" r="4" fill="${dotColor}"/>`;
+    // Status dot
+    svg += `<circle cx="${x + 12}" cy="${cy}" r="4" fill="${isPending ? '#3a3f52' : accent}"/>`;
 
-    // ── Two-line label ─────────────────────────────────────────────────────────
-    const lines  = n.lines || [''];
+    // Label lines
+    const lines  = n.lines;
     const lineH  = 16;
     const startTY = cy - ((lines.length - 1) * lineH) / 2;
     lines.forEach((line, li) => {
       svg += `<text x="${cx + 6}" y="${startTY + li * lineH}"
         text-anchor="middle" dominant-baseline="middle"
-        font-size="13" font-weight="${isActive ? '700' : '500'}"
+        font-size="13" font-weight="${isActive || isDone ? '700' : '500'}"
         fill="${textCol}" font-family="Arial,sans-serif">${line}</text>`;
     });
 
-    // ── Done ✓ or ✗ badges ─────────────────────────────────────────────────────
-    if (isDone && !isReleasedRejected) {
+    // ✓ done badge
+    if (isDone) {
       svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
         text-anchor="middle" font-size="12" fill="#2a9d40" font-family="Arial,sans-serif">✓</text>`;
     }
-    if (isReleasedRejected) {
+
+    // ✗ rejected badge + ▼ return triangle
+    if (isRej) {
       svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
-        text-anchor="middle" font-size="12" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
+        text-anchor="middle" font-size="12" fill="#f87171" font-family="Arial,sans-serif">✗</text>`;
+      svg += `<polygon points="${cx - 7},${nodeY + nodeH - 14} ${cx + 7},${nodeY + nodeH - 14} ${cx},${nodeY + nodeH - 2}"
+        fill="#f87171" opacity="0.9"/>`;
     }
-    if (isActive && isRejected) {
-      svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
-        text-anchor="middle" font-size="12" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
+
+    // Draft node: ▲ return target triangle when rejected
+    if (n.id === 'draft' && isRejected) {
+      svg += `<polygon points="${cx - 7},${nodeY + nodeH - 2} ${cx + 7},${nodeY + nodeH - 2} ${cx},${nodeY + nodeH - 14}"
+        fill="#4f8ef7" opacity="0.9"/>`;
     }
   });
 
-  // ── Rejection arc (BELOW) — from rejected node back to Draft ────────────────
+  // ── Rejection arc (BELOW) ───────────────────────────────────────────────────
   if (isRejected) {
     const arcY   = nodeY + nodeH + 32;
-    const srcIdx = currentState === 'rejected_review' ? 1 : currentState === 'rejected_release' ? 4 : 2;
-    const srcX   = startX + srcIdx * (nodeW + colGap) + nodeW / 2;
+    const rejIdx = currentState === 'rejected_review'   ? 1
+                 : currentState === 'rejected_approval' ? 2
+                 : 3; // rejected_release
+    const srcX   = startX + rejIdx * (nodeW + colGap) + nodeW / 2;
     const dstX   = startX + nodeW / 2;
     const midX   = (srcX + dstX) / 2;
+    const label  = currentState === 'rejected_review'   ? 'Review Rejected'
+                 : currentState === 'rejected_approval' ? 'Approval Rejected'
+                 : 'Release Rejected';
     svg += `<path d="M${srcX},${nodeY + nodeH} C${srcX},${arcY} ${dstX},${arcY} ${dstX},${nodeY + nodeH}"
-      fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3"
-      marker-start="url(#arrR)"/>`;
-    // ▼ triangle inside the rejected node pointing down toward the arc
-    svg += `<polygon points="${srcX - 7},${nodeY + nodeH - 14} ${srcX + 7},${nodeY + nodeH - 14} ${srcX},${nodeY + nodeH - 2}"
-      fill="#dc2626" opacity="0.9"/>`;
-    // ▲ triangle inside Draft pointing up (destination)
-    svg += `<polygon points="${dstX - 7},${nodeY + nodeH - 2} ${dstX + 7},${nodeY + nodeH - 2} ${dstX},${nodeY + nodeH - 14}"
-      fill="#4f8ef7" opacity="0.9"/>`;
-    const label = currentState === 'rejected_review' ? 'Review Rejected' : currentState === 'rejected_release' ? 'Release Rejected' : 'Approval Rejected';
+      fill="none" stroke="#f87171" stroke-width="2" stroke-dasharray="6,3"
+      marker-end="url(#arrR)"/>`;
     svg += `<text x="${midX}" y="${arcY + 18}" text-anchor="middle"
-      font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">${label}</text>`;
+      font-size="13" font-weight="600" fill="#f87171" font-family="Arial,sans-serif">${label}</text>`;
   }
 
-  // ── Unrelease arc (TOP ONLY) ─────────────────────────────────────────────────
-  // unreleased = form was brought back from Released for revision (deliberate or gate-rejected)
-  // Either way: show amber arc ABOVE returning from Released to Draft
+  // ── Unrelease arc (ABOVE) ───────────────────────────────────────────────────
   if (isUnreleased) {
-    const arcYTop = nodeY - 38;
-    const srcX    = startX + 4 * (nodeW + colGap) + nodeW / 2;  // Released center
-    const dstX    = startX + nodeW / 2;                          // Draft center
+    const arcYTop = nodeY - 36;
+    const srcX    = startX + 3 * (nodeW + colGap) + nodeW / 2;
+    const dstX    = startX + nodeW / 2;
     const midX    = (srcX + dstX) / 2;
     svg += `<path d="M${srcX},${nodeY} C${srcX},${arcYTop} ${dstX},${arcYTop} ${dstX},${nodeY}"
-      fill="none" stroke="#c47d18" stroke-width="2" stroke-dasharray="6,3"
+      fill="none" stroke="#f0a030" stroke-width="2" stroke-dasharray="6,3"
       marker-end="url(#arrA)"/>`;
     svg += `<text x="${midX}" y="${arcYTop - 10}" text-anchor="middle"
-      font-size="13" font-weight="600" fill="#c47d18" font-family="Arial,sans-serif">Unrelease</text>`;
+      font-size="13" font-weight="600" fill="#f0a030" font-family="Arial,sans-serif">Unrelease</text>`;
   }
 
-  // ── State label ─────────────────────────────────────────────────────────────
-  // State label below — skip for unreleased (arc label already communicates it)
-  // State label below — suppressed when rejected (arc label already communicates it)
-  // and suppressed when unreleased (arc label above communicates it)
-  if (!isUnreleased && !isRejected) {
+  // ── State label (only for non-rejected, non-unreleased) ─────────────────────
+  if (!isRejected && !isUnreleased && !['draft','in_review'].includes(currentState)) {
     const stateLabel = _formStateLabel(currentState);
     const stateColor = _formStateColor(currentState);
     svg += `<text x="${panelW/2}" y="${nodeY + nodeH + 20}"
@@ -5261,7 +5284,6 @@ function _fphRenderDag(currentState) {
   el.innerHTML = svg;
 }
 
-// ── Activity table renderer ─────────────────────────────────────────────────
 function _fphRenderActivity(rows) {
   const el = document.getElementById('fph-activity');
   if (!el) return;
@@ -5320,30 +5342,53 @@ function _fphRenderActivity(rows) {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   };
 
-  // Derive role from event_type
-  const roleFromEvent = (evt) => {
-    if (!evt) return '—';
-    if (evt.includes('approved') || evt.includes('approval')) return 'Approver';
-    if (evt.includes('review'))   return 'Reviewer';
-    if (evt.includes('released') || evt.includes('release')) return 'Editor';
-    if (evt.includes('reject'))   return evt.includes('approval') ? 'Approver' : 'Reviewer';
-    return 'Editor';
+  // ── Role + Action derivation from event_notes JSON ────────────────────────
+  const parseNotes = (r) => {
+    try { return JSON.parse(r.event_notes || '{}'); } catch(e) { return {}; }
   };
-  // Better: use metadata.stage or metadata.role if stored
-  const roleFromRow = (r) => {
-    const stage = r.metadata?.stage || r.metadata?.role;
-    if (stage === 'approver' || stage === 'approval') return 'Approver';
-    if (stage === 'reviewer' || stage === 'review')   return 'Reviewer';
-    if (stage === 'release')                           return 'Editor';
-    if (r.actor_name === 'System' || !r.actor_name)   return 'System';
-    return roleFromEvent(r.event_type);
+
+  const deriveRoleAction = (r) => {
+    const notes = parseNotes(r);
+    const from  = notes.from || '';
+    const to    = notes.to   || '';
+    const who   = r.actor_name || null;
+
+    // Suppress pure system events with no meaningful actor
+    if (!who && !from && !to) return null;
+
+    // Map from→to transitions to role + action
+    if (from === 'draft' && to === 'in_review')
+      return { role:'Editor',   action:'Submitted for Review', who: who || _selectedForm?._editorName || 'Editor' };
+    if (from === 'in_review' && to === 'in_review')
+      return { role:'Reviewer', action:'Review Approved',      who };
+    if (from === 'in_review' && to === 'reviewed')
+      return { role:'Reviewer', action:'Review Complete',      who };
+    if (from === 'reviewed'  && to === 'approved')
+      return { role:'Approver', action:'Approved',             who };
+    if (to === 'rejected_review')
+      return { role:'Reviewer', action:'Review Rejected',      who };
+    if (to === 'rejected_approval')
+      return { role:'Approver', action:'Approval Rejected',    who };
+    if (to === 'rejected_release')
+      return { role:'Editor',   action:'Rejected at Release',  who };
+    if (from === 'approved' && to === 'released')
+      return { role:'Editor',   action:'Released',             who };
+    if (to === 'unreleased')
+      return { role:'Editor',   action:'Revision Started',     who };
+
+    // Fallback: use event_type label with best-guess role
+    const evType = r.event_type || '';
+    if (evType.includes('released'))  return { role:'Editor',   action:'Released',  who };
+    if (evType.includes('approved'))  return { role:'Approver', action:'Approved',  who };
+    if (evType.includes('rejected'))  return { role:'Reviewer', action:'Rejected',  who };
+    if (!who) return null; // drop System rows with no useful info
+    return { role:'Editor', action: notes.note || evType.replace('form.',''), who };
   };
 
   const roleColor = (role) => ({
     'Editor':   '#60a5fa',
     'Reviewer': '#f0a030',
     'Approver': '#4ade80',
-    'System':   'var(--muted)',
   })[role] || 'var(--muted)';
 
   const th = (label) =>
@@ -5356,21 +5401,22 @@ function _fphRenderActivity(rows) {
       border-bottom:1px solid var(--border);${extra}">${content}</td>`;
 
   const tableRows = rows.map(r => {
-    const color  = evtColor[r.event_type] || 'var(--text2)';
-    const label  = (r.event_type === 'form.state_changed')
-      ? stateChangedLabel(r)
-      : (evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—');
-    const who    = r.actor_name || r.actor_id || 'System';
-    const role   = roleFromRow(r);
+    const derived = deriveRoleAction(r);
+    if (!derived) return '';
+    const { role, action, who } = derived;
     const rColor = roleColor(role);
+    const aColor = action.toLowerCase().includes('reject') ? '#f87171'
+                 : ['Approved','Review Complete','Released','Review Approved'].includes(action) ? '#4ade80'
+                 : action === 'Submitted for Review' ? '#60a5fa'
+                 : 'var(--text1)';
     return `<tr>
       ${td(fmt(r.created_at), 'var(--muted)', 'white-space:nowrap')}
-      ${td(escHtml(who), 'var(--text1)', 'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
-      ${td(`<span style="padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;
+      ${td(escHtml(who || '—'), 'var(--text1)', 'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+      ${td(`<span style="padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;
         background:${rColor}18;border:1px solid ${rColor}44;color:${rColor}">${role}</span>`, 'inherit')}
-      ${td(escHtml(label), color, 'font-weight:600')}
+      ${td(`<span style="font-weight:600;color:${aColor}">${escHtml(action)}</span>`, 'inherit')}
     </tr>`;
-  }).join('');
+  }).filter(Boolean).join('');
 
   el.innerHTML = `<div style="overflow-x:auto;max-height:220px;overflow-y:auto">
     <table style="width:100%;border-collapse:collapse">
