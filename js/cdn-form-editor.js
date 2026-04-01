@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-220001
-console.log('%c[cdn-form-editor] v20260401-220001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-220002
+console.log('%c[cdn-form-editor] v20260401-220002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -5431,10 +5431,13 @@ function _fphRenderActivity(rows) {
       return { role:'Reviewer', action:'Review Rejected',   who, version: _formVersion };
     if (to === 'rejected_approval')
       return { role:'Approver', action:'Approval Rejected', who, version: _formVersion };
-    if (to === 'rejected_release' || stage === 'release' && evType === 'form.rejected')
+    // Rejection at release gate: matches both old ('unreleased' + stage='release') and new ('rejected_release')
+    if (to === 'rejected_release' || (stage === 'release' && evType === 'form.rejected') ||
+        (to === 'unreleased' && stage === 'release'))
       return { role:'Editor',   action:'Rejected',          who, version: _formVersion };
     if (from === 'approved' && to === 'released')
       return { role:'Editor',   action:'Released',          who, version: notes.version || meta.version };
+    // Unreleased without stage=release = deliberate revision start
     if (to === 'unreleased')
       return { role:'Editor',   action:'Revision Started',  who, version: _formVersion };
 
@@ -5450,7 +5453,8 @@ function _fphRenderActivity(rows) {
       return { role: rejRole, action:'Rejected', who, version: _formVersion };
     }
     if (evType === 'form.state_changed' && !from && !to) return null;
-    if (evType === 'form.saved') return null;  // suppress routine saves
+    if (evType === 'form.saved')    return null;  // suppress routine saves
+    if (evType === 'form.archived') return null;  // suppress archive/delete events
     if (!who) return null;
     return { role:'Editor', action: notes.note || evType.replace('form.',''), who };
   };
