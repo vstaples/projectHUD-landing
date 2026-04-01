@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-120200
+// VERSION: 20260402-120300
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-120200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-120300','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -877,29 +877,37 @@ window.loadUserRequests = async function() {
         const wfType    = r.workflow_type || 'unknown';
         const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
         const currentStep = r.current_step_name || '';
+        const isComplete  = r.status === 'complete' || r.status === 'completed';
 
-        // Count CoC events to determine how many steps actually completed
-        const cocEvents = (window._myRequestCoc||{})[r.id] || [];
-        // Only step-advancing events count — approved/context/withdrawn don't advance steps
-        const stepEventTypes = ['request.submitted','request.routed','request.reviewed',
-          'request.revision_requested','request.final_review','request.completed'];
-        const cocDoneCount = cocEvents.filter(e => stepEventTypes.includes(e.event_type)).length || 
-          Math.min(cocEvents.length > 0 ? 1 : 0, stepLabels.length);
+        // Primary: derive active step from current_step_name (always available from DB)
         const currentIdx = stepLabels.findIndex(s =>
           s.toLowerCase().replace(/\s+/g,'').includes(
             (currentStep||'').toLowerCase().replace(/\s+/g,'').slice(0,5)
           )
         );
-        const activeIdx = r.status === 'complete' || r.status === 'completed'
+        // currentIdx is the COMPLETED step; active = one after it
+        const dbActiveIdx = isComplete
           ? stepLabels.length
           : currentIdx >= 0
             ? Math.min(currentIdx + 1, stepLabels.length - 1)
             : 1;
-        const isComplete = r.status === 'complete' || r.status === 'completed';
+
+        // Refinement: use CoC event count if loaded and higher than DB-derived index
+        const cocEvents   = (window._myRequestCoc||{})[r.id] || [];
+        const stepEventTypes = ['request.submitted','request.routed','request.reviewed',
+          'request.revision_requested','request.final_review','request.completed'];
+        const cocDoneCount = cocEvents.length
+          ? Math.max(
+              cocEvents.filter(e => stepEventTypes.includes(e.event_type)).length,
+              currentIdx >= 0 ? currentIdx + 1 : 1
+            )
+          : dbActiveIdx; // fall back to DB-derived when CoC not yet loaded
+
+        const activeIdx = isComplete ? stepLabels.length : Math.min(cocDoneCount, stepLabels.length - 1);
         const steps = stepLabels.map((label, i) => ({
           label,
-          done:   i < cocDoneCount,
-          active: !isComplete && i === cocDoneCount,
+          done:   i < activeIdx,
+          active: !isComplete && i === activeIdx,
         }));
 
         // Map instance status to display status
