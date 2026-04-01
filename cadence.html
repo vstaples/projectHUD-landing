@@ -708,25 +708,72 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 if (typeof _stopElapsedTimer === "undefined") window._stopElapsedTimer = function() {};
 if (typeof _startElapsedTimer === "undefined") window._startElapsedTimer = function() {};
 </script>
-<script src="/js/cdn-core-state.js?v=20260401202000"></script>
-<script src="/js/cdn-utils.js?v=20260401202000"></script>
-<script src="/js/cdn-form-editor.js?v=20260401202000"></script>
-<script src="/js/cdn-form-settings.js?v=20260401202000"></script>
-<script src="/js/cdn-assignee.js?v=20260401202000"></script>
-<script src="/js/cdn-outcomes.js?v=20260401202000"></script>
-<script src="/js/cdn-documents.js?v=20260401202000"></script>
-<script src="/js/cdn-dag-viewer.js?v=20260401202000"></script>
-<script src="/js/cdn-template-editor.js?v=20260401202000"></script>
-<script src="/js/cdn-bist.js?v=20260401202000"></script>
-<script src="/js/cdn-coc.js?v=20260401202000"></script>
-<script src="/js/cdn-meeting.js?v=20260401202000"></script>
-<script src="/js/cdn-scrubber.js?v=20260401202000"></script>
-<script src="/js/cdn-tooltips.js?v=20260401202000"></script>
-<script src="/js/cdn-comments.js?v=20260401202000"></script>
-<script src="/js/cdn-intel.js?v=20260401202000"></script>
-<script src="/js/cdn-events.js?v=20260401202000"></script>
-<script src="/js/cdn-instance-dag.js?v=20260401202000"></script>
-<script src="/js/cdn-instances.js?v=20260401202000"></script>
-    <script src="/js/cdn-form-runtime.js?v=20260401202000"></script>
+<script src="/js/cdn-core-state.js?v=20260401204000"></script>
+<script src="/js/cdn-utils.js?v=20260401204000"></script>
+<script src="/js/cdn-form-editor.js?v=20260401204000"></script>
+<script src="/js/cdn-form-settings.js?v=20260401204000"></script>
+<script src="/js/cdn-assignee.js?v=20260401204000"></script>
+<script src="/js/cdn-outcomes.js?v=20260401204000"></script>
+<script src="/js/cdn-documents.js?v=20260401204000"></script>
+<script src="/js/cdn-dag-viewer.js?v=20260401204000"></script>
+<script src="/js/cdn-template-editor.js?v=20260401204000"></script>
+<script src="/js/cdn-bist.js?v=20260401204000"></script>
+<script src="/js/cdn-coc.js?v=20260401204000"></script>
+<script src="/js/cdn-meeting.js?v=20260401204000"></script>
+<script src="/js/cdn-scrubber.js?v=20260401204000"></script>
+<script src="/js/cdn-tooltips.js?v=20260401204000"></script>
+<script src="/js/cdn-comments.js?v=20260401204000"></script>
+<script src="/js/cdn-intel.js?v=20260401204000"></script>
+<script src="/js/cdn-events.js?v=20260401204000"></script>
+<script src="/js/cdn-instance-dag.js?v=20260401204000"></script>
+<script src="/js/cdn-instances.js?v=20260401204000"></script>
+    <script src="/js/cdn-form-runtime.js?v=20260401204000"></script>
+
+<script>
+// ── Bootstrap CURRENT_USER from JWT + resources table ─────────────────────────
+// Runs after all cdn-*.js modules load. Sets window.CURRENT_USER so any module
+// that needs the current user's identity (form editor, CoC writes, etc.) has it.
+(async function _bootstrapCurrentUser() {
+  try {
+    // 1. Decode JWT to get sub (user UUID) and email
+    const token = await Auth.getToken();
+    if (!token) return;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const userUUID = payload.sub;
+    const email    = payload.email || '';
+    if (!userUUID) return;
+
+    // 2. Look up the matching resources row by user_id
+    const rows = await API.get(
+      `resources?user_id=eq.${userUUID}&select=id,user_id,first_name,last_name,email,department,title,is_external&limit=1`
+    ).catch(() => []) || [];
+
+    const resource = rows[0] || null;
+    const name = resource
+      ? ((resource.first_name||'')+' '+(resource.last_name||'')).trim()
+      : email.split('@')[0];
+
+    // 3. Set the global
+    window.CURRENT_USER = {
+      id:          userUUID,                        // auth users.id (UUID)
+      resource_id: resource?.id        || null,     // resources.id (UUID)
+      user_id:     userUUID,                        // alias
+      email:       resource?.email     || email,
+      name:        name,
+      first_name:  resource?.first_name || '',
+      last_name:   resource?.last_name  || '',
+      department:  resource?.department || '',
+      title:       resource?.title      || '',
+      is_external: resource?.is_external || false,
+    };
+
+    console.log('%c[CadenceHUD] CURRENT_USER ready — ' + name + ' (' + userUUID + ')',
+      'background:#1e3a8a;color:#93c5fd;padding:2px 8px;border-radius:3px;font-weight:600');
+
+  } catch(e) {
+    console.warn('[CadenceHUD] CURRENT_USER bootstrap failed:', e.message);
+  }
+})();
+</script>
 </body>
 </html>

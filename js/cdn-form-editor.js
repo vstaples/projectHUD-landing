@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-202000
-console.log('%c[cdn-form-editor] v20260401-202000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-204000
+console.log('%c[cdn-form-editor] v20260401-204000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2904,47 +2904,71 @@ async function _formDoSubmitForReview({ reviewers, approver }) {
 async function _formApproveReview() {
   if (!_selectedForm) return;
 
-  // Only store valid UUIDs — never the 'current_user' fallback string
-  const userId     = window.CURRENT_USER?.id;
-  const resourceId = window.CURRENT_USER?.resource_id;
-  const toAdd      = [userId, resourceId].filter(id => id && id !== 'current_user' && /^[0-9a-f-]{36}$/i.test(id));
+  // ── Resolve current user identity ────────────────────────────────────────
+  // Try CURRENT_USER first, then Supabase auth, then anonymous
+  let userId = null, actorName = null;
 
+  if (window.CURRENT_USER?.id && /^[0-9a-f-]{36}$/i.test(window.CURRENT_USER.id)) {
+    userId    = window.CURRENT_USER.id;
+    actorName = window.CURRENT_USER.name || window.CURRENT_USER.email || null;
+  }
+  if (!userId) {
+    try {
+      const { data } = await (window.supabase?.auth?.getUser() || Promise.resolve({ data: null }));
+      if (data?.user?.id) {
+        userId    = data.user.id;
+        actorName = data.user.email || null;
+      }
+    } catch(e) { /* silent */ }
+  }
+  actorName = actorName || 'Reviewer';
+
+  // ── Record who approved ───────────────────────────────────────────────────
+  // Store the resolved UUID if available; also append the resource_id if different
+  const resourceId = window.CURRENT_USER?.resource_id;
+  const toAdd = [userId, resourceId].filter(id => id && /^[0-9a-f-]{36}$/i.test(id));
   const existing = _selectedForm.reviewed_by || [];
   _selectedForm.reviewed_by = [...new Set([...existing, ...toAdd])];
 
-  const allReviewed = (_selectedForm.pending_reviewer_ids||[]).every(id =>
-    (_selectedForm.reviewed_by||[]).includes(id)
-  ) || (_selectedForm.pending_reviewer_ids||[]).length === 0;
+  // ── Determine if all reviewers have approved ──────────────────────────────
+  // If pending_reviewer_ids is empty OR if this click is the final approval,
+  // advance to reviewed. Since CURRENT_USER may not carry resource_id yet,
+  // we also advance if the count of approvals reaches the pending count.
+  const pending = _selectedForm.pending_reviewer_ids || [];
+  const approved = _selectedForm.reviewed_by || [];
 
-  const actorNote = window.CURRENT_USER?.name || window.CURRENT_USER?.email || 'Reviewer';
+  const allReviewed =
+    pending.length === 0 ||
+    pending.every(id => approved.includes(id)) ||
+    // Fallback: treat each click as one reviewer approving — advance when
+    // the number of unique approvals >= number of pending reviewers
+    approved.length >= pending.length;
 
   if (allReviewed) {
     _selectedForm.state = 'reviewed';
     _formCoCWrite('form.state_changed', _selectedForm.id, {
       from: 'in_review', to: 'reviewed',
-      note: 'All reviewers approved — awaiting approval'
+      note: `All reviewers approved — ${actorName} was last to sign off`
     });
     cadToast('Review complete — awaiting final approval', 'success');
   } else {
     _formCoCWrite('form.state_changed', _selectedForm.id, {
       from: 'in_review', to: 'in_review',
-      note: `${actorNote} approved`
+      note: `${actorName} approved (${approved.length} of ${pending.length})`
     });
     cadToast('Your review recorded', 'info');
   }
 
   await _formSave();
 
-  // If in preview mode — refresh panels in-place, do NOT exit preview
+  // ── Stay in preview if we're already there ────────────────────────────────
   if (_formPreviewMode) {
     _formRefreshToolbar();
     _formRefreshRolePanel();
-    // Reload history panel with fresh CoC data
     await _formShowPreviewHistoryPanel();
     return;
   }
 
-  // Not in preview — full re-render
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
 }
@@ -3249,18 +3273,12 @@ function _formCoCWrite(eventType, formId, details) {
     entity_id:   formId,
     event_type:  eventType,
     details:     { ...details, form_name: _selectedForm?.source_name },
-    actor_id:    window.CURRENT_USER?.id || null,
+    actor_id:    window.CURRENT_USER?.id || null,         // auth user UUID
     actor_name:  window.CURRENT_USER?.name || window.CURRENT_USER?.email || null,
     firm_id:     window.FIRM_ID || FIRM_ID_CAD,
     created_at:  new Date().toISOString(),
   };
-
-  // Try window.CoC.write first (platform CoC module)
-  if (window.CoC?.write) {
-    try { window.CoC.write(payload); } catch(e) { console.warn('[CoC] write failed:', e.message); }
-  }
-
-  // Write directly to coc_events using actual column names from DB schema
+  // Map to coc_events actual column names
   const cocRow = {
     firm_id:           payload.firm_id,
     entity_id:         payload.entity_id,
@@ -3270,12 +3288,18 @@ function _formCoCWrite(eventType, formId, details) {
                          ? JSON.stringify(payload.details)
                          : (payload.details || ''),
     actor_name:        payload.actor_name || null,
-    actor_resource_id: payload.actor_id   || null,  // actor_id → actor_resource_id
+    actor_resource_id: window.CURRENT_USER?.resource_id || payload.actor_id || null,
     event_class:       'form',
     severity:          'info',
     occurred_at:       payload.created_at || new Date().toISOString(),
     metadata:          payload.details || null,
   };
+
+  // Try window.CoC.write first (platform CoC module)
+  if (window.CoC?.write) {
+    try { window.CoC.write(payload); } catch(e) { console.warn('[CoC] write failed:', e.message); }
+  }
+
   API.post('coc_events', cocRow).catch(e =>
     console.warn('[form-editor] coc_events write failed:', e.message)
   );
