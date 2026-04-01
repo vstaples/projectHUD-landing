@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-220000
-console.log('%c[cdn-form-editor] v20260401-220000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-220001
+console.log('%c[cdn-form-editor] v20260401-220001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2422,10 +2422,11 @@ async function _formReplacePdfChosen(event) {
     await _ensurePdfJs();
     const arrayBuffer = await file.arrayBuffer();
 
-    // Store new file for save upload
+    // Store new file for save — do NOT set _unsaved (that triggers POST/duplicate)
+    // The PATCH branch handles file upload when _file is set and _unsaved is false
     if (_selectedForm) {
       _selectedForm._file         = file;
-      _selectedForm._unsaved      = true; // force re-upload on next save
+      _selectedForm._unsaved      = false; // keep as PATCH — just re-upload file
       _selectedForm.source_name   = _selectedForm.source_name || file.name;
       window._pendingImportFile   = file;
     }
@@ -3617,6 +3618,23 @@ async function _formSave() {
     const _rejectedStates = ['rejected_review','rejected_approval','rejected_release'];
     if (_rejectedStates.includes(_selectedForm.state)) {
       _selectedForm.state = 'draft';
+    }
+    // Upload replacement PDF if one was selected via Replace PDF button
+    if (_selectedForm._file && !_selectedForm._unsaved) {
+      try {
+        const path  = _selectedForm.source_path ||
+          `${window.FIRM_ID||FIRM_ID_CAD}/${Date.now()}_${_selectedForm._file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+        const token = await Auth.getToken();
+        const res   = await fetch(`${SUPA_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+          method:'POST', headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+token,
+            'Content-Type':_selectedForm._file.type||'application/pdf', 'x-upsert':'true' },
+          body: _selectedForm._file,
+        });
+        if (res.ok) {
+          _selectedForm.source_path = path;
+          delete _selectedForm._file;
+        }
+      } catch(e) { console.warn('[formSave] PDF upload failed:', e.message); }
     }
     await API.patch(`workflow_form_definitions?id=eq.${_selectedForm.id}`, {
       source_name:   _selectedForm.source_name,
@@ -5034,24 +5052,30 @@ async function _formShowPreviewHistoryPanel() {
   dragHandle.addEventListener('mousedown',  (e) => _formColDragStart(e, 'form-preview-history-panel', 'left'));
   panel.appendChild(dragHandle);
 
-  // Render DAG immediately (no async needed — state is known)
-  // hasHistory: form has been through at least one review cycle
-  const _hasHistory = (rows || []).some(r => {
-    try { const p = JSON.parse(r.event_notes||'{}'); return p.from && p.to; } catch(e) { return false; }
-  });
+  // Render DAG without history flag first (immediate, no async)
   _fphRenderDag(
     state,
     _selectedForm?.reviewed_by          || [],
     _selectedForm?.pending_reviewer_ids || [],
-    _hasHistory
+    false  // hasHistory — will re-render after CoC loads
   );
 
-  // Load CoC data for activity + comments
+  // Load CoC data for activity + comments + re-render DAG with history flag
   if (_selectedForm?.id) {
     try {
       const rows = await API.get(
         `coc_events?entity_id=eq.${_selectedForm.id}&order=created_at.asc&limit=200`
       ).catch(() => []) || [];
+      // Re-render DAG now that we know if form has prior review history
+      const _hasHistory = rows.some(r => {
+        try { const p = JSON.parse(r.event_notes||'{}'); return p.from && p.to; } catch(e) { return false; }
+      });
+      _fphRenderDag(
+        state,
+        _selectedForm?.reviewed_by          || [],
+        _selectedForm?.pending_reviewer_ids || [],
+        _hasHistory
+      );
       _fphRenderActivity(rows);
       _fphRenderComments(rows);
     } catch(e) {
