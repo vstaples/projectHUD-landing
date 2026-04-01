@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-219003
-console.log('%c[cdn-form-editor] v20260401-219003','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-220000
+console.log('%c[cdn-form-editor] v20260401-220000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3613,6 +3613,11 @@ async function _formSave() {
       if (listEl) listEl.innerHTML = _renderFormList();
     } catch(e) { cadToast('Save failed: ' + e.message, 'error'); }
   } else {
+    // Auto-advance rejected states back to draft when editor saves
+    const _rejectedStates = ['rejected_review','rejected_approval','rejected_release'];
+    if (_rejectedStates.includes(_selectedForm.state)) {
+      _selectedForm.state = 'draft';
+    }
     await API.patch(`workflow_form_definitions?id=eq.${_selectedForm.id}`, {
       source_name:   _selectedForm.source_name,
       fields:        _selectedForm.fields,
@@ -5030,17 +5035,22 @@ async function _formShowPreviewHistoryPanel() {
   panel.appendChild(dragHandle);
 
   // Render DAG immediately (no async needed — state is known)
+  // hasHistory: form has been through at least one review cycle
+  const _hasHistory = (rows || []).some(r => {
+    try { const p = JSON.parse(r.event_notes||'{}'); return p.from && p.to; } catch(e) { return false; }
+  });
   _fphRenderDag(
     state,
-    _selectedForm?.reviewed_by         || [],
-    _selectedForm?.pending_reviewer_ids || []
+    _selectedForm?.reviewed_by          || [],
+    _selectedForm?.pending_reviewer_ids || [],
+    _hasHistory
   );
 
   // Load CoC data for activity + comments
   if (_selectedForm?.id) {
     try {
       const rows = await API.get(
-        `coc_events?entity_id=eq.${_selectedForm.id}&event_class=eq.form&order=created_at.asc&limit=200`
+        `coc_events?entity_id=eq.${_selectedForm.id}&order=created_at.asc&limit=200`
       ).catch(() => []) || [];
       _fphRenderActivity(rows);
       _fphRenderComments(rows);
@@ -5059,7 +5069,7 @@ async function _formShowPreviewHistoryPanel() {
 }
 
 // ── Workflow DAG renderer ──────────────────────────────────────────────────
-function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds) {
+function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds, hasHistory) {
   const el = document.getElementById('fph-dag');
   if (!el) return;
 
@@ -5078,8 +5088,12 @@ function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds) {
       case 'draft': {
         if (['in_review','reviewed','approved','released'].includes(currentState))
           return { lines:['Draft','Complete'], color:'#2a9d40', status:'done' };
-        if (currentState === 'draft')
+        if (currentState === 'draft') {
+          // Amber 'In Draft' when editor is reworking after a rejection
+          if (hasHistory)
+            return { lines:['In Draft'], color:'#f0a030', status:'active' };
           return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
+        }
         if (currentState === 'unreleased')
           return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
         if (['rejected_review','rejected_approval','rejected_release'].includes(currentState))
@@ -5412,6 +5426,7 @@ function _fphRenderActivity(rows) {
       return { role: rejRole, action:'Rejected', who, version: _formVersion };
     }
     if (evType === 'form.state_changed' && !from && !to) return null;
+    if (evType === 'form.saved') return null;  // suppress routine saves
     if (!who) return null;
     return { role:'Editor', action: notes.note || evType.replace('form.',''), who };
   };
