@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-190000
-console.log('%c[cdn-form-editor] v20260401-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-192000
+console.log('%c[cdn-form-editor] v20260401-192000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2577,64 +2577,326 @@ function _formRefreshToolbar() {
 // ─────────────────────────────────────────────────────────────────────────────
 // LIFECYCLE STATE TRANSITIONS
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// APPROVAL CHAIN DIALOG — shown when editor clicks Submit for Review
+// ─────────────────────────────────────────────────────────────────────────────
 async function _formSubmitForReview() {
   if (!_selectedForm) return;
-  const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-  const baseReviewerIds = cat?.reviewer_ids || [];
 
-  // Only show PersonPicker if category has NO reviewers configured
-  const extraReviewers = [];
-  if (!baseReviewerIds.length) {
-    const submitAnchor = document.querySelector('[onclick*="_formSubmitForReview"]');
-    if (window.PersonPicker?.show && submitAnchor) {
-      await new Promise(resolve => {
-        window.PersonPicker.show(submitAnchor, function(person) {
-          if (person?.id) extraReviewers.push({ id:person.id, name:person.name, email:'' });
-          resolve();
-        });
-      });
-    } else {
-      if (!confirm('Submit for review? No reviewers configured in category.')) return;
+  const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+
+  // Resolve category reviewers + approver from resources table
+  const reviewerIds  = cat?.reviewer_ids || [];
+  const approverId   = cat?.approver_id  || null;
+
+  let reviewers = [], approver = null;
+
+  const allIds = [...new Set([...reviewerIds, ...(approverId ? [approverId] : [])])];
+  if (allIds.length) {
+    const rows = await API.get(
+      `resources?id=in.(${allIds.join(',')})&select=id,user_id,first_name,last_name,email,department,title`
+    ).catch(() => []) || [];
+    const byId = Object.fromEntries(rows.map(r => [r.id, r]));
+    reviewers = reviewerIds
+      .filter(id => byId[id])
+      .map(id => ({
+        id:      byId[id].id,
+        user_id: byId[id].user_id,
+        name:    ((byId[id].first_name||'')+' '+(byId[id].last_name||'')).trim(),
+        email:   byId[id].email || '',
+        dept:    byId[id].department || '',
+        title:   byId[id].title || '',
+      }));
+    if (approverId && byId[approverId]) {
+      const a = byId[approverId];
+      approver = {
+        id:      a.id,
+        user_id: a.user_id,
+        name:    ((a.first_name||'')+' '+(a.last_name||'')).trim(),
+        email:   a.email || '',
+        dept:    a.department || '',
+        title:   a.title || '',
+      };
     }
   }
 
-  // Fetch category reviewer details from resources table
-  let reviewers = [];
-  if (baseReviewerIds.length) {
-    const rows = await API.get(`resources?id=in.(${baseReviewerIds.join(',')})&select=id,first_name,last_name,email`).catch(()=>[]) || [];
-    reviewers = rows.map(r => ({ id:r.id, name:((r.first_name||'')+' '+(r.last_name||'')).trim(), email:r.email||'' }));
-  }
-  extraReviewers.forEach(p => {
-    const id = p.id||p;
-    if (!reviewers.find(r => r.id === id)) reviewers.push({ id, name:p.full_name||p.name||id, email:p.email||'' });
+  // Show the Approval Chain dialog — user can review/adjust before sending
+  _formShowApprovalChainDialog({
+    form:      _selectedForm,
+    reviewers,
+    approver,
+    onSend:    _formDoSubmitForReview,
   });
+}
 
-  // Save, then update state
-  await _formSave();
-  _selectedForm.state = 'in_review';
-  _selectedForm.pending_reviewer_ids = reviewers.map(r => r.id);
-  _selectedForm.reviewed_by = [];
-  await _formSave();
+function _formShowApprovalChainDialog({ form, reviewers, approver, onSend }) {
+  document.getElementById('cad-approval-chain-modal')?.remove();
 
-  // Send email notifications
-  if (reviewers.length) {
-    try {
-      await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY },
-        body: JSON.stringify({ form_def_id:_selectedForm.id, reviewers, role:'reviewer' })
+  // Working copies — user can add/remove before sending
+  let wReviewers = [...reviewers];
+  let wApprover  = approver ? { ...approver } : null;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cad-approval-chain-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
+    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+
+  const personRow = (p, role, canRemove) => `
+    <div data-person-id="${p.id}" style="display:flex;align-items:center;gap:10px;
+      padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
+        background:${{ reviewer:'rgba(196,125,24,.2)', approver:'rgba(42,157,64,.2)' }[role]||'rgba(79,142,247,.2)'};
+        border:1px solid ${{ reviewer:'var(--cad)', approver:'var(--green)' }[role]||'var(--accent)'};
+        display:flex;align-items:center;justify-content:center;
+        font-size:12px;font-weight:700;
+        color:${{ reviewer:'var(--cad)', approver:'var(--green)' }[role]||'var(--accent)'}">
+        ${p.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">
+          ${escHtml(p.name)}
+        </div>
+        <div style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif">
+          ${escHtml(p.email)}${p.dept ? ' · '+escHtml(p.dept) : ''}
+        </div>
+      </div>
+      <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;
+        background:${{ reviewer:'rgba(196,125,24,.15)', approver:'rgba(42,157,64,.15)' }[role]||'rgba(79,142,247,.15)'};
+        color:${{ reviewer:'var(--cad)', approver:'var(--green)' }[role]||'var(--accent)'}">
+        ${{ reviewer:'Reviewer', approver:'Approver', editor:'Editor' }[role]||role}
+      </span>
+      ${canRemove ? `<button onclick="_formApprovalChainRemoveReviewer('${p.id}')"
+        title="Remove reviewer"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;
+               font-size:16px;padding:0 2px;line-height:1;flex-shrink:0">✕</button>` : ''}
+    </div>`;
+
+  const render = () => {
+    const box = document.getElementById('cad-ac-box');
+    if (!box) return;
+
+    const editorName = window.CURRENT_USER?.name || window.CURRENT_USER?.email || 'You (editor)';
+
+    box.innerHTML = `
+      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
+        display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">Submit for Review</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px">${escHtml(form.source_name||'Untitled')} · ${escHtml(form.version||'0.1.0')}</div>
+        </div>
+        <button onclick="document.getElementById('cad-approval-chain-modal')?.remove()"
+          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+
+      <div style="padding:16px 22px;overflow-y:auto;max-height:60vh">
+
+        <!-- Editor row -->
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+          color:var(--muted);margin-bottom:8px;font-family:Arial,sans-serif">Editor</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;
+          border-bottom:1px solid var(--border);margin-bottom:16px">
+          <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
+            background:rgba(79,142,247,.2);border:1px solid var(--accent);
+            display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">
+            ${editorName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:var(--text)">${escHtml(editorName)}</div>
+            <div style="font-size:12px;color:var(--muted)">Completes draft</div>
+          </div>
+          <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;
+            background:rgba(79,142,247,.15);color:var(--accent)">Editor</span>
+        </div>
+
+        <!-- Reviewers -->
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+          color:var(--muted);margin-bottom:8px;font-family:Arial,sans-serif">
+          Reviewers <span style="font-weight:400;text-transform:none;letter-spacing:0">(all must approve)</span>
+        </div>
+        <div id="cad-ac-reviewers">
+          ${wReviewers.length
+            ? wReviewers.map(r => personRow(r, 'reviewer', true)).join('')
+            : '<div style="font-size:13px;color:var(--muted);padding:8px 0;font-family:Arial,sans-serif;font-style:italic">No reviewers assigned</div>'
+          }
+        </div>
+        <button id="cad-ac-add-reviewer"
+          style="margin-top:8px;font-size:13px;padding:5px 14px;border-radius:4px;
+            background:transparent;border:1px solid var(--border);color:var(--text2);
+            cursor:pointer;font-family:Arial,sans-serif">+ Add Reviewer</button>
+
+        <!-- Approver -->
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+          color:var(--muted);margin-top:18px;margin-bottom:8px;font-family:Arial,sans-serif">Approver</div>
+        <div id="cad-ac-approver">
+          ${wApprover
+            ? personRow(wApprover, 'approver', false) +
+              `<button onclick="_formApprovalChainChangeApprover()"
+                style="margin-top:6px;font-size:12px;padding:3px 10px;border-radius:4px;
+                  background:transparent;border:1px solid var(--border);color:var(--muted);
+                  cursor:pointer;font-family:Arial,sans-serif">Change Approver</button>`
+            : '<div style="font-size:13px;color:var(--amber);padding:8px 0;font-family:Arial,sans-serif">⚠ No approver assigned — form will stop at Reviewed</div>'
+          }
+        </div>
+
+        <!-- Info note -->
+        <div style="margin-top:18px;padding:10px 12px;background:var(--surf2);border-radius:6px;
+          border-left:3px solid var(--accent)">
+          <div style="font-size:12px;color:var(--text2);line-height:1.6;font-family:Arial,sans-serif">
+            Each reviewer will receive an <strong>email</strong> with a secure review link
+            and an <strong>in-app action item</strong> assigned to them.
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:14px 22px;border-top:1px solid var(--border);
+        display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('cad-approval-chain-modal')?.remove()"
+          style="padding:8px 20px;border-radius:6px;background:transparent;
+            border:1px solid var(--border);color:var(--muted);cursor:pointer;
+            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
+        <button id="cad-ac-send-btn"
+          style="padding:8px 24px;border-radius:6px;background:var(--cad);
+            border:none;color:var(--bg);cursor:pointer;font-size:14px;
+            font-weight:700;font-family:Arial,sans-serif">
+          Send for Review →
+        </button>
+      </div>`;
+
+    // Wire add reviewer button
+    document.getElementById('cad-ac-add-reviewer')?.addEventListener('click', function() {
+      window.PersonPicker?.show(this, function(person) {
+        if (!person?.id) return;
+        if (wReviewers.find(r => r.id === person.id)) return;
+        wReviewers.push({
+          id:      person.id,
+          user_id: person.user_id,
+          name:    person.name,
+          email:   person.email || '',
+          dept:    person.dept  || '',
+        });
+        render();
       });
-      cadToast(`Submitted — ${reviewers.length} reviewer(s) notified`, 'success');
-    } catch(e) { cadToast('Submitted — email notification failed', 'info'); }
-  } else {
-    cadToast('Submitted for review (no reviewers notified)', 'info');
+    });
+
+    // Wire send button
+    document.getElementById('cad-ac-send-btn')?.addEventListener('click', async () => {
+      if (!wReviewers.length && !wApprover) {
+        cadToast('Add at least one reviewer or approver before sending', 'error');
+        return;
+      }
+      const btn = document.getElementById('cad-ac-send-btn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+      document.getElementById('cad-approval-chain-modal')?.remove();
+      await onSend({ reviewers: wReviewers, approver: wApprover });
+    });
+  };
+
+  overlay.innerHTML = `<div id="cad-ac-box"
+    style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+      width:520px;max-width:calc(100vw - 32px);max-height:90vh;
+      display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.7)"></div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  render();
+
+  // Expose helpers for inline event handlers
+  window._formApprovalChainRemoveReviewer = (id) => {
+    wReviewers = wReviewers.filter(r => r.id !== id);
+    render();
+  };
+  window._formApprovalChainChangeApprover = () => {
+    const btn = document.getElementById('cad-ac-approver')?.querySelector('button');
+    window.PersonPicker?.show(btn || document.body, function(person) {
+      if (!person?.id) return;
+      wApprover = {
+        id:      person.id,
+        user_id: person.user_id,
+        name:    person.name,
+        email:   person.email || '',
+      };
+      render();
+    });
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DO SUBMIT — called by dialog after user confirms the chain
+// ─────────────────────────────────────────────────────────────────────────────
+async function _formDoSubmitForReview({ reviewers, approver }) {
+  if (!_selectedForm) return;
+  const fromState = _selectedForm.state;
+
+  // Save current state first
+  await _formSave();
+
+  // Advance to in_review
+  _selectedForm.state                = 'in_review';
+  _selectedForm.pending_reviewer_ids = reviewers.map(r => r.id);
+  _selectedForm.reviewed_by          = [];
+  await _formSave();
+
+  // Write CoC
+  _formCoCWrite('form.state_changed', _selectedForm.id, {
+    from: fromState,
+    to:   'in_review',
+    note: `Reviewers: ${reviewers.map(r => r.name).join(', ') || 'none'}` +
+          (approver ? ` | Approver: ${approver.name}` : ''),
+  });
+
+  // Send emails via notify-form-review edge function
+  const firmId  = window.FIRM_ID || FIRM_ID_CAD;
+  const formId  = _selectedForm.id;
+  const currentUserId = window.CURRENT_USER?.id || null;
+
+  try {
+    await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
+      method:  'POST',
+      headers: { 'Content-Type':'application/json', 'apikey':SUPA_KEY, 'Authorization':'Bearer '+SUPA_KEY },
+      body:    JSON.stringify({
+        form_def_id: formId,
+        reviewers,
+        role:    'reviewer',
+        context: 'definition',
+      }),
+    });
+  } catch(e) { console.warn('[formSubmit] email notification failed:', e); }
+
+  // Create action items for each reviewer
+  if (window.HUD?.ActionItems?.open) {
+    for (const reviewer of reviewers) {
+      // resolveResponsible: resources.id → user_id (for action_items FK)
+      const resolveResponsible = (resourceId) => {
+        return reviewers.find(r => r.id === resourceId)?.user_id || null;
+      };
+
+      window.HUD.ActionItems.open({
+        table:      'action_items',
+        firmId,
+        projectId:  formId,   // form ID as project context
+        submittedBy: currentUserId,
+        description: `Review form: "${_selectedForm.source_name}" v${_selectedForm.version||'0.1.0'}`,
+        people: [{
+          group: 'Reviewer',
+          id:    reviewer.id,
+          label: reviewer.name,
+          sub:   reviewer.email,
+        }],
+        defaultDueDays: 7,
+        resolveResponsible,
+        onSave: () => Promise.resolve(),
+        onCoCLog: async (payload) => {
+          _formCoCWrite('form.action_item_created', formId, {
+            for: reviewer.name,
+            role: 'reviewer',
+          });
+        },
+      });
+    }
   }
 
-  _formCoCWrite('form.state_changed', _selectedForm.id, {
-    from: ['unreleased','rejected_review','rejected_approval'].includes(_selectedForm.state) ? _selectedForm.state : 'draft',
-    to:'in_review',
-    note:`Reviewers: ${reviewers.map(r=>r.name).join(', ')||'none'}`
-  });
+  cadToast(`Submitted for review — ${reviewers.length} reviewer(s) notified`, 'success');
+
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
 }
@@ -3669,11 +3931,11 @@ function _formTogglePreview() {
     if (colRout) { colRout.style.display = 'none'; }
     const cocPanel = document.getElementById('form-coc-panel');
     if (cocPanel?.classList.contains('open')) cocPanel.classList.remove('open');
-    // Inject role switcher panel
+    // Inject workflow/history panel then role panel
+    _formShowPreviewHistoryPanel();
     _formShowRolePanel();
     _formRenderPreviewOverlay();
     // Scroll to top so the full form is visible from the beginning.
-    // Fields are correctly positioned — user scrolls down to reach signatures.
     const outerWrap = document.getElementById('form-canvas-wrap');
     if (outerWrap) outerWrap.scrollTo({ top: 0, behavior: 'instant' });
   } else {
@@ -3681,8 +3943,9 @@ function _formTogglePreview() {
     // 1. Remove all input overlays
     document.querySelectorAll('.form-preview-input-wrap').forEach(el => el.remove());
     document.getElementById('form-preview-container')?.remove();
-    // 2. Remove stage bar and role panel
+    // 2. Remove stage bar, history panel, and role panel
     document.getElementById('form-preview-stagebar')?.remove();
+    document.getElementById('form-preview-history-panel')?.remove();
     document.getElementById('form-preview-role-panel')?.remove();
     // 3. Remove done overlays
     document.querySelectorAll('[id^="form-preview-done"]').forEach(el => el.remove());
@@ -4372,7 +4635,337 @@ function _formPreviewAttendeesField(wrap, field, existingVal, h, fs) {
 // ─────────────────────────────────────────────────────────────────────────────
 // PREVIEW ROLE SWITCHER PANEL
 // ─────────────────────────────────────────────────────────────────────────────
-function _formShowRolePanel() {
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PREVIEW HISTORY PANEL
+// Shows: lifecycle workflow DAG  |  activity table  |  comments
+// Inserted as a flex sibling between the canvas and SIMULATE panel.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function _formShowPreviewHistoryPanel() {
+  document.getElementById('form-preview-history-panel')?.remove();
+  const bodyRow = document.getElementById('form-body-row');
+  if (!bodyRow) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'form-preview-history-panel';
+  panel.style.cssText = [
+    'width:320px;min-width:260px;max-width:400px;flex-shrink:0',
+    'background:var(--bg1)',
+    'border-left:1px solid var(--border)',
+    'display:flex;flex-direction:column',
+    'font-family:Arial,sans-serif',
+    'overflow-y:auto',
+    'overflow-x:hidden',
+  ].join(';');
+
+  // Insert BEFORE the SIMULATE panel (append adds it after canvas, before any existing panels)
+  const simulate = document.getElementById('form-preview-role-panel');
+  bodyRow.insertBefore(panel, simulate || null);
+
+  const state = _selectedForm?.state || 'draft';
+
+  // ── Section header helper ──────────────────────────────────────────────────
+  const sectionHdr = (title) =>
+    `<div style="padding:9px 14px 7px;border-bottom:1px solid var(--border);
+       font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+       color:var(--muted);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
+
+  // ── 1. WORKFLOW DAG ────────────────────────────────────────────────────────
+  panel.innerHTML = sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 10px 8px;flex-shrink:0"></div>`;
+
+  // ── 2. ACTIVITY TABLE placeholder ─────────────────────────────────────────
+  panel.innerHTML += sectionHdr('Activity') +
+    `<div id="fph-activity" style="padding:0;flex-shrink:0">
+       <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
+     </div>`;
+
+  // ── 3. COMMENTS placeholder ────────────────────────────────────────────────
+  panel.innerHTML += sectionHdr('Comments') +
+    `<div id="fph-comments" style="padding:0;flex:1">
+       <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
+     </div>`;
+
+  // Render DAG immediately (no async needed — state is known)
+  _fphRenderDag(state);
+
+  // Load CoC data for activity + comments
+  if (_selectedForm?.id) {
+    try {
+      const rows = await API.get(
+        `coc_events?entity_id=eq.${_selectedForm.id}&order=created_at.asc&limit=200`
+      ).catch(() => []) || [];
+      _fphRenderActivity(rows);
+      _fphRenderComments(rows);
+    } catch(e) {
+      ['fph-activity','fph-comments'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--red)">Failed to load.</div>';
+      });
+    }
+  } else {
+    ['fph-activity','fph-comments'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--muted)">No history yet.</div>';
+    });
+  }
+}
+
+// ── Workflow DAG renderer ──────────────────────────────────────────────────
+function _fphRenderDag(currentState) {
+  const el = document.getElementById('fph-dag');
+  if (!el) return;
+
+  // Node definitions — fixed LC1 lifecycle
+  const NODES = [
+    { id:'draft',    label:'Draft',   color:'#8b91a5', activeColor:'#4f8ef7' },
+    { id:'in_review',label:'Review',  color:'#8b91a5', activeColor:'#c47d18' },
+    { id:'reviewed', label:'Reviewed',color:'#8b91a5', activeColor:'#c47d18' },
+    { id:'approved', label:'Approved',color:'#8b91a5', activeColor:'#2a9d40' },
+    { id:'released', label:'Released',color:'#8b91a5', activeColor:'#2a9d40' },
+  ];
+
+  const isRejected  = currentState === 'rejected_review' || currentState === 'rejected_approval';
+  const isUnreleased = currentState === 'unreleased';
+
+  // Determine which nodes are active/done
+  const stateOrder = ['draft','in_review','reviewed','approved','released'];
+  const currentIdx  = stateOrder.indexOf(currentState);
+
+  const panelW = 300;
+  const nodeW  = 72, nodeH = 36, nodeR = 6;
+  const colGap = 10;  // gap between nodes
+  const cols   = NODES.length;
+  const totalW = cols * nodeW + (cols - 1) * colGap;
+  const startX = (panelW - totalW) / 2;
+  const nodeY  = 48;   // Y of node tops
+  const svgH   = isRejected ? 160 : 110;
+
+  let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
+    style="display:block;overflow:visible" xmlns="http://www.w3.org/2000/svg">`;
+
+  // ── Forward arrows between nodes ──────────────────────────────────────────
+  NODES.forEach((n, i) => {
+    if (i === NODES.length - 1) return;
+    const x1 = startX + i * (nodeW + colGap) + nodeW;
+    const x2 = startX + (i + 1) * (nodeW + colGap);
+    const cy  = nodeY + nodeH / 2;
+    const isDoneEdge = currentIdx > i;
+    svg += `<line x1="${x1}" y1="${cy}" x2="${x2}" y2="${cy}"
+      stroke="${isDoneEdge ? '#2a9d40' : '#444'}" stroke-width="${isDoneEdge ? 2 : 1}"
+      marker-end="url(#arr${isDoneEdge ? 'G' : 'D'})"/>`;
+  });
+
+  // ── Arrow markers ─────────────────────────────────────────────────────────
+  svg += `<defs>
+    <marker id="arrG" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#2a9d40"/>
+    </marker>
+    <marker id="arrD" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#444"/>
+    </marker>
+    <marker id="arrR" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#dc2626"/>
+    </marker>
+    <marker id="arrA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#c47d18"/>
+    </marker>
+  </defs>`;
+
+  // ── Kickback arcs (below) — rejected_review → draft, rejected_approval → draft ──
+  if (isRejected) {
+    const arcY    = nodeY + nodeH + 28;
+    const srcIdx  = currentState === 'rejected_review' ? 1 : 3;
+    const srcX    = startX + srcIdx * (nodeW + colGap) + nodeW / 2;
+    const dstX    = startX + nodeW / 2;  // Draft center
+    const sweep   = srcX > dstX ? 0 : 1;
+    svg += `<path d="M${srcX},${nodeY + nodeH} Q${srcX},${arcY} ${(srcX+dstX)/2},${arcY} Q${dstX},${arcY} ${dstX},${nodeY + nodeH}"
+      fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"
+      marker-end="url(#arrR)"/>`;
+    svg += `<text x="${(srcX+dstX)/2}" y="${arcY + 14}" text-anchor="middle"
+      font-size="9" fill="#dc2626" font-family="Arial,sans-serif">
+      ${currentState === 'rejected_review' ? 'Review rejected' : 'Approval rejected'}
+    </text>`;
+  }
+
+  // ── Unrelease arc (above) — unreleased → draft ─────────────────────────────
+  if (isUnreleased) {
+    const arcY  = nodeY - 28;
+    const srcX  = startX + 4 * (nodeW + colGap) + nodeW / 2; // Released center
+    const dstX  = startX + nodeW / 2;                         // Draft center
+    svg += `<path d="M${srcX},${nodeY} Q${srcX},${arcY} ${(srcX+dstX)/2},${arcY} Q${dstX},${arcY} ${dstX},${nodeY}"
+      fill="none" stroke="#c47d18" stroke-width="1.5" stroke-dasharray="5,3"
+      marker-end="url(#arrA)"/>`;
+    svg += `<text x="${(srcX+dstX)/2}" y="${arcY - 6}" text-anchor="middle"
+      font-size="9" fill="#c47d18" font-family="Arial,sans-serif">Unrelease</text>`;
+  }
+
+  // ── Node cards ─────────────────────────────────────────────────────────────
+  NODES.forEach((n, i) => {
+    const x        = startX + i * (nodeW + colGap);
+    const isCurrent = n.id === currentState ||
+      (currentState === 'rejected_review'   && n.id === 'in_review') ||
+      (currentState === 'rejected_approval' && n.id === 'approved') ||
+      (currentState === 'unreleased'        && n.id === 'released');
+    const isDone   = !isCurrent && stateOrder.indexOf(n.id) < currentIdx;
+    const accent   = isCurrent ? n.activeColor : isDone ? '#2a9d40' : '#444';
+    const textCol  = isCurrent || isDone ? '#f0f0f0' : '#666';
+    const fillCol  = isCurrent ? `${n.activeColor}22` : isDone ? '#2a9d4018' : '#1a1f2e';
+    const sw       = isCurrent ? 2 : 1;
+
+    svg += `<rect x="${x}" y="${nodeY}" width="${nodeW}" height="${nodeH}"
+      rx="${nodeR}" fill="${fillCol}" stroke="${accent}" stroke-width="${sw}"/>`;
+
+    // Status dot
+    const dotColor = isCurrent ? n.activeColor : isDone ? '#2a9d40' : '#444';
+    svg += `<circle cx="${x + 10}" cy="${nodeY + nodeH/2}" r="3" fill="${dotColor}"/>`;
+
+    // Label
+    svg += `<text x="${x + nodeW/2 + 4}" y="${nodeY + nodeH/2 + 1}"
+      text-anchor="middle" dominant-baseline="middle"
+      font-size="10" font-weight="${isCurrent ? '700' : '400'}"
+      fill="${textCol}" font-family="Arial,sans-serif">${n.label}</text>`;
+
+    // Done checkmark
+    if (isDone) {
+      svg += `<text x="${x + nodeW - 8}" y="${nodeY + 10}"
+        text-anchor="middle" font-size="8" fill="#2a9d40" font-family="Arial,sans-serif">✓</text>`;
+    }
+
+    // Rejected X badge on rejected node
+    if ((currentState === 'rejected_review' && n.id === 'in_review') ||
+        (currentState === 'rejected_approval' && n.id === 'approved')) {
+      svg += `<text x="${x + nodeW - 8}" y="${nodeY + 10}"
+        text-anchor="middle" font-size="9" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
+    }
+  });
+
+  // ── State label below ─────────────────────────────────────────────────────
+  const stateLabel = _formStateLabel(currentState);
+  const stateColor = _formStateColor(currentState);
+  svg += `<text x="${panelW/2}" y="${nodeY + nodeH + (isRejected ? 68 : 16)}"
+    text-anchor="middle" font-size="11" fill="${stateColor}"
+    font-family="Arial,sans-serif" font-weight="600">${stateLabel}</text>`;
+
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+// ── Activity table renderer ─────────────────────────────────────────────────
+function _fphRenderActivity(rows) {
+  const el = document.getElementById('fph-activity');
+  if (!el) return;
+
+  if (!rows.length) {
+    el.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">No activity yet.</div>';
+    return;
+  }
+
+  const evtLabel = {
+    'form.saved':              'Saved',
+    'form.state_changed':      'State Changed',
+    'form.released':           'Released',
+    'form.approved':           'Approved',
+    'form.rejected':           'Rejected',
+    'form.all_reviewed':       'All Reviewed',
+    'form.review_approved':    'Reviewer Approved',
+    'form.approval_approved':  'Approver Approved',
+    'form.archived':           'Archived',
+    'form.content_rejected':   'Content Rejected',
+    'form.content_approved':   'Content Approved',
+  };
+  const evtColor = {
+    'form.released':           '#2a9d40',
+    'form.approved':           '#2a9d40',
+    'form.approval_approved':  '#2a9d40',
+    'form.all_reviewed':       '#c47d18',
+    'form.review_approved':    '#c47d18',
+    'form.rejected':           '#dc2626',
+    'form.content_rejected':   '#dc2626',
+  };
+
+  const fmt = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  };
+
+  const tableRows = rows.map(r => {
+    const color = evtColor[r.event_type] || 'var(--text2)';
+    const label = evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—';
+    const who   = r.actor_name || r.actor_id || 'System';
+    return `<tr>
+      <td style="padding:5px 8px;font-size:11px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif;border-bottom:1px solid var(--border)">${fmt(r.created_at)}</td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--text1);font-family:Arial,sans-serif;border-bottom:1px solid var(--border);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(who)}</td>
+      <td style="padding:5px 8px;font-size:11px;color:${color};font-family:Arial,sans-serif;border-bottom:1px solid var(--border);font-weight:600">${escHtml(label)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--bg2)">
+          <th style="padding:5px 8px;font-size:10px;color:var(--muted);font-family:Arial,sans-serif;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Date/Time</th>
+          <th style="padding:5px 8px;font-size:10px;color:var(--muted);font-family:Arial,sans-serif;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Person</th>
+          <th style="padding:5px 8px;font-size:10px;color:var(--muted);font-family:Arial,sans-serif;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Action</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── Comments renderer ───────────────────────────────────────────────────────
+function _fphRenderComments(rows) {
+  const el = document.getElementById('fph-comments');
+  if (!el) return;
+
+  // Comments = rejection notes + any note-bearing events, newest first
+  const commentEvents = rows
+    .filter(r => r.details?.note || r.details?.comment)
+    .reverse();
+
+  if (!commentEvents.length) {
+    el.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif;font-style:italic">No comments recorded.</div>';
+    return;
+  }
+
+  const isReject = (type) => type?.includes('reject') || type?.includes('rejected');
+  const fmt = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  };
+
+  el.innerHTML = commentEvents.map(r => {
+    const who     = r.actor_name || r.actor_id || 'System';
+    const text    = r.details?.comment || r.details?.note || '';
+    const color   = isReject(r.event_type) ? '#dc2626' : 'var(--cad)';
+    const badge   = isReject(r.event_type) ? '✗ Rejected' : '● Note';
+    const ini     = who.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--surf3);
+          display:flex;align-items:center;justify-content:center;
+          font-size:10px;font-weight:700;color:var(--text);flex-shrink:0">${escHtml(ini)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">${escHtml(who)}</div>
+          <div style="font-size:10px;color:var(--muted);font-family:Arial,sans-serif">${fmt(r.created_at)}</div>
+        </div>
+        <span style="font-size:10px;font-weight:700;color:${color};
+          font-family:Arial,sans-serif;flex-shrink:0">${badge}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text1);line-height:1.6;font-family:Arial,sans-serif;
+        padding:6px 8px;background:var(--surf2);border-radius:4px;
+        border-left:3px solid ${color}">
+        ${escHtml(text)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function _formShowRolePanel() {
   document.getElementById('form-preview-role-panel')?.remove();
   const bodyRow = document.getElementById('form-body-row');
   if (!bodyRow) return;
@@ -4380,15 +4973,38 @@ function _formShowRolePanel() {
   const panel = document.createElement('div');
   panel.id = 'form-preview-role-panel';
   panel.style.cssText = [
-    'width:140px;min-width:140px;flex-shrink:0',
+    'width:200px;min-width:180px;flex-shrink:0',
     'background:var(--bg1)',
     'border-left:1px solid var(--border)',
     'display:flex;flex-direction:column',
     'font-family:Arial,sans-serif',
     'overflow:hidden',
   ].join(';');
-
   bodyRow.appendChild(panel);
+
+  // Load real people from category
+  const cat         = window.FormSettings?.getCategoryById?.(_selectedForm?.category_id);
+  const reviewerIds = cat?.reviewer_ids || [];
+  const approverId  = cat?.approver_id  || null;
+  let   people      = {};
+
+  const allIds = [...new Set([...reviewerIds, ...(approverId ? [approverId] : [])])];
+  if (allIds.length) {
+    const rows = await API.get(
+      `resources?id=in.(${allIds.join(',')})&select=id,user_id,first_name,last_name,email`
+    ).catch(() => []) || [];
+    rows.forEach(r => {
+      people[r.id] = {
+        name:    ((r.first_name||'')+' '+(r.last_name||'')).trim(),
+        email:   r.email || '',
+        user_id: r.user_id,
+      };
+    });
+  }
+
+  window._fprPeople      = people;
+  window._fprReviewerIds = reviewerIds;
+  window._fprApproverId  = approverId;
   _formRefreshRolePanel();
 }
 
@@ -4396,74 +5012,105 @@ function _formRefreshRolePanel() {
   const panel = document.getElementById('form-preview-role-panel');
   if (!panel) return;
 
-  const stages   = _formGetStages();
-  const LABELS   = { assignee:'Assignee', reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' };
-  const COLORS   = { reviewer:'var(--cad)', approver:'var(--green)', pm:'#7c4dff', external:'var(--muted)' };
+  const state       = _selectedForm?.state || 'draft';
+  const people      = window._fprPeople      || {};
+  const reviewerIds = window._fprReviewerIds || [];
+  const approverId  = window._fprApproverId  || null;
+  const reviewedBy  = _selectedForm?.reviewed_by || [];
+
+  const isInReview     = state === 'in_review';
+  const isReviewed     = state === 'reviewed';
+  const isApproved     = state === 'approved';
+  const isReleased     = state === 'released';
+  const isEditorActive = ['draft','unreleased','rejected_review','rejected_approval'].includes(state);
+
+  const editorName = window.CURRENT_USER?.name || window.CURRENT_USER?.email || 'Editor';
+  const editorIni  = editorName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+
+  const personRow = ({ ini, name, role, roleColor, statusLabel, statusColor, isActive }) => `
+    <div style="padding:10px 12px;
+      background:${isActive ? 'var(--surf2)' : 'transparent'};
+      border-left:3px solid ${isActive ? roleColor : 'transparent'}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;
+          background:${roleColor}22;border:1.5px solid ${roleColor};
+          display:flex;align-items:center;justify-content:center;
+          font-size:11px;font-weight:700;color:${roleColor}">${ini}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:${isActive?'700':'500'};
+            color:${isActive?'var(--text)':'var(--text1)'};
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</div>
+          <div style="font-size:10px;color:var(--muted)">${escHtml(role)}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;padding-left:36px">
+        <div style="width:6px;height:6px;border-radius:50%;background:${statusColor};flex-shrink:0"></div>
+        <span style="font-size:11px;color:${statusColor};font-weight:600">${statusLabel}</span>
+      </div>
+    </div>`;
+
+  const divider = `<div style="height:1px;background:var(--border);margin:2px 0"></div>`;
+
+  const editorDot = isEditorActive ? 'var(--accent)' : 'var(--green)';
+  const editorLbl = isEditorActive ? (state === 'draft' ? 'Drafting' : 'Revising') :
+                    isReleased ? 'Released' : 'Complete';
 
   let html = `
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-size:13px;font-weight:700;color:var(--text);letter-spacing:.04em">SIMULATE</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text);letter-spacing:.06em;
+        text-transform:uppercase">Approval Process</div>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:8px 0">`;
+    <div style="flex:1;overflow-y:auto">`;
 
-  stages.forEach(s => {
-    const isActive = s.stage === _previewStage;
-    const isDone   = s.stage < _previewStage;
-    const color    = COLORS[s.role] || 'var(--muted)';
-    const label    = LABELS[s.role] || s.role;
-    html += `
-      <div onclick="_formSwitchPreviewStage(${s.stage})"
-        style="padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;
-               background:${isActive?'var(--surf3)':'transparent'};
-               border-left:3px solid ${isActive?color:'transparent'};
-               transition:background .1s">
-        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
-                    background:${isDone?'var(--green)':isActive?color:'var(--border)'}"></div>
-        <span style="font-size:13px;font-weight:${isActive?'600':'400'};
-                     color:${isActive?'var(--text)':'var(--muted)'}">${label}</span>
-        ${isDone?'<span style="font-size:11px;color:var(--green);margin-left:auto">✓</span>':''}
-      </div>`;
-  });
+  html += personRow({ ini:editorIni, name:editorName, role:'Editor',
+    roleColor:'var(--accent)', isActive:isEditorActive,
+    statusLabel:editorLbl, statusColor:editorDot });
 
-  html += `</div>
-    <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:6px">`;
-
-  // Reject button — always shown for reviewer/approver
-  html += `<button onclick="_formPreviewReject()"
-    style="font-size:13px;padding:6px 0;border-radius:6px;background:transparent;
-           border:1.5px solid #dc2626;color:#dc2626;cursor:pointer;
-           font-family:Arial,sans-serif;font-weight:600;width:100%;margin-bottom:2px">
-    ✗ Reject
-  </button>`;
-
-  // Sign button — only if current stage has a signature field
-  const stageSigFields = _formFieldsForStage(_previewStage).filter(f => f.type === 'signature');
-  if (stageSigFields.length) {
-    html += `<button onclick="_formPreviewQuickSign()"
-      style="font-size:13px;padding:6px 0;border-radius:6px;background:var(--accent);
-             color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;font-weight:600;width:100%">
-      ✍ Sign
-    </button>`;
+  if (reviewerIds.length) {
+    html += divider;
+    reviewerIds.forEach(rid => {
+      const p   = people[rid] || { name:rid, email:'' };
+      const ini = p.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      const hasReviewed = reviewedBy.includes(rid);
+      const lbl = hasReviewed ? 'Approved'
+        : isInReview ? 'Reviewing'
+        : state === 'rejected_review' ? 'Rejected'
+        : 'Pending';
+      const col = hasReviewed ? 'var(--green)'
+        : isInReview ? 'var(--cad)'
+        : state === 'rejected_review' ? 'var(--red)'
+        : 'var(--muted)';
+      html += personRow({ ini, name:p.name, role:'Reviewer',
+        roleColor:'var(--cad)', isActive:isInReview && !hasReviewed,
+        statusLabel:lbl, statusColor:col });
+    });
   }
 
-  // Submit / next stage
-  const isLast = _previewStage >= stages.length;
-  html += `<button onclick="_formPreviewSubmitStage()"
-    style="font-size:13px;padding:6px 0;border-radius:6px;
-           background:${isLast?'var(--green)':'var(--surf2)'};
-           color:${isLast?'white':'var(--text1)'};
-           border:1px solid ${isLast?'var(--green)':'var(--border)'};
-           cursor:pointer;font-family:Arial,sans-serif;font-weight:600;width:100%">
-    ${isLast?'✓ Done':'Submit →'}
-  </button>
-  <button onclick="_formTogglePreview()"
-    style="font-size:13px;padding:5px 0;border-radius:6px;background:transparent;
-           border:1px solid var(--border);color:var(--muted);cursor:pointer;
-           font-family:Arial,sans-serif;width:100%">
-    ✕ Exit
-  </button>`;
+  if (approverId) {
+    html += divider;
+    const p   = people[approverId] || { name:approverId, email:'' };
+    const ini = p.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+    const lbl = (isApproved||isReleased) ? 'Approved'
+      : isReviewed ? 'Approving'
+      : state === 'rejected_approval' ? 'Rejected'
+      : 'Pending';
+    const col = (isApproved||isReleased) ? 'var(--green)'
+      : isReviewed ? 'var(--cad)'
+      : state === 'rejected_approval' ? 'var(--red)'
+      : 'var(--muted)';
+    html += personRow({ ini, name:p.name, role:'Approver',
+      roleColor:'var(--green)', isActive:isReviewed,
+      statusLabel:lbl, statusColor:col });
+  }
 
-  html += '</div>';
+  html += `</div>
+    <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0">
+      <button onclick="_formTogglePreview()"
+        style="font-size:13px;padding:7px 0;border-radius:6px;background:transparent;
+               border:1px solid var(--border);color:var(--muted);cursor:pointer;
+               font-family:Arial,sans-serif;width:100%">✕ Exit Preview</button>
+    </div>`;
+
   panel.innerHTML = html;
 }
 
