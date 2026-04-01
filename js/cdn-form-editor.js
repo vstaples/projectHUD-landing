@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-209000
-console.log('%c[cdn-form-editor] v20260401-209000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-211000
+console.log('%c[cdn-form-editor] v20260401-211000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -5036,149 +5036,203 @@ function _fphRenderDag(currentState) {
   const el = document.getElementById('fph-dag');
   if (!el) return;
 
-  // Node definitions — labels split into lines for two-line display in taller nodes
+  // ── Node definitions ───────────────────────────────────────────────────────
   const NODES = [
-    { id:'draft',    lines:['Draft'],             color:'#8b91a5', activeColor:'#4f8ef7' },
-    { id:'in_review',lines:['In','Review'],       color:'#8b91a5', activeColor:'#c47d18' },
-    { id:'reviewed', lines:['Awaiting','Approval'],color:'#8b91a5', activeColor:'#c47d18' },
-    { id:'approved', lines:['Approved'],           color:'#8b91a5', activeColor:'#2a9d40' },
-    { id:'released', lines:['Released'],           color:'#8b91a5', activeColor:'#2a9d40' },
+    { id:'draft',     lines:['Draft'],              baseColor:'#4f8ef7' },
+    { id:'in_review', lines:['In','Review'],        baseColor:'#c47d18' },
+    { id:'reviewed',  lines:['Awaiting','Approval'],baseColor:'#c47d18' },
+    { id:'approved',  lines:['Approved'],           baseColor:'#2a9d40' },
+    { id:'released',  lines:['Released'],           baseColor:'#2a9d40' },
   ];
 
-  const isRejected  = currentState === 'rejected_review' || currentState === 'rejected_approval';
+  const stateOrder   = ['draft','in_review','reviewed','approved','released'];
+
+  // Map every form state to which node is "current" and what color it should be
+  const STATE_MAP = {
+    draft:               { activeId:'draft',    color:'#4f8ef7' },
+    unreleased:          { activeId:'draft',    color:'#4f8ef7' },   // ready to re-edit
+    in_review:           { activeId:'in_review',color:'#c47d18' },
+    reviewed:            { activeId:'reviewed', color:'#c47d18' },
+    approved:            { activeId:'approved', color:'#2a9d40' },
+    released:            { activeId:'released', color:'#2a9d40' },
+    rejected_review:     { activeId:'in_review',color:'#dc2626' },   // red — rejected here
+    rejected_approval:   { activeId:'reviewed', color:'#dc2626' },   // red — rejected here
+  };
+
+  const mapped       = STATE_MAP[currentState] || STATE_MAP.draft;
+  const activeId     = mapped.activeId;
+  const activeColor  = mapped.color;
+  const activeIdx    = stateOrder.indexOf(activeId);
+
+  const isRejected   = currentState === 'rejected_review' || currentState === 'rejected_approval';
+  const isReleaseRejected = currentState === 'unreleased' || isRejected;
   const isUnreleased = currentState === 'unreleased';
 
-  // Determine which nodes are active/done
-  const stateOrder = ['draft','in_review','reviewed','approved','released'];
-  const currentIdx  = stateOrder.indexOf(currentState);
+  // ── Dimensions ─────────────────────────────────────────────────────────────
+  const panelEl  = document.getElementById('form-preview-history-panel');
+  const panelW   = Math.max(500, (panelEl?.clientWidth || 560) - 24);
+  const colGap   = 10;
+  const nodeW    = Math.floor((panelW - 4 * colGap) / 5);
+  const nodeH    = 64, nodeR = 8;
+  const totalW   = 5 * nodeW + 4 * colGap;
+  const startX   = (panelW - totalW) / 2;
+  const nodeY    = isUnreleased ? 60 : 40;
+  const svgH     = isRejected ? 210 : isUnreleased ? 180 : 148;
 
-  // Derive panelW from actual container width so SVG always fits
-  const panelEl = document.getElementById('form-preview-history-panel');
-  const panelW  = Math.max(500, (panelEl?.clientWidth || 560) - 24);
-  const colGap  = 10;
-  const nodeW   = Math.floor((panelW - 4 * colGap) / 5);
-  const nodeH   = 64, nodeR = 8;   // taller cards, larger text
-  const cols    = NODES.length;
-  const totalW  = cols * nodeW + (cols - 1) * colGap;
-  const startX  = (panelW - totalW) / 2;
-  const nodeY   = 56;   // extra top room for unrelease arc
-  const svgH    = isRejected ? 210 : 148;
-
+  // ── SVG open + animation defs ──────────────────────────────────────────────
   let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
-    style="display:block;overflow:visible;max-width:100%" xmlns="http://www.w3.org/2000/svg">`;
+    style="display:block;overflow:visible;max-width:100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @keyframes dagGlow {
+        0%,100% { opacity:.55; r:${nodeH/2 + 6}; }
+        50%      { opacity:.9;  r:${nodeH/2 + 11}; }
+      }
+      .dag-pulse { animation: dagGlow 1.8s ease-in-out infinite; }
+    </style>
+    <marker id="arrG" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#2a9d40"/>
+    </marker>
+    <marker id="arrD" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#444"/>
+    </marker>
+    <marker id="arrR" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#dc2626"/>
+    </marker>
+    <marker id="arrA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#c47d18"/>
+    </marker>
+  </defs>`;
 
-  // ── Forward arrows between nodes ──────────────────────────────────────────
+  // ── Forward connector lines ─────────────────────────────────────────────────
   NODES.forEach((n, i) => {
     if (i === NODES.length - 1) return;
     const x1 = startX + i * (nodeW + colGap) + nodeW;
     const x2 = startX + (i + 1) * (nodeW + colGap);
     const cy  = nodeY + nodeH / 2;
-    const isDoneEdge = currentIdx > i;
+    // Green if both nodes are done/completed, grey otherwise
+    const bothDone = i < activeIdx && (i + 1) < activeIdx;
+    const col = bothDone ? '#2a9d40' : '#444';
+    const sw  = bothDone ? 2 : 1;
     svg += `<line x1="${x1}" y1="${cy}" x2="${x2}" y2="${cy}"
-      stroke="${isDoneEdge ? '#2a9d40' : '#444'}" stroke-width="${isDoneEdge ? 2 : 1}"
-      marker-end="url(#arr${isDoneEdge ? 'G' : 'D'})"/>`;
+      stroke="${col}" stroke-width="${sw}" marker-end="url(#arr${bothDone ? 'G' : 'D'})"/>`;
   });
 
-  // ── Arrow markers ─────────────────────────────────────────────────────────
-  svg += `<defs>
-    <marker id="arrG" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-      <path d="M0,0 L6,3 L0,6 Z" fill="#2a9d40"/>
-    </marker>
-    <marker id="arrD" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-      <path d="M0,0 L6,3 L0,6 Z" fill="#444"/>
-    </marker>
-    <marker id="arrR" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-      <path d="M0,0 L6,3 L0,6 Z" fill="#dc2626"/>
-    </marker>
-    <marker id="arrA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-      <path d="M0,0 L6,3 L0,6 Z" fill="#c47d18"/>
-    </marker>
-  </defs>`;
-
-  // ── Kickback arcs (below) — rejected_review → draft, rejected_approval → draft ──
-  if (isRejected) {
-    const arcY    = nodeY + nodeH + 28;
-    const srcIdx  = currentState === 'rejected_review' ? 1 : 3;
-    const srcX    = startX + srcIdx * (nodeW + colGap) + nodeW / 2;
-    const dstX    = startX + nodeW / 2;  // Draft center
-    const sweep   = srcX > dstX ? 0 : 1;
-    svg += `<path d="M${srcX},${nodeY + nodeH} Q${srcX},${arcY} ${(srcX+dstX)/2},${arcY} Q${dstX},${arcY} ${dstX},${nodeY + nodeH}"
-      fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3"
-      marker-end="url(#arrR)"/>`;
-    svg += `<text x="${(srcX+dstX)/2}" y="${arcY + 18}" text-anchor="middle"
-      font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">
-      ${currentState === 'rejected_review' ? 'Review Rejected' : 'Approval Rejected'}
-    </text>`;
-  }
-
-  // ── Unrelease arc (above) — Released → Draft, arrow at Draft end ────────────
-  if (isUnreleased) {
-    const arcY  = nodeY - 32;
-    const srcX  = startX + 4 * (nodeW + colGap) + nodeW / 2; // Released center
-    const dstX  = startX + nodeW / 2;                         // Draft center
-    const midX  = (srcX + dstX) / 2;
-    // Draw from Released to Draft so marker-end arrow points AT Draft (left)
-    // Use a smooth cubic bezier that arcs above the nodes
-    svg += `<path d="M${srcX},${nodeY} C${srcX},${arcY} ${dstX},${arcY} ${dstX},${nodeY}"
-      fill="none" stroke="#c47d18" stroke-width="1.5" stroke-dasharray="5,3"
-      marker-end="url(#arrA)"/>`;
-    svg += `<text x="${midX}" y="${arcY - 8}" text-anchor="middle"
-      font-size="13" font-weight="600" fill="#c47d18" font-family="Arial,sans-serif">Unrelease</text>`;
-  }
-
-  // ── Node cards ─────────────────────────────────────────────────────────────
+  // ── Node cards ──────────────────────────────────────────────────────────────
   NODES.forEach((n, i) => {
-    const x        = startX + i * (nodeW + colGap);
-    const isCurrent = n.id === currentState ||
-      (currentState === 'rejected_review'   && n.id === 'in_review') ||
-      (currentState === 'rejected_approval' && n.id === 'approved') ||
-      (currentState === 'unreleased'        && n.id === 'released');
-    const isDone   = !isCurrent && stateOrder.indexOf(n.id) < currentIdx;
-    const accent   = isCurrent ? n.activeColor : isDone ? '#2a9d40' : '#444';
-    const textCol  = isCurrent || isDone ? '#f0f0f0' : '#666';
-    const fillCol  = isCurrent ? `${n.activeColor}22` : isDone ? '#2a9d4018' : '#1a1f2e';
-    const sw       = isCurrent ? 2 : 1;
+    const x         = startX + i * (nodeW + colGap);
+    const cx        = x + nodeW / 2;
+    const cy        = nodeY + nodeH / 2;
+    const isActive  = n.id === activeId;
+    const isDone    = !isActive && i < activeIdx;
+    // Released node gets red if state is rejected-at-release or unreleased
+    const isReleasedRejected = n.id === 'released' &&
+      (currentState === 'unreleased' || isRejected);
 
+    // Color logic
+    const accent = isActive    ? activeColor
+                 : isReleasedRejected ? '#dc2626'
+                 : isDone      ? '#2a9d40'
+                 : '#3a3f52';
+
+    const fillCol = isActive    ? `${activeColor}28`
+                  : isReleasedRejected ? 'rgba(220,38,38,.12)'
+                  : isDone      ? 'rgba(42,157,64,.12)'
+                  : '#1a1f2e';
+
+    const textCol = isActive || isDone ? '#f0f0f0'
+                  : isReleasedRejected ? '#f87171'
+                  : '#666';
+
+    const sw = isActive || isReleasedRejected ? 2 : isDone ? 1.5 : 1;
+
+    // ── Glow ring around active node ─────────────────────────────────────────
+    if (isActive) {
+      svg += `<circle cx="${cx}" cy="${cy}" r="${nodeH/2 + 6}"
+        fill="none" stroke="${activeColor}" stroke-width="2" opacity="0.55"
+        class="dag-pulse"/>`;
+    }
+
+    // ── Node rectangle ────────────────────────────────────────────────────────
     svg += `<rect x="${x}" y="${nodeY}" width="${nodeW}" height="${nodeH}"
       rx="${nodeR}" fill="${fillCol}" stroke="${accent}" stroke-width="${sw}"/>`;
 
-    // Status dot
-    const dotColor = isCurrent ? n.activeColor : isDone ? '#2a9d40' : '#444';
-    svg += `<circle cx="${x + 12}" cy="${nodeY + nodeH/2}" r="4" fill="${dotColor}"/>`;
+    // ── Status dot ─────────────────────────────────────────────────────────────
+    const dotColor = isActive ? activeColor : isDone ? '#2a9d40' : isReleasedRejected ? '#dc2626' : '#3a3f52';
+    svg += `<circle cx="${x + 12}" cy="${cy}" r="4" fill="${dotColor}"/>`;
 
-    // Label
-    // Two-line label support
-    const lines   = n.lines || [n.label || ''];
-    const lineH   = 16;
-    const totalTH = lines.length * lineH;
-    const startTY = nodeY + nodeH/2 - totalTH/2 + lineH/2 + 2;
+    // ── Two-line label ─────────────────────────────────────────────────────────
+    const lines  = n.lines || [''];
+    const lineH  = 16;
+    const startTY = cy - ((lines.length - 1) * lineH) / 2;
     lines.forEach((line, li) => {
-      svg += `<text x="${x + nodeW/2 + 5}" y="${startTY + li * lineH}"
+      svg += `<text x="${cx + 6}" y="${startTY + li * lineH}"
         text-anchor="middle" dominant-baseline="middle"
-        font-size="13" font-weight="${isCurrent ? '700' : '500'}"
+        font-size="13" font-weight="${isActive ? '700' : '500'}"
         fill="${textCol}" font-family="Arial,sans-serif">${line}</text>`;
     });
 
-    // Done checkmark
-    if (isDone) {
+    // ── Done ✓ or ✗ badges ─────────────────────────────────────────────────────
+    if (isDone && !isReleasedRejected) {
       svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
         text-anchor="middle" font-size="12" fill="#2a9d40" font-family="Arial,sans-serif">✓</text>`;
     }
-
-    // Rejected X badge on rejected node
-    if ((currentState === 'rejected_review' && n.id === 'in_review') ||
-        (currentState === 'rejected_approval' && n.id === 'approved')) {
+    if (isReleasedRejected) {
+      svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
+        text-anchor="middle" font-size="12" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
+    }
+    if (isActive && isRejected) {
       svg += `<text x="${x + nodeW - 10}" y="${nodeY + 14}"
         text-anchor="middle" font-size="12" fill="#dc2626" font-family="Arial,sans-serif">✗</text>`;
     }
   });
 
-  // ── State label below ─────────────────────────────────────────────────────
+  // ── Rejection arc (BELOW) — from rejected node back to Draft ────────────────
+  if (isRejected) {
+    const arcY   = nodeY + nodeH + 32;
+    const srcIdx = currentState === 'rejected_review' ? 1 : 2;
+    const srcX   = startX + srcIdx * (nodeW + colGap) + nodeW / 2;
+    const dstX   = startX + nodeW / 2;
+    const midX   = (srcX + dstX) / 2;
+    svg += `<path d="M${srcX},${nodeY + nodeH} C${srcX},${arcY} ${dstX},${arcY} ${dstX},${nodeY + nodeH}"
+      fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3"
+      marker-end="url(#arrR)"/>`;
+    const label = currentState === 'rejected_review' ? 'Review Rejected' : 'Approval Rejected';
+    svg += `<text x="${midX}" y="${arcY + 18}" text-anchor="middle"
+      font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">${label}</text>`;
+  }
+
+  // ── Release-stage rejection arc (BELOW) — unreleased state ─────────────────
+  // When a form is rejected at the Release gate it returns to unreleased/draft
+  if (isUnreleased) {
+    const arcYBot = nodeY + nodeH + 32;
+    const srcX    = startX + 4 * (nodeW + colGap) + nodeW / 2;  // Released center
+    const dstX    = startX + nodeW / 2;                          // Draft center
+    const midX    = (srcX + dstX) / 2;
+    // Bottom arc: release-gate rejection → back to Draft
+    svg += `<path d="M${srcX},${nodeY + nodeH} C${srcX},${arcYBot} ${dstX},${arcYBot} ${dstX},${nodeY + nodeH}"
+      fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3"
+      marker-end="url(#arrR)"/>`;
+    svg += `<text x="${midX}" y="${arcYBot + 18}" text-anchor="middle"
+      font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">Release Rejected</text>`;
+    // Top arc: the deliberate unrelease path (evolutionary change)
+    const arcYTop = nodeY - 36;
+    svg += `<path d="M${srcX},${nodeY} C${srcX},${arcYTop} ${dstX},${arcYTop} ${dstX},${nodeY}"
+      fill="none" stroke="#c47d18" stroke-width="2" stroke-dasharray="6,3"
+      marker-end="url(#arrA)"/>`;
+    svg += `<text x="${midX}" y="${arcYTop - 10}" text-anchor="middle"
+      font-size="13" font-weight="600" fill="#c47d18" font-family="Arial,sans-serif">Unrelease</text>`;
+  }
+
+  // ── State label ─────────────────────────────────────────────────────────────
   const stateLabel = _formStateLabel(currentState);
   const stateColor = _formStateColor(currentState);
-  svg += `<text x="${panelW/2}" y="${nodeY + nodeH + (isRejected ? 72 : 20)}"
-    text-anchor="middle" font-size="13" fill="${stateColor}"
-    font-family="Arial,sans-serif" font-weight="700">${stateLabel}</text>`;
+  const labelY     = isRejected || isUnreleased
+    ? nodeY + nodeH + 82
+    : nodeY + nodeH + 20;
+  svg += `<text x="${panelW/2}" y="${labelY}"
+    text-anchor="middle" font-size="13" font-weight="700"
+    fill="${stateColor}" font-family="Arial,sans-serif">${stateLabel}</text>`;
 
   svg += '</svg>';
   el.innerHTML = svg;
