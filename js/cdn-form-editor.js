@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-221001
-console.log('%c[cdn-form-editor] v20260401-221001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-222000
+console.log('%c[cdn-form-editor] v20260401-222000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3115,7 +3115,7 @@ async function _formDoApproveAndRelease({ newVer, note }) {
   await _formSave();
 
   _formCoCWrite('form.approved', _selectedForm.id, {
-    version: newVer,
+    version: _selectedForm.version,
     note,
     approved_by: _selectedForm.approved_by
   });
@@ -3456,6 +3456,7 @@ function _formShowReleaseModal(form) {
     await _formSave();
     _formCoCWrite('form.rejected', _selectedForm.id, {
       from, to: 'rejected_release', stage: 'release', note,
+      version:     _selectedForm.version,
       rejected_by: window.CURRENT_USER?.id || null,
     });
     cadToast('Returned for revision', 'info');
@@ -5436,30 +5437,30 @@ function _fphRenderActivity(rows) {
     if (!who && !from && !to && !evType) return null;
 
     // ── from→to state transition mapping (checked before event_type) ─────────
+    // Helper: version from event notes (written at time of event) — never use live _formVersion
+    const v = notes.version || meta.version || null;
+
     if (from === 'draft' && to === 'in_review')
-      return { role:'Editor',   action:'Draft Complete',    who, version: notes.version || meta.version };
+      return { role:'Editor',   action:'Draft Complete',    who, version: v };
     if (from === 'in_review' && to === 'in_review')
-      return { role:'Reviewer', action:'Review Approved',   who, version: _formVersion };
+      return { role:'Reviewer', action:'Review Approved',   who, version: v };
     if (from === 'in_review' && to === 'reviewed')
-      return { role:'Reviewer', action:'Review Complete',   who, version: _formVersion };
+      return { role:'Reviewer', action:'Review Complete',   who, version: v };
     if (from === 'reviewed'  && to === 'approved')
-      return { role:'Approver', action:'Approved',          who, version: _formVersion };
+      return { role:'Approver', action:'Approved',          who, version: v };
     if (to === 'rejected_review')
-      return { role:'Reviewer', action:'Review Rejected',   who, version: _formVersion };
+      return { role:'Reviewer', action:'Review Rejected',   who, version: v };
     if (to === 'rejected_approval')
-      return { role:'Approver', action:'Approval Rejected', who, version: _formVersion };
-    // Rejection at release gate: matches both old ('unreleased' + stage='release') and new ('rejected_release')
+      return { role:'Approver', action:'Approval Rejected', who, version: v };
     if (to === 'rejected_release' || (stage === 'release' && evType === 'form.rejected') ||
         (to === 'unreleased' && stage === 'release'))
-      return { role:'Editor',   action:'Rejected',          who, version: _formVersion };
+      return { role:'Editor',   action:'Rejected',          who, version: v };
     if (from === 'approved' && to === 'released')
-      return { role:'Editor',   action:'Released',          who, version: notes.version || meta.version };
-    // rejected→draft: editor saved after rejection
+      return { role:'Editor',   action:'Released',          who, version: v };
     if (from && from.startsWith('rejected') && to === 'draft')
-      return { role:'Editor',   action:'Returned to Draft', who, version: notes.version || _formVersion };
-    // Unreleased without stage=release = deliberate revision start
+      return { role:'Editor',   action:'Returned to Draft', who, version: v };
     if (to === 'unreleased')
-      return { role:'Editor',   action:'Revision Started',  who, version: _formVersion };
+      return { role:'Editor',   action:'Revision Started',  who, version: v };
 
     // ── event_type fallback ───────────────────────────────────────────────────
     if (evType === 'form.released')
@@ -5470,7 +5471,7 @@ function _fphRenderActivity(rows) {
       // Determine role from stage if available
       const rejRole = stage === 'release' ? 'Editor'
                     : stage === 'approval' ? 'Approver' : 'Reviewer';
-      return { role: rejRole, action:'Rejected', who, version: _formVersion };
+      return { role: rejRole, action:'Rejected', who, version: v };
     }
     if (evType === 'form.state_changed' && !from && !to) return null;
     if (evType === 'form.saved') {
@@ -5479,7 +5480,7 @@ function _fphRenderActivity(rows) {
       if (!who) return null;
       const savedState = notes.state || '';
       if (['draft','unreleased'].includes(savedState))
-        return { role:'Editor', action:'In Draft', who, version: notes.version || _formVersion };
+        return { role:'Editor', action:'In Draft', who, version: notes.version || meta.version || null };
       return null; // suppress saves during other states
     }
     if (evType === 'form.archived') return null;  // suppress archive/delete events
@@ -5510,7 +5511,8 @@ function _fphRenderActivity(rows) {
     const aColor = action.toLowerCase().includes('reject') ? '#f87171'
                  : ['Approved','Review Complete','Released','Review Approved'].includes(action) ? '#4ade80'
                  : action === 'Submitted for Review' || action === 'Draft Complete' ? '#60a5fa'
-                 : action === 'In Draft' || action === 'Returned to Draft' ? '#f0a030'
+                 : action === 'In Draft' ? '#f0a030'
+                 : action === 'Returned to Draft' ? '#60a5fa'
                  : 'var(--text1)';
     return `<tr>
       ${td(fmt(r.created_at), 'var(--muted)', 'white-space:nowrap')}
