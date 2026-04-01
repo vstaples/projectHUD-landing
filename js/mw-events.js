@@ -1,5 +1,5 @@
-// VERSION: 20260402-100000
-console.log('%c[mw-events] v20260402-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-100100
+console.log('%c[mw-events] v20260402-100100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS for inline panels ─────────────────────────────────
 (function() {
@@ -377,8 +377,8 @@ async function openRequestReviewPanel(item) {
   document.getElementById('req-review-panel')?.remove();
 
   const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
-  const resName = window._myResource?.name || 'Unknown';
-  const resId   = window._myResource?.id   || null;
+  const resName = _myResource?.name || 'Unknown';
+  const resId   = _myResource?.id   || null;
 
   // Fetch the workflow instance for full context
   let instance = null;
@@ -542,8 +542,8 @@ async function openRequestReviewPanel(item) {
 window._rrpSubmit = async function(actionItemId, instanceId, decision) {
   const comments = document.getElementById('rrp-comments')?.value?.trim() || '';
   const firmId   = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
-  const resName  = window._myResource?.name || 'Unknown';
-  const resId    = window._myResource?.id   || null;
+  const resName  = _myResource?.name || 'Unknown';
+  const resId    = _myResource?.id   || null;
   const now      = new Date().toISOString();
 
   // Disable buttons

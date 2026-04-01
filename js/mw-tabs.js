@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100000
+// VERSION: 20260402-100100
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-100100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -732,15 +732,15 @@ window.loadUserRequests = async function() {
 
   renderMyRequestsCatalog();
 
-  const resId = window._myResource?.id;
-  if (!resId) {
-    // _myResource not yet resolved — wait up to 3s then retry
+  // _myResource is a compass.html scoped let — not on window.
+  // Wait for it to be populated by loadBaseData() if not ready yet.
+  if (!_myResource?.id) {
     console.log('[MyRequests] _myResource not ready, waiting...');
     let waited = 0;
     await new Promise(resolve => {
       const poll = setInterval(() => {
         waited += 100;
-        if (window._myResource?.id || waited >= 3000) {
+        if (_myResource?.id || waited >= 3000) {
           clearInterval(poll);
           resolve();
         }
@@ -748,7 +748,7 @@ window.loadUserRequests = async function() {
     });
   }
 
-  const resolvedResId = window._myResource?.id;
+  const resolvedResId = _myResource?.id;
   console.log('[MyRequests] loadUserRequests firing | resId:', resolvedResId || 'STILL UNDEFINED');
   if (resolvedResId) {
     try {
@@ -1282,8 +1282,8 @@ window.myrCloseModal = function() {
 window.myrWithdrawRequest = async function(instanceId) {
   if (!instanceId) return;
   const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
-  const resName = window._myResource?.name || 'Unknown';
-  const resId   = window._myResource?.id   || null;
+  const resName = _myResource?.name || 'Unknown';
+  const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
 
   // Confirm
@@ -1386,8 +1386,8 @@ window.myrSubmitContext = async function(instanceId) {
   if (!text) { compassToast('Enter some context before submitting.', 2000); return; }
 
   const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
-  const resName = window._myResource?.name || 'Unknown';
-  const resId   = window._myResource?.id   || null;
+  const resName = _myResource?.name || 'Unknown';
+  const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
 
   try {
@@ -1717,8 +1717,8 @@ window.myrSubmitWorkflow = async function(wfId) {
   myrCloseModal();
 
   const firmId   = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
-  const resId    = window._myResource?.id || null;
-  const resName  = window._myResource?.name || 'Unknown';
+  const resId    = _myResource?.id || null;
+  const resName  = _myResource?.name || 'Unknown';
   const now      = new Date().toISOString();
   const instanceId = crypto.randomUUID();
 
