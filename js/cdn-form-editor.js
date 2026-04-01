@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-194000
-console.log('%c[cdn-form-editor] v20260401-194000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-200000
+console.log('%c[cdn-form-editor] v20260401-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3221,16 +3221,26 @@ async function _formArchive() {
 // COC WRITER
 // ─────────────────────────────────────────────────────────────────────────────
 function _formCoCWrite(eventType, formId, details) {
-  if (!window.CoC?.write) { return; } // CoC not yet wired — silent skip
-  try {
-    window.CoC.write({
-      entity_type: 'workflow_form_definition',
-      entity_id:   formId,
-      event_type:  eventType,
-      details:     { ...details, form_name: _selectedForm?.source_name },
-      actor_id:    window.CURRENT_USER?.id || null,
-    });
-  } catch(e) { console.warn('[form-editor] CoC write failed:', e.message); }
+  const payload = {
+    entity_type: 'workflow_form_definition',
+    entity_id:   formId,
+    event_type:  eventType,
+    details:     { ...details, form_name: _selectedForm?.source_name },
+    actor_id:    window.CURRENT_USER?.id || null,
+    actor_name:  window.CURRENT_USER?.name || window.CURRENT_USER?.email || null,
+    firm_id:     window.FIRM_ID || FIRM_ID_CAD,
+    created_at:  new Date().toISOString(),
+  };
+
+  // Try window.CoC.write first (platform CoC module)
+  if (window.CoC?.write) {
+    try { window.CoC.write(payload); } catch(e) { console.warn('[CoC] write failed:', e.message); }
+  }
+
+  // Always also write directly to coc_events table so activity panel has live data
+  API.post('coc_events', payload).catch(e =>
+    console.warn('[form-editor] coc_events write failed:', e.message)
+  );
 }
 
 function _formDelete(formId) {
