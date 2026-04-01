@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-229000
-console.log('%c[cdn-form-editor] v20260401-229000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-229001
+console.log('%c[cdn-form-editor] v20260401-229001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -260,6 +260,7 @@ function _formStateColor(state) {
 }
 
 function renderFormsTab(el) {
+  window.renderFormsTab = renderFormsTab; // ensure global availability
   // Ensure categories are always current when Form Library is open.
   // _fsLoad is safe to call at any time — it just refreshes _fsCats in the background.
   if (window.FormSettings?.loadCategories) {
@@ -2551,7 +2552,7 @@ async function _formPickCategory() {
   document.body.appendChild(overlay);
 }
 
-function _formSetCategory(catId) {
+async function _formSetCategory(catId) {
   if (!_selectedForm) return;
   _selectedForm.category_id = catId;
   const cat = window.FormSettings?.getCategoryById?.(catId);

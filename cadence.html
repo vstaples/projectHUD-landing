@@ -717,27 +717,34 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 <script>
 if (typeof _stopElapsedTimer === "undefined") window._stopElapsedTimer = function() {};
 if (typeof _startElapsedTimer === "undefined") window._startElapsedTimer = function() {};
+// Stub — replaced once cdn-form-editor.js loads
+if (typeof window.renderFormsTab === "undefined") {
+  window.renderFormsTab = function(el) {
+    // cdn-form-editor not yet loaded — retry after short delay
+    setTimeout(() => { if (typeof window.renderFormsTab === 'function') window.renderFormsTab(el); }, 200);
+  };
+}
 </script>
-<script src="/js/cdn-core-state.js?v=20260401229000"></script>
-<script src="/js/cdn-utils.js?v=20260401229000"></script>
-<script src="/js/cdn-form-editor.js?v=20260401229000"></script>
-<script src="/js/cdn-form-settings.js?v=20260401229000"></script>
-<script src="/js/cdn-assignee.js?v=20260401229000"></script>
-<script src="/js/cdn-outcomes.js?v=20260401229000"></script>
-<script src="/js/cdn-documents.js?v=20260401229000"></script>
-<script src="/js/cdn-dag-viewer.js?v=20260401229000"></script>
-<script src="/js/cdn-template-editor.js?v=20260401229000"></script>
-<script src="/js/cdn-bist.js?v=20260401229000"></script>
-<script src="/js/cdn-coc.js?v=20260401229000"></script>
-<script src="/js/cdn-meeting.js?v=20260401229000"></script>
-<script src="/js/cdn-scrubber.js?v=20260401229000"></script>
-<script src="/js/cdn-tooltips.js?v=20260401229000"></script>
-<script src="/js/cdn-comments.js?v=20260401229000"></script>
-<script src="/js/cdn-intel.js?v=20260401229000"></script>
-<script src="/js/cdn-events.js?v=20260401229000"></script>
-<script src="/js/cdn-instance-dag.js?v=20260401229000"></script>
-<script src="/js/cdn-instances.js?v=20260401229000"></script>
-    <script src="/js/cdn-form-runtime.js?v=20260401229000"></script>
+<script src="/js/cdn-core-state.js?v=20260401229001"></script>
+<script src="/js/cdn-utils.js?v=20260401229001"></script>
+<script src="/js/cdn-form-editor.js?v=20260401229001"></script>
+<script src="/js/cdn-form-settings.js?v=20260401229001"></script>
+<script src="/js/cdn-assignee.js?v=20260401229001"></script>
+<script src="/js/cdn-outcomes.js?v=20260401229001"></script>
+<script src="/js/cdn-documents.js?v=20260401229001"></script>
+<script src="/js/cdn-dag-viewer.js?v=20260401229001"></script>
+<script src="/js/cdn-template-editor.js?v=20260401229001"></script>
+<script src="/js/cdn-bist.js?v=20260401229001"></script>
+<script src="/js/cdn-coc.js?v=20260401229001"></script>
+<script src="/js/cdn-meeting.js?v=20260401229001"></script>
+<script src="/js/cdn-scrubber.js?v=20260401229001"></script>
+<script src="/js/cdn-tooltips.js?v=20260401229001"></script>
+<script src="/js/cdn-comments.js?v=20260401229001"></script>
+<script src="/js/cdn-intel.js?v=20260401229001"></script>
+<script src="/js/cdn-events.js?v=20260401229001"></script>
+<script src="/js/cdn-instance-dag.js?v=20260401229001"></script>
+<script src="/js/cdn-instances.js?v=20260401229001"></script>
+    <script src="/js/cdn-form-runtime.js?v=20260401229001"></script>
 
 <script>
 // ── Bootstrap CURRENT_USER from JWT + resources table ─────────────────────────
