@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-205000
-console.log('%c[cdn-form-editor] v20260401-205000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-206000
+console.log('%c[cdn-form-editor] v20260401-206000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -336,7 +336,7 @@ function _renderFormList() {
               approved:'var(--green)', released:'var(--green)',
               archived:'var(--muted)', unreleased:'var(--amber)',
               rejected_review:'var(--red)', rejected_approval:'var(--red)' }[f.state]||'var(--muted)'}"
-          >${{ in_review:'● In Review', reviewed:'● Reviewed', approved:'✓ Approved',
+          >${{ in_review:'● In Review', reviewed:'● Awaiting Approval', approved:'✓ Approved',
                released:'✓ Released', archived:'Archived', unreleased:'Unreleased',
                rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
         </div>
@@ -2975,10 +2975,114 @@ async function _formApproveReview() {
 
 async function _formApproveAndRelease() {
   if (!_selectedForm) return;
-  const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-  const fmt = cat?.version_format || 'semver';
+  const cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+  const fmt    = cat?.version_format || 'semver';
   const newVer = _formBumpVersion(_selectedForm.version, fmt, 'minor');
-  const note = prompt(`Release as version ${newVer}. Add a release note (optional):`)||'';
+
+  // Show professional approval dialog instead of prompt()
+  _formShowApproveReleaseModal({ form: _selectedForm, newVer, onSubmit: _formDoApproveAndRelease });
+}
+
+function _formShowApproveReleaseModal({ form, newVer, onSubmit }) {
+  document.getElementById('cad-approve-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cad-approve-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
+    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+      width:480px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.7);overflow:hidden">
+
+      <!-- Header -->
+      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
+        display:flex;align-items:flex-start;gap:12px">
+        <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;
+          background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.3);
+          display:flex;align-items:center;justify-content:center;font-size:18px">✓</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:700;color:var(--text)">Approve & Release</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px">
+            ${escHtml(form.source_name)} · releasing as <strong style="color:var(--green)">${escHtml(newVer)}</strong>
+          </div>
+        </div>
+        <button onclick="document.getElementById('cad-approve-modal')?.remove()"
+          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:20px 22px">
+        <label style="display:block;font-size:13px;font-weight:600;color:var(--text2);
+          margin-bottom:8px;letter-spacing:.03em">
+          Approval Notes
+          <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
+        </label>
+        <textarea id="cad-approve-notes"
+          placeholder="Describe what was reviewed and any conditions of approval…"
+          style="width:100%;min-height:100px;resize:vertical;box-sizing:border-box;
+            background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
+            color:var(--text);font-family:Arial,sans-serif;font-size:14px;
+            line-height:1.6;padding:10px 12px;outline:none;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--green)'"
+          onblur="this.style.borderColor='var(--border2)'"
+        ></textarea>
+        <div style="margin-top:12px;padding:10px 12px;background:var(--surf2);border-radius:6px;
+          border-left:3px solid var(--green)">
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">
+            This form will be marked <strong>Approved</strong> and can then be
+            <strong>Released</strong> for use in workflows. This action is recorded
+            in the Chain of Custody.
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:14px 22px 18px;border-top:1px solid var(--border);
+        display:flex;gap:10px;justify-content:flex-end">
+        <button id="cad-approve-reject-btn"
+          style="padding:8px 20px;border-radius:6px;background:transparent;
+            border:1.5px solid var(--red);color:var(--red);cursor:pointer;
+            font-size:14px;font-weight:600;font-family:Arial,sans-serif;transition:opacity .12s"
+          onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+          ✗ Reject
+        </button>
+        <div style="flex:1"></div>
+        <button onclick="document.getElementById('cad-approve-modal')?.remove()"
+          style="padding:8px 20px;border-radius:6px;background:transparent;
+            border:1px solid var(--border);color:var(--muted);cursor:pointer;
+            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
+        <button id="cad-approve-submit-btn"
+          style="padding:8px 26px;border-radius:6px;background:var(--green);
+            border:none;color:white;cursor:pointer;font-size:14px;font-weight:700;
+            font-family:Arial,sans-serif;transition:opacity .12s"
+          onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          ✓ Approve & Release
+        </button>
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('cad-approve-notes')?.focus(), 50);
+
+  // Reject button → reuse reject modal
+  document.getElementById('cad-approve-reject-btn').onclick = () => {
+    overlay.remove();
+    _formRejectForm('approval');
+  };
+
+  // Submit
+  document.getElementById('cad-approve-submit-btn').onclick = async () => {
+    const note = document.getElementById('cad-approve-notes')?.value?.trim() || '';
+    overlay.remove();
+    await onSubmit({ newVer, note });
+  };
+}
+
+async function _formDoApproveAndRelease({ newVer, note }) {
+  if (!_selectedForm) return;
+  const
 
   // Mark prior released version as superseded
   const priorReleased = _formDefs.find(f =>
