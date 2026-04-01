@@ -667,22 +667,95 @@ window.loadUserConcerns = async function() {
 
 
 // ── My Requests — loadUserRequests ───────────────────────
+// Fetches real workflow_instances submitted by this user and maps them
+// to the _myRequests shape expected by renderMyRequestsActive/History.
 window.loadUserRequests = async function() {
   window._requestsLoaded = true;
   renderMyRequestsCatalog();
+
+  const resId = window._myResource?.id;
+  if (resId) {
+    try {
+      const rows = await API.get(
+        `workflow_instances?submitted_by_resource_id=eq.${resId}` +
+        `&order=created_at.desc&limit=100` +
+        `&select=id,title,status,current_step_name,workflow_type,created_at,metadata`
+      ).catch(() => []);
+
+      // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
+      const _STEP_LABELS = {
+        'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
+        'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
+        'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
+        'doc-review':        ['Submit','Route to reviewers','Review round 1','Revisions','Final review','Sign-off'],
+        'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
+        'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
+        'expense':           ['Submit','PM review','Finance approval','Processed'],
+        'training':          ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
+        'new-project':       ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
+        'project-closure':   ['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
+      };
+
+      window._myRequests = (rows || []).map(r => {
+        const meta      = r.metadata || {};
+        const wfType    = r.workflow_type || meta.workflow_type || 'unknown';
+        const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
+        const currentStep = r.current_step_name || '';
+
+        // Build step progress array — mark done/active based on current_step_name
+        const currentIdx = stepLabels.findIndex(s =>
+          s.toLowerCase().includes((currentStep||'').toLowerCase().split(' ')[0])
+        );
+        const activeIdx = currentIdx >= 0 ? currentIdx : (r.status === 'completed' ? stepLabels.length : 0);
+        const steps = stepLabels.map((label, i) => ({
+          label,
+          done:   r.status === 'completed' ? true : i < activeIdx,
+          active: r.status !== 'completed' && i === activeIdx,
+        }));
+
+        // Map instance status to display status
+        const statusMap = {
+          'pending':    'awaiting',
+          'in_progress':'in_progress',
+          'active':     'in_progress',
+          'completed':  'completed',
+          'rejected':   'rejected',
+          'withdrawn':  'rejected',
+        };
+
+        return {
+          id:        r.id,
+          title:     r.title || meta.doc_name || 'Untitled request',
+          status:    statusMap[r.status] || 'in_progress',
+          workflow:  wfType.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
+          submitted: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
+          steps,
+          cocNote:   meta.instructions || meta.notes || '',
+          _raw:      r,
+        };
+      });
+    } catch(e) {
+      console.warn('[MyRequests] loadUserRequests fetch failed:', e);
+      window._myRequests = [];
+    }
+  } else {
+    window._myRequests = [];
+  }
+
   renderMyRequestsActive();
   renderMyRequestsHistory();
-  // badge
+
+  // Update badges
   const activeCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
   const badge = document.getElementById('ust-requests-badge');
-  if (badge && activeCount > 0) {
-    badge.textContent = activeCount + ' active';
-    badge.style.display = 'inline';
+  if (badge) {
+    badge.textContent = activeCount > 0 ? activeCount + ' active' : '';
+    badge.style.display = activeCount > 0 ? 'inline' : 'none';
   }
   const activeBadge = document.getElementById('myr-active-badge');
-  if (activeBadge && activeCount > 0) {
-    activeBadge.textContent = activeCount;
-    activeBadge.style.display = 'inline';
+  if (activeBadge) {
+    activeBadge.textContent = activeCount > 0 ? activeCount : '';
+    activeBadge.style.display = activeCount > 0 ? 'inline' : 'none';
   }
 };
 
@@ -822,8 +895,8 @@ function renderMyRequestsActive() {
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${req.cocNote?`<div style="font-family:var(--font-head);font-size:11px;padding:6px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.35);color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">${_esc(req.cocNote)}</div>`:''}
         <div style="display:flex;gap:5px;flex-wrap:wrap">
-          <button onclick="compassToast('Request withdrawn. CoC event written.')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>
-          <button onclick="compassToast('Context added to request thread.')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
+          <button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>
+          <button onclick="myrAddContext('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
         </div>
       </div>
     </div>`;
@@ -902,7 +975,7 @@ window.myrOpenWorkflowForm = function(wfId) {
     </div>
     <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end">
       <button onclick="myrCloseModal()" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">Cancel</button>
-      <button onclick="myrSubmitWorkflow('${wfId}')" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Submit request &#8594;</button>
+      <button onclick="myrSubmitWorkflow('${wfId}')" data-myr-submit style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Submit request &#8594;</button>
     </div>`;
   // Create modal overlay
   let overlay = document.getElementById('myr-modal-overlay');
@@ -927,35 +1000,473 @@ window.myrCloseModal = function() {
   if (overlay) overlay.style.display = 'none';
 };
 
-window.myrSubmitWorkflow = function(wfId) {
-  myrCloseModal();
-  const msgs = {
-    'resource-alloc':   'Resource request submitted. Routing to VS for PM review.',
-    'pto-request':      'PTO request submitted. VS will review within 4h. Calendar pre-blocked pending approval.',
-    'capacity-concern': 'Capacity concern submitted to VS. Full queue context attached. 24h response window started.',
-    'doc-review':       'Document review request submitted. Routing to designated reviewers.',
-    'change-request':   'Change request submitted. PM review initiated.',
-    'issue-escalation': 'Issue escalation submitted. CoC context attached. PM notified.',
-    'expense':          'Expense reimbursement submitted. PM review initiated.',
-    'training':         'Training request submitted. Routing to PM for review.',
-    'new-project':      'New project intake submitted. Scoping workflow initiated.',
-    'project-closure':  'Project closure request submitted. Final CoC summary generation started.',
+// ── Withdraw a submitted request ──────────────────────────
+window.myrWithdrawRequest = async function(instanceId) {
+  if (!instanceId) return;
+  const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const resName = window._myResource?.name || 'Unknown';
+  const resId   = window._myResource?.id   || null;
+  const now     = new Date().toISOString();
+
+  // Confirm
+  const req = (window._myRequests||[]).find(r => r.id === instanceId);
+  const title = req?.title || 'this request';
+
+  // Simple inline confirm — replace with modal if needed
+  if (!window.confirm(`Withdraw "${title}"?\n\nThis will cancel the request and notify the reviewer.`)) return;
+
+  try {
+    // PATCH instance status to withdrawn
+    await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+      status: 'withdrawn',
+      updated_at: now,
+    });
+
+    // CoC event
+    await API.post('coc_events', {
+      id:                crypto.randomUUID(),
+      firm_id:           firmId,
+      entity_id:         instanceId,
+      entity_type:       'workflow_instance',
+      event_type:        'request.withdrawn',
+      event_class:       'lifecycle',
+      severity:          'info',
+      event_notes:       JSON.stringify({ title, withdrawn_by: resName }),
+      actor_name:        resName,
+      actor_resource_id: resId,
+      occurred_at:       now,
+      created_at:        now,
+    });
+
+    // Close any open action items for this instance
+    await API.patch(`workflow_action_items?instance_id=eq.${instanceId}&status=eq.open`, {
+      status: 'resolved',
+      updated_at: now,
+    }).catch(() => {});
+
+    // Optimistic local update
+    if (window._myRequests) {
+      window._myRequests = window._myRequests.map(r =>
+        r.id === instanceId ? { ...r, status: 'rejected' } : r
+      );
+    }
+    renderMyRequestsActive();
+    renderMyRequestsHistory();
+    compassToast(`"${title}" withdrawn. Reviewer notified.`);
+
+  } catch(e) {
+    console.error('[MyRequests] withdraw failed:', e);
+    compassToast('Withdraw failed — ' + (e.message || 'check console'), 4000);
+  }
+};
+
+// ── Add context to an active request ─────────────────────
+window.myrAddContext = async function(instanceId) {
+  if (!instanceId) return;
+  const req = (window._myRequests||[]).find(r => r.id === instanceId);
+  const title = req?.title || 'request';
+
+  // Inline context modal
+  const existing = document.getElementById('myr-context-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'myr-context-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:#111827;border:1px solid rgba(0,210,255,.25);width:420px;border-radius:4px;overflow:hidden">
+      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">Add context</div>
+        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(title)}</div>
+        <button onclick="document.getElementById('myr-context-overlay').remove()"
+          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:var(--font-head);font-size:11px">&#x2715;</button>
+      </div>
+      <div style="padding:14px">
+        <textarea id="myr-context-text" placeholder="Add additional context, updates, or attachments for the reviewer…"
+          style="width:100%;padding:8px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+                 color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
+                 resize:none;box-sizing:border-box" rows="4"></textarea>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end">
+        <button onclick="document.getElementById('myr-context-overlay').remove()"
+          style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">
+          Cancel
+        </button>
+        <button onclick="myrSubmitContext('${instanceId}')"
+          style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">
+          Add to thread &#8594;
+        </button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  document.getElementById('myr-context-text')?.focus();
+};
+
+window.myrSubmitContext = async function(instanceId) {
+  const text = document.getElementById('myr-context-text')?.value?.trim();
+  if (!text) { compassToast('Enter some context before submitting.', 2000); return; }
+
+  const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const resName = window._myResource?.name || 'Unknown';
+  const resId   = window._myResource?.id   || null;
+  const now     = new Date().toISOString();
+
+  try {
+    await API.post('coc_events', {
+      id:                crypto.randomUUID(),
+      firm_id:           firmId,
+      entity_id:         instanceId,
+      entity_type:       'workflow_instance',
+      event_type:        'request.context_added',
+      event_class:       'note',
+      severity:          'info',
+      event_notes:       JSON.stringify({ note: text }),
+      actor_name:        resName,
+      actor_resource_id: resId,
+      occurred_at:       now,
+      created_at:        now,
+    });
+
+    // Update local cocNote on the request
+    if (window._myRequests) {
+      window._myRequests = window._myRequests.map(r =>
+        r.id === instanceId ? { ...r, cocNote: text } : r
+      );
+    }
+    renderMyRequestsActive();
+    document.getElementById('myr-context-overlay')?.remove();
+    compassToast('Context added to request thread.');
+
+  } catch(e) {
+    console.error('[MyRequests] add context failed:', e);
+    compassToast('Failed to add context — ' + (e.message || 'check console'), 4000);
+  }
+};
+
+window.myrSubmitWorkflow = async function(wfId) {
+  // ── 1. Collect form values from modal ───────────────────
+  const modal = document.getElementById('myr-modal');
+  if (!modal) return;
+
+  // Read all labelled inputs/selects/textareas by their data-field attribute
+  const getField = (fieldId) => {
+    const el = modal.querySelector(`[data-myr-field="${fieldId}"]`);
+    return el ? el.value.trim() : '';
   };
-  compassToast(msgs[wfId] || 'Request submitted. CoC event written.');
+
+  // Build field map by workflow type
+  let title = '', details = {}, reviewerLabel = '';
+  switch (wfId) {
+    case 'doc-review': {
+      const docName    = getField('doc_name');
+      const reviewer   = getField('reviewer');
+      const deadline   = getField('deadline');
+      const instructions = getField('instructions');
+      if (!docName) { compassToast('Document name is required.', 2500); return; }
+      if (!reviewer) { compassToast('Reviewer is required.', 2500); return; }
+      title        = `Document review: ${docName}`;
+      reviewerLabel = reviewer;
+      details      = { doc_name: docName, reviewer, deadline, instructions };
+      break;
+    }
+    case 'resource-alloc': {
+      const resource = getField('resource');
+      const alloc    = getField('allocation');
+      const effDate  = getField('effective_date');
+      const justif   = getField('justification');
+      if (!resource) { compassToast('Resource is required.', 2500); return; }
+      title   = `Resource allocation: ${resource} → ${alloc}`;
+      details = { resource, allocation: alloc, effective_date: effDate, justification: justif };
+      break;
+    }
+    case 'pto-request': {
+      const from = getField('from');
+      const to   = getField('to');
+      const plan = getField('coverage_plan');
+      if (!from || !to) { compassToast('Start and end dates are required.', 2500); return; }
+      title   = `PTO request: ${from} – ${to}`;
+      details = { from, to, coverage_plan: plan };
+      break;
+    }
+    case 'change-request': {
+      const type   = getField('change_type');
+      const desc   = getField('change_desc');
+      const impact = getField('impact');
+      if (!desc) { compassToast('Change description is required.', 2500); return; }
+      title   = `Change request: ${type}`;
+      details = { change_type: type, description: desc, impact };
+      break;
+    }
+    case 'issue-escalation': {
+      const proj  = getField('project');
+      const issue = getField('issue_desc');
+      const steps = getField('steps_taken');
+      if (!issue) { compassToast('Issue description is required.', 2500); return; }
+      title   = `Issue escalation: ${proj}`;
+      details = { project: proj, description: issue, steps_taken: steps };
+      break;
+    }
+    default: {
+      const desc = getField('details');
+      title   = wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) + ' request';
+      details = { description: desc };
+    }
+  }
+
+  // ── 2. Disable submit button to prevent double-submit ───
+  const submitBtn = modal.querySelector('[data-myr-submit]');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
+
+  myrCloseModal();
+
+  const firmId   = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const resId    = window._myResource?.id || null;
+  const resName  = window._myResource?.name || 'Unknown';
+  const now      = new Date().toISOString();
+  const instanceId = crypto.randomUUID();
+
+  try {
+    // ── 3. Create workflow_instance ────────────────────────
+    await API.post('workflow_instances', {
+      id:                       instanceId,
+      firm_id:                  firmId,
+      title,
+      status:                   'pending',
+      workflow_type:            wfId,
+      current_step_name:        'Submitted',
+      submitted_by_resource_id: resId,
+      submitted_by_name:        resName,
+      created_at:               now,
+      metadata:                 details,
+    });
+
+    // ── 4. Write CoC event ─────────────────────────────────
+    const cocId = crypto.randomUUID();
+    await API.post('coc_events', {
+      id:               cocId,
+      firm_id:          firmId,
+      entity_id:        instanceId,
+      entity_type:      'workflow_instance',
+      event_type:       'request.submitted',
+      event_class:      'lifecycle',
+      severity:         'info',
+      event_notes:      JSON.stringify({
+        workflow_type: wfId,
+        title,
+        ...details,
+      }),
+      actor_name:       resName,
+      actor_resource_id: resId,
+      occurred_at:      now,
+      created_at:       now,
+    });
+
+    // ── 5. Create action item for the reviewer in My Work ──
+    // Resolve reviewer resource_id: for doc-review, match label against _resources
+    // For other types, default to PM (first resource that is_pm, or fallback)
+    let ownerResId   = null;
+    let ownerResName = reviewerLabel || 'PM';
+
+    if (reviewerLabel && window._resources?.length) {
+      // Strip any role suffix like " (PM)" from the label
+      const cleanLabel = reviewerLabel.replace(/\s*\(.*?\)\s*$/,'').trim();
+      const match = window._resources.find(r =>
+        r.name && r.name.toLowerCase().includes(cleanLabel.toLowerCase().split(' ')[0])
+      );
+      if (match) { ownerResId = match.id; ownerResName = match.name; }
+    }
+    // Fallback: find any PM resource
+    if (!ownerResId && window._resources?.length) {
+      const pm = window._resources.find(r => r.department?.toLowerCase().includes('pm') || r.title?.toLowerCase().includes('project manager'));
+      if (pm) { ownerResId = pm.id; ownerResName = pm.name; }
+    }
+
+    if (ownerResId) {
+      await API.post('workflow_action_items', {
+        id:               crypto.randomUUID(),
+        firm_id:          firmId,
+        instance_id:      instanceId,
+        title:            `Review request: ${title}`,
+        body:             details.instructions || details.justification || details.description || '',
+        status:           'open',
+        owner_resource_id: ownerResId,
+        owner_name:       ownerResName,
+        created_by_name:  resName,
+        due_date:         details.deadline || null,
+        created_at:       now,
+      });
+    }
+
+    // ── 6. Optimistic local update → re-render ─────────────
+    const stepPreviews = {
+      'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
+      'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
+      'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
+      'doc-review':        ['Submit','Route to reviewers','Review round 1','Revisions','Final review','Sign-off'],
+      'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
+      'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
+      'expense':           ['Submit','PM review','Finance approval','Processed'],
+      'training':          ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
+      'new-project':       ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
+      'project-closure':   ['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
+    };
+    const labels = stepPreviews[wfId] || ['Submit','Review','Complete'];
+    const steps  = labels.map((label, i) => ({ label, done: i < 1, active: i === 1 }));
+
+    window._myRequests = window._myRequests || [];
+    window._myRequests.unshift({
+      id:        instanceId,
+      title,
+      status:    'in_progress',
+      workflow:  wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
+      submitted: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),
+      steps,
+      cocNote:   details.instructions || details.description || '',
+      expanded:  true,
+    });
+
+    renderMyRequestsActive();
+    renderMyRequestsHistory();
+
+    // Update tab badge
+    const activeCount = window._myRequests.filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
+    const badge = document.getElementById('ust-requests-badge');
+    if (badge) { badge.textContent = activeCount + ' active'; badge.style.display = 'inline'; }
+
+    // Switch to Active sub-tab so the user sees their new request
+    const activeBtn = document.querySelector('.myr-subnav[data-myr="active"]');
+    if (activeBtn) myrSwitchView('active', activeBtn);
+
+    compassToast(`✓ ${title} — submitted & routed to ${ownerResName}`);
+
+  } catch(e) {
+    console.error('[MyRequests] submit failed:', e);
+    compassToast('Submission failed — ' + (e.message || 'check console'), 4000);
+  }
 };
 
 function _buildWorkflowFormBody(wfId, wf) {
-  const inp = (label, val='', required=true) => `<div style="margin-bottom:10px"><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">${label}${required?' <span style="color:#E24B4A">*</span>':''}</div><input style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none" type="text" value="${_esc(val)}"/></div>`;
-  const ta  = (label, val='', rows=3, required=true) => `<div style="margin-bottom:10px"><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">${label}${required?' <span style="color:#E24B4A">*</span>':''}</div><textarea style="width:100%;padding:7px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;resize:none" rows="${rows}">${_esc(val)}</textarea></div>`;
-  const sel = (label, opts, required=true) => `<div style="margin-bottom:10px"><div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">${label}${required?' <span style="color:#E24B4A">*</span>':''}</div><select style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;cursor:pointer">${opts.map(o=>`<option>${_esc(o)}</option>`).join('')}</select></div>`;
-  switch(wfId) {
-    case 'resource-alloc': return sel('Resource requested',['Robert Chen','Sandra Okafor','Alan Smith','(Other)']) + sel('New allocation',['40% NovaBio','60% NovaBio','80% NovaBio','100% NovaBio']) + inp('Effective date','Apr 2, 2026') + ta('Justification','Section 4.3 review requires a dedicated resource starting Apr 2. Robert Chen at current 40% is insufficient.',3);
-    case 'pto-request':    return inp('From','Mon Mar 31, 2026') + inp('To','Tue Apr 1, 2026') + ta('Coverage plan','Sandra Okafor to monitor NovaBio items. No Flexscope actions expected in this window.',2,false);
-    case 'capacity-concern': return `<div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);border-left:2px solid #E24B4A;padding:9px 11px;margin-bottom:10px;font-size:12px;color:rgba(240,246,255,.7);line-height:1.6"><div style="font-family:var(--font-head);font-size:11px;color:#E24B4A;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Current load — auto-generated</div><div>Overdue: <strong style="color:#E24B4A">3 items</strong></div><div>Due today: <strong style="color:#EF9F27">4 items</strong></div></div>` + ta('What needs to move, be delegated, or be dropped?','',3);
-    case 'doc-review':     return inp('Document name / version','') + sel('Reviewer(s)',['VS (PM)','Sandra Okafor','Robert Chen','Alan Smith']) + inp('Review deadline','') + ta('Review instructions','',2,false);
-    case 'change-request': return sel('Change type',['Scope change','Timeline change','Resource change','Budget change']) + ta('Change description','',3) + ta('Justification & impact','',2);
-    case 'issue-escalation': return sel('Project',['Flexscope','NovaBio','Internal']) + ta('Issue description','',3) + ta('Steps already taken','',2,false);
-    default: return ta('Details','',3);
+  // All inputs carry data-myr-field so myrSubmitWorkflow can read values by ID
+  const inp = (label, fieldId, val='', required=true) =>
+    `<div style="margin-bottom:10px">
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
+        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
+      </div>
+      <input data-myr-field="${fieldId}"
+        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box"
+        type="text" value="${_esc(val)}"/>
+    </div>`;
+  const ta = (label, fieldId, val='', rows=3, required=true) =>
+    `<div style="margin-bottom:10px">
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
+        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
+      </div>
+      <textarea data-myr-field="${fieldId}"
+        style="width:100%;padding:7px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
+               resize:none;box-sizing:border-box"
+        rows="${rows}">${_esc(val)}</textarea>
+    </div>`;
+  const sel = (label, fieldId, opts, required=true) =>
+    `<div style="margin-bottom:10px">
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
+        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
+      </div>
+      <select data-myr-field="${fieldId}"
+        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
+               cursor:pointer;box-sizing:border-box">
+        ${opts.map(o=>`<option>${_esc(o)}</option>`).join('')}
+      </select>
+    </div>`;
+
+  // Reviewer options from live _resources, fallback to seed names
+  const reviewerOpts = (window._resources||[]).length
+    ? window._resources.map(r => r.name + (r.department ? ` (${r.department})` : ''))
+    : ['VS (PM)','Sandra Okafor','Robert Chen','Alan Smith'];
+
+  // Resource options for allocation requests
+  const resourceOpts = (window._resources||[]).length
+    ? window._resources.map(r => r.name)
+    : ['Robert Chen','Sandra Okafor','Alan Smith','(Other)'];
+
+  switch (wfId) {
+    case 'resource-alloc':
+      return sel('Resource requested', 'resource', resourceOpts) +
+        sel('New allocation', 'allocation', ['40% NovaBio','60% NovaBio','80% NovaBio','100% NovaBio']) +
+        inp('Effective date', 'effective_date', 'Apr 2, 2026') +
+        ta('Justification', 'justification',
+          'Section 4.3 review requires a dedicated resource starting Apr 2. Robert Chen at current 40% is insufficient.', 3);
+
+    case 'pto-request':
+      return inp('From', 'from', 'Mon Mar 31, 2026') +
+        inp('To', 'to', 'Tue Apr 1, 2026') +
+        ta('Coverage plan', 'coverage_plan',
+          'Sandra Okafor to monitor NovaBio items. No Flexscope actions expected in this window.', 2, false);
+
+    case 'capacity-concern':
+      return `<div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);
+                border-left:2px solid #E24B4A;padding:9px 11px;margin-bottom:10px;
+                font-size:12px;color:rgba(240,246,255,.7);line-height:1.6">
+          <div style="font-family:var(--font-head);font-size:11px;color:#E24B4A;
+                      letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">
+            Current load — auto-generated
+          </div>
+          <div>Overdue: <strong style="color:#E24B4A">3 items</strong></div>
+          <div>Due today: <strong style="color:#EF9F27">4 items</strong></div>
+        </div>` +
+        ta('What needs to move, be delegated, or be dropped?', 'details', '', 3);
+
+    case 'doc-review':
+      return inp('Document name / version', 'doc_name', '') +
+        sel('Reviewer(s)', 'reviewer', reviewerOpts) +
+        inp('Review deadline', 'deadline', '') +
+        ta('Review instructions', 'instructions', '', 2, false);
+
+    case 'change-request':
+      return sel('Change type', 'change_type',
+          ['Scope change','Timeline change','Resource change','Budget change']) +
+        ta('Change description', 'change_desc', '', 3) +
+        ta('Justification & impact', 'impact', '', 2);
+
+    case 'issue-escalation':
+      return sel('Project', 'project', ['Flexscope','NovaBio','Internal']) +
+        ta('Issue description', 'issue_desc', '', 3) +
+        ta('Steps already taken', 'steps_taken', '', 2, false);
+
+    case 'expense':
+      return inp('Project', 'project', '') +
+        inp('Amount ($)', 'amount', '') +
+        inp('Date incurred', 'expense_date', '') +
+        ta('Description & receipts', 'description', '', 3);
+
+    case 'training':
+      return inp('Course / event name', 'course_name', '') +
+        inp('Provider', 'provider', '') +
+        inp('Cost ($)', 'cost', '') +
+        inp('Dates', 'dates', '') +
+        ta('Justification', 'justification', '', 2);
+
+    case 'new-project':
+      return inp('Project name', 'project_name', '') +
+        sel('Client', 'client',
+          [...new Set((window._projects||[]).map(p=>p.client_name||p.name).filter(Boolean)),
+           '(New client)']) +
+        inp('Target start date', 'start_date', '') +
+        ta('Scope summary', 'scope', '', 3);
+
+    case 'project-closure':
+      return sel('Project', 'project',
+          (window._projects||[]).map(p=>p.name).filter(Boolean).length
+            ? (window._projects||[]).map(p=>p.name)
+            : ['Flexscope','NovaBio','Internal']) +
+        ta('Lessons learned', 'lessons', '', 3) +
+        ta('Final notes', 'final_notes', '', 2, false);
+
+    default:
+      return ta('Details', 'details', '', 3);
   }
 }
 
