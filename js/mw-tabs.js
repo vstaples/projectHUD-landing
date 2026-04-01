@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100100
+// VERSION: 20260402-100200
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-100200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -826,7 +826,7 @@ window.loadUserRequests = async function() {
   const activeIds = (window._myRequests||[])
     .filter(r => r.status !== 'completed' && r.status !== 'rejected')
     .map(r => r.id).filter(Boolean);
-  if (activeIds.length && window.API?.get) {
+  if (activeIds.length && API?.get) {
     window._myRequestCoc = window._myRequestCoc || {};
     API.get(
       `coc_events?entity_id=in.(${activeIds.join(',')})&order=occurred_at.asc&select=*`
@@ -1084,7 +1084,7 @@ function renderMyRequestsActive() {
                 ? (a.size/1048576).toFixed(1)+'MB'
                 : (a.size/1024).toFixed(0)+'KB') : '';
               const href = a.url || (a.path
-                ? `${window.SUPA_URL||''}/storage/v1/object/public/workflow-documents/${a.path}`
+                ? `${SUPA_URL||''}/storage/v1/object/public/workflow-documents/${a.path}`
                 : '#');
               return `<a href="${href}" target="_blank" rel="noopener"
                 style="display:flex;align-items:center;gap:6px;padding:4px 8px;
@@ -1281,7 +1281,7 @@ window.myrCloseModal = function() {
 // ── Withdraw a submitted request ──────────────────────────
 window.myrWithdrawRequest = async function(instanceId) {
   if (!instanceId) return;
-  const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId  = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
   const resName = _myResource?.name || 'Unknown';
   const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
@@ -1385,7 +1385,7 @@ window.myrSubmitContext = async function(instanceId) {
   const text = document.getElementById('myr-context-text')?.value?.trim();
   if (!text) { compassToast('Enter some context before submitting.', 2000); return; }
 
-  const firmId  = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId  = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
   const resName = _myResource?.name || 'Unknown';
   const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
@@ -1449,12 +1449,12 @@ window.myrHandleDocUpload = async function(event) {
       const token = await (window.Auth?.getFreshToken?.() || window.Auth?.getToken?.()).catch(() => null);
 
       const res = await fetch(
-        `${window.SUPA_URL}/storage/v1/object/workflow-documents/${path}`,
+        `${SUPA_URL}/storage/v1/object/workflow-documents/${path}`,
         {
           method:  'POST',
           headers: {
-            'apikey':         window.SUPA_KEY || '',
-            'Authorization':  `Bearer ${token || window.SUPA_KEY}`,
+            'apikey':         SUPA_KEY || '',
+            'Authorization':  `Bearer ${token || SUPA_KEY}`,
             'Content-Type':   file.type || 'application/octet-stream',
             'x-upsert':       'true',
           },
@@ -1470,7 +1470,7 @@ window.myrHandleDocUpload = async function(event) {
       }
 
       // Build public URL
-      const url = `${window.SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`;
+      const url = `${SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`;
 
       window._myrPendingDocs.push({
         id:     docId,
@@ -1613,7 +1613,7 @@ window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
   }
 
   const url = sourcePath
-    ? `${window.SUPA_URL}/storage/v1/object/public/workflow-documents/${sourcePath}`
+    ? `${SUPA_URL}/storage/v1/object/public/workflow-documents/${sourcePath}`
     : null;
 
   window._myrPendingDocs = window._myrPendingDocs || [];
@@ -1716,7 +1716,7 @@ window.myrSubmitWorkflow = async function(wfId) {
 
   myrCloseModal();
 
-  const firmId   = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  const firmId   = FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
   const resId    = _myResource?.id || null;
   const resName  = _myResource?.name || 'Unknown';
   const now      = new Date().toISOString();
@@ -1773,17 +1773,17 @@ window.myrSubmitWorkflow = async function(wfId) {
     let ownerResId   = null;
     let ownerResName = reviewerLabel || 'PM';
 
-    if (reviewerLabel && window._resources?.length) {
+    if (reviewerLabel && _resources?.length) {
       // Strip any role suffix like " (PM)" from the label
       const cleanLabel = reviewerLabel.replace(/\s*\(.*?\)\s*$/,'').trim();
-      const match = window._resources.find(r =>
+      const match = _resources.find(r =>
         r.name && r.name.toLowerCase().includes(cleanLabel.toLowerCase().split(' ')[0])
       );
       if (match) { ownerResId = match.id; ownerResName = match.name; }
     }
     // Fallback: find any PM resource
-    if (!ownerResId && window._resources?.length) {
-      const pm = window._resources.find(r => r.department?.toLowerCase().includes('pm') || r.title?.toLowerCase().includes('project manager'));
+    if (!ownerResId && _resources?.length) {
+      const pm = _resources.find(r => r.department?.toLowerCase().includes('pm') || r.title?.toLowerCase().includes('project manager'));
       if (pm) { ownerResId = pm.id; ownerResName = pm.name; }
     }
 
@@ -1890,13 +1890,13 @@ function _buildWorkflowFormBody(wfId, wf) {
     </div>`;
 
   // Reviewer options from live _resources, fallback to seed names
-  const reviewerOpts = (window._resources||[]).length
-    ? window._resources.map(r => r.name + (r.department ? ` (${r.department})` : ''))
+  const reviewerOpts = (_resources||[]).length
+    ? _resources.map(r => r.name + (r.department ? ` (${r.department})` : ''))
     : ['VS (PM)','Sandra Okafor','Robert Chen','Alan Smith'];
 
   // Resource options for allocation requests
-  const resourceOpts = (window._resources||[]).length
-    ? window._resources.map(r => r.name)
+  const resourceOpts = (_resources||[]).length
+    ? _resources.map(r => r.name)
     : ['Robert Chen','Sandra Okafor','Alan Smith','(Other)'];
 
   switch (wfId) {
