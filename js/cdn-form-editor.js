@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-224004
-console.log('%c[cdn-form-editor] v20260401-224004','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-225001
+console.log('%c[cdn-form-editor] v20260401-225001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2015,7 +2015,6 @@ function _renderFieldOverlays() {
   if (sel.size > 0) {
     const firstId = [...sel][0];
     const firstField = _formFields.find(f => f.id === firstId);
-    console.log('[overlay] sel ids:', [...sel].slice(0,3), '| first field.id:', firstField?.id, '| match:', firstField?.id === firstId);
   }
 
   const currentPageFields = _formFields.filter(f => (f.page||1) === _pdfPage);
@@ -3207,7 +3206,8 @@ async function _formDoApproveAndRelease({ newVer, note }) {
   try {
     const relCat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
     if (relCat?.approver_id) {
-      const apRows = await API.get(`persons?id=eq.${relCat.approver_id}&select=id,full_name,email`).catch(()=>[]);
+      const apRows = await API.get(`resources?id=eq.${relCat.approver_id}&select=id,first_name,last_name,email`).catch(()=>[]);
+      if (apRows?.[0]) apRows[0].full_name = ((apRows[0].first_name||'')+' '+(apRows[0].last_name||'')).trim();
       if (apRows?.[0]) {
         await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
           method:'POST',
@@ -3567,11 +3567,7 @@ async function _formDoReleaseFinal(note) {
     f.state === 'released' &&
     f.source_name === _selectedForm.source_name
   );
-  // Bump version on Release — this is when the form officially becomes a new published version
-  const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-  const _fmt    = _cat?.version_format || 'semver';
-  const _oldVer = _selectedForm.version;
-  _selectedForm.version     = _formBumpVersion(_oldVer, _fmt, 'minor');
+  // Release at current version — no bump here (version bumps when revision is created)
   _selectedForm.state       = 'released';
   _selectedForm.released_at = new Date().toISOString();
   await _formSave();
@@ -3592,11 +3588,20 @@ async function _formDoReleaseFinal(note) {
 
 async function _formCreateRevision() {
   if (!_selectedForm) return;
-  if (!confirm(`Create a new revision of "${_selectedForm.source_name}"? The current Released version will remain active until the new revision is released.`)) return;
-  _selectedForm.state = 'unreleased';
+  const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+  const _fmt    = _cat?.version_format || 'semver';
+  const _oldVer = _selectedForm.version;
+  const _newVer = _formBumpVersion(_oldVer, _fmt, 'minor');
+  if (!confirm(`Create a new revision of "${_selectedForm.source_name}"?\n\nVersion will advance from ${_oldVer} → ${_newVer}.\nThe current released version remains active until the new revision is published.`)) return;
+  _selectedForm.state   = 'unreleased';
+  _selectedForm.version = _newVer;
   await _formSave();
-  _formCoCWrite('form.state_changed', _selectedForm.id, { from:'released', to:'unreleased', note:'Revision started' });
-  cadToast('Revision opened for editing', 'info');
+  _formCoCWrite('form.state_changed', _selectedForm.id, {
+    from: 'released', to: 'unreleased',
+    version: _newVer,
+    note: `Revision started — version ${_oldVer} → ${_newVer}`
+  });
+  cadToast(`Revision ${_newVer} opened for editing`, 'info');
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
 }
@@ -3712,18 +3717,14 @@ async function _formSave() {
     const _rejectedStates = ['rejected_review','rejected_approval','rejected_release'];
     if (_rejectedStates.includes(_selectedForm.state)) {
       const _prevState = _selectedForm.state;
-      const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-      const _fmt    = _cat?.version_format || 'semver';
-      const _oldVer = _selectedForm.version;
-      _selectedForm.version = _formBumpVersion(_oldVer, _fmt, 'minor');
-      _selectedForm.state   = 'draft';
+      _selectedForm.state = 'draft';
       // Small delay ensures "Returned to Draft" CoC timestamp is AFTER "Rejected"
       await new Promise(r => setTimeout(r, 50));
       _formCoCWrite('form.state_changed', _selectedForm.id, {
         from:    _prevState,
         to:      'draft',
-        note:    `Returned to Draft — version bumped ${_oldVer} → ${_selectedForm.version}`,
-        version: _selectedForm.version,
+        note:    'Returned to Draft',
+        version: _selectedForm.version,  // version unchanged — only bumps on Release
       });
     }
     // Upload replacement PDF if one was selected via Replace PDF button
@@ -5749,7 +5750,15 @@ function _fphRenderActivity(rows) {
     `<td style="padding:6px 8px;font-size:13px;color:${color};font-family:Arial,sans-serif;
       border-bottom:1px solid var(--border);${extra}">${content}</td>`;
 
-  const tableRows = rows.map(r => {
+  // Deduplicate: for consecutive form.saved events, keep only the last one
+  const deduped = rows.filter((r, i) => {
+    if (r.event_type !== 'form.saved') return true;
+    // Keep this saved event only if the next event is NOT also a form.saved
+    const next = rows[i + 1];
+    return !next || next.event_type !== 'form.saved';
+  });
+
+  const tableRows = deduped.map(r => {
     const derived = deriveRoleAction(r);
     if (!derived) return '';
     const { role, action, who } = derived;
