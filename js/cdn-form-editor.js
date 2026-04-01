@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-222001
-console.log('%c[cdn-form-editor] v20260401-222001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-224000
+console.log('%c[cdn-form-editor] v20260401-224000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -513,6 +513,8 @@ function _renderFormEditor() {
           <button onclick="_formReplacePdf()" title="Replace PDF background"
             id="form-replace-btn"
             style="${_railBtn()};${['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
+          <button onclick="_formClearHistory('${f.id}')" title="[DEV] Clear history — reset CoC to clean state"
+            style="${_railBtn()};color:#6b7280;font-size:14px;opacity:.6" id="form-clear-history-btn">⌫</button>
           <button onclick="_formDeleteWithConfirm('${f.id}')" title="Remove form"
             style="${_railBtn()};color:var(--red)">🗑</button>
         </div>
@@ -2336,7 +2338,7 @@ function _formLifecycleButtons(f) {
     btns.push(`<span style="font-size:12px;color:var(--accent);font-family:Arial,sans-serif;
       padding:3px 8px;background:rgba(79,142,247,.1);border-radius:4px">● In Review</span>`);
     // Editor-side simulate approve (for testing / admin override)
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formApproveReview()"
+    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formShowMarkReviewedModal()"
       style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.4);color:#4ade80;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✓ Mark Reviewed</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('review')"
       style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✗ Reject</button>`);
@@ -2917,7 +2919,87 @@ async function _formDoSubmitForReview({ reviewers, approver }) {
   if (el) renderFormsTab(el);
 }
 
-async function _formApproveReview() {
+function _formShowMarkReviewedModal() {
+  document.getElementById('cad-mark-reviewed-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cad-mark-reviewed-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
+    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+      width:480px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.7);overflow:hidden">
+
+      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
+        display:flex;align-items:flex-start;gap:12px">
+        <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;
+          background:rgba(240,160,48,.15);border:1px solid rgba(240,160,48,.3);
+          display:flex;align-items:center;justify-content:center;font-size:18px">✓</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:700;color:var(--text)">Mark Reviewed</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px">
+            ${escHtml(_selectedForm?.source_name||'')} · <span style="color:#f0a030">v${escHtml(_selectedForm?.version||'0.1.0')}</span>
+            ${(_selectedForm?.pending_reviewer_ids||[]).length > 1
+              ? ` · <span style="color:var(--muted)">Reviewer ${(_selectedForm?.reviewed_by||[]).length+1} of ${(_selectedForm?.pending_reviewer_ids||[]).length}</span>`
+              : ''}
+          </div>
+        </div>
+        <button onclick="document.getElementById('cad-mark-reviewed-modal')?.remove()"
+          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+
+      <div style="padding:20px 22px">
+        <div style="padding:10px 12px;background:var(--surf2);border-radius:6px;
+          border-left:3px solid #f0a030;margin-bottom:16px">
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">
+            ${(_selectedForm?.pending_reviewer_ids||[]).length > 1 &&
+              (_selectedForm?.reviewed_by||[]).length + 1 < (_selectedForm?.pending_reviewer_ids||[]).length
+              ? 'Your approval will be recorded. The form advances when <strong>all reviewers</strong> have approved.'
+              : 'This is the <strong>final review</strong>. Approving will advance the form to Approval stage.'}
+          </div>
+        </div>
+        <label style="display:block;font-size:13px;font-weight:600;color:var(--text2);
+          margin-bottom:8px">
+          Review Comments
+          <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
+        </label>
+        <textarea id="cad-reviewed-notes"
+          placeholder="Describe what you reviewed and any observations…"
+          style="width:100%;min-height:90px;resize:vertical;box-sizing:border-box;
+            background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
+            color:var(--text);font-family:Arial,sans-serif;font-size:14px;
+            line-height:1.6;padding:10px 12px;outline:none;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--green)'"
+          onblur="this.style.borderColor='var(--border2)'"
+        ></textarea>
+      </div>
+
+      <div style="padding:14px 22px 18px;border-top:1px solid var(--border);
+        display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('cad-mark-reviewed-modal')?.remove()"
+          style="padding:8px 20px;border-radius:999px;background:transparent;
+            border:1px solid var(--border);color:var(--muted);cursor:pointer;
+            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
+        <button id="cad-reviewed-submit"
+          style="padding:8px 26px;border-radius:999px;background:#f0a030;
+            border:none;color:var(--bg);cursor:pointer;font-size:14px;font-weight:700;
+            font-family:Arial,sans-serif">✓ Submit Review</button>
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('cad-reviewed-notes')?.focus(), 50);
+
+  document.getElementById('cad-reviewed-submit').onclick = async () => {
+    const note = document.getElementById('cad-reviewed-notes')?.value?.trim() || '';
+    overlay.remove();
+    await _formApproveReview(note);
+  };
+}
+
+async function _formApproveReview(reviewNote) {
   if (!_selectedForm) return;
 
   // ── Resolve current user identity ────────────────────────────────────────
@@ -2964,13 +3046,15 @@ async function _formApproveReview() {
     _selectedForm.state = 'reviewed';
     _formCoCWrite('form.state_changed', _selectedForm.id, {
       from: 'in_review', to: 'reviewed',
-      note: `All reviewers approved — ${actorName} was last to sign off`
+      version: _selectedForm.version,
+      note: reviewNote || `All reviewers approved — ${actorName} was last to sign off`,
     });
     cadToast('Review complete — awaiting final approval', 'success');
   } else {
     _formCoCWrite('form.state_changed', _selectedForm.id, {
       from: 'in_review', to: 'in_review',
-      note: `${actorName} approved (${approved.length} of ${pending.length})`
+      version: _selectedForm.version,
+      note: reviewNote ? `${actorName}: ${reviewNote}` : `${actorName} approved (${approved.length} of ${pending.length})`,
     });
     cadToast('Your review recorded', 'info');
   }
@@ -3318,15 +3402,17 @@ async function _formRejectForm(rejectionStage) {
     onSubmit: async (note) => {
       const from = _selectedForm.state;
       const to   = rejectionStage === 'review' ? 'rejected_review' : 'rejected_approval';
-  _selectedForm.state       = to;
-  _selectedForm.review_note = note;
-  await _formSave();
+      _selectedForm.state       = to;
+      _selectedForm.review_note = note;
+      // Write Rejected CoC BEFORE save (save auto-transitions and writes its own CoC)
       _formCoCWrite('form.rejected', _selectedForm.id, {
         from, to,
-        stage: rejectionStage,
+        stage:       rejectionStage,
         note,
+        version:     _selectedForm.version,
         rejected_by: window.CURRENT_USER?.id || 'editor'
       });
+      await _formSave();
       cadToast('Rejected — returned to editor for revision', 'info');
       if (_formPreviewMode) {
         _formRefreshToolbar();
@@ -3451,14 +3537,16 @@ function _formShowReleaseModal(form) {
     }
     overlay.remove();
     const from = _selectedForm.state;
+    // 1. Write Rejected CoC first (correct chronological order)
     _selectedForm.state       = 'rejected_release';
     _selectedForm.review_note = note;
-    await _formSave();
     _formCoCWrite('form.rejected', _selectedForm.id, {
       from, to: 'rejected_release', stage: 'release', note,
       version:     _selectedForm.version,
       rejected_by: window.CURRENT_USER?.id || null,
     });
+    // 2. Save — this auto-transitions to draft and writes "Returned to Draft" CoC
+    await _formSave();
     cadToast('Returned for revision', 'info');
     const el = document.getElementById('cad-content');
     if (el) renderFormsTab(el);
@@ -3624,12 +3712,13 @@ async function _formSave() {
     const _rejectedStates = ['rejected_review','rejected_approval','rejected_release'];
     if (_rejectedStates.includes(_selectedForm.state)) {
       const _prevState = _selectedForm.state;
-      // Bump version on first save after rejection — new revision cycle begins
       const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
       const _fmt    = _cat?.version_format || 'semver';
       const _oldVer = _selectedForm.version;
       _selectedForm.version = _formBumpVersion(_oldVer, _fmt, 'minor');
       _selectedForm.state   = 'draft';
+      // Small delay ensures "Returned to Draft" CoC timestamp is AFTER "Rejected"
+      await new Promise(r => setTimeout(r, 50));
       _formCoCWrite('form.state_changed', _selectedForm.id, {
         from:    _prevState,
         to:      'draft',
@@ -4145,6 +4234,67 @@ function _resizeMouseUp() {
 // ─────────────────────────────────────────────────────────────────────────────
 // FORM CoC PANEL — toggle, load, render
 // ─────────────────────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEV TOOL: Clear History
+// Deletes all coc_events for this form and replaces with a single clean entry.
+// Useful for iterating through lifecycle during development.
+// ─────────────────────────────────────────────────────────────────────────────
+async function _formClearHistory(formId) {
+  if (!formId) return;
+  const form = _selectedForm;
+  if (!form) return;
+
+  // Show confirmation with form name
+  const confirmed = confirm(
+    `[DEV] Clear all history for "${form.source_name}"?\n\n` +
+    `This will:\n` +
+    `• Delete all CoC / activity events\n` +
+    `• Reset state to "draft"\n` +
+    `• Reset version to "0.1.0"\n` +
+    `• Add a single "Form import complete" entry\n\n` +
+    `This cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  cadToast('Clearing history…', 'info');
+
+  try {
+    // 1. Delete all coc_events for this form
+    await API.del(`coc_events?entity_id=eq.${formId}`).catch(e =>
+      console.warn('[devTool] coc delete failed:', e.message)
+    );
+
+    // 2. Reset form state + version
+    form.state   = 'draft';
+    form.version = '0.1.0';
+    form.reviewed_by          = [];
+    form.pending_reviewer_ids = [];
+    form.approved_by          = null;
+    form.review_note          = null;
+    form.released_at          = null;
+    await _formSave();
+
+    // 3. Write clean baseline entry
+    _formCoCWrite('form.state_changed', formId, {
+      from:    'import',
+      to:      'draft',
+      version: '0.1.0',
+      note:    'Form import complete',
+    });
+
+    cadToast('[DEV] History cleared — reset to draft 0.1.0', 'success');
+
+    // Refresh UI
+    const el = document.getElementById('cad-content');
+    if (el) renderFormsTab(el);
+
+  } catch(e) {
+    cadToast('[DEV] Clear failed: ' + e.message, 'error');
+    console.error('[devTool] clear history failed:', e);
+  }
+}
 
 function _formToggleCoC() {
   const panel  = document.getElementById('form-coc-panel');
@@ -5144,11 +5294,16 @@ async function _formShowPreviewHistoryPanel() {
       const _hasHistory = rows.some(r => {
         try { const p = JSON.parse(r.event_notes||'{}'); return p.from && p.to; } catch(e) { return false; }
       });
+      const _hasDraftSave = rows.some(r => {
+        if (r.event_type !== 'form.saved') return false;
+        try { const p = JSON.parse(r.event_notes||'{}'); return p.state === 'draft'; } catch(e) { return false; }
+      });
       _fphRenderDag(
         state,
         _selectedForm?.reviewed_by          || [],
         _selectedForm?.pending_reviewer_ids || [],
-        _hasHistory
+        _hasHistory,
+        _hasDraftSave
       );
       _fphRenderActivity(rows);
       _fphRenderComments(rows);
@@ -5167,7 +5322,7 @@ async function _formShowPreviewHistoryPanel() {
 }
 
 // ── Workflow DAG renderer ──────────────────────────────────────────────────
-function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds, hasHistory) {
+function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds, hasHistory, hasDraftSave) {
   const el = document.getElementById('fph-dag');
   if (!el) return;
 
@@ -5187,9 +5342,11 @@ function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds, hasHistory)
         if (['in_review','reviewed','approved','released'].includes(currentState))
           return { lines:['Draft','Complete'], color:'#2a9d40', status:'done' };
         if (currentState === 'draft') {
-          // Amber 'In Draft' when editor is reworking after a rejection
-          if (hasHistory)
+          // Amber 'In Draft' only when editor has actually saved edits in draft
+          // (hasDraftSave distinguishes "just returned" from "actively editing")
+          if (hasHistory && hasDraftSave)
             return { lines:['In Draft'], color:'#f0a030', status:'active' };
+          // Blue 'Draft' = ready to edit (fresh return from rejection, no edits yet)
           return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
         }
         if (currentState === 'unreleased')
@@ -5515,6 +5672,8 @@ function _fphRenderActivity(rows) {
       return { role:'Editor',   action:'Released',          who, version: v };
     if (from && from.startsWith('rejected') && to === 'draft')
       return { role:'Editor',   action:'Returned to Draft', who, version: v };
+    if (from === 'import' && to === 'draft')
+      return { role:'Editor',   action:'Form Import Complete', who, version: v };
     if (to === 'unreleased')
       return { role:'Editor',   action:'Revision Started',  who, version: v };
 
