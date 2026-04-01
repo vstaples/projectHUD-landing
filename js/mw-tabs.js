@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-101000
+// VERSION: 20260402-101100
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-101000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-101100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -735,7 +735,7 @@ window.loadUserRequests = async function() {
         font-size: 10px; font-weight: 700; flex-shrink: 0;
       }
       .myr-ptd-done   { background: #1D9E75; color: #fff; box-shadow: 0 0 0 3px rgba(29,158,117,.2); }
-      .myr-ptd-active { background: #00D2FF; color: #060a10; animation: myrActivePulse 1.5s infinite; box-shadow: 0 0 0 3px rgba(0,210,255,.2); }
+      .myr-ptd-active { background: #EF9F27; color: #060a10; animation: myrActivePulse 1.5s infinite; box-shadow: 0 0 0 3px rgba(239,159,39,.25); }
       @keyframes myrActivePulse { 0%,100%{opacity:1} 50%{opacity:.65} }
       .myr-ptd-pending { background: rgba(255,255,255,.06); color: rgba(255,255,255,.3); border: 1px solid rgba(255,255,255,.12); }
       .myr-pt-name {
@@ -743,7 +743,24 @@ window.loadUserRequests = async function() {
         text-align: center; letter-spacing: .03em; line-height: 1.3; max-width: 72px;
       }
       .myr-pt-name.done   { color: #1D9E75; }
-      .myr-pt-name.active { color: #00D2FF; font-weight: 600; }
+      .myr-pt-name.active { color: #EF9F27; font-weight: 600; }
+      /* Step tooltip — only visible on hover */
+      .myr-pt-tip {
+        visibility: hidden; opacity: 0;
+        position: absolute; bottom: calc(100% + 8px); left: 50%;
+        transform: translateX(-50%);
+        background: #0a1628; border: 1px solid rgba(239,159,39,.3);
+        padding: 5px 9px; min-width: 140px; max-width: 200px;
+        font-family: var(--font-head); font-size: 11px; line-height: 1.5;
+        color: #C8DFF0; white-space: nowrap; z-index: 200;
+        pointer-events: none; transition: opacity .15s;
+      }
+      .myr-pt-tip::after {
+        content: ''; position: absolute; top: 100%; left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent; border-top-color: rgba(239,159,39,.3);
+      }
+      .myr-pt-step:hover .myr-pt-tip { visibility: visible; opacity: 1; }
       /* CoC panel */
       .myr-coc-panel {
         margin-top: 10px;
@@ -849,11 +866,19 @@ window.loadUserRequests = async function() {
         const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
         const currentStep = r.current_step_name || '';
 
-        // Build step progress array — mark done/active based on current_step_name
+        // currentStep matches the COMPLETED step — active is one AFTER it
+        // e.g. current_step_name='Submitted' means Submit is done, Route to reviewers is active
         const currentIdx = stepLabels.findIndex(s =>
-          s.toLowerCase().includes((currentStep||'').toLowerCase().split(' ')[0])
+          s.toLowerCase().replace(/\s+/g,'').includes(
+            (currentStep||'').toLowerCase().replace(/\s+/g,'').slice(0,5)
+          )
         );
-        const activeIdx = currentIdx >= 0 ? currentIdx : (r.status === 'complete' || r.status === 'completed' ? stepLabels.length : 0);
+        // Active = step AFTER the current completed one (unless already at end)
+        const activeIdx = r.status === 'complete' || r.status === 'completed'
+          ? stepLabels.length
+          : currentIdx >= 0
+            ? Math.min(currentIdx + 1, stepLabels.length - 1)
+            : 1; // default to step 1 (Route to reviewers) for newly submitted requests
         const steps = stepLabels.map((label, i) => ({
           label,
           done:   r.status === 'complete' || r.status === 'completed' ? true : i < activeIdx,
@@ -896,22 +921,25 @@ window.loadUserRequests = async function() {
   renderMyRequestsActive();
   renderMyRequestsHistory();
 
-  // Pre-fetch CoC events for all active requests so tooltips are ready
+  // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
   const activeIds = (window._myRequests||[])
     .filter(r => r.status !== 'completed' && r.status !== 'rejected')
     .map(r => r.id).filter(Boolean);
-  if (activeIds.length && API?.get) {
-    window._myRequestCoc = window._myRequestCoc || {};
+  window._myRequestCoc = window._myRequestCoc || {};
+  const unloadedIds = activeIds.filter(id => !window._myRequestCoc[id]);
+  if (unloadedIds.length) {
     API.get(
-      `coc_events?entity_id=in.(${activeIds.join(',')})&order=occurred_at.asc&select=*`
+      `coc_events?entity_id=in.(${unloadedIds.join(',')})&order=occurred_at.asc&select=*`
     ).then(rows => {
       (rows||[]).forEach(e => {
         if (!window._myRequestCoc[e.entity_id]) window._myRequestCoc[e.entity_id] = [];
-        window._myRequestCoc[e.entity_id].push(e);
+        if (!window._myRequestCoc[e.entity_id].find(x => x.id === e.id))
+          window._myRequestCoc[e.entity_id].push(e);
       });
-      // Re-render now that CoC data is available
       renderMyRequestsActive();
     }).catch(() => {});
+  } else {
+    renderMyRequestsActive();
   }
 
   // Update badges
@@ -1159,10 +1187,13 @@ function renderMyRequestsActive() {
               const sizeStr = a.size ? (a.size > 1048576
                 ? (a.size/1048576).toFixed(1)+'MB'
                 : (a.size/1024).toFixed(0)+'KB') : '';
-              const href = a.url || (a.path
-                ? `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${a.path}`
-                : '#');
+              const href = a.url && !a.url.includes('/public/') ? a.url :
+                           a.path ? 'javascript:void(0)' : '#';
+              const onclick = a.path
+                ? `myrOpenAttachment('${a.path}');return false;`
+                : '';
               return `<a href="${href}" target="_blank" rel="noopener"
+                onclick="${onclick}"
                 style="display:flex;align-items:center;gap:6px;padding:4px 8px;
                        background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
                        color:#00D2FF;text-decoration:none;font-family:var(--font-head);font-size:11px;
@@ -1177,7 +1208,23 @@ function renderMyRequestsActive() {
             }).join('')}
           </div>
         </div>` : ''}
-        ${req.cocNote?`<div style="font-family:var(--font-head);font-size:11px;padding:6px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.35);color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">${_esc(req.cocNote)}</div>`:''}
+        ${(() => {
+          const submitEv = instCoc.find(e => e.event_type === 'request.submitted');
+          const actor = submitEv?.actor_name || req._raw?.submitted_by_name || '';
+          const ts = submitEv
+            ? new Date(submitEv.occurred_at||submitEv.created_at).toLocaleString('en-US',
+                {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
+            : req.submitted || '';
+          return actor
+            ? `<div style="font-family:var(--font-head);font-size:11px;padding:5px 9px;
+                           background:rgba(239,159,39,.06);border-left:2px solid rgba(239,159,39,.4);
+                           color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:8px">
+                 Submitted by <strong style="color:rgba(255,255,255,.7)">${_esc(actor)}</strong>
+                 ${ts ? `· <span style="color:rgba(255,255,255,.3)">${_esc(ts)}</span>` : ''}
+                 — awaiting reviewer action
+               </div>`
+            : '';
+        })()}
         <div class="myr-coc-panel">
           <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
             <span>&#9656; Chain of Custody</span>
@@ -1220,6 +1267,32 @@ function renderMyRequestsHistory() {
   html += `</div>`;
   el.innerHTML = html;
 }
+
+// Open a storage attachment via signed URL (workflow-documents bucket is private)
+window.myrOpenAttachment = async function(path) {
+  try {
+    const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
+    const bucket = _mwStorageBucket();
+    const res = await fetch(
+      `${_mwSupaURL()}/storage/v1/object/sign/${bucket}/${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey':        _mwSupaKey(),
+          'Authorization': `Bearer ${token || _mwSupaKey()}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({ expiresIn: 300 }), // 5-minute signed URL
+      }
+    );
+    if (!res.ok) throw new Error('Signed URL failed: ' + res.status);
+    const { signedURL } = await res.json();
+    window.open(_mwSupaURL() + signedURL, '_blank');
+  } catch(e) {
+    console.error('[Attachment] signed URL error:', e);
+    compassToast('Could not open file — ' + e.message, 3000);
+  }
+};
 
 window.myrToggleReq = function(id) {
   const el = document.getElementById(id);
