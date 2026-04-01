@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-220004
-console.log('%c[cdn-form-editor] v20260401-220004','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-221001
+console.log('%c[cdn-form-editor] v20260401-221001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2348,7 +2348,7 @@ function _formLifecycleButtons(f) {
     btns.push(`<button onclick="_formApproveAndRelease()"
       style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
              color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
-      ✓ Approve & Release</button>`);
+      ✓ Approve</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('approval')"
       style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✗ Reject</button>`);
   }
@@ -2992,8 +2992,8 @@ async function _formApproveReview() {
 async function _formApproveAndRelease() {
   if (!_selectedForm) return;
   const cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-  const fmt    = cat?.version_format || 'semver';
-  const newVer = _formBumpVersion(_selectedForm.version, fmt, 'minor');
+  // Version is NOT bumped on Approve — it bumps on Release
+  const newVer = _selectedForm.version || '0.1.0';
 
   // Show professional approval dialog instead of prompt()
   _formShowApproveReleaseModal({ form: _selectedForm, newVer, onSubmit: _formDoApproveAndRelease });
@@ -3016,11 +3016,11 @@ function _formShowApproveReleaseModal({ form, newVer, onSubmit }) {
         display:flex;align-items:flex-start;gap:12px">
         <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;
           background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.3);
-          display:flex;align-items:center;justify-content:center;font-size:18px">✓</div>
+          display:flex;align-items:center;justify-content:center;font-size:18px">★</div>
         <div style="flex:1">
-          <div style="font-size:16px;font-weight:700;color:var(--text)">Approve & Release</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">Approve</div>
           <div style="font-size:13px;color:var(--muted);margin-top:2px">
-            ${escHtml(form.source_name)} · releasing as <strong style="color:var(--green)">${escHtml(newVer)}</strong>
+            ${escHtml(form.source_name)} · <span style="color:var(--green)">v${escHtml(form.version||'0.1.0')}</span>
           </div>
         </div>
         <button onclick="document.getElementById('cad-approve-modal')?.remove()"
@@ -3046,8 +3046,8 @@ function _formShowApproveReleaseModal({ form, newVer, onSubmit }) {
         <div style="margin-top:12px;padding:10px 12px;background:var(--surf2);border-radius:6px;
           border-left:3px solid var(--green)">
           <div style="font-size:12px;color:var(--text2);line-height:1.6">
-            This form will be marked <strong>Approved</strong> and can then be
-            <strong>Released</strong> for use in workflows. This action is recorded
+            This form will be marked <strong>Approved</strong>. The editor can then
+            <strong>Release</strong> it for use in workflows. This action is recorded
             in the Chain of Custody.
           </div>
         </div>
@@ -3073,7 +3073,7 @@ function _formShowApproveReleaseModal({ form, newVer, onSubmit }) {
             border:none;color:white;cursor:pointer;font-size:14px;font-weight:700;
             font-family:Arial,sans-serif;transition:opacity .12s"
           onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-          ✓ Approve & Release
+          ✓ Approve
         </button>
       </div>
     </div>`;
@@ -3478,6 +3478,11 @@ async function _formDoReleaseFinal(note) {
     f.state === 'released' &&
     f.source_name === _selectedForm.source_name
   );
+  // Bump version on Release — this is when the form officially becomes a new published version
+  const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+  const _fmt    = _cat?.version_format || 'semver';
+  const _oldVer = _selectedForm.version;
+  _selectedForm.version     = _formBumpVersion(_oldVer, _fmt, 'minor');
   _selectedForm.state       = 'released';
   _selectedForm.released_at = new Date().toISOString();
   await _formSave();
