@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-193000
-console.log('%c[cdn-form-editor] v20260401-193000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-194000
+console.log('%c[cdn-form-editor] v20260401-194000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2903,8 +2903,12 @@ async function _formDoSubmitForReview({ reviewers, approver }) {
 
 async function _formApproveReview() {
   if (!_selectedForm) return;
-  const userId = window.CURRENT_USER?.id || 'current_user';
-  _selectedForm.reviewed_by = [...(_selectedForm.reviewed_by||[]), userId];
+  const userId     = window.CURRENT_USER?.id     || 'current_user';
+  const resourceId = window.CURRENT_USER?.resource_id || userId;
+  // Store both user_id and resource_id so panel can match either
+  const toAdd = [userId, resourceId].filter(Boolean);
+  const existing = _selectedForm.reviewed_by || [];
+  _selectedForm.reviewed_by = [...new Set([...existing, ...toAdd])];
   const allReviewed = (_selectedForm.pending_reviewer_ids||[]).every(id =>
     (_selectedForm.reviewed_by||[]).includes(id)
   ) || (_selectedForm.pending_reviewer_ids||[]).length === 0;
@@ -4674,8 +4678,19 @@ async function _formShowPreviewHistoryPanel() {
        font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
        color:var(--muted);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
 
-  // ── 1. WORKFLOW DAG ────────────────────────────────────────────────────────
-  // Left-edge drag handle — reuses _formColDragStart infrastructure
+  // ── Build all content HTML first, then set once (avoids innerHTML += destroying appended nodes)
+  panel.innerHTML =
+    sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 16px 8px;flex-shrink:0"></div>` +
+    sectionHdr('Activity') +
+    `<div id="fph-activity" style="padding:0;flex-shrink:0">
+       <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
+     </div>` +
+    sectionHdr('Comments') +
+    `<div id="fph-comments" style="padding:0;flex:1">
+       <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
+     </div>`;
+
+  // ── Drag handle: append AFTER innerHTML set so it isn't wiped ─────────────
   const dragHandle = document.createElement('div');
   dragHandle.style.cssText = [
     'position:absolute;left:0;top:0;bottom:0;width:6px',
@@ -4685,20 +4700,6 @@ async function _formShowPreviewHistoryPanel() {
   dragHandle.addEventListener('mouseout',   () => { if (!window._formDragCol) dragHandle.style.background = 'transparent'; });
   dragHandle.addEventListener('mousedown',  (e) => _formColDragStart(e, 'form-preview-history-panel', 'left'));
   panel.appendChild(dragHandle);
-
-  panel.innerHTML += sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 16px 8px;flex-shrink:0"></div>`;
-
-  // ── 2. ACTIVITY TABLE placeholder ─────────────────────────────────────────
-  panel.innerHTML += sectionHdr('Activity') +
-    `<div id="fph-activity" style="padding:0;flex-shrink:0">
-       <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
-     </div>`;
-
-  // ── 3. COMMENTS placeholder ────────────────────────────────────────────────
-  panel.innerHTML += sectionHdr('Comments') +
-    `<div id="fph-comments" style="padding:0;flex:1">
-       <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
-     </div>`;
 
   // Render DAG immediately (no async needed — state is known)
   _fphRenderDag(state);
@@ -5088,17 +5089,20 @@ function _formRefreshRolePanel() {
     reviewerIds.forEach(rid => {
       const p   = people[rid] || { name:rid, email:'' };
       const ini = p.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      const hasReviewed = reviewedBy.includes(rid);
+      // hasReviewed: true if their id is in reviewed_by OR state has moved past in_review
+      const hasReviewed = reviewedBy.includes(rid)
+        || ['reviewed','approved','released'].includes(state);
+      const isActiveReviewer = isInReview && !reviewedBy.includes(rid);
       const lbl = hasReviewed ? 'Approved'
-        : isInReview ? 'Reviewing'
+        : isActiveReviewer ? 'Reviewing'
         : state === 'rejected_review' ? 'Rejected'
         : 'Pending';
       const col = hasReviewed ? 'var(--green)'
-        : isInReview ? 'var(--cad)'
+        : isActiveReviewer ? 'var(--cad)'
         : state === 'rejected_review' ? 'var(--red)'
         : 'var(--muted)';
       html += personRow({ ini, name:p.name, role:'Reviewer',
-        roleColor:'var(--cad)', isActive:isInReview && !hasReviewed,
+        roleColor:'var(--cad)', isActive:isActiveReviewer,
         statusLabel:lbl, statusColor:col });
     });
   }
