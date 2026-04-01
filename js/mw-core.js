@@ -1,3 +1,6 @@
+// VERSION: 20260402-100000
+console.log('%c[mw-core] v20260402-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
   if (!s) return '';

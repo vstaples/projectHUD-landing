@@ -1,3 +1,6 @@
+// VERSION: 20260402-100000
+console.log('%c[mw-events] v20260402-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+
 // ── CSS for inline panels ─────────────────────────────────
 (function() {
   if (document.getElementById('f1-style')) return;

@@ -1,6 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
+// VERSION: 20260402-100000
 // ══════════════════════════════════════════════════════════
+console.log('%c[mw-tabs] v20260402-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -733,6 +735,7 @@ window.loadUserRequests = async function() {
   const resId = window._myResource?.id;
   if (!resId) {
     // _myResource not yet resolved — wait up to 3s then retry
+    console.log('[MyRequests] _myResource not ready, waiting...');
     let waited = 0;
     await new Promise(resolve => {
       const poll = setInterval(() => {
@@ -746,6 +749,7 @@ window.loadUserRequests = async function() {
   }
 
   const resolvedResId = window._myResource?.id;
+  console.log('[MyRequests] loadUserRequests firing | resId:', resolvedResId || 'STILL UNDEFINED');
   if (resolvedResId) {
     try {
       const rows = await API.get(
@@ -753,6 +757,7 @@ window.loadUserRequests = async function() {
         `&order=created_at.desc&limit=100` +
         `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
       ).catch(() => []);
+      console.log('[MyRequests] query returned', (rows||[]).length, 'rows');
 
       // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
       const _STEP_LABELS = {
