@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-214000
-console.log('%c[cdn-form-editor] v20260401-214000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-217000
+console.log('%c[cdn-form-editor] v20260401-217000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -153,7 +153,7 @@ function _railBtn(active = false) {
     'font-size:20px;font-family:Arial,sans-serif;transition:all .12s',
     active
       ? 'background:var(--cad);color:var(--bg)'
-      : 'background:transparent;color:var(--muted)'
+      : 'background:transparent;color:var(--text1)'
   ].join(';');
 }
 
@@ -244,11 +244,19 @@ function _formStateLabel(state) {
 }
 
 function _formStateColor(state) {
-  return { draft:'var(--muted)', unreleased:'var(--amber)',
-           in_review:'var(--accent)', reviewed:'var(--cad)',
-           approved:'var(--green)', released:'var(--green)',
-           archived:'var(--muted)', rejected_review:'var(--red)',
-           rejected_approval:'var(--red)', rejected_release:'var(--red)' }[state] || 'var(--muted)';
+  // All colors are bright/vivid — no muted/dark values for legibility
+  return {
+    draft:              '#a8b4c8',
+    unreleased:         '#f0a030',
+    in_review:          '#60a5fa',
+    reviewed:           '#f0a030',
+    approved:           '#4ade80',
+    released:           '#4ade80',
+    archived:           '#a8b4c8',
+    rejected_review:    '#f87171',
+    rejected_approval:  '#f87171',
+    rejected_release:   '#f87171',
+  }[state] || '#a8b4c8';
 }
 
 function renderFormsTab(el) {
@@ -335,7 +343,7 @@ function _renderFormList() {
             color:${{ in_review:'var(--accent)', reviewed:'var(--cad)',
               approved:'var(--green)', released:'var(--green)',
               archived:'var(--muted)', unreleased:'var(--amber)',
-              rejected_review:'var(--red)', rejected_approval:'var(--red)', rejected_release:'var(--red)' }[f.state]||'var(--muted)'}"
+              rejected_review:'#f87171', rejected_approval:'#f87171', rejected_release:'#f87171' }[f.state]||'var(--muted)'}"
           >${{ in_review:'● In Review', reviewed:'● Awaiting Approval', approved:'✓ Approved',
                released:'✓ Released', archived:'Archived', unreleased:'Unreleased',
                rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected', rejected_release:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
@@ -2323,7 +2331,7 @@ function _formLifecycleButtons(f) {
         style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
     } else {
       btns.push(`<button onclick="_formReleaseDirectly()"
-        style="font-size:13px;padding:4px 16px;border-radius:999px;background:var(--green);
+        style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
                color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
         ✓ Release</button>`);
     }
@@ -2334,27 +2342,27 @@ function _formLifecycleButtons(f) {
       padding:3px 8px;background:rgba(79,142,247,.1);border-radius:4px">● In Review</span>`);
     // Editor-side simulate approve (for testing / admin override)
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formApproveReview()"
-      style="font-size:12px;color:var(--green)">✓ Mark Reviewed</button>`);
+      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.4);color:#4ade80;cursor:pointer;font-family:Arial,sans-serif">✓ Mark Reviewed</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('review')"
-      style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif">✗ Reject</button>`);
   }
 
   if (state === 'reviewed') {
     btns.push(`<span style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif;
       padding:3px 8px;background:rgba(196,125,24,.1);border-radius:4px">● Awaiting Approval</span>`);
     btns.push(`<button onclick="_formApproveAndRelease()"
-      style="font-size:13px;padding:4px 16px;border-radius:999px;background:var(--green);
+      style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
              color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
       ✓ Approve & Release</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('approval')"
-      style="font-size:12px;color:var(--red)">✗ Reject</button>`);
+      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif">✗ Reject</button>`);
   }
 
   if (state === 'approved') {
     btns.push(`<span style="font-size:12px;color:var(--green);font-family:Arial,sans-serif;
       padding:3px 8px;background:rgba(42,157,64,.1);border-radius:4px">✓ Approved</span>`);
     btns.push(`<button onclick="_formReleaseFinal()"
-      style="font-size:13px;padding:4px 16px;border-radius:999px;background:var(--green);
+      style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
              color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
       ↑ Release</button>`);
   }
@@ -4992,7 +5000,7 @@ async function _formShowPreviewHistoryPanel() {
   // ── Build all content HTML first, then set once (avoids innerHTML += destroying appended nodes)
   panel.innerHTML =
     sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 16px 8px;flex-shrink:0"></div>` +
-    sectionHdr('Activity') +
+    `<div style="height:1px;background:var(--border);flex-shrink:0"></div>` +
     `<div id="fph-activity" style="padding:0;flex-shrink:0">
        <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
      </div>` +
@@ -5296,24 +5304,61 @@ function _fphRenderActivity(rows) {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   };
 
+  // Derive role from event_type
+  const roleFromEvent = (evt) => {
+    if (!evt) return '—';
+    if (evt.includes('approved') || evt.includes('approval')) return 'Approver';
+    if (evt.includes('review'))   return 'Reviewer';
+    if (evt.includes('released') || evt.includes('release')) return 'Editor';
+    if (evt.includes('reject'))   return evt.includes('approval') ? 'Approver' : 'Reviewer';
+    return 'Editor';
+  };
+  // Better: use metadata.stage or metadata.role if stored
+  const roleFromRow = (r) => {
+    const stage = r.metadata?.stage || r.metadata?.role;
+    if (stage === 'approver' || stage === 'approval') return 'Approver';
+    if (stage === 'reviewer' || stage === 'review')   return 'Reviewer';
+    if (stage === 'release')                           return 'Editor';
+    if (r.actor_name === 'System' || !r.actor_name)   return 'System';
+    return roleFromEvent(r.event_type);
+  };
+
+  const roleColor = (role) => ({
+    'Editor':   '#60a5fa',
+    'Reviewer': '#f0a030',
+    'Approver': '#4ade80',
+    'System':   'var(--muted)',
+  })[role] || 'var(--muted)';
+
+  const th = (label) =>
+    `<th style="padding:6px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;
+      text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      border-bottom:1px solid var(--border);white-space:nowrap">${label}</th>`;
+
+  const td = (content, color='var(--text1)', extra='') =>
+    `<td style="padding:6px 8px;font-size:13px;color:${color};font-family:Arial,sans-serif;
+      border-bottom:1px solid var(--border);${extra}">${content}</td>`;
+
   const tableRows = rows.map(r => {
-    const color = evtColor[r.event_type] || 'var(--text2)';
-    const label = evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—';
-    const who   = r.actor_name || r.actor_id || 'System';
+    const color  = evtColor[r.event_type] || 'var(--text2)';
+    const label  = evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—';
+    const who    = r.actor_name || r.actor_id || 'System';
+    const role   = roleFromRow(r);
+    const rColor = roleColor(role);
     return `<tr>
-      <td style="padding:5px 8px;font-size:13px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif;border-bottom:1px solid var(--border)">${fmt(r.created_at)}</td>
-      <td style="padding:5px 8px;font-size:13px;color:var(--text1);font-family:Arial,sans-serif;border-bottom:1px solid var(--border);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(who)}</td>
-      <td style="padding:5px 8px;font-size:13px;color:${color};font-family:Arial,sans-serif;border-bottom:1px solid var(--border);font-weight:600">${escHtml(label)}</td>
+      ${td(fmt(r.created_at), 'var(--muted)', 'white-space:nowrap')}
+      ${td(escHtml(who), 'var(--text1)', 'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+      ${td(`<span style="padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;
+        background:${rColor}18;border:1px solid ${rColor}44;color:${rColor}">${role}</span>`, 'inherit')}
+      ${td(escHtml(label), color, 'font-weight:600')}
     </tr>`;
   }).join('');
 
-  el.innerHTML = `<div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+  el.innerHTML = `<div style="overflow-x:auto;max-height:220px;overflow-y:auto">
     <table style="width:100%;border-collapse:collapse">
       <thead>
-        <tr style="background:var(--bg2)">
-          <th style="padding:5px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Date/Time</th>
-          <th style="padding:5px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Person</th>
-          <th style="padding:5px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Action</th>
+        <tr style="background:var(--bg2);position:sticky;top:0">
+          ${th('Date/Time')}${th('Person')}${th('Role')}${th('Action')}
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -5454,7 +5499,7 @@ function _formRefreshRolePanel() {
   const isReviewed     = state === 'reviewed';
   const isApproved     = state === 'approved';
   const isReleased     = state === 'released';
-  const isEditorActive = ['draft','unreleased','rejected_review','rejected_approval'].includes(state);
+  const isEditorActive = ['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(state);
 
   const editorName = window.CURRENT_USER?.name || window.CURRENT_USER?.email || 'Editor';
   const editorIni  = editorName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
@@ -5483,9 +5528,14 @@ function _formRefreshRolePanel() {
 
   const divider = `<div style="height:1px;background:var(--border);margin:2px 0"></div>`;
 
-  const editorDot = isEditorActive ? 'var(--accent)' : 'var(--green)';
-  const editorLbl = isEditorActive ? (state === 'draft' ? 'Drafting' : 'Revising') :
-                    isReleased ? 'Released' : 'Complete';
+  const editorDot = isEditorActive ? '#60a5fa' : '#4ade80';
+  const editorLbl = !isEditorActive
+    ? (isReleased ? 'Released' : 'Complete')
+    : state === 'draft'             ? 'Drafting'
+    : state === 'rejected_release'  ? 'Revising — Release Rejected'
+    : state === 'rejected_review'   ? 'Revising — Review Rejected'
+    : state === 'rejected_approval' ? 'Revising — Approval Rejected'
+    : 'Revising';
 
   let html = `
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
@@ -5541,9 +5591,16 @@ function _formRefreshRolePanel() {
   html += `</div>
     <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0">
       <button onclick="_formTogglePreview()"
-        style="font-size:14px;padding:8px 0;border-radius:6px;background:transparent;
-               border:1px solid var(--border);color:var(--muted);cursor:pointer;
-               font-family:Arial,sans-serif;width:100%">✕ Exit Preview</button>
+        style="font-size:14px;padding:8px 16px;border-radius:999px;
+               background:rgba(255,255,255,.07);
+               border:1px solid rgba(255,255,255,.3);
+               color:var(--text);cursor:pointer;font-weight:600;
+               font-family:Arial,sans-serif;width:100%;
+               transition:all .15s"
+        onmouseover="this.style.background='rgba(255,255,255,.14)'"
+        onmouseout="this.style.background='rgba(255,255,255,.07)'">
+        ✕ Exit Preview
+      </button>
     </div>`;
 
   panel.innerHTML = html;

@@ -1,41 +1,39 @@
 {
-  "redirects": [
-    {
-      "source": "/favicon.ico",
-      "destination": "/favicon.svg",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
-      "source": "/api/ai-form-vision",
-      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/ai-form-vision"
+      "source": "/api/notify-form-review",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/notify-form-review"
     },
     {
-      "source": "/api/ai-briefing",
-      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/ai-briefing"
-    },
-    {
-      "source": "/api/ai-draft",
-      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/ai-draft"
-    },
-    {
-      "source": "/api/notify-step-activated",
-      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/notify-step-activated"
+      "source": "/api/process-form-decision",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/process-form-decision"
     }
   ],
   "headers": [
     {
-      "source": "/favicon.svg",
+      "source": "/(.*)\\.html",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400" },
-        { "key": "Content-Type",  "value": "image/svg+xml" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        }
       ]
     },
     {
-      "source": "/js/(.*)\\.js",
+      "source": "/js/:file*",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=86400" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        }
       ]
     }
   ]
