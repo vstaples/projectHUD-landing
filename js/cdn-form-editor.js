@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-213000
-console.log('%c[cdn-form-editor] v20260401-213000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-214000
+console.log('%c[cdn-form-editor] v20260401-214000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -5136,27 +5136,37 @@ function _fphRenderDag(currentState) {
     const isReleasedRejected = n.id === 'released' &&
       (currentState === 'unreleased' || isRejected);
 
+    // Draft is "ready" (blue) when form has been rejected and needs revision
+    const isDraftReady = n.id === 'draft' && isRejected;
+
     // Color logic
-    const accent = isActive    ? activeColor
+    const accent = isActive       ? activeColor
+                 : isDraftReady   ? '#4f8ef7'        // blue = ready to edit
                  : isReleasedRejected ? '#dc2626'
-                 : isDone      ? '#2a9d40'
+                 : isDone         ? '#2a9d40'
                  : '#3a3f52';
 
-    const fillCol = isActive    ? `${activeColor}28`
+    const fillCol = isActive       ? `${activeColor}28`
+                  : isDraftReady   ? 'rgba(79,142,247,.15)'
                   : isReleasedRejected ? 'rgba(220,38,38,.12)'
-                  : isDone      ? 'rgba(42,157,64,.12)'
+                  : isDone         ? 'rgba(42,157,64,.12)'
                   : '#1a1f2e';
 
-    const textCol = isActive || isDone ? '#f0f0f0'
+    const textCol = isActive || isDone || isDraftReady ? '#f0f0f0'
                   : isReleasedRejected ? '#f87171'
                   : '#666';
 
-    const sw = isActive || isReleasedRejected ? 2 : isDone ? 1.5 : 1;
+    const sw = isActive || isReleasedRejected || isDraftReady ? 2 : isDone ? 1.5 : 1;
 
     // ── Glow ring around active node ─────────────────────────────────────────
-    if (isActive) {
+    // For rejected states, pulse on Draft (ready to edit), not the rejected node
+    const isDraftNode   = n.id === 'draft';
+    const glowOnDraft   = isRejected && isDraftNode;
+    const glowOnActive  = isActive && !isRejected;
+    if (glowOnActive || glowOnDraft) {
+      const glowColor = glowOnDraft ? '#4f8ef7' : activeColor;
       svg += `<circle cx="${cx}" cy="${cy}" r="${nodeH/2 + 6}"
-        fill="none" stroke="${activeColor}" stroke-width="2" opacity="0.55"
+        fill="none" stroke="${glowColor}" stroke-width="2" opacity="0.55"
         class="dag-pulse"/>`;
     }
 
@@ -5203,7 +5213,13 @@ function _fphRenderDag(currentState) {
     const midX   = (srcX + dstX) / 2;
     svg += `<path d="M${srcX},${nodeY + nodeH} C${srcX},${arcY} ${dstX},${arcY} ${dstX},${nodeY + nodeH}"
       fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3"
-      marker-end="url(#arrR)"/>`;
+      marker-start="url(#arrR)"/>`;
+    // ▼ triangle inside the rejected node pointing down toward the arc
+    svg += `<polygon points="${srcX - 7},${nodeY + nodeH - 14} ${srcX + 7},${nodeY + nodeH - 14} ${srcX},${nodeY + nodeH - 2}"
+      fill="#dc2626" opacity="0.9"/>`;
+    // ▲ triangle inside Draft pointing up (destination)
+    svg += `<polygon points="${dstX - 7},${nodeY + nodeH - 2} ${dstX + 7},${nodeY + nodeH - 2} ${dstX},${nodeY + nodeH - 14}"
+      fill="#4f8ef7" opacity="0.9"/>`;
     const label = currentState === 'rejected_review' ? 'Review Rejected' : currentState === 'rejected_release' ? 'Release Rejected' : 'Approval Rejected';
     svg += `<text x="${midX}" y="${arcY + 18}" text-anchor="middle"
       font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">${label}</text>`;
@@ -5285,9 +5301,9 @@ function _fphRenderActivity(rows) {
     const label = evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—';
     const who   = r.actor_name || r.actor_id || 'System';
     return `<tr>
-      <td style="padding:5px 8px;font-size:11px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif;border-bottom:1px solid var(--border)">${fmt(r.created_at)}</td>
-      <td style="padding:5px 8px;font-size:11px;color:var(--text1);font-family:Arial,sans-serif;border-bottom:1px solid var(--border);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(who)}</td>
-      <td style="padding:5px 8px;font-size:11px;color:${color};font-family:Arial,sans-serif;border-bottom:1px solid var(--border);font-weight:600">${escHtml(label)}</td>
+      <td style="padding:5px 8px;font-size:13px;color:var(--muted);white-space:nowrap;font-family:Arial,sans-serif;border-bottom:1px solid var(--border)">${fmt(r.created_at)}</td>
+      <td style="padding:5px 8px;font-size:13px;color:var(--text1);font-family:Arial,sans-serif;border-bottom:1px solid var(--border);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(who)}</td>
+      <td style="padding:5px 8px;font-size:13px;color:${color};font-family:Arial,sans-serif;border-bottom:1px solid var(--border);font-weight:600">${escHtml(label)}</td>
     </tr>`;
   }).join('');
 
@@ -5364,12 +5380,12 @@ function _fphRenderComments(rows) {
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
         <div style="width:24px;height:24px;border-radius:50%;background:var(--surf3);
           display:flex;align-items:center;justify-content:center;
-          font-size:10px;font-weight:700;color:var(--text);flex-shrink:0">${escHtml(ini)}</div>
+          font-size:13px;font-weight:700;color:var(--text);flex-shrink:0">${escHtml(ini)}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">${escHtml(who)}</div>
           <div style="font-size:13px;color:var(--muted);font-family:Arial,sans-serif">${fmt(r.created_at)}</div>
         </div>
-        <span style="font-size:10px;font-weight:700;color:${color};
+        <span style="font-size:13px;font-weight:700;color:${color};
           font-family:Arial,sans-serif;flex-shrink:0">${badge}</span>
       </div>
       <div style="font-size:14px;color:var(--text1);line-height:1.6;font-family:Arial,sans-serif;
@@ -5444,24 +5460,24 @@ function _formRefreshRolePanel() {
   const editorIni  = editorName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
 
   const personRow = ({ ini, name, role, roleColor, statusLabel, statusColor, isActive }) => `
-    <div style="padding:10px 12px;
+    <div style="padding:12px 14px;
       background:${isActive ? 'var(--surf2)' : 'transparent'};
       border-left:3px solid ${isActive ? roleColor : 'transparent'}">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;
-          background:${roleColor}22;border:1.5px solid ${roleColor};
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
+          background:${roleColor}22;border:2px solid ${roleColor};
           display:flex;align-items:center;justify-content:center;
-          font-size:11px;font-weight:700;color:${roleColor}">${ini}</div>
+          font-size:13px;font-weight:700;color:${roleColor}">${ini}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:${isActive?'700':'500'};
+          <div style="font-size:15px;font-weight:${isActive?'700':'500'};
             color:${isActive?'var(--text)':'var(--text1)'};
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</div>
-          <div style="font-size:10px;color:var(--muted)">${escHtml(role)}</div>
+          <div style="font-size:13px;color:var(--muted);font-family:Arial,sans-serif">${escHtml(role)}</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;padding-left:36px">
-        <div style="width:6px;height:6px;border-radius:50%;background:${statusColor};flex-shrink:0"></div>
-        <span style="font-size:11px;color:${statusColor};font-weight:600">${statusLabel}</span>
+      <div style="display:flex;align-items:center;gap:6px;padding-left:46px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0"></div>
+        <span style="font-size:14px;color:${statusColor};font-weight:600;font-family:Arial,sans-serif">${statusLabel}</span>
       </div>
     </div>`;
 
@@ -5473,8 +5489,8 @@ function _formRefreshRolePanel() {
 
   let html = `
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-size:12px;font-weight:700;color:var(--text);letter-spacing:.06em;
-        text-transform:uppercase">Approval Process</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);letter-spacing:.06em;
+        text-transform:uppercase;font-family:Arial,sans-serif">Approval Process</div>
     </div>
     <div style="flex:1;overflow-y:auto">`;
 
@@ -5525,7 +5541,7 @@ function _formRefreshRolePanel() {
   html += `</div>
     <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0">
       <button onclick="_formTogglePreview()"
-        style="font-size:13px;padding:7px 0;border-radius:6px;background:transparent;
+        style="font-size:14px;padding:8px 0;border-radius:6px;background:transparent;
                border:1px solid var(--border);color:var(--muted);cursor:pointer;
                font-family:Arial,sans-serif;width:100%">✕ Exit Preview</button>
     </div>`;
