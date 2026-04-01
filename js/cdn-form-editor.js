@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-211000
-console.log('%c[cdn-form-editor] v20260401-211000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-212000
+console.log('%c[cdn-form-editor] v20260401-212000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4979,9 +4979,9 @@ async function _formShowPreviewHistoryPanel() {
 
   // ── Section header helper ──────────────────────────────────────────────────
   const sectionHdr = (title) =>
-    `<div style="padding:9px 14px 7px;border-bottom:1px solid var(--border);
-       font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-       color:var(--muted);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
+    `<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border);
+       font-size:13px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+       color:var(--text);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
 
   // ── Build all content HTML first, then set once (avoids innerHTML += destroying appended nodes)
   panel.innerHTML =
@@ -5076,8 +5076,8 @@ function _fphRenderDag(currentState) {
   const nodeH    = 64, nodeR = 8;
   const totalW   = 5 * nodeW + 4 * colGap;
   const startX   = (panelW - totalW) / 2;
-  const nodeY    = isUnreleased ? 60 : 40;
-  const svgH     = isRejected ? 210 : isUnreleased ? 180 : 148;
+  const nodeY    = isUnreleased ? 72 : 40;  // extra top room for unrelease arc + label
+  const svgH     = isRejected ? 210 : 148;  // unreleased uses top room via nodeY
 
   // ── SVG open + animation defs ──────────────────────────────────────────────
   let svg = `<svg viewBox="0 0 ${panelW} ${svgH}" width="${panelW}" height="${svgH}"
@@ -5202,21 +5202,14 @@ function _fphRenderDag(currentState) {
       font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">${label}</text>`;
   }
 
-  // ── Release-stage rejection arc (BELOW) — unreleased state ─────────────────
-  // When a form is rejected at the Release gate it returns to unreleased/draft
+  // ── Unrelease arc (TOP ONLY) ─────────────────────────────────────────────────
+  // unreleased = form was brought back from Released for revision (deliberate or gate-rejected)
+  // Either way: show amber arc ABOVE returning from Released to Draft
   if (isUnreleased) {
-    const arcYBot = nodeY + nodeH + 32;
+    const arcYTop = nodeY - 38;
     const srcX    = startX + 4 * (nodeW + colGap) + nodeW / 2;  // Released center
     const dstX    = startX + nodeW / 2;                          // Draft center
     const midX    = (srcX + dstX) / 2;
-    // Bottom arc: release-gate rejection → back to Draft
-    svg += `<path d="M${srcX},${nodeY + nodeH} C${srcX},${arcYBot} ${dstX},${arcYBot} ${dstX},${nodeY + nodeH}"
-      fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3"
-      marker-end="url(#arrR)"/>`;
-    svg += `<text x="${midX}" y="${arcYBot + 18}" text-anchor="middle"
-      font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">Release Rejected</text>`;
-    // Top arc: the deliberate unrelease path (evolutionary change)
-    const arcYTop = nodeY - 36;
     svg += `<path d="M${srcX},${nodeY} C${srcX},${arcYTop} ${dstX},${arcYTop} ${dstX},${nodeY}"
       fill="none" stroke="#c47d18" stroke-width="2" stroke-dasharray="6,3"
       marker-end="url(#arrA)"/>`;
@@ -5225,14 +5218,15 @@ function _fphRenderDag(currentState) {
   }
 
   // ── State label ─────────────────────────────────────────────────────────────
-  const stateLabel = _formStateLabel(currentState);
-  const stateColor = _formStateColor(currentState);
-  const labelY     = isRejected || isUnreleased
-    ? nodeY + nodeH + 82
-    : nodeY + nodeH + 20;
-  svg += `<text x="${panelW/2}" y="${labelY}"
-    text-anchor="middle" font-size="13" font-weight="700"
-    fill="${stateColor}" font-family="Arial,sans-serif">${stateLabel}</text>`;
+  // State label below — skip for unreleased (arc label already communicates it)
+  if (!isUnreleased) {
+    const stateLabel = _formStateLabel(currentState);
+    const stateColor = _formStateColor(currentState);
+    const labelY     = isRejected ? nodeY + nodeH + 82 : nodeY + nodeH + 20;
+    svg += `<text x="${panelW/2}" y="${labelY}"
+      text-anchor="middle" font-size="13" font-weight="700"
+      fill="${stateColor}" font-family="Arial,sans-serif">${stateLabel}</text>`;
+  }
 
   svg += '</svg>';
   el.innerHTML = svg;
@@ -5294,9 +5288,9 @@ function _fphRenderActivity(rows) {
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:var(--bg2)">
-          <th style="padding:5px 8px;font-size:10px;color:var(--muted);font-family:Arial,sans-serif;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Date/Time</th>
-          <th style="padding:5px 8px;font-size:10px;color:var(--muted);font-family:Arial,sans-serif;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Person</th>
-          <th style="padding:5px 8px;font-size:10px;color:var(--muted);font-family:Arial,sans-serif;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Action</th>
+          <th style="padding:5px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Date/Time</th>
+          <th style="padding:5px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Person</th>
+          <th style="padding:5px 8px;font-size:12px;color:var(--text);font-family:Arial,sans-serif;text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border)">Action</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -5365,14 +5359,14 @@ function _fphRenderComments(rows) {
           display:flex;align-items:center;justify-content:center;
           font-size:10px;font-weight:700;color:var(--text);flex-shrink:0">${escHtml(ini)}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">${escHtml(who)}</div>
-          <div style="font-size:10px;color:var(--muted);font-family:Arial,sans-serif">${fmt(r.created_at)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">${escHtml(who)}</div>
+          <div style="font-size:13px;color:var(--muted);font-family:Arial,sans-serif">${fmt(r.created_at)}</div>
         </div>
         <span style="font-size:10px;font-weight:700;color:${color};
           font-family:Arial,sans-serif;flex-shrink:0">${badge}</span>
       </div>
-      <div style="font-size:12px;color:var(--text1);line-height:1.6;font-family:Arial,sans-serif;
-        padding:6px 8px;background:var(--surf2);border-radius:4px;
+      <div style="font-size:14px;color:var(--text1);line-height:1.6;font-family:Arial,sans-serif;
+        padding:8px 10px;background:var(--surf2);border-radius:4px;
         border-left:3px solid ${color}">
         ${escHtml(text)}
       </div>
