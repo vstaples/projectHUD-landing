@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-229002
-console.log('%c[cdn-form-editor] v20260401-229002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-230000
+console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -346,7 +346,7 @@ function _renderFormList() {
               archived:'var(--muted)', unreleased:'var(--amber)',
               rejected_review:'#f87171', rejected_approval:'#f87171', rejected_release:'#f87171' }[f.state]||'var(--muted)'}"
           >${{ in_review:'● In Review', reviewed:'● Awaiting Approval', approved:'✓ Approved',
-               released:'✓ Released', archived:'Archived', unreleased:'Unreleased',
+               released:'🔒 Released', archived:'Archived', unreleased:'Unreleased',
                rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected', rejected_release:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
         </div>
       </div>`;
@@ -3604,12 +3604,54 @@ async function _formCancelRevision() {
   parts[2] = 0;
   const restoredVer = parts.join('.');
 
-  const confirmed = confirm(
-    `Cancel revision of "${_selectedForm.source_name}"?\n\n` +
-    `Version ${currentVer} will be discarded.\n` +
-    `Form returns to Released at version ${restoredVer}.\n\n` +
-    `Any changes made during this revision will be lost.`
-  );
+  // Professional modal — no browser confirm()
+  const confirmed = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;
+      display:flex;align-items:center;justify-content:center;`;
+    overlay.innerHTML = `
+      <div style="background:var(--bg1);border:1px solid var(--border);border-radius:12px;
+                  padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.5);
+                  font-family:Arial,sans-serif;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+          <span style="width:36px;height:36px;border-radius:50%;background:rgba(248,113,113,.15);
+                       display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">✕</span>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--fg);">Cancel Revision</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${_selectedForm.source_name}</div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:var(--fg);line-height:1.6;margin-bottom:20px;">
+          <div style="margin-bottom:10px;">This will discard the current revision:</div>
+          <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);
+                      border-radius:6px;padding:10px 14px;margin-bottom:10px;">
+            <span style="color:#f87171;font-weight:600;">Version ${currentVer}</span>
+            <span style="color:var(--muted);"> — will be discarded</span>
+          </div>
+          <div style="background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);
+                      border-radius:6px;padding:10px 14px;">
+            <span style="color:#4f8ef7;font-weight:600;">Version ${restoredVer}</span>
+            <span style="color:var(--muted);"> — will be restored (Released)</span>
+          </div>
+          <div style="margin-top:12px;color:var(--muted);font-size:12px;">
+            Any unsaved changes in this revision will be permanently lost.
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="_cancelRevKeepBtn" style="padding:8px 18px;border-radius:999px;border:1px solid var(--border);
+            background:var(--bg2);color:var(--fg);font-family:Arial,sans-serif;font-size:13px;
+            cursor:pointer;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,.3);">Keep Editing</button>
+          <button id="_cancelRevConfirmBtn" style="padding:8px 18px;border-radius:999px;border:none;
+            background:#f87171;color:#fff;font-family:Arial,sans-serif;font-size:13px;
+            cursor:pointer;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,.4);">✕ Cancel Revision</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelector('#_cancelRevKeepBtn').onclick    = () => cleanup(false);
+    overlay.querySelector('#_cancelRevConfirmBtn').onclick = () => cleanup(true);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
+  });
   if (!confirmed) return;
 
   _formCoCWrite('form.state_changed', _selectedForm.id, {
@@ -5606,9 +5648,9 @@ function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds, hasHistory,
         fill="#f87171" opacity="0.9"/>`;
     }
 
-    // Draft node: ▲ return target triangle when rejected
+    // Draft node: ▼ return target triangle when rejected (tip points DOWN)
     if (n.id === 'draft' && isRejected) {
-      svg += `<polygon points="${cx - 7},${nodeY + nodeH - 2} ${cx + 7},${nodeY + nodeH - 2} ${cx},${nodeY + nodeH - 14}"
+      svg += `<polygon points="${cx - 7},${nodeY + nodeH - 14} ${cx + 7},${nodeY + nodeH - 14} ${cx},${nodeY + nodeH - 2}"
         fill="#4f8ef7" opacity="0.9"/>`;
     }
   });
