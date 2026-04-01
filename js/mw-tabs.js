@@ -1,14 +1,14 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-101700
+// VERSION: 20260402-120200
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-101700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-120200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
 // when loaded from compass.html vs cadence.html. Resolve from any source.
 function _mwSupaURL()      { try { return SUPA_URL;       } catch(_) { return window.SUPA_URL       || 'https://dvbetgdzksatcgdfftbs.supabase.co'; } }
-function _mwSupaKey()      { try { return SUPA_KEY;       } catch(_) { return window.SUPA_KEY       || ''; } }
+function _mwSupaKey()      { try { return SUPA_KEY;       } catch(_) { return window.SUPA_KEY       || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358'; } }
 function _mwStorageBucket(){ try { return STORAGE_BUCKET; } catch(_) { return window.STORAGE_BUCKET || 'workflow-documents'; } }
 function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return window.FIRM_ID        || 'aaaaaaaa-0001-0001-0001-000000000001'; } }
 
@@ -880,7 +880,11 @@ window.loadUserRequests = async function() {
 
         // Count CoC events to determine how many steps actually completed
         const cocEvents = (window._myRequestCoc||{})[r.id] || [];
-        const cocDoneCount = cocEvents.length;
+        // Only step-advancing events count — approved/context/withdrawn don't advance steps
+        const stepEventTypes = ['request.submitted','request.routed','request.reviewed',
+          'request.revision_requested','request.final_review','request.completed'];
+        const cocDoneCount = cocEvents.filter(e => stepEventTypes.includes(e.event_type)).length || 
+          Math.min(cocEvents.length > 0 ? 1 : 0, stepLabels.length);
         const currentIdx = stepLabels.findIndex(s =>
           s.toLowerCase().replace(/\s+/g,'').includes(
             (currentStep||'').toLowerCase().replace(/\s+/g,'').slice(0,5)
@@ -935,11 +939,9 @@ window.loadUserRequests = async function() {
   renderMyRequestsHistory();
 
   // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
-  const activeIds = (window._myRequests||[])
-    .filter(r => r.status !== 'completed' && r.status !== 'rejected')
-    .map(r => r.id).filter(Boolean);
+  const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
   window._myRequestCoc = window._myRequestCoc || {};
-  const unloadedIds = activeIds.filter(id => !window._myRequestCoc[id]);
+  const unloadedIds = allIds.filter(id => !window._myRequestCoc[id]);
   if (unloadedIds.length) {
     API.get(
       `coc_events?entity_id=in.(${unloadedIds.join(',')})&order=occurred_at.asc&select=*`
@@ -1086,12 +1088,13 @@ function renderMyRequestsActive() {
 
   let html = '';
   active.forEach((req, i) => {
-    const statusColor = req.status==='approved'?'#1D9E75': req.status==='awaiting'?'#EF9F27':'#00D2FF';
-    const badgeStyle  = req.status==='approved'?'border:1px solid rgba(29,158,117,.3);color:#1D9E75':
-                        req.status==='awaiting' ?'border:1px solid rgba(239,159,39,.3);color:#EF9F27':
-                                                  'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
+    const isAmber     = req.status==='awaiting' || req.status==='in_progress';
+    const statusColor = req.status==='approved'?'#1D9E75': isAmber?'#EF9F27':'#00D2FF';
+    const badgeStyle  = req.status==='approved'?'border:1px solid rgba(29,158,117,.4);color:#1D9E75':
+                        isAmber?'border:1px solid rgba(239,159,39,.4);color:#EF9F27':
+                                'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
     const badgeLabel  = req.status==='approved'?'Approved':req.status==='awaiting'?'Awaiting response':'In progress';
-    const dotAnim     = req.status==='awaiting'?'animation:myrActivePulse 1.5s infinite':'';
+    const dotAnim     = isAmber?'animation:myrActivePulse 1.5s infinite':'';
 
     // Build CoC event map for this instance: event_type → {actor, time, notes}
     const instCoc = (cocByInstance[req.id] || []);
@@ -1384,11 +1387,13 @@ window.myrOpenAttachment = async function(path) {
       const err = await res.text();
       throw new Error(`${res.status}: ${err}`);
     }
-    const data = await res.json();
-    // Supabase returns { signedUrl: "/storage/v1/..." } — prepend base only if relative
-    const url  = data.signedUrl || data.signedURL || '';
-    if (!url) throw new Error('No signed URL in response');
-    const fullUrl = url.startsWith('http') ? url : `${_mwSupaURL()}${url}`;
+    const data    = await res.json();
+    const signed  = data.signedURL || data.signedUrl || '';
+    if (!signed) throw new Error('No signed URL returned');
+    // Supabase returns /object/sign/... — prepend storage base (not full SUPA_URL)
+    const fullUrl = signed.startsWith('http')
+      ? signed
+      : `${_mwSupaURL()}/storage/v1${signed}`;
     window.open(fullUrl, '_blank');
   } catch(e) {
     console.error('[Attachment] signed URL error:', e);
