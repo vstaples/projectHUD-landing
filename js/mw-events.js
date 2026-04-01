@@ -1,5 +1,5 @@
-// VERSION: 20260402-100200
-console.log('%c[mw-events] v20260402-100200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-100500
+console.log('%c[mw-events] v20260402-100500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS for inline panels ─────────────────────────────────
 (function() {
@@ -553,7 +553,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
   });
 
   const approved   = decision === 'approved';
-  const newStatus  = approved ? 'completed' : 'pending';  // rejected goes back to pending for revision
+  const newStatus  = approved ? 'complete' : 'pending';  // 'complete' is the DB CHECK constraint value
   const eventType  = approved ? 'request.approved' : 'request.changes_requested';
   const stepName   = approved ? 'Approved' : 'Revisions';
 

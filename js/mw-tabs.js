@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100400
+// VERSION: 20260402-100500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-100500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -845,22 +845,24 @@ window.loadUserRequests = async function() {
         const currentIdx = stepLabels.findIndex(s =>
           s.toLowerCase().includes((currentStep||'').toLowerCase().split(' ')[0])
         );
-        const activeIdx = currentIdx >= 0 ? currentIdx : (r.status === 'completed' ? stepLabels.length : 0);
+        const activeIdx = currentIdx >= 0 ? currentIdx : (r.status === 'complete' || r.status === 'completed' ? stepLabels.length : 0);
         const steps = stepLabels.map((label, i) => ({
           label,
-          done:   r.status === 'completed' ? true : i < activeIdx,
-          active: r.status !== 'completed' && i === activeIdx,
+          done:   r.status === 'complete' || r.status === 'completed' ? true : i < activeIdx,
+          active: r.status !== 'complete' && r.status !== 'completed' && i === activeIdx,
         }));
 
         // Map instance status to display status
         const statusMap = {
-          'pending':    'awaiting',
-          'in_progress':'in_progress',
-          'active':     'in_progress',
-          'completed':  'completed',
-          'rejected':   'rejected',
-          'withdrawn':  'rejected',
-          'cancelled':  'rejected',
+          'pending':     'awaiting',
+          'in_progress': 'in_progress',
+          'active':      'in_progress',
+          'complete':    'completed',   // DB canonical value
+          'completed':   'completed',   // legacy / optimistic value
+          'cancelled':   'rejected',
+          'withdrawn':   'rejected',
+          'rejected':    'rejected',
+          'overridden':  'rejected',
         };
 
         return {
