@@ -1,8 +1,15 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-100500
+// VERSION: 20260402-100700
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-100500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-100700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+
+// ── Supabase URL/Key helpers ──────────────────────────────
+// SUPA_URL/SUPA_KEY are defined in config.js but may be block-scoped
+// when loaded from compass.html vs cadence.html. Resolve from any source.
+function _mwSupaURL()      { try { return SUPA_URL;         } catch(_) { return window.SUPA_URL       || 'https://dvbetgdzksatcgdfftbs.supabase.co'; } }
+function _mwSupaKey()      { try { return SUPA_KEY;         } catch(_) { return window.SUPA_KEY       || ''; } }
+function _mwStorageBucket(){ try { return STORAGE_BUCKET;   } catch(_) { return window.STORAGE_BUCKET || 'workflow-documents'; } }
 
 // ── Tab switcher ─────────────────────────────────────────
 let _uActiveTab = 'work';
@@ -1152,7 +1159,7 @@ function renderMyRequestsActive() {
                 ? (a.size/1048576).toFixed(1)+'MB'
                 : (a.size/1024).toFixed(0)+'KB') : '';
               const href = a.url || (a.path
-                ? `${SUPA_URL||''}/storage/v1/object/public/workflow-documents/${a.path}`
+                ? `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${a.path}`
                 : '#');
               return `<a href="${href}" target="_blank" rel="noopener"
                 style="display:flex;align-items:center;gap:6px;padding:4px 8px;
@@ -1356,12 +1363,62 @@ window.myrWithdrawRequest = async function(instanceId) {
   const resId   = _myResource?.id   || null;
   const now     = new Date().toISOString();
 
-  // Confirm
-  const req = (window._myRequests||[]).find(r => r.id === instanceId);
-  const title = req?.title || 'this request';
-
-  // Simple inline confirm — replace with modal if needed
-  if (!window.confirm(`Withdraw "${title}"?\n\nThis will cancel the request and notify the reviewer.`)) return;
+  // Professional confirmation modal — no browser confirm()
+  const confirmed = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;' +
+      'display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.innerHTML = `
+      <div style="background:#0d1b2e;border:1px solid rgba(226,75,74,.3);width:420px;
+                  border-radius:4px;overflow:hidden;font-family:var(--font-head)">
+        <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
+                    display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
+                      background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.3);
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:15px;color:#E24B4A">✕</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#F0F6FF">Withdraw Request</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;
+                        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">
+              ${_esc(title)}
+            </div>
+          </div>
+        </div>
+        <div style="padding:16px 18px">
+          <div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:12px">
+            This will cancel the request and notify the reviewer.
+            Any work already done on this request will be preserved in the Chain of Custody.
+          </div>
+          <div style="background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.2);
+                      border-left:2px solid #E24B4A;padding:8px 12px;
+                      font-size:11px;color:rgba(255,255,255,.4)">
+            This action cannot be undone.
+          </div>
+        </div>
+        <div style="padding:10px 18px 14px;display:flex;gap:8px;justify-content:flex-end;
+                    border-top:1px solid rgba(255,255,255,.06)">
+          <button id="_wdKeepBtn"
+            style="font-family:var(--font-head);font-size:11px;padding:6px 18px;
+                   background:none;border:1px solid rgba(255,255,255,.15);
+                   color:rgba(255,255,255,.5);cursor:pointer;letter-spacing:.06em">
+            Keep Request
+          </button>
+          <button id="_wdConfirmBtn"
+            style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
+                   background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.4);
+                   color:#E24B4A;cursor:pointer;letter-spacing:.06em">
+            ✕ Withdraw
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = result => { overlay.remove(); resolve(result); };
+    overlay.querySelector('#_wdKeepBtn').onclick    = () => cleanup(false);
+    overlay.querySelector('#_wdConfirmBtn').onclick = () => cleanup(true);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
+  });
+  if (!confirmed) return;
 
   try {
     // PATCH instance status to cancelled (withdrawn by submitter)
@@ -1515,16 +1572,16 @@ window.myrHandleDocUpload = async function(event) {
     const path    = `requests/${docId}/${safeName}`;
 
     try {
-      // Get auth token for storage upload
-      const token = await (window.Auth?.getFreshToken?.() || window.Auth?.getToken?.()).catch(() => null);
+      // Get auth token for storage upload — Auth is a bare global from auth.js
+      const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
 
       const res = await fetch(
-        `${SUPA_URL}/storage/v1/object/workflow-documents/${path}`,
+        `${_mwSupaURL()}/storage/v1/object/workflow-documents/${path}`,
         {
           method:  'POST',
           headers: {
-            'apikey':         SUPA_KEY || '',
-            'Authorization':  `Bearer ${token || SUPA_KEY}`,
+            'apikey':         (_mwSupaKey()),
+            'Authorization':  `Bearer ${token || _mwSupaKey()}`,
             'Content-Type':   file.type || 'application/octet-stream',
             'x-upsert':       'true',
           },
@@ -1540,7 +1597,7 @@ window.myrHandleDocUpload = async function(event) {
       }
 
       // Build public URL
-      const url = `${SUPA_URL}/storage/v1/object/public/workflow-documents/${path}`;
+      const url = `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${path}`;
 
       window._myrPendingDocs.push({
         id:     docId,
@@ -1683,7 +1740,7 @@ window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
   }
 
   const url = sourcePath
-    ? `${SUPA_URL}/storage/v1/object/public/workflow-documents/${sourcePath}`
+    ? `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${sourcePath}`
     : null;
 
   window._myrPendingDocs = window._myrPendingDocs || [];
