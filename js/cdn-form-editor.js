@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-206000
-console.log('%c[cdn-form-editor] v20260401-206000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-206001
+console.log('%c[cdn-form-editor] v20260401-206001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3082,7 +3082,6 @@ function _formShowApproveReleaseModal({ form, newVer, onSubmit }) {
 
 async function _formDoApproveAndRelease({ newVer, note }) {
   if (!_selectedForm) return;
-  const
 
   // Mark prior released version as superseded
   const priorReleased = _formDefs.find(f =>
