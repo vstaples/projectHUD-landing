@@ -1236,6 +1236,7 @@ window.myrSubmitWorkflow = async function(wfId) {
       current_step_name:        'Submitted',
       submitted_by_resource_id: resId,
       submitted_by_name:        resName,
+      template_id:              null,   // My Requests submissions are template-free
       created_at:               now,
     });
 

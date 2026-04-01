@@ -429,6 +429,7 @@
       } else {
         return [];
       }
+      if (!window.API?.get) throw new Error('window.API not yet available');
       const rows = await window.API.get(qs);
       return Array.isArray(rows) ? rows : [];
     } catch (e) {
