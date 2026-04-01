@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-225001
-console.log('%c[cdn-form-editor] v20260401-225001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-226000
+console.log('%c[cdn-form-editor] v20260401-226000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4465,8 +4465,23 @@ document.addEventListener('wheel', function _formWheelZoom(e) {
 
 function _formTogglePreview() {
   _formPreviewMode = !_formPreviewMode;
-  _previewStage     = 1;
   _previewResponses = {};
+
+  // Set active stage based on current form state so correct signature fields are active
+  if (_formPreviewMode) {
+    const state  = _selectedForm?.state || 'draft';
+    const stages = _formGetStages();
+    // Find the stage index matching the current actor role
+    const roleForState = {
+      'in_review':          'reviewer',
+      'reviewed':           'approver',
+      'approved':           'approver',
+    }[state] || 'assignee';
+    const matchedStage = stages.find(s => s.role === roleForState);
+    _previewStage = matchedStage?.stage || 1;
+  } else {
+    _previewStage = 1;
+  }
 
   const hwWgt   = document.getElementById('form-hw-widget');
   const colFlds = document.getElementById('form-col-fields');
@@ -6015,6 +6030,21 @@ function _formRefreshRolePanel() {
 
   html += `</div>
     <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0">
+      ${stages.length > 1 ? `
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        ${stages.map(s => {
+          const LABELS = { assignee:'Assignee', reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' };
+          const COLORS = { reviewer:'var(--cad)', approver:'var(--green)', assignee:'var(--accent)' };
+          const isActive = s.stage === _previewStage;
+          const col = COLORS[s.role] || 'var(--muted)';
+          return `<button onclick="_formSwitchPreviewStage(${s.stage})"
+            style="flex:1;font-size:11px;padding:4px 4px;border-radius:6px;cursor:pointer;
+              font-family:Arial,sans-serif;font-weight:600;transition:all .12s;
+              background:${isActive ? col+'22' : 'transparent'};
+              border:1px solid ${isActive ? col : 'var(--border)'};
+              color:${isActive ? col : 'var(--muted)'}">${LABELS[s.role]||s.role}</button>`;
+        }).join('')}
+      </div>` : ''}
       <button onclick="_formTogglePreview()"
         style="font-size:14px;padding:8px 16px;border-radius:999px;
                background:rgba(255,255,255,.07);
