@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-224000
-console.log('%c[cdn-form-editor] v20260401-224000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-224001
+console.log('%c[cdn-form-editor] v20260401-224001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4246,13 +4246,11 @@ async function _formClearHistory(formId) {
   const form = _selectedForm;
   if (!form) return;
 
-  // Show confirmation with form name
   const confirmed = confirm(
     `[DEV] Clear all history for "${form.source_name}"?\n\n` +
     `This will:\n` +
     `• Delete all CoC / activity events\n` +
-    `• Reset state to "draft"\n` +
-    `• Reset version to "0.1.0"\n` +
+    `• Reset state to "draft" and version to "0.1.0"\n` +
     `• Add a single "Form import complete" entry\n\n` +
     `This cannot be undone.`
   );
@@ -4261,32 +4259,64 @@ async function _formClearHistory(formId) {
   cadToast('Clearing history…', 'info');
 
   try {
-    // 1. Delete all coc_events for this form
-    await API.del(`coc_events?entity_id=eq.${formId}`).catch(e =>
-      console.warn('[devTool] coc delete failed:', e.message)
+    // 1. Delete all coc_events using direct fetch (API.del may not exist)
+    const token = await Auth.getToken();
+    const delRes = await fetch(
+      `${SUPA_URL}/rest/v1/coc_events?entity_id=eq.${formId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        }
+      }
     );
+    if (!delRes.ok) console.warn('[devTool] DELETE status:', delRes.status);
 
-    // 2. Reset form state + version
-    form.state   = 'draft';
-    form.version = '0.1.0';
+    // 2. Reset form fields — bypass _formSave to avoid triggering CoC auto-writes
+    form.state                = 'draft';
+    form.version              = '0.1.0';
     form.reviewed_by          = [];
     form.pending_reviewer_ids = [];
     form.approved_by          = null;
     form.review_note          = null;
     form.released_at          = null;
-    await _formSave();
+    form.archived_at          = null;
 
-    // 3. Write clean baseline entry
-    _formCoCWrite('form.state_changed', formId, {
-      from:    'import',
-      to:      'draft',
-      version: '0.1.0',
-      note:    'Form import complete',
-    });
+    // Patch DB directly — don't go through _formSave (avoids auto-transition CoC writes)
+    await API.patch(`workflow_form_definitions?id=eq.${formId}`, {
+      state:                'draft',
+      version:              '0.1.0',
+      reviewed_by:          [],
+      pending_reviewer_ids: [],
+      approved_by:          null,
+      review_note:          null,
+      released_at:          null,
+      archived_at:          null,
+    }).catch(e => console.warn('[devTool] PATCH failed:', e.message));
+
+    // 3. Write single clean baseline entry directly to DB
+    await API.post('coc_events', {
+      firm_id:           window.FIRM_ID || FIRM_ID_CAD,
+      entity_id:         formId,
+      entity_type:       'workflow_form_definition',
+      event_type:        'form.state_changed',
+      event_notes:       JSON.stringify({ from:'import', to:'draft', version:'0.1.0', note:'Form import complete' }),
+      actor_name:        window.CURRENT_USER?.name || 'System',
+      actor_resource_id: window.CURRENT_USER?.resource_id || null,
+      event_class:       'form',
+      severity:          'info',
+      occurred_at:       new Date().toISOString(),
+      metadata:          { from:'import', to:'draft', version:'0.1.0', note:'Form import complete' },
+    }).catch(e => console.warn('[devTool] baseline CoC write failed:', e.message));
 
     cadToast('[DEV] History cleared — reset to draft 0.1.0', 'success');
 
-    // Refresh UI
+    // Update local state and refresh UI
+    _formDirty = false;
+    _formUpdateSaveBtn();
     const el = document.getElementById('cad-content');
     if (el) renderFormsTab(el);
 
