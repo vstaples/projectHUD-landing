@@ -731,10 +731,25 @@ window.loadUserRequests = async function() {
   renderMyRequestsCatalog();
 
   const resId = window._myResource?.id;
-  if (resId) {
+  if (!resId) {
+    // _myResource not yet resolved — wait up to 3s then retry
+    let waited = 0;
+    await new Promise(resolve => {
+      const poll = setInterval(() => {
+        waited += 100;
+        if (window._myResource?.id || waited >= 3000) {
+          clearInterval(poll);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
+  const resolvedResId = window._myResource?.id;
+  if (resolvedResId) {
     try {
       const rows = await API.get(
-        `workflow_instances?submitted_by_resource_id=eq.${resId}` +
+        `workflow_instances?submitted_by_resource_id=eq.${resolvedResId}` +
         `&order=created_at.desc&limit=100` +
         `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
       ).catch(() => []);
