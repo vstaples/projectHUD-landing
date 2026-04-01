@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-219002
-console.log('%c[cdn-form-editor] v20260401-219002','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-219003
+console.log('%c[cdn-form-editor] v20260401-219003','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -512,7 +512,7 @@ function _renderFormEditor() {
             style="${_railBtn()}">≡</button>
           <button onclick="_formReplacePdf()" title="Replace PDF background"
             id="form-replace-btn"
-            style="${_railBtn()};${['draft','unreleased'].includes(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
+            style="${_railBtn()};${['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
           <button onclick="_formDeleteWithConfirm('${f.id}')" title="Remove form"
             style="${_railBtn()};color:var(--red)">🗑</button>
         </div>
@@ -2387,7 +2387,16 @@ function _formLifecycleButtons(f) {
 // REPLACE PDF — swap background document, keep all fields intact
 // ─────────────────────────────────────────────────────────────────────────────
 function _formReplacePdf() {
-  document.getElementById('form-replace-input')?.click();
+  let inp = document.getElementById('form-replace-input');
+  if (!inp) {
+    // Re-create input if missing from DOM (can happen after full re-render)
+    inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.pdf'; inp.style.display = 'none';
+    inp.id = 'form-replace-input';
+    inp.addEventListener('change', _formReplacePdfChosen);
+    document.body.appendChild(inp);
+  }
+  inp.click();
 }
 
 async function _formReplacePdfChosen(event) {
