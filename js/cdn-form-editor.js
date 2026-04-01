@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-217000
-console.log('%c[cdn-form-editor] v20260401-217000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-219000
+console.log('%c[cdn-form-editor] v20260401-219000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -411,13 +411,11 @@ function _renderFormEditor() {
         <!-- State · Version · Category pills -->
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           <span id="form-state-badge"
-                style="font-size:13px;padding:3px 10px;border-radius:4px;
-                       background:var(--surf2);border:1px solid var(--border);
-                       color:${_formStateColor(f.state||'draft')};font-family:Arial,sans-serif;
-                       line-height:1.4">${_formStateLabel(f.state||'draft')}</span>
-          <span style="font-size:13px;padding:3px 10px;border-radius:4px;
-                       background:var(--surf2);border:1px solid var(--border);
-                       color:var(--muted);font-family:Arial,sans-serif;line-height:1.4">${f.version||'0.1.0'}</span>
+                style="padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:1.4;box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);background:var(--surf3);border:1px solid var(--border2);
+                       color:${_formStateColor(f.state||'draft')}"
+                >${_formStateLabel(f.state||'draft')}</span>
+          <span style="padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:1.4;box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);background:var(--surf3);border:1px solid var(--border2);
+                       color:var(--text1)">${f.version||'0.1.0'}</span>
           <span id="form-category-pill">${_formCategoryPill(f)}</span>
         </div>
 
@@ -2294,15 +2292,12 @@ function _formCategoryPill(f) {
     // Assigned — show amber pill, clicking reopens picker to change it
     return `<button onclick="_formPickCategory()"
       title="Click to change category"
-      style="font-size:13px;padding:3px 10px;border-radius:4px;
-             background:var(--cad-dim);border:1px solid var(--cad-wire);
-             color:var(--cad);font-family:Arial,sans-serif;line-height:1.4;
-             cursor:pointer">${escHtml(cat.name)}</button>`;
+      style="padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:1.4;box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);background:rgba(240,160,48,.12);border:1px solid rgba(240,160,48,.3);
+             color:#f0a030;cursor:pointer">${escHtml(cat.name)}</button>`;
   }
   return `<button onclick="_formPickCategory()"
-    style="font-size:13px;padding:3px 10px;border-radius:4px;background:transparent;
-           border:1px solid var(--border);color:var(--muted);cursor:pointer;
-           font-family:Arial,sans-serif;line-height:1.4">+ Category</button>`;
+    style="padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:1.4;box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);background:transparent;
+           border:1px solid rgba(255,255,255,.2);color:var(--text1);cursor:pointer">+ Category</button>`;
 }
 
 function _formLifecycleButtons(f) {
@@ -2342,9 +2337,9 @@ function _formLifecycleButtons(f) {
       padding:3px 8px;background:rgba(79,142,247,.1);border-radius:4px">● In Review</span>`);
     // Editor-side simulate approve (for testing / admin override)
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formApproveReview()"
-      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.4);color:#4ade80;cursor:pointer;font-family:Arial,sans-serif">✓ Mark Reviewed</button>`);
+      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.4);color:#4ade80;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✓ Mark Reviewed</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('review')"
-      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif">✗ Reject</button>`);
+      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✗ Reject</button>`);
   }
 
   if (state === 'reviewed') {
@@ -2355,7 +2350,7 @@ function _formLifecycleButtons(f) {
              color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
       ✓ Approve & Release</button>`);
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('approval')"
-      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif">✗ Reject</button>`);
+      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✗ Reject</button>`);
   }
 
   if (state === 'approved') {
@@ -4993,7 +4988,9 @@ async function _formShowPreviewHistoryPanel() {
 
   // ── Section header helper ──────────────────────────────────────────────────
   const sectionHdr = (title) =>
-    `<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border);
+    `<div style="padding:9px 16px 8px;
+       background:var(--bg);
+       border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);
        font-size:13px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
        color:var(--text);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
 
@@ -5054,7 +5051,7 @@ function _fphRenderDag(currentState) {
   const NODES = [
     { id:'draft',     lines:['Draft'],              baseColor:'#4f8ef7' },
     { id:'in_review', lines:['In','Review'],        baseColor:'#c47d18' },
-    { id:'reviewed',  lines:['Awaiting','Approval'],baseColor:'#c47d18' },
+    { id:'reviewed',  lines:['Approval'],            baseColor:'#c47d18' },
     { id:'approved',  lines:['Approved'],           baseColor:'#2a9d40' },
     { id:'released',  lines:['Released'],           baseColor:'#2a9d40' },
   ];
@@ -5250,11 +5247,12 @@ function _fphRenderDag(currentState) {
 
   // ── State label ─────────────────────────────────────────────────────────────
   // State label below — skip for unreleased (arc label already communicates it)
-  if (!isUnreleased) {
+  // State label below — suppressed when rejected (arc label already communicates it)
+  // and suppressed when unreleased (arc label above communicates it)
+  if (!isUnreleased && !isRejected) {
     const stateLabel = _formStateLabel(currentState);
     const stateColor = _formStateColor(currentState);
-    const labelY     = isRejected ? nodeY + nodeH + 82 : nodeY + nodeH + 20;
-    svg += `<text x="${panelW/2}" y="${labelY}"
+    svg += `<text x="${panelW/2}" y="${nodeY + nodeH + 20}"
       text-anchor="middle" font-size="13" font-weight="700"
       fill="${stateColor}" font-family="Arial,sans-serif">${stateLabel}</text>`;
   }
@@ -5273,9 +5271,27 @@ function _fphRenderActivity(rows) {
     return;
   }
 
+  // For state_changed events, derive a human label from the from/to in event_notes
+  const stateChangedLabel = (r) => {
+    try {
+      const p = JSON.parse(r.event_notes || '{}');
+      const from = p.from, to = p.to;
+      if (to === 'in_review')          return 'Submitted for Review';
+      if (to === 'reviewed')           return 'All Reviewers Approved';
+      if (to === 'approved')           return 'Approved';
+      if (to === 'released')           return 'Released';
+      if (to === 'unreleased')         return 'Revision Started';
+      if (to === 'rejected_review')    return 'Rejected at Review';
+      if (to === 'rejected_approval')  return 'Rejected at Approval';
+      if (to === 'rejected_release')   return 'Rejected at Release';
+      if (to === 'draft' || !to)       return 'Form Completed';
+    } catch(e) {}
+    return 'State Changed';
+  };
+
   const evtLabel = {
     'form.saved':              'Saved',
-    'form.state_changed':      'State Changed',
+    'form.state_changed':      null,   // resolved dynamically via stateChangedLabel()
     'form.released':           'Released',
     'form.approved':           'Approved',
     'form.rejected':           'Rejected',
@@ -5341,7 +5357,9 @@ function _fphRenderActivity(rows) {
 
   const tableRows = rows.map(r => {
     const color  = evtColor[r.event_type] || 'var(--text2)';
-    const label  = evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—';
+    const label  = (r.event_type === 'form.state_changed')
+      ? stateChangedLabel(r)
+      : (evtLabel[r.event_type] || r.event_type?.replace('form.','') || '—');
     const who    = r.actor_name || r.actor_id || 'System';
     const role   = roleFromRow(r);
     const rColor = roleColor(role);

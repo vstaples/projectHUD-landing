@@ -445,9 +445,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .btn{
   font-size:13px;font-weight:600;padding:7px 16px;
   border-radius:999px;border:1px solid;cursor:pointer;
-  font-family:Arial,sans-serif;transition:all .15s;
+  font-family:Arial,sans-serif;transition:all .12s;
   display:inline-flex;align-items:center;gap:5px;
   letter-spacing:.02em;
+  box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.btn:hover{
+  transform:translateY(-1px);
+  box-shadow:0 4px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.12);
+}
+.btn:active{
+  transform:translateY(0px);
+  box-shadow:0 1px 3px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06);
 }
 .btn-cad{color:var(--cad);border-color:var(--cad-wire);background:var(--cad-dim)}
 .btn-cad:hover{background:rgba(196,125,24,.25);border-color:var(--cad)}
@@ -709,26 +718,26 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 if (typeof _stopElapsedTimer === "undefined") window._stopElapsedTimer = function() {};
 if (typeof _startElapsedTimer === "undefined") window._startElapsedTimer = function() {};
 </script>
-<script src="/js/cdn-core-state.js?v=20260401217000"></script>
-<script src="/js/cdn-utils.js?v=20260401217000"></script>
-<script src="/js/cdn-form-editor.js?v=20260401217000"></script>
-<script src="/js/cdn-form-settings.js?v=20260401217000"></script>
-<script src="/js/cdn-assignee.js?v=20260401217000"></script>
-<script src="/js/cdn-outcomes.js?v=20260401217000"></script>
-<script src="/js/cdn-documents.js?v=20260401217000"></script>
-<script src="/js/cdn-dag-viewer.js?v=20260401217000"></script>
-<script src="/js/cdn-template-editor.js?v=20260401217000"></script>
-<script src="/js/cdn-bist.js?v=20260401217000"></script>
-<script src="/js/cdn-coc.js?v=20260401217000"></script>
-<script src="/js/cdn-meeting.js?v=20260401217000"></script>
-<script src="/js/cdn-scrubber.js?v=20260401217000"></script>
-<script src="/js/cdn-tooltips.js?v=20260401217000"></script>
-<script src="/js/cdn-comments.js?v=20260401217000"></script>
-<script src="/js/cdn-intel.js?v=20260401217000"></script>
-<script src="/js/cdn-events.js?v=20260401217000"></script>
-<script src="/js/cdn-instance-dag.js?v=20260401217000"></script>
-<script src="/js/cdn-instances.js?v=20260401217000"></script>
-    <script src="/js/cdn-form-runtime.js?v=20260401217000"></script>
+<script src="/js/cdn-core-state.js?v=20260401219000"></script>
+<script src="/js/cdn-utils.js?v=20260401219000"></script>
+<script src="/js/cdn-form-editor.js?v=20260401219000"></script>
+<script src="/js/cdn-form-settings.js?v=20260401219000"></script>
+<script src="/js/cdn-assignee.js?v=20260401219000"></script>
+<script src="/js/cdn-outcomes.js?v=20260401219000"></script>
+<script src="/js/cdn-documents.js?v=20260401219000"></script>
+<script src="/js/cdn-dag-viewer.js?v=20260401219000"></script>
+<script src="/js/cdn-template-editor.js?v=20260401219000"></script>
+<script src="/js/cdn-bist.js?v=20260401219000"></script>
+<script src="/js/cdn-coc.js?v=20260401219000"></script>
+<script src="/js/cdn-meeting.js?v=20260401219000"></script>
+<script src="/js/cdn-scrubber.js?v=20260401219000"></script>
+<script src="/js/cdn-tooltips.js?v=20260401219000"></script>
+<script src="/js/cdn-comments.js?v=20260401219000"></script>
+<script src="/js/cdn-intel.js?v=20260401219000"></script>
+<script src="/js/cdn-events.js?v=20260401219000"></script>
+<script src="/js/cdn-instance-dag.js?v=20260401219000"></script>
+<script src="/js/cdn-instances.js?v=20260401219000"></script>
+    <script src="/js/cdn-form-runtime.js?v=20260401219000"></script>
 
 <script>
 // ── Bootstrap CURRENT_USER from JWT + resources table ─────────────────────────
