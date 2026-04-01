@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-207001
-console.log('%c[cdn-form-editor] v20260401-207001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-208000
+console.log('%c[cdn-form-editor] v20260401-208000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3360,14 +3360,15 @@ function _formShowReleaseModal(form) {
           <div style="font-size:12px;color:var(--text2);line-height:1.6">
             This is your final check. Once committed, this form becomes
             <strong>live</strong> and available for assignment in workflows.
-            If you spot anything that needs changing, click <strong>Reject</strong>
-            to return it for revision.
+            If you spot anything that needs changing, enter a comment below
+            and click <strong>Reject</strong> to return it for revision.
           </div>
         </div>
         <label style="display:block;font-size:13px;font-weight:600;color:var(--text2);
           margin-bottom:8px;letter-spacing:.03em">
-          Release Comments
-          <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
+          Comments
+          <span id="cad-release-notes-req"
+            style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
         </label>
         <textarea id="cad-release-notes"
           placeholder="Any final notes about this release…"
@@ -3378,6 +3379,11 @@ function _formShowReleaseModal(form) {
           onfocus="this.style.borderColor='var(--green)'"
           onblur="this.style.borderColor='var(--border2)'"
         ></textarea>
+        <div id="cad-release-error"
+          style="display:none;margin-top:6px;font-size:12px;
+            color:var(--red);font-family:Arial,sans-serif">
+          A comment is required when rejecting.
+        </div>
       </div>
 
       <!-- Footer -->
@@ -3407,30 +3413,32 @@ function _formShowReleaseModal(form) {
   document.body.appendChild(overlay);
   setTimeout(() => document.getElementById('cad-release-notes')?.focus(), 50);
 
-  // Reject → editor caught a last-minute issue, return to unreleased for revision
-  document.getElementById('cad-release-reject-btn').onclick = () => {
+  // Reject — mandatory comment, no second modal
+  document.getElementById('cad-release-reject-btn').onclick = async () => {
+    const note    = document.getElementById('cad-release-notes')?.value?.trim() || '';
+    const errEl   = document.getElementById('cad-release-error');
+    const reqEl   = document.getElementById('cad-release-notes-req');
+    const ta      = document.getElementById('cad-release-notes');
+    if (!note) {
+      errEl.style.display = 'block';
+      ta.style.borderColor = 'var(--red)';
+      reqEl.textContent = '(required for rejection)';
+      reqEl.style.color = 'var(--red)';
+      ta.focus();
+      return;
+    }
     overlay.remove();
-    _formShowRejectModal({
-      title:    'Return for Revision',
-      subtitle: 'The form will be returned to the editor as Unreleased. ' +
-                'Your comments will be recorded in the Chain of Custody.',
-      role:     'approver',
-      onSubmit: async (note) => {
-        const from = _selectedForm.state;
-        _selectedForm.state       = 'unreleased';
-        _selectedForm.review_note = note;
-        await _formSave();
-        _formCoCWrite('form.rejected', _selectedForm.id, {
-          from, to: 'unreleased',
-          stage: 'release',
-          note,
-          rejected_by: window.CURRENT_USER?.id || null,
-        });
-        cadToast('Returned for revision', 'info');
-        const el = document.getElementById('cad-content');
-        if (el) renderFormsTab(el);
-      }
+    const from = _selectedForm.state;
+    _selectedForm.state       = 'unreleased';
+    _selectedForm.review_note = note;
+    await _formSave();
+    _formCoCWrite('form.rejected', _selectedForm.id, {
+      from, to: 'unreleased', stage: 'release', note,
+      rejected_by: window.CURRENT_USER?.id || null,
     });
+    cadToast('Returned for revision', 'info');
+    const el = document.getElementById('cad-content');
+    if (el) renderFormsTab(el);
   };
 
   // Commit → execute the release
