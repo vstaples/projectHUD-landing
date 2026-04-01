@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-206001
-console.log('%c[cdn-form-editor] v20260401-206001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-207000
+console.log('%c[cdn-form-editor] v20260401-207000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3321,7 +3321,108 @@ async function _formRejectForm(rejectionStage) {
 // _formReleaseFinal — called from 'approved' state to formally publish
 async function _formReleaseFinal() {
   if (!_selectedForm) return;
-  if (!confirm(`Release "${_selectedForm.source_name} ${_selectedForm.version}" to production?`)) return;
+  _formShowReleaseModal(_selectedForm);
+}
+
+function _formShowReleaseModal(form) {
+  document.getElementById('cad-release-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cad-release-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
+    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+      width:480px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.7);overflow:hidden">
+
+      <!-- Header -->
+      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
+        display:flex;align-items:flex-start;gap:12px">
+        <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;
+          background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.3);
+          display:flex;align-items:center;justify-content:center;font-size:18px">↑</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:700;color:var(--text)">Release to Production</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px">
+            ${escHtml(form.source_name)}
+            <strong style="color:var(--green)">&nbsp;${escHtml(form.version)}</strong>
+          </div>
+        </div>
+        <button onclick="document.getElementById('cad-release-modal')?.remove()"
+          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:20px 22px">
+        <div style="padding:10px 12px;background:var(--surf2);border-radius:6px;
+          border-left:3px solid var(--green);margin-bottom:16px">
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">
+            This is your final check. Once committed, this form becomes
+            <strong>live</strong> and available for assignment in workflows.
+            If you spot anything that needs changing, click <strong>Reject</strong>
+            to return it for revision.
+          </div>
+        </div>
+        <label style="display:block;font-size:13px;font-weight:600;color:var(--text2);
+          margin-bottom:8px;letter-spacing:.03em">
+          Release Comments
+          <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
+        </label>
+        <textarea id="cad-release-notes"
+          placeholder="Any final notes about this release…"
+          style="width:100%;min-height:90px;resize:vertical;box-sizing:border-box;
+            background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
+            color:var(--text);font-family:Arial,sans-serif;font-size:14px;
+            line-height:1.6;padding:10px 12px;outline:none;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--green)'"
+          onblur="this.style.borderColor='var(--border2)'"
+        ></textarea>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:14px 22px 18px;border-top:1px solid var(--border);
+        display:flex;gap:10px;align-items:center">
+        <button id="cad-release-reject-btn"
+          style="padding:8px 20px;border-radius:6px;background:transparent;
+            border:1.5px solid var(--red);color:var(--red);cursor:pointer;
+            font-size:14px;font-weight:600;font-family:Arial,sans-serif">
+          ✗ Reject
+        </button>
+        <div style="flex:1"></div>
+        <button onclick="document.getElementById('cad-release-modal')?.remove()"
+          style="padding:8px 20px;border-radius:6px;background:transparent;
+            border:1px solid var(--border);color:var(--muted);cursor:pointer;
+            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
+        <button id="cad-release-commit-btn"
+          style="padding:8px 26px;border-radius:6px;background:var(--green);
+            border:none;color:white;cursor:pointer;font-size:14px;font-weight:700;
+            font-family:Arial,sans-serif">
+          ↑ Commit Release
+        </button>
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('cad-release-notes')?.focus(), 50);
+
+  // Reject → return to editor for revision
+  document.getElementById('cad-release-reject-btn').onclick = () => {
+    overlay.remove();
+    _formRejectForm('approval');
+  };
+
+  // Commit → execute the release
+  document.getElementById('cad-release-commit-btn').onclick = async () => {
+    const note = document.getElementById('cad-release-notes')?.value?.trim() || '';
+    overlay.remove();
+    await _formDoReleaseFinal(note);
+  };
+}
+
+async function _formDoReleaseFinal(note) {
+  if (!_selectedForm) return;
   const priorReleased = _formDefs.find(f =>
     f.id !== _selectedForm.id &&
     f.state === 'released' &&
@@ -3336,7 +3437,8 @@ async function _formReleaseFinal() {
       { superseded_by: _selectedForm.id, state: 'archived' }).catch(()=>{});
   }
   _formCoCWrite('form.released', _selectedForm.id, {
-    version: _selectedForm.version,
+    version:    _selectedForm.version,
+    note,
     supersedes: priorReleased?.id
   });
   cadToast(`Released ${_selectedForm.version}`, 'success');
