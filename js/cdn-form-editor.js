@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-222000
-console.log('%c[cdn-form-editor] v20260401-222000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-222001
+console.log('%c[cdn-form-editor] v20260401-222001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -5048,18 +5048,34 @@ async function _formShowPreviewHistoryPanel() {
        color:var(--text);font-family:Arial,sans-serif;flex-shrink:0">${title}</div>`;
 
   // ── Build all content HTML first, then set once (avoids innerHTML += destroying appended nodes)
+  // Activity starts at 220px, Comments gets the rest — both resizable via drag
   panel.innerHTML =
     sectionHdr('Lifecycle') + `<div id="fph-dag" style="padding:16px 16px 8px;flex-shrink:0"></div>` +
     `<div style="height:1px;background:var(--border);flex-shrink:0"></div>` +
-    `<div id="fph-activity" style="padding:0;flex-shrink:0">
+    `<div id="fph-activity" style="padding:0;flex-shrink:0;overflow:hidden">
        <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
      </div>` +
-    sectionHdr('Comments') +
-    `<div id="fph-comments" style="padding:0;flex:1">
+    `<div id="fph-comments-drag-handle"
+       style="height:8px;flex-shrink:0;cursor:row-resize;background:var(--border);
+              display:flex;align-items:center;justify-content:center;
+              transition:background .15s;user-select:none;position:relative"
+       title="Drag to resize">
+       <div style="width:32px;height:2px;border-radius:1px;background:var(--muted);pointer-events:none"></div>
+     </div>` +
+    `<div id="fph-comments-hdr"
+       style="padding:10px 16px 8px;border-bottom:1px solid var(--border);
+              font-size:13px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+              color:var(--text);font-family:Arial,sans-serif;flex-shrink:0;
+              cursor:row-resize;user-select:none;display:flex;align-items:center;gap:8px">
+       <span>Comments</span>
+       <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none;
+         letter-spacing:0;margin-left:auto">⠿ drag</span>
+     </div>` +
+    `<div id="fph-comments" style="padding:0;flex:1;overflow-y:auto;min-height:60px">
        <div style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:Arial,sans-serif">Loading…</div>
      </div>`;
 
-  // ── Drag handle: append AFTER innerHTML set so it isn't wiped ─────────────
+  // ── Left edge drag handle (horizontal resize of whole panel) ───────────────
   const dragHandle = document.createElement('div');
   dragHandle.style.cssText = [
     'position:absolute;left:0;top:0;bottom:0;width:6px',
@@ -5069,6 +5085,46 @@ async function _formShowPreviewHistoryPanel() {
   dragHandle.addEventListener('mouseout',   () => { if (!window._formDragCol) dragHandle.style.background = 'transparent'; });
   dragHandle.addEventListener('mousedown',  (e) => _formColDragStart(e, 'form-preview-history-panel', 'left'));
   panel.appendChild(dragHandle);
+
+  // ── Vertical drag handle between Activity and Comments ────────────────────
+  const vDragHandle = panel.querySelector('#fph-comments-drag-handle');
+  const vDragHdr    = panel.querySelector('#fph-comments-hdr');
+  const _wireVDrag  = (el) => {
+    if (!el) return;
+    el.addEventListener('mouseover', () => {
+      vDragHandle.style.background = 'rgba(196,125,24,.35)';
+    });
+    el.addEventListener('mouseout', () => {
+      if (!window._fphVDragging) vDragHandle.style.background = 'var(--border)';
+    });
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      window._fphVDragging  = true;
+      const activityEl  = document.getElementById('fph-activity');
+      const startY      = e.clientY;
+      const startH      = activityEl?.offsetHeight || 220;
+
+      const onMove = (me) => {
+        const delta  = me.clientY - startY;
+        const newH   = Math.max(60, Math.min(500, startH + delta));
+        if (activityEl) activityEl.style.height = newH + 'px';
+      };
+      const onUp = () => {
+        window._fphVDragging = false;
+        if (vDragHandle) vDragHandle.style.background = 'var(--border)';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup',   onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onUp);
+    });
+  };
+  _wireVDrag(vDragHandle);
+  _wireVDrag(vDragHdr);
+
+  // Set initial activity height
+  const actEl = panel.querySelector('#fph-activity');
+  if (actEl) actEl.style.height = '220px';
 
   // Render DAG without history flag first (immediate, no async)
   _fphRenderDag(
@@ -5524,7 +5580,7 @@ function _fphRenderActivity(rows) {
     </tr>`;
   }).filter(Boolean).join('');
 
-  el.innerHTML = `<div style="overflow-x:auto;max-height:220px;overflow-y:auto">
+  el.innerHTML = `<div style="overflow-x:auto;height:100%;overflow-y:auto">
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:var(--bg2);position:sticky;top:0">
