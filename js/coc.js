@@ -417,6 +417,11 @@
     // Support two modes:
     //   1. entity-based: entityIds is non-empty array
     //   2. actor-based:  entityIds is empty, opts.actorResourceId is set
+    //
+    // Guard: API may not be initialized yet on early page-load calls.
+    // Return [] silently — mw-core falls back to direct API.get on the same tick.
+    if (!window.API?.get) return [];
+
     try {
       const limit = opts.limit || 500;
       let qs;
@@ -429,11 +434,10 @@
       } else {
         return [];
       }
-      if (!window.API?.get) throw new Error('window.API not yet available');
       const rows = await window.API.get(qs);
       return Array.isArray(rows) ? rows : [];
     } catch (e) {
-      console.error('[CoC] readMany failed:', e.message);
+      console.warn('[CoC] readMany failed:', e.message);
       return [];
     }
   }

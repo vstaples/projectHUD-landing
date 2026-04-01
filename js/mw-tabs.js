@@ -671,6 +671,58 @@ window.loadUserConcerns = async function() {
 // to the _myRequests shape expected by renderMyRequestsActive/History.
 window.loadUserRequests = async function() {
   window._requestsLoaded = true;
+
+  // Inject supplemental styles once
+  if (!document.getElementById('myr-ext-styles')) {
+    const s = document.createElement('style');
+    s.id = 'myr-ext-styles';
+    s.textContent = `
+      /* Step tooltip */
+      .myr-pt-step { position:relative; }
+      .myr-pt-tip {
+        display:none; position:absolute; bottom:calc(100% + 8px); left:50%;
+        transform:translateX(-50%);
+        background:#0a1628; border:1px solid rgba(0,210,255,.3);
+        padding:5px 9px; min-width:140px; max-width:200px;
+        font-family:var(--font-head); font-size:10px; line-height:1.5;
+        color:#C8DFF0; white-space:nowrap; z-index:200;
+        pointer-events:none;
+      }
+      .myr-pt-tip::after {
+        content:''; position:absolute; top:100%; left:50%;
+        transform:translateX(-50%);
+        border:5px solid transparent;
+        border-top-color:rgba(0,210,255,.3);
+      }
+      .myr-pt-step:hover .myr-pt-tip { display:block; }
+      /* CoC panel inside request body */
+      .myr-coc-panel {
+        margin-top:8px; border-top:1px solid rgba(255,255,255,.06); padding-top:8px;
+      }
+      .myr-coc-label {
+        font-family:var(--font-head); font-size:10px; letter-spacing:.08em;
+        text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:6px;
+        display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+      }
+      .myr-coc-label:hover { color:rgba(0,210,255,.6); }
+      .myr-coc-events { display:none; }
+      .myr-coc-events.open { display:block; }
+      .myr-coc-row {
+        display:flex; gap:8px; padding:4px 0;
+        border-bottom:1px solid rgba(255,255,255,.04);
+        font-family:var(--font-head); font-size:10px;
+      }
+      .myr-coc-row:last-child { border-bottom:none; }
+      .myr-coc-dot {
+        width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:3px;
+      }
+      .myr-coc-event-type { color:rgba(0,210,255,.8); flex-shrink:0; min-width:120px; }
+      .myr-coc-actor { color:rgba(255,255,255,.4); flex-shrink:0; }
+      .myr-coc-time  { color:rgba(255,255,255,.22); margin-left:auto; flex-shrink:0; }
+    `;
+    document.head.appendChild(s);
+  }
+
   renderMyRequestsCatalog();
 
   const resId = window._myResource?.id;
@@ -743,6 +795,24 @@ window.loadUserRequests = async function() {
 
   renderMyRequestsActive();
   renderMyRequestsHistory();
+
+  // Pre-fetch CoC events for all active requests so tooltips are ready
+  const activeIds = (window._myRequests||[])
+    .filter(r => r.status !== 'completed' && r.status !== 'rejected')
+    .map(r => r.id).filter(Boolean);
+  if (activeIds.length && window.API?.get) {
+    window._myRequestCoc = window._myRequestCoc || {};
+    API.get(
+      `coc_events?entity_id=in.(${activeIds.join(',')})&order=occurred_at.asc&select=*`
+    ).then(rows => {
+      (rows||[]).forEach(e => {
+        if (!window._myRequestCoc[e.entity_id]) window._myRequestCoc[e.entity_id] = [];
+        window._myRequestCoc[e.entity_id].push(e);
+      });
+      // Re-render now that CoC data is available
+      renderMyRequestsActive();
+    }).catch(() => {});
+  }
 
   // Update badges
   const activeCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
@@ -868,32 +938,119 @@ function renderMyRequestsActive() {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
     return;
   }
+
+  // Build a lookup of CoC events by instanceId for tooltips
+  // _myRequestCoc is populated lazily by myrLoadRequestCoc()
+  const cocByInstance = window._myRequestCoc || {};
+
   let html = '';
   active.forEach((req, i) => {
     const statusColor = req.status==='approved'?'#1D9E75': req.status==='awaiting'?'#EF9F27':'#00D2FF';
-    const badgeClass = req.status==='approved'?'style="border:1px solid rgba(29,158,117,.3);color:#1D9E75"':
-                       req.status==='awaiting' ?'style="border:1px solid rgba(239,159,39,.3);color:#EF9F27"':
-                                                'style="border:1px solid rgba(0,210,255,.3);color:#00D2FF"';
-    const badgeLabel = req.status==='approved'?'Approved':req.status==='awaiting'?'Awaiting response':'In progress';
-    const dotAnim = req.status==='awaiting'?'animation:myrActivePulse 1.5s infinite':'';
-    let stepsHtml = (req.steps||[]).map((s,si) => {
-      const cls = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
+    const badgeStyle  = req.status==='approved'?'border:1px solid rgba(29,158,117,.3);color:#1D9E75':
+                        req.status==='awaiting' ?'border:1px solid rgba(239,159,39,.3);color:#EF9F27':
+                                                  'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
+    const badgeLabel  = req.status==='approved'?'Approved':req.status==='awaiting'?'Awaiting response':'In progress';
+    const dotAnim     = req.status==='awaiting'?'animation:myrActivePulse 1.5s infinite':'';
+
+    // Build CoC event map for this instance: event_type → {actor, time, notes}
+    const instCoc = (cocByInstance[req.id] || []);
+    const cocByType = {};
+    instCoc.forEach(e => { cocByType[e.event_type] = e; });
+
+    // Step type → CoC event_type mapping
+    const stepEventMap = {
+      'Submit':            'request.submitted',
+      'Route to reviewers':'request.submitted',
+      'Review round 1':    'request.reviewed',
+      'Revisions':         'request.revision_requested',
+      'Final review':      'request.final_review',
+      'Sign-off':          'request.completed',
+      'PM review':         'request.pm_reviewed',
+      'Approved':          'request.completed',
+    };
+
+    // Build step nodes with tooltips
+    let stepsHtml = (req.steps||[]).map((s, si) => {
+      const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
       const nameCls = s.done?'done':s.active?'active':'';
-      const label = s.done?'&#10003;':(si+1);
-      return `<div class="myr-pt-step"><div class="myr-pt-dot ${cls}">${label}</div><div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div></div>`;
+      const label   = s.done?'&#10003;':(si+1);
+
+      // Look up CoC event for this step
+      const evType  = stepEventMap[s.label] || null;
+      const ev      = evType ? cocByType[evType] : null;
+      const tipTime = ev ? new Date(ev.occurred_at||ev.created_at).toLocaleString('en-US',
+        {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : null;
+      const tipActor = ev?.actor_name || null;
+
+      // Build tooltip content
+      let tipHtml = '';
+      if (s.done && tipTime) {
+        tipHtml = `<div class="myr-pt-tip">
+          <div style="color:rgba(0,210,255,.9);margin-bottom:2px">${_esc(s.label)}</div>
+          <div>${_esc(tipActor||'System')}</div>
+          <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
+        </div>`;
+      } else if (s.active) {
+        tipHtml = `<div class="myr-pt-tip">
+          <div style="color:#00D2FF;margin-bottom:2px">${_esc(s.label)}</div>
+          <div style="color:rgba(255,255,255,.4)">In progress</div>
+        </div>`;
+      } else if (!s.done) {
+        tipHtml = `<div class="myr-pt-tip">
+          <div style="color:rgba(255,255,255,.3)">${_esc(s.label)}</div>
+          <div style="color:rgba(255,255,255,.2)">Pending</div>
+        </div>`;
+      }
+
+      return `<div class="myr-pt-step">
+        <div class="myr-pt-dot ${cls}">${label}</div>
+        <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
+        ${tipHtml}
+      </div>`;
     }).join('');
+
+    // Build CoC event rows
+    const cocRows = instCoc.length
+      ? instCoc.map(e => {
+          const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+            {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+          const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
+          const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
+                            e.event_type==='request.completed'?'#1D9E75':
+                            e.event_type?.includes('reject')||e.event_type?.includes('withdraw')?'#E24B4A':'#EF9F27';
+          let notes = '';
+          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||''; } catch(_){}
+          return `<div class="myr-coc-row">
+            <div class="myr-coc-dot" style="background:${dotColor}"></div>
+            <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
+            <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
+            ${notes?`<div style="color:rgba(255,255,255,.35);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(notes)}</div>`:''}
+            <div class="myr-coc-time">${_esc(t)}</div>
+          </div>`;
+        }).join('')
+      : `<div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:4px 0">
+           Loading audit trail…
+         </div>`;
+
     html += `<div class="myr-active-req">
       <div class="myr-ar-head" onclick="myrToggleReq('myr-ar-body-${i}')">
         <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;${dotAnim}"></div>
         <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeClass.slice(7,-1)}">${badgeLabel}</span>
+        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
       </div>
       <div class="myr-ar-body${req.expanded?' open':''}" id="myr-ar-body-${i}">
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${req.cocNote?`<div style="font-family:var(--font-head);font-size:11px;padding:6px 9px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.35);color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">${_esc(req.cocNote)}</div>`:''}
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <div class="myr-coc-panel">
+          <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
+            <span>&#9656; Chain of Custody</span>
+            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
+          </div>
+          <div class="myr-coc-events" id="myr-coc-${i}">${cocRows}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
           <button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>
           <button onclick="myrAddContext('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
         </div>
@@ -932,6 +1089,69 @@ function renderMyRequestsHistory() {
 window.myrToggleReq = function(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('open');
+};
+
+// Toggle CoC panel — fetch events lazily on first open
+window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+    if (labelEl) labelEl.querySelector('span:first-child').textContent = '▶ Chain of Custody';
+    return;
+  }
+
+  // Open — fetch if not yet loaded
+  panel.classList.add('open');
+  if (labelEl) labelEl.querySelector('span:first-child').textContent = '▼ Chain of Custody';
+
+  if (!(window._myRequestCoc||{})[instanceId]) {
+    await myrLoadRequestCoc(instanceId);
+    // Re-render the CoC rows in the panel
+    const events = (window._myRequestCoc||{})[instanceId] || [];
+    if (events.length) {
+      panel.innerHTML = events.map(e => {
+        const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+          {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
+        const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
+                          e.event_type==='request.completed'?'#1D9E75':
+                          (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
+        let notes = '';
+        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||''; } catch(_){}
+        return `<div class="myr-coc-row">
+          <div class="myr-coc-dot" style="background:${dotColor}"></div>
+          <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
+          <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
+          ${notes?`<div style="color:rgba(255,255,255,.35);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(notes)}</div>`:''}
+          <div class="myr-coc-time">${_esc(t)}</div>
+        </div>`;
+      }).join('');
+      // Update the event count in the label
+      if (labelEl) {
+        const countEl = labelEl.querySelector('span:last-child');
+        if (countEl) countEl.textContent = events.length + ' event' + (events.length!==1?'s':'');
+      }
+    } else {
+      panel.innerHTML = `<div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
+    }
+  }
+};
+
+// Fetch CoC events for a single instance and cache in window._myRequestCoc
+window.myrLoadRequestCoc = async function(instanceId) {
+  if (!instanceId) return;
+  window._myRequestCoc = window._myRequestCoc || {};
+  try {
+    const rows = await API.get(
+      `coc_events?entity_id=eq.${instanceId}&order=occurred_at.asc&select=*`
+    ).catch(() => []);
+    window._myRequestCoc[instanceId] = rows || [];
+  } catch(e) {
+    window._myRequestCoc[instanceId] = [];
+  }
 };
 
 window.myrOpenWorkflowForm = function(wfId) {
