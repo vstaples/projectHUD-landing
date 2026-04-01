@@ -679,7 +679,7 @@ window.loadUserRequests = async function() {
       const rows = await API.get(
         `workflow_instances?submitted_by_resource_id=eq.${resId}` +
         `&order=created_at.desc&limit=100` +
-        `&select=id,title,status,current_step_name,workflow_type,created_at,metadata`
+        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at`
       ).catch(() => []);
 
       // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
@@ -697,8 +697,7 @@ window.loadUserRequests = async function() {
       };
 
       window._myRequests = (rows || []).map(r => {
-        const meta      = r.metadata || {};
-        const wfType    = r.workflow_type || meta.workflow_type || 'unknown';
+        const wfType    = r.workflow_type || 'unknown';
         const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
         const currentStep = r.current_step_name || '';
 
@@ -725,12 +724,12 @@ window.loadUserRequests = async function() {
 
         return {
           id:        r.id,
-          title:     r.title || meta.doc_name || 'Untitled request',
+          title:     r.title || 'Untitled request',
           status:    statusMap[r.status] || 'in_progress',
           workflow:  wfType.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
           submitted: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
           steps,
-          cocNote:   meta.instructions || meta.notes || '',
+          cocNote:   '',   // loaded lazily from CoC events if needed
           _raw:      r,
         };
       });
@@ -1238,7 +1237,6 @@ window.myrSubmitWorkflow = async function(wfId) {
       submitted_by_resource_id: resId,
       submitted_by_name:        resName,
       created_at:               now,
-      metadata:                 details,
     });
 
     // ── 4. Write CoC event ─────────────────────────────────
@@ -1285,7 +1283,6 @@ window.myrSubmitWorkflow = async function(wfId) {
     if (ownerResId) {
       await API.post('workflow_action_items', {
         id:               crypto.randomUUID(),
-        firm_id:          firmId,
         instance_id:      instanceId,
         title:            `Review request: ${title}`,
         body:             details.instructions || details.justification || details.description || '',
@@ -1294,7 +1291,6 @@ window.myrSubmitWorkflow = async function(wfId) {
         owner_name:       ownerResName,
         created_by_name:  resName,
         due_date:         details.deadline || null,
-        created_at:       now,
       });
     }
 
