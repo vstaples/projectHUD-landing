@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-201000
-console.log('%c[cdn-form-editor] v20260401-201000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-202000
+console.log('%c[cdn-form-editor] v20260401-202000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2903,25 +2903,48 @@ async function _formDoSubmitForReview({ reviewers, approver }) {
 
 async function _formApproveReview() {
   if (!_selectedForm) return;
-  const userId     = window.CURRENT_USER?.id     || 'current_user';
-  const resourceId = window.CURRENT_USER?.resource_id || userId;
-  // Store both user_id and resource_id so panel can match either
-  const toAdd = [userId, resourceId].filter(Boolean);
+
+  // Only store valid UUIDs — never the 'current_user' fallback string
+  const userId     = window.CURRENT_USER?.id;
+  const resourceId = window.CURRENT_USER?.resource_id;
+  const toAdd      = [userId, resourceId].filter(id => id && id !== 'current_user' && /^[0-9a-f-]{36}$/i.test(id));
+
   const existing = _selectedForm.reviewed_by || [];
   _selectedForm.reviewed_by = [...new Set([...existing, ...toAdd])];
+
   const allReviewed = (_selectedForm.pending_reviewer_ids||[]).every(id =>
     (_selectedForm.reviewed_by||[]).includes(id)
   ) || (_selectedForm.pending_reviewer_ids||[]).length === 0;
 
+  const actorNote = window.CURRENT_USER?.name || window.CURRENT_USER?.email || 'Reviewer';
+
   if (allReviewed) {
     _selectedForm.state = 'reviewed';
-    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'in_review', to:'reviewed', note:'All reviewers approved — awaiting approval' });
+    _formCoCWrite('form.state_changed', _selectedForm.id, {
+      from: 'in_review', to: 'reviewed',
+      note: 'All reviewers approved — awaiting approval'
+    });
     cadToast('Review complete — awaiting final approval', 'success');
   } else {
-    _formCoCWrite('form.state_changed', _selectedForm.id, { from:'in_review', to:'in_review', note:`Reviewer ${userId} approved` });
+    _formCoCWrite('form.state_changed', _selectedForm.id, {
+      from: 'in_review', to: 'in_review',
+      note: `${actorNote} approved`
+    });
     cadToast('Your review recorded', 'info');
   }
+
   await _formSave();
+
+  // If in preview mode — refresh panels in-place, do NOT exit preview
+  if (_formPreviewMode) {
+    _formRefreshToolbar();
+    _formRefreshRolePanel();
+    // Reload history panel with fresh CoC data
+    await _formShowPreviewHistoryPanel();
+    return;
+  }
+
+  // Not in preview — full re-render
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
 }
