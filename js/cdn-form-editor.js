@@ -5075,7 +5075,8 @@ function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds) {
         return { lines:['Draft'], color:'#4f8ef7', status:'ready' };
       }
       case 'review': {
-        if (['approved','released'].includes(currentState))
+        // Green if form made it past review (approved, released, rejected at a later stage)
+        if (['approved','released','rejected_approval','rejected_release'].includes(currentState))
           return { lines:['Review','Complete'], color:'#2a9d40', status:'done' };
         if (currentState === 'reviewed')
           return { lines:['Review','Complete'], color:'#2a9d40', status:'done' };
@@ -5091,8 +5092,9 @@ function _fphRenderDag(currentState, reviewedBy, pendingReviewerIds) {
         return { lines:['Review'], color:'#3a3f52', status:'pending' };
       }
       case 'approve': {
-        if (currentState === 'released')
-          return { lines:['Approve','Complete'], color:'#2a9d40', status:'done' };
+        // Green if form made it past approval (released, or rejected at release gate)
+        if (['released','rejected_release'].includes(currentState))
+          return { lines:['Approved'], color:'#2a9d40', status:'done' };
         if (currentState === 'approved')
           return { lines:['Approved'], color:'#2a9d40', status:'done' };
         if (currentState === 'rejected_approval')
