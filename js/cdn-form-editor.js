@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-212000
-console.log('%c[cdn-form-editor] v20260401-212000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-213000
+console.log('%c[cdn-form-editor] v20260401-213000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -240,7 +240,7 @@ function _formStateLabel(state) {
   return { draft:'Draft', unreleased:'Unreleased',
            in_review:'In Review', reviewed:'Reviewed',
            approved:'Approved', released:'Released', archived:'Archived',
-           rejected_review:'Rejected — Review', rejected_approval:'Rejected — Approval' }[state] || state;
+           rejected_review:'Rejected — Review', rejected_approval:'Rejected — Approval', rejected_release:'Rejected — Release' }[state] || state;
 }
 
 function _formStateColor(state) {
@@ -248,7 +248,7 @@ function _formStateColor(state) {
            in_review:'var(--accent)', reviewed:'var(--cad)',
            approved:'var(--green)', released:'var(--green)',
            archived:'var(--muted)', rejected_review:'var(--red)',
-           rejected_approval:'var(--red)' }[state] || 'var(--muted)';
+           rejected_approval:'var(--red)', rejected_release:'var(--red)' }[state] || 'var(--muted)';
 }
 
 function renderFormsTab(el) {
@@ -331,14 +331,14 @@ function _renderFormList() {
             background:${{ in_review:'rgba(79,142,247,.15)', reviewed:'rgba(196,125,24,.15)',
               approved:'rgba(42,157,64,.15)', released:'rgba(42,157,64,.15)',
               archived:'rgba(255,255,255,.06)', unreleased:'rgba(212,144,31,.15)',
-              rejected_review:'rgba(220,60,60,.15)', rejected_approval:'rgba(220,60,60,.15)' }[f.state]||'transparent'};
+              rejected_review:'rgba(220,60,60,.15)', rejected_approval:'rgba(220,60,60,.15)', rejected_release:'rgba(220,60,60,.15)' }[f.state]||'transparent'};
             color:${{ in_review:'var(--accent)', reviewed:'var(--cad)',
               approved:'var(--green)', released:'var(--green)',
               archived:'var(--muted)', unreleased:'var(--amber)',
-              rejected_review:'var(--red)', rejected_approval:'var(--red)' }[f.state]||'var(--muted)'}"
+              rejected_review:'var(--red)', rejected_approval:'var(--red)', rejected_release:'var(--red)' }[f.state]||'var(--muted)'}"
           >${{ in_review:'● In Review', reviewed:'● Awaiting Approval', approved:'✓ Approved',
                released:'✓ Released', archived:'Archived', unreleased:'Unreleased',
-               rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
+               rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected', rejected_release:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -2299,7 +2299,7 @@ function _formCategoryPill(f) {
 
 function _formLifecycleButtons(f) {
   const state  = f.state || 'draft';
-  const isEdit = ['draft','unreleased','rejected_review','rejected_approval'].includes(state);
+  const isEdit = ['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(state);
   const btns   = [];
 
   // Save button — always visible in editable states
@@ -3312,6 +3312,12 @@ async function _formRejectForm(rejectionStage) {
         rejected_by: window.CURRENT_USER?.id || 'editor'
       });
       cadToast('Rejected — returned to editor for revision', 'info');
+      if (_formPreviewMode) {
+        _formRefreshToolbar();
+        _formRefreshRolePanel();
+        await _formShowPreviewHistoryPanel();
+        return;
+      }
       const el = document.getElementById('cad-content');
       if (el) renderFormsTab(el);
     }
@@ -3429,11 +3435,11 @@ function _formShowReleaseModal(form) {
     }
     overlay.remove();
     const from = _selectedForm.state;
-    _selectedForm.state       = 'unreleased';
+    _selectedForm.state       = 'rejected_release';
     _selectedForm.review_note = note;
     await _formSave();
     _formCoCWrite('form.rejected', _selectedForm.id, {
-      from, to: 'unreleased', stage: 'release', note,
+      from, to: 'rejected_release', stage: 'release', note,
       rejected_by: window.CURRENT_USER?.id || null,
     });
     cadToast('Returned for revision', 'info');
@@ -5057,6 +5063,7 @@ function _fphRenderDag(currentState) {
     released:            { activeId:'released', color:'#2a9d40' },
     rejected_review:     { activeId:'in_review',color:'#dc2626' },   // red — rejected here
     rejected_approval:   { activeId:'reviewed', color:'#dc2626' },   // red — rejected here
+    rejected_release:    { activeId:'released', color:'#dc2626' },    // red — rejected at release gate
   };
 
   const mapped       = STATE_MAP[currentState] || STATE_MAP.draft;
@@ -5064,7 +5071,7 @@ function _fphRenderDag(currentState) {
   const activeColor  = mapped.color;
   const activeIdx    = stateOrder.indexOf(activeId);
 
-  const isRejected   = currentState === 'rejected_review' || currentState === 'rejected_approval';
+  const isRejected   = currentState === 'rejected_review' || currentState === 'rejected_approval' || currentState === 'rejected_release';
   const isReleaseRejected = currentState === 'unreleased' || isRejected;
   const isUnreleased = currentState === 'unreleased';
 
@@ -5190,14 +5197,14 @@ function _fphRenderDag(currentState) {
   // ── Rejection arc (BELOW) — from rejected node back to Draft ────────────────
   if (isRejected) {
     const arcY   = nodeY + nodeH + 32;
-    const srcIdx = currentState === 'rejected_review' ? 1 : 2;
+    const srcIdx = currentState === 'rejected_review' ? 1 : currentState === 'rejected_release' ? 4 : 2;
     const srcX   = startX + srcIdx * (nodeW + colGap) + nodeW / 2;
     const dstX   = startX + nodeW / 2;
     const midX   = (srcX + dstX) / 2;
     svg += `<path d="M${srcX},${nodeY + nodeH} C${srcX},${arcY} ${dstX},${arcY} ${dstX},${nodeY + nodeH}"
       fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3"
       marker-end="url(#arrR)"/>`;
-    const label = currentState === 'rejected_review' ? 'Review Rejected' : 'Approval Rejected';
+    const label = currentState === 'rejected_review' ? 'Review Rejected' : currentState === 'rejected_release' ? 'Release Rejected' : 'Approval Rejected';
     svg += `<text x="${midX}" y="${arcY + 18}" text-anchor="middle"
       font-size="13" font-weight="600" fill="#dc2626" font-family="Arial,sans-serif">${label}</text>`;
   }
