@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-226001
-console.log('%c[cdn-form-editor] v20260401-226001','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260401-229000
+console.log('%c[cdn-form-editor] v20260401-229000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2323,6 +2323,12 @@ function _formLifecycleButtons(f) {
         btns.push(`<span style="font-size:12px;color:var(--red);font-family:Arial,sans-serif">
           ✗ Rejected — revise & resubmit</span>`);
       }
+      // Cancel Revision — only for unreleased (revision in progress, not yet submitted)
+      if (state === 'unreleased') {
+        btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCancelRevision()"
+          style="font-size:13px;color:var(--red);border-color:rgba(248,113,113,.4)">
+          ✕ Cancel Revision</button>`);
+      }
       btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
         style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
     } else {
@@ -2566,9 +2572,7 @@ function _formRefreshToolbar() {
   const cat = window.FormSettings?.getCategoryById?.(f.category_id);
   const topTb = document.getElementById('form-top-toolbar');
   if (!topTb) {
-    // Toolbar not in DOM — fall back to full re-render
-    const el = document.getElementById('cad-content');
-    if (el) renderFormsTab(el);
+    await _formRefreshUI();
     return;
   }
   // Re-render just the lifecycle buttons
@@ -2591,6 +2595,18 @@ function _formRefreshToolbar() {
 // ─────────────────────────────────────────────────────────────────────────────
 // LIFECYCLE STATE TRANSITIONS
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Preview-safe refresh — stays in preview if active, otherwise full re-render
+async function _formRefreshUI() {
+  if (_formPreviewMode) {
+    _formRefreshToolbar();
+    _formRefreshRolePanel();
+    await _formShowPreviewHistoryPanel();
+    return;
+  }
+  await _formRefreshUI();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // APPROVAL CHAIN DIALOG — shown when editor clicks Submit for Review
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2913,9 +2929,7 @@ async function _formDoSubmitForReview({ reviewers, approver }) {
   }
 
   cadToast(`Submitted for review — ${reviewers.length} reviewer(s) notified`, 'success');
-
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  await _formRefreshUI();
 }
 
 function _formShowMarkReviewedModal() {
@@ -3060,16 +3074,7 @@ async function _formApproveReview(reviewNote) {
 
   await _formSave();
 
-  // ── Stay in preview if we're already there ────────────────────────────────
-  if (_formPreviewMode) {
-    _formRefreshToolbar();
-    _formRefreshRolePanel();
-    await _formShowPreviewHistoryPanel();
-    return;
-  }
-
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  await _formRefreshUI();
 }
 
 async function _formApproveAndRelease() {
@@ -3217,9 +3222,8 @@ async function _formDoApproveAndRelease({ newVer, note }) {
       }
     }
   } catch(e) { console.warn('Approver notification failed:', e.message); }
-  cadToast(`Released as ${newVer}`, 'success');
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  cadToast('Approved — ready for release', 'success');
+  await _formRefreshUI();
 }
 
 async function _formReleaseDirectly() {
@@ -3231,8 +3235,7 @@ async function _formReleaseDirectly() {
   await _formSave();
   _formCoCWrite('form.released', _selectedForm.id, { version:_selectedForm.version, note });
   cadToast(`Released ${_selectedForm.version}`, 'success');
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  await _formRefreshUI();
 }
 
 // _formRejectForm — called from reviewer (in_review) or approver (reviewed) reject buttons
@@ -3414,14 +3417,7 @@ async function _formRejectForm(rejectionStage) {
       });
       await _formSave();
       cadToast('Rejected — returned to editor for revision', 'info');
-      if (_formPreviewMode) {
-        _formRefreshToolbar();
-        _formRefreshRolePanel();
-        await _formShowPreviewHistoryPanel();
-        return;
-      }
-      const el = document.getElementById('cad-content');
-      if (el) renderFormsTab(el);
+      await _formRefreshUI();
     }
   });
 }
@@ -3548,8 +3544,7 @@ function _formShowReleaseModal(form) {
     // 2. Save — this auto-transitions to draft and writes "Returned to Draft" CoC
     await _formSave();
     cadToast('Returned for revision', 'info');
-    const el = document.getElementById('cad-content');
-    if (el) renderFormsTab(el);
+    await _formRefreshUI();
   };
 
   // Commit → execute the release
@@ -3582,8 +3577,56 @@ async function _formDoReleaseFinal(note) {
     supersedes: priorReleased?.id
   });
   cadToast(`Released ${_selectedForm.version}`, 'success');
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  await _formRefreshUI();
+}
+
+
+async function _formCancelRevision() {
+  if (!_selectedForm) return;
+
+  // Find the prior released version to restore to
+  const priorVer = _formDefs.find(f =>
+    f.id !== _selectedForm.id &&
+    f.state === 'released' &&
+    f.source_name === _selectedForm.source_name
+  );
+
+  // Compute what version we'd be returning to
+  // Current form is unreleased at e.g. 0.2.0 — restore to 0.1.0
+  const _cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
+  const _fmt    = _cat?.version_format || 'semver';
+  const currentVer = _selectedForm.version;
+
+  // Bump down = reverse the minor bump: parse and decrement minor
+  const parts = currentVer.replace(/[^\d.]/g,'').split('.').map(Number);
+  parts[1] = Math.max(0, parts[1] - 1);
+  parts[2] = 0;
+  const restoredVer = parts.join('.');
+
+  const confirmed = confirm(
+    `Cancel revision of "${_selectedForm.source_name}"?\n\n` +
+    `Version ${currentVer} will be discarded.\n` +
+    `Form returns to Released at version ${restoredVer}.\n\n` +
+    `Any changes made during this revision will be lost.`
+  );
+  if (!confirmed) return;
+
+  _formCoCWrite('form.state_changed', _selectedForm.id, {
+    from:    'unreleased',
+    to:      'released',
+    version: restoredVer,
+    note:    `Revision cancelled — reverted to ${restoredVer}`,
+  });
+
+  await new Promise(r => setTimeout(r, 50));
+
+  _selectedForm.state   = 'released';
+  _selectedForm.version = restoredVer;
+  _selectedForm.released_at = _selectedForm.released_at || new Date().toISOString();
+  await _formSave();
+
+  cadToast(`Revision cancelled — returned to Released ${restoredVer}`, 'info');
+  await _formRefreshUI();
 }
 
 async function _formCreateRevision() {
@@ -3595,15 +3638,16 @@ async function _formCreateRevision() {
   if (!confirm(`Create a new revision of "${_selectedForm.source_name}"?\n\nVersion will advance from ${_oldVer} → ${_newVer}.\nThe current released version remains active until the new revision is published.`)) return;
   _selectedForm.state   = 'unreleased';
   _selectedForm.version = _newVer;
-  await _formSave();
+  // Write CoC BEFORE save so "Revision Started" timestamp precedes "In Draft"
   _formCoCWrite('form.state_changed', _selectedForm.id, {
     from: 'released', to: 'unreleased',
     version: _newVer,
     note: `Revision started — version ${_oldVer} → ${_newVer}`
   });
+  await new Promise(r => setTimeout(r, 50));
+  await _formSave();
   cadToast(`Revision ${_newVer} opened for editing`, 'info');
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
+  await _formRefreshUI();
 }
 
 async function _formArchive() {
@@ -4964,10 +5008,9 @@ function _formPreviewSubmitStage() {
       }
     });
   } else {
-    // All stages done — toast and auto-exit
+    // All stages done — stay in preview, let user exit manually
     const total = Object.keys(_previewResponses).filter(k => !k.endsWith('_img') && _previewResponses[k]).length;
-    cadToast(`Preview complete — ${total} fields filled across all stages`, 'success');
-    setTimeout(() => _formTogglePreview(), 1200);
+    cadToast(`All stages filled — ${total} fields completed. Click Exit Preview when done.`, 'success');
   }
 }
 
