@@ -1,5 +1,5 @@
-// VERSION: 20260402-141000
-console.log('%c[mw-events] v20260402-141000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-141500
+console.log('%c[mw-events] v20260402-141500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -194,7 +194,6 @@ document.addEventListener('click', function(ev) {
     const item = _wiItems.find(w => w.id === actionBtn.dataset.wiId);
     if (!item) return;
     const status = actionBtn.dataset.wiStatus;
-    if (item.type==='action') {
     if (item.type==='action') {
       // ── Check if this action item is a review/approve request ──────────────
       // Route via workflow_requests table (dedicated) — no title-prefix heuristic.
