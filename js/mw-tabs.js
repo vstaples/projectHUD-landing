@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-120000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-130000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -869,8 +869,8 @@ window.loadUserRequests = async function() {
         padding-top: 8px;
       }
       .myr-coc-label {
-        font-family: var(--font-head); font-size: 11px; letter-spacing: .07em;
-        text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 6px;
+        font-family: var(--font-head); font-size: 13px; letter-spacing: .05em;
+        text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 6px;
         display: flex; align-items: center; justify-content: space-between;
         cursor: pointer; padding: 2px 0;
       }
@@ -889,8 +889,8 @@ window.loadUserRequests = async function() {
         width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
       }
       .myr-coc-time {
-        font-family: var(--font-head); font-size: 11px;
-        color: #c47d18; white-space: nowrap;
+        font-family: var(--font-head); font-size: 12px;
+        color: #e89b30; white-space: nowrap;
         padding-top: 2px; flex-shrink: 0; min-width: 110px;
       }
       .myr-coc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -899,12 +899,12 @@ window.loadUserRequests = async function() {
         color: rgba(0,210,255,.9); letter-spacing: .03em; text-transform: capitalize;
       }
       .myr-coc-actor {
-        font-family: var(--font-head); font-size: 11px;
-        color: rgba(255,255,255,.55);
+        font-family: var(--font-head); font-size: 12px;
+        color: rgba(255,255,255,.75);
       }
       .myr-coc-note {
-        font-family: var(--font-head); font-size: 11px;
-        color: rgba(255,255,255,.35);
+        font-family: var(--font-head); font-size: 12px;
+        color: rgba(255,255,255,.6);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       /* History rows */
@@ -1472,15 +1472,15 @@ function renderMyRequestsActive() {
         <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;${dotAnim}"></div>
         <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
         <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyleFn}">${badgeLabel}</span>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
+        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.55)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
       </div>
       <div class="myr-ar-body${(req.expanded || expandedIds.has(req.id)) ?' open':''}" id="myr-ar-body-${i}">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
+        <div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.6);margin-bottom:5px">Workflow progress</div>
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${(req.attachments||[]).length ? `
         <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.07em;
-                      text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">
+          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
+                      text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:5px">
             Documents
           </div>
           <div style="display:flex;flex-direction:column;gap:3px">
@@ -1621,7 +1621,7 @@ function renderMyRequestsActive() {
                 const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
                 const role = getRole(e);
                 return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-                  <td style="padding:6px 10px 6px 0;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap">${_esc(t)}</td>
+                  <td style="padding:6px 10px 6px 0;font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap">${_esc(t)}</td>
                   <td style="padding:6px 10px;font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap">${_esc(e.actor_name||'System')}</td>
                   <td style="padding:6px 10px">
                     <span style="font-family:var(--font-head);font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;${roleStyle(role)}">${role}</span>
@@ -1641,7 +1641,7 @@ function renderMyRequestsActive() {
                   <div style="min-width:0">
                     <div style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF;
                                 overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(p.name)}</div>
-                    <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-top:1px">${p.role}</div>
+                    <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.6);margin-top:1px">${p.role}</div>
                     <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
                       <div style="width:7px;height:7px;border-radius:50%;background:${p.statusColor}"></div>
                       <span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:${p.statusColor}">${_esc(p.status)}</span>
@@ -1652,8 +1652,8 @@ function renderMyRequestsActive() {
               // Comments section
               const commentsHtml = commentEvts.length ? `
                 <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)">
-                  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-                              text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:10px">Comments</div>
+                  <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
+                              text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">Comments</div>
                   ${commentEvts.map(e => {
                     const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
                     let note = '';
@@ -1668,7 +1668,7 @@ function renderMyRequestsActive() {
                       <div style="flex:1;min-width:0">
                         <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
                           <span style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF">${_esc(e.actor_name||'Unknown')}</span>
-                          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">${_esc(t)}</span>
+                          <span style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.5)">${_esc(t)}</span>
                         </div>
                         <div style="font-family:var(--font-head);font-size:12px;color:rgba(240,246,255,.65);
                                     padding:7px 10px;background:rgba(255,255,255,.03);
@@ -1682,8 +1682,6 @@ function renderMyRequestsActive() {
                 <div style="display:grid;grid-template-columns:1fr 190px;gap:0;margin-top:4px;min-width:0">
                   <!-- Left: Lifecycle table -->
                   <div style="border-right:1px solid rgba(255,255,255,.06);padding-right:14px;min-width:0;overflow:hidden">
-                    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-                                text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:8px">Lifecycle</div>
                     <table style="width:100%;border-collapse:collapse;table-layout:fixed">
                       <colgroup>
                         <col style="width:130px">
@@ -1693,10 +1691,10 @@ function renderMyRequestsActive() {
                       </colgroup>
                       <thead>
                         <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-                          <th style="text-align:left;padding:0 8px 6px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">DATE/TIME</th>
-                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">PERSON</th>
-                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ROLE</th>
-                          <th style="text-align:left;padding:0 0 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ACTION</th>
+                          <th style="text-align:left;padding:0 8px 6px 0;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">DATE/TIME</th>
+                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">PERSON</th>
+                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">ROLE</th>
+                          <th style="text-align:left;padding:0 0 6px;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">ACTION</th>
                         </tr>
                       </thead>
                       <tbody>${tableRows}</tbody>
@@ -1705,8 +1703,8 @@ function renderMyRequestsActive() {
                   </div>
                   <!-- Right: Approval process -->
                   <div style="padding-left:14px;min-width:0">
-                    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-                                text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:4px">Approval Process</div>
+                    <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
+                                text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:4px">Approval Process</div>
                     ${sidebarRows}
                   </div>
                 </div>`;
@@ -1825,16 +1823,16 @@ function renderMyRequestsHistory() {
         <div style="width:8px;height:8px;border-radius:50%;background:${isApproved?'#1D9E75':'#E24B4A'};flex-shrink:0"></div>
         <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
         <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
+        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.55)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
         <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2)">&#9656;</div>
       </div>
       <div id="${bodyId}" class="myr-ar-body open">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
+        <div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.6);margin-bottom:5px">Workflow progress</div>
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${(req.attachments||[]).length ? `
         <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;
-                      text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">Documents</div>
+          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
+                      text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:5px">Documents</div>
           ${(req.attachments||[]).map(a => {
             const icon = (a.type||'').includes('pdf') ? '📄' :
                          (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
