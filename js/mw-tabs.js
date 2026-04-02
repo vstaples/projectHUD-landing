@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-170500
+// VERSION: 20260402-171000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-170500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-171000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1698,7 +1698,15 @@ window.myrOpenWorkflowForm = function(wfId) {
       </div>
       ${formBody}
     </div>
-    <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end">
+    <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;align-items:center">
+      ${wfId === 'doc-review' ? `
+      <label style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;
+                    color:rgba(255,255,255,.3);cursor:pointer;user-select:none;margin-right:auto">
+        <input type="checkbox" id="myr-save-responses"
+          ${localStorage.getItem('myr_save_responses') === '1' ? 'checked' : ''}
+          style="accent-color:#00D2FF;cursor:pointer"/>
+        Save responses
+      </label>` : '<div style="margin-right:auto"></div>'}
       <button onclick="myrCloseModal()" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">Cancel</button>
       <button onclick="myrSubmitWorkflow('${wfId}')" data-myr-submit style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Submit request &#8594;</button>
     </div>`;
@@ -1718,6 +1726,29 @@ window.myrOpenWorkflowForm = function(wfId) {
   overlay.innerHTML = '';
   overlay.appendChild(modal);
   overlay.style.display = 'flex';
+
+  // Restore saved doc-review responses if checkbox was previously checked
+  if (wfId === 'doc-review' && localStorage.getItem('myr_save_responses') === '1') {
+    try {
+      const saved = JSON.parse(localStorage.getItem('myr_doc_review_saved') || '{}');
+      if (saved.reviewers?.length) {
+        window._myrPendingReviewers = saved.reviewers;
+        myrRenderReviewerPills();
+      }
+      if (saved.approver) {
+        window._myrPendingApprover = saved.approver;
+        myrRenderApproverPill();
+      }
+      if (saved.deadline) {
+        const dl = modal.querySelector('[data-myr-field="deadline"]');
+        if (dl) dl.value = saved.deadline;
+      }
+      if (saved.instructions) {
+        const instr = modal.querySelector('[data-myr-field="instructions"]');
+        if (instr) instr.value = saved.instructions;
+      }
+    } catch(_) {}
+  }
 };
 
 window.myrCloseModal = function() {
@@ -2274,6 +2305,12 @@ window.myrSubmitWorkflow = async function(wfId) {
       reviewerLabel      = reviewers[0]?.name || '';
       details            = { docs, reviewers, approver, deadline, instructions,
                              doc_count: docs.length, doc_names: docNames };
+      // Persist responses if "Save responses" is checked
+      const saveChk = modal.querySelector('#myr-save-responses');
+      if (saveChk) localStorage.setItem('myr_save_responses', saveChk.checked ? '1' : '0');
+      if (saveChk?.checked) {
+        localStorage.setItem('myr_doc_review_saved', JSON.stringify({ reviewers, approver, deadline, instructions }));
+      }
       break;
     }
     case 'resource-alloc': {
