@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-172500
+// VERSION: 20260402-174000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-172500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-174000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -734,9 +734,10 @@ window.loadUserConcerns = async function() {
 // Fetches real workflow_instances submitted by this user and maps them
 // to the _myRequests shape expected by renderMyRequestsActive/History.
 window.loadUserRequests = async function() {
-  if (window._requestsInFlight) return; // prevent concurrent fetches overwriting each other
+  if (window._requestsInFlight) return;
   window._requestsInFlight = true;
   window._requestsLoaded = true;
+  try {
 
   // Inject supplemental styles once
   if (!document.getElementById('myr-ext-styles')) {
@@ -1062,7 +1063,9 @@ window.loadUserRequests = async function() {
     }, 10000);
     console.log('[MyRequests] CoC live refresh poll started (10s)');
   }
-  window._requestsInFlight = false;
+  } finally {
+    window._requestsInFlight = false;
+  }
 };
 
 window.myrSwitchView = function(view, btn) {
