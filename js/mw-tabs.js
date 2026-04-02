@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-181000
+// VERSION: 20260402-181500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-181000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-181500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1250,6 +1250,8 @@ function renderMyRequestsActive() {
           s = { ...s, done: true,  active: false };
         } else if (approvalCount > 0) {
           s = { ...s, done: false, active: true };
+        } else {
+          s = { ...s, done: false, active: false }; // waiting — show as pending/blue
         }
       }
       const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
@@ -1356,8 +1358,10 @@ function renderMyRequestsActive() {
         </div>`;
       }
 
-      const dotInline = s.done ? 'background:#1D9E75;color:#fff;box-shadow:0 0 0 3px rgba(29,158,117,.2)'
-                      : s.active ? 'background:#EF9F27;color:#060a10;box-shadow:0 0 0 3px rgba(239,159,39,.25)'
+      const isPartialReview = s.label === 'Review' && approvalCount > 0 && !allReviewersDone;
+      const dotInline = s.done        ? 'background:#1D9E75;color:#fff;box-shadow:0 0 0 3px rgba(29,158,117,.2)'
+                      : isPartialReview ? 'background:#EF9F27;color:#060a10;box-shadow:0 0 0 3px rgba(239,159,39,.25)'
+                      : s.active      ? 'background:#00D2FF;color:#060a10;box-shadow:0 0 0 3px rgba(0,210,255,.2)'
                       : 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)';
       return `<div class="myr-pt-step">
         <div class="myr-pt-dot ${cls}" style="${dotInline}">${label}</div>
