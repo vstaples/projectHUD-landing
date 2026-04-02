@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-120000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1235,7 +1235,6 @@ window._mwLoadUserView = async function() {
       let _knownActionIds  = new Set((myActionItems||[]).map(a => a.id));
       let _knownReviewIds  = new Set((myPendingReviews||[]).map(r => r.id));
       let _knownInstSteps  = {};  // instanceId → current_step_name snapshot for submitter
-      let _knownResetCocIds = new Set(); // coc_event IDs for request.changes_requested already handled
       // Seed instance step snapshot from current requests
       (window._myRequests||[]).forEach(r => { _knownInstSteps[r.id] = r._raw?.current_step_name || ''; });
       let _pollCount = 0;
@@ -1243,7 +1242,7 @@ window._mwLoadUserView = async function() {
         if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
         _pollCount++;
         try {
-          const [freshActions, freshReviews, freshInsts, freshResets] = await Promise.all([
+          const [freshActions, freshReviews, freshInsts] = await Promise.all([
             API.get(
               `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
             ).catch(e => { console.warn('[Poll] action_items fetch error:', e.message); return null; }),
@@ -1252,10 +1251,6 @@ window._mwLoadUserView = async function() {
             ).catch(e => { console.warn('[Poll] workflow_requests fetch error:', e.message); return null; }),
             API.get(
               `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name&limit=50`
-            ).catch(() => null),
-            // Detect changes_requested events on instances this user submitted
-            API.get(
-              `coc_events?event_type=eq.request.changes_requested&select=id,entity_id,actor_name,event_notes,occurred_at,created_at&limit=20&order=created_at.desc`
             ).catch(() => null),
           ]);
           const newActions  = (freshActions||[]).filter(a => !_knownActionIds.has(a.id));
@@ -1271,102 +1266,12 @@ window._mwLoadUserView = async function() {
             _knownInstSteps[inst.id] = inst.current_step_name;
             return changed;
           });
-          // Detect new changes_requested events on instances this user submitted
-          const myInstanceIds = new Set(Object.keys(_knownInstSteps));
-          const newResets = (freshResets||[]).filter(e =>
-            e.entity_id && myInstanceIds.has(e.entity_id) && !_knownResetCocIds.has(e.id)
-          );
-          newResets.forEach(e => _knownResetCocIds.add(e.id));
-
-          // For each new reset event: re-notify reviewers + create new action items
-          if (newResets.length) {
-            for (const resetEv of newResets) {
-              try {
-                const instanceId = resetEv.entity_id;
-                // Fetch the instance to get title and submitted_by
-                const instRows = await API.get(
-                  `workflow_instances?id=eq.${instanceId}&select=id,title,firm_id,submitted_by_name`
-                ).catch(() => null);
-                const inst = instRows?.[0];
-                if (!inst) continue;
-
-                // Fetch submitted CoC event to get reviewer/approver list
-                const cocRows = await API.get(
-                  `coc_events?entity_id=eq.${instanceId}&event_type=eq.request.submitted&select=event_notes&limit=1`
-                ).catch(() => null);
-                let subData = {};
-                try { if (cocRows?.[0]) subData = JSON.parse(cocRows[0].event_notes || '{}'); } catch(_) {}
-                const reviewers = subData.reviewers || [];
-                const firmId    = inst.firm_id || _mwFirmId();
-                const changerName = resetEv.actor_name || 'External Approver';
-                const instTitle   = inst.title || 'Document review';
-                const now = new Date().toISOString();
-
-                // Re-open reviewer workflow_requests rows (already done by approve.html,
-                // but patch again to be safe in case of partial failure)
-                await API.patch(
-                  `workflow_requests?instance_id=eq.${instanceId}&role=eq.reviewer`,
-                  { status: 'open', updated_at: now }
-                ).catch(() => {});
-
-                // Create new workflow_action_items for each reviewer
-                for (const reviewer of reviewers) {
-                  if (!reviewer.id) continue;
-                  await API.post('workflow_action_items', {
-                    id:                crypto.randomUUID(),
-                    firm_id:           firmId,
-                    instance_id:       instanceId,
-                    title:             `↺ Re-review requested: ${instTitle}`,
-                    body:              `${changerName} requested changes. Please re-review.`,
-                    status:            'open',
-                    owner_resource_id: reviewer.id,
-                    owner_name:        reviewer.name || '',
-                    created_by_name:   changerName,
-                    due_date:          null,
-                  }).catch(() => {});
-
-                  // Re-notify reviewer by email
-                  if (reviewer.email && window._myrNotify) {
-                    _myrNotify({
-                      toEmail:    reviewer.email,
-                      toName:     reviewer.name || '',
-                      fromName:   changerName,
-                      stepName:   'Review',
-                      stepType:   'review',
-                      title:      instTitle,
-                      instanceId: instanceId,
-                      body:       `${changerName} has requested changes to this document. Please re-review.`,
-                    }).catch(() => {});
-                  }
-                }
-
-                // Create a new action item for the submitter showing reset
-                if (_myResource?.id) {
-                  await API.post('workflow_action_items', {
-                    id:                crypto.randomUUID(),
-                    firm_id:           firmId,
-                    instance_id:       instanceId,
-                    title:             `↺ Changes requested: ${instTitle}`,
-                    body:              `${changerName} requested changes. Document has been returned to Review.`,
-                    status:            'open',
-                    owner_resource_id: _myResource.id,
-                    owner_name:        _myResource.name || '',
-                    created_by_name:   changerName,
-                    due_date:          null,
-                  }).catch(() => {});
-                }
-
-                // Force My Requests reload so submitter sees the reset state
-                window._requestsLoaded = false;
-                compassToast && compassToast(`↺ ${changerName} requested changes on "${instTitle}" — reviewers notified.`, 5000);
-              } catch(resetErr) {
-                console.warn('[Poll] reset re-notify failed:', resetErr.message);
-              }
-            }
-          }
+          // Re-notification on changes_requested is handled directly by approve.html.
+          // The poll detects the step change back to Review via stepChanged above,
+          // which triggers a My Requests reload so the submitter sees the reset state.
 
           const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
-          const totalNew  = newActions.length + newReviews.length + stepChanged.length + newResets.length;
+          const totalNew  = newActions.length + newReviews.length + stepChanged.length;
           if (totalNew) {
             newActions.forEach(a => _knownActionIds.add(a.id));
             newReviews.forEach(r => _knownReviewIds.add(r.id));

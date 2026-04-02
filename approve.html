@@ -842,6 +842,105 @@ async function submitResponse() {
       } catch (resetErr) {
         console.warn('[approve.html] Changes requested reset failed:', resetErr);
       }
+
+      // 5. Re-notify all reviewers directly from approve.html
+      //    No poll dependency — fires immediately at submission time.
+      try {
+        const cocRes = await fetch(
+          `${SUPA_URL}/rest/v1/coc_events?entity_id=eq.${_tokenRec.instance_id}&event_type=eq.request.submitted&select=event_notes&limit=1`,
+          { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+        );
+        const cocRows = await cocRes.json();
+        let subData = {};
+        try { if (cocRows?.[0]) subData = JSON.parse(cocRows[0].event_notes || '{}'); } catch(_) {}
+        const reviewers = subData.reviewers || [];
+        const instTitle = _tokenRec.instance_title || 'Document review';
+        const changerName = _tokenRec.assignee_name || _tokenRec.recipient_name || 'Approver';
+        const notifyUrl = `${SUPA_URL}/functions/v1/notify-step-activated`;
+
+        for (const reviewer of reviewers) {
+          if (!reviewer.email) continue;
+          // Create workflow_action_item for reviewer
+          await fetch(`${SUPA_URL}/rest/v1/workflow_action_items`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              id:                crypto.randomUUID(),
+              firm_id:           _tokenRec.firm_id,
+              instance_id:       _tokenRec.instance_id,
+              title:             `↺ Re-review requested: ${instTitle}`,
+              body:              `${changerName} requested changes. Please re-review.`,
+              status:            'open',
+              owner_resource_id: reviewer.id || null,
+              owner_name:        reviewer.name || '',
+              created_by_name:   changerName,
+            }),
+          }).catch(() => {});
+
+          // Email reviewer via Edge Function
+          fetch(notifyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+            },
+            body: JSON.stringify({
+              firm_id:            _tokenRec.firm_id,
+              instance_id:        _tokenRec.instance_id,
+              instance_title:     instTitle,
+              template_name:      'Document Review Request',
+              step_name:          'Review',
+              step_type:          'review',
+              assignee_name:      reviewer.name || '',
+              assignee_email:     reviewer.email,
+              launched_by:        changerName,
+              is_bist:            false,
+              step_instructions:  `${changerName} has requested changes. Please re-review the document.`,
+              approve_url:        null,
+              reject_url:         null,
+              has_action_buttons: false,
+              outcomes:           [],
+            }),
+          }).catch(() => {});
+        }
+
+        // Also create a Changes Requested action item for the submitter
+        if (subData.submitter_resource_id || _tokenRec.instance_id) {
+          const instRes = await fetch(
+            `${SUPA_URL}/rest/v1/workflow_instances?id=eq.${_tokenRec.instance_id}&select=submitted_by_resource_id,submitted_by_name&limit=1`,
+            { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+          ).catch(() => null);
+          const instData = instRes ? await instRes.json().catch(() => []) : [];
+          const submitterResId = instData?.[0]?.submitted_by_resource_id;
+          const submitterName  = instData?.[0]?.submitted_by_name || '';
+          if (submitterResId) {
+            await fetch(`${SUPA_URL}/rest/v1/workflow_action_items`, {
+              method: 'POST',
+              headers: {
+                'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+                'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+              },
+              body: JSON.stringify({
+                id:                crypto.randomUUID(),
+                firm_id:           _tokenRec.firm_id,
+                instance_id:       _tokenRec.instance_id,
+                title:             `↺ Changes requested: ${instTitle}`,
+                body:              notes || `${changerName} requested changes. Please revise and resubmit.`,
+                status:            'open',
+                owner_resource_id: submitterResId,
+                owner_name:        submitterName,
+                created_by_name:   changerName,
+              }),
+            }).catch(() => {});
+          }
+        }
+      } catch(notifyErr) {
+        console.warn('[approve.html] reviewer re-notify failed:', notifyErr);
+      }
     }
 
     // 3. Write step_completed CoC event via respond-step Edge Function

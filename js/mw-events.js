@@ -1,5 +1,5 @@
-// VERSION: 20260402-184000
-console.log('%c[mw-events] v20260402-184000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-130000
+console.log('%c[mw-events] v20260403-130000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -229,6 +229,26 @@ document.addEventListener('click', function(ev) {
         openRequestReviewPanel(item, item._wrRole === 'approver');
         return;
       }
+      // ── Changes requested / re-review items → open resubmit panel ──────
+      if (item.instanceId && (
+        (item.title||'').startsWith('↺ Changes requested:') ||
+        (item.title||'').startsWith('↺ Re-review requested:')
+      )) {
+        openResubmitPanel(item);
+        return;
+      }
+      // ── Informational items (Approved, Partial approval) → just dismiss ─
+      if (item.instanceId && (
+        (item.title||'').startsWith('✓ Approved:') ||
+        (item.title||'').startsWith('ℹ Partial approval:')
+      )) {
+        // These are read-only notifications — resolve them on click
+        API.patch(`workflow_action_items?id=eq.${item.id}`, { status:'resolved', updated_at: new Date().toISOString() })
+          .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
+          .catch(() => {});
+        compassToast('Notification dismissed.');
+        return;
+      }
       const _ns = negGetState(item.id).state;
       if (_ns==='unrated' || _ns==='pending' || _ns==='negotiating' || _ns==='escalated') {
         // Not yet agreed — open drawer to LOE negotiation panel
@@ -432,7 +452,9 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
   }
 
   const docName      = submittedDetails.doc_name || instance?.title || item.title;
-  const instructions = submittedDetails.instructions || item.body || '';
+  // Don't show placeholder default body as instructions
+  const _rawInstructions = submittedDetails.instructions || item.body || '';
+  const instructions = (_rawInstructions === 'New request' || _rawInstructions === 'Document review request') ? '' : _rawInstructions;
   const deadline     = submittedDetails.deadline || item.due || '';
   const submittedBy  = instance?.submitted_by_name || item.createdBy || 'Unknown';
   const submittedAt  = submitEvent
@@ -466,8 +488,8 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
   // Clickable document list from submission CoC notes
   const docsHtml = (submittedDetails.docs||[]).length
     ? `<div style="margin-bottom:14px">
-        <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
-                    text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">
+        <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.08em;
+                    text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px">
           Documents
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
@@ -532,8 +554,8 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
         <!-- Instructions -->
         ${instructions ? `
         <div style="margin-bottom:14px">
-          <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
-                      text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">
+          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.08em;
+                      text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px">
             Review Instructions
           </div>
           <div style="font-family:var(--font-head);font-size:12px;color:rgba(240,246,255,.7);
@@ -546,8 +568,8 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
 
         <!-- Review comments -->
         <div style="margin-bottom:14px">
-          <label style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
-                        text-transform:uppercase;color:rgba(255,255,255,.3);display:block;margin-bottom:6px">
+          <label style="font-family:var(--font-head);font-size:12px;letter-spacing:.08em;
+                        text-transform:uppercase;color:rgba(255,255,255,.6);display:block;margin-bottom:6px">
             Your Review Comments
             <span style="text-transform:none;letter-spacing:0;color:rgba(255,255,255,.2)"> (optional)</span>
           </label>
@@ -563,8 +585,8 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
 
         <!-- Chain of custody -->
         <div>
-          <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
-                      text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">
+          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.08em;
+                      text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px">
             Chain of Custody
           </div>
           <div style="padding:2px 0">${cocHtml}</div>
@@ -602,6 +624,339 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
   document.body.appendChild(overlay);
   document.getElementById('rrp-comments')?.focus();
 }
+
+// ── Resubmit Panel ────────────────────────────────────────────────────────────
+// Opens when the SUBMITTER clicks a "↺ Changes requested" or "↺ Re-review requested"
+// action item. Lets them upload revised documents and resubmit to reviewers.
+// On submit: resolves their action item, creates reviewer work items, notifies.
+// ─────────────────────────────────────────────────────────────────────────────
+window.openResubmitPanel = async function openResubmitPanel(item) {
+  document.getElementById('req-resubmit-panel')?.remove();
+
+  const firmId  = _mwFirmId();
+  const resName = _myResource?.name || 'Unknown';
+  const resId   = _myResource?.id   || null;
+
+  // Fetch instance + CoC for full context
+  let instance = null;
+  let cocEvents = [];
+  if (item.instanceId) {
+    try {
+      const [instRows, coc] = await Promise.all([
+        API.get(`workflow_instances?id=eq.${item.instanceId}&select=*&limit=1`).catch(()=>[]),
+        API.get(`coc_events?entity_id=eq.${item.instanceId}&order=occurred_at.asc&select=*`).catch(()=>[]),
+      ]);
+      instance  = instRows?.[0] || null;
+      cocEvents = coc || [];
+    } catch(e) { console.warn('[ResubmitPanel] fetch failed:', e); }
+  }
+
+  // Get original submission details
+  let submittedDetails = {};
+  const submitEvent = cocEvents.find(e => e.event_type === 'request.submitted');
+  if (submitEvent) {
+    try { submittedDetails = JSON.parse(submitEvent.event_notes || '{}'); } catch(_) {}
+  }
+
+  // Get the changes_requested event for context
+  const changesEv = [...cocEvents].reverse().find(e => e.event_type === 'request.changes_requested');
+  let changesNote = '';
+  if (changesEv) {
+    try { changesNote = JSON.parse(changesEv.event_notes||'{}').comments || ''; } catch(_) {}
+  }
+
+  const reviewers    = submittedDetails.reviewers || [];
+  const approver     = submittedDetails.approver || null;
+  const instTitle    = instance?.title || item.title || 'Document review';
+  const changerName  = changesEv?.actor_name || 'Approver';
+
+  // Prior documents shown as reminders
+  const priorDocs = (submittedDetails.docs||[]);
+  const priorDocsHtml = priorDocs.length ? `
+    <div style="margin-bottom:4px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35)">
+      Prior documents (re-upload revised versions below):
+    </div>
+    ${priorDocs.map(d => `<div style="font-family:var(--font-head);font-size:11px;
+      color:rgba(255,255,255,.3);padding:3px 8px;background:rgba(255,255,255,.02);
+      border-left:2px solid rgba(255,255,255,.1);margin-bottom:2px">
+      📄 ${esc(d.name||'Document')} <span style="color:rgba(255,75,74,.4)">↑ re-upload required</span>
+    </div>`).join('')}` : '';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'req-resubmit-panel';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:800;' +
+    'display:flex;align-items:center;justify-content:center;padding:20px';
+
+  overlay.innerHTML = `
+    <div style="background:#0d1b2e;border:1px solid rgba(239,159,39,.35);width:560px;max-height:88vh;
+                border-radius:4px;overflow:hidden;display:flex;flex-direction:column">
+
+      <!-- Header -->
+      <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
+                  display:flex;align-items:flex-start;gap:10px;flex-shrink:0;
+                  background:rgba(239,159,39,.04)">
+        <div style="flex:1">
+          <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.08em;
+                      text-transform:uppercase;color:#EF9F27;margin-bottom:4px">
+            ↺ Changes Requested — Resubmit
+          </div>
+          <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;margin-bottom:3px">
+            ${esc(instTitle)}
+          </div>
+          <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.45)">
+            ${changerName} requested changes${changesNote ? ' — ' + esc(changesNote) : ''}
+          </div>
+        </div>
+        <button onclick="document.getElementById('req-resubmit-panel').remove()"
+          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;
+                 width:22px;height:22px;cursor:pointer;font-family:var(--font-head);
+                 font-size:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+          &#x2715;
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div style="flex:1;overflow-y:auto;padding:16px 18px">
+
+        <!-- Reviewers being notified -->
+        <div style="margin-bottom:14px;padding:10px 12px;background:rgba(0,210,255,.03);
+                    border:1px solid rgba(0,210,255,.1);border-left:2px solid rgba(0,210,255,.3)">
+          <div style="font-family:var(--font-head);font-size:12px;color:rgba(0,210,255,.7);margin-bottom:4px">
+            Reviewers to be notified on resubmit:
+          </div>
+          <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.65)">
+            ${reviewers.map(r => esc(r.name||r.email||'Reviewer')).join(' · ') || 'No reviewers found'}
+          </div>
+        </div>
+
+        <!-- Prior docs reminder -->
+        ${priorDocsHtml ? `<div style="margin-bottom:14px">${priorDocsHtml}</div>` : ''}
+
+        <!-- New document upload -->
+        <div style="margin-bottom:14px">
+          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
+                      text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px">
+            Attach Revised Document(s) <span style="color:#E24B4A">*</span>
+          </div>
+          <label id="rsb-file-label"
+            style="display:flex;align-items:center;gap:8px;padding:10px 14px;
+                   background:rgba(0,210,255,.04);border:1px dashed rgba(0,210,255,.3);
+                   color:#00D2FF;font-family:var(--font-head);font-size:12px;
+                   cursor:pointer;transition:background .12s"
+            onmouseover="this.style.background='rgba(0,210,255,.09)'"
+            onmouseout="this.style.background='rgba(0,210,255,.04)'">
+            <span>📎</span>
+            <span id="rsb-file-names">Click to attach PDF, Word, or Excel</span>
+            <input type="file" id="rsb-file-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx"
+              style="display:none" onchange="_rsbOnFiles(this)">
+          </label>
+        </div>
+
+        <!-- Resubmit note -->
+        <div style="margin-bottom:14px">
+          <label style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
+                        text-transform:uppercase;color:rgba(255,255,255,.6);display:block;margin-bottom:6px">
+            Note to Reviewers
+            <span style="text-transform:none;letter-spacing:0;color:rgba(255,255,255,.3);font-size:11px"> (optional)</span>
+          </label>
+          <textarea id="rsb-note"
+            placeholder="Describe what was changed in this revision…"
+            style="width:100%;padding:8px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+                   color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
+                   resize:none;box-sizing:border-box;line-height:1.6" rows="3"
+            onfocus="this.style.borderColor='rgba(0,210,255,.5)'"
+            onblur="this.style.borderColor='rgba(0,210,255,.2)'"></textarea>
+        </div>
+
+        <div id="rsb-status" style="font-family:var(--font-head);font-size:12px;
+             color:rgba(255,75,74,.8);min-height:16px;margin-bottom:8px"></div>
+
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:12px 18px;border-top:1px solid rgba(255,255,255,.07);
+                  display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;
+                  background:rgba(0,0,0,.2)">
+        <button onclick="document.getElementById('req-resubmit-panel').remove()"
+          style="font-family:var(--font-head);font-size:11px;padding:6px 16px;
+                 background:none;border:1px solid rgba(255,255,255,.15);
+                 color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">
+          Cancel
+        </button>
+        <button id="rsb-submit-btn"
+          onclick="_rsbSubmit('${item.id}','${item.instanceId||''}')"
+          style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 20px;
+                 background:rgba(239,159,39,.12);border:1px solid rgba(239,159,39,.5);
+                 color:#EF9F27;cursor:pointer;letter-spacing:.06em">
+          ↺ Resubmit for Review
+        </button>
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+
+  // Store context for submit handler
+  window._rsbContext = { reviewers, approver, submittedDetails, firmId };
+};
+
+// ── Track selected files for resubmit ────────────────────────────────────────
+window._rsbFiles = [];
+window._rsbOnFiles = function(input) {
+  window._rsbFiles = Array.from(input.files||[]);
+  const label = document.getElementById('rsb-file-names');
+  if (label) {
+    label.textContent = window._rsbFiles.length
+      ? window._rsbFiles.map(f => f.name).join(', ')
+      : 'Click to attach PDF, Word, or Excel';
+  }
+};
+
+// ── Resubmit submit handler ───────────────────────────────────────────────────
+window._rsbSubmit = async function(actionItemId, instanceId) {
+  const note     = document.getElementById('rsb-note')?.value?.trim() || '';
+  const statusEl = document.getElementById('rsb-status');
+  const submitBtn = document.getElementById('rsb-submit-btn');
+  const files    = window._rsbFiles || [];
+  const ctx      = window._rsbContext || {};
+
+  if (!files.length) {
+    if (statusEl) statusEl.textContent = 'Please attach at least one revised document.';
+    return;
+  }
+
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Uploading…'; }
+  if (statusEl)  statusEl.textContent = '';
+
+  const firmId  = _mwFirmId();
+  const resName = _myResource?.name || 'Unknown';
+  const resId   = _myResource?.id   || null;
+  const now     = new Date().toISOString();
+
+  try {
+    // 1. Upload documents to storage
+    const uploadedDocs = [];
+    for (const file of files) {
+      try {
+        const token  = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
+        const bucket = (typeof _mwStorageBucket === 'function') ? _mwStorageBucket() : 'workflow-documents';
+        const path   = `${firmId}/${instanceId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+        const uploadRes = await fetch(
+          `${(typeof _mwSupaURL==='function'?_mwSupaURL():'https://dvbetgdzksatcgdfftbs.supabase.co')}/storage/v1/object/${bucket}/${path}`,
+          { method:'POST', headers:{
+              'Authorization': `Bearer ${token||''}`,
+              'Content-Type': file.type||'application/octet-stream',
+              'x-upsert': 'true',
+            }, body: file }
+        );
+        if (uploadRes.ok) {
+          uploadedDocs.push({ name: file.name, path, mime: file.type, size: file.size, source: 'upload' });
+        }
+      } catch(uploadErr) { console.warn('[Resubmit] upload error:', uploadErr); }
+    }
+
+    if (!uploadedDocs.length) {
+      if (statusEl)  statusEl.textContent = 'Upload failed — please try again.';
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '↺ Resubmit for Review'; }
+      return;
+    }
+
+    // 2. Write new request.submitted CoC event (this is the re-submission record)
+    const cocPayload = {
+      id:           crypto.randomUUID(),
+      firm_id:      firmId,
+      entity_id:    instanceId,
+      entity_type:  'workflow_instance',
+      event_type:   'request.submitted',
+      event_class:  'lifecycle',
+      severity:     'info',
+      event_notes:  JSON.stringify({
+        ...ctx.submittedDetails,
+        docs:         uploadedDocs,
+        doc_name:     uploadedDocs.map(d=>d.name).join(', '),
+        note:         note || undefined,
+        resubmission: true,
+      }),
+      actor_name:   resName,
+      actor_resource_id: resId,
+      occurred_at:  now,
+      created_at:   now,
+    };
+    await API.post('coc_events', cocPayload).catch(()=>{});
+
+    // 3. Reset workflow_instance back to Review step
+    await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+      status:            'in_progress',
+      current_step_name: 'Review',
+      updated_at:        now,
+      attachments:       uploadedDocs,
+    }).catch(()=>{});
+
+    // 4. Re-open all reviewer workflow_requests rows
+    await API.patch(
+      `workflow_requests?instance_id=eq.${instanceId}&role=eq.reviewer`,
+      { status: 'open', updated_at: now }
+    ).catch(()=>{});
+
+    // 5. Create new workflow_action_items for each reviewer
+    for (const reviewer of (ctx.reviewers||[])) {
+      if (!reviewer.id) continue;
+      await API.post('workflow_action_items', {
+        id:                crypto.randomUUID(),
+        firm_id:           firmId,
+        instance_id:       instanceId,
+        title:             `Review request: ${uploadedDocs.map(d=>d.name).join(', ')}`,
+        body:              note || ctx.submittedDetails?.instructions || '',
+        status:            'open',
+        owner_resource_id: reviewer.id,
+        owner_name:        reviewer.name || '',
+        created_by_name:   resName,
+      }).catch(()=>{});
+
+      // 6. Email reviewer
+      if (reviewer.email && window._myrNotify) {
+        _myrNotify({
+          toEmail:    reviewer.email,
+          toName:     reviewer.name || '',
+          fromName:   resName,
+          stepName:   'Review',
+          stepType:   'review',
+          title:      uploadedDocs.map(d=>d.name).join(', '),
+          instanceId: instanceId,
+          body:       note || 'A revised document has been submitted for your review.',
+        }).catch(()=>{});
+      }
+    }
+
+    // 7. Resolve the submitter's "Changes requested" action item
+    if (actionItemId) {
+      await API.patch(
+        `workflow_action_items?id=eq.${actionItemId}`,
+        { status: 'resolved', updated_at: now }
+      ).catch(()=>{});
+    }
+    // Also resolve any other open changes-requested items for this instance
+    await API.patch(
+      `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open`,
+      { status: 'resolved', updated_at: now }
+    ).catch(()=>{});
+
+    // 8. Close panel and refresh
+    document.getElementById('req-resubmit-panel')?.remove();
+    window._rsbFiles = [];
+    _viewLoaded['user'] = false;
+    _mwLoadUserView();
+    window._requestsLoaded = false;
+    window.loadUserRequests && window.loadUserRequests();
+    compassToast(`↺ Resubmitted — ${ctx.reviewers?.length||0} reviewer(s) notified.`);
+
+  } catch(err) {
+    console.error('[Resubmit] failed:', err);
+    if (statusEl)  statusEl.textContent = 'Resubmit failed — ' + (err.message||'check console');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '↺ Resubmit for Review'; }
+  }
+};
+
 
 // ── Review panel submit ───────────────────────────────────
 window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
@@ -705,25 +1060,8 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         }).catch(()=>{});
       }
 
-      // Notify all other open reviewers so they see the partial approval in their queue
-      if (approved) {
-        const otherReviewers = await API.get(
-          `workflow_requests?instance_id=eq.${instanceId}&role=eq.reviewer&status=eq.open&select=id,owner_resource_id,owner_name&limit=50`
-        ).catch(() => []);
-        for (const r of (otherReviewers||[]).filter(r => r.owner_resource_id !== resId)) {
-          await API.post('workflow_action_items', {
-            id:                crypto.randomUUID(),
-            firm_id:           _mwFirmId(),
-            instance_id:       instanceId,
-            title:             `ℹ Partial approval: ${inst?.title||'Document review request'}`,
-            body:              `${resName} approved. Your review is still pending.`,
-            status:            'open',
-            owner_resource_id: r.owner_resource_id,
-            owner_name:        r.owner_name || '',
-            created_by_name:   resName,
-          }).catch(()=>{});
-        }
-      }
+      // Partial approval is recorded in the CoC — no separate action item needed.
+      // Other reviewers will see the amber step color in the submitter's My Requests view.
     }
 
     document.getElementById('req-review-panel')?.remove();

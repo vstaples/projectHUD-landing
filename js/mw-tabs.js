@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-130000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1307,8 +1307,13 @@ function renderMyRequestsActive() {
       if (s.label === 'Approve') {
         if (approverApproved) {
           s = { ...s, done: true, active: false };
+        } else if (lastResetTs && approvalCount === 0) {
+          // Post-reset with no new approvals yet — force back to pending/gray
+          s = { ...s, done: false, active: false };
         } else if (allReviewersDone) {
           s = { ...s, done: false, active: true }; // all reviewers done — approver's turn
+        } else {
+          s = { ...s, done: false, active: false }; // waiting for review
         }
       }
       const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
@@ -3250,11 +3255,25 @@ window.myrDevPurge = async function() {
 
   try {
     // Delete in dependency order — child rows before parent rows
-    await supa('workflow_requests',     `firm_id=eq.${firmId}`);
+    // First collect all doc-review instance IDs so we can wipe ALL their action items
+    const instRows = await API.get(
+      `workflow_instances?firm_id=eq.${firmId}&workflow_type=eq.doc-review&select=id&limit=200`
+    ).catch(() => []);
+    const instIds = (instRows||[]).map(r => r.id);
+
+    await supa('workflow_requests', `firm_id=eq.${firmId}`);
+    // Wipe ALL action items for these instances (regardless of owner or title)
+    for (const iid of instIds) {
+      await supa('workflow_action_items', `instance_id=eq.${iid}`);
+    }
+    // Also catch any remaining by title prefix (legacy / orphaned)
     await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Review request:*`);
     await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Approve request:*`);
     await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%9C%93 Approved:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA Changes requested:*`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA*`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%8F%B3 Pending review:*`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%84%B9 Partial*`);
+    await supa('external_step_tokens',  `firm_id=eq.${firmId}`);
     await supa('coc_events',            `firm_id=eq.${firmId}&event_type=like.request.*`);
     await supa('workflow_instances',    `firm_id=eq.${firmId}&workflow_type=eq.doc-review`);
 
