@@ -1,5 +1,5 @@
-// VERSION: 20260402-173000
-console.log('%c[mw-events] v20260402-173000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-183000
+console.log('%c[mw-events] v20260402-183000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -689,6 +689,8 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title&limit=1`
       ).catch(()=>[]);
       inst = instRows?.[0];
+
+      // Notify submitter
       if (inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
         await API.post('workflow_action_items', {
           id:                crypto.randomUUID(),
@@ -703,6 +705,26 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
           owner_name:        inst.submitted_by_name || '',
           created_by_name:   resName,
         }).catch(()=>{});
+      }
+
+      // Notify all other open reviewers so they see the partial approval in their queue
+      if (approved) {
+        const otherReviewers = await API.get(
+          `workflow_requests?instance_id=eq.${instanceId}&role=eq.reviewer&status=eq.open&select=id,owner_resource_id,owner_name&limit=50`
+        ).catch(() => []);
+        for (const r of (otherReviewers||[]).filter(r => r.owner_resource_id !== resId)) {
+          await API.post('workflow_action_items', {
+            id:                crypto.randomUUID(),
+            firm_id:           _mwFirmId(),
+            instance_id:       instanceId,
+            title:             `ℹ Partial approval: ${inst?.title||'Document review request'}`,
+            body:              `${resName} approved. Your review is still pending.`,
+            status:            'open',
+            owner_resource_id: r.owner_resource_id,
+            owner_name:        r.owner_name || '',
+            created_by_name:   resName,
+          }).catch(()=>{});
+        }
       }
     }
 
