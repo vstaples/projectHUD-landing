@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121000
+// VERSION: 20260402-121100
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -961,7 +961,8 @@ window.loadUserRequests = async function() {
           steps,
           cocNote:     '',
           attachments: r.attachments || [],
-          _raw:        { ...r, reviewers: r.details?.reviewers || [] },
+          _reviewerNames: (window._myRequestReviewers||{})[r.id] || [],
+          _raw:        r,
         };
       });
     } catch(e) {
@@ -981,14 +982,17 @@ window.loadUserRequests = async function() {
     const ids = activeReqs.map(r => r.id).join(',');
     API.get(`workflow_action_items?instance_id=in.(${ids})&select=instance_id,owner_name,title&limit=200`)
       .then(rows => {
+        window._myRequestReviewers = window._myRequestReviewers || {};
         (rows||[]).forEach(a => {
           if (!(a.title||'').startsWith('Review request:')) return;
-          const req = (window._myRequests||[]).find(r => r.id === a.instance_id);
-          if (req) {
-            req._reviewerNames = req._reviewerNames || [];
-            if (a.owner_name && !req._reviewerNames.includes(a.owner_name))
-              req._reviewerNames.push(a.owner_name);
-          }
+          if (!window._myRequestReviewers[a.instance_id])
+            window._myRequestReviewers[a.instance_id] = [];
+          if (a.owner_name && !window._myRequestReviewers[a.instance_id].includes(a.owner_name))
+            window._myRequestReviewers[a.instance_id].push(a.owner_name);
+        });
+        // Apply to request objects
+        (window._myRequests||[]).forEach(r => {
+          r._reviewerNames = window._myRequestReviewers[r.id] || [];
         });
         renderMyRequestsActive();
       }).catch(() => {});
@@ -996,9 +1000,8 @@ window.loadUserRequests = async function() {
 
   // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
   const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
-  window._myRequestCoc = window._myRequestCoc || {};
-  // Always re-fetch — CoC state changes when reviewers act
-  const unloadedIds = allIds;
+  // Always clear CoC cache on re-fetch — picks up new events from reviewers
+  window._myRequestCoc = {};
   if (unloadedIds.length) {
     API.get(
       `coc_events?entity_id=in.(${unloadedIds.join(',')})&order=occurred_at.asc&select=*`
@@ -1685,11 +1688,13 @@ window.myrWithdrawRequest = async function(instanceId) {
       created_at:        now,
     });
 
-    // Close any open action items for this instance
-    await API.patch(`workflow_action_items?instance_id=eq.${instanceId}&status=eq.open`, {
-      status: 'resolved',
-      updated_at: now,
-    }).catch(() => {});
+    // On withdraw: resolve only the submitter's own action items.
+    // Reviewer/approver items remain open so they see the WITHDRAWN tag
+    // and get auto-resolved when they next click the item.
+    await API.patch(
+      `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&owner_resource_id=eq.${resId}`,
+      { status: 'resolved', updated_at: now }
+    ).catch(() => {});
 
     // Optimistic local update
     if (window._myRequests) {
