@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-195000
+// VERSION: 20260402-200000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-195000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1513,7 +1513,170 @@ function renderMyRequestsActive() {
             <span>${cocOpenIds.has(req.id) ? '&#9662; Chain of Custody' : '&#9656; Chain of Custody'}</span>
             <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
           </div>
-          <div class="myr-coc-events${cocOpenIds.has(req.id) ? ' open' : ''}" id="myr-coc-${i}">${cocRows}</div>
+          <div class="myr-coc-events${cocOpenIds.has(req.id) ? ' open' : ''}" id="myr-coc-${i}">
+            ${(() => {
+              if (!instCoc.length) return `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
+
+              // Parse submitted data for roles
+              let subData = {};
+              try { const se = instCoc.find(e=>e.event_type==='request.submitted'); if(se) subData=JSON.parse(se.event_notes||'{}'); } catch(_){}
+              const reviewerIds = new Set((subData.reviewers||[]).map(r=>r.id));
+              const approverId  = subData.approver?.id || null;
+
+              // Role derivation
+              const getRole = (e) => {
+                if (e.event_type === 'request.submitted') return 'Submitter';
+                if (e.event_type === 'request.context_added') return 'Submitter';
+                if (e.actor_resource_id === approverId) return 'Approver';
+                if (reviewerIds.has(e.actor_resource_id)) return 'Reviewer';
+                return 'Submitter';
+              };
+              const roleStyle = (role) => {
+                if (role==='Approver') return 'background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.4);color:#1D9E75';
+                if (role==='Reviewer') return 'background:rgba(239,159,39,.12);border:1px solid rgba(239,159,39,.35);color:#EF9F27';
+                return 'background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF';
+              };
+              const actionStyle = (evt) => {
+                if (evt==='request.submitted') return 'color:#00D2FF';
+                if (evt==='request.approved') return 'color:#1D9E75';
+                if (evt==='request.changes_requested') return 'color:#E24B4A';
+                if (evt==='request.withdrawn') return 'color:#E24B4A';
+                if (evt==='request.context_added') return 'color:rgba(255,255,255,.5)';
+                return 'color:rgba(255,255,255,.4)';
+              };
+              const actionLabel = (evt) => {
+                const map = {
+                  'request.submitted': 'Submitted',
+                  'request.approved': 'Approved',
+                  'request.changes_requested': 'Changes Requested',
+                  'request.withdrawn': 'Withdrawn',
+                  'request.context_added': 'Context Added',
+                };
+                return map[evt] || (evt||'').replace('request.','').replace(/_/g,' ');
+              };
+              const initials = (name) => (name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+              const avatarColor = (role) => role==='Approver'?'#1D9E75':role==='Reviewer'?'#EF9F27':'#00D2FF';
+
+              // Separate comments from lifecycle events
+              const lifecycleEvts = instCoc.filter(e => e.event_type !== 'request.context_added');
+              const commentEvts   = instCoc.filter(e => e.event_type === 'request.context_added');
+
+              // Build approval process sidebar entries
+              const approvalPersons = [];
+              // Submitter
+              const submitEvt = instCoc.find(e=>e.event_type==='request.submitted');
+              if (submitEvt) approvalPersons.push({ name: submitEvt.actor_name||'Submitter', role: 'Submitter', status: 'Submitted', statusColor: '#00D2FF' });
+              // Reviewers from submitted data
+              (subData.reviewers||[]).forEach(r => {
+                const decided = instCoc.find(e => (e.event_type==='request.approved'||e.event_type==='request.changes_requested') && e.actor_resource_id===r.id);
+                approvalPersons.push({
+                  name: r.name||'Reviewer',
+                  role: 'Reviewer',
+                  status: decided ? (decided.event_type==='request.approved'?'Approved':'Changes Requested') : 'Pending',
+                  statusColor: decided ? (decided.event_type==='request.approved'?'#1D9E75':'#E24B4A') : '#EF9F27',
+                });
+              });
+              // Approver
+              if (subData.approver?.name) {
+                const apprEvt = instCoc.find(e=>e.event_type==='request.approved' && e.actor_resource_id===approverId);
+                approvalPersons.push({
+                  name: subData.approver.name,
+                  role: 'Approver',
+                  status: apprEvt ? 'Approved' : 'Pending',
+                  statusColor: apprEvt ? '#1D9E75' : '#EF9F27',
+                });
+              }
+
+              // Lifecycle table
+              const tableRows = lifecycleEvts.map(e => {
+                const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+                const role = getRole(e);
+                return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+                  <td style="padding:6px 10px 6px 0;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap">${_esc(t)}</td>
+                  <td style="padding:6px 10px;font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap">${_esc(e.actor_name||'System')}</td>
+                  <td style="padding:6px 10px">
+                    <span style="font-family:var(--font-head);font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;${roleStyle(role)}">${role}</span>
+                  </td>
+                  <td style="padding:6px 0;font-family:var(--font-head);font-size:12px;font-weight:600;${actionStyle(e.event_type)}">${_esc(actionLabel(e.event_type))}</td>
+                </tr>`;
+              }).join('');
+
+              // Approval process sidebar
+              const sidebarRows = approvalPersons.map(p => `
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                  <div style="width:36px;height:36px;border-radius:50%;background:rgba(${p.role==='Approver'?'29,158,117':p.role==='Reviewer'?'239,159,39':'0,210,255'},.15);
+                              border:2px solid ${avatarColor(p.role)};display:flex;align-items:center;justify-content:center;
+                              font-family:var(--font-head);font-size:12px;font-weight:700;color:${avatarColor(p.role)};flex-shrink:0">
+                    ${initials(p.name)}
+                  </div>
+                  <div style="min-width:0">
+                    <div style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF;
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(p.name)}</div>
+                    <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);margin-top:1px">${p.role}</div>
+                    <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
+                      <div style="width:7px;height:7px;border-radius:50%;background:${p.statusColor}"></div>
+                      <span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:${p.statusColor}">${_esc(p.status)}</span>
+                    </div>
+                  </div>
+                </div>`).join('');
+
+              // Comments section
+              const commentsHtml = commentEvts.length ? `
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)">
+                  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+                              text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:10px">Comments</div>
+                  ${commentEvts.map(e => {
+                    const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+                    let note = '';
+                    try { note = JSON.parse(e.event_notes||'{}').note || ''; } catch(_){}
+                    return `<div style="display:flex;gap:10px;margin-bottom:10px">
+                      <div style="width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.12);
+                                  border:1px solid rgba(0,210,255,.3);display:flex;align-items:center;
+                                  justify-content:center;font-family:var(--font-head);font-size:10px;
+                                  font-weight:700;color:#00D2FF;flex-shrink:0">
+                        ${initials(e.actor_name)}
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+                          <span style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF">${_esc(e.actor_name||'Unknown')}</span>
+                          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">${_esc(t)}</span>
+                        </div>
+                        <div style="font-family:var(--font-head);font-size:12px;color:rgba(240,246,255,.65);
+                                    padding:7px 10px;background:rgba(255,255,255,.03);
+                                    border-left:2px solid rgba(0,210,255,.25);line-height:1.55">${_esc(note)}</div>
+                      </div>
+                    </div>`;
+                  }).join('')}
+                </div>` : '';
+
+              return `
+                <div style="display:grid;grid-template-columns:1fr 200px;gap:0;margin-top:4px">
+                  <!-- Left: Lifecycle table -->
+                  <div style="border-right:1px solid rgba(255,255,255,.06);padding-right:14px">
+                    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+                                text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:8px">Lifecycle</div>
+                    <table style="width:100%;border-collapse:collapse">
+                      <thead>
+                        <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+                          <th style="text-align:left;padding:0 10px 6px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">DATE/TIME</th>
+                          <th style="text-align:left;padding:0 10px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">PERSON</th>
+                          <th style="text-align:left;padding:0 10px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ROLE</th>
+                          <th style="text-align:left;padding:0 0 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody>${tableRows}</tbody>
+                    </table>
+                    ${commentsHtml}
+                  </div>
+                  <!-- Right: Approval process -->
+                  <div style="padding-left:14px">
+                    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+                                text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:4px">Approval Process</div>
+                    ${sidebarRows}
+                  </div>
+                </div>`;
+            })()}
+          </div>
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
           ${approverApproved ? '' : `<button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>`}
