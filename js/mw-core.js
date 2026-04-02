@@ -1,5 +1,5 @@
-// VERSION: 20260402-151500
-console.log('%c[mw-core] v20260402-151500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-153000
+console.log('%c[mw-core] v20260402-153000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -153,7 +153,7 @@ window._mwLoadUserView = async function() {
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
       // 4th parallel fetch: dedicated workflow_requests table (review/approve rows)
-      API.get(`workflow_requests?owner_resource_id=eq.${resId}&status=eq.open&select=id,role,title,body,instance_id,owner_name,due_date&limit=100`).catch(() => []),
+      API.get(`workflow_requests?owner_resource_id=eq.${resId}&status=eq.open&select=id,role,title,body,instance_id,owner_name,created_by_name,due_date,created_at&limit=100`).catch(() => []),
     ]);
 
     // _myCocEvents set after workItems built (below)
@@ -213,6 +213,7 @@ window._mwLoadUserView = async function() {
         overdue:         wr.due_date && wr.due_date < today,
         urgency:         -1,           // always top of queue, exempt from all date filters
         createdBy:       wr.created_by_name || null,
+        createdAt:       wr.created_at || null,
         ownerName:       wr.owner_name || null,
         ownerResourceId: resId,
         instanceId:      wr.instance_id || null,
@@ -639,8 +640,11 @@ window._mwLoadUserView = async function() {
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${_titleStyle}">${esc(w.title)}${_instCancelled?' <span style="font-size:10px;color:#E24B4A;font-family:var(--font-mono)">WITHDRAWN</span>':''}</div>
             <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              <span>${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</span>
-              ${w.type==='action'?(()=>{const _ns=negGetState(w.id).state;return _ns&&_ns!=='unrated'?getNegotiationBadgeHtml(_ns):'';})():''}</div>
+              ${w._isWrRow
+                ? `<span>From: ${esc(w.createdBy||'—')} · ${w.createdAt ? new Date(w.createdAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—'}</span>`
+                : `<span>${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</span>`
+              }
+              ${w.type==='action'&&!w._isWrRow?(()=>{const _ns=negGetState(w.id).state;return _ns&&_ns!=='unrated'?getNegotiationBadgeHtml(_ns):'';})():''}</div>
           </div>
           <div style="padding:0 8px">${progressCell}</div>
           <div style="text-align:center">${dueCell}</div>

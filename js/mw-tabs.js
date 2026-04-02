@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-152000
+// VERSION: 20260402-153000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-152000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-153000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -2473,9 +2473,9 @@ function _buildWorkflowFormBody(wfId, wf) {
         ${label}${required?' <span style="color:#E24B4A">*</span>':''}
       </div>
       <input data-myr-field="${fieldId}" type="date"
-        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+        style="width:160px;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
                color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box;
-               color-scheme:dark"/>
+               color-scheme:dark;display:block"/>
     </div>`;
   const ta = (label, fieldId, val='', rows=3, required=true) =>
     `<div style="margin-bottom:10px">
