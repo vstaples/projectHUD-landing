@@ -1,5 +1,5 @@
-// VERSION: 20260402-170000
-console.log('%c[mw-core] v20260402-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-173000
+console.log('%c[mw-core] v20260402-173000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1261,17 +1261,19 @@ window._mwLoadUserView = async function() {
           // Detect step changes on submitter's own instances
           const stepChanged = (freshInsts||[]).filter(inst => {
             if (!Object.prototype.hasOwnProperty.call(_knownInstSteps, inst.id)) {
-              // New instance — seed without flagging as changed
+              console.log(`[Poll] New instance seeded: ${inst.id.slice(0,8)} step="${inst.current_step_name}"`);
               _knownInstSteps[inst.id] = inst.current_step_name;
               return false;
             }
-            const changed = _knownInstSteps[inst.id] !== inst.current_step_name;
+            const prev = _knownInstSteps[inst.id];
+            const changed = prev !== inst.current_step_name;
+            console.log(`[Poll] Instance ${inst.id.slice(0,8)}: prev="${prev}" now="${inst.current_step_name}" changed=${changed}`);
             _knownInstSteps[inst.id] = inst.current_step_name;
             return changed;
           });
           const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
           const totalNew  = newActions.length + newReviews.length + stepChanged.length;
-          console.log(`[Poll #${_pollCount}] ${totalOpen} open items | ${totalNew} new`
+          console.log(`[Poll #${_pollCount}] open=${totalOpen} new=${totalNew} | activeTab=${typeof _uActiveTab !== 'undefined' ? _uActiveTab : '?'} | inFlight=${!!window._requestsInFlight}`
             + (newActions.length ? ' | actions: ' + newActions.map(a=>a.title?.slice(0,30)).join(', ') : '')
             + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : '')
             + (stepChanged.length ? ' | step changes: ' + stepChanged.map(i=>i.current_step_name).join(', ') : ''));
