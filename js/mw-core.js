@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260402-173000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1238,9 +1238,6 @@ window._mwLoadUserView = async function() {
       // Seed instance step snapshot from current requests
       (window._myRequests||[]).forEach(r => { _knownInstSteps[r.id] = r._raw?.current_step_name || ''; });
       let _pollCount = 0;
-      console.log('%c[Poll] Started — watching workflow_requests + workflow_action_items every 15s | resId: ' + (_myResource?.id||'?'),
-        'background:#1a3a1a;color:#4ade80;padding:2px 6px;font-weight:600');
-      console.log('[Poll] Run window._pollNow() to trigger manually');
       const _doPoll = async () => {
         if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
         _pollCount++;
@@ -1261,35 +1258,26 @@ window._mwLoadUserView = async function() {
           // Detect step changes on submitter's own instances
           const stepChanged = (freshInsts||[]).filter(inst => {
             if (!Object.prototype.hasOwnProperty.call(_knownInstSteps, inst.id)) {
-              console.log(`[Poll] New instance seeded: ${inst.id.slice(0,8)} step="${inst.current_step_name}"`);
               _knownInstSteps[inst.id] = inst.current_step_name;
               return false;
             }
             const prev = _knownInstSteps[inst.id];
             const changed = prev !== inst.current_step_name;
-            console.log(`[Poll] Instance ${inst.id.slice(0,8)}: prev="${prev}" now="${inst.current_step_name}" changed=${changed}`);
             _knownInstSteps[inst.id] = inst.current_step_name;
             return changed;
           });
           const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
           const totalNew  = newActions.length + newReviews.length + stepChanged.length;
-          console.log(`[Poll #${_pollCount}] open=${totalOpen} new=${totalNew} | activeTab=${typeof _uActiveTab !== 'undefined' ? _uActiveTab : '?'} | inFlight=${!!window._requestsInFlight}`
-            + (newActions.length ? ' | actions: ' + newActions.map(a=>a.title?.slice(0,30)).join(', ') : '')
-            + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : '')
-            + (stepChanged.length ? ' | step changes: ' + stepChanged.map(i=>i.current_step_name).join(', ') : ''));
           if (totalNew) {
             newActions.forEach(a => _knownActionIds.add(a.id));
             newReviews.forEach(r => _knownReviewIds.add(r.id));
             const activeTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
             if (activeTab === 'work') {
-              console.log('%c[Poll] Reloading My Work','background:#1a3a1a;color:#4ade80;padding:2px 6px');
               window._mwLoadUserView && window._mwLoadUserView();
             } else if (activeTab === 'requests') {
-              console.log('[Poll] Step/item change — refreshing My Requests');
               window._requestsLoaded = false;
               window.loadUserRequests && window.loadUserRequests();
             } else {
-              console.log('[Poll] New items detected — deferring reload');
               window._mwWorkStale = true;
             }
           }
@@ -1298,7 +1286,6 @@ window._mwLoadUserView = async function() {
       window._pollNow = _doPoll;
       window._actionItemPollTimer = setInterval(_doPoll, 10000);
     } else {
-      console.log('[Poll] Already running — timer:', window._actionItemPollTimer);
     }
 
     

@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-202500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1266,9 +1266,27 @@ function renderMyRequestsActive() {
 
     // Detect final approval from CoC or instance status
     const instanceComplete = req.status === 'completed' || req._raw?.status === 'complete';
+    // approve.html doesn't write actor_resource_id — match approver by name as fallback
+    const approverName = submittedDataForStep.approver?.name || null;
+    const approverApprovedByCoC = allReviewersDone && approvalCount > totalReviewers &&
+      instCoc.some(e =>
+        e.event_type === 'request.approved' &&
+        (e.actor_resource_id === submittedDataForStep.approver?.id ||
+         (approverName && (e.actor_name||'').trim().toLowerCase() === approverName.trim().toLowerCase()))
+      );
     // The approver's event is the last request.approved after all reviewers are done
-    const approverApproved = instanceComplete ||
+    const approverApproved = instanceComplete || approverApprovedByCoC ||
       (allReviewersDone && approvalCount > totalReviewers);
+
+    // Auto-resolve open ⏳ Pending review action items when instance is complete
+    if (isComplete && req.id && !window._myrAutoResolved?.has(req.id)) {
+      window._myrAutoResolved = window._myrAutoResolved || new Set();
+      window._myrAutoResolved.add(req.id);
+      API.patch(
+        `workflow_action_items?instance_id=eq.${req.id}&status=eq.open`,
+        { status: 'resolved', updated_at: new Date().toISOString() }
+      ).catch(() => {});
+    }
 
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
@@ -1490,7 +1508,7 @@ function renderMyRequestsActive() {
                            color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:8px">
                  Submitted by <strong style="color:rgba(255,255,255,.7)">${_esc(actor)}</strong>
                  ${ts ? `· <span style="color:rgba(255,255,255,.3)">${_esc(ts)}</span>` : ''}
-                 — awaiting reviewer action
+                 ${isComplete ? '' : allReviewersDone ? '— awaiting approver' : '— awaiting reviewer action'}
                </div>`
             : '';
         })()}
@@ -1509,12 +1527,14 @@ function renderMyRequestsActive() {
               const reviewerIds = new Set((subData.reviewers||[]).map(r=>r.id));
               const approverId  = subData.approver?.id || null;
 
-              // Role derivation
+              // Role derivation — id match first, then name fallback for approve.html events
+              const approverNameLC = (subData.approver?.name||'').trim().toLowerCase();
               const getRole = (e) => {
                 if (e.event_type === 'request.submitted') return 'Submitter';
                 if (e.event_type === 'request.context_added') return 'Submitter';
-                if (e.actor_resource_id === approverId) return 'Approver';
-                if (reviewerIds.has(e.actor_resource_id)) return 'Reviewer';
+                if (approverId && e.actor_resource_id === approverId) return 'Approver';
+                if (approverNameLC && (e.actor_name||'').trim().toLowerCase() === approverNameLC) return 'Approver';
+                if (e.actor_resource_id && reviewerIds.has(e.actor_resource_id)) return 'Reviewer';
                 return 'Submitter';
               };
               const roleStyle = (role) => {
