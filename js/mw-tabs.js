@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-180000
+// VERSION: 20260402-180500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-180500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1241,6 +1241,7 @@ function renderMyRequestsActive() {
     const totalReviewers   = (submittedDataForStep.reviewers||[]).length || 1;
     const approvalCount    = instCoc.filter(e => e.event_type === 'request.approved').length;
     const allReviewersDone = approvalCount >= totalReviewers;
+    console.log(`[StepRender] req=${req.id.slice(0,8)} instCoc=${instCoc.length} approvals=${approvalCount} totalReviewers=${totalReviewers} allDone=${allReviewersDone}`);
 
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
