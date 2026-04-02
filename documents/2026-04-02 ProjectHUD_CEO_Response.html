@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectHUD — You Asked The Right Questions</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700;900&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #04080f;
+  --bg2:    #080f1c;
+  --bg3:    #0c1525;
+  --cyan:   #00d4ff;
+  --green:  #00e5a0;
+  --amber:  #f5a623;
+  --red:    #ff3b5c;
+  --white:  #f0f6ff;
+  --muted:  #7a9bbf;
+  --dim:    #2a3f58;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-head:    'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+/* GRID BG */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* ══════════════════════════════════
+   PAGE 1 — OPENING STRIKE
+══════════════════════════════════ */
+.p1 {
+  min-height: 100vh;
+  position: relative; z-index: 1;
+  display: flex; align-items: center;
+  padding: 80px;
+  background:
+    radial-gradient(ellipse 60% 80% at 100% 50%, rgba(0,212,255,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 0% 100%, rgba(245,166,35,0.05) 0%, transparent 60%);
+  overflow: hidden;
+}
+
+.p1-scan {
+  position: absolute; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--cyan) 40%, var(--cyan) 60%, transparent 100%);
+  animation: scan 5s ease-in-out infinite;
+  opacity: 0.5;
+}
+@keyframes scan {
+  0%   { top: -2px; opacity: 0; }
+  5%   { opacity: 0.5; }
+  95%  { opacity: 0.15; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.p1-content { position: relative; z-index: 1; max-width: 1100px; }
+
+.p1-tag {
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.3em;
+  color: var(--amber); text-transform: uppercase;
+  margin-bottom: 32px;
+  display: flex; align-items: center; gap: 12px;
+}
+.p1-tag::before {
+  content: '';
+  display: block; width: 32px; height: 1px;
+  background: var(--amber);
+}
+
+.p1-headline {
+  font-family: var(--font-display);
+  font-size: clamp(72px, 9vw, 128px);
+  line-height: 0.92;
+  letter-spacing: 0.02em;
+  color: var(--white);
+  margin-bottom: 48px;
+}
+.p1-headline em {
+  font-style: normal;
+  color: var(--cyan);
+  display: block;
+}
+.p1-headline .strike {
+  position: relative; color: var(--dim);
+}
+.p1-headline .strike::after {
+  content: '';
+  position: absolute; left: 0; right: 0;
+  top: 50%; height: 3px;
+  background: var(--red);
+}
+
+.p1-subhead {
+  font-family: var(--font-body);
+  font-size: 22px; font-weight: 300;
+  color: var(--muted); max-width: 600px;
+  line-height: 1.6; margin-bottom: 56px;
+}
+.p1-subhead strong { color: var(--white); font-weight: 700; }
+
+.p1-answers {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 2px; max-width: 900px;
+}
+.p1-ans {
+  background: var(--bg2);
+  border: 1px solid var(--dim);
+  padding: 20px 24px;
+  border-top: 2px solid var(--cyan);
+}
+.p1-ans-q {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.15em;
+  color: var(--amber); text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.p1-ans-a {
+  font-family: var(--font-head);
+  font-size: 15px; font-weight: 700;
+  color: var(--white); line-height: 1.3;
+}
+
+/* ══════════════════════════════════
+   PAGE 2 — THE BUYER
+══════════════════════════════════ */
+.p2 {
+  min-height: 100vh;
+  position: relative; z-index: 1;
+  padding: 100px 80px;
+  background: var(--bg2);
+  display: flex; flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+.p2::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.4em;
+  color: var(--cyan); text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 6vw, 80px);
+  line-height: 0.95; letter-spacing: 0.02em;
+  margin-bottom: 60px;
+}
+.section-title em {
+  font-style: normal; color: var(--cyan);
+}
+
+.buyer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px; margin-bottom: 60px;
+}
+.buyer-card {
+  background: var(--bg3);
+  border: 1px solid var(--dim);
+  padding: 40px;
+  position: relative; overflow: hidden;
+}
+.buyer-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.buyer-card.cyan::before { background: var(--cyan); }
+.buyer-card.green::before { background: var(--green); }
+.buyer-card.amber::before { background: var(--amber); }
+.buyer-card.red::before { background: var(--red); }
+
+.buyer-role {
+  font-family: var(--font-head);
+  font-size: 22px; font-weight: 800;
+  color: var(--white); margin-bottom: 8px;
+}
+.buyer-firm {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 0.15em; text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.buyer-pain {
+  font-size: 15px; color: var(--muted);
+  line-height: 1.6; margin-bottom: 20px;
+}
+.buyer-acv {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.1em;
+  padding: 6px 12px;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.25);
+  color: var(--cyan);
+}
+
+/* ══════════════════════════════════
+   PAGE 3 — THE DIFFERENTIATOR
+══════════════════════════════════ */
+.p3 {
+  min-height: 100vh;
+  position: relative; z-index: 1;
+  padding: 100px 80px;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,212,255,0.04) 0%, transparent 70%);
+}
+
+.diff-hero {
+  text-align: center;
+  margin-bottom: 80px;
+}
+.diff-hero .section-label { justify-content: center; display: flex; }
+
+.diff-statement {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 5.5vw, 72px);
+  line-height: 1.05;
+  max-width: 900px; margin: 0 auto 32px;
+}
+.diff-statement em { font-style: normal; color: var(--cyan); }
+
+.diff-sub {
+  font-size: 18px; font-weight: 300;
+  color: var(--muted); max-width: 680px;
+  margin: 0 auto; line-height: 1.7;
+}
+
+.diff-grid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr 1px 1fr;
+  gap: 0;
+}
+.diff-divider {
+  background: var(--dim);
+  margin: 20px 0;
+}
+.diff-col {
+  padding: 40px 50px;
+}
+.diff-num {
+  font-family: var(--font-display);
+  font-size: 80px; line-height: 1;
+  color: var(--dim); margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+.diff-col-title {
+  font-family: var(--font-head);
+  font-size: 20px; font-weight: 800;
+  color: var(--white); margin-bottom: 12px;
+}
+.diff-col-body {
+  font-size: 14px; color: var(--muted);
+  line-height: 1.7;
+}
+.diff-col-body strong { color: var(--white); }
+
+/* ══════════════════════════════════
+   PAGE 4 — THE PROOF (vs. CEO critique)
+══════════════════════════════════ */
+.p4 {
+  min-height: 100vh;
+  position: relative; z-index: 1;
+  padding: 100px 80px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+.p4::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+}
+
+.objection-list {
+  display: flex; flex-direction: column;
+  gap: 2px; margin-top: 60px;
+}
+.objection {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  background: var(--bg3);
+  border: 1px solid var(--dim);
+  overflow: hidden;
+}
+.obj-left {
+  padding: 40px;
+  background: rgba(255,59,92,0.04);
+  border-right: 1px solid var(--dim);
+}
+.obj-tag {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.2em;
+  color: var(--red); text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.obj-quote {
+  font-family: var(--font-body);
+  font-size: 15px; font-style: italic;
+  color: var(--muted); line-height: 1.6;
+}
+.obj-right {
+  padding: 40px 48px;
+}
+.obj-ans-label {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.2em;
+  color: var(--green); text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.obj-ans-title {
+  font-family: var(--font-head);
+  font-size: 20px; font-weight: 800;
+  color: var(--white); margin-bottom: 12px;
+}
+.obj-ans-body {
+  font-size: 15px; color: var(--muted);
+  line-height: 1.7;
+}
+.obj-ans-body strong { color: var(--white); }
+.obj-ans-body .stat {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--cyan);
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.2);
+  padding: 3px 10px; margin-top: 12px;
+}
+
+/* ══════════════════════════════════
+   PAGE 5 — THE MOAT
+══════════════════════════════════ */
+.p5 {
+  min-height: 100vh;
+  position: relative; z-index: 1;
+  padding: 100px 80px;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(0,229,160,0.04) 0%, transparent 60%);
+  overflow: hidden;
+}
+
+.moat-header { margin-bottom: 70px; }
+
+.moat-diagram {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  margin-bottom: 60px;
+}
+.moat-layer {
+  padding: 30px 24px;
+  border: 1px solid var(--dim);
+  position: relative; overflow: hidden;
+  text-align: center;
+}
+.moat-layer.active {
+  border-color: rgba(0,212,255,0.4);
+  background: rgba(0,212,255,0.04);
+}
+.moat-layer-icon {
+  font-size: 28px; margin-bottom: 16px;
+}
+.moat-layer-name {
+  font-family: var(--font-head);
+  font-size: 16px; font-weight: 800;
+  color: var(--white); margin-bottom: 8px;
+}
+.moat-layer-desc {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 0.08em; line-height: 1.5;
+}
+.moat-connector {
+  position: absolute; right: -1px; top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid var(--cyan);
+  z-index: 2;
+}
+
+.moat-coc {
+  background: var(--bg2);
+  border: 1px solid rgba(0,229,160,0.25);
+  border-left: 4px solid var(--green);
+  padding: 40px 48px;
+}
+.moat-coc-title {
+  font-family: var(--font-head);
+  font-size: 24px; font-weight: 800;
+  color: var(--white); margin-bottom: 16px;
+}
+.moat-coc-body {
+  font-size: 16px; color: var(--muted);
+  line-height: 1.7; max-width: 820px;
+}
+.moat-coc-body strong { color: var(--white); }
+
+/* ══════════════════════════════════
+   PAGE 6 — CLOSE
+══════════════════════════════════ */
+.p6 {
+  min-height: 100vh;
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 100px 80px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,212,255,0.06) 0%, transparent 70%);
+  overflow: hidden;
+}
+
+.close-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.4em;
+  color: var(--amber); text-transform: uppercase;
+  margin-bottom: 40px;
+}
+
+.close-headline {
+  font-family: var(--font-display);
+  font-size: clamp(60px, 8vw, 110px);
+  line-height: 0.92;
+  margin-bottom: 40px;
+}
+.close-headline em {
+  font-style: normal; color: var(--cyan); display: block;
+}
+
+.close-body {
+  font-size: 18px; font-weight: 300;
+  color: var(--muted); max-width: 640px;
+  line-height: 1.7; margin-bottom: 60px;
+}
+.close-body strong { color: var(--white); }
+
+.close-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px; width: 100%; max-width: 900px;
+  margin-bottom: 60px;
+}
+.close-metric {
+  padding: 32px 24px;
+  border: 1px solid var(--dim);
+  background: var(--bg2);
+}
+.close-metric-val {
+  font-family: var(--font-display);
+  font-size: 52px; line-height: 1;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+.close-metric-val.cyan { color: var(--cyan); }
+.close-metric-val.green { color: var(--green); }
+.close-metric-val.amber { color: var(--amber); }
+.close-metric-val.red { color: var(--red); }
+.close-metric-label {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.18em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+.close-url {
+  font-family: var(--font-head);
+  font-size: 28px; font-weight: 800;
+  color: var(--white); letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--cyan);
+  padding-bottom: 8px;
+}
+
+/* FOOTER */
+.page-footer {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 20px 80px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-top: 1px solid var(--dim);
+}
+.footer-brand {
+  font-family: var(--font-head);
+  font-size: 13px; font-weight: 800;
+  color: var(--white); letter-spacing: 0.08em;
+}
+.footer-brand span { color: var(--cyan); }
+.footer-pg {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--dim);
+  letter-spacing: 0.2em;
+}
+
+@media print {
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .p1, .p2, .p3, .p4, .p5, .p6 { page-break-after: always; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     PAGE 1 — OPENING STRIKE
+══════════════════════════════════ -->
+<section class="p1">
+  <div class="p1-scan"></div>
+  <div class="p1-content">
+    <div class="p1-tag">ProjectHUD · Investor Response Brief · 2026</div>
+
+    <div class="p1-headline">
+      YOU ASKED<br>
+      THE RIGHT<br>
+      <em>QUESTIONS.</em>
+    </div>
+
+    <p class="p1-subhead">
+      <strong>"Decision intelligence" = a to-do list with math.</strong><br>
+      Fair. Here's what it actually is — and why it matters to the one buyer who closes fast.
+    </p>
+
+    <div class="p1-answers">
+      <div class="p1-ans">
+        <div class="p1-ans-q">The exact buyer</div>
+        <div class="p1-ans-a">Engineering VP at a 15–80 person professional services firm</div>
+      </div>
+      <div class="p1-ans">
+        <div class="p1-ans-q">What nothing else does</div>
+        <div class="p1-ans-a">Immutable, replay-capable audit trail across every decision, doc, approval & hour logged</div>
+      </div>
+      <div class="p1-ans">
+        <div class="p1-ans-q">ACV target</div>
+        <div class="p1-ans-a">$18K–$60K per firm / year depending on headcount & module tier</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-pg">01 / 06</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     PAGE 2 — THE EXACT BUYER
+══════════════════════════════════ -->
+<section class="p2">
+  <div class="section-label">The Buyer — Specific, Defensible, Validated</div>
+  <div class="section-title">Not "Project Managers."<br><em>These Four People.</em></div>
+
+  <div class="buyer-grid">
+    <div class="buyer-card cyan">
+      <div class="buyer-role">VP of Engineering Services</div>
+      <div class="buyer-firm">Medical Device / Pharma Consulting · 20–60 staff</div>
+      <div class="buyer-pain">
+        Running 8–12 simultaneous client programs. Uses Excel for EVM, email for approvals,
+        SharePoint for documents. Spends 6 hours every Friday building a status report that's
+        already stale by Monday. Gets blindsided by schedule slips because no one told the
+        critical path when scope changed.
+      </div>
+      <div class="buyer-acv">ACV: $28,800 – $48,000 / yr</div>
+    </div>
+
+    <div class="buyer-card green">
+      <div class="buyer-role">Director of Program Management</div>
+      <div class="buyer-firm">Aerospace / Defense PMO · 40–120 staff</div>
+      <div class="buyer-pain">
+        DCAA audit coming. Needs to prove every hour logged ties to a task, every task ties
+        to a contract. Currently manually reconciling three systems. ProjectHUD's Chain of
+        Custody is the audit trail DCAA auditors actually want to see — and it's automatic.
+      </div>
+      <div class="buyer-acv">ACV: $36,000 – $60,000 / yr</div>
+    </div>
+
+    <div class="buyer-card amber">
+      <div class="buyer-role">Managing Principal</div>
+      <div class="buyer-firm">Engineering Consulting Boutique · 8–25 staff</div>
+      <div class="buyer-pain">
+        Billing $175–$250/hr. Losing 15–20% to unbilled hours, scope creep they can't
+        prove, and client disputes they can't document. One project goes sideways and they
+        need to show a judge exactly what was approved and when. They don't have that today.
+      </div>
+      <div class="buyer-acv">ACV: $18,000 – $28,800 / yr</div>
+    </div>
+
+    <div class="buyer-card red">
+      <div class="buyer-role">QA / Regulatory Affairs Director</div>
+      <div class="buyer-firm">510(k) Submissions · Device Manufacturing</div>
+      <div class="buyer-pain">
+        510(k) pathway requires documented design control. Every review, every approval,
+        every revision must be traceable. They're using Jira hacked with custom workflows
+        and praying the FDA doesn't ask for cross-system audit trails. ProjectHUD gives
+        them native design control from day one.
+      </div>
+      <div class="buyer-acv">ACV: $24,000 – $42,000 / yr</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-pg">02 / 06</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     PAGE 3 — THE REAL DIFFERENTIATOR
+══════════════════════════════════ -->
+<section class="p3">
+  <div class="diff-hero">
+    <div class="section-label">The Differentiator — What No One Else Has</div>
+    <div class="diff-statement">
+      Every other PM tool<br>tells you <em>what happened.</em><br>
+      We prove it.
+    </div>
+    <p class="diff-sub">
+      ProjectHUD's Chain of Custody is not a log file. It is an immutable,
+      cryptographically-ordered record of every decision, approval, document review,
+      hour logged, and status change — attached permanently to the project record.
+      Replay it forward. Present it in court. Submit it to a regulator. It holds.
+    </p>
+  </div>
+
+  <div class="diff-grid">
+    <div class="diff-col">
+      <div class="diff-num">01</div>
+      <div class="diff-col-title">Asana, Jira, Monday</div>
+      <div class="diff-col-body">
+        Tell you task status. Show you a Gantt. Let you comment on tickets.
+        <strong>No binding audit trail. No approval chain. No traceability to hours, budget, or decisions.</strong>
+        When a project goes wrong, they give you nothing.
+      </div>
+    </div>
+    <div class="diff-divider"></div>
+    <div class="diff-col">
+      <div class="diff-num">02</div>
+      <div class="diff-col-title">Microsoft Project, Smartsheet</div>
+      <div class="diff-col-body">
+        Better Gantt. Better EVM. Still no audit trail.
+        <strong>Change a date — no record of who, when, why, or what downstream impact was acknowledged.</strong>
+        Compliance teams hate them. Auditors ignore their exports.
+      </div>
+    </div>
+    <div class="diff-divider"></div>
+    <div class="diff-col">
+      <div class="diff-num">03</div>
+      <div class="diff-col-title">ProjectHUD</div>
+      <div class="diff-col-body">
+        Every action — task update, document approval, scope change, hour logged,
+        request submitted — writes a permanent, signed CoC event.
+        <strong>You can replay any project state at any point in time. That's new. Nothing else does it.</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-pg">03 / 06</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     PAGE 4 — OBJECTIONS ANSWERED
+══════════════════════════════════ -->
+<section class="p4">
+  <div class="section-label">Critique — Addressed Directly</div>
+  <div class="section-title">You Said It.<br><em>We Heard It.</em></div>
+
+  <div class="objection-list">
+
+    <div class="objection">
+      <div class="obj-left">
+        <div class="obj-tag">Critique 01</div>
+        <div class="obj-quote">
+          "Decision intelligence platform for professional services firms — I've heard
+          that sentence 40 times this year. What decision? What intelligence?
+          That's a to-do list with math."
+        </div>
+      </div>
+      <div class="obj-right">
+        <div class="obj-ans-label">The Real Answer</div>
+        <div class="obj-ans-title">It's Not a Priority Sorter. It's a Decision Record.</div>
+        <div class="obj-ans-body">
+          The "intelligence" isn't in the prioritization algorithm — that's a feature.
+          The intelligence is in the <strong>audit layer that every decision writes to.</strong>
+          When your client says "you never told us that would cost more," you open
+          ProjectHUD and show them the CoC event from six weeks ago with their PM's
+          approval signature. That's not a to-do list. That's your legal defense.
+          <br><br><span class="stat">→ Immutable CoC events write on every action, automatically</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="objection">
+      <div class="obj-left">
+        <div class="obj-tag">Critique 02</div>
+        <div class="obj-quote">
+          "Who is the exact buyer — title, firm size, ACV expectation?"
+        </div>
+      </div>
+      <div class="obj-right">
+        <div class="obj-ans-label">Precise Answer</div>
+        <div class="obj-ans-title">Four Titles, One Profile, One Pain.</div>
+        <div class="obj-ans-body">
+          VP Engineering Services, Director of PM, Managing Principal, QA/RA Director.
+          All at professional services firms between <strong>15 and 120 staff</strong>,
+          billing time against client programs. ACV <strong>$18K–$60K</strong> based on
+          seat count and module tier. Sales cycle 30–60 days. Closes on demo + a
+          conversation about their last audit or dispute. See page 02 for the full profile.
+          <br><br><span class="stat">→ TAM: ~42,000 qualifying firms in North America alone</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="objection">
+      <div class="obj-left">
+        <div class="obj-tag">Critique 03</div>
+        <div class="obj-quote">
+          "What does Compass do that nothing else does?"
+        </div>
+      </div>
+      <div class="obj-right">
+        <div class="obj-ans-label">Single Sentence Answer</div>
+        <div class="obj-ans-title">It Gives Every Person on the Team One Screen to Run Their Day.</div>
+        <div class="obj-ans-body">
+          Compass is the personal ops layer — My Work, My Time, My Calendar, My Requests,
+          My Views — all real-time, all pulling from the same data layer as the PM.
+          <strong>The PM sees the critical path. The engineer sees their queue.
+          The client sees their portal.</strong> Same data, different lens.
+          No other tool unifies those three perspectives without three different products.
+          <br><br><span class="stat">→ Zero context-switching. One platform. Every role.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="objection">
+      <div class="obj-left">
+        <div class="obj-tag">Critique 04</div>
+        <div class="obj-quote">
+          "The architecture is a mess. A whole section of this doc is a collision
+          registry. That's archaeology, not architecture. This scales to zero."
+        </div>
+      </div>
+      <div class="obj-right">
+        <div class="obj-ans-label">Honest Answer</div>
+        <div class="obj-ans-title">The Product Works. The Refactor Is Scheduled.</div>
+        <div class="obj-ans-body">
+          Fair. The platform is in active daily use and the collision patterns are
+          documented and understood — that's not denial, that's engineering discipline.
+          The <strong>workflow_requests</strong> table migration, the module namespace
+          isolation, and the Supabase Realtime push layer are the next session's work.
+          The moat — the Chain of Custody data model — is clean, correct, and
+          already in production. That's what matters for a Series A conversation.
+          <br><br><span class="stat">→ Live at project-hud-landing.vercel.app</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-pg">04 / 06</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     PAGE 5 — THE MOAT IN DETAIL
+══════════════════════════════════ -->
+<section class="p5">
+  <div class="moat-header">
+    <div class="section-label">Architecture — The Durable Advantage</div>
+    <div class="section-title">Five Layers.<br><em>One Unbreakable Thread.</em></div>
+  </div>
+
+  <div class="moat-diagram">
+    <div class="moat-layer active">
+      <div class="moat-layer-icon">👤</div>
+      <div class="moat-layer-name">Compass</div>
+      <div class="moat-layer-desc">Personal ops layer. Every person's daily work, time, calendar, and requests.</div>
+      <div class="moat-connector"></div>
+    </div>
+    <div class="moat-layer active">
+      <div class="moat-layer-icon">📊</div>
+      <div class="moat-layer-name">ProjectHUD</div>
+      <div class="moat-layer-desc">PM execution. CPM/PERT, EVM, Gantt, multi-project dashboard.</div>
+      <div class="moat-connector"></div>
+    </div>
+    <div class="moat-layer active">
+      <div class="moat-layer-icon">⚙️</div>
+      <div class="moat-layer-name">CadenceHUD</div>
+      <div class="moat-layer-desc">Process control. Workflow templates, live instances, form engine.</div>
+      <div class="moat-connector"></div>
+    </div>
+    <div class="moat-layer active">
+      <div class="moat-layer-icon">🔗</div>
+      <div class="moat-layer-name">Client Portal</div>
+      <div class="moat-layer-desc">Row-level secure client view. Milestones, deliverables, approvals only.</div>
+      <div class="moat-connector"></div>
+    </div>
+    <div class="moat-layer active" style="border-color:rgba(0,229,160,0.5);background:rgba(0,229,160,0.04);">
+      <div class="moat-layer-icon">🔒</div>
+      <div class="moat-layer-name">Chain of Custody</div>
+      <div class="moat-layer-desc" style="color:var(--green);">Runs beneath everything. Immutable. Replay-capable. Permanent.</div>
+    </div>
+  </div>
+
+  <div class="moat-coc">
+    <div class="moat-coc-title">Chain of Custody — The Data Moat</div>
+    <div class="moat-coc-body">
+      Every layer writes to the same underlying Chain of Custody.
+      A task update in Compass, a schedule change in ProjectHUD, a document approval in
+      CadenceHUD, a client sign-off in the portal — <strong>all generate permanent, ordered,
+      actor-attributed CoC events.</strong> No competing systems. No reconciliation.
+      No "who changed this?" moments. When your client disputes a deliverable, when your
+      auditor wants the change log, when your attorney needs project history —
+      <strong>you open one screen and replay the truth.</strong>
+      That is not a feature. That is why they can't leave.
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-pg">05 / 06</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════
+     PAGE 6 — CLOSE
+══════════════════════════════════ -->
+<section class="p6">
+  <div class="close-eyebrow">ProjectHUD · Series A Readiness · 2026</div>
+
+  <div class="close-headline">
+    THE PLATFORM<br>
+    IS<br>
+    <em>LIVE.</em>
+  </div>
+
+  <p class="close-body">
+    Not a mockup. Not a prototype. Not a deck.
+    <strong>A working platform in daily operational use</strong>
+    with real projects, real clients, real audit trails.
+    The architecture critique is noted and scheduled.
+    The moat is already in production.
+  </p>
+
+  <div class="close-metrics">
+    <div class="close-metric">
+      <div class="close-metric-val cyan">13</div>
+      <div class="close-metric-label">EVM Indices<br>Auto-computed</div>
+    </div>
+    <div class="close-metric">
+      <div class="close-metric-val green">100%</div>
+      <div class="close-metric-label">Audit Trail<br>Coverage</div>
+    </div>
+    <div class="close-metric">
+      <div class="close-metric-val amber">0</div>
+      <div class="close-metric-label">Manual Status<br>Reports</div>
+    </div>
+    <div class="close-metric">
+      <div class="close-metric-val red">42K</div>
+      <div class="close-metric-label">Qualifying<br>Firms · NA TAM</div>
+    </div>
+  </div>
+
+  <div class="close-url">project-hud-landing.vercel.app</div>
+
+  <div class="page-footer">
+    <div class="footer-brand">Project<span>HUD</span></div>
+    <div class="footer-pg">06 / 06</div>
+  </div>
+</section>
+
+</body>
+</html>
