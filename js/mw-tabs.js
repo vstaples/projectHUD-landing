@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-201500
+// VERSION: 20260402-202000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-201500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-202000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -796,6 +796,7 @@ window.loadUserRequests = async function() {
         background: rgba(0,210,255,.03);
         box-shadow: 0 2px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
         transition: border-color .15s, box-shadow .15s;
+        max-width: 900px;
       }
       .myr-active-req:hover {
         border-color: rgba(0,210,255,.35);
@@ -1544,7 +1545,14 @@ function renderMyRequestsActive() {
 
               // Separate comments from lifecycle events
               const lifecycleEvts = instCoc.filter(e => e.event_type !== 'request.context_added');
-              const commentEvts   = instCoc.filter(e => e.event_type === 'request.context_added');
+              const commentEvts   = instCoc.filter(e => {
+                if (e.event_type === 'request.context_added') return true;
+                // Also show approval/review comments if they have content
+                if (e.event_type === 'request.approved' || e.event_type === 'request.changes_requested') {
+                  try { return !!(JSON.parse(e.event_notes||'{}').comments); } catch(_) { return false; }
+                }
+                return false;
+              });
 
               // Build approval process sidebar entries
               const approvalPersons = [];
@@ -1613,7 +1621,7 @@ function renderMyRequestsActive() {
                   ${commentEvts.map(e => {
                     const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
                     let note = '';
-                    try { note = JSON.parse(e.event_notes||'{}').note || ''; } catch(_){}
+                    try { const p = JSON.parse(e.event_notes||'{}'); note = p.note || p.comments || ''; } catch(_){}
                     return `<div style="display:flex;gap:10px;margin-bottom:10px">
                       <div style="width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.12);
                                   border:1px solid rgba(0,210,255,.3);display:flex;align-items:center;
