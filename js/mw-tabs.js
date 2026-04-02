@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-185500
+// VERSION: 20260402-190000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-185500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -2596,9 +2596,24 @@ window.myrSubmitWorkflow = async function(wfId) {
     // Force re-fetch on next tab visit to sync with DB
     window._requestsLoaded = false;
 
-    // Reload My Work immediately so the ⏳ Pending review item appears in Vaughn's queue now
-    window._viewLoaded && (window._viewLoaded['user'] = false);
-    window._mwLoadUserView && window._mwLoadUserView();
+    // Silently notify My Work badge that a new item exists — no tab switch, no rebuild
+    (async () => {
+      try {
+        const resId = _myResource?.id;
+        if (!resId) return;
+        const fresh = await API.get(
+          `workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&select=id&limit=100`
+        ).catch(() => null);
+        if (!fresh) return;
+        const badge = document.getElementById('ust-work-badge');
+        if (badge) {
+          badge.textContent = fresh.length;
+          badge.style.display = fresh.length > 0 ? 'inline' : 'none';
+        }
+        // Mark My Work stale — will rebuild when user next switches to it
+        window._mwWorkStale = true;
+      } catch(_) {}
+    })();
 
     const recipientSummary = actionRecipients.length
       ? actionRecipients.map(r => r.name).join(', ')
