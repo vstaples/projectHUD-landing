@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121300
+// VERSION: 20260402-121400
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121300','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1197,17 +1197,21 @@ function renderMyRequestsActive() {
           if (subEv) submittedData = JSON.parse(subEv.event_notes || '{}');
         } catch(_) {}
 
-        // Build reviewer decision status from CoC approved events
-        const approvedEvs = instCoc.filter(e => e.event_type === 'request.approved');
-        const approvedByName = approvedEvs.reduce((m, e) => {
+        // Build reviewer decision status from ALL CoC approved events (one per reviewer)
+        const approvedByName = {};
+        instCoc.filter(e => e.event_type === 'request.approved' || e.event_type === 'request.changes_requested').forEach(e => {
           try {
             const p = JSON.parse(e.event_notes || '{}');
             const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
               {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-            m[e.actor_name] = { time: t, comments: p.comments || '' };
+            const name = e.actor_name || p.reviewer;
+            if (name) approvedByName[name] = {
+              time: t,
+              comments: p.comments || '',
+              approved: e.event_type === 'request.approved',
+            };
           } catch(_) {}
-          return m;
-        }, {});
+        });
 
         if (s.label === 'Review') {
           const reviewers = submittedData.reviewers || req._reviewerNames?.map(n=>({name:n})) || [];
@@ -1215,14 +1219,17 @@ function renderMyRequestsActive() {
             const name = r.name || r;
             const dec  = approvedByName[name];
             const status = dec
-              ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
+              ? dec.approved
+                ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
+                : `<span style="color:#E24B4A">↺ Changes requested ${_esc(dec.time)}</span>`
               : `<span style="color:#EF9F27">Pending</span>`;
             const comment = dec?.comments
               ? `<div style="color:rgba(255,255,255,.35);font-size:10px;max-width:180px;
                              white-space:normal;margin-top:1px">"${_esc(dec.comments)}"</div>`
               : '';
-            return `<div style="margin-bottom:3px">
-              <div>${_esc(name)} · ${status}</div>${comment}</div>`;
+            return `<div style="margin-bottom:4px">
+              <div style="font-weight:600">${_esc(name)}</div>
+              <div>${status}</div>${comment}</div>`;
           }).join('');
           tipHtml = `<div class="myr-pt-tip" style="min-width:180px;white-space:normal">
             <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Reviewers</div>

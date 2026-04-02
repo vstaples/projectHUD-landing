@@ -1,5 +1,5 @@
-// VERSION: 20260402-120800
-console.log('%c[mw-events] v20260402-120800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-121400
+console.log('%c[mw-events] v20260402-121400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -196,7 +196,9 @@ document.addEventListener('click', function(ev) {
     const status = actionBtn.dataset.wiStatus;
     if (item.type==='action') {
       // ── Check if parent workflow instance was cancelled ───
-      if (item.instanceId && (item.title||'').startsWith('Review request:')) {
+      const isReviewItem  = item.instanceId && (item.title||'').startsWith('Review request:');
+      const isApproveItem = item.instanceId && (item.title||'').startsWith('Approve request:');
+      if (isReviewItem || isApproveItem) {
         const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
         if (parentInst?.status === 'cancelled') {
           compassToast('This request was withdrawn by the submitter.', 3000);
@@ -205,7 +207,7 @@ document.addEventListener('click', function(ev) {
             .catch(() => {});
           return;
         }
-        openRequestReviewPanel(item);
+        openRequestReviewPanel(item, isApproveItem);
         return;
       }
       const _ns = negGetState(item.id).state;
@@ -607,11 +609,12 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
 
     // 4. If approved, notify submitter via a new action item in their My Work
     //    Fetch instance to get submitted_by_resource_id
+    let inst = null;
     if (instanceId) {
       const instRows = await API.get(
         `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title&limit=1`
       ).catch(()=>[]);
-      const inst = instRows?.[0];
+      inst = instRows?.[0];
       if (inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
         await API.post('workflow_action_items', {
           id:                crypto.randomUUID(),
@@ -649,6 +652,36 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
             instanceId,
             body: comments || (approved ? 'Your request has been approved.' : 'Changes were requested.'),
           });
+        }
+      } catch(_) {}
+    }
+
+    // If all reviewers have now approved → notify the approver
+    if (approved && instanceId) {
+      try {
+        // Get all open action items for this instance
+        const openItems = await API.get(
+          `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&select=id,title,owner_name,owner_resource_id`
+        ).catch(() => []);
+        // If only the Approve request remains open, all reviewers are done
+        const onlyApproveLeft = (openItems||[]).every(i => (i.title||'').startsWith('Approve request:'));
+        if (onlyApproveLeft && openItems?.length) {
+          const approveItem = openItems[0];
+          // Look up approver email from resources
+          const approverRes = (_resources||[]).find(r => r.id === approveItem.owner_resource_id);
+          const approverEmail = approverRes?.email || '';
+          if (approverEmail) {
+            window._myrNotify && _myrNotify({
+              toEmail: approverEmail,
+              toName:  approveItem.owner_name || '',
+              fromName: resName,
+              stepName: 'Approve',
+              stepType: 'approval',
+              title: inst?.title || 'Document review request',
+              instanceId,
+              body: 'All reviewers have approved. Your sign-off is required.',
+            });
+          }
         }
       } catch(_) {}
     }
