@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-194000
+// VERSION: 20260402-195000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-194000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-195000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1516,8 +1516,9 @@ function renderMyRequestsActive() {
           <div class="myr-coc-events${cocOpenIds.has(req.id) ? ' open' : ''}" id="myr-coc-${i}">${cocRows}</div>
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
-          <button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>
+          ${approverApproved ? '' : `<button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>`}
           <button onclick="myrAddContext('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
+          ${approverApproved ? `<button onclick="myrArchiveRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:rgba(29,158,117,.08);border:1px solid rgba(29,158,117,.4);color:#1D9E75;cursor:pointer;letter-spacing:.06em">✓ Archive</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -1986,7 +1987,33 @@ window.myrWithdrawRequest = async function(instanceId) {
   }
 };
 
-// ── Add context to an active request ─────────────────────
+// ── Archive a completed request → moves to History ───────────────────────
+window.myrArchiveRequest = async function(instanceId) {
+  if (!instanceId) return;
+  const now = new Date().toISOString();
+  try {
+    await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+      status:     'complete',
+      updated_at: now,
+    }).catch(()=>{});
+    // Resolve any remaining open action items for submitter
+    await API.patch(
+      `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open`,
+      { status: 'resolved', updated_at: now }
+    ).catch(()=>{});
+    // Optimistic local update → move to completed
+    if (window._myRequests) {
+      window._myRequests = window._myRequests.map(r =>
+        r.id === instanceId ? { ...r, status: 'completed' } : r
+      );
+    }
+    renderMyRequestsActive();
+    renderMyRequestsHistory();
+    compassToast('Request archived.');
+  } catch(e) {
+    compassToast('Archive failed — ' + (e.message||'check console'), 3000);
+  }
+};
 window.myrAddContext = async function(instanceId) {
   if (!instanceId) return;
   const req = (window._myRequests||[]).find(r => r.id === instanceId);
