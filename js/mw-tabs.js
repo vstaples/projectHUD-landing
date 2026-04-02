@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-161500
+// VERSION: 20260402-162000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-161500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-162000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -76,7 +76,8 @@ window.uSwitchTab = function(tab, btn) {
   if (panel) panel.classList.add('on');
   if (tab === 'meetings' && !window._mtgLoaded) loadMyMeetingsView();
   else if (tab === 'meetings' && window._mtgRefresh) window._mtgRefresh();
-  if (tab === 'work' && window._viewLoaded && window._viewLoaded['user'] === false) {
+  if (tab === 'work' && window._mwWorkStale) {
+    window._mwWorkStale = false;
     window._mwLoadUserView && window._mwLoadUserView();
   }
   if (tab === 'concerns' && !window._notesLoaded) loadMyNotesView();

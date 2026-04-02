@@ -1,5 +1,5 @@
-// VERSION: 20260402-160000
-console.log('%c[mw-core] v20260402-160000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-162000
+console.log('%c[mw-core] v20260402-162000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1268,7 +1268,7 @@ window._mwLoadUserView = async function() {
             } else {
               console.log('[Poll] New items detected — deferring reload until user returns to My Work tab');
               // Mark stale so it reloads when they switch back
-              if (window._viewLoaded) window._viewLoaded['user'] = false;
+              window._mwWorkStale = true;
             }
           }
         } catch(e) { console.error('[Poll] error:', e.message); }
