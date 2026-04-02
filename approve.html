@@ -486,6 +486,7 @@ async function loadToken(token) {
     }
 
     // Check already used
+    console.log('[approve.html] token status — used_at:', rec.used_at, 'submitted_at:', rec.submitted_at, 'outcome:', rec.outcome);
     if (rec.used_at || rec.submitted_at) {
       const usedDate = new Date(rec.used_at || rec.submitted_at).toLocaleString('en-US',
         {weekday:'short', month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
@@ -760,7 +761,8 @@ async function submitResponse() {
         console.warn('[approve.html] My Requests completion failed:', mwErr);
       }
     } else if (_tokenRec?.instance_id && _selected.requiresReset) {
-      // Changes requested / rejected — loop back to Review step
+      // Changes requested / rejected — route back to submitter
+      console.log('[approve.html] Changes requested path — instance:', _tokenRec.instance_id, 'outcome:', _selected.id);
       try {
         const now3 = new Date().toISOString();
         // 1. Reset workflow_instance back to Review
@@ -776,12 +778,13 @@ async function submitResponse() {
             },
             body: JSON.stringify({
               status:            'in_progress',
-              current_step_name: 'Review',
+              current_step_name: 'Submit',
               updated_at:        now3,
             }),
           }
         );
-        // 2. Re-open all reviewer workflow_requests rows for this instance
+        // 2. Close all reviewer workflow_requests rows — submitter must resubmit fresh
+        //    They will be re-created when the submitter resubmits via the Resubmit Panel.
         await fetch(
           `${SUPA_URL}/rest/v1/workflow_requests?instance_id=eq.${_tokenRec.instance_id}&role=eq.reviewer`,
           {
@@ -792,7 +795,7 @@ async function submitResponse() {
               'Content-Type': 'application/json',
               'Prefer': 'return=minimal',
             },
-            body: JSON.stringify({ status: 'open', updated_at: now3 }),
+            body: JSON.stringify({ status: 'resolved', updated_at: now3 }),
           }
         );
         // 3. Resolve the approver's workflow_requests row

@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-160000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1258,6 +1258,10 @@ function renderMyRequestsActive() {
     };
 
     // Build step nodes with tooltips
+    // When current_step_name is 'Submit', the ball is back with the submitter.
+    // CoC overrides are bypassed — DB step is authoritative in this state.
+    const isAwaitingResubmit = (req._raw?.current_step_name || '') === 'Submit' &&
+      !instanceComplete;
     // For the Review step: override done/active from CoC approval count vs assigned reviewers.
     // This is the ground truth — independent of current_step_name or polling timing.
     let submittedDataForStep = {};
@@ -1294,7 +1298,8 @@ function renderMyRequestsActive() {
 
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
-      if (s.label === 'Review' && !instanceComplete) {
+      // Skip override when ball is back with submitter (Submit step active)
+      if (s.label === 'Review' && !instanceComplete && !isAwaitingResubmit) {
         if (allReviewersDone) {
           s = { ...s, done: true,  active: false };
         } else if (approvalCount > 0) {
@@ -1307,8 +1312,8 @@ function renderMyRequestsActive() {
       if (s.label === 'Approve') {
         if (approverApproved) {
           s = { ...s, done: true, active: false };
-        } else if (lastResetTs && approvalCount === 0) {
-          // Post-reset with no new approvals yet — force back to pending/gray
+        } else if (isAwaitingResubmit || (lastResetTs && approvalCount === 0)) {
+          // Ball back with submitter, or post-reset no new approvals — force gray
           s = { ...s, done: false, active: false };
         } else if (allReviewersDone) {
           s = { ...s, done: false, active: true }; // all reviewers done — approver's turn
@@ -1526,7 +1531,7 @@ function renderMyRequestsActive() {
                            color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:8px">
                  Submitted by <strong style="color:rgba(255,255,255,.7)">${_esc(actor)}</strong>
                  ${ts ? `· <span style="color:rgba(255,255,255,.3)">${_esc(ts)}</span>` : ''}
-                 ${isComplete ? '' : allReviewersDone ? '— awaiting approver' : '— awaiting reviewer action'}
+                 ${isComplete ? '' : isAwaitingResubmit ? '— awaiting submitter revision' : allReviewersDone ? '— awaiting approver' : '— awaiting reviewer action'}
                </div>`
             : '';
         })()}
