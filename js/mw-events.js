@@ -1,5 +1,5 @@
-// VERSION: 20260402-141500
-console.log('%c[mw-events] v20260402-141500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-150000
+console.log('%c[mw-events] v20260402-150000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -440,7 +440,7 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
         .toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
     : '';
 
-  // CoC timeline rows
+  // CoC timeline rows — 3-column grid: event type | actor | timestamp
   const cocHtml = cocEvents.length
     ? cocEvents.map(e => {
         const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
@@ -449,15 +449,48 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
         const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
                           e.event_type==='request.completed'?'#1D9E75':
                           (e.event_type||'').includes('reject')?'#E24B4A':'#EF9F27';
-        return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);
-                            font-family:var(--font-head);font-size:10px;align-items:flex-start">
-          <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:3px"></div>
-          <div style="color:rgba(0,210,255,.8);min-width:110px">${esc(typeLabel)}</div>
-          <div style="color:rgba(255,255,255,.4)">${esc(e.actor_name||'System')}</div>
-          <div style="color:rgba(255,255,255,.2);margin-left:auto">${esc(t)}</div>
+        let notes = '';
+        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||''; } catch(_){}
+        return `<div style="display:grid;grid-template-columns:7px 130px 1fr auto;
+                            gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);
+                            font-family:var(--font-head);font-size:11px;align-items:start">
+          <div style="width:7px;height:7px;border-radius:50%;background:${dotColor};margin-top:3px;flex-shrink:0"></div>
+          <div style="color:rgba(0,210,255,.85);font-weight:600;text-transform:capitalize">${esc(typeLabel)}</div>
+          <div style="color:rgba(255,255,255,.5)">${esc(e.actor_name||'System')}${notes?` <span style="color:rgba(255,255,255,.28);font-style:italic">— ${esc(notes)}</span>`:''}
+          </div>
+          <div style="color:rgba(255,255,255,.25);white-space:nowrap;text-align:right">${esc(t)}</div>
         </div>`;
       }).join('')
     : `<div style="font-family:var(--font-head);font-size:10px;color:rgba(255,255,255,.2);padding:4px 0">No events yet.</div>`;
+
+  // Clickable document list from submission CoC notes
+  const docsHtml = (submittedDetails.docs||[]).length
+    ? `<div style="margin-bottom:14px">
+        <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.08em;
+                    text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px">
+          Documents
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${(submittedDetails.docs||[]).map(d => {
+            const icon = (d.mime||'').includes('pdf')||(d.name||'').endsWith('.pdf') ? '📄' :
+                         (d.mime||'').includes('word')||(d.name||'').endsWith('.docx') ? '📝' :
+                         (d.source==='form') ? '◈' : '📎';
+            const safePathAttr = (d.path||'').replace(/'/g,"\\'");
+            return `<button onclick="myrOpenAttachment('${safePathAttr}')"
+              style="display:flex;align-items:center;gap:7px;padding:5px 10px;
+                     background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15);
+                     color:#00D2FF;font-family:var(--font-head);font-size:11px;
+                     cursor:pointer;text-align:left;transition:background .12s;width:100%"
+              onmouseover="this.style.background='rgba(0,210,255,.1)'"
+              onmouseout="this.style.background='rgba(0,210,255,.04)'">
+              <span>${icon}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name||'Document')}</span>
+              <span style="color:rgba(255,255,255,.3);font-size:11px;flex-shrink:0">↗ View</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>`
+    : '';
 
   const overlay = document.createElement('div');
   overlay.id = 'req-review-panel';
@@ -493,6 +526,8 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
 
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:16px 18px">
+
+        ${docsHtml}
 
         <!-- Instructions -->
         ${instructions ? `
@@ -591,12 +626,25 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
   const stepName = approved ? 'Approve' : 'Review';
 
   try {
-    // 1. Update workflow_instance status + current step
+    // 1. Update workflow_instance — only advance step if all reviewers are now done
     if (instanceId) {
+      // Check remaining open reviewer rows AFTER this one resolves
+      // We do this before patching so we can count accurately
+      const remainingReviewers = await API.get(
+        `workflow_requests?instance_id=eq.${instanceId}&role=eq.reviewer&status=eq.open&select=id&limit=50`
+      ).catch(() => []);
+      // Subtract 1 for the row we're about to resolve (this one)
+      const otherOpenReviewers = (remainingReviewers||[]).filter(r => r.id !== actionItemId);
+      const allReviewersDone = otherOpenReviewers.length === 0;
+
+      // Only advance to Approve step when all reviewers have signed off
+      const advancedStepName = approved && allReviewersDone ? 'Approve' : 'Review';
+      const finalStepName    = approved ? advancedStepName : 'Review';
+
       await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-        status:           newStatus,
-        current_step_name: stepName,
-        updated_at:       now,
+        status:            newStatus,
+        current_step_name: finalStepName,
+        updated_at:        now,
       }).catch(()=>{});
     }
 
@@ -667,12 +715,12 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       : `↺ Changes requested${comments?' — feedback recorded':''}. Submitter notified.`
     );
 
-    // Email submitter and any external parties
+    // Email submitter — best-effort, 404 on endpoint is non-fatal
     if (inst?.submitted_by_resource_id) {
       try {
         const submitterRes = (_resources||[]).find(r => r.id === inst.submitted_by_resource_id);
         if (submitterRes?.email) {
-          window._myrNotify && _myrNotify({
+          await _myrNotify({
             toEmail: submitterRes.email, toName: submitterRes.name || inst.submitted_by_name,
             fromName: resName,
             stepName: approved ? 'Approved' : 'Changes requested',
@@ -680,7 +728,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             title: inst.title || 'Document review request',
             instanceId,
             body: comments || (approved ? 'Your request has been approved.' : 'Changes were requested.'),
-          });
+          }).catch(()=>{});
         }
       } catch(_) {}
     }

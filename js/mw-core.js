@@ -1,5 +1,5 @@
-// VERSION: 20260402-142000
-console.log('%c[mw-core] v20260402-142000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-151500
+console.log('%c[mw-core] v20260402-151500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1198,7 +1198,15 @@ window._mwLoadUserView = async function() {
           <button class="myr-subnav on" data-myr="browse" onclick="myrSwitchView('browse',this)">Browse</button>
           <button class="myr-subnav" data-myr="active" onclick="myrSwitchView('active',this)">Active <span id="myr-active-badge" class="ust-badge ust-badge-amber" style="display:none"></span></button>
           <button class="myr-subnav" data-myr="history" onclick="myrSwitchView('history',this)">History</button>
-          <div style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.06em;padding-right:4px">Powered by <span style="color:rgba(0,210,255,.5)">CadenceHUD</span> workflow engine</div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:4px">
+            <button onclick="myrDevPurge()" title="DEV — purge all requests from Supabase"
+              style="font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;padding:2px 9px;
+                     background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.3);
+                     color:rgba(226,75,74,.6);cursor:pointer;border-radius:2px;white-space:nowrap">
+              ⚠ DEV: Purge
+            </button>
+            <div style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.06em">Powered by <span style="color:rgba(0,210,255,.5)">CadenceHUD</span> workflow engine</div>
+          </div>
         </div>
         <div id="myr-pane-browse">
           <div id="myr-catalog-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading workflow catalog…</div></div>
@@ -1254,7 +1262,7 @@ window._mwLoadUserView = async function() {
         } catch(e) { console.error('[Poll] error:', e.message); }
       };
       window._pollNow = _doPoll;
-      window._actionItemPollTimer = setInterval(_doPoll, 15000);
+      window._actionItemPollTimer = setInterval(_doPoll, 10000);
     } else {
       console.log('[Poll] Already running — timer:', window._actionItemPollTimer);
     }
