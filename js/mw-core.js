@@ -1,5 +1,5 @@
-// VERSION: 20260402-100000
-console.log('%c[mw-core] v20260402-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-120800
+console.log('%c[mw-core] v20260402-120800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -7,22 +7,22 @@ function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 // My Work filter state
-let _wfStatus    = 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
-let _wfProject   = '';     // project id | '' = all
-let _wfDateRange = 'week'; // 'today' | 'week' | '30d' | 'all'
-let _wfType      = 'all';  // 'all' | 'task' | 'action'  [Session 16]
-let _doneToday   = [];     // session-persistent completed items  [Session 16]
-let _activeGauge = null;   // clicked gauge date key | null  [Session 16]
-let _dwellTimer  = null;   // gauge hover dwell timer  [Session 16]
+var _wfStatus    = (typeof _wfStatus    !== 'undefined') ? _wfStatus    : 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
+var _wfProject   = (typeof _wfProject   !== 'undefined') ? _wfProject   : '';     // project id | '' = all
+var _wfDateRange = (typeof _wfDateRange !== 'undefined') ? _wfDateRange : 'week'; // 'today' | 'week' | '30d' | 'all'
+var _wfType      = (typeof _wfType      !== 'undefined') ? _wfType      : 'all';  // 'all' | 'task' | 'action'  [Session 16]
+var _doneToday   = (typeof _doneToday   !== 'undefined') ? _doneToday   : [];     // session-persistent completed items  [Session 16]
+var _activeGauge = (typeof _activeGauge !== 'undefined') ? _activeGauge : null;   // clicked gauge date key | null  [Session 16]
+var _dwellTimer  = (typeof _dwellTimer  !== 'undefined') ? _dwellTimer  : null;   // gauge hover dwell timer  [Session 16]
 // ── Diagram mode state ────────────────────────────────────────────────────
-let _diagramMode  = false; // LIST vs DIAGRAM toggle
-let _diagScale    = 1;
-let _diagPanX     = 0;
-let _diagPanY     = 0;
+var _diagramMode  = (typeof _diagramMode  !== 'undefined') ? _diagramMode  : false; // LIST vs DIAGRAM toggle
+var _diagScale    = (typeof _diagScale    !== 'undefined') ? _diagScale    : 1;
+var _diagPanX     = (typeof _diagPanX     !== 'undefined') ? _diagPanX     : 0;
+var _diagPanY     = (typeof _diagPanY     !== 'undefined') ? _diagPanY     : 0;
 let _diagCollapsed = new Set(); // collapsed project IDs
-let _diagPanning  = false;
-let _diagLastX    = 0;
-let _diagLastY    = 0;
+var _diagPanning  = (typeof _diagPanning  !== 'undefined') ? _diagPanning  : false;
+var _diagLastX    = (typeof _diagLastX    !== 'undefined') ? _diagLastX    : 0;
+var _diagLastY    = (typeof _diagLastY    !== 'undefined') ? _diagLastY    : 0;
 let _weekOffset  = 0;      // weeks back from current week (0 = this week)
 
 // ── Init ──────────────────────────────────────────────────
@@ -561,10 +561,16 @@ window._mwLoadUserView = async function() {
         else if (w.status==='in_progress'){btnLabel='In Progress';btnStyle=`color:var(--compass-amber);border:1px solid rgba(239,159,39,.5);background:none`;}
         else                               {btnLabel='Start';      btnStyle=`color:#060a10;border:1px solid #00D2FF;background:#00D2FF;font-weight:700`;}
         const _negBorder = w.type==='action' ? (() => { const _ns=negGetState(w.id).state; return _ns==='unrated'?'border-left:3px dashed rgba(255,255,255,.18)':_ns==='pending'?'border-left:3px dashed rgba(239,159,39,.5)':_ns==='negotiating'?'border-left:3px solid rgba(139,92,246,.6)':_ns==='agreed'?'border-left:3px solid rgba(29,158,117,.5)':_ns==='escalated'?'border-left:3px solid rgba(226,75,74,.5)':''; })() : '';
+        // Check if parent workflow instance was cancelled/withdrawn
+        const _instCancelled = w.instanceId
+          ? (window._wfInstances||[]).find(i => i.id === w.instanceId)?.status === 'cancelled'
+          : false;
+        const _cancelStyle = _instCancelled ? 'opacity:.45;' : '';
+        const _titleStyle  = _instCancelled ? 'text-decoration:line-through;color:rgba(255,255,255,.4);' : '';
         return `<div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
           data-wi-status="${w.status}" data-wi-projectid="${w.projectId||''}"
           style="display:grid;grid-template-columns:14px 80px 1fr 140px 56px 78px;
-            gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;${_negBorder}">
+            gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;${_negBorder}${_cancelStyle}">
           <div style="display:flex;align-items:center;justify-content:center">
             <div class="wi-complete-circle" data-wi-id="${w.id}" data-wi-type="${w.type}"
               data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
@@ -577,7 +583,7 @@ window._mwLoadUserView = async function() {
           <div style="padding:0 6px 0 2px;display:flex;align-items:center">${badge}</div>
           <div style="padding:8px 8px 8px 4px;min-width:0">
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${_titleStyle}">${esc(w.title)}${_instCancelled?' <span style="font-size:10px;color:#E24B4A;font-family:var(--font-mono)">WITHDRAWN</span>':''}</div>
             <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <span>${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</span>
               ${w.type==='action'?(()=>{const _ns=negGetState(w.id).state;return _ns&&_ns!=='unrated'?getNegotiationBadgeHtml(_ns):'';})():''}</div>

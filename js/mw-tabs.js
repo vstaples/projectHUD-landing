@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-120700
+// VERSION: 20260402-120800
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-120700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-120800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -884,7 +884,7 @@ window.loadUserRequests = async function() {
       const rows = await API.get(
         `workflow_instances?submitted_by_resource_id=eq.${resolvedResId}` +
         `&order=created_at.desc&limit=100` +
-        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
+        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments,details`
       ).catch(() => []);
       console.log('[MyRequests] query returned', (rows||[]).length, 'rows');
 
@@ -961,7 +961,7 @@ window.loadUserRequests = async function() {
           steps,
           cocNote:     '',
           attachments: r.attachments || [],
-          _raw:        r,
+          _raw:        { ...r, reviewers: r.details?.reviewers || [] },
         };
       });
     } catch(e) {
@@ -1169,9 +1169,13 @@ function renderMyRequestsActive() {
           <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
         </div>`;
       } else if (s.active) {
+        // For Review step — show reviewer list if available
+        const reviewerLines = s.label === 'Review' && req._raw?.reviewers?.length
+          ? req._raw.reviewers.map(r => `<div style="color:rgba(255,255,255,.55)">${_esc(r.name||r)}</div>`).join('')
+          : '';
         tipHtml = `<div class="myr-pt-tip">
-          <div style="color:#00D2FF;margin-bottom:2px">${_esc(s.label)}</div>
-          <div style="color:rgba(255,255,255,.4)">In progress</div>
+          <div style="color:#EF9F27;margin-bottom:2px">${_esc(s.label)}</div>
+          ${reviewerLines || `<div style="color:rgba(255,255,255,.4)">Awaiting action</div>`}
         </div>`;
       } else if (!s.done) {
         tipHtml = `<div class="myr-pt-tip">
@@ -1676,6 +1680,12 @@ window.myrWithdrawRequest = async function(instanceId) {
     }
     renderMyRequestsActive();
     renderMyRequestsHistory();
+    // Fix badge — recalculate active count after withdraw
+    const _wBadge = document.getElementById('ust-requests-badge');
+    const _wActive = document.getElementById('myr-active-badge');
+    const _wCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
+    if (_wBadge) { _wBadge.textContent = _wCount > 0 ? _wCount+' active' : ''; _wBadge.style.display = _wCount > 0 ? 'inline' : 'none'; }
+    if (_wActive) { _wActive.textContent = _wCount; _wActive.style.display = _wCount > 0 ? 'inline' : 'none'; }
     compassToast(`"${title}" withdrawn. Reviewer notified.`);
 
   } catch(e) {
@@ -2368,6 +2378,16 @@ function _buildWorkflowFormBody(wfId, wf) {
                color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box"
         type="text" value="${_esc(val)}"/>
     </div>`;
+  const dateInp = (label, fieldId, required=false) =>
+    `<div style="margin-bottom:10px">
+      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
+        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
+      </div>
+      <input data-myr-field="${fieldId}" type="date"
+        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
+               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box;
+               color-scheme:dark"/>
+    </div>`;
   const ta = (label, fieldId, val='', rows=3, required=true) =>
     `<div style="margin-bottom:10px">
       <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
@@ -2491,7 +2511,7 @@ function _buildWorkflowFormBody(wfId, wf) {
             + Set Approver
           </button>
         </div>` +
-        inp('Review deadline', 'deadline', '') +
+        dateInp('Review deadline', 'deadline') +
         ta('Review instructions', 'instructions', '', 2, false);
 
     case 'change-request':

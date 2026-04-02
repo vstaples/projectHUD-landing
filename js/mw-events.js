@@ -1,5 +1,5 @@
-// VERSION: 20260402-120700
-console.log('%c[mw-events] v20260402-120700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-120800
+console.log('%c[mw-events] v20260402-120800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -195,10 +195,16 @@ document.addEventListener('click', function(ev) {
     if (!item) return;
     const status = actionBtn.dataset.wiStatus;
     if (item.type==='action') {
-      // ── Review requests from My Requests system ──────────
-      // These are identified by instanceId + title prefix "Review request:"
-      // Route to the dedicated review panel instead of LOE negotiation.
+      // ── Check if parent workflow instance was cancelled ───
       if (item.instanceId && (item.title||'').startsWith('Review request:')) {
+        const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
+        if (parentInst?.status === 'cancelled') {
+          compassToast('This request was withdrawn by the submitter.', 3000);
+          API.patch(`workflow_action_items?id=eq.${item.id}`, { status: 'resolved' })
+            .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
+            .catch(() => {});
+          return;
+        }
         openRequestReviewPanel(item);
         return;
       }
@@ -410,7 +416,7 @@ async function openRequestReviewPanel(item) {
   const submittedBy  = instance?.submitted_by_name || item.createdBy || 'Unknown';
   const submittedAt  = submitEvent
     ? new Date(submitEvent.occurred_at||submitEvent.created_at)
-        .toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
+        .toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
     : '';
 
   // CoC timeline rows
