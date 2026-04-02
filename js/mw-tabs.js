@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-151500
+// VERSION: 20260402-152000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-151500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-152000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -2755,17 +2755,33 @@ window.myrDevPurge = async function() {
   if (!confirmed) return;
 
   const firmId = _mwFirmId();
+  const supaUrl = _mwSupaURL();
+  const supaKey = _mwSupaKey();
   compassToast('Purging…', 60000);
+
+  // API wrapper has no delete method — use raw fetch with Supabase REST DELETE
+  const supa = async (table, query) => {
+    const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
+    return fetch(`${supaUrl}/rest/v1/${table}?${query}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey':        supaKey,
+        'Authorization': `Bearer ${token || supaKey}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal',
+      },
+    });
+  };
 
   try {
     await Promise.all([
-      API.delete(`workflow_requests?firm_id=eq.${firmId}`).catch(()=>{}),
-      API.delete(`workflow_instances?firm_id=eq.${firmId}&workflow_type=eq.doc-review`).catch(()=>{}),
-      API.delete(`workflow_action_items?firm_id=eq.${firmId}&title=like.Review request:*`).catch(()=>{}),
-      API.delete(`workflow_action_items?firm_id=eq.${firmId}&title=like.Approve request:*`).catch(()=>{}),
-      API.delete(`workflow_action_items?firm_id=eq.${firmId}&title=like.✓ Approved:*`).catch(()=>{}),
-      API.delete(`workflow_action_items?firm_id=eq.${firmId}&title=like.↺ Changes requested:*`).catch(()=>{}),
-      API.delete(`coc_events?firm_id=eq.${firmId}&event_type=like.request.*`).catch(()=>{}),
+      supa('workflow_requests',   `firm_id=eq.${firmId}`),
+      supa('workflow_instances',  `firm_id=eq.${firmId}&workflow_type=eq.doc-review`),
+      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Review request:*`),
+      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Approve request:*`),
+      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%9C%93 Approved:*`),
+      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA Changes requested:*`),
+      supa('coc_events',          `firm_id=eq.${firmId}&event_type=like.request.*`),
     ]);
 
     // Reset local state
