@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-200000
+// VERSION: 20260402-200500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-200500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1886,15 +1886,15 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
     return;
   }
 
-  // Open — fetch if not yet loaded
   panel.classList.add('open');
   if (labelEl) labelEl.querySelector('span:first-child').textContent = '▼ Chain of Custody';
 
+  // If CoC not yet loaded, fetch and re-render the full card
   if (!(window._myRequestCoc||{})[instanceId]) {
     await myrLoadRequestCoc(instanceId);
+    // Re-render active cards to populate the new layout with fresh CoC data
+    renderMyRequestsActive();
   }
-  const events = (window._myRequestCoc||{})[instanceId] || [];
-  _myrRenderCocPanel(panel, events, labelEl);
 };
 
 // Fetch CoC events for a single instance and cache in window._myRequestCoc
