@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-162000
+// VERSION: 20260402-163000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-162000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-163000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -934,7 +934,11 @@ window.loadUserRequests = async function() {
         // step completions, which incorrectly advanced Review to green when only one of
         // multiple reviewers had acted. current_step_name is gated in _rrpSubmit and only
         // advances to 'Approve' when ALL reviewers are resolved.
-        const activeIdx = isComplete ? stepLabels.length : (currentIdx >= 0 ? currentIdx : 0);
+        const activeIdx = isComplete
+          ? stepLabels.length
+          : currentIdx >= 0
+            ? Math.min(currentIdx + 1, stepLabels.length - 1)
+            : 1;
         const steps = stepLabels.map((label, i) => ({
           label,
           done:   i < activeIdx,

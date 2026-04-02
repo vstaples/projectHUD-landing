@@ -1,5 +1,5 @@
-// VERSION: 20260402-162000
-console.log('%c[mw-core] v20260402-162000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-163000
+console.log('%c[mw-core] v20260402-163000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1260,14 +1260,16 @@ window._mwLoadUserView = async function() {
           if (totalNew) {
             newActions.forEach(a => _knownActionIds.add(a.id));
             newReviews.forEach(r => _knownReviewIds.add(r.id));
-            // Only reload My Work if the user is on the work tab — don't interrupt other tabs
             const activeTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
             if (activeTab === 'work') {
               console.log('%c[Poll] Reloading My Work','background:#1a3a1a;color:#4ade80;padding:2px 6px');
               window._mwLoadUserView && window._mwLoadUserView();
+            } else if (activeTab === 'requests') {
+              console.log('[Poll] New items — refreshing My Requests');
+              window._requestsLoaded = false;
+              window.loadUserRequests && window.loadUserRequests();
             } else {
-              console.log('[Poll] New items detected — deferring reload until user returns to My Work tab');
-              // Mark stale so it reloads when they switch back
+              console.log('[Poll] New items detected — deferring reload');
               window._mwWorkStale = true;
             }
           }
