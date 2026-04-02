@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-191500
+// VERSION: 20260402-192000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-191500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-192000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -53,12 +53,14 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
       } catch(_) {}
     }
 
-    const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-    const res = await fetch('/api/notify-step-activated', {
+    const _notifyUrl = `${_mwSupaURL()}/functions/v1/notify-step-activated`;
+    const _notifyKey = _mwSupaKey();
+    const res = await fetch(_notifyUrl, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
-        'Authorization': `Bearer ${token || ''}`,
+        'apikey':        _notifyKey,
+        'Authorization': `Bearer ${_notifyKey}`,
       },
       body: JSON.stringify({
         instance_id:        instanceId || null,
