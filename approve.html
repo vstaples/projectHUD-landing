@@ -682,7 +682,100 @@ async function submitResponse() {
       }
     );
 
-    // 2. Write step_completed CoC event via respond-step Edge Function
+    // 2. If this token is for a My Requests doc-review approval — complete the workflow_instance
+    //    and resolve the approver's workflow_requests row
+    if (_tokenRec?.instance_id && !_selected.requiresReset) {
+      try {
+        const now2 = new Date().toISOString();
+        // Complete the workflow instance
+        await fetch(
+          `${SUPA_URL}/rest/v1/workflow_instances?id=eq.${_tokenRec.instance_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              status:            'complete',
+              current_step_name: 'Approved',
+              updated_at:        now2,
+            }),
+          }
+        );
+        // Resolve the approver's workflow_requests row
+        await fetch(
+          `${SUPA_URL}/rest/v1/workflow_requests?instance_id=eq.${_tokenRec.instance_id}&role=eq.approver&status=eq.open`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ status: 'resolved', updated_at: now2 }),
+          }
+        );
+        // Write CoC event
+        await fetch(
+          `${SUPA_URL}/rest/v1/coc_events`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              id:                crypto.randomUUID(),
+              firm_id:           _tokenRec.firm_id,
+              entity_id:         _tokenRec.instance_id,
+              entity_type:       'workflow_instance',
+              event_type:        'request.approved',
+              event_class:       'lifecycle',
+              severity:          'info',
+              event_notes:       JSON.stringify({
+                decision: 'approved',
+                comments: notes || '',
+                reviewer: _tokenRec.assignee_name || _tokenRec.recipient_name || 'External Approver',
+              }),
+              actor_name:        _tokenRec.assignee_name || _tokenRec.recipient_name || 'External Approver',
+              occurred_at:       now2,
+              created_at:        now2,
+            }),
+          }
+        );
+      } catch (mwErr) {
+        console.warn('[approve.html] My Requests completion failed:', mwErr);
+      }
+    } else if (_tokenRec?.instance_id && _selected.requiresReset) {
+      // Changes requested / rejected — loop back to Review step
+      try {
+        await fetch(
+          `${SUPA_URL}/rest/v1/workflow_instances?id=eq.${_tokenRec.instance_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              status:            'in_progress',
+              current_step_name: 'Review',
+              updated_at:        new Date().toISOString(),
+            }),
+          }
+        );
+      } catch (_) {}
+    }
+
+    // 3. Write step_completed CoC event via respond-step Edge Function
     // (Falls back to direct DB write if Edge Function not yet deployed)
     let routingDone = false;
     try {
@@ -705,7 +798,7 @@ async function submitResponse() {
       if (efRes.ok) routingDone = true;
     } catch (_) { /* Edge Function not deployed yet — graceful degradation */ }
 
-    // 3. Direct CoC write fallback (if Edge Function not available)
+    // 4. Direct CoC write fallback (if Edge Function not available)
     if (!routingDone && _tokenRec) {
       await fetch(`${SUPA_URL}/rest/v1/workflow_step_instances`, {
         method: 'POST',
@@ -730,7 +823,7 @@ async function submitResponse() {
       });
     }
 
-    // 4. Show confirmation
+    // 5. Show confirmation
     showConfirmation(notes);
 
   } catch (err) {
