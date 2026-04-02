@@ -1,5 +1,5 @@
-// VERSION: 20260402-140500
-console.log('%c[mw-events] v20260402-140500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-141000
+console.log('%c[mw-events] v20260402-141000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -317,7 +317,7 @@ document.addEventListener('mouseout', function(ev) {
 });
 
 // ── In-Progress Update Panel (1.C) ───────────────────────
-function openInProgressPanel(item) {
+window.openInProgressPanel = function openInProgressPanel(item) {
   document.getElementById('completion-micro-panel')?.remove();
   document.getElementById('inprogress-panel')?.remove();
   const row = document.querySelector(`.wi-row[data-wi-id="${item.id}"]`);
@@ -372,7 +372,7 @@ function openInProgressPanel(item) {
   document.getElementById('ip-pct')?.focus();
 }
 
-async function saveInProgressUpdate(itemId, projectId) {
+window.saveInProgressUpdate = async function saveInProgressUpdate(itemId, projectId) {
   const pct=parseInt(document.getElementById('ip-pct')?.value)||0;
   const hours=parseFloat(document.getElementById('ip-hours')?.value||0);
   const status=document.getElementById('ip-status')?.value||'in_progress';
@@ -404,7 +404,7 @@ async function saveInProgressUpdate(itemId, projectId) {
 // and coc_events (audit trail). Notifies the submitter via their My Work queue.
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function openRequestReviewPanel(item) {
+window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
   document.getElementById('req-review-panel')?.remove();
 
   const firmId  = _mwFirmId();
