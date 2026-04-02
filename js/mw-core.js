@@ -1,5 +1,5 @@
-// VERSION: 20260402-121700
-console.log('%c[mw-core] v20260402-121700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-121800
+console.log('%c[mw-core] v20260402-121800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -147,7 +147,7 @@ window._mwLoadUserView = async function() {
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
-      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.${window.FIRM_ID||'aaaaaaaa-0001-0001-0001-000000000001'}&status=in.(active,in_progress,pending)&limit=200`).catch(() => []),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.${window.FIRM_ID||'aaaaaaaa-0001-0001-0001-000000000001'}&status=in.(active,in_progress,pending,cancelled)&limit=200`).catch(() => []),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
@@ -209,8 +209,15 @@ window._mwLoadUserView = async function() {
       if (a.due && b.due) return a.due.localeCompare(b.due);
       return 0;
     });
-    _wiItems = workItems;
-    window._wiItems = workItems;
+    // Filter out action items whose parent workflow instance is cancelled
+    const cancelledInstanceIds = new Set(
+      (wfInstances||[]).filter(i => i.status === 'cancelled').map(i => i.id)
+    );
+    const filteredItems = workItems.filter(w =>
+      !w.instanceId || !cancelledInstanceIds.has(w.instanceId)
+    );
+    _wiItems = filteredItems;
+    window._wiItems = filteredItems;
     window.myActionItems = myActionItems||[];
     window._wfInstances   = wfInstances||[];
     // Seed negotiation state cache from DB so row borders render correctly
@@ -1164,26 +1171,25 @@ window._mwLoadUserView = async function() {
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
 
-    // ── Action item polling — checks every 30s for new items ─
-    // Bridges the gap until WebSocket/server push is available.
+    // ── Action item polling — checks every 30s for new open items ─
     if (!window._actionItemPollTimer) {
       let _knownActionIds = new Set((myActionItems||[]).map(a => a.id));
       window._actionItemPollTimer = setInterval(async () => {
         if (!_myResource?.id) return;
         try {
           const fresh = await API.get(
-            `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
+            `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id&limit=50`
           ).catch(() => null);
           if (!fresh) return;
           const hasNew = fresh.some(a => !_knownActionIds.has(a.id));
           if (hasNew) {
             fresh.forEach(a => _knownActionIds.add(a.id));
-            console.log('[MyWork] New action items detected — refreshing');
-            _viewLoaded['user'] = false;
-            _mwLoadUserView();
+            console.log('[MyWork] New action items — reloading work queue');
+            // Re-run the full data load
+            window._mwLoadUserView && window._mwLoadUserView();
           }
         } catch(_) {}
-      }, 30000); // 30 seconds
+      }, 15000); // poll every 15 seconds
     }
 
     
