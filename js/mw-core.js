@@ -1,5 +1,5 @@
-// VERSION: 20260402-122000
-console.log('%c[mw-core] v20260402-122000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-140000
+console.log('%c[mw-core] v20260402-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -144,7 +144,7 @@ window._mwLoadUserView = async function() {
       }
     }
 
-    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek] = await Promise.all([
+    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek, myPendingReviews] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.${window.FIRM_ID||'aaaaaaaa-0001-0001-0001-000000000001'}&status=in.(active,in_progress,pending,cancelled)&limit=200`).catch(() => []),
@@ -152,7 +152,8 @@ window._mwLoadUserView = async function() {
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
-      Promise.resolve([]), // myCocEvents fetched below after instance IDs are known
+      // 4th parallel fetch: dedicated workflow_requests table (review/approve rows)
+      API.get(`workflow_requests?owner_resource_id=eq.${resId}&status=eq.open&select=id,role,title,body,instance_id,owner_name,due_date&limit=100`).catch(() => []),
     ]);
 
     // _myCocEvents set after workItems built (below)
@@ -195,7 +196,41 @@ window._mwLoadUserView = async function() {
           assignedTo:   t.assigned_to||null,
           urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
       });
+
+    // ── workflow_requests rows → workItems (PENDING REVIEWS section) ──────────
+    // These are injected at urgency -1 so they always sort above regular tasks.
+    // _wrRole is carried through so mw-events.js can route without title-prefix heuristic.
+    const wrInstanceIds = new Set();
+    (myPendingReviews||[]).forEach(wr => {
+      workItems.push({
+        type:            'action',
+        id:              wr.id,
+        title:           wr.title,
+        project:         wr.role === 'approver' ? 'Pending Approval' : 'Pending Review',
+        projectId:       null,
+        status:          'open',
+        due:             wr.due_date || null,
+        overdue:         wr.due_date && wr.due_date < today,
+        urgency:         -1,           // always top of queue, exempt from all date filters
+        createdBy:       wr.created_by_name || null,
+        ownerName:       wr.owner_name || null,
+        ownerResourceId: resId,
+        instanceId:      wr.instance_id || null,
+        body:            wr.body || null,
+        _wrRole:         wr.role,      // 'reviewer' | 'approver' — used by mw-events routing
+        _isWrRow:        true,
+      });
+      if (wr.instance_id) wrInstanceIds.add(wr.instance_id);
+    });
+
+    // ── Legacy action_items — exclude any that were migrated to workflow_requests ─
+    // During cutover: skip action_items whose instance_id already has a workflow_requests row.
     (myActionItems||[]).filter(a=>a.owner_resource_id).forEach(a => {
+      // Skip if this instance already covered by workflow_requests
+      if (a.instance_id && wrInstanceIds.has(a.instance_id) &&
+          ((a.title||'').startsWith('Review request:') || (a.title||'').startsWith('Approve request:'))) {
+        return;
+      }
       const overdue = a.due_date && a.due_date < today;
       workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
         projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency: overdue?0:1,
@@ -219,6 +254,7 @@ window._mwLoadUserView = async function() {
     _wiItems = filteredItems;
     window._wiItems = filteredItems;
     window.myActionItems = myActionItems||[];
+    window._myPendingReviews = myPendingReviews||[];
     window._wfInstances   = wfInstances||[];
     // Seed negotiation state cache from DB so row borders render correctly
     window._negStateCache = window._negStateCache || {};
@@ -518,8 +554,9 @@ window._mwLoadUserView = async function() {
           if (w.type!=='action' && w.status !== _wfStatus) return false;
         }
         if (_wfProject && w.projectId !== _wfProject) return false;
-        const isRequestItem = (w.title||'').startsWith('Review request:') || (w.title||'').startsWith('Approve request:');
-        if (isRequestItem) return true; // always show — blocking items regardless of due date
+      const isRequestItem = w._isWrRow ||
+        (w.title||'').startsWith('Review request:') || (w.title||'').startsWith('Approve request:');
+      if (isRequestItem) return true; // always show — blocking items regardless of due date or type filter
         if (_wfDateRange==='today') return !w.due||w.due===today||w.overdue;
         if (_wfDateRange==='week')  return !w.due||w.due<=weekDays[6]||w.overdue;
         if (_wfDateRange==='30d')   return !w.due||w.due<=cutoff30d||w.overdue;
@@ -1175,24 +1212,34 @@ window._mwLoadUserView = async function() {
 
     // ── Action item polling — checks every 15s for new open items ─
     if (!window._actionItemPollTimer) {
-      let _knownActionIds = new Set((myActionItems||[]).map(a => a.id));
+      let _knownActionIds  = new Set((myActionItems||[]).map(a => a.id));
+      let _knownReviewIds  = new Set((myPendingReviews||[]).map(r => r.id));
       let _pollCount = 0;
-      console.log('%c[Poll] Started — watching for new action items every 15s | resId: ' + (_myResource?.id||'?'),
+      console.log('%c[Poll] Started — watching workflow_requests + workflow_action_items every 15s | resId: ' + (_myResource?.id||'?'),
         'background:#1a3a1a;color:#4ade80;padding:2px 6px;font-weight:600');
       console.log('[Poll] Run window._pollNow() to trigger manually');
       const _doPoll = async () => {
         if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
         _pollCount++;
         try {
-          const fresh = await API.get(
-            `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
-          ).catch(e => { console.warn('[Poll] fetch error:', e.message); return null; });
-          if (!fresh) return;
-          const newItems = fresh.filter(a => !_knownActionIds.has(a.id));
-          console.log(`[Poll #${_pollCount}] ${fresh.length} open items | ${newItems.length} new`
-            + (newItems.length ? ': ' + newItems.map(a=>a.title?.slice(0,40)).join(', ') : ''));
-          if (newItems.length) {
-            newItems.forEach(a => _knownActionIds.add(a.id));
+          const [freshActions, freshReviews] = await Promise.all([
+            API.get(
+              `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
+            ).catch(e => { console.warn('[Poll] action_items fetch error:', e.message); return null; }),
+            API.get(
+              `workflow_requests?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,role&limit=50`
+            ).catch(e => { console.warn('[Poll] workflow_requests fetch error:', e.message); return null; }),
+          ]);
+          const newActions  = (freshActions||[]).filter(a => !_knownActionIds.has(a.id));
+          const newReviews  = (freshReviews||[]).filter(r => !_knownReviewIds.has(r.id));
+          const totalOpen   = (freshActions?.length||0) + (freshReviews?.length||0);
+          const totalNew    = newActions.length + newReviews.length;
+          console.log(`[Poll #${_pollCount}] ${totalOpen} open items | ${totalNew} new`
+            + (newActions.length ? ' | actions: ' + newActions.map(a=>a.title?.slice(0,30)).join(', ') : '')
+            + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : ''));
+          if (totalNew) {
+            newActions.forEach(a => _knownActionIds.add(a.id));
+            newReviews.forEach(r => _knownReviewIds.add(r.id));
             console.log('%c[Poll] Reloading My Work','background:#1a3a1a;color:#4ade80;padding:2px 6px');
             window._mwLoadUserView && window._mwLoadUserView();
           }

@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121700
+// VERSION: 20260402-140000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -980,11 +980,11 @@ window.loadUserRequests = async function() {
   const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');
   if (activeReqs.length) {
     const ids = activeReqs.map(r => r.id).join(',');
-    API.get(`workflow_action_items?instance_id=in.(${ids})&select=instance_id,owner_name,title&limit=200`)
+    // Use workflow_requests (dedicated table) — role=reviewer, no title-prefix heuristic needed
+    API.get(`workflow_requests?instance_id=in.(${ids})&role=eq.reviewer&select=instance_id,owner_name&limit=200`)
       .then(rows => {
         window._myRequestReviewers = window._myRequestReviewers || {};
         (rows||[]).forEach(a => {
-          if (!(a.title||'').startsWith('Review request:')) return;
           if (!window._myRequestReviewers[a.instance_id])
             window._myRequestReviewers[a.instance_id] = [];
           if (a.owner_name && !window._myRequestReviewers[a.instance_id].includes(a.owner_name))
@@ -1745,13 +1745,18 @@ window.myrWithdrawRequest = async function(instanceId) {
       created_at:        now,
     });
 
-    // On withdraw: resolve only the submitter's own action items.
-    // Reviewer/approver items remain open so they see the WITHDRAWN tag
-    // and get auto-resolved when they next click the item.
-    await API.patch(
-      `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&owner_resource_id=eq.${resId}`,
-      { status: 'resolved', updated_at: now }
-    ).catch(() => {});
+    // On withdraw: cancel open workflow_requests for this instance (new dedicated table).
+    // Also patch workflow_action_items for any legacy rows during migration cutover.
+    await Promise.all([
+      API.patch(
+        `workflow_requests?instance_id=eq.${instanceId}&status=eq.open`,
+        { status: 'cancelled', updated_at: now }
+      ).catch(() => {}),
+      API.patch(
+        `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&owner_resource_id=eq.${resId}`,
+        { status: 'resolved', updated_at: now }
+      ).catch(() => {}),
+    ]);
 
     // Optimistic local update
     if (window._myRequests) {
@@ -2307,13 +2312,14 @@ window.myrSubmitWorkflow = async function(wfId) {
     const actionRecipients = []; // [{id, name, role}] for toast
 
     if (wfId === 'doc-review' && (details.reviewers||[]).length) {
-      // Create one action item per reviewer
+      // ── POST to workflow_requests (dedicated table, not workflow_action_items) ──
       for (const reviewer of (details.reviewers || [])) {
         if (!reviewer.id) continue;
-        await API.post('workflow_action_items', {
+        await API.post('workflow_requests', {
           id:                crypto.randomUUID(),
           firm_id:           firmId,
           instance_id:       instanceId,
+          role:              'reviewer',
           title:             `Review request: ${title}`,
           body:              details.instructions || '',
           status:            'open',
@@ -2324,12 +2330,13 @@ window.myrSubmitWorkflow = async function(wfId) {
         });
         actionRecipients.push({ name: reviewer.name, role: 'Reviewer' });
       }
-      // Create action item for approver if set
+      // Approver row
       if (details.approver?.id) {
-        await API.post('workflow_action_items', {
+        await API.post('workflow_requests', {
           id:                crypto.randomUUID(),
           firm_id:           firmId,
           instance_id:       instanceId,
+          role:              'approver',
           title:             `Approve request: ${title}`,
           body:              details.instructions || '',
           status:            'open',

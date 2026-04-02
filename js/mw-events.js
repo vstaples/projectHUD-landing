@@ -1,5 +1,5 @@
-// VERSION: 20260402-121400
-console.log('%c[mw-events] v20260402-121400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-140500
+console.log('%c[mw-events] v20260402-140500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -195,10 +195,15 @@ document.addEventListener('click', function(ev) {
     if (!item) return;
     const status = actionBtn.dataset.wiStatus;
     if (item.type==='action') {
-      // ── Check if parent workflow instance was cancelled ───
-      const isReviewItem  = item.instanceId && (item.title||'').startsWith('Review request:');
-      const isApproveItem = item.instanceId && (item.title||'').startsWith('Approve request:');
-      if (isReviewItem || isApproveItem) {
+    if (item.type==='action') {
+      // ── Check if this action item is a review/approve request ──────────────
+      // Route via workflow_requests table (dedicated) — no title-prefix heuristic.
+      // Falls back to title-prefix for any legacy rows during migration cutover.
+      const isLegacyReview  = item.instanceId && (item.title||'').startsWith('Review request:');
+      const isLegacyApprove = item.instanceId && (item.title||'').startsWith('Approve request:');
+
+      if (item.instanceId && (isLegacyReview || isLegacyApprove)) {
+        // Legacy path — action item is still in workflow_action_items
         const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
         if (parentInst?.status === 'cancelled') {
           compassToast('This request was withdrawn by the submitter.', 3000);
@@ -207,7 +212,22 @@ document.addEventListener('click', function(ev) {
             .catch(() => {});
           return;
         }
-        openRequestReviewPanel(item, isApproveItem);
+        openRequestReviewPanel(item, isLegacyApprove);
+        return;
+      }
+
+      // ── New path: item is a workflow_requests row ──────────────────────────
+      if (item.instanceId && item._wrRole) {
+        // _wrRole is set by mw-core.js when building workItems from workflow_requests
+        const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
+        if (parentInst?.status === 'cancelled') {
+          compassToast('This request was withdrawn by the submitter.', 3000);
+          API.patch(`workflow_requests?id=eq.${item.id}`, { status: 'cancelled' })
+            .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
+            .catch(() => {});
+          return;
+        }
+        openRequestReviewPanel(item, item._wrRole === 'approver');
         return;
       }
       const _ns = negGetState(item.id).state;
@@ -528,14 +548,14 @@ async function openRequestReviewPanel(item) {
           Cancel
         </button>
         <button id="rrp-reject-btn"
-          onclick="_rrpSubmit('${item.id}','${item.instanceId||''}','rejected')"
+          onclick="_rrpSubmit('${item.id}','${item.instanceId||''}','rejected','${item._wrRole||''}')"
           style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
                  background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.4);
                  color:#E24B4A;cursor:pointer;letter-spacing:.06em">
           ✗ Request Changes
         </button>
         <button id="rrp-approve-btn"
-          onclick="_rrpSubmit('${item.id}','${item.instanceId||''}','approved')"
+          onclick="_rrpSubmit('${item.id}','${item.instanceId||''}','approved','${item._wrRole||''}')"
           style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
                  background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.4);
                  color:#1D9E75;cursor:pointer;letter-spacing:.06em">
@@ -550,7 +570,7 @@ async function openRequestReviewPanel(item) {
 }
 
 // ── Review panel submit ───────────────────────────────────
-window._rrpSubmit = async function(actionItemId, instanceId, decision) {
+window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
   const comments = document.getElementById('rrp-comments')?.value?.trim() || '';
   const firmId   = _mwFirmId();
   const resName  = _myResource?.name || 'Unknown';
@@ -581,11 +601,21 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
       }).catch(()=>{});
     }
 
-    // 2. Resolve the action item
-    await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
-      status: 'resolved',
-      updated_at: now,
-    }).catch(()=>{});
+    // 2. Resolve the request row — workflow_requests (new) or workflow_action_items (legacy)
+    // wrRole is passed as a 4th string arg from the button onclick ('reviewer'|'approver'|'')
+    const isWrRow = !!(wrRole); // truthy only for rows sourced from workflow_requests
+    if (isWrRow) {
+      await API.patch(`workflow_requests?id=eq.${actionItemId}`, {
+        status: 'resolved',
+        updated_at: now,
+      }).catch(()=>{});
+    } else {
+      // Legacy: still in workflow_action_items during migration cutover
+      await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
+        status: 'resolved',
+        updated_at: now,
+      }).catch(()=>{});
+    }
 
     // 3. Write CoC event
     await API.post('coc_events', {
@@ -607,7 +637,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
       created_at:        now,
     });
 
-    // 4. If approved, notify submitter via a new action item in their My Work
+    // If approved, notify submitter via a new action item in their My Work
     //    Fetch instance to get submitted_by_resource_id
     let inst = null;
     if (instanceId) {
@@ -657,23 +687,22 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
     }
 
     // If all reviewers have now approved → notify the approver
+    // Check workflow_requests (new table) — no title-prefix heuristic needed
     if (approved && instanceId) {
       try {
-        // Get all open action items for this instance
-        const openItems = await API.get(
-          `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&select=id,title,owner_name,owner_resource_id`
+        const openRequests = await API.get(
+          `workflow_requests?instance_id=eq.${instanceId}&status=eq.open&select=id,role,owner_name,owner_resource_id`
         ).catch(() => []);
-        // If only the Approve request remains open, all reviewers are done
-        const onlyApproveLeft = (openItems||[]).every(i => (i.title||'').startsWith('Approve request:'));
-        if (onlyApproveLeft && openItems?.length) {
-          const approveItem = openItems[0];
-          // Look up approver email from resources
-          const approverRes = (_resources||[]).find(r => r.id === approveItem.owner_resource_id);
+        // If only the approver row remains open, all reviewers are done
+        const onlyApproveLeft = (openRequests||[]).every(r => r.role === 'approver');
+        if (onlyApproveLeft && openRequests?.length) {
+          const approveRow = openRequests[0];
+          const approverRes = (_resources||[]).find(r => r.id === approveRow.owner_resource_id);
           const approverEmail = approverRes?.email || '';
           if (approverEmail) {
             window._myrNotify && _myrNotify({
               toEmail: approverEmail,
-              toName:  approveItem.owner_name || '',
+              toName:  approveRow.owner_name || '',
               fromName: resName,
               stepName: 'Approve',
               stepType: 'approval',
