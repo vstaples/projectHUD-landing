@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-153000
+// VERSION: 20260402-161500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-153000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-161500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -60,8 +60,12 @@ window.uSwitchTab = function(tab, btn) {
     window._notesStartInboxPoll();
     if (window._notesStartPingSystem) window._notesStartPingSystem();
   }
-  // MY VIEWS — flush save and manage polls same as MY NOTES
-  if (_uActiveTab === 'views' && tab !== 'views' && window._notesSaveNow) window._notesSaveNow();
+  // Stop CoC live poll when leaving requests tab
+  if (_uActiveTab === 'requests' && tab !== 'requests' && window._myrCocPollTimer) {
+    clearInterval(window._myrCocPollTimer);
+    window._myrCocPollTimer = null;
+    console.log('[MyRequests] CoC live refresh poll stopped');
+  }
   if (tab === 'views' && window._notesStartInboxPoll) window._notesStartInboxPoll();
   _uActiveTab = tab;
   localStorage.setItem('compass-user-tab', tab);
@@ -921,18 +925,12 @@ window.loadUserRequests = async function() {
             ? Math.min(currentIdx + 1, stepLabels.length - 1)
             : 1;
 
-        // Refinement: use CoC event count if loaded and higher than DB-derived index
-        const cocEvents   = (window._myRequestCoc||{})[r.id] || [];
-        const stepEventTypes = ['request.submitted','request.routed','request.reviewed',
-          'request.revision_requested','request.final_review','request.completed'];
-        const cocDoneCount = cocEvents.length
-          ? Math.max(
-              cocEvents.filter(e => stepEventTypes.includes(e.event_type)).length,
-              currentIdx >= 0 ? currentIdx + 1 : 1
-            )
-          : dbActiveIdx; // fall back to DB-derived when CoC not yet loaded
-
-        const activeIdx = isComplete ? stepLabels.length : Math.min(cocDoneCount, stepLabels.length - 1);
+        // Derive active step index purely from current_step_name in DB.
+        // The cocDoneCount refinement was removed — it counted request.approved events as
+        // step completions, which incorrectly advanced Review to green when only one of
+        // multiple reviewers had acted. current_step_name is gated in _rrpSubmit and only
+        // advances to 'Approve' when ALL reviewers are resolved.
+        const activeIdx = isComplete ? stepLabels.length : (currentIdx >= 0 ? currentIdx : 0);
         const steps = stepLabels.map((label, i) => ({
           label,
           done:   i < activeIdx,
@@ -1028,6 +1026,34 @@ window.loadUserRequests = async function() {
   if (activeBadge) {
     activeBadge.textContent = activeCount > 0 ? activeCount : '';
     activeBadge.style.display = activeCount > 0 ? 'inline' : 'none';
+  }
+
+  // ── Live CoC refresh — polls open CoC panels every 10s while on requests tab ──
+  // Clears itself when user leaves the requests tab (see uSwitchTab in mw-tabs.js).
+  if (!window._myrCocPollTimer) {
+    window._myrCocPollTimer = setInterval(async () => {
+      // Only run while requests tab is active
+      if ((typeof _uActiveTab !== 'undefined' ? _uActiveTab : '') !== 'requests') return;
+      // Find all open CoC panels in the Active pane
+      const openPanels = document.querySelectorAll('#myr-pane-active .myr-coc-events.open');
+      if (!openPanels.length) return;
+      for (const panel of openPanels) {
+        const instanceId = panel.id.replace('myr-coc-', '').replace(/[^a-f0-9-]/g,'');
+        if (!instanceId || instanceId.length < 10) continue;
+        const before = (window._myRequestCoc||{})[instanceId]?.length || 0;
+        await myrLoadRequestCoc(instanceId); // re-fetches and updates cache
+        const after = (window._myRequestCoc||{})[instanceId]?.length || 0;
+        if (after !== before) {
+          // New events — re-render the panel and update step progress
+          const labelEl = panel.previousElementSibling;
+          _myrRenderCocPanel(panel, window._myRequestCoc[instanceId], labelEl);
+          // Also refresh the step dots for this request
+          const req = (window._myRequests||[]).find(r => r.id === instanceId);
+          if (req) renderMyRequestsActive();
+        }
+      }
+    }, 10000);
+    console.log('[MyRequests] CoC live refresh poll started (10s)');
   }
 };
 
@@ -1198,24 +1224,35 @@ function renderMyRequestsActive() {
           if (subEv) submittedData = JSON.parse(subEv.event_notes || '{}');
         } catch(_) {}
 
-        // Build reviewer decision status from ALL CoC approved events (one per reviewer)
+        // Build reviewer decision status from ALL CoC approved/changes events — keyed by actor name
+        // Each reviewer writes one event; multiple reviewers produce multiple events of the same type.
+        // Must accumulate by actor, NOT overwrite by event_type (which caused later approvals to erase earlier ones).
         const approvedByName = {};
-        instCoc.filter(e => e.event_type === 'request.approved' || e.event_type === 'request.changes_requested').forEach(e => {
-          try {
-            const p = JSON.parse(e.event_notes || '{}');
-            const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-              {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-            const name = e.actor_name || p.reviewer;
-            if (name) approvedByName[name] = {
-              time: t,
-              comments: p.comments || '',
-              approved: e.event_type === 'request.approved',
-            };
-          } catch(_) {}
-        });
+        instCoc
+          .filter(e => e.event_type === 'request.approved' || e.event_type === 'request.changes_requested')
+          .forEach(e => {
+            try {
+              const p = JSON.parse(e.event_notes || '{}');
+              const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+                {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+              const name = e.actor_name || p.reviewer;
+              // First event per actor wins — preserves original decision if they acted multiple times
+              if (name && !approvedByName[name]) {
+                approvedByName[name] = {
+                  time:     t,
+                  comments: p.comments || '',
+                  approved: e.event_type === 'request.approved',
+                };
+              }
+            } catch(_) {}
+          });
 
         if (s.label === 'Review') {
-          const reviewers = submittedData.reviewers || req._reviewerNames?.map(n=>({name:n})) || [];
+          // Source of truth: reviewers list from the request.submitted CoC event notes.
+          // _reviewerNames is a fallback only — submittedData.reviewers always has the full list.
+          const reviewers = (submittedData.reviewers||[]).length
+            ? submittedData.reviewers
+            : (req._reviewerNames||[]).map(n => ({ name: n }));
           const lines = reviewers.map(r => {
             const name = r.name || r;
             const dec  = approvedByName[name];
@@ -1524,6 +1561,38 @@ window.myrToggleReq = function(id) {
   if (el) el.classList.toggle('open');
 };
 
+// Shared CoC row renderer — used by myrToggleCoc and the live refresh poll
+window._myrRenderCocPanel = function(panelEl, events, labelEl) {
+  if (!panelEl) return;
+  if (!events.length) {
+    panelEl.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
+    return;
+  }
+  panelEl.innerHTML = events.map(e => {
+    const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
+    const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
+                      e.event_type==='request.completed'?'#1D9E75':
+                      (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
+    let notes = '';
+    try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
+    return `<div class="myr-coc-row">
+      <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
+      <div class="myr-coc-time">${_esc(t)}</div>
+      <div class="myr-coc-main">
+        <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
+        <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
+        ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  if (labelEl) {
+    const countEl = labelEl.querySelector('span:last-child');
+    if (countEl) countEl.textContent = events.length + ' event' + (events.length!==1?'s':'');
+  }
+};
+
 // Toggle CoC panel — fetch events lazily on first open
 window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
   const panel = document.getElementById(panelId);
@@ -1542,37 +1611,9 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
 
   if (!(window._myRequestCoc||{})[instanceId]) {
     await myrLoadRequestCoc(instanceId);
-    // Re-render the CoC rows in the panel
-    const events = (window._myRequestCoc||{})[instanceId] || [];
-    if (events.length) {
-      panel.innerHTML = events.map(e => {
-        const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-          {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-        const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-        const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
-                          e.event_type==='request.completed'?'#1D9E75':
-                          (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
-        let notes = '';
-        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
-        return `<div class="myr-coc-row">
-          <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-          <div class="myr-coc-time">${_esc(t)}</div>
-          <div class="myr-coc-main">
-            <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-            <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-            ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
-          </div>
-        </div>`;
-      }).join('');
-      // Update the event count in the label
-      if (labelEl) {
-        const countEl = labelEl.querySelector('span:last-child');
-        if (countEl) countEl.textContent = events.length + ' event' + (events.length!==1?'s':'');
-      }
-    } else {
-      panel.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
-    }
   }
+  const events = (window._myRequestCoc||{})[instanceId] || [];
+  _myrRenderCocPanel(panel, events, labelEl);
 };
 
 // Fetch CoC events for a single instance and cache in window._myRequestCoc
