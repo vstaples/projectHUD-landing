@@ -1,5 +1,5 @@
-// VERSION: 20260402-150000
-console.log('%c[mw-events] v20260402-150000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-173000
+console.log('%c[mw-events] v20260402-173000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -632,12 +632,11 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       // We do this before patching so we can count accurately
       const remainingReviewers = await API.get(
         `workflow_requests?instance_id=eq.${instanceId}&role=eq.reviewer&status=eq.open&select=id&limit=50`
-      ).catch(() => []);
-      // Subtract 1 for the row we're about to resolve (this one)
+      ).catch(e => { console.error('[rrpSubmit] remainingReviewers fetch failed:', e.message); return []; });
       const otherOpenReviewers = (remainingReviewers||[]).filter(r => r.id !== actionItemId);
       const allReviewersDone = otherOpenReviewers.length === 0;
+      console.log(`[rrpSubmit] remainingReviewers=${remainingReviewers?.length} otherOpen=${otherOpenReviewers.length} allDone=${allReviewersDone} finalStep=${approved && allReviewersDone ? 'Approve' : 'Review'}`);
 
-      // Only advance to Approve step when all reviewers have signed off
       const advancedStepName = approved && allReviewersDone ? 'Approve' : 'Review';
       const finalStepName    = approved ? advancedStepName : 'Review';
 
@@ -645,23 +644,21 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         status:            newStatus,
         current_step_name: finalStepName,
         updated_at:        now,
-      }).catch(()=>{});
+      }).catch(e => console.error('[rrpSubmit] workflow_instances PATCH failed:', e.message));
     }
 
-    // 2. Resolve the request row — workflow_requests (new) or workflow_action_items (legacy)
-    // wrRole is passed as a 4th string arg from the button onclick ('reviewer'|'approver'|'')
-    const isWrRow = !!(wrRole); // truthy only for rows sourced from workflow_requests
+    const isWrRow = !!(wrRole);
+    console.log(`[rrpSubmit] actionItemId=${actionItemId} wrRole=${wrRole} isWrRow=${isWrRow}`);
     if (isWrRow) {
       await API.patch(`workflow_requests?id=eq.${actionItemId}`, {
         status: 'resolved',
         updated_at: now,
-      }).catch(()=>{});
+      }).catch(e => console.error('[rrpSubmit] workflow_requests PATCH failed:', e.message));
     } else {
-      // Legacy: still in workflow_action_items during migration cutover
       await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
         status: 'resolved',
         updated_at: now,
-      }).catch(()=>{});
+      }).catch(e => console.error('[rrpSubmit] workflow_action_items PATCH failed:', e.message));
     }
 
     // 3. Write CoC event
