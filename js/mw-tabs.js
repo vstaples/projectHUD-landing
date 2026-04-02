@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-192000
+// VERSION: 20260402-192500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-192000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-192500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -77,6 +77,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         approve_url:        approveUrl,
         reject_url:         rejectUrl,
         has_action_buttons: !!(approveUrl && rejectUrl),
+        outcomes:           [],
       }),
     });
     if (res.ok) console.log('[MyRequests] Email sent to', toEmail);
