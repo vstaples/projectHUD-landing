@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-200500
+// VERSION: 20260402-201500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-200500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-201500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1093,12 +1093,6 @@ window.loadUserRequests = async function() {
         const after = (window._myRequestCoc||{})[req.id]?.length || 0;
         if (after !== before) {
           anyNew = true;
-          // Update open CoC panel if visible
-          const panel = document.getElementById('myr-coc-' + (window._myRequests||[]).indexOf(req));
-          if (panel?.classList.contains('open')) {
-            const labelEl = panel.previousElementSibling;
-            _myrRenderCocPanel(panel, window._myRequestCoc[req.id], labelEl);
-          }
         }
       }
       // Always re-render steps — CoC approval count drives step color
@@ -1221,24 +1215,13 @@ function renderMyRequestsActive() {
   const cocOpenIds  = new Set();
   el.querySelectorAll('.myr-ar-body.open').forEach(body => {
     const card = body.closest('.myr-active-req');
-    if (card) {
-      const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
-      if (withdrawBtn) {
-        const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
-        if (m) expandedIds.add(m[1]);
-      }
-    }
+    const rid = card?.dataset.reqId;
+    if (rid) expandedIds.add(rid);
   });
   el.querySelectorAll('.myr-coc-events.open').forEach(cocEl => {
-    // CoC panel id is myr-coc-{i} — find req id from sibling withdraw button
     const card = cocEl.closest('.myr-active-req');
-    if (card) {
-      const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
-      if (withdrawBtn) {
-        const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
-        if (m) cocOpenIds.add(m[1]);
-      }
-    }
+    const rid = card?.dataset.reqId;
+    if (rid) cocOpenIds.add(rid);
   });
   if (!active.length) {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
@@ -1253,10 +1236,6 @@ function renderMyRequestsActive() {
   active.forEach((req, i) => {
     const isAmber     = req.status==='awaiting' || req.status==='in_progress';
     const statusColor = req.status==='approved'?'#1D9E75': isAmber?'#EF9F27':'#00D2FF';
-    const badgeStyle  = req.status==='approved'?'border:1px solid rgba(29,158,117,.4);color:#1D9E75':
-                        isAmber?'border:1px solid rgba(239,159,39,.4);color:#EF9F27':
-                                'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
-    const badgeLabel  = req.status==='approved'?'Approved':req.status==='awaiting'?'Awaiting response':'In progress';
     const dotAnim     = isAmber?'animation:myrActivePulse 1.5s infinite':'';
 
     // Build CoC event map for this instance: event_type → {actor, time, notes}
@@ -1450,11 +1429,17 @@ function renderMyRequestsActive() {
            Loading audit trail…
          </div>`;
 
-    html += `<div class="myr-active-req">
+    const isComplete   = approverApproved || req._raw?.status === 'complete' || req.status === 'completed';
+    const badgeLabel   = isComplete ? 'Approved' : req.status==='awaiting' ? 'Awaiting response' : 'In progress';
+    const badgeStyleFn = isComplete ? 'border:1px solid rgba(29,158,117,.4);color:#1D9E75'
+                       : isAmber   ? 'border:1px solid rgba(239,159,39,.4);color:#EF9F27'
+                       :             'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
+
+    html += `<div class="myr-active-req" data-req-id="${req.id}">
       <div class="myr-ar-head" onclick="myrToggleReq('myr-ar-body-${i}')">
         <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;${dotAnim}"></div>
         <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
+        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyleFn}">${badgeLabel}</span>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
       </div>
       <div class="myr-ar-body${(req.expanded || expandedIds.has(req.id)) ?' open':''}" id="myr-ar-body-${i}">
@@ -1650,17 +1635,23 @@ function renderMyRequestsActive() {
                 </div>` : '';
 
               return `
-                <div style="display:grid;grid-template-columns:1fr 200px;gap:0;margin-top:4px">
+                <div style="display:grid;grid-template-columns:1fr 190px;gap:0;margin-top:4px;min-width:0">
                   <!-- Left: Lifecycle table -->
-                  <div style="border-right:1px solid rgba(255,255,255,.06);padding-right:14px">
+                  <div style="border-right:1px solid rgba(255,255,255,.06);padding-right:14px;min-width:0;overflow:hidden">
                     <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
                                 text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:8px">Lifecycle</div>
-                    <table style="width:100%;border-collapse:collapse">
+                    <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+                      <colgroup>
+                        <col style="width:130px">
+                        <col style="width:130px">
+                        <col style="width:90px">
+                        <col>
+                      </colgroup>
                       <thead>
                         <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-                          <th style="text-align:left;padding:0 10px 6px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">DATE/TIME</th>
-                          <th style="text-align:left;padding:0 10px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">PERSON</th>
-                          <th style="text-align:left;padding:0 10px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ROLE</th>
+                          <th style="text-align:left;padding:0 8px 6px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">DATE/TIME</th>
+                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">PERSON</th>
+                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ROLE</th>
                           <th style="text-align:left;padding:0 0 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);font-weight:400">ACTION</th>
                         </tr>
                       </thead>
@@ -1669,7 +1660,7 @@ function renderMyRequestsActive() {
                     ${commentsHtml}
                   </div>
                   <!-- Right: Approval process -->
-                  <div style="padding-left:14px">
+                  <div style="padding-left:14px;min-width:0">
                     <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
                                 text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:4px">Approval Process</div>
                     ${sidebarRows}
@@ -1843,37 +1834,6 @@ window.myrToggleReq = function(id) {
 };
 
 // Shared CoC row renderer — used by myrToggleCoc and the live refresh poll
-window._myrRenderCocPanel = function(panelEl, events, labelEl) {
-  if (!panelEl) return;
-  if (!events.length) {
-    panelEl.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
-    return;
-  }
-  panelEl.innerHTML = events.map(e => {
-    const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-    const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-    const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
-                      e.event_type==='request.completed'?'#1D9E75':
-                      (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
-    let notes = '';
-    try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
-    return `<div class="myr-coc-row">
-      <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-      <div class="myr-coc-time">${_esc(t)}</div>
-      <div class="myr-coc-main">
-        <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-        <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-        ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
-  if (labelEl) {
-    const countEl = labelEl.querySelector('span:last-child');
-    if (countEl) countEl.textContent = events.length + ' event' + (events.length!==1?'s':'');
-  }
-};
-
 // Toggle CoC panel — fetch events lazily on first open
 window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
   const panel = document.getElementById(panelId);
