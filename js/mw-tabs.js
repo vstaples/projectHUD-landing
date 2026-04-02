@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-184000
+// VERSION: 20260402-185000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-184000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-185000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1246,7 +1246,7 @@ function renderMyRequestsActive() {
         } else if (approvalCount > 0) {
           s = { ...s, done: false, active: true };
         } else {
-          s = { ...s, done: false, active: false }; // waiting — show as pending/blue
+          s = { ...s, done: false, active: true }; // waiting — blue active dot
         }
       }
       const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
