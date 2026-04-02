@@ -59,9 +59,9 @@ body::before {
 }
 .hdr-logo span{color:var(--cyan)}
 .hdr-secure {
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--green);
-  letter-spacing:0.22em;
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--green);
+  letter-spacing:0.08em;
   display:flex;align-items:center;gap:6px;
 }
 .hdr-secure::before {
@@ -87,9 +87,9 @@ body::before {
   background:rgba(0,0,0,0.2);
 }
 .card-firm {
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--text3);
-  letter-spacing:0.22em;text-transform:uppercase;
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--text3);
+  letter-spacing:0.08em;text-transform:uppercase;
   margin-bottom:10px;
 }
 .card-step-name {
@@ -118,16 +118,16 @@ body::before {
   margin-bottom:22px;
 }
 .instructions-label {
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--cyan);
-  letter-spacing:0.22em;margin-bottom:6px;
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--cyan);
+  letter-spacing:0.06em;margin-bottom:6px;
 }
 
 /* ── Outcomes ── */
 .outcomes-label {
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--text3);
-  letter-spacing:0.22em;margin-bottom:10px;
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--text3);
+  letter-spacing:0.06em;margin-bottom:10px;
 }
 .outcomes {display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
 .outcome-btn {
@@ -172,22 +172,23 @@ body::before {
 .outcome-btn.selected-reject  .outcome-text {color:var(--red)}
 .outcome-btn.selected-change  .outcome-text {color:var(--amber)}
 .outcome-hint {
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--text3);
-  margin-left:auto;letter-spacing:0.1em;
+  font-family:Arial, sans-serif;
+  font-size:11px;color:var(--text3);
+  margin-left:auto;letter-spacing:0.02em;
 }
 
 /* ── Notes ── */
 .notes-wrap {margin-bottom:20px}
 .notes-label {
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--text3);
-  letter-spacing:0.22em;margin-bottom:8px;
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--text3);
+  letter-spacing:0.04em;margin-bottom:8px;
   display:flex;align-items:center;gap:8px;
 }
 .notes-required {
+  font-family:Arial, sans-serif;
   color:var(--red);
-  font-size:8px;border:1px solid rgba(255,71,87,0.3);
+  font-size:11px;border:1px solid rgba(255,71,87,0.3);
   padding:1px 6px;
 }
 textarea {
@@ -248,9 +249,9 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
 
 /* ── Error / status ── */
 .status-msg {
-  font-family:var(--font-mono);
-  font-size:10px;
-  letter-spacing:0.12em;
+  font-family:Arial, sans-serif;
+  font-size:13px;
+  letter-spacing:0.02em;
   text-align:center;
   min-height:16px;
   margin-bottom:8px;
@@ -280,19 +281,19 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
   margin-bottom:16px;
 }
 .conf-detail {
-  font-family:var(--font-mono);
-  font-size:10px;color:var(--text3);
-  letter-spacing:0.14em;
+  font-family:Arial, sans-serif;
+  font-size:13px;color:var(--text3);
+  letter-spacing:0.02em;
   line-height:1.8;
 }
 .conf-ref {
   display:inline-block;
   margin-top:16px;
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--text3);
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--text3);
   border:1px solid var(--border);
   padding:6px 14px;
-  letter-spacing:0.14em;
+  letter-spacing:0.04em;
 }
 
 /* ── Already used / expired / invalid ── */
@@ -318,9 +319,9 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
 /* ── Loading ── */
 .loading {
   text-align:center;padding:60px 24px;
-  font-family:var(--font-mono);
-  font-size:10px;color:var(--text3);
-  letter-spacing:0.2em;
+  font-family:Arial, sans-serif;
+  font-size:13px;color:var(--text3);
+  letter-spacing:0.04em;
 }
 @keyframes blink {0%,100%{opacity:1}50%{opacity:0.3}}
 .loading span {animation:blink 1.2s ease-in-out infinite}
@@ -330,9 +331,9 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
   position:relative;z-index:1;
   border-top:1px solid var(--border);
   padding:12px 24px;
-  font-family:var(--font-mono);
-  font-size:9px;color:var(--text3);
-  letter-spacing:0.14em;
+  font-family:Arial, sans-serif;
+  font-size:12px;color:var(--text3);
+  letter-spacing:0.02em;
   text-align:center;
 }
 </style>
@@ -404,9 +405,9 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
           SELECT A RESPONSE ABOVE
         </button>
         <div style="text-align:center">
-          <a href="#" style="font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:0.14em;text-decoration:none" onclick="return false">
-            This is a secure, one-time link · Powered by CadenceHUD
-          </a>
+          <span style="font-family:Arial,sans-serif;font-size:12px;color:var(--text3)">
+            This is a secure, one-time link &middot; Powered by CadenceHUD
+          </span>
         </div>
       </div>
     </div>
@@ -518,9 +519,11 @@ async function loadToken(token) {
     const preOutcome = getParam('outcome');
     if (preOutcome) {
       const outcomes = getOutcomes(rec);
-      // Match by exact ID first, then by requiresReset for generic 'reject'
+      // Match by exact ID first; 'reject' url param → prefer changes_requested over rejected
       const preSelected = outcomes.find(o => o.id === preOutcome)
-        || (preOutcome === 'reject' ? outcomes.filter(o => o.requiresReset).pop() : null);
+        || (preOutcome === 'reject'
+            ? outcomes.find(o => o.id === 'changes_requested') || outcomes.find(o => o.requiresReset)
+            : null);
       if (preSelected) selectOutcome(preSelected);
     }
 
@@ -569,8 +572,12 @@ function renderForm(rec) {
   document.getElementById('firm-context').textContent = 'Apex Consulting Group' +
     (parts.length ? ' · ' + parts.join(' · ') : '');
   document.getElementById('step-name').textContent    = rec.step_name || 'Action Required';
+  // Build meaningful context line: document title + who launched it
+  const ctxParts = [];
+  if (rec.instance_title) ctxParts.push(rec.instance_title);
+  if (rec.launched_by || rec.pm_name) ctxParts.push('Submitted by ' + (rec.launched_by || rec.pm_name));
   document.getElementById('step-context').textContent =
-    `Step assignment · ${rec.assignee_name ? 'Assigned to ' + rec.assignee_name : ''}`;
+    ctxParts.length ? ctxParts.join('  ·  ') : (rec.assignee_name ? 'Assigned to ' + rec.assignee_name : '');
 
   // Instructions
   if (rec.step_instructions) {
@@ -755,6 +762,8 @@ async function submitResponse() {
     } else if (_tokenRec?.instance_id && _selected.requiresReset) {
       // Changes requested / rejected — loop back to Review step
       try {
+        const now3 = new Date().toISOString();
+        // 1. Reset workflow_instance back to Review
         await fetch(
           `${SUPA_URL}/rest/v1/workflow_instances?id=eq.${_tokenRec.instance_id}`,
           {
@@ -768,11 +777,71 @@ async function submitResponse() {
             body: JSON.stringify({
               status:            'in_progress',
               current_step_name: 'Review',
-              updated_at:        new Date().toISOString(),
+              updated_at:        now3,
             }),
           }
         );
-      } catch (_) {}
+        // 2. Re-open all reviewer workflow_requests rows for this instance
+        await fetch(
+          `${SUPA_URL}/rest/v1/workflow_requests?instance_id=eq.${_tokenRec.instance_id}&role=eq.reviewer`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ status: 'open', updated_at: now3 }),
+          }
+        );
+        // 3. Resolve the approver's workflow_requests row
+        await fetch(
+          `${SUPA_URL}/rest/v1/workflow_requests?instance_id=eq.${_tokenRec.instance_id}&role=eq.approver&status=eq.open`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ status: 'resolved', updated_at: now3 }),
+          }
+        );
+        // 4. Write CoC event for changes requested
+        await fetch(
+          `${SUPA_URL}/rest/v1/coc_events`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPA_KEY,
+              'Authorization': `Bearer ${SUPA_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              id:           crypto.randomUUID(),
+              firm_id:      _tokenRec.firm_id,
+              entity_id:    _tokenRec.instance_id,
+              entity_type:  'workflow_instance',
+              event_type:   'request.changes_requested',
+              event_class:  'lifecycle',
+              severity:     'warning',
+              event_notes:  JSON.stringify({
+                decision: _selected.id,
+                comments: notes || '',
+                reviewer: _tokenRec.assignee_name || _tokenRec.recipient_name || 'External Approver',
+              }),
+              actor_name:   _tokenRec.assignee_name || _tokenRec.recipient_name || 'External Approver',
+              occurred_at:  now3,
+              created_at:   now3,
+            }),
+          }
+        );
+      } catch (resetErr) {
+        console.warn('[approve.html] Changes requested reset failed:', resetErr);
+      }
     }
 
     // 3. Write step_completed CoC event via respond-step Edge Function

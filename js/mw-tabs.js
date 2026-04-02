@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-100000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-120000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -63,6 +63,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         'Authorization': `Bearer ${_notifyKey}`,
       },
       body: JSON.stringify({
+        firm_id:            _mwFirmId(),
         instance_id:        instanceId || null,
         instance_title:     title      || null,
         template_name:      'Document Review Request',
@@ -80,9 +81,13 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         outcomes:           [],
       }),
     });
-    if (res.ok) console.log('[MyRequests] Email sent to', toEmail);
-  } catch(_) {
-    // silent — notify endpoint is best-effort
+    if (res.ok) {
+      console.log('[MyRequests] Email sent to', toEmail);
+    } else {
+      res.text().then(t => console.warn('[MyRequests] notify', res.status, t.slice(0,300)));
+    }
+  } catch(e) {
+    console.warn('[MyRequests] notify error:', e.message);
   }
 }
 
@@ -1225,7 +1230,7 @@ function renderMyRequestsActive() {
     if (rid) cocOpenIds.add(rid);
   });
   if (!active.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:15px;color:rgba(255,255,255,.35);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
     return;
   }
 
@@ -1261,7 +1266,16 @@ function renderMyRequestsActive() {
       if (subEv) submittedDataForStep = JSON.parse(subEv.event_notes || '{}');
     } catch(_) {}
     const totalReviewers   = (submittedDataForStep.reviewers||[]).length || 1;
-    const approvalCount    = instCoc.filter(e => e.event_type === 'request.approved').length;
+    // Only count approvals that occurred AFTER the most recent changes_requested reset.
+    // Without this, a reset loop still shows Review as green from prior approvals.
+    const lastResetEv = instCoc
+      .filter(e => e.event_type === 'request.changes_requested')
+      .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
+    const lastResetTs = lastResetEv ? new Date(lastResetEv.occurred_at||lastResetEv.created_at) : null;
+    const approvalCount    = instCoc.filter(e =>
+      e.event_type === 'request.approved' &&
+      (!lastResetTs || new Date(e.occurred_at||e.created_at) > lastResetTs)
+    ).length;
     const allReviewersDone = approvalCount >= totalReviewers;
 
     // Detect final approval from CoC or instance status
@@ -1513,10 +1527,10 @@ function renderMyRequestsActive() {
         })()}
         <div class="myr-coc-panel">
           <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
-            <span>${cocOpenIds.has(req.id) ? '&#9662; Chain of Custody' : '&#9656; Chain of Custody'}</span>
+            <span>&#9662; Chain of Custody</span>
             <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
           </div>
-          <div class="myr-coc-events${cocOpenIds.has(req.id) ? ' open' : ''}" id="myr-coc-${i}">
+          <div class="myr-coc-events open" id="myr-coc-${i}">
             ${(() => {
               if (!instCoc.length) return `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
 
@@ -1716,7 +1730,7 @@ function renderMyRequestsHistory() {
   const reqs = window._myRequests || [];
   const hist = reqs.filter(r => r.status === 'completed' || r.status === 'rejected');
   if (!hist.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No completed requests yet.</div>`;
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:15px;color:rgba(255,255,255,.35);padding:32px 0;text-align:center">No completed requests yet.</div>`;
     return;
   }
 
@@ -1746,24 +1760,52 @@ function renderMyRequestsHistory() {
 
     // CoC rows
     const instCoc = cocByInstance[req.id] || [];
+    // Parse submitted event for role resolution
+    let hSubData = {};
+    try { const se = instCoc.find(e=>e.event_type==='request.submitted'); if(se) hSubData=JSON.parse(se.event_notes||'{}'); } catch(_){}
+    const hReviewerIds = new Set((hSubData.reviewers||[]).map(r=>r.id));
+    const hApproverId  = hSubData.approver?.id || null;
+    const hApproverNameLC = (hSubData.approver?.name||'').trim().toLowerCase();
+    const hGetRole = (e) => {
+      if (e.event_type==='request.submitted'||e.event_type==='request.context_added') return 'Submitter';
+      if (hApproverId && e.actor_resource_id===hApproverId) return 'Approver';
+      if (hApproverNameLC && (e.actor_name||'').trim().toLowerCase()===hApproverNameLC) return 'Approver';
+      if (e.actor_resource_id && hReviewerIds.has(e.actor_resource_id)) return 'Reviewer';
+      return 'Submitter';
+    };
+    const hRoleStyle = (role) => {
+      if (role==='Approver') return 'background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.4);color:#1D9E75';
+      if (role==='Reviewer') return 'background:rgba(239,159,39,.12);border:1px solid rgba(239,159,39,.35);color:#EF9F27';
+      return 'background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF';
+    };
+    const hActionStyle = (evt) => {
+      if (evt==='request.submitted') return 'color:#00D2FF';
+      if (evt==='request.approved') return 'color:#1D9E75';
+      if (evt==='request.changes_requested') return 'color:#E24B4A';
+      if (evt==='request.withdrawn') return 'color:#E24B4A';
+      return 'color:rgba(255,255,255,.4)';
+    };
+    const hActionLabel = (evt) => ({
+      'request.submitted':'Submitted','request.approved':'Approved',
+      'request.changes_requested':'Changes Requested','request.withdrawn':'Withdrawn',
+      'request.context_added':'Context Added',
+    })[evt] || evt.replace('request.','');
     const cocRows = instCoc.length
       ? instCoc.map(e => {
           const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
             {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-          const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-          const dotColor  = e.event_type==='request.submitted' ? '#00D2FF'
-            : e.event_type==='request.approved'||e.event_type==='request.completed' ? '#1D9E75'
-            : (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw') ? '#E24B4A'
-            : '#EF9F27';
+          const role = hGetRole(e);
           let notes = '';
-          try { const p=JSON.parse(e.event_notes||'{}'); notes=p.note||p.comments||p.title||p.doc_names||''; } catch(_){}
+          try { const p=JSON.parse(e.event_notes||'{}'); notes=p.comments||p.note||p.title||p.doc_names||''; } catch(_){}
           return `<div class="myr-coc-row">
-            <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-            <div class="myr-coc-time">${_esc(t)}</div>
-            <div class="myr-coc-main">
-              <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-              <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-              ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
+            <div class="myr-coc-time" style="min-width:110px">${_esc(t)}</div>
+            <div class="myr-coc-main" style="flex:1">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-family:var(--font-head);font-size:11px;padding:1px 6px;${hRoleStyle(role)}">${role}</span>
+                <span style="font-family:var(--font-head);font-size:11px;font-weight:600;${hActionStyle(e.event_type)}">${hActionLabel(e.event_type)}</span>
+              </div>
+              <div class="myr-coc-actor" style="margin-top:2px">${_esc(e.actor_name||'System')}</div>
+              ${notes?`<div class="myr-coc-note" style="margin-top:3px">${_esc(notes)}</div>`:''}
             </div>
           </div>`;
         }).join('')
@@ -1786,7 +1828,7 @@ function renderMyRequestsHistory() {
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
         <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2)">&#9656;</div>
       </div>
-      <div id="${bodyId}" class="myr-ar-body">
+      <div id="${bodyId}" class="myr-ar-body open">
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${(req.attachments||[]).length ? `
@@ -1810,11 +1852,11 @@ function renderMyRequestsHistory() {
           }).join('')}
         </div>` : ''}
         <div class="myr-coc-panel">
-          <div class="myr-coc-label" onclick="myrToggleCoc('${cocId}','${req.id}',this)">
-            <span>&#9656; Chain of Custody</span>
-            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
+          <div class="myr-coc-label">
+            <span>&#9662; Chain of Custody</span>
+            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : ''}</span>
           </div>
-          <div class="myr-coc-events" id="${cocId}">${cocRows}</div>
+          <div class="myr-coc-events open" id="${cocId}">${cocRows}</div>
         </div>
       </div>
     </div>`;
@@ -2126,12 +2168,7 @@ window.myrWithdrawRequest = async function(instanceId) {
     }
     renderMyRequestsActive();
     renderMyRequestsHistory();
-    // Fix badge — recalculate active count after withdraw
-    const _wBadge = document.getElementById('ust-requests-badge');
-    const _wActive = document.getElementById('myr-active-badge');
-    const _wCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
-    if (_wBadge) { _wBadge.textContent = _wCount > 0 ? _wCount+' active' : ''; _wBadge.style.display = _wCount > 0 ? 'inline' : 'none'; }
-    if (_wActive) { _wActive.textContent = _wCount; _wActive.style.display = _wCount > 0 ? 'inline' : 'none'; }
+    _myrUpdateRequestBadges();
     compassToast(`"${title}" withdrawn. Reviewer notified.`);
 
   } catch(e) {
@@ -2141,6 +2178,17 @@ window.myrWithdrawRequest = async function(instanceId) {
 };
 
 // ── Archive a completed request → moves to History ───────────────────────
+// ── Recalculate & repaint both request badge elements ─────────────────────
+function _myrUpdateRequestBadges() {
+  const active = (window._myRequests||[]).filter(r =>
+    r.status !== 'completed' && r.status !== 'rejected'
+  ).length;
+  const b1 = document.getElementById('ust-requests-badge');
+  if (b1) { b1.textContent = active > 0 ? active + ' active' : ''; b1.style.display = active > 0 ? 'inline' : 'none'; }
+  const b2 = document.getElementById('myr-active-badge');
+  if (b2) { b2.textContent = active > 0 ? active : ''; b2.style.display = active > 0 ? 'inline' : 'none'; }
+}
+
 window.myrArchiveRequest = async function(instanceId) {
   if (!instanceId) return;
   const now = new Date().toISOString();
@@ -2162,6 +2210,7 @@ window.myrArchiveRequest = async function(instanceId) {
     }
     renderMyRequestsActive();
     renderMyRequestsHistory();
+    _myrUpdateRequestBadges();
     compassToast('Request archived.');
   } catch(e) {
     compassToast('Archive failed — ' + (e.message||'check console'), 3000);
