@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121200
+// VERSION: 20260402-121300
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121300','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1189,15 +1189,66 @@ function renderMyRequestsActive() {
           <div>${_esc(tipActor||'System')}</div>
           <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
         </div>`;
-      } else if (s.active) {
-        // For Review step — show reviewer names from action items if available
-        const reviewerLines = s.label === 'Review' && req._reviewerNames?.length
-          ? req._reviewerNames.map(n => `<div style="color:rgba(255,255,255,.55)">${_esc(n)}</div>`).join('')
-          : '';
-        tipHtml = `<div class="myr-pt-tip">
-          <div style="color:#EF9F27;margin-bottom:2px">${_esc(s.label)}</div>
-          ${reviewerLines || `<div style="color:rgba(255,255,255,.4)">Awaiting action</div>`}
-        </div>`;
+      } else if (s.active || s.label === 'Review' || s.label === 'Approve') {
+        // Parse reviewer/approver list from request.submitted CoC event
+        let submittedData = {};
+        try {
+          const subEv = instCoc.find(e => e.event_type === 'request.submitted');
+          if (subEv) submittedData = JSON.parse(subEv.event_notes || '{}');
+        } catch(_) {}
+
+        // Build reviewer decision status from CoC approved events
+        const approvedEvs = instCoc.filter(e => e.event_type === 'request.approved');
+        const approvedByName = approvedEvs.reduce((m, e) => {
+          try {
+            const p = JSON.parse(e.event_notes || '{}');
+            const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
+              {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+            m[e.actor_name] = { time: t, comments: p.comments || '' };
+          } catch(_) {}
+          return m;
+        }, {});
+
+        if (s.label === 'Review') {
+          const reviewers = submittedData.reviewers || req._reviewerNames?.map(n=>({name:n})) || [];
+          const lines = reviewers.map(r => {
+            const name = r.name || r;
+            const dec  = approvedByName[name];
+            const status = dec
+              ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
+              : `<span style="color:#EF9F27">Pending</span>`;
+            const comment = dec?.comments
+              ? `<div style="color:rgba(255,255,255,.35);font-size:10px;max-width:180px;
+                             white-space:normal;margin-top:1px">"${_esc(dec.comments)}"</div>`
+              : '';
+            return `<div style="margin-bottom:3px">
+              <div>${_esc(name)} · ${status}</div>${comment}</div>`;
+          }).join('');
+          tipHtml = `<div class="myr-pt-tip" style="min-width:180px;white-space:normal">
+            <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Reviewers</div>
+            ${lines || '<div style="color:rgba(255,255,255,.3)">None assigned</div>'}
+          </div>`;
+        } else if (s.label === 'Approve') {
+          const appr = submittedData.approver;
+          const name = appr?.name || '—';
+          const dec  = approvedByName[name];
+          const status = dec
+            ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
+            : `<span style="color:#EF9F27">Awaiting sign-off</span>`;
+          const comment = dec?.comments
+            ? `<div style="color:rgba(255,255,255,.35);font-size:10px;white-space:normal;
+                           margin-top:2px">"${_esc(dec.comments)}"</div>`
+            : '';
+          tipHtml = `<div class="myr-pt-tip" style="min-width:160px;white-space:normal">
+            <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Approver</div>
+            <div>${_esc(name)} · ${status}</div>${comment}
+          </div>`;
+        } else {
+          tipHtml = `<div class="myr-pt-tip">
+            <div style="color:#EF9F27;margin-bottom:2px">${_esc(s.label)}</div>
+            <div style="color:rgba(255,255,255,.4)">Awaiting action</div>
+          </div>`;
+        }
       } else if (!s.done) {
         tipHtml = `<div class="myr-pt-tip">
           <div style="color:rgba(255,255,255,.3)">${_esc(s.label)}</div>
@@ -1222,7 +1273,7 @@ function renderMyRequestsActive() {
                             e.event_type==='request.completed'?'#1D9E75':
                             e.event_type?.includes('reject')||e.event_type?.includes('withdraw')?'#E24B4A':'#EF9F27';
           let notes = '';
-          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
+          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
           return `<div class="myr-coc-row">
             <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
             <div class="myr-coc-time">${_esc(t)}</div>
@@ -1494,7 +1545,7 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
                           e.event_type==='request.completed'?'#1D9E75':
                           (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
         let notes = '';
-        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
+        try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
         return `<div class="myr-coc-row">
           <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
           <div class="myr-coc-time">${_esc(t)}</div>
