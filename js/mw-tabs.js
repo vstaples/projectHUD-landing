@@ -76,6 +76,9 @@ window.uSwitchTab = function(tab, btn) {
   if (panel) panel.classList.add('on');
   if (tab === 'meetings' && !window._mtgLoaded) loadMyMeetingsView();
   else if (tab === 'meetings' && window._mtgRefresh) window._mtgRefresh();
+  if (tab === 'work' && window._viewLoaded && window._viewLoaded['user'] === false) {
+    window._mwLoadUserView && window._mwLoadUserView();
+  }
   if (tab === 'concerns' && !window._notesLoaded) loadMyNotesView();
   else if (tab === 'concerns' && window._notesRefresh) window._notesRefresh();
   if (tab === 'views' && !window._myViewsLoaded) loadMyViewsView();
@@ -997,18 +1000,20 @@ window.loadUserRequests = async function() {
       }).catch(() => {});
   }
 
-  // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
+  // Pre-fetch CoC — preserve existing cache so step progress renders correctly while fetch is in-flight
   const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
-  window._myRequestCoc = {};
+  window._myRequestCoc = window._myRequestCoc || {};
   if (allIds.length) {
     API.get(
       `coc_events?entity_id=in.(${allIds.join(',')})&order=occurred_at.asc&select=*`
     ).then(rows => {
+      // Rebuild cache from fresh fetch — replace rather than merge to pick up new events
+      const freshCoc = {};
       (rows||[]).forEach(e => {
-        if (!window._myRequestCoc[e.entity_id]) window._myRequestCoc[e.entity_id] = [];
-        if (!window._myRequestCoc[e.entity_id].find(x => x.id === e.id))
-          window._myRequestCoc[e.entity_id].push(e);
+        if (!freshCoc[e.entity_id]) freshCoc[e.entity_id] = [];
+        freshCoc[e.entity_id].push(e);
       });
+      window._myRequestCoc = freshCoc;
       renderMyRequestsActive();
     }).catch(() => {});
   } else {
