@@ -1,5 +1,5 @@
-// VERSION: 20260402-165000
-console.log('%c[mw-core] v20260402-165000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-165500
+console.log('%c[mw-core] v20260402-165500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1274,6 +1274,7 @@ window._mwLoadUserView = async function() {
             }
           }
           const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
+          const totalNew  = newActions.length + newReviews.length + stepChanged.length;
           console.log(`[Poll #${_pollCount}] ${totalOpen} open items | ${totalNew} new`
             + (newActions.length ? ' | actions: ' + newActions.map(a=>a.title?.slice(0,30)).join(', ') : '')
             + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : '')
