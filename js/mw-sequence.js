@@ -177,7 +177,15 @@ function buildRecommendedSequence(workItems) {
     const isActionByOther = w.type === 'action' && w.createdBy && w.createdBy !== (_myResource?.name || '');
     if (isActionByOther) { score += 1000; reasons.push('Blocking ' + esc(w.createdBy)); }
 
-    // 2. Overdue
+    // 1b. Review/Approve requests always urgent — even if self-assigned as reviewer
+    const isReviewItem = w.type === 'action' && (
+      (w.title||'').startsWith('Review request:') || (w.title||'').startsWith('Approve request:')
+    );
+    if (isReviewItem && !isActionByOther) {
+      score += 800;
+      reasons.push('Pending review decision');
+    }
+
     if (w.overdue) {
       const daysLate = w.due ? Math.floor((Date.now() - new Date(w.due+'T00:00:00').getTime()) / 86400000) : 1;
       score += 500 + daysLate * 10;
