@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121600
+// VERSION: 20260402-121700
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -788,18 +788,18 @@ window.loadUserRequests = async function() {
       /* Step tooltip — only visible on hover */
       .myr-pt-tip {
         visibility: hidden; opacity: 0;
-        position: absolute; bottom: calc(100% + 8px); left: 50%;
+        position: absolute; top: calc(100% + 6px); left: 50%;
         transform: translateX(-50%);
         background: #0a1628; border: 1px solid rgba(239,159,39,.3);
         padding: 8px 10px; min-width: 160px; max-width: 240px;
-        font-family: var(--font-head); font-size: 11px; line-height: 1.5;
+        font-family: var(--font-head); font-size: 11px; line-height: 1.6;
         color: #C8DFF0; white-space: normal; z-index: 200;
         pointer-events: none; transition: opacity .15s;
       }
       .myr-pt-tip::after {
-        content: ''; position: absolute; top: 100%; left: 50%;
+        content: ''; position: absolute; bottom: 100%; left: 50%;
         transform: translateX(-50%);
-        border: 5px solid transparent; border-top-color: rgba(239,159,39,.3);
+        border: 5px solid transparent; border-bottom-color: rgba(239,159,39,.3);
       }
       .myr-pt-step:hover .myr-pt-tip { visibility: visible; opacity: 1; }
       /* CoC panel */
