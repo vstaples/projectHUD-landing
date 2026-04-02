@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-181500
+// VERSION: 20260402-182000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-181500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-182000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -733,8 +733,6 @@ window.loadUserConcerns = async function() {
 // Fetches real workflow_instances submitted by this user and maps them
 // to the _myRequests shape expected by renderMyRequestsActive/History.
 window.loadUserRequests = async function() {
-  if (window._requestsInFlight) return;
-  window._requestsInFlight = true;
   window._requestsLoaded = true;
   try {
 
@@ -1062,9 +1060,7 @@ window.loadUserRequests = async function() {
     }, 10000);
     console.log('[MyRequests] CoC live refresh poll started (10s)');
   }
-  } finally {
-    window._requestsInFlight = false;
-  }
+  } finally {}
 };
 
 window.myrSwitchView = function(view, btn) {
@@ -1241,7 +1237,6 @@ function renderMyRequestsActive() {
     const totalReviewers   = (submittedDataForStep.reviewers||[]).length || 1;
     const approvalCount    = instCoc.filter(e => e.event_type === 'request.approved').length;
     const allReviewersDone = approvalCount >= totalReviewers;
-    console.log(`[StepRender] req=${req.id.slice(0,8)} instCoc=${instCoc.length} approvals=${approvalCount} totalReviewers=${totalReviewers} allDone=${allReviewersDone} paneVisible=${document.getElementById('myr-pane-active')?.style.display !== 'none'}`);
 
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
