@@ -1278,16 +1278,6 @@ function renderMyRequestsActive() {
     const approverApproved = instanceComplete || approverApprovedByCoC ||
       (allReviewersDone && approvalCount > totalReviewers);
 
-    // Auto-resolve open ⏳ Pending review action items when instance is complete
-    if (isComplete && req.id && !window._myrAutoResolved?.has(req.id)) {
-      window._myrAutoResolved = window._myrAutoResolved || new Set();
-      window._myrAutoResolved.add(req.id);
-      API.patch(
-        `workflow_action_items?instance_id=eq.${req.id}&status=eq.open`,
-        { status: 'resolved', updated_at: new Date().toISOString() }
-      ).catch(() => {});
-    }
-
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
       if (s.label === 'Review' && !instanceComplete) {
@@ -1449,6 +1439,15 @@ function renderMyRequestsActive() {
          </div>`;
 
     const isComplete   = approverApproved || req._raw?.status === 'complete' || req.status === 'completed';
+    // Auto-resolve open ⏳ Pending review action items when instance is complete
+    if (isComplete && req.id && !window._myrAutoResolved?.has(req.id)) {
+      window._myrAutoResolved = window._myrAutoResolved || new Set();
+      window._myrAutoResolved.add(req.id);
+      API.patch(
+        `workflow_action_items?instance_id=eq.${req.id}&status=eq.open`,
+        { status: 'resolved', updated_at: new Date().toISOString() }
+      ).catch(() => {});
+    }
     const badgeLabel   = isComplete ? 'Approved' : req.status==='awaiting' ? 'Awaiting response' : 'In progress';
     const badgeStyleFn = isComplete ? 'border:1px solid rgba(29,158,117,.4);color:#1D9E75'
                        : isAmber   ? 'border:1px solid rgba(239,159,39,.4);color:#EF9F27'
