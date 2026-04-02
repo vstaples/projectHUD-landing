@@ -1,2937 +1,1852 @@
+// VERSION: 20260402-173000
+console.log('%c[mw-core] v20260402-173000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+
+// ── HTML escape helper (used throughout this module) ──────────────────────
+function _esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+// My Work filter state
+var _wfStatus    = (typeof _wfStatus    !== 'undefined') ? _wfStatus    : 'all';  // 'all' | 'not_started' | 'in_progress' | 'blocked'
+var _wfProject   = (typeof _wfProject   !== 'undefined') ? _wfProject   : '';     // project id | '' = all
+var _wfDateRange = (typeof _wfDateRange !== 'undefined') ? _wfDateRange : 'week'; // 'today' | 'week' | '30d' | 'all'
+var _wfType      = (typeof _wfType      !== 'undefined') ? _wfType      : 'all';  // 'all' | 'task' | 'action'  [Session 16]
+var _doneToday   = (typeof _doneToday   !== 'undefined') ? _doneToday   : [];     // session-persistent completed items  [Session 16]
+var _activeGauge = (typeof _activeGauge !== 'undefined') ? _activeGauge : null;   // clicked gauge date key | null  [Session 16]
+var _dwellTimer  = (typeof _dwellTimer  !== 'undefined') ? _dwellTimer  : null;   // gauge hover dwell timer  [Session 16]
+// ── Diagram mode state ────────────────────────────────────────────────────
+var _diagramMode  = (typeof _diagramMode  !== 'undefined') ? _diagramMode  : false; // LIST vs DIAGRAM toggle
+var _diagScale    = (typeof _diagScale    !== 'undefined') ? _diagScale    : 1;
+var _diagPanX     = (typeof _diagPanX     !== 'undefined') ? _diagPanX     : 0;
+var _diagPanY     = (typeof _diagPanY     !== 'undefined') ? _diagPanY     : 0;
+var _diagCollapsed = (typeof _diagCollapsed !== 'undefined') ? _diagCollapsed : new Set(); // collapsed project IDs
+var _diagPanning  = (typeof _diagPanning  !== 'undefined') ? _diagPanning  : false;
+var _diagLastX    = (typeof _diagLastX    !== 'undefined') ? _diagLastX    : 0;
+var _diagLastY    = (typeof _diagLastY    !== 'undefined') ? _diagLastY    : 0;
+var _weekOffset   = (typeof _weekOffset   !== 'undefined') ? _weekOffset   : 0;  // weeks back from current week
+
+// ── Init ──────────────────────────────────────────────────
+// compass-date is updated by _mwLoadUserView (shows week range when navigating)
+document.getElementById('compass-date').textContent =
+  new Date().toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+  }).toUpperCase();
+
+
+// ── Load shared base data ─────────────────────────────────
 // ══════════════════════════════════════════════════════════
-// MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-172500
+// VIEW: MY WORK (Individual Contributor) — Feature #1 · Session 16
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-172500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-
-// ── Supabase URL/Key helpers ──────────────────────────────
-// SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
-// when loaded from compass.html vs cadence.html. Resolve from any source.
-function _mwSupaURL()      { try { return SUPA_URL;       } catch(_) { return window.SUPA_URL       || 'https://dvbetgdzksatcgdfftbs.supabase.co'; } }
-function _mwSupaKey()      { try { return SUPA_KEY;       } catch(_) { return window.SUPA_KEY       || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358'; } }
-function _mwStorageBucket(){ try { return STORAGE_BUCKET; } catch(_) { return window.STORAGE_BUCKET || 'workflow-documents'; } }
-function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return window.FIRM_ID        || 'aaaaaaaa-0001-0001-0001-000000000001'; } }
-
-// ── Email notification helper ─────────────────────────────
-// Calls /api/notify-step-activated — same endpoint CadenceHUD uses.
-async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title, instanceId, body }) {
-  if (!toEmail) return;
-  try {
-    const base = (window.location.origin || 'https://projecthud.com');
-    await fetch('/api/notify-step-activated', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instance_id:    instanceId || null,
-        instance_title: title      || null,
-        template_name:  'Document Review Request',
-        step_name:      stepName   || 'Review',
-        step_type:      stepType   || 'review',
-        assignee_name:  toName     || null,
-        assignee_email: toEmail,
-        launched_by:    fromName   || null,
-        is_bist:        false,
-        has_action_buttons: false,
-        step_instructions: body || null,
-      }),
-    });
-    console.log('[MyRequests] Email sent to', toEmail);
-  } catch(e) {
-    console.warn('[MyRequests] Notify failed:', e.message);
-  }
-}
-
-
-// var (not let) — my-work.html scripts are injected via document.head.appendChild
-// and may execute more than once per page session. var re-declaration is safe; let/const are not.
-var _uActiveTab = _uActiveTab || 'work';
-window.uSwitchTab = function(tab, btn) {
-  // Flush any pending notes save before leaving the tab
-  if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesSaveNow) {
-    window._notesSaveNow();
-  }
-  // Stop polls when leaving MY NOTES
-  if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesStopInboxPoll) {
-    window._notesStopInboxPoll();
-    if (window._notesStopPingSystem) window._notesStopPingSystem();
-  }
-  // Restart polls when entering MY NOTES
-  if (tab === 'concerns' && window._notesStartInboxPoll) {
-    window._notesStartInboxPoll();
-    if (window._notesStartPingSystem) window._notesStartPingSystem();
-  }
-  // Stop CoC live poll when leaving requests tab
-  if (_uActiveTab === 'requests' && tab !== 'requests' && window._myrCocPollTimer) {
-    clearInterval(window._myrCocPollTimer);
-    window._myrCocPollTimer = null;
-    console.log('[MyRequests] CoC live refresh poll stopped');
-  }
-  if (tab === 'views' && window._notesStartInboxPoll) window._notesStartInboxPoll();
-  _uActiveTab = tab;
-  localStorage.setItem('compass-user-tab', tab);
-  document.querySelectorAll('.ust').forEach(b => b.classList.remove('on'));
-  document.querySelectorAll('.utc').forEach(c => c.classList.remove('on'));
-  if (btn) btn.classList.add('on');
-  const panel = document.getElementById('utc-'+tab);
-  if (panel) panel.classList.add('on');
-  if (tab === 'meetings' && !window._mtgLoaded) loadMyMeetingsView();
-  else if (tab === 'meetings' && window._mtgRefresh) window._mtgRefresh();
-  if (tab === 'work' && window._mwWorkStale) {
-    window._mwWorkStale = false;
-    window._mwLoadUserView && window._mwLoadUserView();
-  }
-  if (tab === 'concerns' && !window._notesLoaded) loadMyNotesView();
-  else if (tab === 'concerns' && window._notesRefresh) window._notesRefresh();
-  if (tab === 'views' && !window._myViewsLoaded) loadMyViewsView();
-  else if (tab === 'views' && window._viewsRefresh) window._viewsRefresh();
-  if (tab === 'calendar' && !window._calLoaded) loadMyCalView();
-  else if (tab === 'calendar' && window._calRefresh) window._calRefresh();
-  if (tab === 'requests' && !window._requestsLoaded) loadUserRequests();
-  else if (tab === 'requests' && window._requestsLoaded) {
-    // Re-fetch on every visit to pick up reviewer actions and status changes
-    window._requestsLoaded = false;
-    loadUserRequests();
-  }
-  if (tab === 'timesheet' && !window._myTimeLoaded) loadMyTimeView();
-};
-
-// ── Calendar popup ────────────────────────────────────────
-var _ucalYear  = (typeof _ucalYear  !== "undefined") ? _ucalYear  : new Date().getFullYear();
-var _ucalMonth = (typeof _ucalMonth !== "undefined") ? _ucalMonth : new Date().getMonth(); // 0-indexed
-
-window.toggleMwCoc = function() {
-  const coc = document.getElementById('mw-coc');
-  if (!coc) { console.warn('[Compass] mw-coc not found'); return; }
-  // Panel uses flex — toggle between flex and none
-  const isVisible = coc.style.display === 'flex';
-  if (isVisible) {
-    coc.style.display = 'none';
-  } else {
-    coc.style.display = 'flex';
-    coc.style.flexDirection = 'column';
-  }
-};
-
-window.toggleUserCalendar = function() {
-  const p = document.getElementById('user-cal-popup');
-  if (!p) return;
-  const visible = p.style.display !== 'none';
-  p.style.display = visible ? 'none' : 'block';
-  if (!visible) renderUserCalendar();
-};
-
-window.ucalNav = function(dir) {
-  _ucalMonth += dir;
-  if (_ucalMonth > 11) { _ucalMonth = 0; _ucalYear++; }
-  if (_ucalMonth < 0)  { _ucalMonth = 11; _ucalYear--; }
-  renderUserCalendar();
-};
-
-function renderUserCalendar() {
-  const today = new Date().toLocaleDateString('en-CA');
-  const todayDate = new Date(today+'T00:00:00');
-  const lblEl = document.getElementById('ucal-month-label');
-  if (lblEl) lblEl.textContent = new Date(_ucalYear, _ucalMonth, 1)
-    .toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
-
-  const cells = document.getElementById('ucal-cells');
-  if (!cells) return;
-
-  // Build event map from live data
-  const evMap = {}; // date-string -> array of color
-  const addEv = (date, col) => {
-    if (!date) return;
-    const d = date.slice(0,10);
-    if (!evMap[d]) evMap[d] = [];
-    evMap[d].push(col);
-  };
-
-  // Tasks due
-  (_wiItems||[]).forEach(w => { if (w.due) addEv(w.due, w.overdue?'#E24B4A':'#EF9F27'); });
-  // Action items
-  (window._userConcerns||[]).forEach(c => { if (c.raised_date) addEv(c.raised_date, '#E24B4A'); });
-  // Meetings
-  (window._userMeetings||[]).forEach(m => { if (m.date) addEv(m.date, '#8B5CF6'); });
-
-  const firstDay = new Date(_ucalYear, _ucalMonth, 1);
-  const lastDay  = new Date(_ucalYear, _ucalMonth+1, 0);
-  const startDow = (firstDay.getDay()+6)%7; // Mon=0
-
-  let html = '';
-  // Blanks
-  for (let i=0;i<startDow;i++) {
-    const prevDate = new Date(_ucalYear, _ucalMonth, -startDow+i+1);
-    html += `<div style="padding:2px 3px;border:1px solid transparent;opacity:.3">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);text-align:center">${prevDate.getDate()}</div>
-    </div>`;
-  }
-  for (let d=1; d<=lastDay.getDate(); d++) {
-    const dt = new Date(_ucalYear, _ucalMonth, d).toLocaleDateString('en-CA');
-    const isToday = dt === today;
-    const dots = evMap[dt]||[];
-    html += `<div onclick="ucalSelectDay('${dt}')" style="min-height:30px;padding:2px 3px;border:1px solid ${isToday?'rgba(0,210,255,.5)':'transparent'};background:${isToday?'rgba(0,210,255,.08)':'transparent'};cursor:pointer;position:relative;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='${isToday?'rgba(0,210,255,.5)':'transparent'}'">
-      <div style="font-family:var(--font-head);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.6)'};font-weight:${isToday?'700':'400'};text-align:center">${d}</div>
-      <div style="display:flex;gap:1.5px;justify-content:center;flex-wrap:wrap;margin-top:1px">${dots.slice(0,3).map(c=>`<div style="width:4px;height:4px;border-radius:50%;background:${c}"></div>`).join('')}</div>
-    </div>`;
-  }
-  cells.innerHTML = html;
-  ucalSelectDay(today); // default to today's agenda
-}
-
-window.ucalSelectDay = function(dt) {
-  const agendaEl = document.getElementById('ucal-agenda');
-  if (!agendaEl) return;
-  const label = new Date(dt+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  const items = [];
-  // Tasks due on this day
-  (_wiItems||[]).filter(w=>w.due===dt).forEach(w=>
-    items.push({color:w.overdue?'#E24B4A':'#EF9F27', time:'Task', text:esc(w.title)}));
-  // Meetings on this day
-  (window._userMeetings||[]).filter(m=>m.date&&m.date.slice(0,10)===dt).forEach(m=>
-    items.push({color:'#8B5CF6', time:m.time||'Mtg', text:esc(m.title)}));
-  agendaEl.innerHTML = `<div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.5);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">${label}</div>` +
-    (items.length ? items.map(i=>`<div style="display:flex;align-items:center;gap:6px;font-family:var(--font-head);font-size:11px;color:rgba(240,246,255,.7);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-      <div style="width:6px;height:6px;border-radius:50%;background:${i.color};flex-shrink:0"></div>
-      <span style="color:rgba(255,255,255,.35);min-width:36px;flex-shrink:0">${i.time}</span>
-      <span>${i.text}</span>
-    </div>`).join('') : `<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80">No events</div>`);
-};
-
-// ── MEETINGS ─────────────────────────────────────────────
-window._meetingsLoaded = false;
-window._userMeetings   = [];
-window._mtgFilter      = 'all';
-window._requestsLoaded = false;
-window._calTabLoaded   = false;
-window._myRequests     = [];
-
-// ── My Time loader ────────────────────────────────────────
-// Fetches /my-time.html, injects into #mt-root, calls _mtLoadView().
-// Subsequent tab clicks hit _mtRefresh() via the loaded guard.
-window.loadMyTimeView = async function() {
-  if (window._myTimeLoaded) {
-    window._mtRefresh && window._mtRefresh();
-    return;
-  }
-  const container = document.getElementById('mt-root');
-  if (!container) { console.error('[Compass] #mt-root not found'); return; }
-  try {
-    const resp = await fetch('/my-time.html');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(html, 'text/html');
-    Array.from(doc.body.childNodes).forEach(node => {
-      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
-    });
-    for (const s of doc.querySelectorAll('script')) {
-      await new Promise((resolve, reject) => {
-        const el = document.createElement('script');
-        if (s.src) {
-          el.src = s.src;
-          el.onload  = resolve;
-          el.onerror = () => reject(new Error('Failed to load ' + s.src));
-        } else {
-          el.textContent = s.textContent;
-        }
-        document.head.appendChild(el);
-        if (!s.src) resolve();
-      });
-    }
-    window._myTimeLoaded = true;
-    // Hand scoped lets from compass.html to my-time.html via window
-    window._mtResource = typeof _myResource !== 'undefined' ? _myResource : null;
-    window._mtProjects = typeof _projects  !== 'undefined' ? _projects  : [];
-    window._mtTasks    = typeof _tasks     !== 'undefined' ? _tasks     : [];
-    window._mtCalEvents = [];
-    if (window._mtLoadView) await window._mtLoadView();
-    else console.error('[Compass] _mtLoadView not exported by my-time.html');
-  } catch (err) {
-    console.error('[Compass] Failed to load my-time.html:', err);
-    if (window.compassToast) compassToast('Failed to load My Time — check console', 4000);
-  }
-};
-
-// ── My Calendar loader ───────────────────────────────────
-// Fetches /my-calendar.html, injects into #cal-root, calls _calLoadView().
-// Bridges _myResource, _wiItems, _mtCalEvents as window._cal* globals.
-window.loadMyCalView = async function() {
-  if (window._calLoaded) {
-    window._calRefresh && window._calRefresh();
-    return;
-  }
-  const container = document.getElementById('cal-root');
-  if (!container) { console.error('[Compass] #cal-root not found'); return; }
-  try {
-    const resp = await fetch('/my-calendar.html');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(html, 'text/html');
-    // Inject <style> blocks from doc.head — DOMParser puts them there, not in body
-    for (const st of doc.querySelectorAll('style')) {
-      const el = document.createElement('style');
-      el.textContent = st.textContent;
-      document.head.appendChild(el);
-    }
-    Array.from(doc.body.childNodes).forEach(node => {
-      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
-    });
-    for (const s of doc.querySelectorAll('script')) {
-      await new Promise((resolve, reject) => {
-        const el = document.createElement('script');
-        if (s.src) {
-          el.src = s.src;
-          el.onload  = resolve;
-          el.onerror = () => reject(new Error('Failed to load ' + s.src));
-        } else {
-          el.textContent = s.textContent;
-        }
-        document.head.appendChild(el);
-        if (!s.src) resolve();
-      });
-    }
-    // Bridge scoped vars from compass.html / my-work.html into my-calendar.html
-    window._calResource    = typeof _myResource !== 'undefined' ? _myResource : null;
-    window._calItems       = typeof _wiItems    !== 'undefined' ? _wiItems    : [];
-    window._calCalEvents   = window._mtCalEvents || [];
-    window._projects       = typeof _projects   !== 'undefined' ? _projects   : (window._projects || []);
-    // Note: _calTimeEntries is fetched directly by buildCalendarTab — no bridge needed
-    if (window._calLoadView) await window._calLoadView();
-    else console.error('[Compass] _calLoadView not exported by my-calendar.html');
-  } catch (err) {
-    console.error('[Compass] Failed to load my-calendar.html:', err);
-    compassToast('Failed to load My Calendar — check console', 4000);
-  }
-};
-
-// ── My Meetings loader ────────────────────────────────────────────────────
-window.loadMyMeetingsView = async function() {
-  if (window._mtgLoaded) {
-    window._mtgRefresh && window._mtgRefresh();
-    return;
-  }
-  const container = document.getElementById('user-meetings-content');
-  if (!container) { console.error('[Compass] #user-meetings-content not found'); return; }
-  container.innerHTML = ''; // clear "Loading meetings…" placeholder
-  try {
-    const resp = await fetch('/my-meetings.html');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(html, 'text/html');
-    for (const st of doc.querySelectorAll('style')) {
-      const el = document.createElement('style');
-      el.textContent = st.textContent;
-      document.head.appendChild(el);
-    }
-    Array.from(doc.body.childNodes).forEach(node => {
-      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
-    });
-    for (const s of doc.querySelectorAll('script')) {
-      await new Promise((resolve, reject) => {
-        const el = document.createElement('script');
-        if (s.src) {
-          el.src = s.src;
-          el.onload  = resolve;
-          el.onerror = () => reject(new Error('Failed to load ' + s.src));
-        } else {
-          el.textContent = s.textContent;
-        }
-        document.head.appendChild(el);
-        if (!s.src) resolve();
-      });
-    }
-    // Bridge resource
-    window._mtgResource = typeof _myResource !== 'undefined' ? _myResource : null;
-    window._users       = typeof _users       !== 'undefined' ? _users       : (window._users || []);
-    if (window._mtgLoadView) await window._mtgLoadView();
-    else console.error('[Compass] _mtgLoadView not exported by my-meetings.html');
-  } catch(err) {
-    console.error('[Compass] Failed to load my-meetings.html:', err);
-    compassToast('Failed to load My Meetings — check console', 4000);
-  }
-};
-
-// ── My Notes loader ───────────────────────────────────────────────────────
-window.loadMyNotesView = async function() {
-  if (window._notesLoaded) {
-    window._notesRefresh && window._notesRefresh();
-    return;
-  }
-  const container = document.getElementById('notes-root');
-  if (!container) { console.error('[Compass] #notes-root not found'); return; }
-  container.innerHTML = '';
-  try {
-    const resp = await fetch('/my-notes.html');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(html, 'text/html');
-    for (const st of doc.querySelectorAll('style')) {
-      const el = document.createElement('style');
-      el.textContent = st.textContent;
-      document.head.appendChild(el);
-    }
-    Array.from(doc.body.childNodes).forEach(node => {
-      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
-    });
-    for (const s of doc.querySelectorAll('script')) {
-      await new Promise((resolve, reject) => {
-        const el = document.createElement('script');
-        if (s.src) {
-          el.src = s.src;
-          el.onload  = resolve;
-          el.onerror = () => reject(new Error('Failed to load ' + s.src));
-        } else {
-          el.textContent = s.textContent;
-        }
-        document.head.appendChild(el);
-        if (!s.src) resolve();
-      });
-    }
-    // Bridge resource
-    window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
-    if (window._notesLoadView) await window._notesLoadView();
-    else console.error('[Compass] _notesLoadView not exported by my-notes.html');
-  } catch(err) {
-    console.error('[Compass] Failed to load my-notes.html:', err);
-    compassToast('Failed to load My Notes — check console', 4000);
-  }
-};
-
-window.loadMyViewsView = async function() {
-  if (window._myViewsLoaded) {
-    // If _widgetContext is missing despite being loaded, the const collision killed
-    // the script block — force a clean re-init (page reload is the safest recovery)
-    if (!window._widgetContext) {
-      console.warn('[MyViews] _widgetContext missing after load — reloading page to recover');
-      window.location.reload();
-      return;
-    }
-    // Already loaded and healthy — just refresh data
-    if (window._viewsRefresh) {
-      window._viewsRefresh();
-    } else if (window._viewsLoadView) {
-      window._viewsLoaded = false;
-      await window._viewsLoadView();
-    }
-    return;
-  }
-  const container = document.getElementById('views-root');
-  if (!container) {
-    console.warn('[Compass] #views-root not found — deferring until _mwLoadUserView completes');
-    const MAX_WAIT = 8000;
-    const POLL_MS  = 100;
-    let elapsed = 0;
-    await new Promise(resolve => {
-      const poll = setInterval(() => {
-        elapsed += POLL_MS;
-        if (document.getElementById('views-root') || elapsed >= MAX_WAIT) {
-          clearInterval(poll);
-          resolve();
-        }
-      }, POLL_MS);
-    });
-    if (!document.getElementById('views-root')) {
-      console.error('[Compass] #views-root still not found after ' + MAX_WAIT + 'ms — aborting');
-      return;
-    }
-    if (window._myViewsLoaded) {
-      window._viewsRefresh && window._viewsRefresh();
-      return;
-    }
-  }
-  container.innerHTML = '';
-  try {
-    const resp = await fetch('/my-views.html');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(html, 'text/html');
-    for (const st of doc.querySelectorAll('style')) {
-      const el = document.createElement('style');
-      el.textContent = st.textContent;
-      document.head.appendChild(el);
-    }
-    Array.from(doc.body.childNodes).forEach(node => {
-      if (node.nodeName !== 'SCRIPT') container.appendChild(document.importNode(node, true));
-    });
-    for (const s of doc.querySelectorAll('script')) {
-      await new Promise((resolve, reject) => {
-        const el = document.createElement('script');
-        if (s.src) {
-          el.src = s.src;
-          el.onload  = resolve;
-          el.onerror = () => reject(new Error('Failed to load ' + s.src));
-        } else {
-          el.textContent = s.textContent;
-        }
-        document.head.appendChild(el);
-        if (!s.src) resolve();
-      });
-    }
-    // Bridge resource BEFORE calling _viewsLoadView so _widgetContext resolves correctly
-    window._notesResource = typeof _myResource !== 'undefined' ? _myResource : null;
-    window._myViewsLoaded = true;
-    if (window._viewsLoadView) await window._viewsLoadView();
-    else console.error('[Compass] _viewsLoadView not exported by my-views.html');
-  } catch(err) {
-    console.error('[Compass] Failed to load my-views.html:', err);
-    compassToast('Failed to load My Views — check console', 4000);
-  }
-};
-
-
-window.loadUserMeetings = async function() {
-  window._meetingsLoaded = true;
-  const el = document.getElementById('user-meetings-content');
-  if (!el) return;
-
-  try {
-    // meetings table — linked to pipeline prospects and workflow instances
-    const today = new Date().toLocaleDateString('en-CA');
-    const resId = _myResource?.id;
-    const userId = _myResource?.user_id;
-
-    const [meetings, attendees] = await Promise.all([
-      API.get(`v_meetings?select=id,title,meeting_date,duration_minutes,location_or_link,meeting_type,status,organizer_id&order=meeting_date.desc&limit=50`).catch(()=>[]),
-      userId ? API.get(`meeting_attendees?select=meeting_id,attendance_status&user_id=eq.${userId}&limit=100`).catch(()=>[]) : Promise.resolve([]),
-    ]);
-
-    const myMeetingIds = new Set(attendees.map(a=>a.meeting_id));
-    const myMeetings = (meetings||[]);  // show all firm meetings from v_meetings
-
-    window._userMeetings = myMeetings.map(m => ({
-      id: m.id,
-      title: m.title,
-      date: m.meeting_date?.slice(0,10),
-      time: m.meeting_date ? new Date(m.meeting_date).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : null,
-      duration: m.duration_minutes||60,
-      location: m.location_or_link,
-      type: m.meeting_type||'meeting',
-      status: 'scheduled',
-      owned: false,
-      past: m.meeting_date && m.meeting_date.slice(0,10) < today,
-    }));
-
-    // Update badge
-    const todayMtgs = window._userMeetings.filter(m=>m.date===today).length;
-    const badge = document.getElementById('ust-meetings-badge');
-    if (badge && todayMtgs > 0) {
-      badge.textContent = todayMtgs+' today';
-      badge.className = 'ust-badge ust-badge-green';
-      badge.style.display = 'inline';
-    }
-
-    renderUserMeetings();
-  } catch(e) {
-    console.error('[Compass] meetings load error:', e);
-    el.innerHTML = '<div style="font-family:var(--font-head);font-size:12px;color:#E24B4A;padding:16px 0">Failed to load meetings</div>';
-  }
-};
-
-function renderUserMeetings() {
-  const el = document.getElementById('user-meetings-content');
-  if (!el) return;
-  const today = new Date().toLocaleDateString('en-CA');
-  const f = window._mtgFilter;
-
-  const filtered = (window._userMeetings||[]).filter(m => {
-    if (f==='owned')    return m.owned;
-    if (f==='upcoming') return !m.past;
-    if (f==='past')     return m.past;
-    if (f==='today')    return m.date===today;
-    return true;
-  });
-
-  // Group into sections
-  const todayMtgs    = filtered.filter(m=>m.date===today);
-  const upcomingMtgs = filtered.filter(m=>!m.past&&m.date!==today);
-  const pastMtgs     = filtered.filter(m=>m.past).slice(0,10);
-
-  function mtgRow(m) {
-    const barColor = m.owned ? '#8B5CF6' : m.past ? 'rgba(255,255,255,.15)' : '#00D2FF';
-    const badge = m.owned ? '<span style="font-family:var(--font-head);font-size:11px;padding:2px 7px;border:1px solid rgba(139,92,246,.35);color:#8B5CF6;background:rgba(139,92,246,.07)">Owned by me</span>'
-                : m.past  ? '<span style="font-family:var(--font-head);font-size:11px;padding:2px 7px;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.35)">Completed</span>'
-                          : '<span style="font-family:var(--font-head);font-size:11px;padding:2px 7px;border:1px solid rgba(0,210,255,.25);color:rgba(0,210,255,.7);background:rgba(0,210,255,.05)">Invited</span>';
-    const timeStr = m.time ? m.time : '';
-    const durStr  = m.duration ? m.duration+'min' : '';
-    const locStr  = m.location ? esc(m.location) : '';
-    const metaParts = [timeStr, durStr, locStr].filter(Boolean);
-    const expandId = 'umtg-exp-'+m.id;
-    return `<div style="display:flex;align-items:flex-start;gap:0;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;cursor:pointer;transition:border-color .1s" onmouseenter="this.style.borderColor='rgba(0,210,255,.2)'" onmouseleave="this.style.borderColor='rgba(255,255,255,.07)'">
-      <div style="width:4px;align-self:stretch;background:${barColor};flex-shrink:0"></div>
-      <div style="flex:1;padding:9px 12px">
-        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px">
-          <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1;line-height:1.3">${esc(m.title)}</div>
-          ${badge}
-        </div>
-        <div style="display:flex;gap:10px;font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);flex-wrap:wrap;margin-bottom:5px">${metaParts.map(p=>`<span>${p}</span>`).join('')}</div>
-      </div>
-      <div style="padding:9px 10px;display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-        <button onclick="event.stopPropagation();uToggleMtgExpand('${expandId}')"
-          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid ${m.past?'rgba(255,255,255,.15)':'rgba(0,210,255,.35)'};color:${m.past?'rgba(255,255,255,.4)':'#00D2FF'};cursor:pointer;letter-spacing:.06em">Details</button>
-        ${!m.past?`<button onclick="event.stopPropagation();window.location.href='/meeting-minutes.html?meeting_id=${m.id}'"
-          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.2);color:#5A84A8;cursor:pointer;letter-spacing:.06em">Minutes</button>`:''}
-      </div>
-    </div>
-    <div id="${expandId}" style="display:none;padding:6px 12px 10px 16px;background:#060c18;border:1px solid rgba(255,255,255,.06);border-top:none;margin-top:-6px;margin-bottom:6px">
-      ${m.past?`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Outcome</div>
-        <div style="font-family:var(--font-body);font-size:12px;color:rgba(240,246,255,.65);line-height:1.55;margin-bottom:8px">Meeting completed. Open minutes for full record.</div>`
-      :`<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">Outcome (fill after meeting)</div>
-        <textarea id="umtg-out-${m.id}" style="width:100%;padding:5px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#C8DFF0;font-family:var(--font-body);font-size:12px;outline:none;resize:none;box-sizing:border-box" rows="2" placeholder="Record outcome — will be written to CoC…"></textarea>`}
-      <div style="display:flex;gap:5px;margin-top:7px">
-        ${!m.past?`<button onclick="uSaveOutcome('${m.id}')"
-          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Save outcome to CoC →</button>
-        <button onclick="alert('Action item form — assigns to a team member and logs to CoC')"
-          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">+ Spawn action item</button>`:''}
-        <button onclick="window.location.href='/meeting-minutes.html?meeting_id=${m.id}'"
-          style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Open minutes →</button>
-      </div>
-    </div>`;
-  }
-
-  function section(label, rows) {
-    if (!rows.length) return '';
-    return `<div style="font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(0,210,255,.5);text-transform:uppercase;margin:10px 0 7px;padding-bottom:4px;border-bottom:1px solid rgba(0,210,255,.08)">${label}</div>` +
-      rows.map(mtgRow).join('');
-  }
-
-  const filterBar = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-    <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase">Show</span>
-    ${['all','owned','today','upcoming','past'].map(f=>`<button onclick="window._mtgFilter='${f}';renderUserMeetings()" 
-      style="font-family:var(--font-head);font-size:11px;padding:3px 10px;background:${window._mtgFilter===f?'rgba(0,210,255,.08)':'none'};border:1px solid ${window._mtgFilter===f?'rgba(0,210,255,.4)':'rgba(255,255,255,.12)'};color:${window._mtgFilter===f?'#00D2FF':'rgba(255,255,255,.5)'};cursor:pointer;transition:.12s;letter-spacing:.06em;text-transform:capitalize">${f}</button>`).join('')}
-    <button onclick="alert('New meeting form: title, project, date/time, duration, attendees, agenda, CoC link')"
-      style="font-family:var(--font-head);font-size:11px;margin-left:auto;padding:4px 12px;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.35);color:#00D2FF;cursor:pointer;letter-spacing:.07em">+ Schedule meeting</button>
-  </div>`;
-
-  if (!filtered.length) {
-    el.innerHTML = filterBar + '<div style="font-family:var(--font-head);font-size:12px;color:#3A5C80;padding:24px 0;text-align:center">No meetings found for this filter.</div>';
-    return;
-  }
-
-  el.innerHTML = filterBar +
-    (f==='all' || f==='today'    ? section('Today — '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), todayMtgs) : '') +
-    (f==='all' || f==='upcoming' ? section('Upcoming', upcomingMtgs) : '') +
-    (f==='all' || f==='past'     ? section('Past', pastMtgs) : '') +
-    (f==='owned' || f==='today' || f==='upcoming' || f==='past' ? filtered.map(mtgRow).join('') : '');
-}
-
-window.uToggleMtgExpand = function(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.display = el.style.display==='none' ? 'block' : 'none';
-};
-
-window.uSaveOutcome = async function(meetingId) {
-  const txt = document.getElementById('umtg-out-'+meetingId)?.value?.trim()||'';
-  if (!txt) { compassToast('Enter an outcome before saving',2000); return; }
-  await API.post('workflow_step_instances',{
-    id: crypto.randomUUID(), instance_id: crypto.randomUUID(), step_type: 'manual',
-    event_type: 'step_completed',
-    step_name: 'Meeting outcome',
-    event_notes: txt,
-    actor_name: _myResource?.name||null,
-    outcome: 'on_track',
-    created_at: new Date().toISOString(),
-    firm_id: 'aaaaaaaa-0001-0001-0001-000000000001'
-  }).catch(()=>{});
-  compassToast('Outcome saved to CoC',2200);
-  document.getElementById('umtg-out-'+meetingId).value = '';
-};
-
-// ── CONCERNS ─────────────────────────────────────────────
-window._concernsLoaded = false;
-window._userConcerns   = [];
-window._concernFilter  = 'all';
-let _concernSeq = 0; // for optimistic local IDs
-
-window.loadUserConcerns = async function() {
-  window._concernsLoaded = true;
-  const el = document.getElementById('user-concerns-content');
-  if (!el) return;
-
-  const resId = _myResource?.id;
-  if (!resId) { window._userConcerns = []; renderUserConcerns(); return; }
-
-  try {
-    // Load concerns + their comments in parallel
-    const [concerns, comments] = await Promise.all([
-      API.get(`concerns?raiser_resource_id=eq.${resId}&order=raised_at.desc&limit=100`).catch(()=>[]),
-      API.get(`concern_comments?concern_id=not.is.null&order=created_at.asc&limit=500&select=id,concern_id,parent_id,author_name,body,event_type,created_at`).catch(()=>[]),
-    ]);
-
-    _concernSeq = 0;
-    const commentsByC = {};
-    (comments||[]).forEach(c => {
-      if (!commentsByC[c.concern_id]) commentsByC[c.concern_id] = [];
-      commentsByC[c.concern_id].push(c);
-    });
-
-    window._userConcerns = (concerns||[]).map(c => ({
-      id:          c.id,
-      cid:         'C-' + String(++_concernSeq).padStart(3,'0'),
-      title:       c.title,
-      description: c.description||'',
-      status:      c.status||'unread',
-      priority:    c.priority||'medium',
-      visibility:  c.visibility||'pm',
-      projectId:   c.project_id,
-      project:     (_projects||[]).find(p=>p.id===c.project_id)?.name||'—',
-      phase:       c.phase||'',
-      raised_date: c.raised_at?.slice(0,10),
-      raisedAt:    c.raised_at,
-      thread:      (commentsByC[c.id]||[]).map(e=>({
-        id:        e.id,
-        parent_id: e.parent_id||null,
-        who:       e.author_name,
-        when:      e.created_at,
-        text:      e.body,
-        type:      e.event_type,
-      })),
-    }));
-
-    // Migrate any localStorage concerns to DB (one-time)
-    try {
-      const lsKey = 'compass_concerns_' + resId;
-      const lsRaw = localStorage.getItem(lsKey);
-      if (lsRaw) {
-        const lsItems = JSON.parse(lsRaw)||[];
-        const dbIds = new Set((concerns||[]).map(c=>c.id));
-        const toMigrate = lsItems.filter(c=>!dbIds.has(c.id));
-        for (const c of toMigrate) {
-          await API.post('concerns',{
-            id: c.id, firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
-            raiser_resource_id: resId,
-            raiser_name: _myResource?.name||null,
-            title: c.title, description: c.description||c.title,
-            status: c.status||'unread', priority: c.priority||'medium',
-            raised_at: c.raisedAt||new Date().toISOString(),
-          }).catch(()=>{});
-        }
-        if (toMigrate.length) {
-          localStorage.removeItem(lsKey);
-          // Reload to pick up migrated items
-          window._concernsLoaded = false;
-          loadUserConcerns(); return;
-        }
-        localStorage.removeItem(lsKey);
-      }
-    } catch(e) {}
-
-    updateConcernBadge();
-    renderUserConcerns();
-  } catch(e) {
-    console.error('[Compass] concerns load error:', e);
-    window._userConcerns = [];
-    renderUserConcerns();
-  }
-};
-
-
-// ── My Requests — loadUserRequests ───────────────────────
-// Fetches real workflow_instances submitted by this user and maps them
-// to the _myRequests shape expected by renderMyRequestsActive/History.
-window.loadUserRequests = async function() {
-  if (window._requestsInFlight) return; // prevent concurrent fetches overwriting each other
-  window._requestsInFlight = true;
-  window._requestsLoaded = true;
-
-  // Inject supplemental styles once
-  if (!document.getElementById('myr-ext-styles')) {
-    const s = document.createElement('style');
-    s.id = 'myr-ext-styles';
-    s.textContent = `
-      /* Active request card — raised, accented */
-      .myr-active-req {
-        border: 1px solid rgba(0,210,255,.18);
-        border-left: 3px solid rgba(0,210,255,.5);
-        margin-bottom: 10px;
-        overflow: hidden;
-        background: rgba(0,210,255,.03);
-        box-shadow: 0 2px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
-        transition: border-color .15s, box-shadow .15s;
-      }
-      .myr-active-req:hover {
-        border-color: rgba(0,210,255,.35);
-        border-left-color: rgba(0,210,255,.8);
-        box-shadow: 0 3px 12px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
-      }
-      .myr-ar-head {
-        display: flex; align-items: center; gap: 8px;
-        padding: 10px 14px;
-        border-bottom: 1px solid rgba(255,255,255,.05);
-        cursor: pointer; transition: background .12s;
-      }
-      .myr-ar-head:hover { background: rgba(255,255,255,.03); }
-      .myr-ar-body { padding: 10px 14px; display: none; }
-      .myr-ar-body.open { display: block; }
-      /* Step progress */
-      .myr-pt-steps {
-        display: flex; gap: 0; position: relative;
-        margin: 6px 0 12px;
-      }
-      .myr-pt-steps::before {
-        content: ''; position: absolute; top: 9px; left: 0; right: 0;
-        height: 1px; background: rgba(255,255,255,.08); z-index: 0;
-      }
-      .myr-pt-step {
-        display: flex; flex-direction: column; align-items: center;
-        gap: 5px; flex: 1; position: relative; z-index: 1;
-      }
-      .myr-pt-dot {
-        width: 20px; height: 20px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 10px; font-weight: 700; flex-shrink: 0;
-      }
-      .myr-ptd-done   { background: #1D9E75; color: #fff; box-shadow: 0 0 0 3px rgba(29,158,117,.2); }
-      .myr-ptd-active { background: #EF9F27; color: #060a10; animation: myrActivePulse 1.5s infinite; box-shadow: 0 0 0 3px rgba(239,159,39,.25); }
-      @keyframes myrActivePulse { 0%,100%{opacity:1} 50%{opacity:.65} }
-      .myr-ptd-pending { background: rgba(255,255,255,.06); color: rgba(255,255,255,.3); border: 1px solid rgba(255,255,255,.12); }
-      .myr-pt-name {
-        font-size: 11px; color: rgba(255,255,255,.35);
-        text-align: center; letter-spacing: .03em; line-height: 1.3; max-width: 72px;
-      }
-      .myr-pt-name.done   { color: #1D9E75; }
-      .myr-pt-name.active { color: #EF9F27; font-weight: 600; }
-      /* Step tooltip — only visible on hover */
-      .myr-pt-tip {
-        visibility: hidden; opacity: 0;
-        position: absolute; top: calc(100% + 6px); left: 50%;
-        transform: translateX(-50%);
-        background: #0a1628; border: 1px solid rgba(239,159,39,.3);
-        padding: 8px 10px; min-width: 160px; max-width: 240px;
-        font-family: var(--font-head); font-size: 11px; line-height: 1.6;
-        color: #C8DFF0; white-space: normal; z-index: 200;
-        pointer-events: none; transition: opacity .15s;
-      }
-      .myr-pt-tip::after {
-        content: ''; position: absolute; bottom: 100%; left: 50%;
-        transform: translateX(-50%);
-        border: 5px solid transparent; border-bottom-color: rgba(239,159,39,.3);
-      }
-      .myr-pt-step:hover .myr-pt-tip { visibility: visible; opacity: 1; }
-      /* CoC panel */
-      .myr-coc-panel {
-        margin-top: 10px;
-        border-top: 1px solid rgba(255,255,255,.06);
-        padding-top: 8px;
-      }
-      .myr-coc-label {
-        font-family: var(--font-head); font-size: 11px; letter-spacing: .07em;
-        text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 6px;
-        display: flex; align-items: center; justify-content: space-between;
-        cursor: pointer; padding: 2px 0;
-      }
-      .myr-coc-label:hover { color: rgba(0,210,255,.7); }
-      .myr-coc-events { display: none; }
-      .myr-coc-events.open { display: block; }
-      .myr-coc-row {
-        display: grid;
-        grid-template-columns: 7px auto 1fr;
-        gap: 8px; padding: 6px 0;
-        border-bottom: 1px solid rgba(255,255,255,.04);
-        align-items: start;
-      }
-      .myr-coc-row:last-child { border-bottom: none; }
-      .myr-coc-dot {
-        width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
-      }
-      .myr-coc-time {
-        font-family: var(--font-head); font-size: 11px;
-        color: #c47d18; white-space: nowrap;
-        padding-top: 2px; flex-shrink: 0; min-width: 110px;
-      }
-      .myr-coc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .myr-coc-event-type {
-        font-family: var(--font-head); font-size: 12px; font-weight: 600;
-        color: rgba(0,210,255,.9); letter-spacing: .03em; text-transform: capitalize;
-      }
-      .myr-coc-actor {
-        font-family: var(--font-head); font-size: 11px;
-        color: rgba(255,255,255,.55);
-      }
-      .myr-coc-note {
-        font-family: var(--font-head); font-size: 11px;
-        color: rgba(255,255,255,.35);
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      /* History rows */
-      .myr-hist-row {
-        display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-        border-bottom: 1px solid rgba(255,255,255,.04);
-        font-family: var(--font-head); font-size: 12px; cursor: pointer; transition: .12s;
-      }
-      .myr-hist-row:hover { background: rgba(255,255,255,.02); }
-      .myr-hist-outcome { font-size: 11px; padding: 2px 8px; border: 1px solid; letter-spacing: .04em; }
-    `;
-    document.head.appendChild(s);
-  }
-
-  renderMyRequestsCatalog();
-
-  // _myResource is a compass.html scoped let — not on window.
-  // Wait for it to be populated by loadBaseData() if not ready yet.
+window._mwLoadUserView = async function() {
+  const loading = document.getElementById('compass-loading');
+  const content = document.getElementById('user-content');
+  // Reset lazy-load flags so tabs reload on view refresh
+  window._requestsLoaded = false;
+  
   if (!_myResource?.id) {
-    console.log('[MyRequests] _myResource not ready, waiting...');
-    let waited = 0;
-    await new Promise(resolve => {
-      const poll = setInterval(() => {
-        waited += 100;
-        if (_myResource?.id || waited >= 3000) {
-          clearInterval(poll);
-          resolve();
-        }
-      }, 100);
-    });
-  }
+    if (loading) loading.style.display = 'none';
+    content.style.display = 'block';
 
-  const resolvedResId = _myResource?.id;
-  console.log('[MyRequests] loadUserRequests firing | resId:', resolvedResId || 'STILL UNDEFINED');
-  if (resolvedResId) {
-    try {
-      const rows = await API.get(
-        `workflow_instances?submitted_by_resource_id=eq.${resolvedResId}` +
-        `&order=created_at.desc&limit=100` +
-        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
-      ).catch(e => { console.warn('[MyRequests] fetch error:', e.message); return []; });
-      console.log('[MyRequests] query returned', (rows||[]).length, 'rows');
-
-      // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
-      const _STEP_LABELS = {
-        'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
-        'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
-        'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
-        'doc-review':        ['Submit','Review','Approve'],
-        'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
-        'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
-        'expense':           ['Submit','PM review','Finance approval','Processed'],
-        'training':          ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
-        'new-project':       ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
-        'project-closure':   ['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
-      };
-
-      window._myRequests = (rows || []).map(r => {
-        const wfType    = r.workflow_type || 'unknown';
-        const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
-        const currentStep = r.current_step_name || '';
-        const isComplete  = r.status === 'complete' || r.status === 'completed';
-
-        // Primary: derive active step from current_step_name (always available from DB)
-        const currentIdx = stepLabels.findIndex(s =>
-          s.toLowerCase().replace(/\s+/g,'').includes(
-            (currentStep||'').toLowerCase().replace(/\s+/g,'').slice(0,5)
-          )
-        );
-        // currentIdx is the COMPLETED step; active = one after it
-        const dbActiveIdx = isComplete
-          ? stepLabels.length
-          : currentIdx >= 0
-            ? Math.min(currentIdx + 1, stepLabels.length - 1)
-            : 1;
-
-        // current_step_name is the ACTIVE step (what's happening now), not the completed one.
-        // Steps before it are done; it is active; steps after are pending.
-        const activeIdx = isComplete
-          ? stepLabels.length
-          : currentIdx >= 0 ? currentIdx : 1;
-        const steps = stepLabels.map((label, i) => ({
-          label,
-          done:   i < activeIdx,
-          active: !isComplete && i === activeIdx,
-        }));
-
-        // Map instance status to display status
-        const statusMap = {
-          'pending':     'awaiting',
-          'in_progress': 'in_progress',
-          'active':      'in_progress',
-          'complete':    'completed',   // DB canonical value
-          'completed':   'completed',   // legacy / optimistic value
-          'cancelled':   'rejected',
-          'withdrawn':   'rejected',
-          'rejected':    'rejected',
-          'overridden':  'rejected',
+    // ── Wire CoC drag handle ─────────────────────────────
+    (function() {
+      const resizer = document.getElementById('mw-coc-resizer');
+      const cocPanel = document.getElementById('mw-coc');
+      if (!resizer || !cocPanel) return;
+      let startX, startW;
+      resizer.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        window._cocDragging = true;
+        startX = e.clientX;
+        startW = cocPanel.offsetWidth;
+        resizer.style.background = 'rgba(0,210,255,.5)';
+        const mm = function(e2) {
+          const delta = startX - e2.clientX; // drag left = grow CoC
+          const newW  = Math.max(180, Math.min(600, startW + delta));
+          cocPanel.style.flex = 'none';
+          cocPanel.style.width = newW + 'px';
         };
-
-        return {
-          id:          r.id,
-          title:       r.title || 'Untitled request',
-          status:      statusMap[r.status] || 'in_progress',
-          workflow:    wfType.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
-          submitted:   r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
-          steps,
-          cocNote:     '',
-          attachments: r.attachments || [],
-          _reviewerNames: (window._myRequestReviewers||{})[r.id] || [],
-          _raw:        r,
+        const mu = function() {
+          window._cocDragging = false;
+          resizer.style.background = 'rgba(0,210,255,.08)';
+          document.removeEventListener('mousemove', mm);
+          document.removeEventListener('mouseup', mu);
         };
+        document.addEventListener('mousemove', mm);
+        document.addEventListener('mouseup', mu);
       });
-    } catch(e) {
-      console.warn('[MyRequests] loadUserRequests fetch failed:', e);
-      window._myRequests = [];
-    }
-  } else {
-    window._myRequests = [];
-  }
-
-  renderMyRequestsActive();
-  renderMyRequestsHistory();
-
-  // Fetch reviewer names for each active request (for tooltip on Review step)
-  const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');
-  if (activeReqs.length) {
-    const ids = activeReqs.map(r => r.id).join(',');
-    // Use workflow_requests — fetch ALL reviewer rows (open + resolved) so tooltip always
-    // shows every assigned reviewer regardless of whether they've acted yet
-    API.get(`workflow_requests?instance_id=in.(${ids})&role=eq.reviewer&select=instance_id,owner_name,status&limit=200`)
-      .then(rows => {
-        window._myRequestReviewers = window._myRequestReviewers || {};
-        (rows||[]).forEach(a => {
-          if (!window._myRequestReviewers[a.instance_id])
-            window._myRequestReviewers[a.instance_id] = [];
-          if (a.owner_name && !window._myRequestReviewers[a.instance_id].includes(a.owner_name))
-            window._myRequestReviewers[a.instance_id].push(a.owner_name);
-        });
-        // Apply to request objects
-        (window._myRequests||[]).forEach(r => {
-          r._reviewerNames = window._myRequestReviewers[r.id] || [];
-        });
-        renderMyRequestsActive();
-      }).catch(() => {});
-  }
-
-  // Pre-fetch CoC — preserve existing cache so step progress renders correctly while fetch is in-flight
-  const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
-  window._myRequestCoc = window._myRequestCoc || {};
-  if (allIds.length) {
-    API.get(
-      `coc_events?entity_id=in.(${allIds.join(',')})&order=occurred_at.asc&select=*`
-    ).then(rows => {
-      // Rebuild cache from fresh fetch — replace rather than merge to pick up new events
-      const freshCoc = {};
-      (rows||[]).forEach(e => {
-        if (!freshCoc[e.entity_id]) freshCoc[e.entity_id] = [];
-        freshCoc[e.entity_id].push(e);
-      });
-      window._myRequestCoc = freshCoc;
-      renderMyRequestsActive();
-    }).catch(() => {});
-  } else {
-    renderMyRequestsActive();
-  }
-
-  // Update badges
-  const activeCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
-  const badge = document.getElementById('ust-requests-badge');
-  if (badge) {
-    badge.textContent = activeCount > 0 ? activeCount + ' active' : '';
-    badge.style.display = activeCount > 0 ? 'inline' : 'none';
-  }
-  const activeBadge = document.getElementById('myr-active-badge');
-  if (activeBadge) {
-    activeBadge.textContent = activeCount > 0 ? activeCount : '';
-    activeBadge.style.display = activeCount > 0 ? 'inline' : 'none';
-  }
-
-  // ── Live CoC refresh — polls open CoC panels every 10s while on requests tab ──
-  // Clears itself when user leaves the requests tab (see uSwitchTab in mw-tabs.js).
-  if (!window._myrCocPollTimer) {
-    window._myrCocPollTimer = setInterval(async () => {
-      // Only run while requests tab is active
-      if ((typeof _uActiveTab !== 'undefined' ? _uActiveTab : '') !== 'requests') return;
-      // Find all open CoC panels in the Active pane
-      const openPanels = document.querySelectorAll('#myr-pane-active .myr-coc-events.open');
-      if (!openPanels.length) return;
-      for (const panel of openPanels) {
-        const instanceId = panel.id.replace('myr-coc-', '').replace(/[^a-f0-9-]/g,'');
-        if (!instanceId || instanceId.length < 10) continue;
-        const before = (window._myRequestCoc||{})[instanceId]?.length || 0;
-        await myrLoadRequestCoc(instanceId); // re-fetches and updates cache
-        const after = (window._myRequestCoc||{})[instanceId]?.length || 0;
-        if (after !== before) {
-          // New events — re-render the panel and update step progress
-          const labelEl = panel.previousElementSibling;
-          _myrRenderCocPanel(panel, window._myRequestCoc[instanceId], labelEl);
-          // Also refresh the step dots for this request
-          const req = (window._myRequests||[]).find(r => r.id === instanceId);
-          if (req) renderMyRequestsActive();
-        }
-      }
-    }, 10000);
-    console.log('[MyRequests] CoC live refresh poll started (10s)');
-  }
-  window._requestsInFlight = false;
-};
-
-window.myrSwitchView = function(view, btn) {
-  document.querySelectorAll('.myr-subnav').forEach(b => {
-    b.classList.remove('on');
-    b.style.color = 'rgba(255,255,255,.35)';
-    b.style.borderBottomColor = 'transparent';
-  });
-  if (btn) {
-    btn.classList.add('on');
-    btn.style.color = '#00D2FF';
-    btn.style.borderBottomColor = '#00D2FF';
-  }
-  ['browse','active','history'].forEach(v => {
-    const p = document.getElementById('myr-pane-'+v);
-    if (p) p.style.display = v === view ? 'block' : 'none';
-  });
-};
-
-// Workflow catalog definition
-var _WF_CATALOG = (typeof _WF_CATALOG !== "undefined") ? _WF_CATALOG : [
-  { cat:'Resource & scheduling', items:[
-    { id:'resource-alloc', title:'Resource allocation request', icon:'user', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
-      desc:'Request a change to a team member\'s allocation across projects. Routes to PM then management for approval.',
-      steps:5, avgTime:'Avg 28h', usage:'3 this month' },
-    { id:'pto-request', title:'PTO / leave request', icon:'cal', iconBg:'rgba(139,92,246,.1)', iconColor:'#8B5CF6',
-      desc:'Request time off. Automatically blocks your calendar, notifies your PM, and updates assignment constraints for the period.',
-      steps:3, avgTime:'Avg 4h', usage:'Used 6\xD7 this year', isNew:false },
-    { id:'capacity-concern', title:'Capacity overload concern', icon:'warn', iconBg:'rgba(226,75,74,.1)', iconColor:'#E24B4A',
-      desc:'Formally raise a capacity concern with your PM. Pre-populated with your current load, overdue count, and queue summary.',
-      steps:3, avgTime:'Avg 6h', usage:'PM notified immediately' },
-  ]},
-  { cat:'Approvals & reviews', items:[
-    { id:'doc-review', title:'Document review & sign-off', icon:'check', iconBg:'rgba(29,158,117,.1)', iconColor:'#1D9E75',
-      desc:'Submit a document for structured review. Routes to designated reviewers with version tracking and approval chain.',
-      steps:6, avgTime:'Avg 48h', usage:'New this month', isNew:true },
-    { id:'change-request', title:'Change request', icon:'plus-sq', iconBg:'rgba(239,159,39,.1)', iconColor:'#EF9F27',
-      desc:'Submit a scope, timeline, or resource change request. Requires PM and client acknowledgement before taking effect.',
-      steps:7, avgTime:'Avg 72h', usage:'1 this month' },
-    { id:'issue-escalation', title:'Issue escalation', icon:'info-circle', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
-      desc:'Escalate a project issue through the formal chain of custody. Auto-attaches CoC context and intervention history.',
-      steps:4, avgTime:'Avg 12h', usage:'2 this month' },
-  ]},
-  { cat:'HR & admin', items:[
-    { id:'expense', title:'Expense reimbursement', icon:'doc-lines', iconBg:'rgba(255,255,255,.06)', iconColor:'rgba(255,255,255,.5)',
-      desc:'Submit project-related expenses for reimbursement. Routes to PM then finance for approval and processing.',
-      steps:4, avgTime:'Avg 5 days', usage:'' },
-    { id:'training', title:'Training request', icon:'globe', iconBg:'rgba(255,255,255,.06)', iconColor:'rgba(255,255,255,.5)',
-      desc:'Request approval for external training, certification, or conference attendance. Includes cost and schedule impact review.',
-      steps:5, avgTime:'Avg 3 days', usage:'' },
-  ]},
-  { cat:'Project requests', items:[
-    { id:'new-project', title:'New project intake', icon:'grid', iconBg:'rgba(0,210,255,.08)', iconColor:'rgba(0,210,255,.6)',
-      desc:'Initiate a new project request. Triggers the full intake workflow including scoping, resourcing, and executive approval.',
-      steps:8, avgTime:'Avg 5 days', usage:'' },
-    { id:'project-closure', title:'Project closure', icon:'flag', iconBg:'rgba(29,158,117,.08)', iconColor:'rgba(29,158,117,.6)',
-      desc:'Formally close a project. Captures lessons learned, final CoC summary, and triggers financial reconciliation.',
-      steps:6, avgTime:'Avg 2 days', usage:'' },
-  ]},
-];
-
-const _WF_ICONS = {
-  'user': `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="4" r="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 12c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`,
-  'cal':  `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="1" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="1" x2="4.5" y2="3" stroke="currentColor" stroke-width="1.3"/><line x1="9.5" y1="1" x2="9.5" y2="3" stroke="currentColor" stroke-width="1.3"/></svg>`,
-  'warn': `<svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2L13 12H1Z" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="6" x2="7" y2="9" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="10.5" r=".8" fill="currentColor"/></svg>`,
-  'check':`<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
-  'plus-sq':`<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="5" y1="7" x2="9" y2="7" stroke="currentColor" stroke-width="1.3"/><line x1="7" y1="5" x2="7" y2="9" stroke="currentColor" stroke-width="1.3"/></svg>`,
-  'info-circle':`<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="5" x2="7" y2="7.5" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="9.5" r=".8" fill="currentColor"/></svg>`,
-  'doc-lines':`<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4.5" y1="5" x2="9.5" y2="5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>`,
-  'globe':`<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M4 7h6M7 2v10M3 4.5c1 .7 2.5 1 4 1s3-.3 4-1M3 9.5c1-.7 2.5-1 4-1s3 .3 4 1" stroke="currentColor" stroke-width="1" fill="none"/></svg>`,
-  'grid': `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="8" y="1" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="1" y="8" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="8" y="8" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-  'flag': `<svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 2v10M3 2h8l-2 3 2 3H3" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`,
-};
-
-function renderMyRequestsCatalog() {
-  const _esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const el = document.getElementById('myr-catalog-content');
-  if (!el) return;
-  let html = '';
-  _WF_CATALOG.forEach(cat => {
-    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>${_esc(cat.cat)}<div class="myr-cat-line"></div></div>`;
-    html += `<div class="wf-catalog-grid">`;
-    cat.items.forEach(wf => {
-      const icon = _WF_ICONS[wf.icon] || '';
-      html += `<div class="wf-card${wf.isNew?' wf-card-new':''}" onclick="myrOpenWorkflowForm('${wf.id}')">
-        <div class="wf-card-top">
-          <div class="wf-icon" style="background:${wf.iconBg};color:${wf.iconColor}">${icon}</div>
-          <div class="wf-card-title">${_esc(wf.title)}</div>
+    })();
+    const d = _identityDebug;
+    content.innerHTML = `
+      <div style="padding:40px 20px;text-align:center">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--compass-red);
+          margin-bottom:12px;letter-spacing:.12em">⚠ IDENTITY NOT RESOLVED</div>
+        <div style="display:inline-block;text-align:left;background:var(--bg1);
+          border:1px solid var(--border);padding:14px 20px;margin-bottom:16px;
+          font-family:var(--font-data);font-size:11px;line-height:2;min-width:320px">
+          <div style="color:var(--text3);letter-spacing:.08em;margin-bottom:4px">SESSION DETAILS</div>
+          <div><span style="color:var(--text3)">Auth email&nbsp;&nbsp;&nbsp;</span>
+            <span style="color:${d.authEmail?'var(--compass-cyan)':' var(--compass-red)'}">
+              ${d.authEmail||'— not found in JWT —'}</span></div>
+          <div><span style="color:var(--text3)">Auth UUID&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span style="color:var(--text2)">${d.authSub||'—'}</span></div>
+          <div><span style="color:var(--text3)">App user ID&nbsp;&nbsp;</span>
+            <span style="color:${d.appUserId&&d.appUserId!=='undefin…'?'var(--text2)':' var(--compass-red)'}">
+              ${d.appUserId&&d.appUserId!=='undefin…'?d.appUserId:'— no users row found —'}</span></div>
+          <div><span style="color:var(--text3)">Resource ID&nbsp;&nbsp;</span>
+            <span style="color:${d.resourceId&&d.resourceId!=='undefin…'?'var(--text2)':' var(--compass-red)'}">
+              ${d.resourceId&&d.resourceId!=='undefin…'?d.resourceId:'— not linked —'}</span></div>
+          ${d.error?`<div style="color:var(--compass-red);margin-top:4px">Error: ${esc(d.error)}</div>`:''}
         </div>
-        <div class="wf-card-desc">${_esc(wf.desc)}</div>
-        <div class="wf-card-meta">
-          <span>${wf.steps} steps</span>
-          <span>${wf.avgTime}</span>
-          ${wf.usage?`<span>${_esc(wf.usage)}</span>`:''}
+        <div style="font-family:var(--font-body);font-size:12px;color:var(--text3);
+          margin-bottom:16px;line-height:1.6;max-width:480px;margin-left:auto;margin-right:auto">
+          ${d.authEmail
+            ?`Logged in as <strong style="color:var(--text1)">${esc(d.authEmail)}</strong> but no matching resource was found.`
+            :'No email found in session token. Try logging out and back in.'}
         </div>
-        <button class="wf-card-submit" onclick="event.stopPropagation();myrOpenWorkflowForm('${wf.id}')">Submit &#8594;</button>
+        <a href="/users.html" style="font-family:var(--font-mono);font-size:11px;
+          letter-spacing:.1em;color:var(--compass-cyan);text-decoration:none;
+          border:1px solid rgba(0,210,255,.3);padding:6px 16px;margin-right:8px">USER MGMT →</a>
+        <button onclick="_viewLoaded['user']=false;_mwLoadUserView()"
+          style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
+            color:var(--text2);background:none;border:1px solid var(--border);
+            padding:6px 16px;cursor:pointer">RETRY</button>
       </div>`;
-    });
-    html += `</div>`;
-  });
-  el.innerHTML = html;
-}
-
-function renderMyRequestsActive() {
-  const el = document.getElementById('myr-active-content');
-  if (!el) return;
-  const reqs = window._myRequests || [];
-  const active = reqs.filter(r => r.status !== 'completed' && r.status !== 'rejected');
-
-  // Snapshot which request IDs are currently expanded before wiping innerHTML
-  const expandedIds = new Set();
-  const cocOpenIds  = new Set();
-  el.querySelectorAll('.myr-ar-body.open').forEach(body => {
-    const card = body.closest('.myr-active-req');
-    if (card) {
-      const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
-      if (withdrawBtn) {
-        const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
-        if (m) expandedIds.add(m[1]);
-      }
-    }
-  });
-  el.querySelectorAll('.myr-coc-events.open').forEach(cocEl => {
-    // CoC panel id is myr-coc-{i} — find req id from sibling withdraw button
-    const card = cocEl.closest('.myr-active-req');
-    if (card) {
-      const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
-      if (withdrawBtn) {
-        const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
-        if (m) cocOpenIds.add(m[1]);
-      }
-    }
-  });
-  if (!active.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
     return;
   }
-
-  // Build a lookup of CoC events by instanceId for tooltips
-  // _myRequestCoc is populated lazily by myrLoadRequestCoc()
-  const cocByInstance = window._myRequestCoc || {};
-
-  let html = '';
-  active.forEach((req, i) => {
-    const isAmber     = req.status==='awaiting' || req.status==='in_progress';
-    const statusColor = req.status==='approved'?'#1D9E75': isAmber?'#EF9F27':'#00D2FF';
-    const badgeStyle  = req.status==='approved'?'border:1px solid rgba(29,158,117,.4);color:#1D9E75':
-                        isAmber?'border:1px solid rgba(239,159,39,.4);color:#EF9F27':
-                                'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
-    const badgeLabel  = req.status==='approved'?'Approved':req.status==='awaiting'?'Awaiting response':'In progress';
-    const dotAnim     = isAmber?'animation:myrActivePulse 1.5s infinite':'';
-
-    // Build CoC event map for this instance: event_type → {actor, time, notes}
-    const instCoc = (cocByInstance[req.id] || []);
-    const cocByType = {};
-    instCoc.forEach(e => { cocByType[e.event_type] = e; });
-
-    // Step type → CoC event_type mapping
-    const stepEventMap = {
-      'Submit':   'request.submitted',
-      'Review':   'request.approved',
-      'Approve':  'request.completed',
-      'PM review':'request.pm_reviewed',
-    };
-
-    // Build step nodes with tooltips
-    let stepsHtml = (req.steps||[]).map((s, si) => {
-      const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
-      const nameCls = s.done?'done':s.active?'active':'';
-      const label   = s.done?'&#10003;':(si+1);
-
-      // Look up CoC event for this step
-      const evType  = stepEventMap[s.label] || null;
-      const ev      = evType ? cocByType[evType] : null;
-      const tipTime = ev ? new Date(ev.occurred_at||ev.created_at).toLocaleString('en-US',
-        {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : null;
-      const tipActor = ev?.actor_name || null;
-
-      // Build tooltip content
-      let tipHtml = '';
-      if (s.done && tipTime) {
-        tipHtml = `<div class="myr-pt-tip">
-          <div style="color:rgba(0,210,255,.9);margin-bottom:2px">${_esc(s.label)}</div>
-          <div>${_esc(tipActor||'System')}</div>
-          <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
-        </div>`;
-      } else if (s.active || s.label === 'Review' || s.label === 'Approve') {
-        // Parse reviewer/approver list from request.submitted CoC event
-        let submittedData = {};
-        try {
-          const subEv = instCoc.find(e => e.event_type === 'request.submitted');
-          if (subEv) submittedData = JSON.parse(subEv.event_notes || '{}');
-        } catch(_) {}
-
-        // Build reviewer decision status from ALL CoC approved/changes events — keyed by actor name
-        // Each reviewer writes one event; multiple reviewers produce multiple events of the same type.
-        // Must accumulate by actor, NOT overwrite by event_type (which caused later approvals to erase earlier ones).
-        const approvedByName = {};
-        instCoc
-          .filter(e => e.event_type === 'request.approved' || e.event_type === 'request.changes_requested')
-          .forEach(e => {
-            try {
-              const p = JSON.parse(e.event_notes || '{}');
-              const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-                {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-              const name = e.actor_name || p.reviewer;
-              // First event per actor wins — preserves original decision if they acted multiple times
-              if (name && !approvedByName[name]) {
-                approvedByName[name] = {
-                  time:     t,
-                  comments: p.comments || '',
-                  approved: e.event_type === 'request.approved',
-                };
-              }
-            } catch(_) {}
-          });
-
-        if (s.label === 'Review') {
-          // Source of truth: reviewers list from the request.submitted CoC event notes.
-          // _reviewerNames is a fallback only — submittedData.reviewers always has the full list.
-          const reviewers = (submittedData.reviewers||[]).length
-            ? submittedData.reviewers
-            : (req._reviewerNames||[]).map(n => ({ name: n }));
-          const lines = reviewers.map(r => {
-            const name = r.name || r;
-            const dec  = approvedByName[name];
-            const status = dec
-              ? dec.approved
-                ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
-                : `<span style="color:#E24B4A">↺ Changes requested ${_esc(dec.time)}</span>`
-              : `<span style="color:#EF9F27">Pending</span>`;
-            const comment = dec?.comments
-              ? `<div style="color:rgba(255,255,255,.35);font-size:10px;max-width:180px;
-                             white-space:normal;margin-top:1px">"${_esc(dec.comments)}"</div>`
-              : '';
-            return `<div style="margin-bottom:4px">
-              <div style="font-weight:600">${_esc(name)}</div>
-              <div>${status}</div>${comment}</div>`;
-          }).join('');
-          tipHtml = `<div class="myr-pt-tip" style="min-width:180px;white-space:normal">
-            <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Reviewers</div>
-            ${lines || '<div style="color:rgba(255,255,255,.3)">None assigned</div>'}
-          </div>`;
-        } else if (s.label === 'Approve') {
-          const appr = submittedData.approver;
-          const name = appr?.name || '—';
-          const dec  = approvedByName[name];
-          const status = dec
-            ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
-            : `<span style="color:#EF9F27">Awaiting sign-off</span>`;
-          const comment = dec?.comments
-            ? `<div style="color:rgba(255,255,255,.35);font-size:10px;white-space:normal;
-                           margin-top:2px">"${_esc(dec.comments)}"</div>`
-            : '';
-          tipHtml = `<div class="myr-pt-tip" style="min-width:160px;white-space:normal">
-            <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Approver</div>
-            <div>${_esc(name)} · ${status}</div>${comment}
-          </div>`;
-        } else {
-          tipHtml = `<div class="myr-pt-tip">
-            <div style="color:#EF9F27;margin-bottom:2px">${_esc(s.label)}</div>
-            <div style="color:rgba(255,255,255,.4)">Awaiting action</div>
-          </div>`;
-        }
-      } else if (!s.done) {
-        tipHtml = `<div class="myr-pt-tip">
-          <div style="color:rgba(255,255,255,.3)">${_esc(s.label)}</div>
-          <div style="color:rgba(255,255,255,.2)">Pending</div>
-        </div>`;
-      }
-
-      return `<div class="myr-pt-step">
-        <div class="myr-pt-dot ${cls}">${label}</div>
-        <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
-        ${tipHtml}
-      </div>`;
-    }).join('');
-
-    // Build CoC event rows
-    const cocRows = instCoc.length
-      ? instCoc.map(e => {
-          const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-            {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-          const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-          const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
-                            e.event_type==='request.completed'?'#1D9E75':
-                            e.event_type?.includes('reject')||e.event_type?.includes('withdraw')?'#E24B4A':'#EF9F27';
-          let notes = '';
-          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
-          return `<div class="myr-coc-row">
-            <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-            <div class="myr-coc-time">${_esc(t)}</div>
-            <div class="myr-coc-main">
-              <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-              <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-              ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
-            </div>
-          </div>`;
-        }).join('')
-      : `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">
-           Loading audit trail…
-         </div>`;
-
-    html += `<div class="myr-active-req">
-      <div class="myr-ar-head" onclick="myrToggleReq('myr-ar-body-${i}')">
-        <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;${dotAnim}"></div>
-        <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
-      </div>
-      <div class="myr-ar-body${(req.expanded || expandedIds.has(req.id)) ?' open':''}" id="myr-ar-body-${i}">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
-        <div class="myr-pt-steps">${stepsHtml}</div>
-        ${(req.attachments||[]).length ? `
-        <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.07em;
-                      text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">
-            Documents
-          </div>
-          <div style="display:flex;flex-direction:column;gap:3px">
-            ${(req.attachments||[]).map(a => {
-              const icon = (a.type||'').includes('pdf') ? '📄' :
-                           (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
-                           (a.type||'').includes('sheet')||(a.name||'').endsWith('.xlsx') ? '📊' :
-                           (a.source === 'form') ? '◈' : '📎';
-              const sizeStr = a.size ? (a.size > 1048576
-                ? (a.size/1048576).toFixed(1)+'MB'
-                : (a.size/1024).toFixed(0)+'KB') : '';
-              const safePathAttr = (a.path||'').replace(/'/g, "\\'");
-              return `<button onclick="myrOpenAttachment('${safePathAttr}')"
-                style="display:flex;align-items:center;gap:6px;padding:4px 8px;width:100%;
-                       background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
-                       color:#00D2FF;text-decoration:none;font-family:var(--font-head);font-size:11px;
-                       cursor:pointer;text-align:left;transition:background .12s"
-                onmouseover="this.style.background='rgba(0,210,255,.1)'"
-                onmouseout="this.style.background='rgba(0,210,255,.04)'">
-                <span>${icon}</span>
-                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
-                ${sizeStr?`<span style="color:rgba(255,255,255,.25);font-size:12px;flex-shrink:0">${sizeStr}</span>`:''}
-                <span style="color:rgba(255,255,255,.3);font-size:12px;flex-shrink:0">↗</span>
-              </button>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-        ${(() => {
-          const submitEv = instCoc.find(e => e.event_type === 'request.submitted');
-          const actor = submitEv?.actor_name || req._raw?.submitted_by_name || '';
-          const ts = submitEv
-            ? new Date(submitEv.occurred_at||submitEv.created_at).toLocaleString('en-US',
-                {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
-            : req.submitted || '';
-          return actor
-            ? `<div style="font-family:var(--font-head);font-size:11px;padding:5px 9px;
-                           background:rgba(239,159,39,.06);border-left:2px solid rgba(239,159,39,.4);
-                           color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:8px">
-                 Submitted by <strong style="color:rgba(255,255,255,.7)">${_esc(actor)}</strong>
-                 ${ts ? `· <span style="color:rgba(255,255,255,.3)">${_esc(ts)}</span>` : ''}
-                 — awaiting reviewer action
-               </div>`
-            : '';
-        })()}
-        <div class="myr-coc-panel">
-          <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
-            <span>${cocOpenIds.has(req.id) ? '&#9662; Chain of Custody' : '&#9656; Chain of Custody'}</span>
-            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
-          </div>
-          <div class="myr-coc-events${cocOpenIds.has(req.id) ? ' open' : ''}" id="myr-coc-${i}">${cocRows}</div>
-        </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
-          <button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>
-          <button onclick="myrAddContext('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
-        </div>
-      </div>
-    </div>`;
-  });
-  el.innerHTML = html;
-}
-
-function renderMyRequestsHistory() {
-  const el = document.getElementById('myr-history-content');
-  if (!el) return;
-  const reqs = window._myRequests || [];
-  const hist = reqs.filter(r => r.status === 'completed' || r.status === 'rejected');
-  if (!hist.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No completed requests yet.</div>`;
-    return;
-  }
-
-  const cocByInstance = window._myRequestCoc || {};
-  let html = '';
-
-  hist.forEach((req, i) => {
-    const isApproved   = req.status === 'completed';
-    const accentColor  = isApproved ? 'rgba(29,158,117,.5)'  : 'rgba(226,75,74,.5)';
-    const accentBg     = isApproved ? 'rgba(29,158,117,.03)' : 'rgba(226,75,74,.03)';
-    const badgeStyle   = isApproved
-      ? 'border:1px solid rgba(29,158,117,.4);color:#1D9E75'
-      : 'border:1px solid rgba(226,75,74,.4);color:#E24B4A';
-    const badgeLabel   = isApproved ? '✓ Approved'
-      : req.status === 'rejected' ? '✗ Rejected' : '✗ Withdrawn';
-
-    // Step progress — all done if approved, else show actual state
-    const stepsHtml = (req.steps||[]).map((s, si) => {
-      const cls     = s.done ? 'myr-ptd-done' : 'myr-ptd-pending';
-      const label   = s.done ? '&#10003;' : (si + 1);
-      const nameCls = s.done ? 'done' : '';
-      return `<div class="myr-pt-step">
-        <div class="myr-pt-dot ${cls}">${label}</div>
-        <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
-      </div>`;
-    }).join('');
-
-    // CoC rows
-    const instCoc = cocByInstance[req.id] || [];
-    const cocRows = instCoc.length
-      ? instCoc.map(e => {
-          const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-            {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-          const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-          const dotColor  = e.event_type==='request.submitted' ? '#00D2FF'
-            : e.event_type==='request.approved'||e.event_type==='request.completed' ? '#1D9E75'
-            : (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw') ? '#E24B4A'
-            : '#EF9F27';
-          let notes = '';
-          try { const p=JSON.parse(e.event_notes||'{}'); notes=p.note||p.comments||p.title||p.doc_names||''; } catch(_){}
-          return `<div class="myr-coc-row">
-            <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-            <div class="myr-coc-time">${_esc(t)}</div>
-            <div class="myr-coc-main">
-              <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-              <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-              ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
-            </div>
-          </div>`;
-        }).join('')
-      : `<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded.</div>`;
-
-    const bodyId = `myr-hist-body-${i}`;
-    const cocId  = `myr-hist-coc-${i}`;
-
-    html += `<div style="border:1px solid ${accentColor};border-left-width:3px;
-                         margin-bottom:8px;overflow:hidden;background:${accentBg};
-                         box-shadow:0 2px 8px rgba(0,0,0,.3)">
-      <div onclick="myrToggleReq('${bodyId}')"
-        style="display:flex;align-items:center;gap:8px;padding:10px 14px;
-               border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .12s"
-        onmouseover="this.style.background='rgba(255,255,255,.03)'"
-        onmouseout="this.style.background=''">
-        <div style="width:8px;height:8px;border-radius:50%;background:${isApproved?'#1D9E75':'#E24B4A'};flex-shrink:0"></div>
-        <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
-        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2)">&#9656;</div>
-      </div>
-      <div id="${bodyId}" class="myr-ar-body">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
-        <div class="myr-pt-steps">${stepsHtml}</div>
-        ${(req.attachments||[]).length ? `
-        <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.07em;
-                      text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:5px">Documents</div>
-          ${(req.attachments||[]).map(a => {
-            const icon = (a.type||'').includes('pdf') ? '📄' :
-                         (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
-                         a.source === 'form' ? '◈' : '📎';
-            const sp = (a.path||'').replace(/'/g,"\'");
-            return `<button onclick="myrOpenAttachment('${sp}')"
-              style="display:flex;align-items:center;gap:6px;padding:4px 8px;width:100%;
-                     background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
-                     color:#00D2FF;font-family:var(--font-head);font-size:11px;
-                     cursor:pointer;text-align:left;margin-bottom:3px">
-              <span>${icon}</span>
-              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
-              <span style="color:rgba(255,255,255,.3);font-size:11px">↗</span>
-            </button>`;
-          }).join('')}
-        </div>` : ''}
-        <div class="myr-coc-panel">
-          <div class="myr-coc-label" onclick="myrToggleCoc('${cocId}','${req.id}',this)">
-            <span>&#9656; Chain of Custody</span>
-            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
-          </div>
-          <div class="myr-coc-events" id="${cocId}">${cocRows}</div>
-        </div>
-      </div>
-    </div>`;
-  });
-
-  el.innerHTML = html;
-}
-
-// Open a storage attachment via signed URL (workflow-documents bucket is private)
-window.myrOpenAttachment = async function(path) {
-  try {
-    const token  = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-    const bucket = _mwStorageBucket();
-    const res = await fetch(
-      `${_mwSupaURL()}/storage/v1/object/sign/${bucket}/${path}`,
-      {
-        method: 'POST',
-        headers: {
-          'apikey':        _mwSupaKey(),
-          'Authorization': `Bearer ${token || _mwSupaKey()}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({ expiresIn: 300 }),
-      }
-    );
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${res.status}: ${err}`);
-    }
-    const data    = await res.json();
-    const signed  = data.signedURL || data.signedUrl || '';
-    if (!signed) throw new Error('No signed URL returned');
-    // Supabase returns /object/sign/... — prepend storage base (not full SUPA_URL)
-    const fullUrl = signed.startsWith('http')
-      ? signed
-      : `${_mwSupaURL()}/storage/v1${signed}`;
-    window.open(fullUrl, '_blank');
-  } catch(e) {
-    console.error('[Attachment] signed URL error:', e);
-    compassToast('Could not open file — ' + e.message, 3000);
-  }
-};
-
-window.myrToggleReq = function(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.toggle('open');
-};
-
-// Shared CoC row renderer — used by myrToggleCoc and the live refresh poll
-window._myrRenderCocPanel = function(panelEl, events, labelEl) {
-  if (!panelEl) return;
-  if (!events.length) {
-    panelEl.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
-    return;
-  }
-  panelEl.innerHTML = events.map(e => {
-    const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-      {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-    const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-    const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
-                      e.event_type==='request.completed'?'#1D9E75':
-                      (e.event_type||'').includes('reject')||(e.event_type||'').includes('withdraw')?'#E24B4A':'#EF9F27';
-    let notes = '';
-    try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
-    return `<div class="myr-coc-row">
-      <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-      <div class="myr-coc-time">${_esc(t)}</div>
-      <div class="myr-coc-main">
-        <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-        <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-        ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
-  if (labelEl) {
-    const countEl = labelEl.querySelector('span:last-child');
-    if (countEl) countEl.textContent = events.length + ' event' + (events.length!==1?'s':'');
-  }
-};
-
-// Toggle CoC panel — fetch events lazily on first open
-window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
-  const panel = document.getElementById(panelId);
-  if (!panel) return;
-
-  const isOpen = panel.classList.contains('open');
-  if (isOpen) {
-    panel.classList.remove('open');
-    if (labelEl) labelEl.querySelector('span:first-child').textContent = '▶ Chain of Custody';
-    return;
-  }
-
-  // Open — fetch if not yet loaded
-  panel.classList.add('open');
-  if (labelEl) labelEl.querySelector('span:first-child').textContent = '▼ Chain of Custody';
-
-  if (!(window._myRequestCoc||{})[instanceId]) {
-    await myrLoadRequestCoc(instanceId);
-  }
-  const events = (window._myRequestCoc||{})[instanceId] || [];
-  _myrRenderCocPanel(panel, events, labelEl);
-};
-
-// Fetch CoC events for a single instance and cache in window._myRequestCoc
-window.myrLoadRequestCoc = async function(instanceId) {
-  if (!instanceId) return;
-  window._myRequestCoc = window._myRequestCoc || {};
-  try {
-    const rows = await API.get(
-      `coc_events?entity_id=eq.${instanceId}&order=occurred_at.asc&select=*`
-    ).catch(() => []);
-    window._myRequestCoc[instanceId] = rows || [];
-  } catch(e) {
-    window._myRequestCoc[instanceId] = [];
-  }
-};
-
-window.myrOpenWorkflowForm = function(wfId) {
-  // Find workflow definition
-  let wf = null;
-  _WF_CATALOG.forEach(c => c.items.forEach(w => { if (w.id === wfId) wf = w; }));
-  if (!wf) return;
-  // Build pre-filled form based on workflow type
-  const stepPreviews = {
-    'resource-alloc': ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
-    'pto-request':    ['Submit','PM review','Approved \u2192 cal blocked + team notified'],
-    'capacity-concern':['Submit','PM review','Decision \u2192 queue adjusted'],
-    'doc-review':     ['Submit','Review','Approve'],
-    'change-request': ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
-    'issue-escalation':['Submit','PM review','Resolution plan','Resolved \u2192 CoC event'],
-    'expense':        ['Submit','PM review','Finance approval','Processed'],
-    'training':       ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
-    'new-project':    ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
-    'project-closure':['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
-  };
-  const steps = stepPreviews[wfId] || ['Submit','Review','Complete'];
-  const stepsHtml = steps.map(s=>`<span style="font-family:var(--font-head);font-size:11px;padding:3px 9px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);background:rgba(255,255,255,.02)">${_esc(s)}</span><span style="font-size:11px;color:rgba(255,255,255,.2)">\u2192</span>`).join('').replace(/→$/, '');
-  const formBody = _buildWorkflowFormBody(wfId, wf);
-  // Show via a compass toast-style modal — reuse existing modal infrastructure if available
-  const prefillNote = wfId === 'capacity-concern' || wfId === 'resource-alloc'
-    ? `<div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.5);padding:5px 8px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);margin-bottom:10px;line-height:1.5">Pre-filled from My Work context where available. Review and adjust before submitting.</div>`
-    : '';
-  const modalHtml = `
-    <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px">
-      <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">${_esc(wf.title)}</div>
-      <button onclick="myrCloseModal()" style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:var(--font-head);font-size:11px;display:flex;align-items:center;justify-content:center">&#x2715;</button>
-    </div>
-    <div style="padding:14px;overflow-y:auto;max-height:60vh">
-      ${prefillNote}
-      <div style="margin-bottom:10px">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase">Workflow steps</div>
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${stepsHtml}</div>
-      </div>
-      ${formBody}
-    </div>
-    <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;align-items:center">
-      ${wfId === 'doc-review' ? `
-      <label style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;
-                    color:rgba(255,255,255,.3);cursor:pointer;user-select:none;margin-right:auto">
-        <input type="checkbox" id="myr-save-responses"
-          ${localStorage.getItem('myr_save_responses') === '1' ? 'checked' : ''}
-          style="accent-color:#00D2FF;cursor:pointer"/>
-        Save responses
-      </label>` : '<div style="margin-right:auto"></div>'}
-      <button onclick="myrCloseModal()" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">Cancel</button>
-      <button onclick="myrSubmitWorkflow('${wfId}')" data-myr-submit style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Submit request &#8594;</button>
-    </div>`;
-  // Create modal overlay
-  let overlay = document.getElementById('myr-modal-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'myr-modal-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.addEventListener('click', e => { if (e.target === overlay) myrCloseModal(); });
-    document.body.appendChild(overlay);
-  }
-  const modal = document.createElement('div');
-  modal.id = 'myr-modal';
-  modal.style.cssText = 'background:#111827;border:1px solid rgba(0,210,255,.25);width:480px;max-height:85vh;border-radius:4px;overflow:hidden;display:flex;flex-direction:column';
-  modal.innerHTML = modalHtml;
-  overlay.innerHTML = '';
-  overlay.appendChild(modal);
-  overlay.style.display = 'flex';
-
-  // Restore saved doc-review responses if checkbox was previously checked
-  if (wfId === 'doc-review' && localStorage.getItem('myr_save_responses') === '1') {
-    try {
-      const saved = JSON.parse(localStorage.getItem('myr_doc_review_saved') || '{}');
-      if (saved.reviewers?.length) {
-        window._myrPendingReviewers = saved.reviewers;
-        myrRenderReviewerPills();
-      }
-      if (saved.approver) {
-        window._myrPendingApprover = saved.approver;
-        myrRenderApproverPill();
-      }
-      if (saved.lastDocs?.length) {
-        const listEl = modal.querySelector('#myr-doc-list');
-        if (listEl) {
-          listEl.innerHTML = saved.lastDocs.map(d => {
-            const icon = (d.mime||'').includes('pdf')||(d.name||'').endsWith('.pdf') ? '📄' :
-                         (d.source==='form') ? '◈' : '📎';
-            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;
-                                background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1)">
-              <span>${icon}</span>
-              <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                           flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
-              <span style="font-family:var(--font-head);font-size:10px;color:rgba(239,159,39,.6)">↑ re-upload</span>
-            </div>`;
-          }).join('');
-        }
-      }
-      if (saved.deadline) {
-        const dl = modal.querySelector('[data-myr-field="deadline"]');
-        if (dl) dl.value = saved.deadline;
-      }
-      if (saved.instructions) {
-        const instr = modal.querySelector('[data-myr-field="instructions"]');
-        if (instr) instr.value = saved.instructions;
-      }
-    } catch(_) {}
-  }
-};
-
-window.myrCloseModal = function() {
-  const overlay = document.getElementById('myr-modal-overlay');
-  if (overlay) overlay.style.display = 'none';
-};
-
-// ── Withdraw a submitted request ──────────────────────────
-window.myrWithdrawRequest = async function(instanceId) {
-  if (!instanceId) return;
-  const firmId  = _mwFirmId();
-  const resName = _myResource?.name || 'Unknown';
-  const resId   = _myResource?.id   || null;
-  const now     = new Date().toISOString();
-
-  // Resolve title BEFORE building the modal
-  const req   = (window._myRequests||[]).find(r => r.id === instanceId);
-  const title = req?.title || 'this request';
-
-  // Professional confirmation modal — no browser confirm()
-  const confirmed = await new Promise(resolve => {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;' +
-      'display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.innerHTML = `
-      <div style="background:#0d1b2e;border:1px solid rgba(226,75,74,.3);width:420px;
-                  border-radius:4px;overflow:hidden;font-family:var(--font-head)">
-        <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
-                    display:flex;align-items:center;gap:10px">
-          <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
-                      background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.3);
-                      display:flex;align-items:center;justify-content:center;
-                      font-size:15px;color:#E24B4A">✕</div>
-          <div>
-            <div style="font-size:13px;font-weight:700;color:#F0F6FF">Withdraw Request</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;
-                        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">
-              ${_esc(title)}
-            </div>
-          </div>
-        </div>
-        <div style="padding:16px 18px">
-          <div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:12px">
-            This will cancel the request and notify the reviewer.
-            Any work already done on this request will be preserved in the Chain of Custody.
-          </div>
-          <div style="background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.2);
-                      border-left:2px solid #E24B4A;padding:8px 12px;
-                      font-size:11px;color:rgba(255,255,255,.4)">
-            This action cannot be undone.
-          </div>
-        </div>
-        <div style="padding:10px 18px 14px;display:flex;gap:8px;justify-content:flex-end;
-                    border-top:1px solid rgba(255,255,255,.06)">
-          <button id="_wdKeepBtn"
-            style="font-family:var(--font-head);font-size:11px;padding:6px 18px;
-                   background:none;border:1px solid rgba(255,255,255,.15);
-                   color:rgba(255,255,255,.5);cursor:pointer;letter-spacing:.06em">
-            Keep Request
-          </button>
-          <button id="_wdConfirmBtn"
-            style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
-                   background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.4);
-                   color:#E24B4A;cursor:pointer;letter-spacing:.06em">
-            ✕ Withdraw
-          </button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const cleanup = result => { overlay.remove(); resolve(result); };
-    overlay.querySelector('#_wdKeepBtn').onclick    = () => cleanup(false);
-    overlay.querySelector('#_wdConfirmBtn').onclick = () => cleanup(true);
-    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
-  });
-  if (!confirmed) return;
 
   try {
-    // PATCH instance status to cancelled (withdrawn by submitter)
-    await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-      status: 'cancelled',
-      updated_at: now,
+    const resId = _myResource.id;
+    const today = new Date().toLocaleDateString('en-CA');
+    const todayDate = new Date(today + 'T00:00:00');
+    const dayOfWeek = todayDate.getDay();
+    const isoOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(todayDate);
+    weekStart.setDate(todayDate.getDate() - isoOffset - (_weekOffset * 7));
+    const weekStartDate = weekStart.toLocaleDateString('en-CA');
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+    const weekEndDate = weekEnd.toLocaleDateString('en-CA');
+    const weekDays = Array.from({length:7}, (_, i) => {
+      const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+      return d.toLocaleDateString('en-CA');
     });
+    const weekLabels = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
 
-    // CoC event
-    await API.post('coc_events', {
-      id:                crypto.randomUUID(),
-      firm_id:           firmId,
-      entity_id:         instanceId,
-      entity_type:       'workflow_instance',
-      event_type:        'request.withdrawn',
-      event_class:       'lifecycle',
-      severity:          'info',
-      event_notes:       JSON.stringify({ title, withdrawn_by: resName }),
-      actor_name:        resName,
-      actor_resource_id: resId,
-      occurred_at:       now,
-      created_at:        now,
-    });
+    // Update top-right date display to reflect current week view
+    const dateEl = document.getElementById('compass-date');
+    if (dateEl) {
+      if (_weekOffset === 0) {
+        dateEl.textContent = new Date().toLocaleDateString('en-US',{
+          weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase();
+      } else {
+        const ws = new Date(weekStart).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        const we = new Date(weekEnd).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+        dateEl.textContent = (ws + ' – ' + we).toUpperCase();
+      }
+    }
 
-    // On withdraw: cancel open workflow_requests for this instance (new dedicated table).
-    // Also patch workflow_action_items for any legacy rows during migration cutover.
-    await Promise.all([
-      API.patch(
-        `workflow_requests?instance_id=eq.${instanceId}&status=eq.open`,
-        { status: 'cancelled', updated_at: now }
-      ).catch(() => {}),
-      API.patch(
-        `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&owner_resource_id=eq.${resId}`,
-        { status: 'resolved', updated_at: now }
-      ).catch(() => {}),
+    const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek, myPendingReviews] = await Promise.all([
+      API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
+      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
+      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.${window.FIRM_ID||'aaaaaaaa-0001-0001-0001-000000000001'}&status=in.(active,in_progress,pending,cancelled)&limit=200`).catch(() => []),
+      API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
+      API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
+      API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
+      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
+      // 4th parallel fetch: dedicated workflow_requests table (review/approve rows)
+      API.get(`workflow_requests?owner_resource_id=eq.${resId}&status=eq.open&select=id,role,title,body,instance_id,owner_name,created_by_name,due_date,created_at&limit=100`).catch(() => []),
     ]);
 
-    // Optimistic local update
-    if (window._myRequests) {
-      window._myRequests = window._myRequests.map(r =>
-        r.id === instanceId ? { ...r, status: 'rejected' } : r
-      );
-    }
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
-    // Fix badge — recalculate active count after withdraw
-    const _wBadge = document.getElementById('ust-requests-badge');
-    const _wActive = document.getElementById('myr-active-badge');
-    const _wCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
-    if (_wBadge) { _wBadge.textContent = _wCount > 0 ? _wCount+' active' : ''; _wBadge.style.display = _wCount > 0 ? 'inline' : 'none'; }
-    if (_wActive) { _wActive.textContent = _wCount; _wActive.style.display = _wCount > 0 ? 'inline' : 'none'; }
-    compassToast(`"${title}" withdrawn. Reviewer notified.`);
-
-  } catch(e) {
-    console.error('[MyRequests] withdraw failed:', e);
-    compassToast('Withdraw failed — ' + (e.message || 'check console'), 4000);
-  }
-};
-
-// ── Add context to an active request ─────────────────────
-window.myrAddContext = async function(instanceId) {
-  if (!instanceId) return;
-  const req = (window._myRequests||[]).find(r => r.id === instanceId);
-  const title = req?.title || 'request';
-
-  // Inline context modal
-  const existing = document.getElementById('myr-context-overlay');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'myr-context-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.innerHTML = `
-    <div style="background:#111827;border:1px solid rgba(0,210,255,.25);width:420px;border-radius:4px;overflow:hidden">
-      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">Add context</div>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(title)}</div>
-        <button onclick="document.getElementById('myr-context-overlay').remove()"
-          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:var(--font-head);font-size:11px">&#x2715;</button>
-      </div>
-      <div style="padding:14px">
-        <textarea id="myr-context-text" placeholder="Add additional context, updates, or attachments for the reviewer…"
-          style="width:100%;padding:8px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-                 color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
-                 resize:none;box-sizing:border-box" rows="4"></textarea>
-      </div>
-      <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end">
-        <button onclick="document.getElementById('myr-context-overlay').remove()"
-          style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">
-          Cancel
-        </button>
-        <button onclick="myrSubmitContext('${instanceId}')"
-          style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">
-          Add to thread &#8594;
-        </button>
-      </div>
-    </div>`;
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  document.getElementById('myr-context-text')?.focus();
-};
-
-window.myrSubmitContext = async function(instanceId) {
-  const text = document.getElementById('myr-context-text')?.value?.trim();
-  if (!text) { compassToast('Enter some context before submitting.', 2000); return; }
-
-  const firmId  = _mwFirmId();
-  const resName = _myResource?.name || 'Unknown';
-  const resId   = _myResource?.id   || null;
-  const now     = new Date().toISOString();
-
-  try {
-    await API.post('coc_events', {
-      id:                crypto.randomUUID(),
-      firm_id:           firmId,
-      entity_id:         instanceId,
-      entity_type:       'workflow_instance',
-      event_type:        'request.context_added',
-      event_class:       'note',
-      severity:          'info',
-      event_notes:       JSON.stringify({ note: text }),
-      actor_name:        resName,
-      actor_resource_id: resId,
-      occurred_at:       now,
-      created_at:        now,
-    });
-
-    // Update local cocNote on the request
-    if (window._myRequests) {
-      window._myRequests = window._myRequests.map(r =>
-        r.id === instanceId ? { ...r, cocNote: text } : r
-      );
-    }
-    renderMyRequestsActive();
-    document.getElementById('myr-context-overlay')?.remove();
-    compassToast('Context added to request thread.');
-
-  } catch(e) {
-    console.error('[MyRequests] add context failed:', e);
-    compassToast('Failed to add context — ' + (e.message || 'check console'), 4000);
-  }
-};
-
-
-// ── Document upload helpers for doc-review requests ──────────────────────────
-// _myrPendingDocs:      staging array of docs attached to the open modal
-// _myrPendingReviewers: array of {id, name, email, dept} selected via PersonPicker
-// _myrPendingApprover:  single {id, name, email} or null
-// All cleared on modal close and after successful submit.
-window._myrPendingDocs      = [];
-window._myrPendingReviewers = [];
-window._myrPendingApprover  = null;
-
-// ── Reviewer pill helpers ─────────────────────────────────
-function _myrPersonPill(person, removeKey, removeFn, color) {
-  const ini = (person.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-  return `<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 5px;
-                      background:rgba(${color},.1);border:1px solid rgba(${color},.3);
-                      font-family:var(--font-head);font-size:11px;color:rgb(${color})">
-    <div style="width:20px;height:20px;border-radius:50%;background:rgba(${color},.2);
-                border:1px solid rgba(${color},.4);display:flex;align-items:center;
-                justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">
-      ${ini}
-    </div>
-    <div style="display:flex;flex-direction:column;line-height:1.2">
-      <span style="font-weight:600">${_esc(person.name)}</span>
-      ${person.dept||person.title?`<span style="font-size:10px;opacity:.6">${_esc(person.dept||person.title||'')}</span>`:''}
-    </div>
-    <button onclick="${removeFn}('${removeKey}')" type="button"
-      style="background:none;border:none;color:rgba(${color},.6);cursor:pointer;
-             font-size:12px;padding:0 0 0 3px;line-height:1">✕</button>
-  </div>`;
-}
-
-window.myrRenderReviewerPills = function() {
-  const el = document.getElementById('myr-reviewer-pills');
-  if (!el) return;
-  el.innerHTML = (_myrPendingReviewers||[])
-    .map(p => _myrPersonPill(p, p.id, 'myrRemoveReviewer', '0,210,255'))
-    .join('');
-};
-
-window.myrRemoveReviewer = function(id) {
-  window._myrPendingReviewers = (_myrPendingReviewers||[]).filter(r => r.id !== id);
-  myrRenderReviewerPills();
-};
-
-window.myrAddReviewer = function(btn) {
-  if (!window.PersonPicker?.show) {
-    compassToast('PersonPicker not available', 2000); return;
-  }
-  PersonPicker.show(btn, function(person) {
-    if (!person?.id) return;
-    window._myrPendingReviewers = window._myrPendingReviewers || [];
-    if (_myrPendingReviewers.find(r => r.id === person.id)) return; // no duplicates
-    _myrPendingReviewers.push({
-      id:    person.id,
-      name:  person.name  || '',
-      email: person.email || '',
-      dept:  person.dept  || person.department || '',
-      title: person.title || '',
-    });
-    myrRenderReviewerPills();
-  });
-};
-
-window.myrRenderApproverPill = function() {
-  const el    = document.getElementById('myr-approver-pill');
-  const btn   = document.getElementById('myr-set-approver-btn');
-  if (!el) return;
-  if (_myrPendingApprover) {
-    el.innerHTML = _myrPersonPill(_myrPendingApprover, 'approver', 'myrRemoveApprover', '196,125,24');
-    if (btn) btn.textContent = '↺ Change Approver';
-  } else {
-    el.innerHTML = '';
-    if (btn) btn.textContent = '+ Set Approver';
-  }
-};
-
-window.myrRemoveApprover = function() {
-  window._myrPendingApprover = null;
-  myrRenderApproverPill();
-};
-
-window.myrSetApprover = function(btn) {
-  if (!window.PersonPicker?.show) {
-    compassToast('PersonPicker not available', 2000); return;
-  }
-  PersonPicker.show(btn, function(person) {
-    if (!person?.id) return;
-    window._myrPendingApprover = {
-      id:    person.id,
-      name:  person.name  || '',
-      email: person.email || '',
-      dept:  person.dept  || person.department || '',
-      title: person.title || '',
-    };
-    myrRenderApproverPill();
-  });
-};
-
-// Called when the file input changes — uploads each file to Supabase Storage
-// then adds to _myrPendingDocs and re-renders the doc list.
-window.myrHandleDocUpload = async function(event) {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
-
-  const listEl = document.getElementById('myr-doc-list');
-  const uploadBtn = event.target.closest('label');
-  if (uploadBtn) { uploadBtn.style.opacity = '.5'; uploadBtn.style.pointerEvents = 'none'; }
-
-  for (const file of files) {
-    const docId   = crypto.randomUUID();
-    const ext     = file.name.split('.').pop();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path    = `requests/${docId}/${safeName}`;
-
-    try {
-      // Get auth token for storage upload — Auth is a bare global from auth.js
-      const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-
-      const res = await fetch(
-        `${_mwSupaURL()}/storage/v1/object/workflow-documents/${path}`,
-        {
-          method:  'POST',
-          headers: {
-            'apikey':         (_mwSupaKey()),
-            'Authorization':  `Bearer ${token || _mwSupaKey()}`,
-            'Content-Type':   file.type || 'application/octet-stream',
-            'x-upsert':       'true',
-          },
-          body: file,
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.text();
-        console.warn('[DocUpload] Storage upload failed:', err);
-        compassToast(`Upload failed: ${file.name}`, 3000);
-        continue;
+    // _myCocEvents set after workItems built (below)
+    // ── Hours per day ─────────────────────────────────────────────────
+    const hoursByDay = {}, billableByDay = {};
+    weekDays.forEach(d => { hoursByDay[d] = 0; billableByDay[d] = 0; });
+    myTimeEntries.forEach(e => {
+      if (Object.prototype.hasOwnProperty.call(hoursByDay, e.date)) {
+        const h = parseFloat(e.hours || 0);
+        hoursByDay[e.date] += h;
+        if (e.is_billable) billableByDay[e.date] += h;
       }
+    });
 
-      // Build public URL
-      const url = `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${path}`;
+    // ── Week totals ───────────────────────────────────────────────────
+    const weekEntries  = myTimeEntries.filter(e => weekDays.includes(e.date));
+    const weekTotal    = weekEntries.reduce((s,e) => s + parseFloat(e.hours||0), 0);
+    const weekBillable = weekEntries.filter(e=>e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0), 0);
+    const todayTotal   = parseFloat(hoursByDay[today] || 0);
+    const maxDayHours  = Math.max(...Object.values(hoursByDay), 1);
 
-      window._myrPendingDocs.push({
-        id:     docId,
-        name:   file.name,
-        path,
-        url,
-        size:   file.size,
-        mime:   file.type,
-        source: 'upload',
+    // ── Work list ─────────────────────────────────────────────────────
+    const workItems = [];
+    (myTasks || [])
+      .filter(t => t.status !== 'cancelled')
+      .filter(t => { const p=parseFloat(t.pct_complete)||0; const pn=p<=1&&p>0?Math.round(p*100):Math.round(p); return pn < 100; })
+      .forEach(t => {
+        const proj = _projects.find(p => p.id === t.project_id);
+        const overdue = t.due_date && t.due_date < today;
+        const p = parseFloat(t.pct_complete)||0;
+        const pctNorm = p<=1&&p>0?Math.round(p*100):Math.round(p);
+        const budgetHrs = t.budget_hours ? parseFloat(t.budget_hours) : t.effort_days ? parseFloat(t.effort_days)*8 : null;
+        workItems.push({ type:'task', id:t.id, title:t.name, project:proj?.name||'—',
+          projectId:t.project_id||null, status:t.status, due:t.due_date, overdue, pct:pctNorm,
+          budgetHours:  budgetHrs,
+          effortDays:   t.effort_days  ? parseFloat(t.effort_days)  : null,
+          actualHours:  t.actual_hours ? parseFloat(t.actual_hours) : null,
+          actualStart:  t.actual_start||null,
+          complexity:   t.complexity_rating||null,
+          assignedTo:   t.assigned_to||null,
+          urgency: overdue ? 0 : (t.due_date ? 1 : 2) });
       });
 
-      myrRenderDocList();
-
-    } catch(e) {
-      console.error('[DocUpload] error:', e);
-      compassToast(`Upload error: ${file.name} — ${e.message}`, 3000);
-    }
-  }
-
-  // Reset the file input so the same file can be re-selected if needed
-  event.target.value = '';
-  if (uploadBtn) { uploadBtn.style.opacity = '1'; uploadBtn.style.pointerEvents = ''; }
-};
-
-// Render the pending doc list inside the modal
-window.myrRenderDocList = function() {
-  const el = document.getElementById('myr-doc-list');
-  if (!el) return;
-  const docs = window._myrPendingDocs || [];
-  if (!docs.length) { el.innerHTML = ''; return; }
-
-  el.innerHTML = docs.map((d, i) => {
-    const icon = (d.mime||'').includes('pdf') ? '📄' :
-                 (d.mime||'').includes('word') || d.name.endsWith('.docx') ? '📝' :
-                 (d.mime||'').includes('sheet') || d.name.endsWith('.xlsx') ? '📊' :
-                 d.source === 'form' ? '◈' : '📎';
-    const sizeStr = d.size > 1048576
-      ? (d.size/1048576).toFixed(1) + 'MB'
-      : (d.size/1024).toFixed(0) + 'KB';
-    return `
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;
-                  background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">
-        <span style="font-size:13px">${icon}</span>
-        <span style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;
-                     flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-              title="${_esc(d.name)}">${_esc(d.name)}</span>
-        <span style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.3);
-                     flex-shrink:0">${d.source === 'form' ? 'Form' : sizeStr}</span>
-        <button onclick="myrRemoveDoc(${i})"
-          style="background:none;border:none;color:rgba(226,75,74,.6);cursor:pointer;
-                 font-size:13px;padding:0 2px;line-height:1;flex-shrink:0"
-          title="Remove">&#x2715;</button>
-      </div>`;
-  }).join('');
-};
-
-// Remove a pending doc by index
-window.myrRemoveDoc = function(idx) {
-  window._myrPendingDocs = (window._myrPendingDocs || []).filter((_,i) => i !== idx);
-  myrRenderDocList();
-};
-
-// Open a picker to select a released CadenceHUD form definition as a document
-window.myrPickCadenceForm = async function() {
-  // Fetch released form definitions
-  let forms = [];
-  try {
-    forms = await API.get(
-      `workflow_form_definitions?state=eq.released&order=source_name.asc&limit=100` +
-      `&select=id,source_name,version,source_path,category_id`
-    ).catch(() => []);
-  } catch(e) { forms = []; }
-
-  if (!forms.length) {
-    compassToast('No released forms found in the Form Library.', 3000);
-    return;
-  }
-
-  // Show picker overlay
-  const existing = document.getElementById('myr-form-picker');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'myr-form-picker';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;' +
-    'display:flex;align-items:center;justify-content:center;padding:20px';
-
-  overlay.innerHTML = `
-    <div style="background:#0d1b2e;border:1px solid rgba(196,125,24,.35);width:460px;
-                max-height:70vh;border-radius:4px;overflow:hidden;display:flex;flex-direction:column">
-      <div style="padding:12px 16px 10px;border-bottom:1px solid rgba(255,255,255,.07);
-                  display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">
-          Select CadenceHUD Form
-        </div>
-        <span style="font-family:var(--font-head);font-size:12px;color:rgba(196,125,24,.7)">
-          Released forms only
-        </span>
-        <button onclick="document.getElementById('myr-form-picker').remove()"
-          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;
-                 width:20px;height:20px;cursor:pointer;font-size:11px;display:flex;
-                 align-items:center;justify-content:center">&#x2715;</button>
-      </div>
-      <div style="flex:1;overflow-y:auto;padding:8px">
-        ${forms.map(f => `
-          <div onclick="myrAttachForm('${f.id}','${_esc(f.source_name)}','${_esc(f.version||'0.1.0')}','${f.source_path||''}')"
-            style="padding:9px 12px;cursor:pointer;border:1px solid rgba(255,255,255,.06);
-                   margin-bottom:4px;transition:background .1s;display:flex;align-items:center;gap:10px"
-            onmouseover="this.style.background='rgba(196,125,24,.08)';this.style.borderColor='rgba(196,125,24,.3)'"
-            onmouseout="this.style.background='';this.style.borderColor='rgba(255,255,255,.06)'">
-            <span style="font-size:16px">◈</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-family:var(--font-head);font-size:12px;font-weight:600;
-                          color:#F0F6FF;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                ${_esc(f.source_name)}
-              </div>
-              <div style="font-family:var(--font-head);font-size:12px;color:rgba(196,125,24,.7);margin-top:1px">
-                v${_esc(f.version||'0.1.0')} · Released
-              </div>
-            </div>
-            <span style="font-family:var(--font-head);font-size:12px;color:rgba(0,210,255,.5)">
-              Attach ›
-            </span>
-          </div>`).join('')}
-      </div>
-    </div>`;
-
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-};
-
-// Attach a CadenceHUD form to the pending docs list
-window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
-  document.getElementById('myr-form-picker')?.remove();
-
-  // Don't add duplicates
-  if ((window._myrPendingDocs||[]).some(d => d.form_id === formId)) {
-    compassToast(`${formName} is already attached.`, 2000);
-    return;
-  }
-
-  const url = sourcePath
-    ? `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${sourcePath}`
-    : null;
-
-  window._myrPendingDocs = window._myrPendingDocs || [];
-  window._myrPendingDocs.push({
-    id:      crypto.randomUUID(),
-    name:    `${formName} v${formVersion}`,
-    path:    sourcePath || null,
-    url,
-    size:    0,
-    mime:    'application/pdf',
-    source:  'form',
-    form_id: formId,
-  });
-
-  myrRenderDocList();
-  compassToast(`${formName} attached.`, 1800);
-};
-
-// Clear pending docs when modal closes
-var _origMyrCloseModal = window.myrCloseModal;
-window.myrCloseModal = function() {
-  window._myrPendingDocs      = [];
-  window._myrPendingReviewers = [];
-  window._myrPendingApprover  = null;
-  if (_origMyrCloseModal) _origMyrCloseModal();
-};
-
-window.myrSubmitWorkflow = async function(wfId) {
-  // ── 1. Collect form values from modal ───────────────────
-  const modal = document.getElementById('myr-modal');
-  if (!modal) return;
-
-  // Read all labelled inputs/selects/textareas by their data-field attribute
-  const getField = (fieldId) => {
-    const el = modal.querySelector(`[data-myr-field="${fieldId}"]`);
-    return el ? el.value.trim() : '';
-  };
-
-  // Build field map by workflow type
-  let title = '', details = {}, reviewerLabel = '';
-  switch (wfId) {
-    case 'doc-review': {
-      const deadline     = getField('deadline');
-      const instructions = getField('instructions');
-      const docs         = window._myrPendingDocs      || [];
-      const reviewers    = window._myrPendingReviewers  || [];
-      const approver     = window._myrPendingApprover   || null;
-      if (!docs.length)      { compassToast('Add at least one document for review.', 2500); return; }
-      if (!reviewers.length) { compassToast('Add at least one reviewer.', 2500); return; }
-      const docNames     = docs.map(d => d.name).join(', ');
-      title              = `Document review: ${docs.length === 1 ? docs[0].name : docs.length + ' documents'}`;
-      reviewerLabel      = reviewers[0]?.name || '';
-      details            = { docs, reviewers, approver, deadline, instructions,
-                             doc_count: docs.length, doc_names: docNames };
-      // Persist responses if "Save responses" is checked
-      const saveChk = modal.querySelector('#myr-save-responses');
-      if (saveChk) localStorage.setItem('myr_save_responses', saveChk.checked ? '1' : '0');
-      if (saveChk?.checked) {
-        localStorage.setItem('myr_doc_review_saved', JSON.stringify({
-          reviewers, approver, deadline, instructions,
-          lastDocs: docs.map(d => ({ name: d.name, size: d.size, mime: d.mime, source: d.source })),
-        }));
-      }
-      break;
-    }
-    case 'resource-alloc': {
-      const resource = getField('resource');
-      const alloc    = getField('allocation');
-      const effDate  = getField('effective_date');
-      const justif   = getField('justification');
-      if (!resource) { compassToast('Resource is required.', 2500); return; }
-      title   = `Resource allocation: ${resource} → ${alloc}`;
-      details = { resource, allocation: alloc, effective_date: effDate, justification: justif };
-      break;
-    }
-    case 'pto-request': {
-      const from = getField('from');
-      const to   = getField('to');
-      const plan = getField('coverage_plan');
-      if (!from || !to) { compassToast('Start and end dates are required.', 2500); return; }
-      title   = `PTO request: ${from} – ${to}`;
-      details = { from, to, coverage_plan: plan };
-      break;
-    }
-    case 'change-request': {
-      const type   = getField('change_type');
-      const desc   = getField('change_desc');
-      const impact = getField('impact');
-      if (!desc) { compassToast('Change description is required.', 2500); return; }
-      title   = `Change request: ${type}`;
-      details = { change_type: type, description: desc, impact };
-      break;
-    }
-    case 'issue-escalation': {
-      const proj  = getField('project');
-      const issue = getField('issue_desc');
-      const steps = getField('steps_taken');
-      if (!issue) { compassToast('Issue description is required.', 2500); return; }
-      title   = `Issue escalation: ${proj}`;
-      details = { project: proj, description: issue, steps_taken: steps };
-      break;
-    }
-    default: {
-      const desc = getField('details');
-      title   = wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) + ' request';
-      details = { description: desc };
-    }
-  }
-
-  // ── 2. Disable submit button to prevent double-submit ───
-  const submitBtn = modal.querySelector('[data-myr-submit]');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
-
-  myrCloseModal();
-
-  const firmId   = _mwFirmId();
-  const resId    = _myResource?.id || null;
-  const resName  = _myResource?.name || 'Unknown';
-  const now      = new Date().toISOString();
-  const instanceId = crypto.randomUUID();
-
-  try {
-    // ── 3. Create workflow_instance ────────────────────────
-    const attachments = (wfId === 'doc-review' ? (details.docs || []) : [])
-      .map(d => ({ id: d.id, name: d.name, path: d.path || null, url: d.url || null,
-                   size: d.size || 0, type: d.mime || '', source: d.source || 'upload',
-                   form_id: d.form_id || null, uploaded_at: now }));
-
-    await API.post('workflow_instances', {
-      id:                       instanceId,
-      firm_id:                  firmId,
-      title,
-      status:                   'in_progress',
-      workflow_type:            wfId,
-      current_step_name:        'Review',
-      submitted_by_resource_id: resId,
-      submitted_by_name:        resName,
-      template_id:              null,
-      attachments:              attachments,
-      created_at:               now,
+    // ── workflow_requests rows → workItems (PENDING REVIEWS section) ──────────
+    // These are injected at urgency -1 so they always sort above regular tasks.
+    // _wrRole is carried through so mw-events.js can route without title-prefix heuristic.
+    const wrInstanceIds = new Set();
+    (myPendingReviews||[]).forEach(wr => {
+      workItems.push({
+        type:            'action',
+        id:              wr.id,
+        title:           wr.title,
+        project:         wr.role === 'approver' ? 'Pending Approval' : 'Pending Review',
+        projectId:       null,
+        status:          'open',
+        due:             wr.due_date || null,
+        overdue:         wr.due_date && wr.due_date < today,
+        urgency:         -1,           // always top of queue, exempt from all date filters
+        createdBy:       wr.created_by_name || null,
+        createdAt:       wr.created_at || null,
+        ownerName:       wr.owner_name || null,
+        ownerResourceId: resId,
+        instanceId:      wr.instance_id || null,
+        body:            wr.body || null,
+        _wrRole:         wr.role,      // 'reviewer' | 'approver' — used by mw-events routing
+        _isWrRow:        true,
+      });
+      if (wr.instance_id) wrInstanceIds.add(wr.instance_id);
     });
 
-    // Clear pending docs after successful POST
-    window._myrPendingDocs = [];
-
-    // ── 4. Write CoC event ─────────────────────────────────
-    const cocId = crypto.randomUUID();
-    await API.post('coc_events', {
-      id:               cocId,
-      firm_id:          firmId,
-      entity_id:        instanceId,
-      entity_type:      'workflow_instance',
-      event_type:       'request.submitted',
-      event_class:      'lifecycle',
-      severity:         'info',
-      event_notes:      JSON.stringify({
-        workflow_type: wfId,
-        title,
-        ...details,
-      }),
-      actor_name:       resName,
-      actor_resource_id: resId,
-      occurred_at:      now,
-      created_at:       now,
-    });
-
-    // ── 5. Create action items in My Work ──────────────────
-    // For doc-review: use _myrPendingReviewers (have .id directly — no fuzzy matching)
-    // For other types: fall back to label matching against _resources
-
-    const actionRecipients = []; // [{id, name, role}] for toast
-
-    if (wfId === 'doc-review' && (details.reviewers||[]).length) {
-      // ── POST to workflow_requests (dedicated table, not workflow_action_items) ──
-      for (const reviewer of (details.reviewers || [])) {
-        if (!reviewer.id) continue;
-        await API.post('workflow_requests', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          role:              'reviewer',
-          title:             `Review request: ${title}`,
-          body:              details.instructions || '',
-          status:            'open',
-          owner_resource_id: reviewer.id,
-          owner_name:        reviewer.name || '',
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        });
-        actionRecipients.push({ name: reviewer.name, role: 'Reviewer' });
+    // ── Legacy action_items — exclude any that were migrated to workflow_requests ─
+    // During cutover: skip action_items whose instance_id already has a workflow_requests row.
+    (myActionItems||[]).filter(a=>a.owner_resource_id).forEach(a => {
+      // Skip if this instance already covered by workflow_requests
+      if (a.instance_id && wrInstanceIds.has(a.instance_id) &&
+          ((a.title||'').startsWith('Review request:') || (a.title||'').startsWith('Approve request:'))) {
+        return;
       }
-      // Approver row
-      if (details.approver?.id) {
-        await API.post('workflow_requests', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          role:              'approver',
-          title:             `Approve request: ${title}`,
-          body:              details.instructions || '',
-          status:            'open',
-          owner_resource_id: details.approver.id,
-          owner_name:        details.approver.name || '',
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        });
-        actionRecipients.push({ name: details.approver.name, role: 'Approver' });
+      const overdue = a.due_date && a.due_date < today;
+      workItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
+        projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency: overdue?0:1,
+        createdBy: a.created_by_name||null,
+        ownerName: a.owner_name||null, ownerResourceId: a.owner_resource_id||null,
+        instanceId: a.instance_id||null,   // needed to route review requests
+        body: a.body||null });
+    });
+    workItems.sort((a,b) => {
+      if (a.urgency !== b.urgency) return a.urgency - b.urgency;
+      if (a.due && b.due) return a.due.localeCompare(b.due);
+      return 0;
+    });
+    // Filter out action items whose parent workflow instance is cancelled
+    const cancelledInstanceIds = new Set(
+      (wfInstances||[]).filter(i => i.status === 'cancelled').map(i => i.id)
+    );
+    const filteredItems = workItems.filter(w =>
+      !w.instanceId || !cancelledInstanceIds.has(w.instanceId)
+    );
+    _wiItems = filteredItems;
+    window._wiItems = filteredItems;
+    window.myActionItems = myActionItems||[];
+    window._myPendingReviews = myPendingReviews||[];
+    window._wfInstances   = wfInstances||[];
+    // Seed negotiation state cache from DB so row borders render correctly
+    window._negStateCache = window._negStateCache || {};
+    (myActionItems||[]).forEach(a => {
+      if (a.negotiation_state) window._negStateCache[a.id] = a.negotiation_state;
+    });
+    _teEntries = myTimeEntries;
+    window._myTimeEntries = myTimeEntries;
+    window._weekEntries = myTimeEntries.filter(function(e){ return weekDays.includes(e.date); });
+    window._today = today;
+
+    // ── Fetch CoC events for all instances backing the user's work ────
+    // ── Fetch CoC events (entity-based + actor-based) ──────────────────────────
+    // Collect all entity IDs this user cares about: task IDs, action item IDs, project IDs
+    const myTaskIds      = workItems.map(w=>w.id).filter(Boolean);
+    const myAiIds        = (myActionItems||[]).map(a=>a.id).filter(Boolean);
+    const myProjectIds   = [...new Set(workItems.map(w=>w.projectId).filter(Boolean))];
+    // Also include workflow_instance IDs for migrated historical events
+    const myInstIds      = (wfInstances||[]).filter(w=>
+      myProjectIds.includes(w.project_id) || workItems.some(wi=>wi.id===w.task_id)
+    ).map(w=>w.id);
+    const allEntityIds   = [...new Set([...myTaskIds, ...myAiIds, ...myProjectIds, ...myInstIds])];
+
+    let myCocEvents   = [];
+    let actorCocEvents = [];
+
+    // Use CoC service if fully loaded (coc.js deployed with readMany)
+    if (typeof window.CoC?.readMany === 'function') {
+      myCocEvents = allEntityIds.length
+        ? await window.CoC.readMany(allEntityIds, { limit: 300 }).catch(() => [])
+        : [];
+      if (_myResource?.id) {
+        actorCocEvents = await window.CoC.readMany([], {
+          actorResourceId: _myResource.id, limit: 100
+        }).catch(() => []);
       }
     } else {
-      // Non-doc-review: resolve by label matching
-      let ownerResId   = null;
-      let ownerResName = reviewerLabel || 'PM';
-      if (reviewerLabel && _resources?.length) {
-        const cleanLabel = reviewerLabel.replace(/\s*\(.*?\)\s*$/,'').trim();
-        const match = _resources.find(r =>
-          r.name && r.name.toLowerCase().includes(cleanLabel.toLowerCase().split(' ')[0])
-        );
-        if (match) { ownerResId = match.id; ownerResName = match.name; }
-      }
-      if (!ownerResId && _resources?.length) {
-        const pm = _resources.find(r =>
-          r.department?.toLowerCase().includes('pm') ||
-          r.title?.toLowerCase().includes('project manager')
-        );
-        if (pm) { ownerResId = pm.id; ownerResName = pm.name; }
-      }
-      if (ownerResId) {
-        await API.post('workflow_action_items', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          title:             `Review request: ${title}`,
-          body:              details.instructions || details.justification || details.description || '',
-          status:            'open',
-          owner_resource_id: ownerResId,
-          owner_name:        ownerResName,
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        });
-        actionRecipients.push({ name: ownerResName, role: 'Reviewer' });
+      // Direct API fallback — used when coc.js is absent or a pre-readMany version
+      // is deployed. Remove once coc.js is confirmed live on the server.
+      if (allEntityIds.length) {
+        myCocEvents = await API.get(
+          `coc_events?select=id,entity_id,entity_type,event_type,step_name,event_notes,actor_name,actor_resource_id,outcome,metadata,occurred_at,created_at&entity_id=in.(${allEntityIds.join(',')})&order=occurred_at.desc&limit=300`
+        ).catch(() => []);
       }
     }
 
-    // ── 6. Optimistic local update → re-render ─────────────
-    const stepPreviews = {
-      'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
-      'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
-      'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
-      'doc-review':        ['Submit','Review','Approve'],
-      'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
-      'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
-      'expense':           ['Submit','PM review','Finance approval','Processed'],
-      'training':          ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
-      'new-project':       ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
-      'project-closure':   ['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
-    };
-    const labels = stepPreviews[wfId] || ['Submit','Review','Complete'];
-    const steps  = labels.map((label, i) => ({ label, done: i < 1, active: i === 1 }));
-
-    window._myRequests = window._myRequests || [];
-    window._myRequests.unshift({
-      id:          instanceId,
-      title,
-      status:      'in_progress',
-      workflow:    wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
-      submitted:   new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),
-      steps,
-      cocNote:     details.instructions || details.description || '',
-      attachments: attachments,
-      expanded:    true,
-    });
-
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
-
-    // Update tab badge
-    const activeCount = window._myRequests.filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
-    const badge = document.getElementById('ust-requests-badge');
-    if (badge) { badge.textContent = activeCount + ' active'; badge.style.display = 'inline'; }
-
-    // Switch to Active sub-tab so the user sees their new request
-    const activeBtn = document.querySelector('.myr-subnav[data-myr="active"]');
-    if (activeBtn) myrSwitchView('active', activeBtn);
-
-    // Force re-fetch on next tab visit to sync with DB
-    window._requestsLoaded = false;
-
-    const recipientSummary = actionRecipients.length
-      ? actionRecipients.map(r => r.name).join(', ')
-      : 'team';
-
-    // Email external reviewers/approvers
-    if (wfId === 'doc-review') {
-      for (const reviewer of (details.reviewers||[])) {
-        if (reviewer.email) {
-          _myrNotify({ toEmail: reviewer.email, toName: reviewer.name,
-            fromName: resName, stepName: 'Review', stepType: 'review',
-            title, instanceId, body: details.instructions || '' });
-        }
-      }
-      if (details.approver?.email) {
-        _myrNotify({ toEmail: details.approver.email, toName: details.approver.name,
-          fromName: resName, stepName: 'Approve', stepType: 'approval',
-          title, instanceId, body: details.instructions || '' });
-      }
+    // Actor-name fallback for legacy rows (written before actor_resource_id was enforced)
+    if (!actorCocEvents.length && _myResource?.name) {
+      actorCocEvents = await API.get(
+        `coc_events?actor_name=eq.${encodeURIComponent(_myResource.name)}&order=occurred_at.desc&limit=100&select=*`
+      ).catch(() => []);
     }
 
-    compassToast(`✓ ${title} — routed to ${recipientSummary}`);
+    // Merge, deduplicate by id, sort by occurred_at (canonical timestamp)
+    const cocMap = new Map();
+    [...myCocEvents, ...actorCocEvents].forEach(e => cocMap.set(e.id, e));
+    window._myCocEvents = [...cocMap.values()].sort(
+      (a,b) => (b.occurred_at||b.created_at||'').localeCompare(a.occurred_at||a.created_at||'')
+    );
+    console.log('[Compass] myCocEvents:', window._myCocEvents.length,
+      '| CoC service:', typeof window.CoC?.readMany === 'function' ? 'active' : 'fallback mode');
+    if (_teFilter && !weekDays.includes(_teFilter)) _teFilter = null;
 
-  } catch(e) {
-    console.error('[MyRequests] submit failed:', e);
-    compassToast('Submission failed — ' + (e.message || 'check console'), 4000);
-  }
-};
+    const overdueCount = workItems.filter(w => w.overdue).length;
+    const waiting    = workItems.filter(w => w.status==='not_started').length;
+    const inProgress = workItems.filter(w => w.status==='in_progress').length;
+    const blocked    = workItems.filter(w => w.status==='blocked').length;
 
-function _buildWorkflowFormBody(wfId, wf) {
-  // All inputs carry data-myr-field so myrSubmitWorkflow can read values by ID
-  const inp = (label, fieldId, val='', required=true) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <input data-myr-field="${fieldId}"
-        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box"
-        type="text" value="${_esc(val)}"/>
-    </div>`;
-  const dateInp = (label, fieldId, required=false) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <input data-myr-field="${fieldId}" type="date"
-        style="width:160px;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box;
-               color-scheme:dark;display:block"/>
-    </div>`;
-  const ta = (label, fieldId, val='', rows=3, required=true) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <textarea data-myr-field="${fieldId}"
-        style="width:100%;padding:7px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
-               resize:none;box-sizing:border-box"
-        rows="${rows}">${_esc(val)}</textarea>
-    </div>`;
-  const sel = (label, fieldId, opts, required=true) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <select data-myr-field="${fieldId}"
-        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
-               cursor:pointer;box-sizing:border-box">
-        ${opts.map(o=>`<option>${_esc(o)}</option>`).join('')}
-      </select>
-    </div>`;
+    // Streak
+    const uniqueDates = [...new Set(myTimeEntries.map(e=>e.date))].sort().reverse();
+    let streak = 0;
+    for (let i = 0; i < 60; i++) {
+      const dd = new Date(today+'T00:00:00'); dd.setDate(dd.getDate()-i);
+      if (uniqueDates.includes(dd.toLocaleDateString('en-CA'))) streak++; else if (i>0) break;
+    }
+    const firstName = (_myResource?.name||'there').split(' ')[0];
+    const hour = new Date().getHours();
+    const greeting = hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
+    const weekOf = weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 
-  // Reviewer options from live _resources, fallback to seed names
-  const reviewerOpts = (_resources||[]).length
-    ? _resources.map(r => r.name + (r.department ? ` (${r.department})` : ''))
-    : ['VS (PM)','Sandra Okafor','Robert Chen','Alan Smith'];
+    // Real completed counts this week (from DB, not session memory)
+    const completedTasksCount  = (completedThisWeek||[]).length;
+    const resolvedActionsCount = (resolvedThisWeek||[]).filter(a => {
+      // Filter client-side since updated_at column may not exist on this table
+      return true; // count all resolved for this resource this week (approximate)
+    }).length;
+    const weekDoneCount = completedTasksCount + resolvedActionsCount;
+    const weekDoneLabel = (() => {
+      if (weekDoneCount === 0) return '0 completed';
+      const parts = [];
+      if (completedTasksCount > 0)  parts.push(`${completedTasksCount} task${completedTasksCount!==1?'s':''}`);
+      if (resolvedActionsCount > 0) parts.push(`${resolvedActionsCount} action${resolvedActionsCount!==1?'s':''}`);
+      return parts.join(' · ') + ' done';
+    })();
 
-  // Resource options for allocation requests
-  const resourceOpts = (_resources||[]).length
-    ? _resources.map(r => r.name)
-    : ['Robert Chen','Sandra Okafor','Alan Smith','(Other)'];
+    // EOD nudge
+    const nowHr = new Date().getHours() + new Date().getMinutes()/60;
+    let eodNudge = null;
+    if (nowHr >= 17 && todayTotal === 0) eodNudge = 'red';
+    else if (nowHr >= 16 && todayTotal < 4) eodNudge = 'amber';
 
-  switch (wfId) {
-    case 'resource-alloc':
-      return sel('Resource requested', 'resource', resourceOpts) +
-        sel('New allocation', 'allocation', ['40% NovaBio','60% NovaBio','80% NovaBio','100% NovaBio']) +
-        inp('Effective date', 'effective_date', 'Apr 2, 2026') +
-        ta('Justification', 'justification',
-          'Section 4.3 review requires a dedicated resource starting Apr 2. Robert Chen at current 40% is insufficient.', 3);
+    // Timesheet status
+    const myWeekRow = myWeek?.[0] || null;
+    const wsStatus  = myWeekRow?.status || 'draft';
+    const wsLabel   = {draft:'DRAFT',submitted:'SUBMITTED',approved:'APPROVED',rejected:'REJECTED',amended:'AMENDED'}[wsStatus]||wsStatus.toUpperCase();
+    const wsColor   = wsStatus==='approved'?'var(--compass-green)':wsStatus==='submitted'?'var(--compass-cyan)':wsStatus==='rejected'?'var(--compass-red)':'var(--text3)';
 
-    case 'pto-request':
-      return inp('From', 'from', 'Mon Mar 31, 2026') +
-        inp('To', 'to', 'Tue Apr 1, 2026') +
-        ta('Coverage plan', 'coverage_plan',
-          'Sandra Okafor to monitor NovaBio items. No Flexscope actions expected in this window.', 2, false);
+    // Day dots M-F
+    function dayDotHtml(d, label) {
+      const hrs=hoursByDay[d]||0, isPast=d<today, isToday=d===today;
+      let fill, border, char, color;
+      if (isToday)           { fill='var(--compass-cyan)'; border='var(--compass-cyan)'; char='■'; color='#060a10'; }
+      else if (isPast&&hrs>0){ fill='var(--compass-green)'; border='var(--compass-green)'; char='✓'; color='#060a10'; }
+      else if (isPast)       { fill='var(--compass-red)'; border='var(--compass-red)'; char='!'; color='#fff'; }
+      else                   { fill='transparent'; border='var(--muted)'; char='—'; color='var(--muted)'; }
+      return `<div class="day-dot" data-day="${d}" title="${label} · ${hrs.toFixed(1)}h"
+        style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+        <div style="width:22px;height:22px;border-radius:50%;background:${fill};
+          border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;
+          font-size:10px;color:${color};font-family:var(--font-mono);font-weight:700;
+          transition:transform .1s"
+          onmouseenter="this.style.transform='scale(1.15)'"
+          onmouseleave="this.style.transform='scale(1)'">${char}</div>
+        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text3)">${label}</span>
+      </div>`;
+    }
+    const dotsHtml = weekDays.slice(0,5).map((d,i)=>dayDotHtml(d,['M','T','W','T','F'][i])).join('');
 
-    case 'capacity-concern':
-      return `<div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);
-                border-left:2px solid #E24B4A;padding:9px 11px;margin-bottom:10px;
-                font-size:12px;color:rgba(240,246,255,.7);line-height:1.6">
-          <div style="font-family:var(--font-head);font-size:11px;color:#E24B4A;
-                      letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">
-            Current load — auto-generated
-          </div>
-          <div>Overdue: <strong style="color:#E24B4A">3 items</strong></div>
-          <div>Due today: <strong style="color:#EF9F27">4 items</strong></div>
-        </div>` +
-        ta('What needs to move, be delegated, or be dropped?', 'details', '', 3);
+    // ══════════════════════════════════════════════════════════
+    // SPEEDOMETER GAUGES — original design preserved exactly.
+    // Scaled from GW=90→74 so all 7 fit compactly side by side.
+    // ALL visual elements kept: tick marks, dual arc (billable +
+    // non-billable purple), needle, centre dot, pill readout.
+    // ══════════════════════════════════════════════════════════
+    const gaugeMax = 8; // fixed 8h scale: 8h = full right, 6h ≈ 2 o'clock, legend below confirms
+    const GW=74, GH=70, GCX=37, GCY=48, GR=30;
 
-    case 'doc-review':
+    function gPt(deg) {
+      const a = (deg - 180) * Math.PI / 180;
+      return [(GCX + GR * Math.cos(a)).toFixed(1), (GCY + GR * Math.sin(a)).toFixed(1)];
+    }
+    function gArc(d1, d2) {
+      if (d2 <= d1) return '';
+      const [x1,y1] = gPt(d1), [x2,y2] = gPt(Math.min(d2, 179.9));
+      return `M${x1},${y1} A${GR},${GR} 0 ${d2-d1>180?1:0} 1 ${x2},${y2}`;
+    }
+
+    // Tick marks + % labels — same geometry as original, rescaled
+    const gTicks = Array.from({length:11}, (_,i) => {
+      const deg = i * 18;
+      const isMaj = i % 2 === 0;
+      const a = (deg - 180) * Math.PI / 180;
+      const r0 = GR + 2, r1 = isMaj ? GR + 7 : GR + 4;
+      const x0=(GCX+r0*Math.cos(a)).toFixed(1), y0=(GCY+r0*Math.sin(a)).toFixed(1);
+      const x1=(GCX+r1*Math.cos(a)).toFixed(1), y1=(GCY+r1*Math.sin(a)).toFixed(1);
+      const tick = `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,255,255,.28)" stroke-width="${isMaj?1:.6}"/>`;
+      if (!isMaj) return tick;
+      const rl=GR+16, lx=(GCX+rl*Math.cos(a)).toFixed(1), ly=(GCY+rl*Math.sin(a)).toFixed(1);
+      return tick + `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="7.5" font-family="monospace" font-weight="700" fill="rgba(255,255,255,.75)">${i*10}%</text>`;
+    }).join('');
+
+    const gaugesHtml = weekDays.map((d, i) => {
+      const hrs=hoursByDay[d]||0, bill=billableByDay[d]||0, nonBill=hrs-bill;
+      const isToday=d===today, isActive=_activeGauge===d;
+      const pct=Math.min(hrs/gaugeMax,1), billPct=Math.min(bill/gaugeMax,1), nbPct=Math.min(nonBill/gaugeMax,1);
+      const billEnd=billPct*180, nbEnd=(billPct+nbPct)*180;
+      const needleRad=(pct*180-180)*Math.PI/180;
+      const nx=(GCX+(GR-6)*Math.cos(needleRad)).toFixed(1);
+      const ny=(GCY+(GR-6)*Math.sin(needleRad)).toFixed(1);
+      const arcColor  = isActive?'#EF9F27':isToday?'#00D2FF':hrs>0?'#1D9E75':'rgba(255,255,255,.08)';
+      const pillColor = isActive?'#EF9F27':isToday?'#00D2FF':hrs>0?'#1D9E75':'rgba(255,255,255,.2)';
+      const dayColor  = isActive?'#EF9F27':isToday?'#00D2FF':'#6A94B8';
+      const fw        = isToday||isActive?'600':'400';
       return `
-        <div style="margin-bottom:10px">
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
-            Documents for review <span style="color:#E24B4A">*</span>
-          </div>
-          <div id="myr-doc-list" style="margin-bottom:8px"></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <label style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
-                           background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.25);
-                           color:#00D2FF;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
-              ↑ Upload file
-              <input type="file" id="myr-doc-upload" multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg"
-                style="display:none" onchange="myrHandleDocUpload(event)"/>
-            </label>
-            <button type="button" onclick="myrPickCadenceForm()"
-              style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
-                     background:rgba(196,125,24,.06);border:1px solid rgba(196,125,24,.25);
-                     color:#c47d18;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
-              ◈ Select CadenceHUD Form
-            </button>
-          </div>
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);margin-top:4px">
-            PDF, Word, Excel, or attach a released CadenceHUD form.
-          </div>
-        </div>
-
-        <!-- Reviewers — PersonPicker pills -->
-        <div style="margin-bottom:10px">
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
-            Reviewer(s) <span style="color:#E24B4A">*</span>
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;
-                         color:rgba(255,255,255,.2);font-size:11px"> — all must approve</span>
-          </div>
-          <div id="myr-reviewer-pills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-          <button type="button" id="myr-add-reviewer-btn" onclick="myrAddReviewer(this)"
-            style="font-family:var(--font-head);font-size:11px;padding:4px 12px;
-                   background:rgba(0,210,255,.05);border:1px dashed rgba(0,210,255,.3);
-                   color:#00D2FF;cursor:pointer;letter-spacing:.06em">
-            + Add Reviewer
-          </button>
-        </div>
-
-        <!-- Approver — PersonPicker single -->
-        <div style="margin-bottom:10px">
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
-            Approver
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;
-                         color:rgba(255,255,255,.2);font-size:11px"> — optional</span>
-          </div>
-          <div id="myr-approver-pill" style="margin-bottom:6px"></div>
-          <button type="button" id="myr-set-approver-btn" onclick="myrSetApprover(this)"
-            style="font-family:var(--font-head);font-size:11px;padding:4px 12px;
-                   background:rgba(196,125,24,.05);border:1px dashed rgba(196,125,24,.3);
-                   color:#c47d18;cursor:pointer;letter-spacing:.06em">
-            + Set Approver
-          </button>
-        </div>` +
-        dateInp('Review deadline', 'deadline') +
-        ta('Review instructions', 'instructions', '', 2, false);
-
-    case 'change-request':
-      return sel('Change type', 'change_type',
-          ['Scope change','Timeline change','Resource change','Budget change']) +
-        ta('Change description', 'change_desc', '', 3) +
-        ta('Justification & impact', 'impact', '', 2);
-
-    case 'issue-escalation':
-      return sel('Project', 'project', ['Flexscope','NovaBio','Internal']) +
-        ta('Issue description', 'issue_desc', '', 3) +
-        ta('Steps already taken', 'steps_taken', '', 2, false);
-
-    case 'expense':
-      return inp('Project', 'project', '') +
-        inp('Amount ($)', 'amount', '') +
-        inp('Date incurred', 'expense_date', '') +
-        ta('Description & receipts', 'description', '', 3);
-
-    case 'training':
-      return inp('Course / event name', 'course_name', '') +
-        inp('Provider', 'provider', '') +
-        inp('Cost ($)', 'cost', '') +
-        inp('Dates', 'dates', '') +
-        ta('Justification', 'justification', '', 2);
-
-    case 'new-project':
-      return inp('Project name', 'project_name', '') +
-        sel('Client', 'client',
-          [...new Set((window._projects||[]).map(p=>p.client_name||p.name).filter(Boolean)),
-           '(New client)']) +
-        inp('Target start date', 'start_date', '') +
-        ta('Scope summary', 'scope', '', 3);
-
-    case 'project-closure':
-      return sel('Project', 'project',
-          (window._projects||[]).map(p=>p.name).filter(Boolean).length
-            ? (window._projects||[]).map(p=>p.name)
-            : ['Flexscope','NovaBio','Internal']) +
-        ta('Lessons learned', 'lessons', '', 3) +
-        ta('Final notes', 'final_notes', '', 2, false);
-
-    default:
-      return ta('Details', 'details', '', 3);
-  }
-}
-
-// ── My Calendar tab ────────────────────────────────────────
-// ── Since-last-login delta strip ───────────────────────────
-window.renderDeltaStrip = function(deltas) {
-  // deltas: [{label, color:'red'|'amber'|'green'|'cyan', navigate:fn}]
-  const strip = document.getElementById('mw-delta-strip');
-  const chips = document.getElementById('mw-delta-chips');
-  if (!strip || !chips || !deltas || !deltas.length) {
-    if (strip) strip.style.display = 'none';
-    return;
-  }
-  const colorMap = {
-    red:   'border:1px solid rgba(226,75,74,.3);color:#E24B4A',
-    amber: 'border:1px solid rgba(239,159,39,.3);color:#EF9F27',
-    green: 'border:1px solid rgba(29,158,117,.3);color:#1D9E75',
-    cyan:  'border:1px solid rgba(0,210,255,.3);color:#00D2FF',
-  };
-  chips.innerHTML = deltas.map((d, i) =>
-    `<span class="delta-chip" style="${colorMap[d.color]||colorMap.cyan}" data-delta-idx="${i}">${_esc(d.label)}</span>`
-  ).join('');
-  // Store navigate fns
-  window._deltaNavigateFns = deltas.map(d => d.navigate || null);
-  strip.style.display = 'flex';
-};
-
-// Wire delta chip clicks at module level
-document.addEventListener('click', function(ev) {
-  const chip = ev.target.closest('.delta-chip');
-  if (!chip) return;
-  const idx = parseInt(chip.dataset.deltaIdx, 10);
-  const fn = (window._deltaNavigateFns||[])[idx];
-  if (typeof fn === 'function') fn();
-});
-
-// Populate delta strip after user view loads (called from _mwLoadUserView)
-window.populateDeltaStrip = function() {
-  // Build deltas from live data — tasks/concerns overdue since last session
-  const tasks    = window._userTasks    || [];
-  const concerns = window._userConcerns || [];
-  const deltas   = [];
-  const newTasks = tasks.filter(t => t._newSinceLogin);
-  if (newTasks.length) {
-    deltas.push({ label: newTasks.length + ' new action item' + (newTasks.length>1?'s':'') + ' assigned', color:'red',
-      navigate: () => uSwitchTab('work', document.querySelector('.ust[data-tab=work]')) });
-  }
-  const overdue = tasks.filter(t => t.status !== 'done' && t.due_date && new Date(t.due_date) < new Date());
-  if (overdue.length) {
-    deltas.push({ label: overdue.length + ' item' + (overdue.length>1?'s':'')+' overdue', color:'amber',
-      navigate: () => uSwitchTab('work', document.querySelector('.ust[data-tab=work]')) });
-  }
-  const unreads = concerns.filter(c => c.status==='unread'||c.status==='not_yet_read');
-  if (unreads.length) {
-    deltas.push({ label: unreads.length + ' unread concern' + (unreads.length>1?'s':''), color:'red',
-      navigate: () => uSwitchTab('concerns', document.querySelector('.ust[data-tab=concerns]')) });
-  }
-  const reqs = window._myRequests || [];
-  const recentApproved = reqs.filter(r => r.status==='completed' && r._newSinceLogin);
-  if (recentApproved.length) {
-    deltas.push({ label: recentApproved.length + ' request'+( recentApproved.length>1?'s':'')+' approved', color:'green',
-      navigate: () => { uSwitchTab('requests', document.querySelector('.ust[data-tab=requests]')); myrSwitchView('active', document.querySelector('.myr-subnav[data-myr=active]')); } });
-  }
-  renderDeltaStrip(deltas);
-};
-
-// ── DEV ONLY — Purge all request data from Supabase ──────
-// Remove this button and function before production release.
-window.myrDevPurge = async function() {
-  const confirmed = await new Promise(resolve => {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;' +
-      'display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.innerHTML = `
-      <div style="background:#0d1b2e;border:1px solid rgba(226,75,74,.5);width:380px;
-                  border-radius:4px;font-family:var(--font-head);overflow:hidden">
-        <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
-                    display:flex;align-items:center;gap:10px">
-          <div style="font-size:18px">⚠</div>
-          <div style="font-size:13px;font-weight:700;color:#E24B4A">DEV — Purge All Requests</div>
-        </div>
-        <div style="padding:14px 18px;font-size:12px;color:rgba(255,255,255,.55);line-height:1.6">
-          This will delete all rows from:<br>
-          <code style="color:#EF9F27">workflow_requests</code> ·
-          <code style="color:#EF9F27">workflow_instances</code> (doc-review) ·
-          <code style="color:#EF9F27">workflow_action_items</code> (review rows) ·
-          <code style="color:#EF9F27">coc_events</code> (request events)<br><br>
-          <strong style="color:#E24B4A">Cannot be undone.</strong>
-        </div>
-        <div style="padding:10px 18px 14px;display:flex;gap:8px;justify-content:flex-end;
-                    border-top:1px solid rgba(255,255,255,.06)">
-          <button id="_devPurgeCancel"
-            style="font-family:var(--font-head);font-size:11px;padding:6px 16px;
-                   background:none;border:1px solid rgba(255,255,255,.15);
-                   color:rgba(255,255,255,.5);cursor:pointer">Cancel</button>
-          <button id="_devPurgeConfirm"
-            style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 16px;
-                   background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.5);
-                   color:#E24B4A;cursor:pointer">⚠ Purge Everything</button>
+      <div class="gauge-col" data-gauge-date="${d}" data-gauge-has-data="${hrs>0}"
+        style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;cursor:pointer">
+        <svg viewBox="0 0 ${GW} ${GH}" width="${GW}" height="${GH}" style="overflow:visible">
+          ${gTicks}
+          <path d="${gArc(0,179.9)}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="4" stroke-linecap="round"/>
+          ${hrs>0?`
+          ${bill>0?`<path d="${gArc(0,billEnd)}" fill="none" stroke="${arcColor}" stroke-width="4" stroke-linecap="round"/>`:''}
+          ${nonBill>0?`<path d="${gArc(billEnd,nbEnd)}" fill="none" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>`:''}
+          <line x1="${GCX}" y1="${GCY}" x2="${nx}" y2="${ny}" stroke="${arcColor}" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="${GCX}" cy="${GCY}" r="3" fill="${arcColor}"/>
+          `:`<circle cx="${GCX}" cy="${GCY}" r="2" fill="rgba(255,255,255,.12)"/>`}
+          <rect x="${GCX-17}" y="${GCY+5}" width="34" height="14" rx="7" fill="rgba(6,10,16,.7)" stroke="${pillColor}" stroke-width="1.2"/>
+          <text x="${GCX}" y="${GCY+12}" text-anchor="middle" dominant-baseline="central"
+            font-size="11" font-family="monospace" font-weight="700" fill="${pillColor}">
+            ${hrs>0?hrs.toFixed(1)+'h':'—'}
+          </text>
+        </svg>
+        <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;
+          color:${isToday||isActive?dayColor:'#F0F6FF'};text-align:center;line-height:1.4;letter-spacing:.04em">
+          ${weekLabels[i]}<br>
+          <span style="font-weight:400;color:${dayColor};font-size:11px">${new Date(d+'T00:00:00').getDate()}</span>
         </div>
       </div>`;
-    document.body.appendChild(overlay);
-    const cleanup = result => { overlay.remove(); resolve(result); };
-    overlay.querySelector('#_devPurgeCancel').onclick  = () => cleanup(false);
-    overlay.querySelector('#_devPurgeConfirm').onclick = () => cleanup(true);
-    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
-  });
-  if (!confirmed) return;
+    }).join('');
 
-  const firmId = _mwFirmId();
-  const supaUrl = _mwSupaURL();
-  const supaKey = _mwSupaKey();
-  compassToast('Purging…', 60000);
+    // Wire gauge hover tooltips after render (1.5s dwell)
+    (function _wireGaugeHover() {
+      var _gt = null, _gTimer = null;
+      var container = document.getElementById('mw-gauge-row');
+      if (!container) return;
+      container.addEventListener('mouseover', function(ev) {
+        var col = ev.target.closest('.gauge-col');
+        if (!col) return;
+        if (!ev.ctrlKey) return;  // Ctrl required
+        clearTimeout(_gTimer);
+        _gTimer = setTimeout(function() {
+          if (_gt) { _gt.remove(); _gt = null; }
+          var d    = col.dataset.gaugeDate;
+          var te   = (window._myTimeEntries||[]).filter(function(e){ return e.date===d; });
+          var hrs  = te.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+          var bill = te.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+          var label= new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+          var html = '<div style="font-size:13px;font-weight:700;color:#F0F6FF;margin-bottom:6px">' + label + '</div>';
+          if (!te.length) {
+            html += '<div style="font-size:12px;color:#6A94B8">No time entries</div>';
+          } else {
+            html += '<div style="font-size:12px;color:#C8DFF0;margin-bottom:4px">' + hrs.toFixed(1) + 'h total &nbsp;·&nbsp; ' + bill.toFixed(1) + 'h billable</div>';
+            html += '<div style="border-top:1px solid rgba(255,255,255,.08);margin:6px 0;padding-top:6px">';
+            te.forEach(function(e) {
+              var proj = (_projects||[]).find(function(p){ return p.id===e.project_id; });
+              html += '<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#90B8D8;margin-bottom:3px">';
+              html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (proj?proj.name:e.step_name||'—') + '</span>';
+              html += '<span style="flex-shrink:0;color:' + (e.is_billable?'#00D2FF':'#8B5CF6') + '">' + parseFloat(e.hours||0).toFixed(1) + 'h</span></div>';
+            });
+            html += '</div>';
+          }
+          _gt = document.createElement('div');
+          _gt.style.cssText = 'position:fixed;z-index:9999;background:#0a1628;border:1px solid rgba(0,210,255,.25);border-left:3px solid #00D2FF;border-radius:3px;padding:10px 14px;font-family:inherit;min-width:180px;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.7);pointer-events:none';
+          _gt.innerHTML = html;
+          document.body.appendChild(_gt);
+          var r = col.getBoundingClientRect();
+          var top = r.bottom + 6;
+          var left = r.left + r.width/2 - 140;
+          if (left < 8) left = 8;
+          if (left + 280 > window.innerWidth - 8) left = window.innerWidth - 288;
+          _gt.style.top  = top + 'px';
+          _gt.style.left = left + 'px';
+        }, 1500);
+      });
+      container.addEventListener('mouseout', function(ev) {
+        var col = ev.target.closest('.gauge-col');
+        if (!col) return;
+        clearTimeout(_gTimer);
+        if (_gt) { _gt.remove(); _gt = null; }
+      });
+    })();
 
-  // API wrapper has no delete method — use raw fetch with Supabase REST DELETE
-  const supa = async (table, query) => {
-    const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-    return fetch(`${supaUrl}/rest/v1/${table}?${query}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey':        supaKey,
-        'Authorization': `Bearer ${token || supaKey}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal',
-      },
-    });
+    const barLegend = `
+      <div style="display:flex;align-items:center;gap:12px;padding:0 13px 8px;
+        font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="width:14px;height:4px;background:var(--compass-cyan);border-radius:2px"></div>
+          <span>Billable</span></div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="width:14px;height:4px;background:#8B5CF6;border-radius:2px"></div>
+          <span>Non-billable</span></div>
+        <span>Scale: 8h = full</span>
+        ${_activeGauge?`<button class="gauge-clear-btn" style="margin-left:auto;font-family:var(--font-mono);
+          font-size:11px;color:var(--compass-amber);background:none;border:none;cursor:pointer;padding:0">
+          ✕ clear filter</button>`:''}
+      </div>`;
+
+    // Recent time entries
+    const displayEntries = _teFilter ? myTimeEntries.filter(e=>e.date===_teFilter) : myTimeEntries.slice(0,8);
+    const filterLabel = _teFilter ? new Date(_teFilter+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : null;
+
+    // EOD nudge HTML
+    const eodNudgeHtml = (() => {
+      if (!eodNudge) return '';
+      const isRed=eodNudge==='red', c=isRed?'var(--compass-red)':'var(--compass-amber)';
+      const bg=isRed?'rgba(226,75,74,.06)':'rgba(239,159,39,.06)';
+      return `<div style="border-left:3px solid ${c};background:${bg};padding:9px 12px;margin-top:10px;
+        display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:${c}">
+            ■ ${isRed?'No time logged today.':'Log today\'s time before EOD'}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">
+            ${isRed?(8-todayTotal).toFixed(1)+'h gap':todayTotal.toFixed(1)+'h of ~8h expected'}</div>
+        </div>
+        <button class="open-weekly-ts-btn" data-expand-today="1"
+          style="font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.06em;
+            padding:5px 10px;background:none;border:1px solid ${c};color:${c};cursor:pointer;
+            white-space:nowrap;flex-shrink:0">Log today →</button>
+      </div>`;
+    })();
+
+    // Work list rows
+    function workListRows() {
+      const cutoff30d = new Date(Date.now()+30*86400000).toLocaleDateString('en-CA');
+      const filtered = workItems.filter(w => {
+        if (_wfType !== 'all' && w.type !== _wfType) return false;
+        if (_wfStatus !== 'all') {
+          if (w.type!=='action' && w.status !== _wfStatus) return false;
+        }
+        if (_wfProject && w.projectId !== _wfProject) return false;
+      const isRequestItem = w._isWrRow ||
+        (w.title||'').startsWith('Review request:') || (w.title||'').startsWith('Approve request:');
+      if (isRequestItem) return true; // always show — blocking items regardless of due date or type filter
+        if (_wfDateRange==='today') return !w.due||w.due===today||w.overdue;
+        if (_wfDateRange==='week')  return !w.due||w.due<=weekDays[6]||w.overdue;
+        if (_wfDateRange==='30d')   return !w.due||w.due<=cutoff30d||w.overdue;
+        return true;
+      });
+      if (!filtered.length) return `<div style="padding:18px 13px;text-align:center;
+        font-family:var(--font-mono);font-size:12px;color:var(--text3)">No items match filters</div>`;
+      return filtered.map(w => {
+        const tc = w._isWrRow
+          ? (w._wrRole==='approver'
+              ? {c:'var(--compass-amber)',bg:'rgba(239,159,39,.1)',lbl:'Request'}
+              : {c:'var(--compass-amber)',bg:'rgba(239,159,39,.1)',lbl:'Request'})
+          : w.type==='task'
+            ?{c:'var(--compass-cyan)',bg:'rgba(0,210,255,.08)',lbl:'Task'}
+            :{c:'var(--compass-green)',bg:'rgba(29,158,117,.08)',lbl:'Action'};
+        const badge=`<div style="display:inline-flex;align-items:center;padding:1px 7px;
+          border:1px solid ${tc.c};background:${tc.bg};border-radius:3px;
+          font-family:var(--font-mono);font-size:11px;font-weight:600;color:${tc.c};
+          white-space:nowrap">${tc.lbl}</div>`;
+        let progressCell=`<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">—</span>`;
+        if (w.type==='task'&&w.pct>0) {
+          const fc=w.pct>=80?'var(--compass-green)':w.pct>=40?'var(--compass-cyan)':'rgba(255,255,255,.25)';
+          progressCell=`<div style="position:relative;margin-top:10px">
+            <div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:visible;position:relative">
+              <div style="height:100%;width:${Math.min(w.pct,100)}%;background:${fc};border-radius:3px;transition:width .3s;position:relative">
+                <span style="position:absolute;right:0;top:-14px;transform:translateX(50%);
+                  font-family:var(--font-mono);font-size:11px;font-weight:700;color:${fc};white-space:nowrap">${w.pct}%</span>
+              </div></div></div>`;
+        }
+        const dueCell=w.overdue
+          ?`<span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--compass-red)">${daysOverdue(w.due)}d</span>`
+          :w.due?`<span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${fmtDate(w.due)}</span>`
+          :`<span style="color:var(--text3);font-size:11px">—</span>`;
+        let btnLabel,btnStyle;
+        if (w._isWrRow) {
+          // workflow_requests rows always get a direct action button — no LOE negotiation
+          btnLabel = w._wrRole === 'approver' ? 'Approve' : 'Review';
+          btnStyle = `color:#060a10;border:1px solid var(--compass-cyan);background:var(--compass-cyan);font-weight:700`;
+        } else if (w.type==='action') {
+          const _ns = negGetState(w.id).state;
+          if (_ns==='unrated') {
+            // Must be rated before it can be resolved
+            btnLabel='Rate';      btnStyle=`color:#111827;border:1px solid #F0F6FF;background:#F0F6FF;font-weight:700`;
+          } else if (_ns==='pending' || _ns==='negotiating') {
+            // Awaiting assigner response
+            btnLabel='Pending';   btnStyle=`color:#8B5CF6;border:1px solid rgba(139,92,246,.4);background:none`;
+          } else if (_ns==='escalated') {
+            btnLabel='Escalated'; btnStyle=`color:var(--compass-red);border:1px solid rgba(226,75,74,.4);background:none`;
+          } else {
+            // agreed or any other state — ready to resolve
+            btnLabel='Resolve';  btnStyle=`color:#fff;border:1px solid var(--compass-green);background:var(--compass-green);font-weight:700`;
+          }
+        }
+        else if (w.status==='blocked')    {btnLabel='Unblock';    btnStyle=`color:var(--compass-amber);border:1px solid var(--compass-amber);background:none`;}
+        else if (w.pct>=100)               {btnLabel='Mark Done';  btnStyle=`color:#060a10;border:none;background:#FFFFFF`;}
+        else if (w.status==='in_progress'){btnLabel='In Progress';btnStyle=`color:var(--compass-amber);border:1px solid rgba(239,159,39,.5);background:none`;}
+        else                               {btnLabel='Start';      btnStyle=`color:#060a10;border:1px solid #00D2FF;background:#00D2FF;font-weight:700`;}
+        const _negBorder = w.type==='action' ? (() => { const _ns=negGetState(w.id).state; return _ns==='unrated'?'border-left:3px dashed rgba(255,255,255,.18)':_ns==='pending'?'border-left:3px dashed rgba(239,159,39,.5)':_ns==='negotiating'?'border-left:3px solid rgba(139,92,246,.6)':_ns==='agreed'?'border-left:3px solid rgba(29,158,117,.5)':_ns==='escalated'?'border-left:3px solid rgba(226,75,74,.5)':''; })() : '';
+        // Check if parent workflow instance was cancelled/withdrawn
+        const _instCancelled = w.instanceId
+          ? (window._wfInstances||[]).find(i => i.id === w.instanceId)?.status === 'cancelled'
+          : false;
+        const _cancelStyle = _instCancelled ? 'opacity:.45;' : '';
+        const _titleStyle  = _instCancelled ? 'text-decoration:line-through;color:rgba(255,255,255,.4);' : '';
+        return `<div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
+          data-wi-status="${w.status}" data-wi-projectid="${w.projectId||''}"
+          style="display:grid;grid-template-columns:14px 80px 1fr 140px 56px 78px;
+            gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;${_negBorder}${_cancelStyle}">
+          <div style="display:flex;align-items:center;justify-content:center">
+            <div class="wi-complete-circle" data-wi-id="${w.id}" data-wi-type="${w.type}"
+              data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
+              data-wi-status="${w.status}" title="Click to mark complete"
+              style="width:11px;height:11px;border-radius:50%;border:1.5px solid var(--text3);
+                cursor:pointer;flex-shrink:0;transition:all .12s"
+              onmouseenter="this.style.borderColor='var(--compass-green)';this.style.boxShadow='0 0 0 2px rgba(29,158,117,.25)'"
+              onmouseleave="this.style.borderColor='var(--text3)';this.style.boxShadow='none'"></div>
+          </div>
+          <div style="padding:0 6px 0 2px;display:flex;align-items:center">${badge}</div>
+          <div style="padding:8px 8px 8px 4px;min-width:0">
+            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${_titleStyle}">${esc(w.title)}${_instCancelled?' <span style="font-size:10px;color:#E24B4A;font-family:var(--font-mono)">WITHDRAWN</span>':''}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${w._isWrRow
+                ? `<span>From: ${esc(w.createdBy||'—')} · ${w.createdAt ? new Date(w.createdAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—'}</span>`
+                : `<span>${esc(w.project)}${w.due?' · Due '+fmtDate(w.due):''}</span>`
+              }
+              ${w.type==='action'&&!w._isWrRow?(()=>{const _ns=negGetState(w.id).state;return _ns&&_ns!=='unrated'?getNegotiationBadgeHtml(_ns):'';})():''}</div>
+          </div>
+          <div style="padding:0 8px">${progressCell}</div>
+          <div style="text-align:center">${dueCell}</div>
+          <div style="padding:0 4px">
+            <button class="wi-action-btn" data-wi-id="${w.id}" data-wi-type="${w.type}"
+              data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
+              data-wi-status="${w.status}" data-wi-pct="${w.pct||0}"
+              style="width:100%;font-family:var(--font-mono);font-size:11px;font-weight:600;
+                letter-spacing:.06em;padding:4px 0;cursor:pointer;border-radius:3px;
+                transition:opacity .12s;${btnStyle}"
+              onmouseenter="this.style.opacity='.8'" onmouseleave="this.style.opacity='1'">${btnLabel}</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Done Today rows
+    function doneTodayRows() {
+      if (!_doneToday.length) return `<div style="padding:12px 13px;font-family:var(--font-body);
+        font-size:12px;color:var(--text3);font-style:italic">
+        Nothing completed yet today — complete items from your work list to see them here.</div>`;
+      return _doneToday.map(item=>{
+        const sc=item.signal==='green'?'var(--compass-green)':item.signal==='red'?'var(--compass-red)':'var(--compass-amber)';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border)">
+          <span style="color:var(--compass-green);font-size:13px;flex-shrink:0">✓</span>
+          <div style="flex:1;min-width:0;overflow:hidden">
+            <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+              ${esc(item.project||'—')} · ${item.time||'—'}${item.noTime?' · <span style="color:var(--text3)">no time logged</span>':''}</div>
+          </div>
+          ${item.signal?`<div style="width:8px;height:8px;border-radius:50%;background:${sc};flex-shrink:0"></div>`:`<div style="width:8px;height:8px"></div>`}
+          <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;
+            color:${item.noTime?'var(--text3)':'var(--compass-cyan)'};flex-shrink:0">
+            ${item.noTime?'—':(item.hours||0).toFixed(1)+'h'}</div>
+        </div>`;
+      }).join('');
+    }
+
+    content.innerHTML = `
+    <!-- Calendar popup overlay -->
+    <div id="user-cal-popup" style="display:none;position:fixed;top:44px;right:120px;width:310px;background:#0d1e35;border:1px solid rgba(0,210,255,.3);z-index:200;padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:#F0F6FF;letter-spacing:.06em" id="ucal-month-label">MARCH 2026</div>
+        <div style="display:flex;gap:4px">
+          <button onclick="ucalNav(-1)" style="width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'" onmouseleave="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='rgba(255,255,255,.5)'">&#8249;</button>
+          <button onclick="ucalNav(1)"  style="width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.12s" onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'" onmouseleave="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='rgba(255,255,255,.5)'">&#8250;</button>
+          <button onclick="toggleUserCalendar()" style="width:22px;height:22px;background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:14px">&#x2715;</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px">
+        ${['M','T','W','T','F','S','S'].map(d=>`<div style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0;letter-spacing:.06em">${d}</div>`).join('')}
+      </div>
+      <div id="ucal-cells" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        ${[['#8B5CF6','Meeting'],['#EF9F27','Due date'],['#00D2FF','Action item'],['#E24B4A','Concern']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35)"><div style="width:7px;height:7px;border-radius:50%;background:${c}"></div>${l}</div>`).join('')}
+      </div>
+      <div id="ucal-agenda" style="border-top:1px solid rgba(255,255,255,.06);padding-top:8px"></div>
+    </div>
+
+    <!-- Since-last-login delta strip -->
+    <div id="mw-delta-strip" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px 7px;border-bottom:1px solid rgba(0,210,255,.07);background:rgba(0,210,255,.03)">
+      <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;white-space:nowrap">Since last login</span>
+      <div id="mw-delta-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Suite tabs -->
+    <div id="user-suite-tabs" style="display:flex;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px;background:var(--bg0,#060a10);position:sticky;top:0;z-index:10">
+      <button class="ust on" data-tab="work"      onclick="uSwitchTab('work',this)">My Work</button>
+      <button class="ust"    data-tab="timesheet"  onclick="uSwitchTab('timesheet',this)">My Time</button>
+      <button class="ust"    data-tab="calendar"   onclick="uSwitchTab('calendar',this)">My Calendar</button>
+      <button class="ust"    data-tab="meetings"   onclick="uSwitchTab('meetings',this)">My Meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="views"      onclick="uSwitchTab('views',this)">My Views</button>
+      <button class="ust"    data-tab="concerns"   onclick="uSwitchTab('concerns',this)">My Notes <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
+      <button class="ust"    data-tab="requests"   onclick="uSwitchTab('requests',this)">My Requests <span id="ust-requests-badge" class="ust-badge" style="display:none"></span></button>
+    </div>
+    <style>
+      .ust{font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 14px;cursor:pointer;color:rgba(255,255,255,.35);background:none;border:none;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:5px}
+      .ust.on{color:#00D2FF;border-bottom-color:#00D2FF}
+      .ust:hover:not(.on){color:rgba(255,255,255,.7)}
+      .ust-badge{font-size:11px;padding:1px 6px;border-radius:2px}
+      .ust-badge-red{background:rgba(226,75,74,.15);color:#E24B4A}
+      .ust-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27}
+      .ust-badge-green{background:rgba(29,158,117,.12);color:#1D9E75}
+      .utc{display:none}.utc.on{display:block}#utc-concerns.on{display:block}
+      .myr-subnav{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.35);cursor:pointer;transition:.12s;display:flex;align-items:center;gap:5px}
+      .myr-subnav.on{color:#00D2FF;border-bottom-color:#00D2FF}
+      .myr-subnav:hover:not(.on){color:rgba(255,255,255,.7)}
+      .wf-catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:14px}
+      .wf-card{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);padding:11px 13px 38px;cursor:pointer;transition:.12s;position:relative}
+      .wf-card:hover{border-color:rgba(0,210,255,.25);background:rgba(0,210,255,.03)}
+      .wf-card-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+      .wf-icon{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+      .wf-card-title{font-size:12px;font-weight:700;color:#F0F6FF;line-height:1.3;flex:1}
+      .wf-card-desc{font-size:11px;color:rgba(255,255,255,.45);line-height:1.55;margin-bottom:7px}
+      .wf-card-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:rgba(255,255,255,.3)}
+      .wf-card-submit{position:absolute;right:10px;bottom:10px;font-size:11px;padding:3px 10px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;font-family:var(--font-mono);letter-spacing:.06em;transition:.12s}
+      .wf-card-submit:hover{background:rgba(0,210,255,.15)}
+      .wf-card-new::before{content:'New';position:absolute;top:8px;right:8px;font-size:9px;padding:1px 6px;background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.3);color:#1D9E75;letter-spacing:.08em;font-family:var(--font-mono)}
+      .myr-cat-label{font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;margin:10px 0 6px;display:flex;align-items:center;gap:6px}
+      .myr-cat-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
+      .myr-active-req{border:1px solid rgba(255,255,255,.08);margin-bottom:8px;overflow:hidden}
+      .myr-ar-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:.12s}
+      .myr-ar-head:hover{background:rgba(255,255,255,.02)}
+      .myr-ar-body{padding:9px 13px;display:none}
+      .myr-ar-body.open{display:block}
+      .myr-pt-steps{display:flex;gap:0;position:relative;margin:5px 0 10px}
+      .myr-pt-steps::before{content:'';position:absolute;top:9px;left:0;right:0;height:1px;background:rgba(255,255,255,.08);z-index:0}
+      .myr-pt-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative;z-index:1}
+      .myr-pt-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+      .myr-ptd-done{background:#1D9E75;color:#fff}
+      .myr-ptd-active{background:#00D2FF;color:#060a10;animation:myrActivePulse 1.5s infinite}
+      @keyframes myrActivePulse{0%,100%{opacity:1}50%{opacity:.6}}
+      .myr-ptd-pending{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)}
+      .myr-pt-name{font-size:10px;color:rgba(255,255,255,.35);text-align:center;letter-spacing:.04em;line-height:1.3;max-width:64px}
+      .myr-pt-name.done{color:#1D9E75}.myr-pt-name.active{color:#00D2FF}
+      .myr-hist-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--font-mono);font-size:11px;cursor:pointer;transition:.12s}
+      .myr-hist-row:hover{background:rgba(255,255,255,.02)}
+      .myr-hist-outcome{font-size:11px;padding:1px 7px;border:1px solid;letter-spacing:.04em}
+      .cal-tab-cell{height:40px;border-right:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.1);position:relative;cursor:pointer;transition:.12s}
+      .cal-tab-cell:hover{background:rgba(0,210,255,.04)}
+      .cal-tab-event{position:absolute;left:2px;right:2px;top:2px;border-radius:2px;padding:3px 5px;font-size:11px;overflow:hidden;font-family:var(--font-ui,system-ui);z-index:2}
+      .cal-tab-ce-meeting{background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);color:#C4B5F8}
+      .cal-tab-ce-task{background:rgba(239,159,39,.15);border:1px solid rgba(239,159,39,.3);color:#F5D080}
+      .cal-tab-ce-focus{background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);color:#7DD8F0}
+      .cal-tab-ce-pto{background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.25);color:#F0A0A0}
+      .cal-tab-ce-nonbill{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);color:#C4B5F8}
+      .delta-chip{font-family:var(--font-mono);font-size:11px;padding:2px 9px;border:1px solid;cursor:pointer;transition:.12s;white-space:nowrap}
+      .delta-chip:hover{filter:brightness(1.15)}
+      #mw-coc-drag:hover{background:rgba(0,210,255,.3)!important}
+      #mw-coc-drag:active{background:rgba(0,210,255,.5)!important}
+      #mw-done-resize:hover{background:rgba(0,210,255,.25)!important}
+    </style>
+
+    <!-- Tab: WORK (existing content wrapper) -->
+    <div class="utc on" id="utc-work">
+
+    <div id="mw-flex" style="display:flex;gap:0;align-items:flex-start;width:100%">
+    <div style="flex:1;min-width:0">
+
+    <!-- 1.A Greeting -->
+    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text0);line-height:1.1">${greeting}, ${esc(firstName)}</div>
+        <div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);margin-top:2px">
+          ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Calendar icon -->
+        <button onclick="toggleUserCalendar()"
+          style="width:30px;height:30px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0"
+          onmouseenter="this.style.borderColor='rgba(0,210,255,.3)';this.style.color='#00D2FF'"
+          onmouseleave="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.5)'"
+          title="My Calendar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="1" y1="5" x2="13" y2="5" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="4" y1="1" x2="4" y2="3" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="10" y1="1" x2="10" y2="3" stroke="currentColor" stroke-width="1.2"/>
+          </svg>
+        </button>
+        <!-- CoC icon — toggles CoC panel -->
+        <button data-action="toggle-coc"
+          style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;height:30px;padding:0 10px;background:none;border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;transition:all .12s;flex-shrink:0"
+          title="Chain of Custody">CoC</button>
+        ${streak>0&&weekDoneCount>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+          background:rgba(239,159,39,.1);border:1px solid rgba(239,159,39,.3);border-radius:4px;
+          font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--compass-amber);white-space:nowrap">
+          ■ ${streak}-day streak · ${weekDoneLabel}</div>`:streak>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+          background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);border-radius:4px;
+          font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--compass-cyan);white-space:nowrap">
+          ■ ${streak}-day streak</div>`:''}
+      </div>
+    </div>
+
+    <!-- 1.A 8-Card Strip -->
+    <div id="mw-stat-strip" style="display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px">
+      <div class="stat-card" style="border-top:2px solid var(--text3)" onmouseenter="showStatTooltip(event,'waiting')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Tasks Waiting</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:var(--text3)">${waiting}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">assigned</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan)" onmouseenter="showStatTooltip(event,'inprogress')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Tasks In Progress</div>
+        <div class="stat-value sv-cyan" style="font-family:var(--font-mono)">${inProgress}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">active now</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-red)" onmouseenter="showStatTooltip(event,'blocked')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Tasks Blocked</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:${blocked>0?'var(--compass-red)':'var(--text2)'}">${blocked}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">needs attention</div>
+      </div>
+      <div class="stat-card stat-done-today" style="border-top:2px solid var(--compass-green)" onmouseenter="showStatTooltip(event,'done')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Done Today</div>
+        <div class="stat-value" id="done-today-count" style="font-family:var(--font-mono);color:var(--compass-green)">${_doneToday.length}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">completed</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-amber)" onmouseenter="showStatTooltip(event,'hrs_week')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Hrs — Week</div>
+        <div class="stat-value sv-amber" style="font-family:var(--font-mono)">${weekTotal.toFixed(1)}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">${weekBillable.toFixed(1)}h billable</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-cyan)" onmouseenter="showStatTooltip(event,'hrs_today')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Hrs — Today</div>
+        <div class="stat-value sv-cyan" style="font-family:var(--font-mono)">${todayTotal.toFixed(1)}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">of ~8h expected</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid ${overdueCount>0?'var(--compass-amber)':'var(--border)'}" onmouseenter="showStatTooltip(event,'open')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Open Items</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:${overdueCount>0?'var(--compass-amber)':'var(--text1)'}">${workItems.length}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono);color:${overdueCount>0?'var(--compass-red)':'var(--text3)'}">${overdueCount>0?overdueCount+' overdue':'all current'}</div>
+      </div>
+      <div class="stat-card" style="border-top:2px solid var(--compass-purple)" onmouseenter="showStatTooltip(event,'workflows')" onmouseleave="hideStatTooltip()">
+        <div class="stat-label" style="font-family:var(--font-mono)">Active Workflows</div>
+        <div class="stat-value" style="font-family:var(--font-mono);color:var(--compass-purple)">${wfInstances.length}</div>
+        <div class="stat-sub" style="font-family:var(--font-mono)">firm-wide</div>
+      </div>
+    </div>
+
+        <!-- 1.B Speedometer Row + Bill/Non-bill bar -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div class="panel-hdr">
+            <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">${_weekOffset===0?'This week':_weekOffset===1?'Last week':`${_weekOffset} weeks ago`} — hours by day</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <!-- Back a week -->
+              <button id="week-step-back"
+                style="background:none;border:1px solid var(--border);color:var(--text3);
+                  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+                  cursor:pointer;font-size:12px;padding:0;line-height:1;transition:all .12s"
+                onmouseenter="this.style.borderColor='var(--compass-cyan)';this.style.color='var(--compass-cyan)'"
+                onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">‹</button>
+              <!-- Date range label -->
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);min-width:86px;text-align:center">
+                ${new Date(weekDays[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                – ${new Date(weekDays[6]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+              </div>
+              <!-- Forward a week (disabled when at current) -->
+              <button id="week-step-fwd"
+                ${_weekOffset===0?'disabled':''  }
+                style="background:none;border:1px solid ${_weekOffset===0?'rgba(255,255,255,.08)':'var(--border)'};
+                  color:${_weekOffset===0?'rgba(255,255,255,.15)':'var(--text3)'};
+                  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+                  cursor:${_weekOffset===0?'default':'pointer'};font-size:12px;padding:0;line-height:1;transition:all .12s"
+                ${_weekOffset>0?`onmouseenter="this.style.borderColor='var(--compass-cyan)';this.style.color='var(--compass-cyan)'"
+                  onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text3)'"`:''}
+                >›</button>
+            </div>
+          </div>
+          <!-- Inner two-column: gauges left | bill summary right -->
+          <div style="display:grid;grid-template-columns:auto 200px;gap:0;align-items:start">
+            <!-- Gauges column -->
+            <div>
+              <div id="mw-gauge-row" style="display:flex;justify-content:flex-start;padding:8px 4px 0;gap:0">
+                ${gaugesHtml}
+              </div>
+              ${barLegend}
+            </div>
+            <!-- Billable summary column -->
+            <div style="padding:12px 14px 10px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:8px;min-width:0">
+              <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Billable vs Non-Bill</div>
+              <!-- Big numbers -->
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div>
+                  <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;line-height:1;color:var(--compass-cyan)">${weekBillable.toFixed(1)}h</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">billable</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;line-height:1;color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:2px">non-bill</div>
+                </div>
+              </div>
+              <!-- The bar -->
+              ${weekTotal>0?`
+              <div>
+                <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.06)">
+                  <div style="width:${(weekBillable/weekTotal*100).toFixed(1)}%;background:var(--compass-cyan);transition:width .4s ease"></div>
+                  <div style="width:${((weekTotal-weekBillable)/weekTotal*100).toFixed(1)}%;background:#8B5CF6;transition:width .4s ease"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-mono);font-size:11px;font-weight:700">
+                  <span style="color:var(--compass-cyan)">${weekTotal>0?Math.round(weekBillable/weekTotal*100):0}%</span>
+                  <span style="color:#8B5CF6">${weekTotal>0?Math.round((weekTotal-weekBillable)/weekTotal*100):0}%</span>
+                </div>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px">
+                <span style="color:var(--text1);font-weight:600">${weekTotal.toFixed(1)}h</span> total this week
+              </div>`:`<div style="font-family:var(--font-mono);font-size:12px;color:var(--text3)">No hours logged yet</div>`}
+            </div>
+          </div>
+        </div>
+
+        <!-- 1.B2 Recommended Sequence Panel -->
+        <div id="mw-rec-seq" style="margin-bottom:14px;display:none"></div>
+
+        <!-- 1.C Work List -->
+        <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
+          <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
+            <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">My Work Queue</div>
+            <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-mono);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
+            <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
+              <button data-action="diagram-list" style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
+              <button data-action="diagram-diag" style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'rgba(239,159,39,.2)':'none'};color:${_diagramMode?'#EF9F27':'rgba(255,255,255,.3)'};border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .12s">DIAGRAM</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${overdueCount>0?`<span class="panel-badge pb-red">${overdueCount} overdue</span>`:`<span class="panel-badge pb-green">All current</span>`}
+              <div id="diag-zoom-controls" style="display:${_diagramMode?'flex':'none'};align-items:center;gap:4px">
+                <button data-action="diag-zoom-out" style="font-family:var(--font-mono);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
+                <span id="diag-zoom-lbl" style="font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.35);min-width:34px;text-align:center">${Math.round(_diagScale*100)}%</span>
+                <button data-action="diag-zoom-in" style="font-family:var(--font-mono);font-size:13px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+                <button data-action="diag-zoom-reset" style="font-family:var(--font-mono);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center">↺</button>
+                <button data-action="diag-maximize" style="font-family:var(--font-mono);font-size:11px;width:22px;height:22px;background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Maximize">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="1" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:7px 13px;
+            border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg2)">
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em">TYPE</span>
+            <div style="display:flex;gap:3px">
+              ${['all','task','action'].map(t=>{const labels={all:'All',task:'Tasks',action:'Actions'},active=_wfType===t;return `<button class="wf-type-btn" data-type="${t}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(139,92,246,.25)':'none'};color:${active?'#8B5CF6':'var(--text2)'};border:1px solid ${active?'#8B5CF6':'var(--border)'};cursor:pointer">${labels[t]}</button>`;}).join('')}
+            </div>
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">STATUS</span>
+            <div style="display:flex;gap:3px">
+              ${['all','not_started','in_progress','blocked'].map(s=>{const labels={all:'All',not_started:'Not started',in_progress:'In progress',blocked:'Blocked'},active=_wfStatus===s;return `<button class="wf-status-btn" data-status="${s}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(0,210,255,.12)':'none'};color:${active?'var(--compass-cyan)':'var(--text2)'};border:1px solid ${active?'var(--compass-cyan)':'var(--border)'};cursor:pointer">${labels[s]}</button>`;}).join('')}
+            </div>
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">RANGE</span>
+            <div style="display:flex;gap:3px">
+              ${[['today','Today'],['week','Week'],['30d','30d'],['all','All time']].map(([v,l])=>{const active=_wfDateRange===v;return `<button class="wf-date-btn" data-range="${v}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(239,159,39,.15)':'none'};color:${active?'var(--compass-amber)':'var(--text2)'};border:1px solid ${active?'var(--compass-amber)':'var(--border)'};cursor:pointer">${l}</button>`;}).join('')}
+            </div>
+            <select class="wf-proj-sel" style="font-family:var(--font-mono);font-size:11px;padding:3px 8px;
+              background:var(--bg1);color:var(--text1);border:1px solid ${_wfProject?'var(--compass-cyan)':'var(--border)'};
+              cursor:pointer;flex:1;min-width:100px;max-width:160px;margin-left:auto">
+              <option value="">All projects</option>
+              ${[...new Set(workItems.filter(w=>w.projectId).map(w=>w.projectId))].map(pid=>{const p=_projects.find(p=>p.id===pid);return p?`<option value="${p.id}" ${_wfProject===p.id?'selected':''}}>${esc(p.name)}</option>`:'';}).join('')}
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:14px 80px 1fr 140px 56px 78px;
+            gap:0;padding:5px 8px 5px 4px;border-bottom:1px solid var(--border);
+            font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text3);
+            letter-spacing:.08em;text-transform:uppercase">
+            <div></div><div style="padding-left:2px">TYPE</div>
+            <div style="padding-left:4px">TASK / ACTION</div>
+            <div style="padding:0 8px">PROGRESS</div>
+            <div style="text-align:center">DUE</div>
+            <div style="text-align:center;position:relative">
+              <span id="wq-legend-btn"
+                style="font-family:var(--font-mono);font-size:10px;color:rgba(0,210,255,.4);cursor:help;border:1px solid rgba(0,210,255,.2);border-radius:2px;padding:0 4px;line-height:1.6"
+                onmouseenter="window._wqLegendEnter(this,event)"
+                onmouseleave="clearTimeout(window._wqLegendTimer)">?</span>
+            </div>
+          </div>
+          <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
+          <!-- Diagram view -->
+          <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
+            <!-- 4-cell diagram grid:
+                 [corner][timeline header — h-scroll only]
+                 [stub col — v-scroll only][card canvas — both] -->
+            <div id="mw-diag-tl-wrap" style="height:480px;display:grid;grid-template-columns:150px 1fr;grid-template-rows:36px 1fr;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
+              <!-- Top-left: fixed corner -->
+              <div style="background:#060a10;border-right:1px solid rgba(0,210,255,.08);border-bottom:1px solid rgba(0,210,255,.1);z-index:10"></div>
+              <!-- Top-right: timeline header — h-scroll synced, no v-scroll -->
+              <div id="mw-diag-tl-header" style="overflow:hidden;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);z-index:10"></div>
+              <!-- Bottom-left: stub column — v-scroll synced, no h-scroll -->
+              <div id="mw-diag-stub-col" style="overflow:hidden;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);z-index:9"></div>
+              <!-- Bottom-right: card canvas — master scroll source -->
+              <div id="mw-diag-canvas-wrap" style="overflow:auto;cursor:grab;position:relative">
+                <div id="mw-diag-root"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;padding:5px 14px;border-top:1px solid rgba(255,255,255,.04);flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#E24B4A"></div>Overdue</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#EF9F27"></div>Due today</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#00D2FF"></div>Task</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)"><div style="width:8px;height:8px;border-radius:1px;background:#8B5CF6"></div>Action item</div>
+              <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.25)">Capacity bar:</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(29,158,117,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#1D9E75"></div>&lt;70%</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(239,159,39,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#EF9F27"></div>&gt;70%</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(226,75,74,.6)"><div style="width:20px;height:4px;border-radius:1px;background:#E24B4A"></div>Over</div>
+              <div style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">Scroll to zoom · drag to pan</div>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+
+
+      <div id="mw-right" style="width:300px;flex-shrink:0;padding-left:14px;display:flex;flex-direction:column">
+        <!-- 1.E Timesheet Status -->
+        <div class="cmp-panel" style="margin-bottom:14px">
+          <div style="padding:10px 13px 6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text1)">WEEK OF ${weekOf}</span>
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.1em;
+                color:${wsColor};border:1px solid ${wsColor};padding:1px 7px">${wsLabel}</span>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--text0);line-height:1">${weekTotal.toFixed(1)}h</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--text3);margin-top:2px">
+              <span style="color:var(--compass-cyan)">${weekBillable.toFixed(1)}h billable</span>
+              · <span style="color:#8B5CF6">${(weekTotal-weekBillable).toFixed(1)}h non-billable</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-around;
+            padding:8px 13px 10px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+            ${dotsHtml}
+          </div>
+          ${eodNudgeHtml}
+          <div style="padding:8px 13px;display:flex;gap:8px;align-items:center">
+            <button class="open-weekly-ts-btn"
+              style="flex:1;font-family:var(--font-mono);font-size:11px;font-weight:700;
+                letter-spacing:.07em;text-transform:uppercase;padding:7px;
+                background:none;border:1px solid rgba(0,210,255,.3);color:var(--compass-cyan);
+                cursor:pointer;transition:background .12s"
+              onmouseenter="this.style.background='rgba(0,210,255,.07)'"
+              onmouseleave="this.style.background='none'">Full week view →</button>
+            ${(wsStatus==='draft'||wsStatus==='rejected'||wsStatus==='amended')?`
+            <button class="ts-submit-btn" data-week-id="${myWeekRow?.id||''}"
+              data-week-start="${weekStartDate}" data-week-hours="${weekTotal.toFixed(1)}"
+              style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;
+                text-transform:uppercase;padding:7px 14px;background:var(--compass-cyan);
+                color:#060a10;border:none;cursor:pointer;transition:opacity .12s"
+              onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">Submit →</button>`:''}
+          </div>
+        </div>
+
+        <!-- Time log -->
+        <div id="mw-timelog" class="cmp-panel" style="margin-bottom:0;overflow-y:auto;flex-shrink:0">
+          <div class="panel-hdr">
+            <div class="panel-title">Time log${filterLabel?' — '+filterLabel:' — recent'}</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              ${filterLabel?`<button class="te-clear-filter"
+                style="font-family:var(--font-mono);font-size:11px;color:var(--compass-amber);
+                  background:none;border:none;cursor:pointer;padding:0">✕ clear</button>`:''  }
+              <button class="te-new-btn"
+                style="font-family:var(--font-mono);font-size:11px;font-weight:700;
+                  letter-spacing:.06em;color:var(--compass-cyan);background:none;
+                  border:1px solid rgba(0,210,255,.25);padding:3px 8px;cursor:pointer"
+                onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+                onmouseleave="this.style.background='none'">+ Log time</button>
+              <button class="te-week-footer"
+                style="font-family:var(--font-mono);font-size:11px;color:var(--text3);
+                  background:none;border:none;cursor:pointer;padding:0">Week view →</button>
+            </div>
+          </div>
+          ${displayEntries.length===0
+            ?`<div style="padding:14px 13px;font-family:var(--font-mono);font-size:12px;color:var(--text3)">
+              ${filterLabel?'No entries for this day':'No time entries this period'}</div>`
+            :displayEntries.map(e=>{
+              const proj=_projects.find(p=>p.id===e.project_id);
+              const srcIcon=e.source_type==='step_comment'?'◈':e.source_type==='action_item'?'⊡':'●';
+              const srcColor=e.source_type==='step_comment'?'var(--compass-cyan)':e.source_type==='action_item'?'var(--compass-purple)':'var(--text3)';
+              const isCadence=e.source_type==='step_comment';
+              return `<div class="te-row" data-te-id="${e.id}" data-te-cadence="${isCadence}"
+                style="display:flex;align-items:center;gap:8px;padding:7px 13px;
+                  border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;
+                  border-left:2px solid ${_teSelected===e.id?'var(--compass-cyan)':'transparent'};
+                  background:${_teSelected===e.id?'rgba(0,210,255,.04)':''}"
+                onmouseenter="this.style.background='var(--bg2)'"
+                onmouseleave="this.style.background='${_teSelected===e.id?'rgba(0,210,255,.04)':''}' ">
+                <div style="font-size:13px;color:${srcColor};flex-shrink:0">${srcIcon}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:var(--font-body);font-size:12px;font-weight:500;
+                    color:var(--text0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    ${e.step_name?esc(e.step_name):esc(proj?.name||'—')}</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px">
+                    ${fmtDate(e.date)} · ${e.is_billable?'Billable':'Non-billable'}
+                    ${isCadence?' · <span style="color:var(--compass-cyan)">via Cadence</span>':''}</div>
+                </div>
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;
+                  color:${e.is_billable?'var(--compass-green)':'var(--text2)'};flex-shrink:0">
+                  ${parseFloat(e.hours).toFixed(1)}h</div>
+              </div>`;
+            }).join('')
+            +`<div style="padding:8px 13px;display:flex;justify-content:space-between;
+              align-items:center;border-top:1px solid var(--border)">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">
+                ${filterLabel?filterLabel+' total':'Week of '+new Date(weekStartDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--compass-cyan)">
+                  ${filterLabel?displayEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0).toFixed(1):weekTotal.toFixed(1)}h</span>
+                <button class="te-week-footer"
+                  style="font-family:var(--font-mono);font-size:11px;color:var(--compass-cyan);
+                    background:none;border:1px solid rgba(0,210,255,.25);padding:3px 10px;cursor:pointer"
+                  onmouseenter="this.style.background='rgba(0,210,255,.08)'"
+                  onmouseleave="this.style.background='none'">Week view →</button>
+              </div>
+            </div>`}
+        </div>
+
+
+      <!-- Done Today — with vertical drag handle above -->
+        <div id="mw-done-resize" style="height:5px;cursor:row-resize;background:rgba(0,210,255,.08);border-top:1px solid rgba(0,210,255,.12);transition:background .15s" data-action="done-resize"></div>
+        <div id="mw-done-today" style="flex:1;overflow-y:auto;min-height:80px">
+          <div class="cmp-panel" style="height:100%;margin-bottom:0">
+            <div class="panel-hdr" style="flex-shrink:0">
+              <div class="panel-title">Done today
+                ${_doneToday.length>0?`<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--compass-green);margin-left:8px">${_doneToday.length} completed</span>`:''}</div>
+            </div>
+            <div id="done-today-list" style="overflow-y:auto">${doneTodayRows()}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CoC Panel — fills remaining space -->
+      <div id="mw-coc" style="display:none;flex-direction:column;width:300px;flex-shrink:0;background:#060c18;border-left:1px solid rgba(0,210,255,.15);position:relative">
+        <!-- Drag handle on left edge -->
+        <div id="mw-coc-drag" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:10;background:transparent"></div>
+        <div style="display:flex;flex-direction:column;height:100%;overflow-y:auto">
+        <div style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)">
+          <div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
+            <div id="mw-coc-count" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px"></div>
+          </div>
+        </div>
+        <div id="mw-coc-body" style="padding:10px 14px">
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">No history yet.</div>
+        </div>
+      </div>
+
+        </div><!-- end inner scroll -->
+    </div><!-- end mw-coc -->
+    </div><!-- end mw-flex -->
+
+    </div><!-- end utc-work -->
+
+    <!-- Tab: TIMESHEET — my-time.html injected here on first activation -->
+    <div class="utc" id="utc-timesheet">
+      <div id="mt-root"></div>
+    </div>
+
+    <!-- Tab: MEETINGS -->
+    <div class="utc" id="utc-meetings">
+      <div id="user-meetings-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading meetings…</div></div>
+    </div>
+
+    <!-- Tab: MY VIEWS — my-views.html injected here on first activation -->
+    <div class="utc" id="utc-views">
+      <div id="views-root"></div>
+    </div>
+
+    <!-- Tab: CONCERNS -->
+    <div class="utc" id="utc-concerns">
+      <div id="notes-root"></div>
+    </div>
+
+    <!-- Tab: MY CALENDAR — my-calendar.html injected here on first activation -->
+    <div class="utc" id="utc-calendar">
+      <div id="cal-root"></div>
+    </div>
+
+    <!-- Tab: MY REQUESTS -->
+    <div class="utc" id="utc-requests">
+      <div id="user-requests-content">
+        <div style="display:flex;align-items:center;gap:0;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.06);">
+          <button class="myr-subnav on" data-myr="browse" onclick="myrSwitchView('browse',this)">Browse</button>
+          <button class="myr-subnav" data-myr="active" onclick="myrSwitchView('active',this)">Active <span id="myr-active-badge" class="ust-badge ust-badge-amber" style="display:none"></span></button>
+          <button class="myr-subnav" data-myr="history" onclick="myrSwitchView('history',this)">History</button>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:4px">
+            <button onclick="myrDevPurge()" title="DEV — purge all requests from Supabase"
+              style="font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;padding:2px 9px;
+                     background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.3);
+                     color:rgba(226,75,74,.6);cursor:pointer;border-radius:2px;white-space:nowrap">
+              ⚠ DEV: Purge
+            </button>
+            <div style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.06em">Powered by <span style="color:rgba(0,210,255,.5)">CadenceHUD</span> workflow engine</div>
+          </div>
+        </div>
+        <div id="myr-pane-browse">
+          <div id="myr-catalog-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading workflow catalog…</div></div>
+        </div>
+        <div id="myr-pane-active" style="display:none">
+          <div id="myr-active-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading active requests…</div></div>
+        </div>
+        <div id="myr-pane-history" style="display:none">
+          <div id="myr-history-content"><div style="font-family:var(--font-mono);font-size:12px;color:#3A5C80;padding:16px 0">Loading request history…</div></div>
+        </div>
+      </div>
+    </div>`;
+
+    if (loading) loading.style.display = 'none';
+    content.style.display = 'block';
+
+    // ── Delta strip — since last login ───────────────────
+    setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
+
+    // ── Action item polling — checks every 15s for new open items ─
+    if (!window._actionItemPollTimer) {
+      let _knownActionIds  = new Set((myActionItems||[]).map(a => a.id));
+      let _knownReviewIds  = new Set((myPendingReviews||[]).map(r => r.id));
+      let _knownInstSteps  = {};  // instanceId → current_step_name snapshot for submitter
+      // Seed instance step snapshot from current requests
+      (window._myRequests||[]).forEach(r => { _knownInstSteps[r.id] = r._raw?.current_step_name || ''; });
+      let _pollCount = 0;
+      console.log('%c[Poll] Started — watching workflow_requests + workflow_action_items every 15s | resId: ' + (_myResource?.id||'?'),
+        'background:#1a3a1a;color:#4ade80;padding:2px 6px;font-weight:600');
+      console.log('[Poll] Run window._pollNow() to trigger manually');
+      const _doPoll = async () => {
+        if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
+        _pollCount++;
+        try {
+          const [freshActions, freshReviews, freshInsts] = await Promise.all([
+            API.get(
+              `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
+            ).catch(e => { console.warn('[Poll] action_items fetch error:', e.message); return null; }),
+            API.get(
+              `workflow_requests?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,role&limit=50`
+            ).catch(e => { console.warn('[Poll] workflow_requests fetch error:', e.message); return null; }),
+            API.get(
+              `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name&limit=50`
+            ).catch(() => null),
+          ]);
+          const newActions  = (freshActions||[]).filter(a => !_knownActionIds.has(a.id));
+          const newReviews  = (freshReviews||[]).filter(r => !_knownReviewIds.has(r.id));
+          // Detect step changes on submitter's own instances
+          const stepChanged = (freshInsts||[]).filter(inst => {
+            if (!Object.prototype.hasOwnProperty.call(_knownInstSteps, inst.id)) {
+              console.log(`[Poll] New instance seeded: ${inst.id.slice(0,8)} step="${inst.current_step_name}"`);
+              _knownInstSteps[inst.id] = inst.current_step_name;
+              return false;
+            }
+            const prev = _knownInstSteps[inst.id];
+            const changed = prev !== inst.current_step_name;
+            console.log(`[Poll] Instance ${inst.id.slice(0,8)}: prev="${prev}" now="${inst.current_step_name}" changed=${changed}`);
+            _knownInstSteps[inst.id] = inst.current_step_name;
+            return changed;
+          });
+          const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
+          const totalNew  = newActions.length + newReviews.length + stepChanged.length;
+          console.log(`[Poll #${_pollCount}] open=${totalOpen} new=${totalNew} | activeTab=${typeof _uActiveTab !== 'undefined' ? _uActiveTab : '?'} | inFlight=${!!window._requestsInFlight}`
+            + (newActions.length ? ' | actions: ' + newActions.map(a=>a.title?.slice(0,30)).join(', ') : '')
+            + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : '')
+            + (stepChanged.length ? ' | step changes: ' + stepChanged.map(i=>i.current_step_name).join(', ') : ''));
+          if (totalNew) {
+            newActions.forEach(a => _knownActionIds.add(a.id));
+            newReviews.forEach(r => _knownReviewIds.add(r.id));
+            const activeTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
+            if (activeTab === 'work') {
+              console.log('%c[Poll] Reloading My Work','background:#1a3a1a;color:#4ade80;padding:2px 6px');
+              window._mwLoadUserView && window._mwLoadUserView();
+            } else if (activeTab === 'requests') {
+              console.log('[Poll] Step/item change — refreshing My Requests');
+              window._requestsLoaded = false;
+              window.loadUserRequests && window.loadUserRequests();
+            } else {
+              console.log('[Poll] New items detected — deferring reload');
+              window._mwWorkStale = true;
+            }
+          }
+        } catch(e) { console.error('[Poll] error:', e.message); }
+      };
+      window._pollNow = _doPoll;
+      window._actionItemPollTimer = setInterval(_doPoll, 10000);
+    } else {
+      console.log('[Poll] Already running — timer:', window._actionItemPollTimer);
+    }
+
+    
+// ── Stat strip summary tooltip ──────────────────────────────────────────
+(function() {
+  var _tip = null;
+  var _tipTimer = null;
+
+  window.showStatTooltip = function(e, type) {
+    clearTimeout(_tipTimer);
+    if (_tip) { _tip.remove(); _tip = null; }
+    if (!e.ctrlKey) return;  // Ctrl required
+    var _eTarget = e.currentTarget;
+    var _eType   = type;
+    _tipTimer = setTimeout(function() {
+      window._showStatTooltipNow(_eTarget, _eType);
+    }, 1500);
+  };
+  window._showStatTooltipNow = function(eTarget, type) {
+    if (_tip) { _tip.remove(); _tip = null; }
+    var wi = window._wiItems || [];
+    var type = type || 'summary';
+
+    var today   = new Date().toLocaleDateString('en-CA');
+    var esc     = function(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var fmtDate = function(d) {
+      if (!d) return '—';
+      return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    };
+    var fmtHrs  = function(h) { return parseFloat(h||0).toFixed(1)+'h'; };
+    var te      = window._myTimeEntries || [];
+    var done    = window._doneToday || [];
+    var wf      = window._wfInstances || [];
+
+    var headerColors = {
+      waiting:'var(--text3)', inprogress:'var(--compass-cyan)', blocked:'var(--compass-red)',
+      done:'var(--compass-green)', hrs_week:'var(--compass-amber)', hrs_today:'var(--compass-cyan)',
+      open:'var(--compass-amber)', workflows:'var(--compass-purple)', summary:'rgba(0,210,255,.5)'
+    };
+    var headerTitles = {
+      waiting:'Tasks Waiting', inprogress:'Tasks In Progress', blocked:'Tasks Blocked',
+      done:'Completed Today', hrs_week:'Hours — This Week', hrs_today:'Hours — Today',
+      open:'All Open Items', workflows:'Active Workflows', summary:'Status Summary'
+    };
+    var accentColor = headerColors[type] || 'var(--compass-cyan)';
+    var title = headerTitles[type] || 'Summary';
+
+    var taskRow = function(w, color) {
+      var overdueBadge = w.overdue ? '<span style="font-size:13px;padding:1px 5px;background:rgba(226,75,74,.15);color:var(--compass-red);border:1px solid rgba(226,75,74,.25);border-radius:2px;margin-left:6px;flex-shrink:0">overdue</span>' : '';
+      var pct = w.progress != null ? w.progress : null;
+      var prog = pct != null ? '<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin-top:3px"><div style="height:2px;background:'+color+';width:'+Math.min(100,pct)+'%;border-radius:1px"></div></div>' : '';
+      return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">' +
+          '<span style="color:var(--text0);font-size:13px;flex:1;min-width:0">' + esc(w.title) + '</span>' +
+          overdueBadge +
+          '<span style="color:'+(w.overdue?'var(--compass-red)':'var(--text3)')+';font-size:13px;flex-shrink:0">'+fmtDate(w.due)+'</span>' +
+        '</div>' +
+        '<div style="color:var(--text3);font-size:13px;margin-top:1px">'+esc(w.project||'—')+'</div>' +
+        prog + '</div>';
+    };
+    var teRow = function(e) {
+      var proj = (window._projects||[]).find(function(p){return p.id===e.project_id;});
+      var bill = e.is_billable ? '<span style="color:var(--compass-cyan);font-size:13px;margin-left:4px">● bill</span>' : '<span style="color:var(--compass-purple);font-size:13px;margin-left:4px">● non-bill</span>';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<div style="flex:1;min-width:0"><div style="color:var(--text0);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.description||e.activity||'Time entry')+'</div>' +
+        '<div style="color:var(--text3);font-size:13px">'+esc(proj?proj.name:'—')+bill+'</div></div>' +
+        '<div style="color:var(--compass-amber);font-weight:700;font-size:13px;margin-left:12px;flex-shrink:0">'+fmtHrs(e.hours)+'</div></div>';
+    };
+
+    var html = '';
+
+    if (type === 'waiting') {
+      var items = wi.filter(function(w){return w.status==='not_started';});
+      html = items.length ? items.map(function(w){return taskRow(w,'var(--text3)');}).join('')
+           : '<div style="color:var(--text3);padding:12px 0">No tasks waiting.</div>';
+
+    } else if (type === 'inprogress') {
+      var items = wi.filter(function(w){return w.status==='in_progress';});
+      html = items.length ? items.map(function(w){return taskRow(w,'var(--compass-cyan)');}).join('')
+           : '<div style="color:var(--text3);padding:12px 0">No tasks in progress.</div>';
+
+    } else if (type === 'blocked') {
+      var items = wi.filter(function(w){return w.status==='blocked';});
+      html = items.length ? items.map(function(w){return taskRow(w,'var(--compass-red)');}).join('')
+           : '<div style="color:var(--compass-green);padding:12px 0">✓ Nothing blocked.</div>';
+
+    } else if (type === 'done') {
+      html = done.length ? done.map(function(w){
+        return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+          '<div style="color:var(--text0);font-size:13px">'+esc(w.title)+'</div>' +
+          '<div style="color:var(--text3);font-size:13px;margin-top:1px">'+esc(w.project||'—')+'</div></div>';
+      }).join('') : '<div style="color:var(--text3);padding:12px 0">Nothing completed yet today.</div>';
+
+    } else if (type === 'hrs_week') {
+      var weekTe = window._weekEntries || te;
+      var tot  = weekTe.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var bill = weekTe.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var pct  = tot>0?Math.round(bill/tot*100):0;
+      html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Total</div><div style="color:var(--compass-amber);font-size:13px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Bill %</div><div style="color:'+(pct>=80?'var(--compass-green)':pct>=50?'var(--compass-amber)':'var(--compass-red)')+';font-size:13px;font-weight:700">'+pct+'%</div></div>' +
+        '</div>' + (weekTe.length ? weekTe.slice(0,20).map(teRow).join('') : '<div style="color:var(--text3);padding:8px 0">No time entries this week.</div>');
+
+    } else if (type === 'hrs_today') {
+      var todayStr = window._today || today;
+      var todayTe = te.filter(function(e){return e.date===todayStr;});
+      var tot  = todayTe.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var bill = todayTe.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Total today</div><div style="color:var(--compass-amber);font-size:13px;font-weight:700">'+fmtHrs(tot)+'</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+fmtHrs(bill)+'</div></div>' +
+        '</div>' + (todayTe.length ? todayTe.map(teRow).join('') : '<div style="color:var(--text3);padding:8px 0">No time entries logged today.</div>');
+
+    } else if (type === 'open') {
+      var overdue = wi.filter(function(w){return w.overdue;});
+      var current = wi.filter(function(w){return !w.overdue;});
+      if (overdue.length) {
+        html += '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-red);margin-bottom:4px">Overdue — '+overdue.length+'</div>';
+        html += overdue.map(function(w){return taskRow(w,'var(--compass-red)');}).join('');
+        html += '<div style="margin-top:10px"></div>';
+      }
+      if (current.length) {
+        html += '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-amber);margin-bottom:4px">Current — '+current.length+'</div>';
+        html += current.map(function(w){return taskRow(w,'var(--compass-amber)');}).join('');
+      }
+      if (!wi.length) html = '<div style="color:var(--compass-green);padding:12px 0">✓ No open items.</div>';
+
+    } else if (type === 'workflows') {
+      if (!wf.length) {
+        html = '<div style="color:var(--text3);padding:12px 0">No active workflows.</div>';
+      } else {
+        // Group by status
+        var wfGroups = { blocked:[], in_progress:[], not_started:[], other:[] };
+        wf.forEach(function(w) {
+          var s = w.status || 'other';
+          if (wfGroups[s]) wfGroups[s].push(w); else wfGroups.other.push(w);
+        });
+        var wfRow = function(w, sc) {
+          var proj = (window._projects||[]).find(function(p){return p.id===w.project_id;});
+          var step = w.current_step_name ? '<span style="color:var(--compass-cyan);margin-left:6px;font-size:13px">→ '+esc(w.current_step_name)+'</span>' : '';
+          return '<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+            '<div style="flex:1;min-width:0">' +
+              '<span style="color:var(--text0);font-size:13px">'+esc(w.title||w.template_name||'Workflow')+'</span>' + step +
+              '<div style="color:var(--text3);font-size:13px;margin-top:1px">'+esc(proj?proj.name:'—')+'</div>' +
+            '</div>' +
+          '</div>';
+        };
+        var wfSection = function(label, items, sc) {
+          if (!items.length) return '';
+          return '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+sc+';margin:8px 0 4px">'+label+' — '+items.length+'</div>' +
+            items.map(function(w){ return wfRow(w, sc); }).join('');
+        };
+        // Summary counts bar
+        var statBar = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:center">' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+wfGroups.in_progress.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(wfGroups.blocked.length?'var(--compass-red)':'var(--text2)')+';font-size:13px;font-weight:700">'+wfGroups.blocked.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Not Started</div><div style="color:var(--text2);font-size:13px;font-weight:700">'+wfGroups.not_started.length+'</div></div>' +
+        '</div>';
+        html = statBar +
+          wfSection('Blocked', wfGroups.blocked, 'var(--compass-red)') +
+          wfSection('In Progress', wfGroups.in_progress, 'var(--compass-cyan)') +
+          wfSection('Not Started', wfGroups.not_started, 'var(--text3)') +
+          wfSection('Other', wfGroups.other, 'var(--text3)');
+      }
+
+    } else {
+      // Summary view
+      var waiting  = wi.filter(function(w){return w.status==='not_started';});
+      var inp      = wi.filter(function(w){return w.status==='in_progress';});
+      var blk      = wi.filter(function(w){return w.status==='blocked';});
+      var overdue  = wi.filter(function(w){return w.overdue;});
+      var tot      = te.reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var bill     = te.filter(function(e){return e.is_billable;}).reduce(function(s,e){return s+parseFloat(e.hours||0);},0);
+      var pct      = tot>0?Math.round(bill/tot*100):0;
+      html =
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:center">' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Waiting</div><div style="color:var(--text2);font-size:13px;font-weight:700">'+waiting.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">In Progress</div><div style="color:var(--compass-cyan);font-size:13px;font-weight:700">'+inp.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Blocked</div><div style="color:'+(blk.length?'var(--compass-red)':'var(--text2)')+';font-size:13px;font-weight:700">'+blk.length+'</div></div>' +
+          '<div><div style="color:var(--text3);font-size:13px;text-transform:uppercase;letter-spacing:.08em">Overdue</div><div style="color:'+(overdue.length?'var(--compass-red)':'var(--text2)')+';font-size:13px;font-weight:700">'+overdue.length+'</div></div>' +
+        '</div>' +
+        '<div style="font-size:13px;color:var(--text3)">Week: <span style="color:var(--compass-amber);font-weight:700">'+fmtHrs(tot)+'</span> &nbsp; Billable: <span style="color:var(--compass-cyan);font-weight:700">'+fmtHrs(bill)+' ('+pct+'%)</span></div>';
+    }
+
+    if (!html.trim()) return;
+
+    _tip = document.createElement('div');
+    _tip.id = 'mw-stat-tip';
+    _tip.style.cssText = [
+      'position:fixed', 'z-index:9999', 'background:#0a1628',
+      'border:1px solid rgba(0,210,255,.25)', 'border-radius:3px',
+      'padding:14px 16px', 'font-family:inherit;',
+      'font-size:13px', 'color:var(--text1,#C8DFF0)', 'width:600px',
+      'max-height:70vh', 'overflow-y:auto',
+      'box-shadow:0 8px 32px rgba(0,0,0,.75)', 'pointer-events:auto', 'line-height:1.55'
+    ].join(';');
+    _tip.innerHTML =
+      '<div style="font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.1em;' +
+      'text-transform:uppercase;color:' + accentColor + ';margin-bottom:10px;' +
+      'border-bottom:1px solid rgba(0,210,255,.1);padding-bottom:8px">' + title + '</div>' + html;
+    document.body.appendChild(_tip);
+
+    // Position below the hovered card
+    var cardEl = eTarget;
+    var r = cardEl.getBoundingClientRect();
+    var tipW = 600;
+    var top  = r.bottom + 6;
+    var left = r.left;
+    if (left + tipW > window.innerWidth - 10) left = window.innerWidth - tipW - 10;
+    if (left < 8) left = 8;
+    _tip.style.top  = top + 'px';
+    _tip.style.left = left + 'px';
   };
 
-  try {
-    // Delete in dependency order — child rows before parent rows
-    await supa('workflow_requests',     `firm_id=eq.${firmId}`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Review request:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Approve request:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%9C%93 Approved:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA Changes requested:*`);
-    await supa('coc_events',            `firm_id=eq.${firmId}&event_type=like.request.*`);
-    await supa('workflow_instances',    `firm_id=eq.${firmId}&workflow_type=eq.doc-review`);
+  window.hideStatTooltip = function() {
+    clearTimeout(_tipTimer);
+    _tipTimer = setTimeout(function() {
+      if (_tip) { _tip.remove(); _tip = null; }
+    }, 150);
+  };
+  // Cancel all tooltip timers if Ctrl is released mid-dwell
+  document.addEventListener('keyup', function(e) {
+    if (e.key === 'Control') {
+      clearTimeout(_tipTimer);
+      if (_tip) { _tip.remove(); _tip = null; }
+    }
+  });
+  // Ctrl pressed while already hovering — start dwell for any tooltip target
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key !== 'Control' || ev.repeat) return;
+    // Stat card
+    var statCard = document.querySelector('.stat-card:hover');
+    if (statCard) {
+      var attr = statCard.getAttribute('onmouseenter') || '';
+      var m = attr.match(/showStatTooltip[^'"]*['"](\w+)['"]/); 
+      if (m) {
+        clearTimeout(_tipTimer);
+        if (_tip) { _tip.remove(); _tip = null; }
+        var _cap = statCard, _capType = m[1];
+        _tipTimer = setTimeout(function() { window._showStatTooltipNow(_cap, _capType); }, 1500);
+      }
+    }
+    // Rec seq pane
+    var recPane = document.getElementById('mw-rec-seq');
+    if (recPane && recPane.matches(':hover')) {
+      clearTimeout(window._rTimer);
+      var _capPane = recPane;
+      window._rTimer = setTimeout(function() {
+        if (!window._rTip) window.showRecSeqTooltip({ ctrlKey: true, currentTarget: _capPane });
+      }, 1500);
+    }
+    // Gauge
+    var gaugeRow = document.getElementById('mw-gauge-row');
+    if (gaugeRow) {
+      var gaugeHov = gaugeRow.querySelector('.gauge-col:hover');
+      if (gaugeHov) gaugeHov.dispatchEvent(new MouseEvent('mouseover', { ctrlKey: true, bubbles: true }));
+    }
+    // Work queue legend button
+    var legendBtn = document.getElementById('wq-legend-btn');
+    if (legendBtn && legendBtn.matches(':hover')) {
+      clearTimeout(window._wqLegendTimer);
+      window._wqLegendTimer = setTimeout(function() { window._showWQLegend(legendBtn); }, 1500);
+    }
 
-    // Reset local state
-    window._myRequests     = [];
-    window._myRequestCoc   = {};
-    window._myRequestReviewers = {};
-    window._requestsLoaded = false;
+  });
 
-    // Dismiss toast and re-render
-    document.querySelector('.compass-toast')?.remove();
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
+  // Work Queue legend tooltip
+  window._wqLegendEnter = function(btn, ev) {
+    clearTimeout(window._wqLegendTimer);
+    if (!ev.ctrlKey) return;
+    window._wqLegendTimer = setTimeout(function() { window._showWQLegend(btn); }, 1500);
+  };
+  window._showWQLegend = function(btn) {
+    var existing = document.getElementById('wq-legend-tip');
+    if (existing) { existing.remove(); return; }
+    var tip = document.createElement('div');
+    tip.id = 'wq-legend-tip';
+    tip.style.cssText = 'position:fixed;z-index:9999;background:#0a1628;'
+      + 'border:1px solid rgba(0,210,255,.25);border-left:3px solid #00D2FF;'
+      + 'border-radius:3px;padding:12px 14px;font-family:inherit;'
+      + 'min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.7);pointer-events:auto';
+    tip.innerHTML =
+      '<div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;'
+      + 'color:#00D2FF;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(0,210,255,.15)">'
+      + 'Button Legend</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #FFFFFF;color:#0a1628;background:#FFFFFF;text-align:center;border-radius:2px">Start</div><div style="font-size:11px;color:#90B8D8">Task not yet begun</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #F0F6FF;color:#111827;background:#F0F6FF;text-align:center;border-radius:2px">Rate</div><div style="font-size:11px;color:#90B8D8">Action item needs LOE rating</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-amber);color:var(--compass-amber);text-align:center;border-radius:2px">In Progress</div><div style="font-size:11px;color:#90B8D8">Task underway</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #8B5CF6;color:#8B5CF6;text-align:center;border-radius:2px">Pending</div><div style="font-size:11px;color:#90B8D8">LOE submitted, awaiting assignor</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-red);color:var(--compass-red);text-align:center;border-radius:2px">Escalated</div><div style="font-size:11px;color:#90B8D8">Escalated to PM</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid #FFFFFF;color:#0a1628;background:#FFFFFF;text-align:center;border-radius:2px">Mark Done</div><div style="font-size:11px;color:#90B8D8">Task ≥100% complete</div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><div style="width:66px;flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border:1px solid var(--compass-green);color:#fff;background:var(--compass-green);text-align:center;border-radius:2px">Resolve</div><div style="font-size:11px;color:#90B8D8">LOE agreed, ready to close</div></div>';
+    var r = btn.getBoundingClientRect();
+    tip.style.top  = (r.bottom + 6) + 'px';
+    tip.style.right = (window.innerWidth - r.right - 4) + 'px';
+    document.body.appendChild(tip);
+    // Dismiss on outside click or Ctrl release
+    setTimeout(function() {
+      document.addEventListener('click', function _dismiss(e) {
+        if (!tip.contains(e.target)) { tip.remove(); document.removeEventListener('click', _dismiss); }
+      });
+      document.addEventListener('keyup', function _kup(e) {
+        if (e.key === 'Control') { tip.remove(); document.removeEventListener('keyup', _kup); }
+      });
+    }, 50);
+  };
+  // Also wire mouseout on the ? button to cancel pending timer
+  document.addEventListener('mouseout', function(ev) {
+    if (ev.target && ev.target.id === 'wq-legend-btn') {
+      clearTimeout(window._wqLegendTimer);
+    }
+  });
+  // Keep tip alive when mouse enters it
+  document.addEventListener('mouseover', function(ev) {
+    if (_tip && _tip.contains(ev.target)) { clearTimeout(_tipTimer); }
+  });
+  document.addEventListener('mouseout', function(ev) {
+    if (_tip && _tip.contains(ev.target) && !_tip.contains(ev.relatedTarget)) {
+      window.hideStatTooltip();
+    }
+  });
+})();
 
-    // Refresh My Work to clear review items from queue
-    _viewLoaded['user'] = false;
-    _mwLoadUserView();
 
-    compassToast('✓ All request data purged.', 3000);
-  } catch(e) {
-    document.querySelector('.compass-toast')?.remove();
-    compassToast('Purge failed — ' + (e.message||'check console'), 4000);
-    console.error('[DevPurge] failed:', e);
+// ── Stat card click popup ────────────────────────────────────────────
+window.showCardPopup = function(type, cardEl) {
+  // Remove any existing popup
+  var existing = document.getElementById('mw-card-popup');
+  if (existing) { existing.remove(); return; }
+
+  var wi       = window._wiItems || [];
+  var te       = window._myTimeEntries || [];
+  var done     = window._doneToday || [];
+  var wf       = window._wfInstances || [];
+  var today    = new Date().toLocaleDateString('en-CA');
+
+  var esc = function(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var fmtDate = function(d) {
+    if (!d) return '—';
+    var dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  };
+  var fmtHrs = function(h) { return parseFloat(h||0).toFixed(1) + 'h'; };
+
+  var headerColor = {
+    waiting:'var(--text3)', inprogress:'var(--compass-cyan)', blocked:'var(--compass-red)',
+    done:'var(--compass-green)', hrs_week:'var(--compass-amber)', hrs_today:'var(--compass-cyan)',
+    open:'var(--compass-amber)', workflows:'var(--compass-purple)'
+  }[type] || 'var(--compass-cyan)';
+
+  var titles = {
+    waiting:'Tasks Waiting', inprogress:'Tasks In Progress', blocked:'Tasks Blocked',
+    done:'Completed Today', hrs_week:'Hours — This Week', hrs_today:'Hours — Today',
+    open:'All Open Items', workflows:'Active Workflows'
+  };
+
+  // Row builder for task lists
+  var taskRow = function(w, accentColor) {
+    var overdueBadge = w.overdue
+      ? '<span style="font-size:9px;padding:1px 5px;background:rgba(226,75,74,.15);color:var(--compass-red);border:1px solid rgba(226,75,74,.25);border-radius:2px;margin-left:6px;flex-shrink:0">overdue</span>'
+      : '';
+    var pct = w.progress != null ? w.progress : null;
+    var progBar = pct != null
+      ? '<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin-top:3px"><div style="height:2px;background:' + accentColor + ';width:' + Math.min(100,pct) + '%;border-radius:1px"></div></div>'
+      : '';
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">' +
+        '<span style="color:var(--text0);font-size:12px;flex:1;min-width:0">' + esc(w.title) + '</span>' +
+        overdueBadge +
+        '<span style="color:' + (w.overdue?'var(--compass-red)':'var(--text3)') + ';font-size:11px;flex-shrink:0">' + fmtDate(w.due) + '</span>' +
+      '</div>' +
+      '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(w.project||'—') + '</div>' +
+      progBar +
+    '</div>';
+  };
+
+  // Time entry row
+  var teRow = function(e) {
+    var proj = (window._projects||[]).find(function(p){ return p.id===e.project_id; });
+    var billDot = e.is_billable
+      ? '<span style="color:var(--compass-cyan);font-size:9px;margin-left:4px">● bill</span>'
+      : '<span style="color:var(--compass-purple);font-size:9px;margin-left:4px">● non-bill</span>';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="color:var(--text0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(e.description||e.activity||'Time entry') + '</div>' +
+        '<div style="color:var(--text3);font-size:11px">' + esc(proj?proj.name:'—') + billDot + '</div>' +
+      '</div>' +
+      '<div style="color:var(--compass-amber);font-weight:700;font-size:13px;margin-left:12px;flex-shrink:0">' + fmtHrs(e.hours) + '</div>' +
+    '</div>';
+  };
+
+  // Workflow row
+  var wfRow = function(w) {
+    var proj = (window._projects||[]).find(function(p){ return p.id===w.project_id; });
+    var statusColor = w.status==='in_progress'?'var(--compass-cyan)':w.status==='blocked'?'var(--compass-red)':'var(--text3)';
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="color:var(--text0);font-size:12px;flex:1">' + esc(w.template_name||w.name||'Workflow') + '</span>' +
+        '<span style="font-size:10px;color:' + statusColor + ';font-family:var(--font-mono,monospace);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;margin-left:8px">' + esc(w.status||'') + '</span>' +
+      '</div>' +
+      '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(proj?proj.name:'—') + '</div>' +
+    '</div>';
+  };
+
+  var bodyHtml = '';
+
+  if (type === 'waiting') {
+    var items = wi.filter(function(w){ return w.status==='not_started'; });
+    if (!items.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">No tasks waiting.</div>'; }
+    else bodyHtml = items.map(function(w){ return taskRow(w,'var(--text3)'); }).join('');
+
+  } else if (type === 'inprogress') {
+    var items = wi.filter(function(w){ return w.status==='in_progress'; });
+    if (!items.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">No tasks in progress.</div>'; }
+    else bodyHtml = items.map(function(w){ return taskRow(w,'var(--compass-cyan)'); }).join('');
+
+  } else if (type === 'blocked') {
+    var items = wi.filter(function(w){ return w.status==='blocked'; });
+    if (!items.length) { bodyHtml = '<div style="color:var(--compass-green);padding:12px 0">✓ Nothing blocked.</div>'; }
+    else bodyHtml = items.map(function(w){ return taskRow(w,'var(--compass-red)'); }).join('');
+
+  } else if (type === 'done') {
+    if (!done.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">Nothing completed yet today.</div>'; }
+    else bodyHtml = done.map(function(w){
+      return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<div style="color:var(--text0);font-size:12px">' + esc(w.title) + '</div>' +
+        '<div style="color:var(--text3);font-size:11px;margin-top:1px">' + esc(w.project||'—') + '</div>' +
+      '</div>';
+    }).join('');
+
+  } else if (type === 'hrs_week') {
+    var entries = te;
+    var total   = entries.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var bill    = entries.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var nonBill = total - bill;
+    var pct     = total>0 ? Math.round(bill/total*100) : 0;
+    // Summary bar
+    bodyHtml =
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">' + fmtHrs(total) + '</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">' + fmtHrs(bill) + '</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Bill %</div><div style="color:' + (pct>=80?'var(--compass-green)':pct>=50?'var(--compass-amber)':'var(--compass-red)') + ';font-size:18px;font-weight:700">' + pct + '%</div></div>' +
+      '</div>';
+    if (!entries.length) bodyHtml += '<div style="color:var(--text3);padding:8px 0">No time entries this week.</div>';
+    else bodyHtml += entries.slice(0,15).map(teRow).join('');
+
+  } else if (type === 'hrs_today') {
+    var entries = te.filter(function(e){ return e.date===today; });
+    var total   = entries.reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    var bill    = entries.filter(function(e){ return e.is_billable; }).reduce(function(s,e){ return s+parseFloat(e.hours||0); },0);
+    bodyHtml =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Total today</div><div style="color:var(--compass-amber);font-size:18px;font-weight:700">' + fmtHrs(total) + '</div></div>' +
+        '<div style="text-align:center"><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Billable</div><div style="color:var(--compass-cyan);font-size:18px;font-weight:700">' + fmtHrs(bill) + '</div></div>' +
+      '</div>';
+    if (!entries.length) bodyHtml += '<div style="color:var(--text3);padding:8px 0">No time entries logged today.</div>';
+    else bodyHtml += entries.map(teRow).join('');
+
+  } else if (type === 'open') {
+    var overdue = wi.filter(function(w){ return w.overdue; });
+    var current = wi.filter(function(w){ return !w.overdue; });
+    if (overdue.length) {
+      bodyHtml += '<div style="font-family:var(--font-mono,monospace);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-red);margin-bottom:4px">Overdue — ' + overdue.length + '</div>';
+      bodyHtml += overdue.map(function(w){ return taskRow(w,'var(--compass-red)'); }).join('');
+      bodyHtml += '<div style="margin-top:10px"></div>';
+    }
+    if (current.length) {
+      bodyHtml += '<div style="font-family:var(--font-mono,monospace);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--compass-amber);margin-bottom:4px">Current — ' + current.length + '</div>';
+      bodyHtml += current.map(function(w){ return taskRow(w,'var(--compass-amber)'); }).join('');
+    }
+    if (!wi.length) bodyHtml = '<div style="color:var(--compass-green);padding:12px 0">✓ No open items.</div>';
+
+  } else if (type === 'workflows') {
+    if (!wf.length) { bodyHtml = '<div style="color:var(--text3);padding:12px 0">No active workflows.</div>'; }
+    else bodyHtml = wf.map(wfRow).join('');
   }
+
+  // Build popup
+  var popup = document.createElement('div');
+  popup.id = 'mw-card-popup';
+  popup.style.cssText = [
+    'position:fixed','z-index:9998','background:#0a1628',
+    'border:1px solid rgba(0,210,255,.2)','border-radius:3px',
+    'padding:0','width:420px','max-height:72vh',
+    'box-shadow:0 12px 40px rgba(0,0,0,.8)',
+    'display:flex','flex-direction:column','overflow:hidden'
+  ].join(';');
+
+  popup.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0">' +
+      '<div style="font-family:var(--font-mono,monospace);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:' + headerColor + ';flex:1">' + (titles[type]||type) + '</div>' +
+      '<button onclick="document.getElementById(&apos;mw-card-popup&apos;).remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0;line-height:1">×</button>' +
+    '</div>' +
+    '<div style="padding:10px 14px;overflow-y:auto;flex:1">' + bodyHtml + '</div>';
+
+  document.body.appendChild(popup);
+
+  // Position below the clicked card
+  var r = cardEl.getBoundingClientRect();
+  var top = r.bottom + 6;
+  var left = r.left;
+  if (left + 420 > window.innerWidth - 10) left = window.innerWidth - 430;
+  if (top + 500 > window.innerHeight - 10) top = r.top - Math.min(500, top + 500 - window.innerHeight + 20);
+  popup.style.top  = top + 'px';
+  popup.style.left = left + 'px';
+
+  // Close on outside click
+  setTimeout(function() {
+    document.addEventListener('click', function _closePopup(ev) {
+      if (!popup.contains(ev.target) && ev.target !== cardEl) {
+        popup.remove();
+        document.removeEventListener('click', _closePopup);
+      }
+    });
+  }, 0);
 };
+
+// ── Recommended daily sequence panel ─────────────────
+    // Exclude workflow_requests rows — Request class items don't belong in the sequence scorer
+    const _seqItems = (_wiItems||[]).filter(w => !w._isWrRow);
+    setTimeout(() => buildRecommendedSequence(_seqItems), 100);
+
+    // ── Build diagram if in diagram mode ────────────────
+    if (_diagramMode) {
+      setTimeout(buildWorkDiagram, 50);
+    }
+
+    // ── Populate CoC panel via CoC.render() ────────────
+    (function() {
+      const body  = document.getElementById('mw-coc-body');
+      const count = document.getElementById('mw-coc-count');
+      const evts  = window._myCocEvents || [];
+      if (count) count.textContent = evts.length + ' events';
+      if (!body) return;
+      if (!evts.length) {
+        body.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);line-height:1.7">No CoC events yet.<br><br>Events appear when you complete workflow steps or save progress updates.</div>';
+        return;
+      }
+      // _timelineHtml is the internal renderer exposed by coc.js
+      if (window.CoC?._timelineHtml) {
+        body.innerHTML = window.CoC._timelineHtml(evts);
+      }
+    })();
+
+
+  } catch (e) {
+    console.error('[Compass] _mwLoadUserView error:', e);
+    if (loading) loading.innerHTML = '<div style="color:var(--compass-red);font-family:var(--font-mono);font-size:11px">Failed to load — check console</div>';
+  }
+}
