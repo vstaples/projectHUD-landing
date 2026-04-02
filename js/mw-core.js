@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-140000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-150000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1250,20 +1250,23 @@ window._mwLoadUserView = async function() {
               `workflow_requests?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,role&limit=50`
             ).catch(e => { console.warn('[Poll] workflow_requests fetch error:', e.message); return null; }),
             API.get(
-              `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name&limit=50`
+              `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name,updated_at&limit=50`
             ).catch(() => null),
           ]);
           const newActions  = (freshActions||[]).filter(a => !_knownActionIds.has(a.id));
           const newReviews  = (freshReviews||[]).filter(r => !_knownReviewIds.has(r.id));
-          // Detect step changes on submitter's own instances
+          // Detect step changes on submitter's own instances.
+          // Track step+updated_at composite so Review→Approve→Review
+          // registers as two changes, not zero.
           const stepChanged = (freshInsts||[]).filter(inst => {
+            const composite = `${inst.current_step_name}|${inst.updated_at||''}`;
             if (!Object.prototype.hasOwnProperty.call(_knownInstSteps, inst.id)) {
-              _knownInstSteps[inst.id] = inst.current_step_name;
+              _knownInstSteps[inst.id] = composite;
               return false;
             }
             const prev = _knownInstSteps[inst.id];
-            const changed = prev !== inst.current_step_name;
-            _knownInstSteps[inst.id] = inst.current_step_name;
+            const changed = prev !== composite;
+            _knownInstSteps[inst.id] = composite;
             return changed;
           });
           // Re-notification on changes_requested is handled directly by approve.html.
@@ -1276,7 +1279,13 @@ window._mwLoadUserView = async function() {
             newActions.forEach(a => _knownActionIds.add(a.id));
             newReviews.forEach(r => _knownReviewIds.add(r.id));
             const activeTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
-            if (activeTab === 'work') {
+            // Step changes always reload both My Work and My Requests —
+            // the submitter needs their queue and their request card updated together.
+            if (stepChanged.length) {
+              window._mwLoadUserView && window._mwLoadUserView();
+              window._requestsLoaded = false;
+              window.loadUserRequests && window.loadUserRequests();
+            } else if (activeTab === 'work') {
               window._mwLoadUserView && window._mwLoadUserView();
             } else if (activeTab === 'requests') {
               window._requestsLoaded = false;

@@ -858,8 +858,9 @@ async function submitResponse() {
         const changerName = _tokenRec.assignee_name || _tokenRec.recipient_name || 'Approver';
         const notifyUrl = `${SUPA_URL}/functions/v1/notify-step-activated`;
 
+        console.log('[approve.html] re-notifying', reviewers.length, 'reviewer(s):', reviewers.map(r=>r.name||r.email).join(', '));
         for (const reviewer of reviewers) {
-          if (!reviewer.email) continue;
+          if (!reviewer.email) { console.warn('[approve.html] reviewer missing email, skipping:', reviewer.name); continue; }
           // Create workflow_action_item for reviewer
           await fetch(`${SUPA_URL}/rest/v1/workflow_action_items`, {
             method: 'POST',
@@ -908,21 +909,40 @@ async function submitResponse() {
           }).catch(() => {});
         }
 
-        // Also create a Changes Requested action item for the submitter
-        if (subData.submitter_resource_id || _tokenRec.instance_id) {
+        // Create a Changes Requested action item for the submitter
+        // Try workflow_instances first, fall back to CoC actor_resource_id on submitted event
+        try {
+          let submitterResId = null;
+          let submitterName  = '';
+
+          // Primary: fetch from workflow_instances
           const instRes = await fetch(
             `${SUPA_URL}/rest/v1/workflow_instances?id=eq.${_tokenRec.instance_id}&select=submitted_by_resource_id,submitted_by_name&limit=1`,
             { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
           ).catch(() => null);
           const instData = instRes ? await instRes.json().catch(() => []) : [];
-          const submitterResId = instData?.[0]?.submitted_by_resource_id;
-          const submitterName  = instData?.[0]?.submitted_by_name || '';
+          submitterResId = instData?.[0]?.submitted_by_resource_id || null;
+          submitterName  = instData?.[0]?.submitted_by_name || '';
+          console.log('[approve.html] submitter lookup:', submitterResId, submitterName);
+
+          // Fallback: use actor_resource_id from the request.submitted CoC event
+          if (!submitterResId) {
+            const subCocRes = await fetch(
+              `${SUPA_URL}/rest/v1/coc_events?entity_id=eq.${_tokenRec.instance_id}&event_type=eq.request.submitted&select=actor_resource_id,actor_name&limit=1`,
+              { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+            ).catch(() => null);
+            const subCocRows = subCocRes ? await subCocRes.json().catch(() => []) : [];
+            submitterResId = subCocRows?.[0]?.actor_resource_id || null;
+            submitterName  = subCocRows?.[0]?.actor_name || submitterName;
+            console.log('[approve.html] submitter fallback CoC:', submitterResId, submitterName);
+          }
+
           if (submitterResId) {
-            await fetch(`${SUPA_URL}/rest/v1/workflow_action_items`, {
+            const postRes = await fetch(`${SUPA_URL}/rest/v1/workflow_action_items`, {
               method: 'POST',
               headers: {
                 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
-                'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+                'Content-Type': 'application/json', 'Prefer': 'return=representation',
               },
               body: JSON.stringify({
                 id:                crypto.randomUUID(),
@@ -935,8 +955,14 @@ async function submitResponse() {
                 owner_name:        submitterName,
                 created_by_name:   changerName,
               }),
-            }).catch(() => {});
+            });
+            const postData = await postRes.json().catch(() => null);
+            console.log('[approve.html] submitter action item created:', postRes.status, postData?.[0]?.id);
+          } else {
+            console.warn('[approve.html] could not find submitter resource ID — action item not created');
           }
+        } catch(submitterErr) {
+          console.warn('[approve.html] submitter action item failed:', submitterErr);
         }
       } catch(notifyErr) {
         console.warn('[approve.html] reviewer re-notify failed:', notifyErr);
