@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/notify-step-activated",
+      "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/notify-step-activated"
+    },
+    {
       "source": "/api/notify-form-review",
       "destination": "https://dvbetgdzksatcgdfftbs.supabase.co/functions/v1/notify-form-review"
     },
