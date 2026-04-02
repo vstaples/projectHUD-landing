@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-180500
+// VERSION: 20260402-181000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-180500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-181000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1241,7 +1241,7 @@ function renderMyRequestsActive() {
     const totalReviewers   = (submittedDataForStep.reviewers||[]).length || 1;
     const approvalCount    = instCoc.filter(e => e.event_type === 'request.approved').length;
     const allReviewersDone = approvalCount >= totalReviewers;
-    console.log(`[StepRender] req=${req.id.slice(0,8)} instCoc=${instCoc.length} approvals=${approvalCount} totalReviewers=${totalReviewers} allDone=${allReviewersDone}`);
+    console.log(`[StepRender] req=${req.id.slice(0,8)} instCoc=${instCoc.length} approvals=${approvalCount} totalReviewers=${totalReviewers} allDone=${allReviewersDone} paneVisible=${document.getElementById('myr-pane-active')?.style.display !== 'none'}`);
 
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
@@ -1356,8 +1356,11 @@ function renderMyRequestsActive() {
         </div>`;
       }
 
+      const dotInline = s.done ? 'background:#1D9E75;color:#fff;box-shadow:0 0 0 3px rgba(29,158,117,.2)'
+                      : s.active ? 'background:#EF9F27;color:#060a10;box-shadow:0 0 0 3px rgba(239,159,39,.25)'
+                      : 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)';
       return `<div class="myr-pt-step">
-        <div class="myr-pt-dot ${cls}">${label}</div>
+        <div class="myr-pt-dot ${cls}" style="${dotInline}">${label}</div>
         <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
         ${tipHtml}
       </div>`;
