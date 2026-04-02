@@ -1,5 +1,5 @@
-// VERSION: 20260402-121900
-console.log('%c[mw-core] v20260402-121900','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-122000
+console.log('%c[mw-core] v20260402-122000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -518,6 +518,8 @@ window._mwLoadUserView = async function() {
           if (w.type!=='action' && w.status !== _wfStatus) return false;
         }
         if (_wfProject && w.projectId !== _wfProject) return false;
+        const isRequestItem = (w.title||'').startsWith('Review request:') || (w.title||'').startsWith('Approve request:');
+        if (isRequestItem) return true; // always show — blocking items regardless of due date
         if (_wfDateRange==='today') return !w.due||w.due===today||w.overdue;
         if (_wfDateRange==='week')  return !w.due||w.due<=weekDays[6]||w.overdue;
         if (_wfDateRange==='30d')   return !w.due||w.due<=cutoff30d||w.overdue;
