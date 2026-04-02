@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121100
+// VERSION: 20260402-121200
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121100','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121200','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1000,11 +1000,10 @@ window.loadUserRequests = async function() {
 
   // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
   const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
-  // Always clear CoC cache on re-fetch — picks up new events from reviewers
   window._myRequestCoc = {};
-  if (unloadedIds.length) {
+  if (allIds.length) {
     API.get(
-      `coc_events?entity_id=in.(${unloadedIds.join(',')})&order=occurred_at.asc&select=*`
+      `coc_events?entity_id=in.(${allIds.join(',')})&order=occurred_at.asc&select=*`
     ).then(rows => {
       (rows||[]).forEach(e => {
         if (!window._myRequestCoc[e.entity_id]) window._myRequestCoc[e.entity_id] = [];
