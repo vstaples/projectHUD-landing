@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-190000
+// VERSION: 20260402-191000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-191000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -14,28 +14,67 @@ function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return wi
 
 // ── Email notification helper ─────────────────────────────
 // Calls /api/notify-step-activated — same endpoint CadenceHUD uses.
-async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title, instanceId, body }) {
+async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title, instanceId, body, stepId }) {
   if (!toEmail) return;
   try {
+    // Generate external response token for approval-type steps
+    let approveUrl = null, rejectUrl = null;
+    const _externalTypes = ['approval','signoff','review','external','confirmation'];
+    if (_externalTypes.includes(stepType) && instanceId) {
+      try {
+        const rawToken   = crypto.randomUUID();
+        const bindingStr = `${_mwFirmId()}:${instanceId}:${stepId||stepName}`;
+        const encoder    = new TextEncoder();
+        const hashBuf    = await crypto.subtle.digest('SHA-256', encoder.encode(bindingStr + rawToken));
+        const tokenHmac  = Array.from(new Uint8Array(hashBuf))
+          .map(b => b.toString(16).padStart(2,'0')).join('').slice(0,32);
+        await API.post('external_step_tokens', {
+          firm_id:           _mwFirmId(),
+          instance_id:       instanceId,
+          template_step_id:  stepId || null,
+          token:             rawToken,
+          token_hmac:        tokenHmac,
+          token_hash:        tokenHmac,
+          recipient_email:   toEmail,
+          recipient_name:    toName || null,
+          assignee_email:    toEmail,
+          assignee_name:     toName || null,
+          step_name:         stepName || null,
+          step_instructions: body || null,
+          instance_title:    title || null,
+          template_name:     'Document Review Request',
+          expires_at:        new Date(Date.now() + 30*24*3600*1000).toISOString(),
+          generated_at:      new Date().toISOString(),
+          issued_at:         new Date().toISOString(),
+        }).catch(()=>{});
+        const base = (window.location.origin || 'https://projecthud.com') + '/approve.html';
+        approveUrl = `${base}?token=${rawToken}`;
+        rejectUrl  = `${base}?token=${rawToken}&outcome=reject`;
+      } catch(_) {}
+    }
+
     const res = await fetch('/api/notify-step-activated', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        instance_id:    instanceId || null,
-        instance_title: title      || null,
-        template_name:  'Document Review Request',
-        step_name:      stepName   || 'Review',
-        step_type:      stepType   || 'review',
-        assignee_name:  toName     || null,
-        assignee_email: toEmail,
-        launched_by:    fromName   || null,
-        is_bist:        false,
-        has_action_buttons: false,
-        step_instructions: body || null,
+        instance_id:        instanceId || null,
+        instance_title:     title      || null,
+        template_name:      'Document Review Request',
+        step_id:            stepId     || null,
+        step_name:          stepName   || 'Review',
+        step_type:          stepType   || 'review',
+        assignee_name:      toName     || null,
+        assignee_email:     toEmail,
+        launched_by:        fromName   || null,
+        is_bist:            false,
+        step_instructions:  body       || null,
+        approve_url:        approveUrl,
+        reject_url:         rejectUrl,
+        has_action_buttons: !!(approveUrl && rejectUrl),
       }),
     });
     if (res.ok) console.log('[MyRequests] Email sent to', toEmail);
-  } catch(e) {
+  } catch(_) {
     // silent — notify endpoint is best-effort
   }
 }
@@ -1262,13 +1301,13 @@ function renderMyRequestsActive() {
 
       // Build tooltip content
       let tipHtml = '';
-      if (s.done && tipTime) {
+      if (s.done && tipTime && s.label !== 'Review') {
         tipHtml = `<div class="myr-pt-tip">
           <div style="color:rgba(0,210,255,.9);margin-bottom:2px">${_esc(s.label)}</div>
           <div>${_esc(tipActor||'System')}</div>
           <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
         </div>`;
-      } else if (s.active || s.label === 'Review' || s.label === 'Approve') {
+      } else if (s.label === 'Review' || s.active || s.label === 'Approve') {
         // Parse reviewer/approver list from request.submitted CoC event
         let submittedData = {};
         try {
