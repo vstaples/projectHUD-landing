@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-192500
+// VERSION: 20260402-194000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-192500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-194000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -19,7 +19,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
   try {
     // Generate external response token for approval-type steps
     let approveUrl = null, rejectUrl = null;
-    const _externalTypes = ['approval','signoff','review','external','confirmation'];
+    const _externalTypes = ['approval','signoff','external','confirmation'];
     if (_externalTypes.includes(stepType) && instanceId) {
       try {
         const rawToken   = crypto.randomUUID();
@@ -1284,15 +1284,29 @@ function renderMyRequestsActive() {
     const approvalCount    = instCoc.filter(e => e.event_type === 'request.approved').length;
     const allReviewersDone = approvalCount >= totalReviewers;
 
+    // Detect final approval from CoC or instance status
+    const instanceComplete = req.status === 'completed' || req._raw?.status === 'complete';
+    // The approver's event is the last request.approved after all reviewers are done
+    const approverApproved = instanceComplete ||
+      (allReviewersDone && approvalCount > totalReviewers);
+
     let stepsHtml = (req.steps||[]).map((s, si) => {
       // Override Review step state from CoC counts
-      if (s.label === 'Review' && !req.steps.every(st => st.done)) {
+      if (s.label === 'Review' && !instanceComplete) {
         if (allReviewersDone) {
           s = { ...s, done: true,  active: false };
         } else if (approvalCount > 0) {
           s = { ...s, done: false, active: true };
         } else {
           s = { ...s, done: false, active: true }; // waiting — blue active dot
+        }
+      }
+      // Override Approve step state
+      if (s.label === 'Approve') {
+        if (approverApproved) {
+          s = { ...s, done: true, active: false };
+        } else if (allReviewersDone) {
+          s = { ...s, done: false, active: true }; // all reviewers done — approver's turn
         }
       }
       const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
