@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-174000
+// VERSION: 20260402-175000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-174000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-175000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1232,7 +1232,26 @@ function renderMyRequestsActive() {
     };
 
     // Build step nodes with tooltips
+    // For the Review step: override done/active from CoC approval count vs assigned reviewers.
+    // This is the ground truth — independent of current_step_name or polling timing.
+    let submittedDataForStep = {};
+    try {
+      const subEv = instCoc.find(e => e.event_type === 'request.submitted');
+      if (subEv) submittedDataForStep = JSON.parse(subEv.event_notes || '{}');
+    } catch(_) {}
+    const totalReviewers   = (submittedDataForStep.reviewers||[]).length || 1;
+    const approvalCount    = instCoc.filter(e => e.event_type === 'request.approved').length;
+    const allReviewersDone = approvalCount >= totalReviewers;
+
     let stepsHtml = (req.steps||[]).map((s, si) => {
+      // Override Review step state from CoC counts
+      if (s.label === 'Review' && !req.steps.every(st => st.done)) {
+        if (allReviewersDone) {
+          s = { ...s, done: true,  active: false };
+        } else if (approvalCount > 0) {
+          s = { ...s, done: false, active: true };
+        }
+      }
       const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
       const nameCls = s.done?'done':s.active?'active':'';
       const label   = s.done?'&#10003;':(si+1);
