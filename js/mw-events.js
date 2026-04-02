@@ -1,5 +1,5 @@
-// VERSION: 20260402-183000
-console.log('%c[mw-events] v20260402-183000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-184000
+console.log('%c[mw-events] v20260402-184000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -635,7 +635,6 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       ).catch(e => { console.error('[rrpSubmit] remainingReviewers fetch failed:', e.message); return []; });
       const otherOpenReviewers = (remainingReviewers||[]).filter(r => r.id !== actionItemId);
       const allReviewersDone = otherOpenReviewers.length === 0;
-      console.log(`[rrpSubmit] remainingReviewers=${remainingReviewers?.length} otherOpen=${otherOpenReviewers.length} allDone=${allReviewersDone} finalStep=${approved && allReviewersDone ? 'Approve' : 'Review'}`);
 
       const advancedStepName = approved && allReviewersDone ? 'Approve' : 'Review';
       const finalStepName    = approved ? advancedStepName : 'Review';
@@ -644,16 +643,15 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         status:            newStatus,
         current_step_name: finalStepName,
         updated_at:        now,
-      }).catch(e => console.error('[rrpSubmit] workflow_instances PATCH failed:', e.message));
+      }).catch(()=>{});
     }
 
     const isWrRow = !!(wrRole);
-    console.log(`[rrpSubmit] actionItemId=${actionItemId} wrRole=${wrRole} isWrRow=${isWrRow}`);
     if (isWrRow) {
       await API.patch(`workflow_requests?id=eq.${actionItemId}`, {
         status: 'resolved',
         updated_at: now,
-      }).catch(e => console.error('[rrpSubmit] workflow_requests PATCH failed:', e.message));
+      }).catch(()=>{});
     } else {
       await API.patch(`workflow_action_items?id=eq.${actionItemId}`, {
         status: 'resolved',
