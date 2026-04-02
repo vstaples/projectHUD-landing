@@ -1,5 +1,5 @@
-// VERSION: 20260402-121600
-console.log('%c[mw-core] v20260402-121600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-121700
+console.log('%c[mw-core] v20260402-121700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1163,6 +1163,28 @@ window._mwLoadUserView = async function() {
 
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
+
+    // ── Action item polling — checks every 30s for new items ─
+    // Bridges the gap until WebSocket/server push is available.
+    if (!window._actionItemPollTimer) {
+      let _knownActionIds = new Set((myActionItems||[]).map(a => a.id));
+      window._actionItemPollTimer = setInterval(async () => {
+        if (!_myResource?.id) return;
+        try {
+          const fresh = await API.get(
+            `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
+          ).catch(() => null);
+          if (!fresh) return;
+          const hasNew = fresh.some(a => !_knownActionIds.has(a.id));
+          if (hasNew) {
+            fresh.forEach(a => _knownActionIds.add(a.id));
+            console.log('[MyWork] New action items detected — refreshing');
+            _viewLoaded['user'] = false;
+            _mwLoadUserView();
+          }
+        } catch(_) {}
+      }, 30000); // 30 seconds
+    }
 
     
 // ── Stat strip summary tooltip ──────────────────────────────────────────
