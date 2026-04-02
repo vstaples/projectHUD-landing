@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-120600
+// VERSION: 20260402-120700
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-120600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-120700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -12,7 +12,36 @@ function _mwSupaKey()      { try { return SUPA_KEY;       } catch(_) { return wi
 function _mwStorageBucket(){ try { return STORAGE_BUCKET; } catch(_) { return window.STORAGE_BUCKET || 'workflow-documents'; } }
 function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return window.FIRM_ID        || 'aaaaaaaa-0001-0001-0001-000000000001'; } }
 
-// ── Tab switcher ─────────────────────────────────────────
+// ── Email notification helper ─────────────────────────────
+// Calls /api/notify-step-activated — same endpoint CadenceHUD uses.
+async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title, instanceId, body }) {
+  if (!toEmail) return;
+  try {
+    const base = (window.location.origin || 'https://projecthud.com');
+    await fetch('/api/notify-step-activated', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instance_id:    instanceId || null,
+        instance_title: title      || null,
+        template_name:  'Document Review Request',
+        step_name:      stepName   || 'Review',
+        step_type:      stepType   || 'review',
+        assignee_name:  toName     || null,
+        assignee_email: toEmail,
+        launched_by:    fromName   || null,
+        is_bist:        false,
+        has_action_buttons: false,
+        step_instructions: body || null,
+      }),
+    });
+    console.log('[MyRequests] Email sent to', toEmail);
+  } catch(e) {
+    console.warn('[MyRequests] Notify failed:', e.message);
+  }
+}
+
+
 // var (not let) — my-work.html scripts are injected via document.head.appendChild
 // and may execute more than once per page session. var re-declaration is safe; let/const are not.
 var _uActiveTab = _uActiveTab || 'work';
@@ -2302,6 +2331,22 @@ window.myrSubmitWorkflow = async function(wfId) {
     const recipientSummary = actionRecipients.length
       ? actionRecipients.map(r => r.name).join(', ')
       : 'team';
+
+    // Email external reviewers/approvers
+    if (wfId === 'doc-review') {
+      for (const reviewer of (details.reviewers||[])) {
+        if (reviewer.email) {
+          _myrNotify({ toEmail: reviewer.email, toName: reviewer.name,
+            fromName: resName, stepName: 'Review', stepType: 'review',
+            title, instanceId, body: details.instructions || '' });
+        }
+      }
+      if (details.approver?.email) {
+        _myrNotify({ toEmail: details.approver.email, toName: details.approver.name,
+          fromName: resName, stepName: 'Approve', stepType: 'approval',
+          title, instanceId, body: details.instructions || '' });
+      }
+    }
 
     compassToast(`✓ ${title} — routed to ${recipientSummary}`);
 

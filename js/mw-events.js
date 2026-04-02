@@ -1,5 +1,5 @@
-// VERSION: 20260402-120600
-console.log('%c[mw-events] v20260402-120600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-120700
+console.log('%c[mw-events] v20260402-120700','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -628,6 +628,24 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
       ? `✓ Request approved${comments?' — comments recorded':''}. Submitter notified.`
       : `↺ Changes requested${comments?' — feedback recorded':''}. Submitter notified.`
     );
+
+    // Email submitter and any external parties
+    if (inst?.submitted_by_resource_id) {
+      try {
+        const submitterRes = (_resources||[]).find(r => r.id === inst.submitted_by_resource_id);
+        if (submitterRes?.email) {
+          window._myrNotify && _myrNotify({
+            toEmail: submitterRes.email, toName: submitterRes.name || inst.submitted_by_name,
+            fromName: resName,
+            stepName: approved ? 'Approved' : 'Changes requested',
+            stepType: 'review',
+            title: inst.title || 'Document review request',
+            instanceId,
+            body: comments || (approved ? 'Your request has been approved.' : 'Changes were requested.'),
+          });
+        }
+      } catch(_) {}
+    }
 
     // Refresh My Work to remove resolved item
     _viewLoaded['user'] = false;
