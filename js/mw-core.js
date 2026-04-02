@@ -1,5 +1,5 @@
-// VERSION: 20260402-121800
-console.log('%c[mw-core] v20260402-121800','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-121900
+console.log('%c[mw-core] v20260402-121900','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1171,25 +1171,35 @@ window._mwLoadUserView = async function() {
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
 
-    // ── Action item polling — checks every 30s for new open items ─
+    // ── Action item polling — checks every 15s for new open items ─
     if (!window._actionItemPollTimer) {
       let _knownActionIds = new Set((myActionItems||[]).map(a => a.id));
-      window._actionItemPollTimer = setInterval(async () => {
-        if (!_myResource?.id) return;
+      let _pollCount = 0;
+      console.log('%c[Poll] Started — watching for new action items every 15s | resId: ' + (_myResource?.id||'?'),
+        'background:#1a3a1a;color:#4ade80;padding:2px 6px;font-weight:600');
+      console.log('[Poll] Run window._pollNow() to trigger manually');
+      const _doPoll = async () => {
+        if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
+        _pollCount++;
         try {
           const fresh = await API.get(
-            `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id&limit=50`
-          ).catch(() => null);
+            `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
+          ).catch(e => { console.warn('[Poll] fetch error:', e.message); return null; });
           if (!fresh) return;
-          const hasNew = fresh.some(a => !_knownActionIds.has(a.id));
-          if (hasNew) {
-            fresh.forEach(a => _knownActionIds.add(a.id));
-            console.log('[MyWork] New action items — reloading work queue');
-            // Re-run the full data load
+          const newItems = fresh.filter(a => !_knownActionIds.has(a.id));
+          console.log(`[Poll #${_pollCount}] ${fresh.length} open items | ${newItems.length} new`
+            + (newItems.length ? ': ' + newItems.map(a=>a.title?.slice(0,40)).join(', ') : ''));
+          if (newItems.length) {
+            newItems.forEach(a => _knownActionIds.add(a.id));
+            console.log('%c[Poll] Reloading My Work','background:#1a3a1a;color:#4ade80;padding:2px 6px');
             window._mwLoadUserView && window._mwLoadUserView();
           }
-        } catch(_) {}
-      }, 15000); // poll every 15 seconds
+        } catch(e) { console.error('[Poll] error:', e.message); }
+      };
+      window._pollNow = _doPoll;
+      window._actionItemPollTimer = setInterval(_doPoll, 15000);
+    } else {
+      console.log('[Poll] Already running — timer:', window._actionItemPollTimer);
     }
 
     
