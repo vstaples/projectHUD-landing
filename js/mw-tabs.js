@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-163000
+// VERSION: 20260402-164000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-163000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-164000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1173,6 +1173,20 @@ function renderMyRequestsActive() {
   if (!el) return;
   const reqs = window._myRequests || [];
   const active = reqs.filter(r => r.status !== 'completed' && r.status !== 'rejected');
+
+  // Snapshot which request IDs are currently expanded before wiping innerHTML
+  const expandedIds = new Set();
+  el.querySelectorAll('.myr-ar-body.open').forEach(body => {
+    // body id is myr-ar-body-{i} — find matching req id via sibling head data
+    const card = body.closest('.myr-active-req');
+    if (card) {
+      const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
+      if (withdrawBtn) {
+        const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
+        if (m) expandedIds.add(m[1]);
+      }
+    }
+  });
   if (!active.length) {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.25);padding:20px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
     return;
@@ -1350,7 +1364,7 @@ function renderMyRequestsActive() {
         <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
       </div>
-      <div class="myr-ar-body${req.expanded?' open':''}" id="myr-ar-body-${i}">
+      <div class="myr-ar-body${(req.expanded || expandedIds.has(req.id)) ?' open':''}" id="myr-ar-body-${i}">
         <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px">Workflow progress</div>
         <div class="myr-pt-steps">${stepsHtml}</div>
         ${(req.attachments||[]).length ? `
