@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121500
+// VERSION: 20260402-121600
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -2266,7 +2266,7 @@ window.myrSubmitWorkflow = async function(wfId) {
       id:                       instanceId,
       firm_id:                  firmId,
       title,
-      status:                   'pending',
+      status:                   'in_progress',
       workflow_type:            wfId,
       current_step_name:        'Submitted',
       submitted_by_resource_id: resId,
