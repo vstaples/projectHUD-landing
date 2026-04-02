@@ -1,5 +1,5 @@
-// VERSION: 20260402-120400
-console.log('%c[mw-events] v20260402-120400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-120600
+console.log('%c[mw-events] v20260402-120600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -556,11 +556,12 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision) {
   });
 
   const approved   = decision === 'approved';
-  // Reviewer approval keeps request in_progress — stays in submitter's Active tab.
-  // Only a final explicit sign-off should set status to 'complete'.
-  const newStatus  = approved ? 'in_progress' : 'pending';
+  const newStatus  = approved ? 'in_progress' : 'in_progress'; // stays active until Approver signs off
   const eventType  = approved ? 'request.approved' : 'request.changes_requested';
-  const stepName   = approved ? 'Review round 1' : 'Revisions';
+  // Simple 3-step flow: Submit → Review → Approve
+  // Reviewer approval → moves to Approve step
+  // Approver approval → complete; rejection loops back to Review
+  const stepName = approved ? 'Approve' : 'Review';
 
   try {
     // 1. Update workflow_instance status + current step

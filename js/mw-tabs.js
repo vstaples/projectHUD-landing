@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-120300
+// VERSION: 20260402-120600
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-120300','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-120600','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -864,7 +864,7 @@ window.loadUserRequests = async function() {
         'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
         'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
         'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
-        'doc-review':        ['Submit','Route to reviewers','Review round 1','Revisions','Final review','Sign-off'],
+        'doc-review':        ['Submit','Review','Approve'],
         'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
         'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
         'expense':           ['Submit','PM review','Finance approval','Processed'],
@@ -949,7 +949,8 @@ window.loadUserRequests = async function() {
   // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
   const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
   window._myRequestCoc = window._myRequestCoc || {};
-  const unloadedIds = allIds.filter(id => !window._myRequestCoc[id]);
+  // Always re-fetch — CoC state changes when reviewers act
+  const unloadedIds = allIds;
   if (unloadedIds.length) {
     API.get(
       `coc_events?entity_id=in.(${unloadedIds.join(',')})&order=occurred_at.asc&select=*`
@@ -1111,14 +1112,10 @@ function renderMyRequestsActive() {
 
     // Step type → CoC event_type mapping
     const stepEventMap = {
-      'Submit':            'request.submitted',
-      'Route to reviewers':'request.submitted',
-      'Review round 1':    'request.reviewed',
-      'Revisions':         'request.revision_requested',
-      'Final review':      'request.final_review',
-      'Sign-off':          'request.completed',
-      'PM review':         'request.pm_reviewed',
-      'Approved':          'request.completed',
+      'Submit':   'request.submitted',
+      'Review':   'request.approved',
+      'Approve':  'request.completed',
+      'PM review':'request.pm_reviewed',
     };
 
     // Build step nodes with tooltips
@@ -1489,7 +1486,7 @@ window.myrOpenWorkflowForm = function(wfId) {
     'resource-alloc': ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
     'pto-request':    ['Submit','PM review','Approved \u2192 cal blocked + team notified'],
     'capacity-concern':['Submit','PM review','Decision \u2192 queue adjusted'],
-    'doc-review':     ['Submit','Route to reviewers','Review round 1','Revisions','Final review','Sign-off'],
+    'doc-review':     ['Submit','Review','Approve'],
     'change-request': ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
     'issue-escalation':['Submit','PM review','Resolution plan','Resolved \u2192 CoC event'],
     'expense':        ['Submit','PM review','Finance approval','Processed'],
@@ -2263,7 +2260,7 @@ window.myrSubmitWorkflow = async function(wfId) {
       'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
       'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
       'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
-      'doc-review':        ['Submit','Route to reviewers','Review round 1','Revisions','Final review','Sign-off'],
+      'doc-review':        ['Submit','Review','Approve'],
       'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
       'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
       'expense':           ['Submit','PM review','Finance approval','Processed'],
