@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-185000
+// VERSION: 20260402-185500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-185000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-185500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -2595,6 +2595,10 @@ window.myrSubmitWorkflow = async function(wfId) {
 
     // Force re-fetch on next tab visit to sync with DB
     window._requestsLoaded = false;
+
+    // Reload My Work immediately so the ⏳ Pending review item appears in Vaughn's queue now
+    window._viewLoaded && (window._viewLoaded['user'] = false);
+    window._mwLoadUserView && window._mwLoadUserView();
 
     const recipientSummary = actionRecipients.length
       ? actionRecipients.map(r => r.name).join(', ')
