@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-171500
+// VERSION: 20260402-172000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-171500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-172000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -734,6 +734,8 @@ window.loadUserConcerns = async function() {
 // Fetches real workflow_instances submitted by this user and maps them
 // to the _myRequests shape expected by renderMyRequestsActive/History.
 window.loadUserRequests = async function() {
+  if (window._requestsInFlight) return; // prevent concurrent fetches overwriting each other
+  window._requestsInFlight = true;
   window._requestsLoaded = true;
 
   // Inject supplemental styles once
@@ -1060,6 +1062,7 @@ window.loadUserRequests = async function() {
     }, 10000);
     console.log('[MyRequests] CoC live refresh poll started (10s)');
   }
+  window._requestsInFlight = false;
 };
 
 window.myrSwitchView = function(view, btn) {
@@ -1739,7 +1742,22 @@ window.myrOpenWorkflowForm = function(wfId) {
         window._myrPendingApprover = saved.approver;
         myrRenderApproverPill();
       }
-      if (saved.deadline) {
+      if (saved.lastDocs?.length) {
+        const listEl = modal.querySelector('#myr-doc-list');
+        if (listEl) {
+          listEl.innerHTML = saved.lastDocs.map(d => {
+            const icon = (d.mime||'').includes('pdf')||(d.name||'').endsWith('.pdf') ? '📄' :
+                         (d.source==='form') ? '◈' : '📎';
+            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;
+                                background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1)">
+              <span>${icon}</span>
+              <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
+                           flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
+              <span style="font-family:var(--font-head);font-size:10px;color:rgba(239,159,39,.6)">↑ re-upload</span>
+            </div>`;
+          }).join('');
+        }
+      }
         const dl = modal.querySelector('[data-myr-field="deadline"]');
         if (dl) dl.value = saved.deadline;
       }
@@ -2309,7 +2327,10 @@ window.myrSubmitWorkflow = async function(wfId) {
       const saveChk = modal.querySelector('#myr-save-responses');
       if (saveChk) localStorage.setItem('myr_save_responses', saveChk.checked ? '1' : '0');
       if (saveChk?.checked) {
-        localStorage.setItem('myr_doc_review_saved', JSON.stringify({ reviewers, approver, deadline, instructions }));
+        localStorage.setItem('myr_doc_review_saved', JSON.stringify({
+          reviewers, approver, deadline, instructions,
+          lastDocs: docs.map(d => ({ name: d.name, size: d.size, mime: d.mime, source: d.source })),
+        }));
       }
       break;
     }
