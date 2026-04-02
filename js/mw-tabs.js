@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-175000
+// VERSION: 20260402-180000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-175000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -17,8 +17,7 @@ function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return wi
 async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title, instanceId, body }) {
   if (!toEmail) return;
   try {
-    const base = (window.location.origin || 'https://projecthud.com');
-    await fetch('/api/notify-step-activated', {
+    const res = await fetch('/api/notify-step-activated', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -35,9 +34,9 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         step_instructions: body || null,
       }),
     });
-    console.log('[MyRequests] Email sent to', toEmail);
+    if (res.ok) console.log('[MyRequests] Email sent to', toEmail);
   } catch(e) {
-    console.warn('[MyRequests] Notify failed:', e.message);
+    // silent — notify endpoint is best-effort
   }
 }
 
@@ -1040,26 +1039,26 @@ window.loadUserRequests = async function() {
   // Clears itself when user leaves the requests tab (see uSwitchTab in mw-tabs.js).
   if (!window._myrCocPollTimer) {
     window._myrCocPollTimer = setInterval(async () => {
-      // Only run while requests tab is active
       if ((typeof _uActiveTab !== 'undefined' ? _uActiveTab : '') !== 'requests') return;
-      // Find all open CoC panels in the Active pane
-      const openPanels = document.querySelectorAll('#myr-pane-active .myr-coc-events.open');
-      if (!openPanels.length) return;
-      for (const panel of openPanels) {
-        const instanceId = panel.id.replace('myr-coc-', '').replace(/[^a-f0-9-]/g,'');
-        if (!instanceId || instanceId.length < 10) continue;
-        const before = (window._myRequestCoc||{})[instanceId]?.length || 0;
-        await myrLoadRequestCoc(instanceId); // re-fetches and updates cache
-        const after = (window._myRequestCoc||{})[instanceId]?.length || 0;
+      const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');
+      if (!activeReqs.length) return;
+      let anyNew = false;
+      for (const req of activeReqs) {
+        const before = (window._myRequestCoc||{})[req.id]?.length || 0;
+        await myrLoadRequestCoc(req.id);
+        const after = (window._myRequestCoc||{})[req.id]?.length || 0;
         if (after !== before) {
-          // New events — re-render the panel and update step progress
-          const labelEl = panel.previousElementSibling;
-          _myrRenderCocPanel(panel, window._myRequestCoc[instanceId], labelEl);
-          // Also refresh the step dots for this request
-          const req = (window._myRequests||[]).find(r => r.id === instanceId);
-          if (req) renderMyRequestsActive();
+          anyNew = true;
+          // Update open CoC panel if visible
+          const panel = document.getElementById('myr-coc-' + (window._myRequests||[]).indexOf(req));
+          if (panel?.classList.contains('open')) {
+            const labelEl = panel.previousElementSibling;
+            _myrRenderCocPanel(panel, window._myRequestCoc[req.id], labelEl);
+          }
         }
       }
+      // Always re-render steps — CoC approval count drives step color
+      renderMyRequestsActive();
     }, 10000);
     console.log('[MyRequests] CoC live refresh poll started (10s)');
   }
