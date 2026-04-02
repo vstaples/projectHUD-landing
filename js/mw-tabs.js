@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-120900
+// VERSION: 20260402-121000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-120900','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -975,6 +975,25 @@ window.loadUserRequests = async function() {
   renderMyRequestsActive();
   renderMyRequestsHistory();
 
+  // Fetch reviewer names for each active request (for tooltip on Review step)
+  const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');
+  if (activeReqs.length) {
+    const ids = activeReqs.map(r => r.id).join(',');
+    API.get(`workflow_action_items?instance_id=in.(${ids})&select=instance_id,owner_name,title&limit=200`)
+      .then(rows => {
+        (rows||[]).forEach(a => {
+          if (!(a.title||'').startsWith('Review request:')) return;
+          const req = (window._myRequests||[]).find(r => r.id === a.instance_id);
+          if (req) {
+            req._reviewerNames = req._reviewerNames || [];
+            if (a.owner_name && !req._reviewerNames.includes(a.owner_name))
+              req._reviewerNames.push(a.owner_name);
+          }
+        });
+        renderMyRequestsActive();
+      }).catch(() => {});
+  }
+
   // Pre-fetch CoC — only fetch instances not yet in cache, preserve existing data
   const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
   window._myRequestCoc = window._myRequestCoc || {};
@@ -1169,9 +1188,9 @@ function renderMyRequestsActive() {
           <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
         </div>`;
       } else if (s.active) {
-        // For Review step — show reviewer list if available
-        const reviewerLines = s.label === 'Review' && req._raw?.reviewers?.length
-          ? req._raw.reviewers.map(r => `<div style="color:rgba(255,255,255,.55)">${_esc(r.name||r)}</div>`).join('')
+        // For Review step — show reviewer names from action items if available
+        const reviewerLines = s.label === 'Review' && req._reviewerNames?.length
+          ? req._reviewerNames.map(n => `<div style="color:rgba(255,255,255,.55)">${_esc(n)}</div>`).join('')
           : '';
         tipHtml = `<div class="myr-pt-tip">
           <div style="color:#EF9F27;margin-bottom:2px">${_esc(s.label)}</div>
